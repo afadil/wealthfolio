@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
 import {
@@ -87,6 +88,8 @@ export function useImportColumns<T extends ImportRowData>({
   symbolField = "symbol",
   dateField = "activityDate",
 }: UseImportColumnsOptions<T>): ColumnDef<T>[] {
+  const { t } = useTranslation("common");
+
   const accountOptions = useMemo(
     () =>
       accounts.map((account) => ({
@@ -131,16 +134,17 @@ export function useImportColumns<T extends ImportRowData>({
               table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
             }
             onCheckedChange={(checked) => table.toggleAllRowsSelected(Boolean(checked))}
-            aria-label="Select all rows"
+            aria-label={t("activity.data_grid.aria.select_all_rows")}
           />
         ),
         cell: ({ row }) => (
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
-            aria-label="Select row"
+            aria-label={t("activity.data_grid.aria.select_row")}
           />
         ),
+        meta: { label: t("activity.data_grid.col.select") },
         size: 40,
         minSize: 40,
         maxSize: 40,
@@ -177,7 +181,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "activityDate",
       accessorKey: dateField,
-      header: "Date & Time",
+      header: t("activity.data_grid.col.date"),
       size: 180,
       meta: { cell: { variant: "datetime" } },
     });
@@ -186,7 +190,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "accountId",
       accessorKey: "accountId",
-      header: "Account",
+      header: t("activity.data_grid.col.accountName"),
       size: 180,
       meta: { cell: { variant: "select", options: accountOptions } },
     });
@@ -195,7 +199,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "activityType",
       accessorKey: "activityType",
-      header: "Type",
+      header: t("activity.data_grid.col.activityType"),
       size: 150,
       enablePinning: false,
       meta: {
@@ -213,7 +217,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "subtype",
       accessorKey: "subtype",
-      header: "Subtype",
+      header: t("activity.data_grid.col.subtype"),
       size: 180,
       enableSorting: false,
       enableHiding: true,
@@ -223,7 +227,7 @@ export function useImportColumns<T extends ImportRowData>({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           options: getSubtypeOptions as any,
           allowEmpty: true,
-          emptyLabel: "None",
+          emptyLabel: t("activity.form.subtype_none"),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
       },
@@ -233,7 +237,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "isExternal",
       accessorKey: "isExternal",
-      header: "External",
+      header: t("activity.data_grid.col.external"),
       size: 80,
       enableSorting: false,
       enableHiding: true,
@@ -257,7 +261,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "symbol",
       accessorKey: symbolField,
-      header: "Symbol",
+      header: t("activity.data_grid.col.assetSymbol"),
       size: 140,
       meta: {
         cell: {
@@ -277,7 +281,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "instrumentType",
       accessorKey: "instrumentType",
-      header: "Instrument",
+      header: t("activity.data_grid.col.instrumentType"),
       size: 120,
       enableSorting: false,
       enableHiding: true,
@@ -286,7 +290,7 @@ export function useImportColumns<T extends ImportRowData>({
           variant: "select",
           options: [...INSTRUMENT_TYPE_OPTIONS],
           allowEmpty: true,
-          emptyLabel: "Auto",
+          emptyLabel: t("settings.securities.table.auto"),
         },
       },
     });
@@ -295,7 +299,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "quantity",
       accessorKey: "quantity",
-      header: "Quantity",
+      header: t("activity.data_grid.col.quantity"),
       size: 120,
       enableSorting: false,
       meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -305,7 +309,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "unitPrice",
       accessorKey: "unitPrice",
-      header: "Price",
+      header: t("activity.data_grid.col.unitPrice"),
       size: 120,
       enableSorting: false,
       meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -315,7 +319,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "amount",
       accessorKey: "amount",
-      header: "Amount",
+      header: t("activity.data_grid.col.amount"),
       size: 120,
       enableSorting: false,
       meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -325,7 +329,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "currency",
       accessorKey: "currency",
-      header: "Currency",
+      header: t("activity.data_grid.col.currency"),
       size: 110,
       enableSorting: false,
       meta: { cell: { variant: "currency" } },
@@ -335,7 +339,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "fee",
       accessorKey: "fee",
-      header: "Fee",
+      header: t("activity.data_grid.col.fee"),
       size: 100,
       enableSorting: false,
       meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -345,7 +349,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "fxRate",
       accessorKey: "fxRate",
-      header: "FX Rate",
+      header: t("activity.data_grid.col.fxRate"),
       size: 100,
       enableSorting: false,
       meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -355,7 +359,7 @@ export function useImportColumns<T extends ImportRowData>({
     columns.push({
       id: "comment",
       accessorKey: "comment",
-      header: "Comment",
+      header: t("activity.data_grid.col.comment"),
       size: 260,
       enableSorting: false,
       meta: { cell: { variant: "long-text" } },
@@ -363,6 +367,7 @@ export function useImportColumns<T extends ImportRowData>({
 
     return columns;
   }, [
+    t,
     enableSelection,
     enableStatusColumn,
     renderStatusCell,

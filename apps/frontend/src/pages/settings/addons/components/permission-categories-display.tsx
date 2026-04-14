@@ -2,6 +2,7 @@ import type { FunctionPermission, Permission } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { getFunctionDisplayName } from "@/pages/settings/addons/components/addon-function-names";
 import { getPermissionCategory } from "@wealthfolio/addon-sdk";
+import { useTranslation } from "react-i18next";
 
 interface PermissionForDisplay {
   category: string;
@@ -40,10 +41,11 @@ const getFunctionBadgeVariant = (func: FunctionPermission) => {
 };
 
 export function PermissionCategoriesDisplay({ permissions }: PermissionCategoriesDisplayProps) {
+  const { t } = useTranslation();
   if (permissions.length === 0) {
     return (
       <div className="text-muted-foreground bg-muted/30 rounded-lg p-3 text-sm">
-        No data access permissions detected. This addon appears to have minimal system access.
+        {t("settings.addons.permissions.none_detected")}
       </div>
     );
   }
@@ -54,7 +56,7 @@ export function PermissionCategoriesDisplay({ permissions }: PermissionCategorie
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        <h4 className="font-medium">Permissions</h4>
+        <h4 className="font-medium">{t("settings.addons.permissions.title")}</h4>
         <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
           {displayPermissions.map((permission) => (
             <div

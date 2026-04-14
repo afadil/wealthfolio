@@ -26,7 +26,8 @@ import {
   SheetTrigger,
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { forwardRef, useState } from "react";
+import { forwardRef, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SymbolSelectorMobileProps {
   onSelect: (symbol: string, searchResult?: SymbolSearchResult) => void;
@@ -38,19 +39,12 @@ interface SymbolSelectorMobileProps {
   defaultCurrency?: string;
 }
 
-// Asset type options for inline form (values are InstrumentType)
-const ASSET_TYPE_OPTIONS = [
-  { value: "EQUITY", label: "Security" },
-  { value: "CRYPTO", label: "Crypto" },
-  { value: "OTHER", label: "Other" },
-] as const;
-
 export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelectorMobileProps>(
   (
     {
       onSelect,
       value,
-      placeholder = "Select symbol...",
+      placeholder,
       className,
       open: controlledOpen,
       onOpenChange,
@@ -58,6 +52,17 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
     },
     ref,
   ) => {
+    const { t } = useTranslation();
+    const resolvedPlaceholder = placeholder ?? t("symbol.selector.placeholder");
+    const assetTypeOptions = useMemo(
+      () =>
+        [
+          { value: "EQUITY" as const, label: t("symbol.selector.mobile.asset_type.security") },
+          { value: "CRYPTO" as const, label: t("symbol.selector.mobile.asset_type.crypto") },
+          { value: "OTHER" as const, label: t("symbol.selector.mobile.asset_type.other") },
+        ] as const,
+      [t],
+    );
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const baseSetOpen = onOpenChange !== undefined ? onOpenChange : setInternalOpen;
@@ -159,7 +164,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
 
     const displayText = selectedSymbol
       ? `${selectedSymbol.symbol} - ${selectedSymbol.longName}`
-      : value || placeholder;
+      : value || resolvedPlaceholder;
 
     return (
       <>
@@ -194,8 +199,10 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       <Icons.ArrowLeft className="h-5 w-5" />
                     </button>
                     <div className="flex-1">
-                      <SheetTitle>Create Custom Asset</SheetTitle>
-                      <SheetDescription>Track assets with manual pricing</SheetDescription>
+                      <SheetTitle>{t("symbol.selector.mobile.custom_asset_title")}</SheetTitle>
+                      <SheetDescription>
+                        {t("symbol.selector.mobile.custom_asset_description")}
+                      </SheetDescription>
                     </div>
                   </div>
                 </SheetHeader>
@@ -206,9 +213,11 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     <div className="form-mobile-spacing px-6 py-4">
                       {/* Symbol */}
                       <div className="space-y-2">
-                        <label className="text-base font-medium">Symbol / Ticker</label>
+                        <label className="text-base font-medium">
+                          {t("symbol.selector.mobile.symbol_label")}
+                        </label>
                         <Input
-                          placeholder="e.g., MYCOIN"
+                          placeholder={t("symbol.selector.mobile.symbol_placeholder")}
                           value={customSymbol}
                           onChange={(e) => setCustomSymbol(e.target.value.toUpperCase())}
                           className="uppercase"
@@ -218,9 +227,11 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
 
                       {/* Name */}
                       <div className="space-y-2">
-                        <label className="text-base font-medium">Name</label>
+                        <label className="text-base font-medium">
+                          {t("symbol.selector.mobile.name_label")}
+                        </label>
                         <Input
-                          placeholder="e.g., My Custom Coin"
+                          placeholder={t("symbol.selector.mobile.name_placeholder")}
                           value={customName}
                           onChange={(e) => setCustomName(e.target.value)}
                         />
@@ -229,7 +240,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       {/* Asset Type and Currency - side by side */}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <label className="text-base font-medium">Asset Type</label>
+                          <label className="text-base font-medium">
+                            {t("symbol.selector.mobile.asset_type")}
+                          </label>
                           <Select
                             value={customAssetType}
                             onValueChange={(value) =>
@@ -240,7 +253,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {ASSET_TYPE_OPTIONS.map((option) => (
+                              {assetTypeOptions.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
                                   {option.label}
                                 </SelectItem>
@@ -250,7 +263,9 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-base font-medium">Currency</label>
+                          <label className="text-base font-medium">
+                            {t("activity.form.fields.currency")}
+                          </label>
                           <CurrencyInput value={customCurrency} onChange={setCustomCurrency} />
                         </div>
                       </div>
@@ -266,7 +281,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       className="flex-1"
                       type="button"
                     >
-                      Cancel
+                      {t("activity.form.cancel")}
                     </Button>
                     <Button
                       size="lg"
@@ -277,7 +292,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       }
                       type="button"
                     >
-                      Create Asset
+                      {t("symbol.selector.mobile.create_asset")}
                     </Button>
                   </div>
                 </div>
@@ -286,10 +301,8 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
               <>
                 {/* Search View Header */}
                 <SheetHeader className="border-border border-b px-6 py-4">
-                  <SheetTitle>Select Symbol</SheetTitle>
-                  <SheetDescription>
-                    Search for a stock, ETF, crypto, or other asset
-                  </SheetDescription>
+                  <SheetTitle>{t("symbol.selector.mobile.title")}</SheetTitle>
+                  <SheetDescription>{t("symbol.selector.mobile.description")}</SheetDescription>
                 </SheetHeader>
 
                 <div className="flex h-[calc(85vh-6rem)] flex-col">
@@ -299,7 +312,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       <Icons.Search className="text-muted-foreground absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="Search symbols..."
+                        placeholder={t("symbol.selector.mobile.search_placeholder")}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
@@ -314,7 +327,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     {isLoading && searchQuery.length > 1 && (
                       <div className="space-y-3">
                         <div className="text-muted-foreground text-sm font-medium">
-                          Searching...
+                          {t("symbol.selector.mobile.searching")}
                         </div>
                         <Skeleton className="h-16 w-full rounded-xl" />
                         <Skeleton className="h-16 w-full rounded-xl" />
@@ -325,7 +338,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     {/* Error state */}
                     {isError && searchQuery.length > 1 && (
                       <div className="text-muted-foreground py-8 text-center text-sm">
-                        Error searching for symbols. Please try again.
+                        {t("symbol.selector.mobile.error")}
                       </div>
                     )}
 
@@ -369,7 +382,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                     {searchQuery.length === 0 && (
                       <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 text-center text-sm">
                         <Icons.Search className="h-12 w-12 opacity-20" />
-                        <p>Start typing to search for symbols</p>
+                        <p>{t("symbol.selector.mobile.start_typing")}</p>
                       </div>
                     )}
 
@@ -380,15 +393,15 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                       sortedSearchResults.length === 0 &&
                       searchQuery.length > 1 && (
                         <div className="text-muted-foreground py-8 text-center text-sm">
-                          <p>No matches found for &quot;{searchQuery}&quot;</p>
-                          <p className="mt-2 text-xs">You can create a custom asset below.</p>
+                          <p>{t("symbol.selector.no_matches", { query: searchQuery })}</p>
+                          <p className="mt-2 text-xs">{t("symbol.selector.mobile.no_results_hint")}</p>
                         </div>
                       )}
 
                     {/* Too short query state */}
                     {searchQuery.length > 0 && searchQuery.length <= 1 && (
                       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-                        Type at least 2 characters to search.
+                        {t("symbol.selector.mobile.type_more")}
                       </div>
                     )}
 
@@ -404,11 +417,15 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                             <Icons.Plus className="text-muted-foreground h-5 w-5" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-foreground font-medium">Create custom asset</div>
+                            <div className="text-foreground font-medium">
+                              {t("symbol.selector.mobile.create_custom_title")}
+                            </div>
                             <div className="text-muted-foreground mt-0.5 text-sm">
                               {searchQuery.trim()
-                                ? `Create "${searchQuery.trim().toUpperCase()}" with manual pricing`
-                                : "Track assets not found in market data"}
+                                ? t("symbol.selector.mobile.create_custom_sub_with_symbol", {
+                                    symbol: searchQuery.trim().toUpperCase(),
+                                  })
+                                : t("symbol.selector.mobile.create_custom_sub_generic")}
                             </div>
                           </div>
                           <Icons.ChevronRight className="text-muted-foreground h-5 w-5 shrink-0" />

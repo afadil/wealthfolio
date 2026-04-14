@@ -1,4 +1,6 @@
 import * as z from "zod";
+import i18n from "@/i18n/i18n";
+import { ImportType } from "./import-constants";
 import { accountTypeSchema, ActivityType, activityTypeSchema, quoteModeSchema } from "./constants";
 import { tryParseDate } from "./utils";
 import {
@@ -38,11 +40,7 @@ export const parseConfigSchema = z.object({
   defaultCurrency: z.string().optional(),
 });
 
-export const ImportType = {
-  ACTIVITY: "CSV_ACTIVITY",
-  HOLDINGS: "CSV_HOLDINGS",
-} as const;
-export type ImportType = (typeof ImportType)[keyof typeof ImportType];
+export { ImportType } from "./import-constants";
 
 export const importMappingSchema = z.object({
   accountId: z.string(),
@@ -80,17 +78,17 @@ export const newAccountSchema = z.object({
   name: z
     .string()
     .min(2, {
-      message: "Name must be at least 2 characters.",
+      message: i18n.t("schema.new_account.name_min"),
     })
     .max(50, {
-      message: "Name must not be longer than 50 characters.",
+      message: i18n.t("schema.new_account.name_max"),
     }),
   group: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
   isArchived: z.boolean().optional().default(false),
   accountType: accountTypeSchema,
-  currency: z.string({ required_error: "Please select a currency." }),
+  currency: z.string({ required_error: i18n.t("schema.new_account.currency_required") }),
   trackingMode: trackingModeSchema.optional().default("NOT_SET"),
   meta: z.string().nullable().optional(),
 });
@@ -101,10 +99,10 @@ export const newGoalSchema = z.object({
   description: z.string().optional(),
   targetAmount: z.coerce
     .number({
-      required_error: "Please enter a valid target amount.",
-      invalid_type_error: "Target amount must be a positive number.",
+      required_error: i18n.t("schema.goal.target_amount_required"),
+      invalid_type_error: i18n.t("schema.goal.target_amount_invalid"),
     })
-    .min(0, { message: "Target amount must be a positive number." }),
+    .min(0, { message: i18n.t("schema.goal.target_amount_positive") }),
   isAchieved: z.boolean().optional(),
 });
 
@@ -135,14 +133,14 @@ const decimalLikeSchema = z.union([
 export const importActivitySchema = z
   .object({
     id: z.string().uuid().optional(),
-    accountId: z.string().min(1, { message: "Please select an account." }),
+    accountId: z.string().min(1, { message: i18n.t("activity.validation.account_required") }),
     currency: z.string().optional(),
     activityType: activityTypeSchema,
     date: z
       .union([
         z.date(),
         z.string().refine((val) => tryParseDate(val) !== null, {
-          message: "Invalid date format",
+          message: i18n.t("import.validation.invalid_date"),
         }),
       ])
       .optional(),
@@ -154,7 +152,7 @@ export const importActivitySchema = z
           if (!val || val.trim() === "") return true;
           return /^(CASH:[A-Z]{3}|[A-Z0-9]{1,21}([.-][A-Z0-9]+){0,2})$/.test(val.trim());
         },
-        { message: "Invalid symbol format" },
+        { message: i18n.t("import.validation.invalid_symbol_format") },
       ),
     amount: decimalLikeSchema.nullable().optional(),
     quantity: decimalLikeSchema.nullable().optional(),
@@ -191,7 +189,7 @@ export const importActivitySchema = z
       return quantity === undefined || quantity >= 0;
     },
     {
-      message: "Quantity must be a non-negative number.",
+      message: i18n.t("import.validation.quantity_non_negative"),
       path: ["quantity"],
     },
   )
@@ -201,7 +199,7 @@ export const importActivitySchema = z
       return unitPrice === undefined || unitPrice >= 0;
     },
     {
-      message: "Price must be a non-negative number.",
+      message: i18n.t("import.validation.price_non_negative"),
       path: ["unitPrice"],
     },
   )
@@ -211,7 +209,7 @@ export const importActivitySchema = z
       return fee === undefined || fee >= 0;
     },
     {
-      message: "Fee must be a non-negative number.",
+      message: i18n.t("import.validation.fee_non_negative"),
       path: ["fee"],
     },
   )
@@ -221,7 +219,7 @@ export const importActivitySchema = z
       return fxRate === undefined || fxRate > 0;
     },
     {
-      message: "FX rate must be a positive number.",
+      message: i18n.t("import.validation.fx_rate_positive"),
       path: ["fxRate"],
     },
   )
@@ -234,7 +232,7 @@ export const importActivitySchema = z
       return !!data.symbol?.trim();
     },
     {
-      message: "Symbol is required for non-cash activities",
+      message: i18n.t("import.validation.symbol_required_non_cash"),
       path: ["symbol"],
     },
   )
@@ -259,7 +257,7 @@ export const importActivitySchema = z
       return true;
     },
     {
-      message: "Cash activities require at least one of: amount, quantity, or unit price",
+      message: i18n.t("import.validation.cash_requires_amount_qty_or_price"),
       path: ["amount"],
     },
   )
@@ -276,7 +274,7 @@ export const importActivitySchema = z
       return true;
     },
     {
-      message: "Fee activities require either fee or amount",
+      message: i18n.t("import.validation.fee_requires_fee_or_amount"),
       path: ["fee"],
     },
   )
@@ -290,7 +288,7 @@ export const importActivitySchema = z
       return true;
     },
     {
-      message: "Unit price must be positive for buy/sell activities",
+      message: i18n.t("import.validation.trade_unit_price_positive"),
       path: ["unitPrice"],
     },
   )
@@ -312,21 +310,21 @@ export const importActivitySchema = z
       return true;
     },
     {
-      message: "Quantity must be positive for non-cash activities",
+      message: i18n.t("import.validation.quantity_positive_non_cash"),
       path: ["quantity"],
     },
   );
 
 export const newContributionLimitSchema = z.object({
   id: z.string().optional(),
-  groupName: z.string().min(1, "Group name is required"),
-  contributionYear: z.number().int().min(1900, "Invalid year"),
+  groupName: z.string().min(1, i18n.t("schema.contribution_limit.group_required")),
+  contributionYear: z.number().int().min(1900, i18n.t("schema.contribution_limit.invalid_year")),
   limitAmount: z.coerce
     .number({
-      required_error: "Please enter a valid limit amount.",
-      invalid_type_error: "Limit amount must be a positive number.",
+      required_error: i18n.t("schema.contribution_limit.limit_amount_required"),
+      invalid_type_error: i18n.t("schema.contribution_limit.limit_amount_invalid"),
     })
-    .min(0, { message: "Price must be a non-negative number." }),
+    .min(0, { message: i18n.t("schema.contribution_limit.limit_amount_non_negative") }),
   accountIds: z.string().nullable().optional(),
   startDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),
   endDate: z.union([z.date(), z.string().datetime(), z.null()]).optional(),

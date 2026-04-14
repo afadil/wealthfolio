@@ -16,6 +16,7 @@ import {
   formatPercent,
 } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Bar, BarChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis } from "recharts";
 
@@ -130,27 +131,27 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
 // Helpers
 // ============================================================================
 
-function getPeriodLabel(period: string): string {
+function getPeriodLabel(period: string, t: (key: string) => string): string {
   switch (period) {
     case "YTD":
-      return "Year to Date";
+      return t("ai.tool.income.period.ytd");
     case "LAST_YEAR":
-      return "Last Year";
+      return t("ai.tool.income.period.last_year");
     case "TOTAL":
-      return "All Time";
+      return t("ai.tool.income.period.total");
     default:
       return period;
   }
 }
 
-function getTypeLabel(type: string): string {
+function getTypeLabel(type: string, t: (key: string) => string): string {
   switch (type) {
     case "DIVIDEND":
-      return "Dividends";
+      return t("ai.tool.income.type.dividend");
     case "INTEREST":
-      return "Interest";
+      return t("ai.tool.income.type.interest");
     case "OTHER_INCOME":
-      return "Other";
+      return t("ai.tool.income.type.other");
     default:
       return type;
   }
@@ -196,6 +197,7 @@ export const IncomeToolUI = makeAssistantToolUI<GetIncomeArgs, GetIncomeOutput>(
 type IncomeContentProps = ToolCallMessagePartProps<GetIncomeArgs, GetIncomeOutput>;
 
 function IncomeContent({ result, status }: IncomeContentProps) {
+  const { t } = useTranslation("common");
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = normalizeResult(result);
 
@@ -219,12 +221,12 @@ function IncomeContent({ result, status }: IncomeContentProps) {
       .filter(([, value]) => value > 0)
       .map(([type, value]) => ({
         type,
-        label: getTypeLabel(type),
+        label: getTypeLabel(type, t),
         value,
         percentage: (value / parsed.totalIncome) * 100,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [parsed?.byType, parsed?.totalIncome]);
+  }, [parsed?.byType, parsed?.totalIncome, t]);
 
   // Prepare monthly chart data
   const monthlyData = useMemo(() => {
@@ -269,7 +271,7 @@ function IncomeContent({ result, status }: IncomeContentProps) {
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">Income Summary</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("ai.tool.income.title")}</CardTitle>
               <Skeleton className="mt-1 h-3 w-16" />
             </div>
             <Skeleton className="h-8 w-28" />
@@ -297,7 +299,7 @@ function IncomeContent({ result, status }: IncomeContentProps) {
     return (
       <Card className="border-destructive/30 bg-destructive/5 w-full">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">Failed to load income data.</p>
+          <p className="text-destructive text-sm font-medium">{t("ai.tool.income.error_load")}</p>
         </CardContent>
       </Card>
     );
@@ -308,7 +310,7 @@ function IncomeContent({ result, status }: IncomeContentProps) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No income data found for this period.</p>
+          <p className="text-muted-foreground text-sm">{t("ai.tool.income.empty_period")}</p>
         </CardContent>
       </Card>
     );
@@ -318,7 +320,7 @@ function IncomeContent({ result, status }: IncomeContentProps) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">Income data is unavailable.</p>
+          <p className="text-muted-foreground text-sm">{t("ai.tool.income.unavailable")}</p>
         </CardContent>
       </Card>
     );
@@ -330,12 +332,12 @@ function IncomeContent({ result, status }: IncomeContentProps) {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-base font-medium">Income Summary</CardTitle>
+            <CardTitle className="text-base font-medium">{t("ai.tool.income.title")}</CardTitle>
             <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
-              <span>{getPeriodLabel(parsed.period)}</span>
+              <span>{getPeriodLabel(parsed.period, t)}</span>
               {parsed.yoyGrowth !== undefined && parsed.yoyGrowth !== null && (
                 <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                  <span className="mr-0.5">YoY</span>
+                  <span className="mr-0.5">{t("ai.tool.income.yoy")}</span>
                   <GainPercent value={parsed.yoyGrowth} />
                 </Badge>
               )}
@@ -355,14 +357,14 @@ function IncomeContent({ result, status }: IncomeContentProps) {
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-background/60 rounded-lg border p-3">
-            <span className="text-muted-foreground text-xs">Monthly Average</span>
+            <span className="text-muted-foreground text-xs">{t("ai.tool.income.monthly_average")}</span>
             <div className="mt-1 text-sm font-semibold tabular-nums">
               {formatValue(parsed.monthlyAverage)}
             </div>
           </div>
           {typeBreakdown.length > 0 && (
             <div className="bg-background/60 rounded-lg border p-3">
-              <span className="text-muted-foreground text-xs">By Type</span>
+              <span className="text-muted-foreground text-xs">{t("ai.tool.income.by_type")}</span>
               <div className="mt-1 space-y-0.5">
                 {typeBreakdown.map((item) => (
                   <div key={item.type} className="flex items-center justify-between text-xs">
@@ -380,7 +382,9 @@ function IncomeContent({ result, status }: IncomeContentProps) {
         {/* Monthly bar chart */}
         {monthlyData.length > 1 && (
           <div className="space-y-2">
-            <p className="text-muted-foreground text-xs font-medium uppercase">Monthly Income</p>
+            <p className="text-muted-foreground text-xs font-medium uppercase">
+              {t("ai.tool.income.monthly_income")}
+            </p>
             <div className="h-24">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
@@ -415,7 +419,9 @@ function IncomeContent({ result, status }: IncomeContentProps) {
         {topAssetsSlice.length > 0 && (
           <TooltipProvider>
             <div className="space-y-3">
-              <p className="text-muted-foreground text-xs font-medium uppercase">Sources</p>
+              <p className="text-muted-foreground text-xs font-medium uppercase">
+                {t("ai.tool.income.sources")}
+              </p>
 
               {/* Stacked bar */}
               <div className="flex h-5 w-full items-center gap-0.5 overflow-hidden rounded-md">

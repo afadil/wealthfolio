@@ -5,6 +5,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { format, formatDistanceToNow } from "date-fns";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useImportRunsInfinite } from "../hooks";
 import type { ImportRun, ImportRunStatus } from "../types";
@@ -12,16 +13,15 @@ import type { ImportRun, ImportRunStatus } from "../types";
 const statusConfig: Record<
   ImportRunStatus,
   {
-    label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
     icon: typeof Icons.Check;
   }
 > = {
-  RUNNING: { label: "Syncing", variant: "outline", icon: Icons.Spinner },
-  APPLIED: { label: "Success", variant: "default", icon: Icons.Check },
-  NEEDS_REVIEW: { label: "Review", variant: "destructive", icon: Icons.AlertTriangle },
-  FAILED: { label: "Failed", variant: "destructive", icon: Icons.X },
-  CANCELLED: { label: "Cancelled", variant: "secondary", icon: Icons.X },
+  RUNNING: { variant: "outline", icon: Icons.Spinner },
+  APPLIED: { variant: "default", icon: Icons.Check },
+  NEEDS_REVIEW: { variant: "destructive", icon: Icons.AlertTriangle },
+  FAILED: { variant: "destructive", icon: Icons.X },
+  CANCELLED: { variant: "secondary", icon: Icons.X },
 };
 
 interface SyncHistoryProps {
@@ -29,6 +29,7 @@ interface SyncHistoryProps {
 }
 
 export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
+  const { t } = useTranslation("common");
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage } = useImportRunsInfinite(
     { pageSize },
   );
@@ -44,7 +45,7 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Icons.History className="h-5 w-5" />
-            Sync History
+            {t("connect.import_runs.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -62,15 +63,15 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Icons.History className="h-5 w-5" />
-            Sync History
+            {t("connect.import_runs.title")}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Icons.Clock className="text-muted-foreground mb-3 h-10 w-10" />
-            <p className="text-muted-foreground text-sm">No sync runs yet</p>
+            <p className="text-muted-foreground text-sm">{t("connect.import_runs.empty")}</p>
             <p className="text-muted-foreground/70 mt-1 text-xs">
-              Your sync history will appear here after your first sync
+              {t("connect.sync.history_appears_after_first")}
             </p>
           </div>
         </CardContent>
@@ -84,10 +85,10 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Icons.History className="h-5 w-5" />
-            Sync History
+            {t("connect.import_runs.title")}
           </CardTitle>
           <span className="text-muted-foreground text-xs">
-            {runs.length} run{runs.length !== 1 ? "s" : ""}
+            {t("connect.sync.runs_count", { count: runs.length })}
           </span>
         </div>
       </CardHeader>
@@ -106,12 +107,12 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
             {isFetchingNextPage ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
+                {t("connect.sync.loading")}
               </>
             ) : (
               <>
                 <Icons.ChevronDown className="mr-2 h-4 w-4" />
-                Load more
+                {t("connect.sync.load_more")}
               </>
             )}
           </Button>
@@ -122,6 +123,7 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
 }
 
 function SyncRunItem({ run }: { run: ImportRun }) {
+  const { t } = useTranslation("common");
   const config = statusConfig[run.status];
   const StatusIcon = config.icon;
   const hasWarnings = run.warnings && run.warnings.length > 0;
@@ -162,7 +164,7 @@ function SyncRunItem({ run }: { run: ImportRun }) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">{run.sourceSystem}</span>
               <Badge variant={config.variant} className="text-xs">
-                {config.label}
+                {t(`connect.import_runs.status.${run.status}`)}
               </Badge>
               {hasWarnings && (
                 <span className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
@@ -193,18 +195,18 @@ function SyncRunItem({ run }: { run: ImportRun }) {
               <p className="font-semibold text-green-600 dark:text-green-400">
                 +{run.summary.inserted}
               </p>
-              <p className="text-muted-foreground">new</p>
+              <p className="text-muted-foreground">{t("connect.sync.stat_new")}</p>
             </div>
             <div className="text-center">
               <p className="font-semibold text-blue-600 dark:text-blue-400">
                 {run.summary.updated}
               </p>
-              <p className="text-muted-foreground">updated</p>
+              <p className="text-muted-foreground">{t("connect.import_runs.stat_updated")}</p>
             </div>
             {run.summary.skipped > 0 && (
               <div className="text-center">
                 <p className="text-muted-foreground font-semibold">{run.summary.skipped}</p>
-                <p className="text-muted-foreground">skipped</p>
+                <p className="text-muted-foreground">{t("connect.import_runs.stat_skipped")}</p>
               </div>
             )}
           </div>
@@ -223,13 +225,13 @@ function SyncRunItem({ run }: { run: ImportRun }) {
         <div className="mt-2 space-y-1">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
-              {run.warnings?.length} warning{run.warnings && run.warnings.length !== 1 ? "s" : ""}
+              {t("connect.import_runs.warnings_count", { count: run.warnings?.length ?? 0 })}
             </p>
             <Link
               to={`/activities?account=${run.accountId}&needsReview=true`}
               className="text-primary flex items-center gap-1 text-xs hover:underline"
             >
-              Review
+              {t("connect.page.history_review_link")}
               <Icons.ArrowRight className="h-3 w-3" />
             </Link>
           </div>
@@ -241,7 +243,8 @@ function SyncRunItem({ run }: { run: ImportRun }) {
             ))}
             {(run.warnings?.length ?? 0) > 2 && (
               <li className="text-muted-foreground/70">
-                &bull; +{(run.warnings?.length ?? 0) - 2} more
+                &bull;{" "}
+                {t("connect.import_runs.more_warnings", { count: (run.warnings?.length ?? 0) - 2 })}
               </li>
             )}
           </ul>

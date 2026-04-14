@@ -25,6 +25,10 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sectors: Option<String>,
 
+    /// Top underlying positions from `topHoldings.holdings` (Yahoo), JSON array same shape as sectors.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fund_holdings: Option<String>,
+
     /// Industry within sector (e.g., "Consumer Electronics")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub industry: Option<String>,

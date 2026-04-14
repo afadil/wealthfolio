@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { AssistantRuntimeProvider } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
@@ -85,12 +86,13 @@ function Sidebar({ collapsed }: { collapsed?: boolean }) {
  * Mobile sidebar using Sheet component.
  */
 function MobileSidebar() {
+  const { t } = useTranslation("common");
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="size-9 shrink-0 md:hidden">
           <Icons.PanelLeft className="size-4" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">{t("ai.thread.toggle_conversations_menu")}</span>
         </Button>
       </SheetTrigger>
       <SheetContent
@@ -98,10 +100,10 @@ function MobileSidebar() {
         className="flex w-[280px] flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
       >
         <SheetHeader className="sr-only">
-          <SheetTitle>Conversations</SheetTitle>
+          <SheetTitle>{t("ai.thread.heading")}</SheetTitle>
         </SheetHeader>
         <div className="flex h-14 items-center border-b px-4">
-          <span className="font-semibold">Conversations</span>
+          <span className="font-semibold">{t("ai.thread.heading")}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <ThreadList />
@@ -154,17 +156,18 @@ function Header({
  * Empty state when no AI providers are enabled.
  */
 function NoProvidersEmptyState({ className }: { className?: string }) {
+  const { t } = useTranslation("common");
   return (
     <div className={cn("flex h-full w-full items-center justify-center", className)}>
       <EmptyPlaceholder
         icon={<Icons.Sparkles className="text-muted-foreground h-10 w-10" />}
-        title="No AI provider configured"
-        description="Connect an AI provider to start chatting with your personal finance assistant. Your data stays private and secure."
+        title={t("ai.chat.empty.no_provider_title")}
+        description={t("ai.chat.empty.no_provider_description")}
       >
         <Button asChild>
           <Link to="/settings/ai-providers">
             <Icons.Settings className="mr-2 h-4 w-4" />
-            Configure AI Providers
+            {t("ai.chat.empty.configure_providers")}
           </Link>
         </Button>
       </EmptyPlaceholder>

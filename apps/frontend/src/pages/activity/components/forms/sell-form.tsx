@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useHoldings } from "@/hooks/use-holdings";
 import { useSettings } from "@/hooks/use-settings";
 import { ActivityType, QuoteMode } from "@/lib/constants";
@@ -10,6 +11,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useEffect, useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
   AccountSelect,
@@ -35,98 +37,93 @@ const assetMetadataSchema = z
   })
   .optional();
 
-// Zod schema for SellForm validation
-export const sellFormSchema = z
-  .object({
-    assetType: z.enum(["stock", "option", "bond"]).default("stock"),
-    assetKind: z.string().optional(),
-    accountId: z.string().min(1, { message: "Please select an account." }),
-    assetId: z.string().default(""),
-    activityDate: z.date({ required_error: "Please select a date." }),
-    quantity: z.coerce
-      .number({
-        required_error: "Please enter a quantity.",
-        invalid_type_error: "Quantity must be a number.",
-      })
-      .positive({ message: "Quantity must be greater than 0." }),
-    unitPrice: z.coerce
-      .number({
-        required_error: "Please enter a price.",
-        invalid_type_error: "Price must be a number.",
-      })
-      .positive({ message: "Price must be greater than 0." }),
-    fee: z.coerce
-      .number({
-        invalid_type_error: "Fee must be a number.",
-      })
-      .min(0, { message: "Fee must be non-negative." })
-      .default(0),
-    comment: z.string().optional().nullable(),
-    // Advanced options
-    currency: z.string().min(1, { message: "Currency is required." }),
-    fxRate: z.coerce
-      .number({
-        invalid_type_error: "FX Rate must be a number.",
-      })
-      .positive({ message: "FX Rate must be positive." })
-      .optional(),
-    // Internal fields
-    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-    exchangeMic: z.string().nullable().optional(),
-    symbolQuoteCcy: z.string().nullable().optional(),
-    symbolInstrumentType: z.string().nullable().optional(),
-    // Asset metadata for custom assets (name, etc.)
-    assetMetadata: assetMetadataSchema,
-    // Option-specific fields
-    underlyingSymbol: z.string().optional(),
-    strikePrice: z.coerce.number().positive().optional(),
-    expirationDate: z.string().optional(),
-    optionType: z.enum(["CALL", "PUT"]).optional(),
-    contractMultiplier: z.coerce.number().positive().default(100).optional(),
-  })
-  .superRefine((data, ctx) => {
-    // Options build their symbol at submit time; stocks/bonds require it upfront
-    if (data.assetType !== "option" && (!data.assetId || data.assetId.trim() === "")) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please enter a symbol.",
-        path: ["assetId"],
-      });
-    }
-    // Option contracts require all 4 structured fields
-    if (data.assetType === "option") {
-      if (!data.underlyingSymbol?.trim()) {
+export function createSellFormSchema() {
+  return z
+    .object({
+      assetType: z.enum(["stock", "option", "bond"]).default("stock"),
+      assetKind: z.string().optional(),
+      accountId: z.string().min(1, { message: i18n.t("activity.validation.account_required") }),
+      assetId: z.string().default(""),
+      activityDate: z.date({ required_error: i18n.t("activity.validation.select_date") }),
+      quantity: z.coerce
+        .number({
+          required_error: i18n.t("activity.validation.enter_quantity"),
+          invalid_type_error: i18n.t("activity.validation.quantity_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.quantity_greater_than_zero") }),
+      unitPrice: z.coerce
+        .number({
+          required_error: i18n.t("activity.validation.enter_price"),
+          invalid_type_error: i18n.t("activity.validation.price_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.price_greater_than_zero") }),
+      fee: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.fee_must_be_number"),
+        })
+        .min(0, { message: i18n.t("activity.validation.fee_must_be_non_negative") })
+        .default(0),
+      comment: z.string().optional().nullable(),
+      currency: z.string().min(1, { message: i18n.t("activity.validation.currency_required") }),
+      fxRate: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.fx_rate_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.fx_rate_positive_short") })
+        .optional(),
+      quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+      exchangeMic: z.string().nullable().optional(),
+      symbolQuoteCcy: z.string().nullable().optional(),
+      symbolInstrumentType: z.string().nullable().optional(),
+      assetMetadata: assetMetadataSchema,
+      underlyingSymbol: z.string().optional(),
+      strikePrice: z.coerce.number().positive().optional(),
+      expirationDate: z.string().optional(),
+      optionType: z.enum(["CALL", "PUT"]).optional(),
+      contractMultiplier: z.coerce.number().positive().default(100).optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.assetType !== "option" && (!data.assetId || data.assetId.trim() === "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Underlying symbol is required.",
-          path: ["underlyingSymbol"],
+          message: i18n.t("activity.validation.enter_symbol"),
+          path: ["assetId"],
         });
       }
-      if (!data.strikePrice || data.strikePrice <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Strike price is required.",
-          path: ["strikePrice"],
-        });
+      if (data.assetType === "option") {
+        if (!data.underlyingSymbol?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: i18n.t("activity.validation.option_underlying"),
+            path: ["underlyingSymbol"],
+          });
+        }
+        if (!data.strikePrice || data.strikePrice <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: i18n.t("activity.validation.option_strike"),
+            path: ["strikePrice"],
+          });
+        }
+        if (!data.expirationDate?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: i18n.t("activity.validation.option_expiration"),
+            path: ["expirationDate"],
+          });
+        }
+        if (!data.optionType) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: i18n.t("activity.validation.option_type"),
+            path: ["optionType"],
+          });
+        }
       }
-      if (!data.expirationDate?.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Expiration date is required.",
-          path: ["expirationDate"],
-        });
-      }
-      if (!data.optionType) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Option type is required.",
-          path: ["optionType"],
-        });
-      }
-    }
-  });
+    });
+}
 
-export type SellFormValues = z.infer<typeof sellFormSchema>;
+export type SellFormValues = z.infer<ReturnType<typeof createSellFormSchema>>;
 
 interface SellFormProps {
   accounts: AccountSelectOption[];
@@ -148,6 +145,8 @@ export function SellForm({
   isEditing = false,
   assetCurrency,
 }: SellFormProps) {
+  const { t, i18n } = useTranslation("common");
+  const sellFormSchema = useMemo(() => createSellFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -238,8 +237,14 @@ export function SellForm({
     setValue("assetId", "");
   };
 
-  const quantityLabel = isOption ? "Contracts" : assetType === "bond" ? "Bonds" : "Quantity";
-  const priceLabel = isOption ? "Premium/Share" : "Price";
+  const quantityLabel = isOption
+    ? t("activity.form.quantity.contracts")
+    : assetType === "bond"
+      ? t("activity.form.quantity.bonds")
+      : t("activity.form.fields.quantity");
+  const priceLabel = isOption
+    ? t("activity.form.price.premium_per_share")
+    : t("activity.form.fields.unitPrice");
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -336,7 +341,7 @@ export function SellForm({
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" enableTime={true} />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} enableTime={true} />
 
             {/* Symbol / Option Contract Fields */}
             {isOption ? (
@@ -372,7 +377,7 @@ export function SellForm({
 
             {/* Quantity, Price, Fee Row */}
             {isOption && (
-              <h4 className="text-muted-foreground text-sm font-medium">Trade Details</h4>
+              <h4 className="text-muted-foreground text-sm font-medium">{t("activity.form.trade_details")}</h4>
             )}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
@@ -380,25 +385,33 @@ export function SellForm({
                 {/* Shares breakdown with click-to-edit multiplier */}
                 {isOption && optQuantity && (
                   <div className="text-muted-foreground mt-1.5 flex items-center gap-1 text-xs">
-                    <span>{Number(optQuantity) * (Number(optMultiplier) || 100)} shares</span>
+                    <span>
+                      {t("activity.form.option_shares_equivalent", {
+                        count: Number(optQuantity) * (Number(optMultiplier) || 100),
+                      })}
+                    </span>
                     <span>·</span>
                     <input
                       type="number"
                       {...form.register("contractMultiplier", { valueAsNumber: true })}
                       className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
-                      aria-label="Contract Multiplier"
+                      aria-label={t("activity.form.contract_multiplier_aria")}
                     />
                     <span>x</span>
                   </div>
                 )}
                 {!isOption && currentHoldingQuantity > 0 && (
                   <p className="text-muted-foreground mt-1.5 text-xs">
-                    Available: {currentHoldingQuantity.toLocaleString()}
+                    {t("activity.form.sell.available", {
+                      count: currentHoldingQuantity.toLocaleString(),
+                    })}
                   </p>
                 )}
                 {isOption && currentHoldingQuantity > 0 && (
                   <p className="text-muted-foreground mt-1.5 text-xs">
-                    Holding: {currentHoldingQuantity.toLocaleString()} contracts
+                    {t("activity.form.sell.holding_contracts", {
+                      count: currentHoldingQuantity.toLocaleString(),
+                    })}
                   </p>
                 )}
               </div>
@@ -408,7 +421,7 @@ export function SellForm({
                 maxDecimalPlaces={4}
                 currency={currency}
               />
-              <AmountInput name="fee" label="Fee" currency={currency} />
+              <AmountInput name="fee" label={t("activity.form.fields.fee")} currency={currency} />
             </div>
 
             {/* Option Total Credit with formula breakdown */}
@@ -417,7 +430,7 @@ export function SellForm({
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-muted-foreground text-xs font-medium uppercase">
-                      Total Credit
+                      {t("activity.form.total_credit")}
                     </span>
                     <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
                       {Number(optQuantity)} ×{" "}
@@ -458,9 +471,11 @@ export function SellForm({
               <Alert variant="default" className="border-warning bg-warning/10">
                 <Icons.AlertTriangle className="text-warning h-4 w-4" />
                 <AlertDescription className="text-warning text-sm">
-                  You are selling more {isOption ? "contracts" : "shares"} (
-                  {optQuantity?.toLocaleString()}) than your current holdings (
-                  {currentHoldingQuantity.toLocaleString()}). This may result in a short position.
+                  {t("activity.form.sell.warning_oversell", {
+                    units: isOption ? t("activity.form.units.contracts") : t("activity.form.units.shares"),
+                    sold: optQuantity?.toLocaleString() ?? "",
+                    held: currentHoldingQuantity.toLocaleString(),
+                  })}
                 </AlertDescription>
               </Alert>
             )}
@@ -477,7 +492,7 @@ export function SellForm({
             />
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -485,7 +500,7 @@ export function SellForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
@@ -495,7 +510,11 @@ export function SellForm({
             ) : (
               <Icons.Plus className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : isOption ? "Sell to Close" : "Add Sell"}
+            {isEditing
+              ? t("activity.form.update")
+              : isOption
+                ? t("activity.form.submit.sell_to_close")
+                : t("activity.form.submit.add_sell")}
           </Button>
         </div>
       </form>

@@ -4,6 +4,7 @@ import {
   useHealthStatus,
   useRunHealthChecks,
 } from "@/hooks/use-health";
+import { getHealthIssueDisplayCopy } from "@/lib/health-issue-copy";
 import type { HealthCategory, HealthIssue, HealthSeverity } from "@/lib/types";
 import {
   Badge,
@@ -19,49 +20,46 @@ import {
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { IssueDetailSheet } from "./components/issue-detail-sheet";
 
 const SEVERITY_CONFIG: Record<
   HealthSeverity,
-  { label: string; bgColor: string; textColor: string; dotColor: string }
+  { bgColor: string; textColor: string; dotColor: string }
 > = {
   INFO: {
-    label: "Info",
     bgColor: "bg-muted",
     textColor: "text-muted-foreground",
     dotColor: "bg-muted-foreground",
   },
   WARNING: {
-    label: "Warning",
     bgColor: "bg-warning/15",
     textColor: "text-warning",
     dotColor: "bg-warning",
   },
   ERROR: {
-    label: "Error",
     bgColor: "bg-destructive/10",
     textColor: "text-destructive",
     dotColor: "bg-destructive",
   },
   CRITICAL: {
-    label: "Critical",
     bgColor: "bg-destructive/15",
     textColor: "text-destructive",
     dotColor: "bg-destructive",
   },
 };
 
-const CATEGORY_CONFIG: Record<HealthCategory, { label: string; icon: keyof typeof Icons }> = {
-  PRICE_STALENESS: { label: "Prices", icon: "TrendingUp" },
-  FX_INTEGRITY: { label: "FX Rates", icon: "ArrowLeftRight" },
-  CLASSIFICATION: { label: "Categories", icon: "Tag" },
-  DATA_CONSISTENCY: { label: "Data", icon: "Database" },
-  ACCOUNT_CONFIGURATION: { label: "Accounts", icon: "Settings" },
-  SETTINGS_CONFIGURATION: { label: "Settings", icon: "Settings" },
+const CATEGORY_ICONS: Record<HealthCategory, keyof typeof Icons> = {
+  PRICE_STALENESS: "TrendingUp",
+  FX_INTEGRITY: "ArrowLeftRight",
+  CLASSIFICATION: "Tag",
+  DATA_CONSISTENCY: "Database",
+  ACCOUNT_CONFIGURATION: "Settings",
+  SETTINGS_CONFIGURATION: "Settings",
 };
 
-export function getCategoryConfig(issue: HealthIssue): { label: string; icon: keyof typeof Icons } {
-  return CATEGORY_CONFIG[issue.category];
+export function getCategoryConfig(issue: HealthIssue): { icon: keyof typeof Icons } {
+  return { icon: CATEGORY_ICONS[issue.category] };
 }
 
 function SeverityDot({ severity }: { severity: HealthSeverity }) {
@@ -84,8 +82,11 @@ function HealthIssueRow({
   isDismissing: boolean;
   isFixing: boolean;
 }) {
+  const { t } = useTranslation("common");
   const categoryConfig = getCategoryConfig(issue);
   const CategoryIcon = Icons[categoryConfig.icon];
+  const categoryLabel = t(`health.page.category.${issue.category}`);
+  const displayCopy = getHealthIssueDisplayCopy(issue, t);
 
   return (
     <div
@@ -96,14 +97,14 @@ function HealthIssueRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{issue.title}</span>
+          <span className="truncate text-sm font-medium">{displayCopy.title}</span>
           {issue.affectedCount > 0 && (
             <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[10px] font-medium">
               {issue.affectedCount}
             </Badge>
           )}
         </div>
-        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">{issue.message}</p>
+        <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">{displayCopy.message}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
@@ -114,10 +115,10 @@ function HealthIssueRow({
               className="text-muted-foreground h-6 gap-1 px-2 text-[10px] font-normal"
             >
               <CategoryIcon className="h-3 w-3" />
-              {categoryConfig.label}
+              {categoryLabel}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent side="top">{categoryConfig.label}</TooltipContent>
+          <TooltipContent side="top">{categoryLabel}</TooltipContent>
         </Tooltip>
 
         {issue.fixAction && (
@@ -136,7 +137,7 @@ function HealthIssueRow({
             ) : (
               <>
                 <Icons.Wand2 className="mr-1 h-3 w-3" />
-                Fix
+                {t("health.page.row_fix")}
               </>
             )}
           </Button>
@@ -171,6 +172,7 @@ function StatusSummary({
   selectedSeverity: HealthSeverity | null;
   onSeverityClick: (severity: HealthSeverity | null) => void;
 }) {
+  const { t } = useTranslation("common");
   const totalIssues = Object.values(counts).reduce((a, b) => (a ?? 0) + (b ?? 0), 0);
 
   if (totalIssues === 0) {
@@ -200,7 +202,7 @@ function StatusSummary({
           >
             <SeverityDot severity={severity} />
             <span>{count}</span>
-            <span className="hidden sm:inline">{config.label}</span>
+            <span className="hidden sm:inline">{t(`health.issue_sheet.severity.${severity}`)}</span>
           </button>
         );
       })}
@@ -211,7 +213,7 @@ function StatusSummary({
           className="text-muted-foreground ml-1 h-7 px-2 text-xs"
           onClick={() => onSeverityClick(null)}
         >
-          Clear
+          {t("health.page.filter_clear")}
         </Button>
       )}
     </div>
@@ -219,20 +221,22 @@ function StatusSummary({
 }
 
 function HealthyState() {
+  const { t } = useTranslation("common");
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <div className="bg-success/10 mb-6 flex h-16 w-16 items-center justify-center rounded-full">
         <Icons.CheckCircle className="text-success h-8 w-8" />
       </div>
-      <h2 className="mb-2 text-lg font-semibold">Your Data Looks Great</h2>
+      <h2 className="mb-2 text-lg font-semibold">{t("health.page.healthy_title")}</h2>
       <p className="text-muted-foreground max-w-sm text-center text-sm">
-        No issues found. Your portfolio data is consistent and up to date.
+        {t("health.page.healthy_description")}
       </p>
     </div>
   );
 }
 
 export default function HealthPage() {
+  const { t } = useTranslation("common");
   const [selectedSeverity, setSelectedSeverity] = useState<HealthSeverity | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<HealthIssue | null>(null);
 
@@ -272,8 +276,8 @@ export default function HealthPage() {
     return (
       <Page>
         <PageHeader
-          heading="Data Health"
-          text="Identify and resolve data quality issues"
+          heading={t("health.page.heading")}
+          text={t("health.page.subtitle")}
           actions={headerActions}
         />
         <PageContent className="pt-4">
@@ -281,11 +285,11 @@ export default function HealthPage() {
             <div className="bg-destructive/10 mb-4 flex h-12 w-12 items-center justify-center rounded-full">
               <Icons.AlertCircle className="text-destructive h-6 w-6" />
             </div>
-            <h2 className="mb-1 text-base font-medium">Failed to load health status</h2>
+            <h2 className="mb-1 text-base font-medium">{t("health.page.error_title")}</h2>
             <p className="text-muted-foreground mb-4 text-sm">{error.message}</p>
             <Button size="sm" variant="outline" onClick={handleRefresh}>
               <Icons.RefreshCw className="mr-2 h-3.5 w-3.5" />
-              Retry
+              {t("health.page.retry")}
             </Button>
           </div>
         </PageContent>
@@ -296,8 +300,8 @@ export default function HealthPage() {
   return (
     <Page>
       <PageHeader
-        heading="Data Health"
-        text="Identify and resolve data quality issues"
+        heading={t("health.page.heading")}
+        text={t("health.page.subtitle")}
         actions={headerActions}
       />
       <PageContent className="mt-6">
@@ -322,10 +326,11 @@ export default function HealthPage() {
                   <TooltipTrigger asChild>
                     <span className="text-muted-foreground flex cursor-default items-center gap-1.5 text-xs">
                       {status.isStale && <Icons.AlertCircle className="h-3 w-3 text-amber-500" />}
-                      Updated{" "}
-                      {new Date(status.checkedAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
+                      {t("health.page.updated", {
+                        time: new Date(status.checkedAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }),
                       })}
                     </span>
                   </TooltipTrigger>

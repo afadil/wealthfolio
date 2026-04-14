@@ -16,6 +16,7 @@ import { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Icons, type Icon } from "@wealthfolio/ui";
 import { forwardRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -72,6 +73,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
@@ -110,15 +112,15 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
     const getAccountTypeLabel = (type: string): string => {
       switch (type) {
         case PORTFOLIO_ACCOUNT_ID:
-          return "Portfolio";
+          return t("account.selector.group.portfolio");
         case "SECURITIES":
-          return "Securities Accounts";
+          return t("account.selector.group.securities");
         case "CASH":
-          return "Cash Accounts";
+          return t("account.selector.group.cash");
         case "CRYPTOCURRENCY":
-          return "Cryptocurrency Accounts";
+          return t("account.selector.group.cryptocurrency");
         default:
-          return "Other Accounts";
+          return t("account.selector.group.other");
       }
     };
 
@@ -136,7 +138,7 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
           <Button
             ref={ref}
             variant="outline"
-            aria-label={iconOnly ? "Add account" : undefined}
+            aria-label={iconOnly ? t("account.selector.mobile.aria_add_account") : undefined}
             className={cn(
               "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-[1.5px] border-none text-sm font-medium",
               iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -145,13 +147,13 @@ export const AccountSelectorMobile = forwardRef<HTMLButtonElement, AccountSelect
             size={iconOnly ? "icon" : "sm"}
           >
             <Icons.Briefcase className="h-4 w-4" />
-            {!iconOnly && "Add account"}
+            {!iconOnly && t("account.selector.mobile.add_account")}
           </Button>
         </SheetTrigger>
         <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[80vh] p-0">
           <SheetHeader className="border-border border-b px-6 py-4">
-            <SheetTitle>Select Account</SheetTitle>
-            <SheetDescription>Choose an account to add to the comparison</SheetDescription>
+            <SheetTitle>{t("account.selector.mobile.title")}</SheetTitle>
+            <SheetDescription>{t("account.selector.mobile.description")}</SheetDescription>
           </SheetHeader>
           <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
             <div className="space-y-6">

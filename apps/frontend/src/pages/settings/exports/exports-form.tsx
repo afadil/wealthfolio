@@ -4,8 +4,44 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { ExportDataType, ExportedFileFormat } from "@/lib/types";
+import type { TFunction } from "i18next";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useExportData } from "./use-export-data";
+
+function exportItemTitle(key: string, t: TFunction) {
+  switch (key) {
+    case "portfolio-history":
+      return t("settings.exports.type_portfolio_history");
+    case "full":
+      return t("settings.exports.type_full_sqlite");
+    case "accounts":
+      return t("settings.exports.type_accounts");
+    case "activities":
+      return t("settings.exports.type_activities");
+    case "goals":
+      return t("settings.exports.type_goals");
+    default:
+      return key;
+  }
+}
+
+function exportItemDescription(key: string, t: TFunction) {
+  switch (key) {
+    case "portfolio-history":
+      return t("settings.exports.type_portfolio_history_desc");
+    case "full":
+      return t("settings.exports.type_full_sqlite_desc");
+    case "accounts":
+      return t("settings.exports.type_accounts_desc");
+    case "activities":
+      return t("settings.exports.type_activities_desc");
+    case "goals":
+      return t("settings.exports.type_goals_desc");
+    default:
+      return "";
+  }
+}
 
 const dataFormats = [
   {
@@ -91,6 +127,7 @@ const dataTypes = {
 };
 
 export const ExportForm = () => {
+  const { t } = useTranslation("common");
   const [selectedFormat, setSelectedFormat] = useState<string | undefined>();
 
   const { exportData, isExporting, exportingFormat, exportingData } = useExportData();
@@ -107,7 +144,7 @@ export const ExportForm = () => {
   return (
     <>
       <div className="mt-8 px-2">
-        <h3 className="pb-3 pt-5 font-semibold">Choose Your Preferred Format</h3>
+        <h3 className="pb-3 pt-5 font-semibold">{t("settings.exports.choose_format")}</h3>
         <RadioGroup
           onValueChange={setSelectedFormat}
           className="grid grid-cols-1 gap-4 md:grid-cols-3"
@@ -122,7 +159,13 @@ export const ExportForm = () => {
                 <format.icon className="mb-3 h-6 w-6" />
                 <div className="text-center">
                   <h3 className="font-semibold">{format.name}</h3>
-                  <p className="text-muted-foreground text-sm font-light">{format.description}</p>
+                  <p className="text-muted-foreground text-sm font-light">
+                    {format.name === "CSV"
+                      ? t("settings.exports.format_csv_desc")
+                      : format.name === "JSON"
+                        ? t("settings.exports.format_json_desc")
+                        : t("settings.exports.format_sqlite_desc")}
+                  </p>
                 </div>
               </Label>
             </div>
@@ -132,15 +175,17 @@ export const ExportForm = () => {
 
       {selectedFormat && (
         <div className="px-2 pt-4">
-          <h3 className="pb-3 pt-5 font-semibold">Customize Your Export</h3>
+          <h3 className="pb-3 pt-5 font-semibold">{t("settings.exports.customize_export")}</h3>
           {dataTypes[selectedFormat as keyof typeof dataTypes].map((item) => (
             <Card key={item.key} className="mb-4">
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center">
                   <item.icon className="mr-2 h-5 w-5" />
                   <div>
-                    <span className="font-medium">{item.name}</span>
-                    <p className="text-muted-foreground text-sm">{item.description}</p>
+                    <span className="font-medium">{exportItemTitle(item.key, t)}</span>
+                    <p className="text-muted-foreground text-sm">
+                      {exportItemDescription(item.key, t)}
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -154,12 +199,20 @@ export const ExportForm = () => {
                   exportingData === item.key ? (
                     <>
                       <Icons.Spinner className="h-4 w-4 animate-spin" />
-                      <span className="sr-only">Exporting {item.name}...</span>
+                      <span className="sr-only">
+                        {t("settings.exports.exporting_item", {
+                          item: exportItemTitle(item.key, t),
+                        })}
+                      </span>
                     </>
                   ) : (
                     <>
                       <Icons.Download className="h-4 w-4" />
-                      <span className="sr-only">Export {item.name}</span>
+                      <span className="sr-only">
+                        {t("settings.exports.export_item", {
+                          item: exportItemTitle(item.key, t),
+                        })}
+                      </span>
                     </>
                   )}
                 </Button>

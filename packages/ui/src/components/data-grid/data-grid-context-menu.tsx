@@ -11,7 +11,7 @@ import { Icons } from "../ui/icons";
 import type { ColumnDef, TableMeta } from "@tanstack/react-table";
 import * as React from "react";
 import { toast } from "sonner";
-import type { ContextMenuState, UpdateCell } from "./data-grid-types";
+import type { ContextMenuState, DataGridContextMenuLabels, UpdateCell } from "./data-grid-types";
 import { parseCellKey } from "./data-grid-utils";
 
 interface DataGridContextMenuProps<TData> {
@@ -43,6 +43,7 @@ export function DataGridContextMenu<TData>({ tableMeta, columns, contextMenu }: 
       onRowsDelete={onRowsDelete}
       onCellsCopy={onCellsCopy}
       onCellsCut={onCellsCut}
+      onCellsPaste={tableMeta?.onCellsPaste}
     />
   );
 }
@@ -58,6 +59,7 @@ interface ContextMenuProps<TData>
       | "onRowsDelete"
       | "onCellsCopy"
       | "onCellsCut"
+      | "onCellsPaste"
       | "readOnly"
     >,
     Required<Pick<TableMeta<TData>, "contextMenu">> {
@@ -78,6 +80,30 @@ const ContextMenu = React.memo(ContextMenuImpl, (prev, next) => {
   return true;
 }) as typeof ContextMenuImpl;
 
+const defaultContextMenuLabels: DataGridContextMenuLabels = {
+  copy: "Copy",
+  cut: "Cut",
+  paste: "Paste",
+  clear: "Clear",
+  deleteRows: "Delete rows",
+  toastCellsCleared: (count) => `${count} cell${count !== 1 ? "s" : ""} cleared`,
+  toastRowsDeleted: (count) => `${count} row${count !== 1 ? "s" : ""} deleted`,
+};
+
+function mergeContextMenuLabels(
+  partial?: Partial<DataGridContextMenuLabels>,
+): DataGridContextMenuLabels {
+  return {
+    copy: partial?.copy ?? defaultContextMenuLabels.copy,
+    cut: partial?.cut ?? defaultContextMenuLabels.cut,
+    paste: partial?.paste ?? defaultContextMenuLabels.paste,
+    clear: partial?.clear ?? defaultContextMenuLabels.clear,
+    deleteRows: partial?.deleteRows ?? defaultContextMenuLabels.deleteRows,
+    toastCellsCleared: partial?.toastCellsCleared ?? defaultContextMenuLabels.toastCellsCleared,
+    toastRowsDeleted: partial?.toastRowsDeleted ?? defaultContextMenuLabels.toastRowsDeleted,
+  };
+}
+
 function ContextMenuImpl<TData>({
   tableMeta,
   columns,
@@ -89,7 +115,13 @@ function ContextMenuImpl<TData>({
   onRowsDelete,
   onCellsCopy,
   onCellsCut,
+  onCellsPaste,
 }: ContextMenuProps<TData>) {
+  const labels = React.useMemo(
+    () => mergeContextMenuLabels(tableMeta?.contextMenuLabels),
+    [tableMeta?.contextMenuLabels],
+  );
+
   const triggerStyle = React.useMemo<React.CSSProperties>(
     () => ({
       position: "fixed",
@@ -143,7 +175,7 @@ function ContextMenuImpl<TData>({
       let emptyValue: unknown = "";
       if (cellVariant === "multi-select" || cellVariant === "file") {
         emptyValue = [];
-      } else if (cellVariant === "number" || cellVariant === "date") {
+      } else if (cellVariant === "number" || cellVariant === "date" || cellVariant === "date-input") {
         emptyValue = null;
       } else if (cellVariant === "checkbox") {
         emptyValue = false;
@@ -154,8 +186,8 @@ function ContextMenuImpl<TData>({
 
     onDataUpdate?.(updates);
 
-    toast.success(`${updates.length} cell${updates.length !== 1 ? "s" : ""} cleared`);
-  }, [onDataUpdate, selectionState, columns]);
+    toast.success(labels.toastCellsCleared(updates.length));
+  }, [onDataUpdate, selectionState, columns, labels]);
 
   const onDelete = React.useCallback(async () => {
     if (!selectionState?.selectedCells || selectionState.selectedCells.size === 0) return;
@@ -171,8 +203,8 @@ function ContextMenuImpl<TData>({
 
     await onRowsDelete?.(rowIndicesArray);
 
-    toast.success(`${rowCount} row${rowCount !== 1 ? "s" : ""} deleted`);
-  }, [onRowsDelete, selectionState]);
+    toast.success(labels.toastRowsDeleted(rowCount));
+  }, [onRowsDelete, selectionState, labels]);
 
   return (
     <DropdownMenu open={contextMenu.open} onOpenChange={onContextMenuOpenChange}>
@@ -180,22 +212,33 @@ function ContextMenuImpl<TData>({
       <DropdownMenuContent data-grid-popover="" align="start" className="w-48" onCloseAutoFocus={onCloseAutoFocus}>
         <DropdownMenuItem onSelect={onCopy}>
           <Icons.Copy />
-          Copy
+          {labels.copy}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onCut} disabled={tableMeta?.readOnly}>
           <Icons.Scissors />
-          Cut
+          {labels.cut}
         </DropdownMenuItem>
+        {onCellsPaste && (
+          <DropdownMenuItem
+            onSelect={() => {
+              void onCellsPaste();
+            }}
+            disabled={tableMeta?.readOnly}
+          >
+            <Icons.ClipboardPaste />
+            {labels.paste}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={onClear} disabled={tableMeta?.readOnly}>
           <Icons.Eraser />
-          Clear
+          {labels.clear}
         </DropdownMenuItem>
         {onRowsDelete && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
               <Icons.Trash2 />
-              Delete rows
+              {labels.deleteRows}
             </DropdownMenuItem>
           </>
         )}

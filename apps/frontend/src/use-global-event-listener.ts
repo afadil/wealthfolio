@@ -1,4 +1,5 @@
 // useGlobalEventListener.ts
+import i18n from "@/i18n/i18n";
 import {
   isDesktop,
   listenBrokerSyncComplete,
@@ -85,7 +86,7 @@ const useGlobalEventListener = () => {
       if (isMobileViewportRef.current && syncContextRef.current) {
         syncContextRef.current.setMarketSyncing();
       } else {
-        toast.loading("Syncing market data...", {
+        toast.loading(i18n.t("toast.global.market_sync_loading"), {
           id: TOAST_IDS.marketSyncStart,
           duration: 3000,
         });
@@ -104,11 +105,15 @@ const useGlobalEventListener = () => {
       // Show error toast on both mobile and desktop for failed syncs
       if (failed_syncs && failed_syncs.length > 0) {
         const count = failed_syncs.length;
-        toast.error(`Price update failed for ${count} asset${count === 1 ? "" : "s"}`, {
+        const priceFailKey =
+          count === 1
+            ? "toast.global.market_sync_price_failed_one"
+            : "toast.global.market_sync_price_failed_other";
+        toast.error(i18n.t(priceFailKey, { count }), {
           id: "market-sync-error",
           duration: 10000,
           action: {
-            label: "View",
+            label: i18n.t("toast.global.action_view"),
             onClick: () => navigateRef.current("/health"),
           },
         });
@@ -122,8 +127,8 @@ const useGlobalEventListener = () => {
       } else {
         toast.dismiss(TOAST_IDS.marketSyncStart);
       }
-      toast.error("Market Data Sync Failed", {
-        description: `${errorMsg}. Please try again later.`,
+      toast.error(i18n.t("toast.global.market_data_failed_title"), {
+        description: i18n.t("toast.global.market_data_failed_description", { error: errorMsg }),
         duration: 10000,
       });
       logger.error("Market sync error: " + errorMsg);
@@ -133,7 +138,7 @@ const useGlobalEventListener = () => {
       if (isMobileViewportRef.current && syncContextRef.current) {
         syncContextRef.current.setPortfolioCalculating();
       } else {
-        toast.loading("Calculating portfolio performance...", {
+        toast.loading(i18n.t("toast.global.portfolio_loading"), {
           id: TOAST_IDS.portfolioUpdateStart,
           duration: 2000,
         });
@@ -146,10 +151,9 @@ const useGlobalEventListener = () => {
       } else {
         toast.dismiss(TOAST_IDS.portfolioUpdateStart);
       }
-      toast.error("Portfolio Update Failed", {
+      toast.error(i18n.t("toast.global.portfolio_failed_title"), {
         id: TOAST_IDS.portfolioUpdateError,
-        description:
-          "There was an error updating your portfolio. Please try again or contact support if the issue persists.",
+        description: i18n.t("toast.global.portfolio_failed_description"),
         duration: 5000,
       });
       logger.error("Portfolio Update Error: " + error);
@@ -168,8 +172,8 @@ const useGlobalEventListener = () => {
 
     const handleDatabaseRestored = () => {
       queryClientRef.current.invalidateQueries();
-      toast.success("Database restored successfully", {
-        description: "Please restart the application to ensure all data is properly refreshed.",
+      toast.success(i18n.t("toast.global.database_restored_title"), {
+        description: i18n.t("toast.global.database_restored_description"),
       });
     };
 
@@ -198,7 +202,7 @@ const useGlobalEventListener = () => {
       const { success, message, accountsSynced, activitiesSynced, holdingsSynced, newAccounts } =
         event.payload || {
           success: false,
-          message: "Unknown error",
+          message: i18n.t("errors.unknown"),
         };
 
       // Dismiss the loading toast
@@ -210,10 +214,12 @@ const useGlobalEventListener = () => {
       if (success) {
         // Check if there are new accounts that need configuration
         if (newAccounts && newAccounts.length > 0) {
-          toast.info("New accounts found", {
-            description: `${newAccounts.length} new account(s) need to be configured`,
+          toast.info(i18n.t("toast.global.broker_new_accounts_title"), {
+            description: i18n.t("toast.global.broker_new_accounts_description", {
+              count: newAccounts.length,
+            }),
             action: {
-              label: "Review",
+              label: i18n.t("toast.global.action_review"),
               onClick: () => {
                 navigateRef.current("/settings/accounts");
               },
@@ -241,23 +247,40 @@ const useGlobalEventListener = () => {
           let description: string;
           if (hasChanges) {
             const parts: string[] = [];
-            if (accountsCreated > 0) parts.push(`${accountsCreated} new accounts`);
-            if (accountsUpdated > 0) parts.push(`${accountsUpdated} accounts updated`);
-            if (activities > 0) parts.push(`${activities} activities`);
-            if (positions > 0) parts.push(`${positions} positions (${holdingsAccounts} accounts)`);
-            if (totalNewAssets > 0) parts.push(`${totalNewAssets} new assets`);
+            if (accountsCreated > 0) {
+              parts.push(i18n.t("toast.global.broker_part_new_accounts", { count: accountsCreated }));
+            }
+            if (accountsUpdated > 0) {
+              parts.push(
+                i18n.t("toast.global.broker_part_accounts_updated", { count: accountsUpdated }),
+              );
+            }
+            if (activities > 0) {
+              parts.push(i18n.t("toast.global.broker_part_activities", { count: activities }));
+            }
+            if (positions > 0) {
+              parts.push(
+                i18n.t("toast.global.broker_part_positions", {
+                  positions,
+                  accounts: holdingsAccounts,
+                }),
+              );
+            }
+            if (totalNewAssets > 0) {
+              parts.push(i18n.t("toast.global.broker_part_new_assets", { count: totalNewAssets }));
+            }
             description = parts.join(" · ");
           } else {
-            description = "Everything is up to date";
+            description = i18n.t("toast.global.broker_sync_up_to_date");
           }
 
-          toast.success("Broker Sync Complete", {
+          toast.success(i18n.t("toast.global.broker_sync_complete_title"), {
             description,
             duration: 5000,
           });
         }
       } else {
-        toast.error("Broker Sync Failed", {
+        toast.error(i18n.t("toast.global.broker_sync_failed_title"), {
           description: message,
           duration: 10000,
         });
@@ -268,7 +291,7 @@ const useGlobalEventListener = () => {
       const { error } = event.payload || { error: "Unknown error" };
       // Dismiss the loading toast
       toast.dismiss(TOAST_IDS.brokerSyncStart);
-      toast.error("Broker Sync Failed", {
+      toast.error(i18n.t("toast.global.broker_sync_failed_title"), {
         description: error,
         duration: 10000,
       });

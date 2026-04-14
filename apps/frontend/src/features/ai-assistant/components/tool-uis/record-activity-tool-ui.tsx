@@ -28,6 +28,7 @@ import {
 import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -345,6 +346,7 @@ interface SuccessStateProps {
 }
 
 function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps) {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
   const formatAmount = useCallback(
@@ -368,40 +370,40 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Icons.CheckCircle className="text-success h-5 w-5" />
-          <CardTitle className="text-base">Activity Recorded</CardTitle>
+          <CardTitle className="text-base">{t("ai.tool.record_activity.success_title")}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
-            <span className="text-muted-foreground">Type:</span>{" "}
+            <span className="text-muted-foreground">{t("activity.detail.row.type")}:</span>{" "}
             <span className="font-medium">{activityTypeDisplay}</span>
           </div>
           <div>
-            <span className="text-muted-foreground">Date:</span>{" "}
+            <span className="text-muted-foreground">{t("activity.form.fields.activityDate")}:</span>{" "}
             <span className="font-medium">{new Date(draft.activityDate).toLocaleDateString()}</span>
           </div>
           {draft.symbol && (
             <div>
-              <span className="text-muted-foreground">Asset:</span>{" "}
+              <span className="text-muted-foreground">{t("ai.tool.record_activity.label.asset")}:</span>{" "}
               <span className="font-medium">{draft.symbol}</span>
             </div>
           )}
           {draft.quantity !== undefined && (
             <div>
-              <span className="text-muted-foreground">Quantity:</span>{" "}
+              <span className="text-muted-foreground">{t("activity.detail.row.quantity")}:</span>{" "}
               <span className="font-medium">{draft.quantity}</span>
             </div>
           )}
           {draft.amount !== undefined && (
             <div>
-              <span className="text-muted-foreground">Amount:</span>{" "}
+              <span className="text-muted-foreground">{t("activity.detail.row.amount")}:</span>{" "}
               <span className="font-medium">{formatAmount(draft.amount)}</span>
             </div>
           )}
           {draft.accountName && (
             <div>
-              <span className="text-muted-foreground">Account:</span>{" "}
+              <span className="text-muted-foreground">{t("activity.detail.row.account")}:</span>{" "}
               <span className="font-medium">{draft.accountName}</span>
             </div>
           )}
@@ -410,7 +412,7 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           <Button variant="outline" size="sm" asChild>
             <Link to={createdActivityId ? `/activities?id=${createdActivityId}` : "/activities"}>
               <Icons.ArrowRight className="mr-2 h-4 w-4" />
-              View in Activities
+              {t("ai.tool.record_activity.view_in_activities")}
             </Link>
           </Button>
         </div>
@@ -442,6 +444,7 @@ function DraftForm({
   toolCallId,
   onSuccess,
 }: DraftFormProps) {
+  const { t } = useTranslation();
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
   const { settings } = useSettingsContext();
@@ -707,11 +710,13 @@ function DraftForm({
       // Notify parent of success
       onSuccess(createdActivity.id);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to create activity");
+      setSubmitError(
+        error instanceof Error ? error.message : t("ai.tool.record_activity.error_create"),
+      );
     } finally {
       setIsSubmitting(false);
     }
-  }, [form, selectedSymbol, selectedExchangeMic, threadId, toolCallId, onSuccess]);
+  }, [form, selectedSymbol, selectedExchangeMic, threadId, toolCallId, onSuccess, t]);
 
   const activityTypeDisplay =
     (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[activityType] ?? activityType;
@@ -722,7 +727,7 @@ function DraftForm({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icons.Pencil className="text-primary h-5 w-5" />
-            <CardTitle className="text-base">Record Activity</CardTitle>
+            <CardTitle className="text-base">{t("ai.tool.record_activity.title")}</CardTitle>
           </div>
           <Badge variant="outline" className="uppercase">
             {activityTypeDisplay}
@@ -736,10 +741,10 @@ function DraftForm({
             {/* Activity Type Select */}
             <FormItem>
               <FormLabel className={cn(hasFieldError("activityType") && "text-destructive")}>
-                Type
+                {t("activity.detail.row.type")}
                 {hasFieldError("activityType") && (
                   <Badge variant="destructive" className="ml-2 text-xs">
-                    Required
+                    {t("ai.tool.record_activity.required_badge")}
                   </Badge>
                 )}
               </FormLabel>
@@ -750,7 +755,7 @@ function DraftForm({
                 <SelectTrigger
                   className={cn(hasFieldError("activityType") && "border-destructive")}
                 >
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue placeholder={t("settings.securities.dialog.select_type")} />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(ACTIVITY_TYPE_DISPLAY_NAMES).map(([value, label]) => (
@@ -772,10 +777,10 @@ function DraftForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={cn(hasFieldError("activityDate") && "text-destructive")}>
-                    Date
+                    {t("activity.form.fields.activityDate")}
                     {hasFieldError("activityDate") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
-                        Required
+                        {t("ai.tool.record_activity.required_badge")}
                       </Badge>
                     )}
                   </FormLabel>
@@ -799,10 +804,10 @@ function DraftForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={cn(hasFieldError("accountId") && "text-destructive")}>
-                    Account
+                    {t("activity.detail.row.account")}
                     {hasFieldError("accountId") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
-                        Required
+                        {t("ai.tool.record_activity.required_badge")}
                       </Badge>
                     )}
                   </FormLabel>
@@ -811,7 +816,7 @@ function DraftForm({
                       <SelectTrigger
                         className={cn(hasFieldError("accountId") && "border-destructive")}
                       >
-                        <SelectValue placeholder="Select account" />
+                        <SelectValue placeholder={t("activity.mobile.placeholder_select_account")} />
                       </SelectTrigger>
                       <SelectContent>
                         {availableAccounts.map((account) => (
@@ -834,10 +839,10 @@ function DraftForm({
             {requiresAsset && (
               <FormItem>
                 <FormLabel className={cn(hasFieldError("symbol") && "text-destructive")}>
-                  Asset
+                  {t("ai.tool.record_activity.label.asset")}
                   {hasFieldError("symbol") && (
                     <Badge variant="destructive" className="ml-2 text-xs">
-                      Required
+                      {t("ai.tool.record_activity.required_badge")}
                     </Badge>
                   )}
                 </FormLabel>
@@ -849,9 +854,7 @@ function DraftForm({
                   />
                 </FormControl>
                 {draft.isCustomAsset && (
-                  <p className="text-warning text-xs">
-                    Asset not found. Will be created as custom asset.
-                  </p>
+                  <p className="text-warning text-xs">{t("ai.tool.record_activity.custom_asset_hint")}</p>
                 )}
                 {getFieldError("symbol") && (
                   <p className="text-destructive text-xs">{getFieldError("symbol")}</p>
@@ -869,10 +872,10 @@ function DraftForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={cn(hasFieldError("quantity") && "text-destructive")}>
-                      Quantity
+                      {t("activity.form.fields.quantity")}
                       {hasFieldError("quantity") && (
                         <Badge variant="destructive" className="ml-2 text-xs">
-                          Required
+                          {t("ai.tool.record_activity.required_badge")}
                         </Badge>
                       )}
                     </FormLabel>
@@ -898,10 +901,10 @@ function DraftForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className={cn(hasFieldError("unitPrice") && "text-destructive")}>
-                      Price
+                      {t("activity.form.fields.unitPrice")}
                       {hasFieldError("unitPrice") && (
                         <Badge variant="destructive" className="ml-2 text-xs">
-                          Required
+                          {t("ai.tool.record_activity.required_badge")}
                         </Badge>
                       )}
                     </FormLabel>
@@ -918,7 +921,9 @@ function DraftForm({
                       />
                     </FormControl>
                     {draft.priceSource === "historical" && (
-                      <p className="text-muted-foreground text-xs">Historical price</p>
+                      <p className="text-muted-foreground text-xs">
+                        {t("ai.tool.record_activity.historical_price")}
+                      </p>
                     )}
                   </FormItem>
                 )}
@@ -929,7 +934,7 @@ function DraftForm({
                 name="fee"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fee</FormLabel>
+                    <FormLabel>{t("activity.form.fields.fee")}</FormLabel>
                     <FormControl>
                       <MoneyInput
                         placeholder="0.00"
@@ -960,10 +965,10 @@ function DraftForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className={cn(hasFieldError("amount") && "text-destructive")}>
-                    Amount
+                    {t("activity.form.fields.amount")}
                     {hasFieldError("amount") && (
                       <Badge variant="destructive" className="ml-2 text-xs">
-                        Required
+                        {t("ai.tool.record_activity.required_badge")}
                       </Badge>
                     )}
                   </FormLabel>
@@ -994,7 +999,7 @@ function DraftForm({
                   type="button"
                   className="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-0 py-2"
                 >
-                  <span className="text-sm font-medium">Advanced Options</span>
+                  <span className="text-sm font-medium">{t("activity.form.fields.advanced_options")}</span>
                   <Icons.ChevronDown
                     className={cn(
                       "h-4 w-4 transition-transform duration-200",
@@ -1011,12 +1016,12 @@ function DraftForm({
                     name="currency"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Currency</FormLabel>
+                        <FormLabel>{t("activity.form.fields.currency")}</FormLabel>
                         <FormControl>
                           <CurrencyInput
                             value={field.value}
                             onChange={field.onChange}
-                            placeholder="Select currency"
+                            placeholder={t("ai.tool.record_activity.currency_placeholder")}
                             className="w-full"
                           />
                         </FormControl>
@@ -1049,7 +1054,7 @@ function DraftForm({
                       name="subtype"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Subtype</FormLabel>
+                          <FormLabel>{t("activity.form.fields.subtype")}</FormLabel>
                           <FormControl>
                             <Select
                               value={field.value || "__none__"}
@@ -1058,11 +1063,13 @@ function DraftForm({
                               }
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="Select subtype" />
+                                <SelectValue placeholder={t("activity.form.select_subtype")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none__">
-                                  <span className="text-muted-foreground">None</span>
+                                  <span className="text-muted-foreground">
+                                    {t("activity.form.subtype_none")}
+                                  </span>
                                 </SelectItem>
                                 {subtypesForType.map((st) => (
                                   <SelectItem key={st.value} value={st.value}>
@@ -1084,10 +1091,10 @@ function DraftForm({
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Notes</FormLabel>
+                      <FormLabel>{t("activity.form.fields.comment")}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Add an optional note..."
+                          placeholder={t("activity.form.notes_placeholder")}
                           className="resize-none"
                           rows={2}
                           {...field}
@@ -1117,7 +1124,7 @@ function DraftForm({
               ) : (
                 <Icons.Check className="mr-2 h-4 w-4" />
               )}
-              Confirm
+              {t("ai.tool.record_activity.confirm")}
             </Button>
           </div>
         </FormProvider>
@@ -1140,6 +1147,7 @@ function RecordActivityToolUIContent({
   status,
   toolCallId,
 }: RecordActivityToolUIContentProps) {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -1164,9 +1172,11 @@ function RecordActivityToolUIContent({
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">Failed to prepare activity</p>
+          <p className="text-destructive text-sm font-medium">
+            {t("ai.tool.record_activity.error_prepare")}
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            The request was interrupted or failed.
+            {t("ai.tool.accounts.error_incomplete")}
           </p>
         </CardContent>
       </Card>
@@ -1178,7 +1188,9 @@ function RecordActivityToolUIContent({
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">No activity data available</p>
+          <p className="text-destructive text-sm font-medium">
+            {t("ai.tool.record_activity.error_no_data")}
+          </p>
         </CardContent>
       </Card>
     );

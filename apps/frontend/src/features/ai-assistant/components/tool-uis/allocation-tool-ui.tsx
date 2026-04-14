@@ -14,6 +14,7 @@ import {
   formatPercent,
 } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 
@@ -103,7 +104,7 @@ function normalizeResult(
         (entry.categoryName as string | undefined) ??
         (entry.category_name as string | undefined) ??
         (entry.category as string | undefined) ??
-        "Unknown",
+        "",
       color: (entry.color as string | undefined) ?? `var(--chart-${(index % 5) + 1})`,
       value: Number(entry.value ?? 0),
       percentage: Number(entry.percentage ?? 0),
@@ -163,6 +164,7 @@ type AllocationContentProps = ToolCallMessagePartProps<
 >;
 
 function AllocationContent({ args, result, status }: AllocationContentProps) {
+  const { t } = useTranslation("common");
   const typedArgs = args as GetAssetAllocationArgs | undefined;
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -198,13 +200,14 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     [currency],
   );
 
-  const taxonomyName = parsed?.taxonomyName ?? "Allocation";
+  const taxonomyName = parsed?.taxonomyName ?? t("ai.tool.allocation.title");
   const categoryName = parsed?.categoryName;
   const isLoading = status?.type === "running";
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const categoryCount = sortedCategories.length;
   const holdingsCount = sortedHoldings.length;
+  const unknownLabel = t("settings.securities.table.unknown");
 
   // Format value with privacy
   const formatValue = (value: number) => {
@@ -226,7 +229,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">Allocation</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("ai.tool.allocation.title")}</CardTitle>
               <Skeleton className="mt-1 h-3 w-16" />
             </div>
             <Skeleton className="h-5 w-20" />
@@ -261,7 +264,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     return (
       <Card className="bg-muted/40 border-destructive/30 w-full">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm">Failed to load allocation data.</p>
+          <p className="text-destructive text-sm">{t("ai.tool.allocation.error_load")}</p>
         </CardContent>
       </Card>
     );
@@ -272,7 +275,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No allocation data found.</p>
+          <p className="text-muted-foreground text-sm">{t("ai.tool.allocation.empty")}</p>
         </CardContent>
       </Card>
     );
@@ -285,13 +288,15 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">{categoryName ?? "Holdings"}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {categoryName ?? t("ai.tool.holdings.title")}
+              </CardTitle>
               <p className="text-muted-foreground mt-1 text-xs">
-                {holdingsCount} holding{holdingsCount !== 1 ? "s" : ""}
+                {t("ai.tool.allocation.holdings_count", { count: holdingsCount })}
               </p>
             </div>
             <Badge variant="outline" className="text-xs">
-              Drill-down
+              {t("ai.tool.allocation.drilldown")}
             </Badge>
           </div>
           <div className="mt-2">
@@ -303,10 +308,10 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground border-b text-left">
-                  <th className="pb-2 font-medium">Symbol</th>
-                  <th className="pb-2 font-medium">Name</th>
-                  <th className="pb-2 text-right font-medium">Value</th>
-                  <th className="pb-2 text-right font-medium">Weight</th>
+                  <th className="pb-2 font-medium">{t("ai.tool.common.table.symbol")}</th>
+                  <th className="pb-2 font-medium">{t("ai.tool.common.table.name")}</th>
+                  <th className="pb-2 text-right font-medium">{t("ai.tool.common.table.value")}</th>
+                  <th className="pb-2 text-right font-medium">{t("ai.tool.common.table.weight")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -336,7 +341,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
           <div>
             <CardTitle className="text-sm font-medium">{taxonomyName}</CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              {categoryCount} categor{categoryCount !== 1 ? "ies" : "y"}
+              {t("ai.tool.allocation.categories_count", { count: categoryCount })}
             </p>
           </div>
           {typedArgs?.accountId && typedArgs.accountId !== "TOTAL" && (
@@ -380,7 +385,7 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
                   <TooltipContent side="top" align="center">
                     <div className="text-center">
                       <span className="text-muted-foreground text-[0.70rem] uppercase">
-                        {category.categoryName}
+                        {category.categoryName || unknownLabel}
                       </span>
                       <div className="font-medium">{formatPercent(percent)}</div>
                       {!isBalanceHidden && (
@@ -412,7 +417,9 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
                         backgroundColor: category.color || `var(--chart-${(index % 5) + 1})`,
                       }}
                     />
-                    <span className="text-foreground truncate">{category.categoryName}</span>
+                    <span className="text-foreground truncate">
+                      {category.categoryName || unknownLabel}
+                    </span>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-3 tabular-nums">
                     <span className="text-muted-foreground w-12 text-right">

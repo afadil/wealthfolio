@@ -1,9 +1,11 @@
+import { useDataGridColumnHeaderMenuLabels } from "@/hooks/use-data-grid-column-header-labels";
 import { useCallback, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
 import { searchTicker } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { useTranslation } from "react-i18next";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -49,6 +51,7 @@ function useHoldingsColumns({
   onCreateCustomAsset,
   enableSymbolEditing,
 }: UseHoldingsColumnsOptions): ColumnDef<HoldingsRow>[] {
+  const { t } = useTranslation("common");
   return useMemo<ColumnDef<HoldingsRow>[]>(
     () => [
       // 1. Row number
@@ -70,7 +73,7 @@ function useHoldingsColumns({
       {
         id: "date",
         accessorKey: "date",
-        header: "Date",
+        header: t("activity.import.preview.col_date"),
         size: 120,
         meta: { cell: { variant: "short-text" } },
       },
@@ -78,7 +81,7 @@ function useHoldingsColumns({
       {
         id: "symbol",
         accessorKey: "symbol",
-        header: "Symbol",
+        header: t("activity.import.preview.col_symbol"),
         size: 160,
         meta: enableSymbolEditing
           ? {
@@ -96,7 +99,7 @@ function useHoldingsColumns({
       {
         id: "quantity",
         accessorKey: "quantity",
-        header: "Quantity",
+        header: t("activity.import.preview.col_shares"),
         size: 120,
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -105,7 +108,7 @@ function useHoldingsColumns({
       {
         id: "avgCost",
         accessorKey: "avgCost",
-        header: "Avg Cost",
+        header: t("activity.import.preview.col_price"),
         size: 120,
         enableSorting: false,
         meta: { cell: { variant: "number", step: 0.000001, valueType: "string" } },
@@ -114,13 +117,13 @@ function useHoldingsColumns({
       {
         id: "currency",
         accessorKey: "currency",
-        header: "Currency",
+        header: t("activity.import.preview.col_currency"),
         size: 110,
         enableSorting: false,
         meta: { cell: { variant: "currency" } },
       },
     ],
-    [enableSymbolEditing, onSymbolSearch, onSymbolSelect, onCreateCustomAsset],
+    [enableSymbolEditing, onSymbolSearch, onSymbolSelect, onCreateCustomAsset, t],
   );
 }
 
@@ -136,6 +139,7 @@ export function HoldingsDataGrid({
 }: HoldingsDataGridProps) {
   const { settings } = useSettingsContext();
   const fallbackCurrency = settings?.baseCurrency ?? "USD";
+  const columnHeaderMenuLabels = useDataGridColumnHeaderMenuLabels();
 
   // Custom asset dialog state
   const [customAssetDialog, setCustomAssetDialog] = useState<{
@@ -227,6 +231,7 @@ export function HoldingsDataGrid({
     enableColumnFilters: false,
     enableSearch: false,
     enablePaste: true,
+    columnHeaderMenuLabels,
     onDataChange: handleDataChange,
     initialState: {
       columnPinning: { left: ["status"] },

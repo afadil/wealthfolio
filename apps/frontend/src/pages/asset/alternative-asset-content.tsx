@@ -1,4 +1,7 @@
+import { buildIntervalButtonLabels, buildIntervalLabels } from "@/lib/interval-labels";
 import React, { useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
@@ -19,6 +22,7 @@ import {
   EmptyPlaceholder,
   AmountDisplay,
   formatPercent,
+  getInitialIntervalData,
 } from "@wealthfolio/ui";
 import HistoryChart from "@/components/history-chart-symbol";
 import { ValueHistoryDataGrid } from "./alternative-assets";
@@ -57,11 +61,28 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
   quoteHistory,
   activeTab,
 }) => {
+  const { t } = useTranslation();
+  const intervalLabels = useMemo(() => buildIntervalLabels(t), [t]);
+  const intervalButtonLabels = useMemo(() => buildIntervalButtonLabels(t), [t]);
+  const kindBadgeConfig = useMemo(
+    () => ({
+      property: { label: t("asset.alternative.kind.property"), color: "#6b7280" },
+      vehicle: { label: t("asset.alternative.kind.vehicle"), color: "#6b7280" },
+      collectible: { label: t("asset.alternative.kind.collectible"), color: "#6b7280" },
+      precious: { label: t("asset.alternative.kind.precious"), color: "#6b7280" },
+      liability: { label: t("asset.alternative.kind.liability"), color: "#6b7280" },
+      other: { label: t("asset.alternative.kind.other"), color: "#6b7280" },
+    }),
+    [t],
+  );
   const { isBalanceHidden } = useBalancePrivacy();
 
   // Chart state
   const [selectedIntervalCode, setSelectedIntervalCode] = useState<TimePeriod>("ALL");
-  const [selectedIntervalDesc, setSelectedIntervalDesc] = useState<string>("all time");
+  const selectedIntervalDesc = useMemo(
+    () => getInitialIntervalData(selectedIntervalCode, intervalLabels).description,
+    [selectedIntervalCode, intervalLabels],
+  );
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Fetch linked liabilities for property/vehicle
@@ -144,13 +165,8 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     };
   }, [filteredChartData, selectedIntervalCode, holding.unrealizedGain, holding.unrealizedGainPct]);
 
-  const handleIntervalSelect = (
-    code: TimePeriod,
-    description: string,
-    range: DateRange | undefined,
-  ) => {
+  const handleIntervalSelect = (code: TimePeriod, _description: string, range: DateRange | undefined) => {
     setSelectedIntervalCode(code);
-    setSelectedIntervalDesc(description);
     setDateRange(range);
   };
 
@@ -199,7 +215,9 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                     >
                       {isLiability ? (
                         <>
-                          {gainAmount <= 0 ? "Paid down " : "Increased "}
+                          {gainAmount <= 0
+                            ? t("asset.alternative.liability_paid_down")
+                            : t("asset.alternative.liability_increased")}
                           <AmountDisplay
                             value={Math.abs(gainAmount)}
                             currency={holding.currency}
@@ -230,14 +248,16 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                     onIntervalSelect={handleIntervalSelect}
                     className="absolute bottom-2 left-1/2 -translate-x-1/2 transform"
                     defaultValue="ALL"
+                    intervalLabels={intervalLabels}
+                    intervalButtonLabels={intervalButtonLabels}
                   />
                 </>
               ) : (
                 <div className="flex h-[200px] items-center justify-center">
                   <EmptyPlaceholder
                     icon={<Icons.Activity className="text-muted-foreground h-8 w-8" />}
-                    title="No valuation data"
-                    description="Add your first valuation to see the chart"
+                    title={t("asset.alternative.chart_empty_title")}
+                    description={t("asset.alternative.chart_empty_desc")}
                   />
                 </div>
               )}
@@ -258,14 +278,17 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
         {/* Second row: About section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-bold">About</h3>
+          <h3 className="text-lg font-bold">{t("asset.alternative.about")}</h3>
 
           {/* Kind and subtype badges */}
           <div className="flex flex-wrap items-center gap-2">
             {(() => {
               const kind = holding.kind.toLowerCase();
-              const kindConfig = KIND_CONFIG[kind] || KIND_CONFIG.other;
-              const subtypeLabel = getSubtypeLabel(kind, holding.metadata || {});
+              const kindConfig =
+                kind in kindBadgeConfig
+                  ? kindBadgeConfig[kind as keyof typeof kindBadgeConfig]
+                  : kindBadgeConfig.other;
+              const subtypeLabel = getSubtypeLabel(kind, holding.metadata || {}, t);
 
               return (
                 <>
@@ -302,7 +325,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
           {/* Notes */}
           <p className="text-muted-foreground text-sm">
-            {holding.notes || assetProfile?.notes || "No notes added."}
+            {holding.notes || assetProfile?.notes || t("asset.alternative.no_notes")}
           </p>
         </div>
       </div>
@@ -321,17 +344,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
   );
 };
 
-// Kind labels and colors for badges (subtle/muted colors)
-const KIND_CONFIG: Record<string, { label: string; color: string }> = {
-  property: { label: "Property", color: "#6b7280" },
-  vehicle: { label: "Vehicle", color: "#6b7280" },
-  collectible: { label: "Collectible", color: "#6b7280" },
-  precious: { label: "Precious Metal", color: "#6b7280" },
-  liability: { label: "Liability", color: "#6b7280" },
-  other: { label: "Other", color: "#6b7280" },
-};
-
-// Type-specific subtype labels
+// Type-specific subtype labels (fallbacks for t(..., { defaultValue }))
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
   residence: "Primary Residence",
   rental: "Rental Property",
@@ -362,20 +375,18 @@ const METAL_TYPE_LABELS: Record<string, string> = {
   palladium: "Palladium",
 };
 
-const LIABILITY_TYPE_LABELS: Record<string, string> = {
-  mortgage: "Mortgage",
-  auto_loan: "Auto Loan",
-  student_loan: "Student Loan",
-  credit_card: "Credit Card",
-  personal_loan: "Personal Loan",
-  heloc: "HELOC",
-};
-
 const WEIGHT_UNIT_LABELS: Record<string, string> = {
   oz: "Troy Ounce",
   g: "Gram",
   kg: "Kilogram",
 };
+
+function weightUnitLabel(unit: string | undefined, t: TFunction): string {
+  if (!unit) return "";
+  return t(`asset.alternative.weight.${unit}`, {
+    defaultValue: WEIGHT_UNIT_LABELS[unit] ?? unit,
+  });
+}
 
 interface AlternativeAssetDetailCardProps {
   holding: AlternativeAssetHolding;
@@ -391,30 +402,56 @@ interface AlternativeAssetDetailCardProps {
  * Get subtype label from metadata based on asset kind.
  * Checks both the unified 'sub_type' field and legacy type-specific fields.
  */
-function getSubtypeLabel(kind: string, metadata: Record<string, unknown>): string | null {
+function getSubtypeLabel(
+  kind: string,
+  metadata: Record<string, unknown>,
+  t: TFunction,
+): string | null {
   // First check the unified sub_type field (used by quick-add modal)
   const subType = metadata.sub_type as string | undefined;
 
   switch (kind) {
     case "property": {
       const propertyType = subType || (metadata.property_type as string | undefined);
-      return propertyType ? PROPERTY_TYPE_LABELS[propertyType] || propertyType : null;
+      return propertyType
+        ? t(`asset.alternative.subtype.property.${propertyType}`, {
+            defaultValue: PROPERTY_TYPE_LABELS[propertyType] ?? propertyType,
+          })
+        : null;
     }
     case "vehicle": {
       const vehicleType = subType || (metadata.vehicle_type as string | undefined);
-      return vehicleType ? VEHICLE_TYPE_LABELS[vehicleType] || vehicleType : null;
+      return vehicleType
+        ? t(`asset.alternative.subtype.vehicle.${vehicleType}`, {
+            defaultValue: VEHICLE_TYPE_LABELS[vehicleType] ?? vehicleType,
+          })
+        : null;
     }
     case "collectible": {
       const collectibleType = subType || (metadata.collectible_type as string | undefined);
-      return collectibleType ? COLLECTIBLE_TYPE_LABELS[collectibleType] || collectibleType : null;
+      return collectibleType
+        ? t(`asset.alternative.subtype.collectible.${collectibleType}`, {
+            defaultValue: COLLECTIBLE_TYPE_LABELS[collectibleType] ?? collectibleType,
+          })
+        : null;
     }
     case "precious": {
       const metalType = subType || (metadata.metal_type as string | undefined);
-      return metalType ? METAL_TYPE_LABELS[metalType] || metalType : null;
+      return metalType
+        ? t(`asset.alternative.subtype.precious.${metalType}`, {
+            defaultValue: METAL_TYPE_LABELS[metalType] ?? metalType,
+          })
+        : null;
     }
     case "liability": {
       const liabilityType = subType || (metadata.liability_type as string | undefined);
-      return liabilityType ? LIABILITY_TYPE_LABELS[liabilityType] || liabilityType : null;
+      return liabilityType
+        ? t(`asset.alternative.subtype.liability.${liabilityType}`, {
+            defaultValue: t(`holdings.liability_type.${liabilityType}`, {
+              defaultValue: liabilityType,
+            }),
+          })
+        : null;
     }
     default:
       return null;
@@ -437,13 +474,14 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
   isLiability,
   className,
 }) => {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
   const metadata = holding.metadata || {};
   const kind = holding.kind.toLowerCase();
 
   // Build detail rows based on asset type
-  const detailRows = getDetailRows(kind, metadata, holding, isBalanceHidden);
+  const detailRows = getDetailRows(kind, metadata, holding, isBalanceHidden, t);
 
   // Calculate liability progress
   const liabilityProgress = useMemo(() => {
@@ -477,9 +515,13 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
         <CardHeader className="flex flex-row items-center justify-between pb-0">
           <CardTitle className="flex w-full justify-between text-lg font-bold">
             <div>
-              <div className="text-muted-foreground text-sm font-normal">Net Equity</div>
+              <div className="text-muted-foreground text-sm font-normal">
+                {t("asset.alternative.net_equity")}
+              </div>
               {!hasLinkedLiabilities && (
-                <div className="text-muted-foreground text-xs font-normal">(no liabilities)</div>
+                <div className="text-muted-foreground text-xs font-normal">
+                  {t("asset.alternative.no_liabilities")}
+                </div>
               )}
             </div>
             <div>
@@ -505,10 +547,14 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
         <CardHeader className="flex flex-row items-center justify-between pb-0">
           <CardTitle className="flex w-full justify-between text-lg font-bold">
             <div>
-              <div className="text-muted-foreground text-sm font-normal">Amount Paid</div>
+              <div className="text-muted-foreground text-sm font-normal">
+                {t("asset.alternative.amount_paid")}
+              </div>
               {liabilityProgress.percentPaid !== null && (
                 <div className="text-muted-foreground text-xs font-normal">
-                  {formatPercent(liabilityProgress.percentPaid)} of original
+                  {t("asset.alternative.percent_of_original", {
+                    percent: formatPercent(liabilityProgress.percentPaid),
+                  })}
                 </div>
               )}
             </div>
@@ -533,7 +579,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
       {/* Fallback header for assets without special headers */}
       {!showNetEquityHeader && !showLiabilityHeader && (
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Details</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("asset.alternative.details_heading")}</CardTitle>
         </CardHeader>
       )}
 
@@ -543,7 +589,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
         <div className="space-y-4 text-sm">
           {!isLiability && holding.purchasePrice && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Purchase Price</span>
+              <span className="text-muted-foreground">{t("asset.alternative.purchase_price")}</span>
               <span className="font-medium">
                 <AmountDisplay
                   value={parseFloat(holding.purchasePrice)}
@@ -556,7 +602,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
 
           {!isLiability && holding.purchaseDate && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Purchase Date</span>
+              <span className="text-muted-foreground">{t("asset.alternative.purchase_date")}</span>
               <span className="font-medium">
                 {format(parseLocalDate(holding.purchaseDate), "MMM d, yyyy")}
               </span>
@@ -565,7 +611,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
 
           {holding.valuationDate && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Last Updated</span>
+              <span className="text-muted-foreground">{t("asset.alternative.last_updated")}</span>
               <span className="font-medium">
                 {format(parseLocalDate(holding.valuationDate), "MMM d, yyyy")}
               </span>
@@ -621,6 +667,7 @@ function getDetailRows(
   metadata: Record<string, unknown>,
   holding: AlternativeAssetHolding,
   isBalanceHidden: boolean,
+  t: TFunction,
 ): DetailRow[] {
   const rows: DetailRow[] = [];
 
@@ -629,7 +676,7 @@ function getDetailRows(
       // Address (type is shown in badge)
       const address = metadata.address as string | undefined;
       if (address) {
-        rows.push({ label: "Address", value: address });
+        rows.push({ label: t("asset.alternative.row.address"), value: address });
       }
       break;
     }
@@ -638,7 +685,7 @@ function getDetailRows(
       // Make/Model (type is shown in badge)
       const description = metadata.description as string | undefined;
       if (description) {
-        rows.push({ label: "Make/Model", value: description });
+        rows.push({ label: t("asset.alternative.row.make_model"), value: description });
       }
       break;
     }
@@ -647,7 +694,7 @@ function getDetailRows(
       // Description (type is shown in badge)
       const description = metadata.description as string | undefined;
       if (description) {
-        rows.push({ label: "Description", value: description });
+        rows.push({ label: t("asset.alternative.row.description"), value: description });
       }
       break;
     }
@@ -657,14 +704,17 @@ function getDetailRows(
       const quantity = metadata.quantity as string | number | undefined;
       const unit = metadata.unit as string | undefined;
       if (quantity) {
-        const unitLabel = unit ? WEIGHT_UNIT_LABELS[unit] || unit : "";
-        rows.push({ label: "Quantity", value: `${quantity} ${unitLabel}`.trim() });
+        const unitLabel = weightUnitLabel(unit, t);
+        rows.push({
+          label: t("asset.alternative.row.quantity"),
+          value: `${quantity} ${unitLabel}`.trim(),
+        });
       }
       // Purchase price per unit
       const pricePerUnit = metadata.purchase_price_per_unit as string | undefined;
       if (pricePerUnit) {
         rows.push({
-          label: "Purchase Price/Unit",
+          label: t("asset.alternative.row.purchase_price_unit"),
           value: (
             <AmountDisplay
               value={parseFloat(pricePerUnit)}
@@ -677,7 +727,7 @@ function getDetailRows(
       // Description
       const description = metadata.description as string | undefined;
       if (description) {
-        rows.push({ label: "Description", value: description });
+        rows.push({ label: t("asset.alternative.row.description"), value: description });
       }
       break;
     }
@@ -686,7 +736,7 @@ function getDetailRows(
       // Current balance (shown prominently for liabilities)
       const currentBalance = Math.abs(parseFloat(holding.marketValue));
       rows.push({
-        label: "Current Balance",
+        label: t("asset.alternative.row.current_balance"),
         value: (
           <AmountDisplay
             value={currentBalance}
@@ -702,7 +752,7 @@ function getDetailRows(
         | undefined;
       if (originalAmount) {
         rows.push({
-          label: "Original Amount",
+          label: t("asset.alternative.row.original_amount"),
           value: (
             <AmountDisplay
               value={parseFloat(originalAmount)}
@@ -716,7 +766,10 @@ function getDetailRows(
       // Interest rate
       const interestRate = metadata.interest_rate as string | undefined;
       if (interestRate) {
-        rows.push({ label: "Interest Rate", value: `${interestRate}%` });
+        rows.push({
+          label: t("asset.alternative.row.interest_rate"),
+          value: `${interestRate}%`,
+        });
       }
 
       // Note: Linked asset is shown in its own section with LinkedAssetSection
@@ -727,7 +780,7 @@ function getDetailRows(
         | undefined;
       if (originationDate) {
         rows.push({
-          label: "Origination Date",
+          label: t("asset.alternative.row.origination_date"),
           value: format(parseLocalDate(originationDate), "MMM d, yyyy"),
         });
       }
@@ -738,7 +791,7 @@ function getDetailRows(
     default: {
       const description = metadata.description as string | undefined;
       if (description) {
-        rows.push({ label: "Description", value: description });
+        rows.push({ label: t("asset.alternative.row.description"), value: description });
       }
       break;
     }
@@ -762,6 +815,7 @@ export function useAlternativeAssetActions({
   allHoldings,
   onNavigateBack,
 }: AlternativeAssetActionsProps) {
+  const { t } = useTranslation();
   // Modal state
   const [updateValuationOpen, setUpdateValuationOpen] = useState(false);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
@@ -903,14 +957,21 @@ export function useAlternativeAssetActions({
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Asset</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <span className="font-semibold">{holding.name}</span>?
-              This will remove all valuation history and cannot be undone.
+            <AlertDialogTitle>{t("asset.alternative.delete_title")}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <span>
+                <Trans
+                  i18nKey="asset.alternative.delete_description"
+                  values={{ name: holding.name }}
+                  components={{ highlight: <span className="font-semibold" /> }}
+                />
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              {t("settings.shared.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
@@ -919,10 +980,10 @@ export function useAlternativeAssetActions({
               {deleteMutation.isPending ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  {t("asset.alternative.deleting")}
                 </>
               ) : (
-                "Delete"
+                t("settings.shared.delete")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

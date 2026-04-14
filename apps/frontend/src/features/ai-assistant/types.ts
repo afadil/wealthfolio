@@ -1,5 +1,6 @@
 // AI Assistant Feature Types
 
+import i18n from "@/i18n/i18n";
 import type { MergedProvider } from "@/lib/types";
 
 // Re-export API types for convenience
@@ -335,56 +336,56 @@ export interface ChatError {
 }
 
 /**
- * Maps error codes to user-friendly messages and retry eligibility.
+ * Maps error codes to i18n keys (common.json) and retry eligibility.
  * Error codes come from the backend AiAssistantError enum.
  */
-export const ERROR_CODE_MAP: Record<string, { message: string; retryable: boolean }> = {
+export const ERROR_CODE_CONFIG: Record<string, { messageKey: string; retryable: boolean }> = {
   providerNotConfigured: {
-    message: "AI provider is not configured. Please set up a provider in Settings.",
+    messageKey: "aiAssistant.errors.provider_not_configured",
     retryable: false,
   },
   missingApiKey: {
-    message: "API key is missing. Please add your API key in Settings.",
+    messageKey: "aiAssistant.errors.missing_api_key",
     retryable: false,
   },
   modelNotFound: {
-    message: "The selected model is not available. Please choose a different model.",
+    messageKey: "aiAssistant.errors.model_not_found",
     retryable: false,
   },
   toolNotFound: {
-    message: "A required tool is not available. Please try again.",
+    messageKey: "aiAssistant.errors.tool_not_found",
     retryable: true,
   },
   toolNotAllowed: {
-    message: "A tool is not allowed for this conversation. Please try again.",
+    messageKey: "aiAssistant.errors.tool_not_allowed",
     retryable: true,
   },
   toolExecutionError: {
-    message: "A tool failed to execute. Please try again.",
+    messageKey: "aiAssistant.errors.tool_execution_error",
     retryable: true,
   },
   providerError: {
-    message: "The AI provider returned an error. Please try again.",
+    messageKey: "aiAssistant.errors.provider_error",
     retryable: true,
   },
   threadNotFound: {
-    message: "Conversation not found. Please start a new conversation.",
+    messageKey: "aiAssistant.errors.thread_not_found",
     retryable: false,
   },
   invalidInput: {
-    message: "Invalid input. Please check your message and try again.",
+    messageKey: "aiAssistant.errors.invalid_input",
     retryable: false,
   },
   internal: {
-    message: "An unexpected error occurred. Please try again.",
+    messageKey: "aiAssistant.errors.internal",
     retryable: true,
   },
   cancelled: {
-    message: "Response was cancelled.",
+    messageKey: "aiAssistant.errors.cancelled",
     retryable: true,
   },
   network: {
-    message: "Network error. Please check your connection and try again.",
+    messageKey: "aiAssistant.errors.network",
     retryable: true,
   },
 };
@@ -393,14 +394,14 @@ export const ERROR_CODE_MAP: Record<string, { message: string; retryable: boolea
  * Parse an error code and return a ChatError with user-friendly message.
  */
 export function parseErrorCode(code: string, rawMessage?: string): ChatError {
-  const mapped = ERROR_CODE_MAP[code];
+  const mapped = ERROR_CODE_CONFIG[code];
   if (mapped) {
-    return { code, message: mapped.message, retryable: mapped.retryable };
+    return { code, message: i18n.t(mapped.messageKey), retryable: mapped.retryable };
   }
   // Fallback for unknown error codes
   return {
     code,
-    message: rawMessage ?? "An unexpected error occurred. Please try again.",
+    message: rawMessage ?? i18n.t("aiAssistant.errors.unexpected"),
     retryable: true,
   };
 }

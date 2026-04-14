@@ -36,6 +36,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
 import { useQuery, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 
 interface AssetAccountHoldingsProps {
@@ -77,6 +78,7 @@ export function useHasManualSnapshots(assetId: string): boolean {
 
 /** Holdings table - per-account breakdown for an asset */
 export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHoldingsProps) {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
   const { accounts } = useAccounts();
   const isMobile = useIsMobileViewport();
@@ -89,11 +91,24 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
 
   const accountsMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
 
-  if (isLoading || assetHoldings.length === 0) return null;
+  if (isLoading) return null;
+
+  if (assetHoldings.length === 0) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">{t("asset.profile.account_holdings_title")}</h4>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {t("asset.profile.account_holdings_empty")}
+        </p>
+      </div>
+    );
+  }
 
   if (isMobile) {
     return (
       <div className="space-y-2">
+        <h4 className="text-sm font-medium">{t("asset.profile.account_holdings_title")}</h4>
+        <div className="space-y-2">
         {assetHoldings.map((h) => {
           const account = accountsMap.get(h.accountId);
           const gainAmount = h.totalGain?.local ?? 0;
@@ -106,12 +121,13 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                   <p className="truncate text-sm font-medium">{account?.name ?? h.accountId}</p>
                   {account?.trackingMode === "HOLDINGS" && (
                     <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-                      Manual
+                      {t("holdings.badge.manual")}
                     </Badge>
                   )}
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} /> shares
+                  <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} />{" "}
+                  {t("holdings.table.unit_shares")}
                 </p>
               </div>
               <div className="shrink-0 text-right">
@@ -134,22 +150,31 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
             </div>
           );
         })}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            <TableHead>Account</TableHead>
-            <TableHead className="text-right">Shares</TableHead>
-            <TableHead className="text-right">Market Value</TableHead>
-            <TableHead className="text-right">Cost Basis</TableHead>
-            <TableHead className="text-right">Gain/Loss</TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="space-y-2">
+      <h4 className="text-sm font-medium">{t("asset.profile.account_holdings_title")}</h4>
+      <div className="scrollbar-hide overflow-x-auto rounded-md border">
+        <Table className="min-w-[40rem] w-full">
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead>{t("asset.profile.account_holdings_col_account")}</TableHead>
+              <TableHead className="text-right">{t("asset.profile.account_holdings_col_shares")}</TableHead>
+              <TableHead className="text-right">
+                {t("asset.profile.account_holdings_col_market_value")}
+              </TableHead>
+              <TableHead className="text-right">
+                {t("asset.profile.account_holdings_col_cost_basis")}
+              </TableHead>
+              <TableHead className="text-right">
+                {t("asset.profile.account_holdings_col_gain_loss")}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {assetHoldings.map((h) => {
             const account = accountsMap.get(h.accountId);
@@ -162,7 +187,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
                     {account?.name ?? h.accountId}
                     {account?.trackingMode === "HOLDINGS" && (
                       <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                        Manual
+                        {t("holdings.badge.manual")}
                       </Badge>
                     )}
                   </div>
@@ -199,6 +224,7 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
           })}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }
@@ -220,10 +246,27 @@ export function AssetSnapshotHistory({
   assetId: string;
   baseCurrency: string;
 }) {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
   const queryClient = useQueryClient();
   const { accounts } = useAccounts();
   const isMobile = useIsMobileViewport();
+
+  const snapshotSourceLabel = useCallback(
+    (source: string) => {
+      switch (source) {
+        case "MANUAL_ENTRY":
+          return t("asset.profile.snapshot_source.manual");
+        case "CSV_IMPORT":
+          return t("asset.profile.snapshot_source.csv");
+        case "BROKER_IMPORTED":
+          return t("asset.profile.snapshot_source.broker");
+        default:
+          return source;
+      }
+    },
+    [t],
+  );
 
   const { data: assetHoldings = [] } = useQuery<Holding[]>({
     queryKey: [QueryKeys.ASSET_HOLDINGS, assetId],
@@ -401,7 +444,7 @@ export function AssetSnapshotHistory({
                 <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
                   <span className="truncate">{snap.accountName}</span>
                   <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
-                    {formatSource(snap.source)}
+                    {snapshotSourceLabel(snap.source)}
                   </Badge>
                 </div>
               </div>
@@ -455,16 +498,18 @@ export function AssetSnapshotHistory({
           ))}
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
+        <div className="scrollbar-hide overflow-x-auto rounded-md border">
+          <Table className="min-w-[44rem] w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead className="text-right">Shares</TableHead>
-                <TableHead className="text-right">Avg Cost</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead className="w-[80px]" />
+                <TableHead>{t("asset.profile.snapshot_history_col_date")}</TableHead>
+                <TableHead>{t("asset.profile.snapshot_history_col_account")}</TableHead>
+                <TableHead className="text-right">{t("asset.profile.snapshot_history_col_shares")}</TableHead>
+                <TableHead className="text-right">{t("asset.profile.snapshot_history_col_avg_cost")}</TableHead>
+                <TableHead>{t("asset.profile.snapshot_history_col_source")}</TableHead>
+                <TableHead className="w-[80px]">
+                  <span className="sr-only">{t("asset.profile.snapshot_history_col_actions")}</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -496,7 +541,7 @@ export function AssetSnapshotHistory({
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                      {formatSource(snap.source)}
+                      {snapshotSourceLabel(snap.source)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -537,7 +582,7 @@ export function AssetSnapshotHistory({
         <Sheet open={!!editingSnapshot} onOpenChange={() => handleEditClose()}>
           <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
-              <SheetTitle>Update Holdings</SheetTitle>
+              <SheetTitle>{t("holdings.page.update_holdings")}</SheetTitle>
             </SheetHeader>
             <div className="flex-1 overflow-hidden px-6">
               <HoldingsEditMode
@@ -555,38 +600,26 @@ export function AssetSnapshotHistory({
       <AlertDialog open={!!deletingSnapshot} onOpenChange={() => setDeletingSnapshot(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Position</AlertDialogTitle>
+            <AlertDialogTitle>{t("asset.account.remove_position_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove this asset from the {deletingSnapshot?.accountName} snapshot on{" "}
-              {deletingSnapshot?.date ? formatDate(deletingSnapshot.date) : ""}? The other positions
-              in the snapshot will be kept.
+              {t("asset.profile.snapshot_remove_description", {
+                accountName: deletingSnapshot?.accountName ?? "",
+                date: deletingSnapshot?.date ? formatDate(deletingSnapshot.date) : "",
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>{t("holdings.asset_details.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemovePosition}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? "Removing..." : "Remove"}
+              {isDeleting ? t("asset.profile.snapshot_remove_progress") : t("asset.profile.snapshot_remove_action")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
   );
-}
-
-function formatSource(source: string): string {
-  switch (source) {
-    case "MANUAL_ENTRY":
-      return "Manual";
-    case "CSV_IMPORT":
-      return "CSV";
-    case "BROKER_IMPORTED":
-      return "Broker";
-    default:
-      return source;
-  }
 }

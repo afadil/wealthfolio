@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
 import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
@@ -607,7 +608,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     errors.push({
       transactionId: transaction.id,
       field: "accountId",
-      message: "Account is required",
+      message: i18n.t("activity.validation.account_required"),
     });
   }
 
@@ -616,7 +617,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     errors.push({
       transactionId: transaction.id,
       field: "activityType",
-      message: "Activity type is required",
+      message: i18n.t("activity.validation.activity_type_required"),
     });
   }
 
@@ -625,7 +626,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     errors.push({
       transactionId: transaction.id,
       field: "date",
-      message: "Date is required",
+      message: i18n.t("activity.validation.date_required"),
     });
   }
 
@@ -636,7 +637,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
       errors.push({
         transactionId: transaction.id,
         field: "assetSymbol",
-        message: "Symbol is required for this activity type",
+        message: i18n.t("activity.validation.symbol_required_for_activity_type"),
       });
     }
   }
@@ -646,7 +647,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     errors.push({
       transactionId: transaction.id,
       field: "fee",
-      message: "Fee cannot be negative",
+      message: i18n.t("activity.validation.fee_non_negative"),
     });
   }
 
@@ -654,7 +655,7 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
     errors.push({
       transactionId: transaction.id,
       field: "fxRate",
-      message: "FX rate cannot be negative",
+      message: i18n.t("activity.validation.fx_rate_non_negative"),
     });
   }
 

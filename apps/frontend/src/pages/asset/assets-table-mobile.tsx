@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Badge, Card, Input } from "@wealthfolio/ui";
 
@@ -57,6 +58,7 @@ export function AssetsTableMobile({
   isUpdatingQuotes,
   isRefetchingQuotes,
 }: AssetsTableMobileProps) {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const navigate = useNavigate();
@@ -185,7 +187,7 @@ export function AssetsTableMobile({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Input
-          placeholder="Search..."
+          placeholder={t("settings.securities.mobile.search_placeholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="bg-secondary/30 h-10 flex-1 rounded-full border-none"
@@ -217,7 +219,7 @@ export function AssetsTableMobile({
                   const parsedOption = parseOccSymbol(rawSymbol);
                   const displaySymbol = parsedOption
                     ? parsedOption.underlying
-                    : (asset.displayCode ?? asset.name ?? "Unknown");
+                    : (asset.displayCode ?? asset.name ?? t("settings.securities.table.unknown"));
                   const subtitle = parsedOption
                     ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
                     : (asset.name ?? "-");
@@ -230,7 +232,7 @@ export function AssetsTableMobile({
                           <p className="truncate font-semibold">{displaySymbol}</p>
                           {parsedOption ? (
                             <Badge variant="secondary" className="text-[10px]">
-                              Option
+                              {t("settings.securities.table.option")}
                             </Badge>
                           ) : null}
                           <Badge variant="secondary" className="text-[10px] uppercase">
@@ -258,11 +260,11 @@ export function AssetsTableMobile({
                             <TooltipTrigger asChild>
                               <Icons.AlertTriangle
                                 className="text-destructive h-3.5 w-3.5"
-                                aria-label="Quote is behind market day"
+                                aria-label={t("settings.securities.table.quote_stale_aria")}
                               />
                             </TooltipTrigger>
                             <TooltipContent>
-                              Latest quote is behind the current market day
+                              {t("settings.securities.table.quote_stale_hint")}
                             </TooltipContent>
                           </Tooltip>
                         ) : null}
@@ -272,7 +274,9 @@ export function AssetsTableMobile({
                       </p>
                     </>
                   ) : (
-                    <span className="text-muted-foreground text-xs">No quotes</span>
+                    <span className="text-muted-foreground text-xs">
+                      {t("settings.securities.table.no_quotes")}
+                    </span>
                   )}
                 </div>
 
@@ -281,7 +285,7 @@ export function AssetsTableMobile({
                     <button
                       type="button"
                       className="hover:bg-muted text-muted-foreground inline-flex h-9 w-9 items-center justify-center rounded-md border transition"
-                      aria-label="Open actions"
+                      aria-label={t("settings.securities.table.open_actions")}
                     >
                       <Icons.MoreVertical className="h-4 w-4" />
                     </button>
@@ -291,24 +295,26 @@ export function AssetsTableMobile({
                       onClick={() => onUpdateQuotes(asset)}
                       disabled={isUpdatingQuotes}
                     >
-                      Update quotes
+                      {t("settings.securities.table.update_quotes")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => onRefetchQuotes(asset)}
                       disabled={isRefetchingQuotes}
                     >
-                      Refetch price history
+                      {t("settings.securities.table.refetch_history")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => onClassify?.(asset)}>
-                      Classify
+                      {t("settings.securities.mobile.classify")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit(asset)}>
+                      {t("settings.shared.edit")}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onSelect={() => onDelete(asset)}
                     >
-                      Delete
+                      {t("settings.shared.delete")}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -322,7 +328,7 @@ export function AssetsTableMobile({
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[70vh] flex-col">
           <SheetHeader className="text-left">
-            <SheetTitle>Filter Options</SheetTitle>
+            <SheetTitle>{t("settings.securities.mobile.filter_options")}</SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1 py-4">
             <div className="space-y-6">
@@ -330,7 +336,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                    Portfolio
+                    {t("settings.securities.table.filter_portfolio")}
                   </h4>
                   {selectedStatus.length > 0 &&
                     !(selectedStatus.length === 1 && selectedStatus[0] === "true") && (
@@ -340,14 +346,14 @@ export function AssetsTableMobile({
                         className="h-auto p-0 text-xs"
                         onClick={() => setSelectedStatus(["true"])}
                       >
-                        Reset
+                        {t("settings.securities.mobile.reset")}
                       </Button>
                     )}
                 </div>
                 <div className="space-y-2">
                   {[
-                    { label: "Current", value: "true" },
-                    { label: "Past", value: "false" },
+                    { label: t("settings.securities.table.holding_current"), value: "true" },
+                    { label: t("settings.securities.table.holding_past"), value: "false" },
                   ].map((option) => {
                     const isSelected = selectedStatus.includes(option.value);
                     const count = assets.filter(
@@ -399,7 +405,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                    Data Source
+                    {t("settings.securities.mobile.data_source")}
                   </h4>
                   {selectedDataSources.length > 0 && (
                     <Button
@@ -408,7 +414,7 @@ export function AssetsTableMobile({
                       className="h-auto p-0 text-xs"
                       onClick={() => setSelectedDataSources([])}
                     >
-                      Clear
+                      {t("settings.securities.mobile.clear")}
                     </Button>
                   )}
                 </div>
@@ -460,7 +466,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                    Asset Kind
+                    {t("settings.securities.mobile.asset_kind")}
                   </h4>
                   {selectedAssetKinds.length > 0 && (
                     <Button
@@ -469,7 +475,7 @@ export function AssetsTableMobile({
                       className="h-auto p-0 text-xs"
                       onClick={() => setSelectedAssetKinds([])}
                     >
-                      Clear
+                      {t("settings.securities.mobile.clear")}
                     </Button>
                   )}
                 </div>
@@ -523,7 +529,7 @@ export function AssetsTableMobile({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                    Price Status
+                    {t("settings.securities.mobile.price_status")}
                   </h4>
                   {selectedPriceStatus.length > 0 && (
                     <Button
@@ -532,14 +538,14 @@ export function AssetsTableMobile({
                       className="h-auto p-0 text-xs"
                       onClick={() => setSelectedPriceStatus([])}
                     >
-                      Clear
+                      {t("settings.securities.mobile.clear")}
                     </Button>
                   )}
                 </div>
                 <div className="space-y-2">
                   {[
-                    { label: "Up to Date", value: "false" },
-                    { label: "Stale", value: "true" },
+                    { label: t("settings.securities.table.status_up_to_date"), value: "false" },
+                    { label: t("settings.securities.table.status_stale"), value: "true" },
                   ].map((option) => {
                     const isSelected = selectedPriceStatus.includes(option.value);
                     const count = assets.filter((a) => {
@@ -591,12 +597,12 @@ export function AssetsTableMobile({
           <SheetFooter className="flex-row gap-2">
             {hasActiveFilters && (
               <Button variant="outline" className="flex-1" onClick={handleResetFilters}>
-                Reset All
+                {t("settings.securities.mobile.reset_all")}
               </Button>
             )}
             <SheetClose asChild>
               <Button variant="default" className="flex-1">
-                Apply
+                {t("settings.securities.mobile.apply")}
               </Button>
             </SheetClose>
           </SheetFooter>

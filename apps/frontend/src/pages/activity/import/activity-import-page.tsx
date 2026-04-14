@@ -11,7 +11,9 @@ import { Card, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import i18n from "@/i18n/i18n";
 
 // Context
 import {
@@ -59,14 +61,6 @@ import { findMappedActivityType, validateTickerSymbol } from "./utils/validation
 // Step Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEPS: WizardStep[] = [
-  { id: "upload", label: "Upload" },
-  { id: "mapping", label: "Mapping" },
-  { id: "assets", label: "Review Assets" },
-  { id: "review", label: "Review Activities" },
-  { id: "confirm", label: "Import" },
-];
-
 const STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
   upload: UploadStep,
   mapping: MappingStepUnified,
@@ -85,14 +79,6 @@ const HOLDINGS_STEP_COMPONENTS: Record<ImportStep, React.ComponentType> = {
   confirm: HoldingsConfirmStep,
   result: ContextResultStep,
 };
-
-const HOLDINGS_STEPS: WizardStep[] = [
-  { id: "upload", label: "Upload" },
-  { id: "mapping", label: "Mapping" },
-  { id: "assets", label: "Review Assets" },
-  { id: "review", label: "Review Holdings" },
-  { id: "confirm", label: "Import" },
-];
 
 // Holdings import required fields
 const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
@@ -301,9 +287,32 @@ function useStepValidation(isHoldingsMode: boolean, accounts?: Account[]) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ImportWizardContent() {
+  const { t } = useTranslation();
   const { state, dispatch, validateDrafts, previewAssets } = useImportContext();
   const navigate = useNavigate();
   const { isMobile } = usePlatform();
+
+  const activitySteps: WizardStep[] = useMemo(
+    () => [
+      { id: "upload", label: t("activity.import.step_upload") },
+      { id: "mapping", label: t("activity.import.step_mapping") },
+      { id: "assets", label: t("activity.import.step_review_assets") },
+      { id: "review", label: t("activity.import.step_review_activities") },
+      { id: "confirm", label: t("activity.import.step_import") },
+    ],
+    [t],
+  );
+
+  const holdingsSteps: WizardStep[] = useMemo(
+    () => [
+      { id: "upload", label: t("activity.import.step_upload") },
+      { id: "mapping", label: t("activity.import.step_mapping") },
+      { id: "assets", label: t("activity.import.step_review_assets") },
+      { id: "review", label: t("activity.import.step_review_holdings") },
+      { id: "confirm", label: t("activity.import.step_import") },
+    ],
+    [t],
+  );
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isNextLoading, setIsNextLoading] = useState(false);
@@ -329,7 +338,7 @@ function ImportWizardContent() {
   const canProceed = useStepValidation(isHoldingsMode, accounts);
 
   // Select the appropriate steps and components based on mode
-  const steps = isHoldingsMode ? HOLDINGS_STEPS : STEPS;
+  const steps = isHoldingsMode ? holdingsSteps : activitySteps;
   const stepComponents = isHoldingsMode ? HOLDINGS_STEP_COMPONENTS : STEP_COMPONENTS;
 
   // Step navigation
@@ -489,22 +498,31 @@ function ImportWizardContent() {
   const getNextLabel = useCallback(() => {
     switch (state.step) {
       case "upload":
-        return "Configure Mapping";
+        return t("activity.import.next_configure_mapping");
       case "mapping":
-        return "Review Assets";
+        return t("activity.import.next_review_assets");
       case "assets":
-        return isHoldingsMode ? "Review Holdings" : "Review Activities";
+        return isHoldingsMode
+          ? t("activity.import.next_review_holdings")
+          : t("activity.import.next_review_activities");
       case "review":
         return state.lastValidatedRevision === state.draftRevision
-          ? "Continue to Import"
-          : "Revalidate & Continue";
+          ? t("activity.import.next_continue_import")
+          : t("activity.import.next_revalidate_continue");
       default:
-        return "Continue";
+        return t("activity.import.next_continue");
     }
-  }, [state.step, isHoldingsMode, state.lastValidatedRevision, state.draftRevision]);
+  }, [
+    state.step,
+    isHoldingsMode,
+    state.lastValidatedRevision,
+    state.draftRevision,
+    t,
+  ]);
 
-  // Page title
-  const pageTitle = isHoldingsMode ? "Import Holdings" : "Import Activities";
+  const pageTitle = isHoldingsMode
+    ? t("activity.import.title_holdings")
+    : t("activity.import.title_activities");
 
   if (selectedAccount && !isCsvImportAllowed) {
     return (
@@ -512,11 +530,11 @@ function ImportWizardContent() {
         <PageHeader heading={pageTitle} onBack={() => navigate(-1)} />
         <PageContent>
           <div className="mx-auto max-w-3xl space-y-4 py-6">
-            <AlertFeedback variant="warning" title="CSV import disabled">
-              Holdings CSV import is disabled for connected accounts using Holdings tracking.
+            <AlertFeedback variant="warning" title={t("activity.import.csv_blocked_title")}>
+              {t("activity.import.csv_blocked_body")}
             </AlertFeedback>
             <Button variant="outline" onClick={() => navigate(`/account/${selectedAccount.id}`)}>
-              Go to Account
+              {t("activity.manager.go_to_account")}
             </Button>
           </div>
         </PageContent>
@@ -540,7 +558,7 @@ function ImportWizardContent() {
                 className="hidden sm:flex"
               >
                 <Icons.X className="mr-2 h-4 w-4" />
-                Cancel
+                {t("activity.form.cancel")}
               </Button>
             )}
           </div>
@@ -624,7 +642,9 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 
   override render() {
     if (this.state.hasError) {
-      return <AlertFeedback variant="error" title="Something went wrong." />;
+      return (
+        <AlertFeedback variant="error" title={i18n.t("activity.import.error_generic")} />
+      );
     }
 
     return this.props.children;

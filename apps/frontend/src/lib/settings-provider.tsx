@@ -17,6 +17,7 @@ interface ExtendedSettingsContextType extends SettingsContextType {
         | "onboardingCompleted"
         | "menuBarVisible"
         | "syncEnabled"
+        | "translationSourceLang"
       >
     >,
   ) => Promise<void>;
@@ -49,6 +50,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         | "onboardingCompleted"
         | "menuBarVisible"
         | "syncEnabled"
+        | "translationSourceLang"
       >
     >,
   ) => {

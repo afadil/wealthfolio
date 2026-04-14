@@ -169,7 +169,11 @@ mod tests {
             unimplemented!()
         }
 
-        async fn enrich_assets(&self, _asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+        async fn enrich_assets(
+            &self,
+            _asset_ids: Vec<String>,
+            _force_profile_refresh: bool,
+        ) -> Result<(usize, usize, usize)> {
             Ok((0, 0, 0))
         }
 

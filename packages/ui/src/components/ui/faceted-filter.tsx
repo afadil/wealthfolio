@@ -25,17 +25,33 @@ export interface FacetedFilterProps {
   }[];
   selectedValues: Set<string>;
   onFilterChange: (values: Set<string>) => void;
+  /** Shown when the command search has no matches (e.g. translated). */
+  emptyMessage?: string;
+  /** Label for the clear action at the bottom of the popover. */
+  clearFiltersLabel?: string;
+  /** When more than 2 values are selected, badge text (pass i18n from the app). */
+  manySelectedLabel?: (count: number) => string;
 }
 
-export function FacetedFilter({ title, options, selectedValues, onFilterChange }: FacetedFilterProps) {
+export function FacetedFilter({
+  title,
+  options,
+  selectedValues,
+  onFilterChange,
+  emptyMessage = "No results found.",
+  clearFiltersLabel = "Clear filters",
+  manySelectedLabel,
+}: FacetedFilterProps) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           size="sm"
           className={cn(
-            'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
+            "hover:bg-muted/80 bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
             selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
           )}
         >
@@ -50,7 +66,9 @@ export function FacetedFilter({ title, options, selectedValues, onFilterChange }
               <div className="hidden space-x-1 lg:flex">
                 {selectedValues.size > 2 ? (
                   <Badge variant="secondary" className="text-foreground rounded-sm px-1 font-normal">
-                    {selectedValues.size} selected
+                    {manySelectedLabel
+                      ? manySelectedLabel(selectedValues.size)
+                      : `${selectedValues.size} selected`}
                   </Badge>
                 ) : (
                   options
@@ -74,7 +92,7 @@ export function FacetedFilter({ title, options, selectedValues, onFilterChange }
         <Command>
           <CommandInput placeholder={title} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.has(option.value);
@@ -89,6 +107,8 @@ export function FacetedFilter({ title, options, selectedValues, onFilterChange }
                         newSelectedValues.add(option.value);
                       }
                       onFilterChange(newSelectedValues);
+                      // cmdk closes the popover on select; reopen so multi-select filters stay usable
+                      queueMicrotask(() => setOpen(true));
                     }}
                   >
                     <div
@@ -113,10 +133,13 @@ export function FacetedFilter({ title, options, selectedValues, onFilterChange }
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem
-                    onSelect={() => onFilterChange(new Set())}
+                    onSelect={() => {
+                      onFilterChange(new Set());
+                      queueMicrotask(() => setOpen(false));
+                    }}
                     className="text-destructive hover:bg-destructive/10 justify-center text-center text-sm"
                   >
-                    Clear filters
+                    {clearFiltersLabel}
                   </CommandItem>
                 </CommandGroup>
               </>

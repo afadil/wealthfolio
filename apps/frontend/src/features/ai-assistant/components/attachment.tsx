@@ -6,6 +6,7 @@ import {
   useAssistantState,
 } from "@assistant-ui/react";
 import { PropsWithChildren, useEffect, useState, type FC } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useShallow } from "zustand/shallow";
@@ -59,11 +60,12 @@ interface AttachmentPreviewProps {
 }
 
 const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
+  const { t } = useTranslation("common");
   const [isLoaded, setIsLoaded] = useState(false);
   return (
     <img
       src={src}
-      alt="Image Preview"
+      alt={t("ai.attachment.image_preview_alt")}
       className={
         isLoaded
           ? "aui-attachment-preview-image-loaded block h-auto max-h-[80vh] w-auto max-w-full object-contain"
@@ -75,6 +77,7 @@ const AttachmentPreview: FC<AttachmentPreviewProps> = ({ src }) => {
 };
 
 const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
+  const { t } = useTranslation("common");
   const src = useAttachmentSrc();
 
   if (!src) return children;
@@ -88,7 +91,9 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
         {children}
       </DialogTrigger>
       <DialogContent className="aui-attachment-preview-dialog-content [&>button]:bg-foreground/60 [&_svg]:text-background [&>button]:hover:[&_svg]:text-destructive [&>button]:ring-0! p-2 sm:max-w-3xl [&>button]:rounded-full [&>button]:p-1 [&>button]:opacity-100">
-        <DialogTitle className="aui-sr-only sr-only">Image Attachment Preview</DialogTitle>
+        <DialogTitle className="aui-sr-only sr-only">
+          {t("ai.attachment.preview_dialog_title")}
+        </DialogTitle>
         <div className="aui-attachment-preview bg-background relative mx-auto flex max-h-[80dvh] w-full items-center justify-center overflow-hidden">
           <AttachmentPreview src={src} />
         </div>
@@ -98,6 +103,7 @@ const AttachmentPreviewDialog: FC<PropsWithChildren> = ({ children }) => {
 };
 
 const AttachmentThumb: FC = () => {
+  const { t } = useTranslation("common");
   const isImage = useAssistantState(({ attachment }) => attachment.type === "image");
   const src = useAttachmentSrc();
 
@@ -105,7 +111,7 @@ const AttachmentThumb: FC = () => {
     <Avatar className="aui-attachment-tile-avatar h-full w-full rounded-none">
       <AvatarImage
         src={src}
-        alt="Attachment preview"
+        alt={t("ai.attachment.preview_alt")}
         className="aui-attachment-tile-image object-cover"
       />
       <AvatarFallback delayMs={isImage ? 200 : 0}>
@@ -116,6 +122,7 @@ const AttachmentThumb: FC = () => {
 };
 
 const AttachmentUI: FC = () => {
+  const { t } = useTranslation("common");
   const api = useAssistantApi();
   const isComposer = api.attachment.source === "composer";
 
@@ -124,11 +131,11 @@ const AttachmentUI: FC = () => {
     const type = attachment.type;
     switch (type) {
       case "image":
-        return "Image";
+        return t("ai.attachment.type_image");
       case "document":
-        return "Document";
+        return t("ai.attachment.type_document");
       case "file":
-        return "File";
+        return t("ai.attachment.type_file");
       default:
         const _exhaustiveCheck: never = type;
         throw new Error(`Unknown attachment type: ${_exhaustiveCheck}`);
@@ -152,7 +159,7 @@ const AttachmentUI: FC = () => {
               )}
               role="button"
               id="attachment-tile"
-              aria-label={`${typeLabel} attachment`}
+              aria-label={t("ai.attachment.aria_with_type", { type: typeLabel })}
             >
               <AttachmentThumb />
             </div>
@@ -168,10 +175,11 @@ const AttachmentUI: FC = () => {
 };
 
 const AttachmentRemove: FC = () => {
+  const { t } = useTranslation("common");
   return (
     <AttachmentPrimitive.Remove asChild>
       <TooltipIconButton
-        tooltip="Remove file"
+        tooltip={t("ai.attachment.remove_file")}
         className="aui-attachment-tile-remove text-muted-foreground hover:[&_svg]:text-destructive hover:bg-white! absolute right-1.5 top-1.5 size-3.5 rounded-full bg-white opacity-100 shadow-sm [&_svg]:text-black"
         side="top"
       >
@@ -198,15 +206,16 @@ export const ComposerAttachments: FC = () => {
 };
 
 export const ComposerAddAttachment: FC = () => {
+  const { t } = useTranslation("common");
   return (
     <ComposerPrimitive.AddAttachment asChild>
       <TooltipIconButton
-        tooltip="Add Attachment"
+        tooltip={t("ai.attachment.add_aria")}
         side="bottom"
         variant="ghost"
         size="icon"
         className="aui-composer-add-attachment hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-[34px] rounded-full p-1 text-xs font-semibold"
-        aria-label="Add Attachment"
+        aria-label={t("ai.attachment.add_aria")}
       >
         <Icons.Plus className="aui-attachment-add-icon size-5 stroke-[1.5px]" />
       </TooltipIconButton>

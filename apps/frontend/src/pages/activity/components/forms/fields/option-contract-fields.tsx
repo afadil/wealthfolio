@@ -14,6 +14,7 @@ import {
 } from "@wealthfolio/ui";
 import { useEffect, useRef } from "react";
 import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 
 interface OptionContractFieldsProps<TFieldValues extends FieldValues = FieldValues> {
   underlyingName: FieldPath<TFieldValues>;
@@ -40,20 +41,19 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
   quoteCcyName,
   unitPriceName,
 }: OptionContractFieldsProps<TFieldValues>) {
+  const { t, i18n } = useTranslation("common");
   const { control, setValue, getValues, watch } = useFormContext<TFieldValues>();
   const latestResolveRequestId = useRef(0);
   const needsCurrencyConfirmation = useRef(false);
   const provisionalCurrency = useRef<string | undefined>(undefined);
 
-  // Watch contract fields for summary display and OCC resolve
   const underlying = watch(underlyingName) as string | undefined;
   const strikePrice = watch(strikePriceName) as number | undefined;
   const expirationDate = watch(expirationDateName) as string | undefined;
   const optionType = watch(optionTypeName) as string | undefined;
 
-  // Format expiration for summary (YYYY-MM-DD → "Mar 29")
   const expirationDisplay = expirationDate
-    ? new Date(expirationDate + "T12:00:00").toLocaleDateString("en-US", {
+    ? new Date(expirationDate + "T12:00:00").toLocaleDateString(i18n.language, {
         month: "short",
         day: "numeric",
       })
@@ -63,7 +63,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
   const handleUnderlyingSelect = (symbol: string, searchResult?: SymbolSearchResult) => {
     const upper = symbol.toUpperCase();
 
-    // Try to parse as OCC symbol — either from user paste or option search result
     const parsed = parseOccSymbol(upper);
     if (parsed) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,13 +90,11 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
       setValue(exchangeMicName, searchResult.exchangeMic as any);
     }
 
-    // Set initial quoteCcy from search result
     if (quoteCcyName && searchResult?.currency) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setValue(quoteCcyName, searchResult.currency as any);
     }
 
-    // Track whether currency needs provider confirmation (used by OCC resolve effect)
     needsCurrencyConfirmation.current =
       !!currencyName &&
       !!searchResult &&
@@ -106,8 +103,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
     provisionalCurrency.current = searchResult?.currency?.trim();
   };
 
-  // Resolve option contract quote when all contract fields are filled.
-  // Builds OCC symbol → resolves via provider → sets currency + pre-fills premium.
   useEffect(() => {
     if (!underlying || !strikePrice || !expirationDate || !optionType) return;
     if (optionType !== "CALL" && optionType !== "PUT") return;
@@ -130,7 +125,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
           setValue(quoteCcyName, confirmedCurrency as any);
         }
 
-        // Update activity currency if it was exchange-inferred and user hasn't changed it
         if (needsCurrencyConfirmation.current && confirmedCurrency && currencyName) {
           const current = getValues(currencyName);
           if (current === provisionalCurrency.current) {
@@ -142,7 +136,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
           }
         }
 
-        // Pre-fill premium if not already set by user
         if (resolved?.price != null && unitPriceName) {
           const currentPrice = getValues(unitPriceName);
           if (!currentPrice) {
@@ -151,41 +144,35 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
           }
         }
       })
-      .catch(() => {
-        // Ignore — provisional currency from search result is already set
-      });
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlying, strikePrice, expirationDate, optionType]);
 
   return (
     <div className="space-y-4">
-      <h4 className="text-muted-foreground text-sm font-medium">Option Contract</h4>
+      <h4 className="text-muted-foreground text-sm font-medium">{t("activity.form.option.section_title")}</h4>
 
-      {/* Symbol search — accepts option contracts, underlying tickers, or OCC symbols */}
       <FormField
         control={control}
         name={underlyingName}
         render={({ field }) => (
           <FormItem className="-mt-2">
-            <FormLabel>Symbol</FormLabel>
+            <FormLabel>{t("activity.form.option.symbol_label")}</FormLabel>
             <FormControl>
               <TickerSearchInput
                 onSelectResult={handleUnderlyingSelect}
                 value={field.value as string}
-                placeholder="Search option or ticker..."
+                placeholder={t("activity.form.option.symbol_placeholder")}
               />
             </FormControl>
             <FormMessage className="text-xs" />
             {!field.value && (
-              <p className="text-muted-foreground text-xs">
-                Search by ticker, option contract, or paste an OCC symbol
-              </p>
+              <p className="text-muted-foreground text-xs">{t("activity.form.option.symbol_hint")}</p>
             )}
           </FormItem>
         )}
       />
 
-      {/* Call / Put — full-width toggle, prominent */}
       <FormField
         control={control}
         name={optionTypeName}
@@ -211,7 +198,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Call
+                  CALL
                 </button>
                 <button
                   type="button"
@@ -231,7 +218,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Put
+                  PUT
                 </button>
               </div>
             </FormControl>
@@ -240,14 +227,13 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
         )}
       />
 
-      {/* Strike Price + Expiration Date */}
       <div className="grid grid-cols-2 gap-4">
         <FormField
           control={control}
           name={strikePriceName}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Strike Price</FormLabel>
+              <FormLabel>{t("activity.form.option.strike_price")}</FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -258,7 +244,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                     field.onChange(e.target.value ? Number(e.target.value) : undefined)
                   }
                   className="h-10"
-                  aria-label="Strike Price"
+                  aria-label={t("activity.form.option.strike_price")}
                 />
               </FormControl>
               <FormMessage />
@@ -270,7 +256,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
           name={expirationDateName}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Expiration</FormLabel>
+              <FormLabel>{t("activity.form.option.expiration")}</FormLabel>
               <FormControl>
                 <DatePickerInput
                   onChange={(date: Date | undefined) => {
@@ -292,11 +278,10 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
         />
       </div>
 
-      {/* Contract Summary — confirms what the user is building */}
       {hasContractSummary && (
         <div className="bg-muted/50 border-border rounded-md border px-3 py-2">
           <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
-            Contract
+            {t("activity.form.option.contract_summary")}
           </span>
           <p className="text-sm font-medium tabular-nums">
             {expirationDisplay} ${strikePrice} {optionType}

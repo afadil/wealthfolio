@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { KeyboardEvent, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ActivityDataGridPaginationProps {
   pageIndex: number;
@@ -31,6 +32,7 @@ export function ActivityDataGridPagination({
   onPageChange,
   onPageSizeChange,
 }: ActivityDataGridPaginationProps) {
+  const { t } = useTranslation("common");
   const [pageInput, setPageInput] = useState<string>("");
 
   const currentPage = pageIndex + 1;
@@ -76,18 +78,18 @@ export function ActivityDataGridPagination({
       <div className="text-muted-foreground flex items-center gap-2 text-center text-xs sm:text-left">
         {isFetching && <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />}
         {totalRowCount === 0 ? (
-          <span>No activities</span>
+          <span>{t("activity.pagination.no_activities")}</span>
         ) : (
           <span>
-            <span className="hidden sm:inline">Showing </span>
+            <span className="hidden sm:inline">{t("activity.pagination.showing")} </span>
             <span className="text-foreground font-medium">{startRow}</span>
-            <span className="hidden sm:inline"> to </span>
+            <span className="hidden sm:inline"> {t("activity.pagination.to")} </span>
             <span className="sm:hidden">-</span>
             <span className="text-foreground font-medium">{endRow}</span>
-            <span className="hidden sm:inline"> of </span>
+            <span className="hidden sm:inline"> {t("activity.pagination.of_total")} </span>
             <span className="sm:hidden"> / </span>
             <span className="text-foreground font-medium">{totalRowCount}</span>
-            <span className="hidden sm:inline"> activities</span>
+            <span className="hidden sm:inline"> {t("activity.pagination.activities_suffix")}</span>
           </span>
         )}
       </div>
@@ -97,8 +99,8 @@ export function ActivityDataGridPagination({
         {/* Rows per page selector */}
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-xs">
-            <span className="hidden sm:inline">Rows per page</span>
-            <span className="sm:hidden">Show</span>
+            <span className="hidden sm:inline">{t("activity.pagination.rows_per_page")}</span>
+            <span className="sm:hidden">{t("activity.pagination.show_short")}</span>
           </span>
           <Select
             value={`${pageSize}`}
@@ -131,10 +133,10 @@ export function ActivityDataGridPagination({
             onBlur={handleBlur}
             placeholder={`${currentPage}`}
             className="h-7 w-[50px] text-center text-xs"
-            title={`Enter a page number between 1 and ${pageCount}`}
+            title={t("activity.pagination.jump_title", { max: pageCount || 1 })}
           />
           <span className="text-muted-foreground whitespace-nowrap text-xs">
-            <span className="hidden sm:inline">of</span>
+            <span className="hidden sm:inline">{t("activity.pagination.page_of")}</span>
             <span className="sm:hidden">/</span> {pageCount || 1}
           </span>
         </div>
@@ -148,9 +150,9 @@ export function ActivityDataGridPagination({
             className="hidden h-7 w-7 sm:flex"
             onClick={() => onPageChange(0)}
             disabled={!canPreviousPage || isFetching}
-            title="Go to first page"
+            title={t("activity.pagination.go_first")}
           >
-            <span className="sr-only">Go to first page</span>
+            <span className="sr-only">{t("activity.pagination.go_first")}</span>
             <Icons.ChevronsLeft className="h-3.5 w-3.5" />
           </Button>
           {/* Previous page */}
@@ -160,9 +162,9 @@ export function ActivityDataGridPagination({
             className="h-7 w-7"
             onClick={() => onPageChange(pageIndex - 1)}
             disabled={!canPreviousPage || isFetching}
-            title="Previous page"
+            title={t("activity.pagination.go_prev")}
           >
-            <span className="sr-only">Go to previous page</span>
+            <span className="sr-only">{t("activity.pagination.go_prev")}</span>
             <Icons.ChevronLeft className="h-3.5 w-3.5" />
           </Button>
           {/* Next page */}
@@ -172,9 +174,9 @@ export function ActivityDataGridPagination({
             className="h-7 w-7"
             onClick={() => onPageChange(pageIndex + 1)}
             disabled={!canNextPage || isFetching}
-            title="Next page"
+            title={t("activity.pagination.go_next")}
           >
-            <span className="sr-only">Go to next page</span>
+            <span className="sr-only">{t("activity.pagination.go_next")}</span>
             <Icons.ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {/* Last page */}
@@ -184,9 +186,9 @@ export function ActivityDataGridPagination({
             className="hidden h-7 w-7 sm:flex"
             onClick={() => onPageChange(pageCount - 1)}
             disabled={!canNextPage || isFetching}
-            title="Go to last page"
+            title={t("activity.pagination.go_last")}
           >
-            <span className="sr-only">Go to last page</span>
+            <span className="sr-only">{t("activity.pagination.go_last")}</span>
             <Icons.ChevronsRight className="h-3.5 w-3.5" />
           </Button>
         </div>

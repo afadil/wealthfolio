@@ -1,0 +1,12 @@
+[package]
+name = "wealthfolio-translation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Optional text translation helpers (MyMemory public API)"
+
+[dependencies]
+log.workspace = true
+reqwest.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

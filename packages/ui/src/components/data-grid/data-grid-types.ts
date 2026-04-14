@@ -107,6 +107,54 @@ export interface UpdateCell {
   value: unknown;
 }
 
+/** Overrides for strings in `DataGridColumnHeader` (merged with English defaults). */
+export interface DataGridColumnHeaderMenuLabels {
+  sortAsc: string;
+  sortDesc: string;
+  removeSort: string;
+  pinToLeft: string;
+  unpinFromLeft: string;
+  pinToRight: string;
+  unpinFromRight: string;
+  hideColumn: string;
+  /** `aria-label` for the column resize handle; receives the column title. */
+  resizeColumnAria: (columnLabel: string) => string;
+}
+
+/** Row/cell context menu (right-click). */
+export interface DataGridContextMenuLabels {
+  copy: string;
+  cut: string;
+  paste: string;
+  clear: string;
+  deleteRows: string;
+  toastCellsCleared: (count: number) => string;
+  toastRowsDeleted: (count: number) => string;
+}
+
+/** Paste expansion dialog copy. */
+export interface DataGridPasteDialogLabels {
+  title: string;
+  description: (rowsNeeded: number) => string;
+  expandTitle: string;
+  expandDescription: (rowsNeeded: number) => string;
+  fitTitle: string;
+  fitDescription: string;
+  cancel: string;
+  continue: string;
+}
+
+/** In-grid search panel (Ctrl+F). */
+export interface DataGridSearchLabels {
+  placeholder: string;
+  noResults: string;
+  typeToSearch: string;
+  matchProgress: (current: number, total: number) => string;
+  ariaPreviousMatch: string;
+  ariaNextMatch: string;
+  ariaCloseSearch: string;
+}
+
 declare module "@tanstack/react-table" {
   // biome-ignore lint/correctness/noUnusedVariables: TData and TValue are used in the ColumnMeta interface
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -165,6 +213,12 @@ declare module "@tanstack/react-table" {
     onPasteDialogOpenChange?: (open: boolean) => void;
     onPasteWithExpansion?: () => void;
     onPasteWithoutExpansion?: () => void;
+    /** Override labels for the default column header menu (sort / pin / hide). English defaults apply for omitted keys. */
+    columnHeaderMenuLabels?: Partial<DataGridColumnHeaderMenuLabels>;
+    contextMenuLabels?: Partial<DataGridContextMenuLabels>;
+    pasteDialogLabels?: Partial<DataGridPasteDialogLabels>;
+    /** When `enablePaste`, invoked from the context menu or Ctrl+V. */
+    onCellsPaste?: (expandRows?: boolean) => void | Promise<void>;
   }
 }
 
@@ -222,6 +276,7 @@ export interface SearchState {
   onSearch: (query: string) => void;
   onNavigateToNextMatch: () => void;
   onNavigateToPrevMatch: () => void;
+  searchLabels?: Partial<DataGridSearchLabels>;
 }
 
 export interface CellValidationState {

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { submitAddonRating, getAddonRatings } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
+import { useTranslation } from "react-i18next";
 
 interface SubmitRatingParams {
   addonId: string;
@@ -10,6 +11,7 @@ interface SubmitRatingParams {
 }
 
 export function useAddonRatingMutation() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -19,8 +21,8 @@ export function useAddonRatingMutation() {
     },
     onSuccess: () => {
       toast({
-        title: "Rating submitted",
-        description: "Thank you for your feedback!",
+        title: t("settings.addons.hooks.rating_submitted_title"),
+        description: t("settings.addons.hooks.rating_submitted_description"),
       });
 
       // Invalidate relevant queries to refresh data
@@ -36,8 +38,8 @@ export function useAddonRatingMutation() {
     onError: (error: Error) => {
       console.error("Failed to submit rating:", error);
       toast({
-        title: "Rating submission failed",
-        description: error.message || "Failed to submit rating",
+        title: t("settings.addons.hooks.rating_submit_failed_title"),
+        description: error.message || t("settings.addons.hooks.rating_submit_failed_description"),
         variant: "destructive",
       });
     },

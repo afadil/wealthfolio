@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { AlternativeAssetKind } from "@/lib/types";
 import * as z from "zod";
 
@@ -18,13 +19,22 @@ export const WEIGHT_UNITS = [
 
 // Liability types
 export const LIABILITY_TYPES = [
-  { value: "mortgage", label: "Mortgage" },
-  { value: "auto_loan", label: "Auto Loan" },
-  { value: "student_loan", label: "Student Loan" },
-  { value: "credit_card", label: "Credit Card" },
-  { value: "personal_loan", label: "Personal Loan" },
-  { value: "heloc", label: "HELOC" },
-  { value: "other", label: "Other" },
+  { value: "mortgage", label: i18n.t("asset.alternative.quick_add.liability_option.mortgage") },
+  { value: "auto_loan", label: i18n.t("asset.alternative.quick_add.liability_option.auto_loan") },
+  {
+    value: "student_loan",
+    label: i18n.t("asset.alternative.quick_add.liability_option.student_loan"),
+  },
+  {
+    value: "credit_card",
+    label: i18n.t("asset.alternative.quick_add.liability_option.credit_card"),
+  },
+  {
+    value: "personal_loan",
+    label: i18n.t("asset.alternative.quick_add.liability_option.personal_loan"),
+  },
+  { value: "heloc", label: i18n.t("asset.alternative.quick_add.liability_option.heloc") },
+  { value: "other", label: i18n.t("asset.alternative.quick_add.liability_option.other") },
 ] as const;
 
 // Asset type options for the type selector
@@ -51,22 +61,25 @@ export const alternativeAssetQuickAddSchema = z
     ]),
 
     // Common fields
-    name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
-    currency: z.string().min(1, "Currency is required"),
+    name: z
+      .string()
+      .min(1, i18n.t("alternativeAsset.quickAdd.validation.name_required"))
+      .max(100, i18n.t("alternativeAsset.quickAdd.validation.name_max")),
+    currency: z.string().min(1, i18n.t("alternativeAsset.quickAdd.validation.currency_required")),
     quantity: z.coerce
       .number({
-        required_error: "Please enter a valid quantity.",
-        invalid_type_error: "Quantity must be a number.",
+        required_error: i18n.t("alternativeAsset.quickAdd.validation.quantity_required"),
+        invalid_type_error: i18n.t("alternativeAsset.quickAdd.validation.quantity_invalid_type"),
       })
-      .positive("Quantity must be greater than 0"),
+      .positive(i18n.t("alternativeAsset.quickAdd.validation.quantity_positive")),
     currentValue: z.coerce
       .number({
-        required_error: "Please enter a valid value.",
-        invalid_type_error: "Value must be a number.",
+        required_error: i18n.t("alternativeAsset.quickAdd.validation.value_required"),
+        invalid_type_error: i18n.t("alternativeAsset.quickAdd.validation.value_invalid_type"),
       })
-      .positive("Value must be greater than 0"),
+      .positive(i18n.t("alternativeAsset.quickAdd.validation.value_positive")),
     valueDate: z.date({
-      required_error: "Value date is required",
+      required_error: i18n.t("alternativeAsset.quickAdd.validation.value_date_required"),
     }),
 
     // Property-specific: has mortgage checkbox
@@ -99,7 +112,7 @@ export const alternativeAssetQuickAddSchema = z
       return true;
     },
     {
-      message: "Metal type and unit are required for precious metals",
+      message: i18n.t("alternativeAsset.quickAdd.validation.metal_type_unit_required"),
       path: ["metalType"],
     },
   );

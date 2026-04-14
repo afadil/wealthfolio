@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -166,6 +167,7 @@ type ActivitiesContentProps = ToolCallMessagePartProps<
 >;
 
 function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -199,7 +201,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">Activities</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("ai.tool.activities.title")}</CardTitle>
               <Skeleton className="mt-1 h-3 w-24" />
             </div>
             <Skeleton className="h-5 w-20" />
@@ -210,12 +212,14 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4 text-xs">Date</TableHead>
-                  <TableHead className="text-xs">Type</TableHead>
-                  <TableHead className="text-xs">Symbol</TableHead>
-                  <TableHead className="text-right text-xs">Qty</TableHead>
-                  <TableHead className="text-right text-xs">Price</TableHead>
-                  <TableHead className="pr-4 text-right text-xs">Amount</TableHead>
+                  <TableHead className="pl-4 text-xs">{t("ai.tool.activities.col.date")}</TableHead>
+                  <TableHead className="text-xs">{t("ai.tool.activities.col.type")}</TableHead>
+                  <TableHead className="text-xs">{t("ai.tool.activities.col.symbol")}</TableHead>
+                  <TableHead className="text-right text-xs">{t("ai.tool.activities.col.qty")}</TableHead>
+                  <TableHead className="text-right text-xs">{t("ai.tool.activities.col.price")}</TableHead>
+                  <TableHead className="pr-4 text-right text-xs">
+                    {t("ai.tool.activities.col.amount")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -254,7 +258,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
     return (
       <Card className="bg-muted/40 border-destructive/30 w-full">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm">Failed to load activities data.</p>
+          <p className="text-destructive text-sm">{t("ai.tool.activities.error_load")}</p>
         </CardContent>
       </Card>
     );
@@ -265,7 +269,7 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No activities found for this query.</p>
+          <p className="text-muted-foreground text-sm">{t("ai.tool.activities.empty")}</p>
         </CardContent>
       </Card>
     );
@@ -277,9 +281,14 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-sm font-medium">Activities</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("ai.tool.activities.title")}</CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              {activitiesCount} transaction{activitiesCount !== 1 ? "s" : ""}
+              {t(
+                activitiesCount === 1
+                  ? "ai.tool.activities.transaction_count_one"
+                  : "ai.tool.activities.transaction_count_other",
+                { count: activitiesCount },
+              )}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -301,12 +310,14 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 text-xs">Date</TableHead>
-                <TableHead className="text-xs">Type</TableHead>
-                <TableHead className="text-xs">Symbol</TableHead>
-                <TableHead className="text-right text-xs">Qty</TableHead>
-                <TableHead className="text-right text-xs">Price</TableHead>
-                <TableHead className="pr-4 text-right text-xs">Amount</TableHead>
+                <TableHead className="pl-4 text-xs">{t("ai.tool.activities.col.date")}</TableHead>
+                <TableHead className="text-xs">{t("ai.tool.activities.col.type")}</TableHead>
+                <TableHead className="text-xs">{t("ai.tool.activities.col.symbol")}</TableHead>
+                <TableHead className="text-right text-xs">{t("ai.tool.activities.col.qty")}</TableHead>
+                <TableHead className="text-right text-xs">{t("ai.tool.activities.col.price")}</TableHead>
+                <TableHead className="pr-4 text-right text-xs">
+                  {t("ai.tool.activities.col.amount")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -53,6 +53,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/compon
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import * as z from "zod";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
@@ -186,6 +187,7 @@ function PricingModeToggle({
   isManualMode: boolean;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const isAutomatic = !isManualMode;
 
@@ -193,11 +195,11 @@ function PricingModeToggle({
     <div className="rounded-lg border p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1 space-y-1">
-          <Label className="text-sm font-medium">Automatic Updates</Label>
+          <Label className="text-sm font-medium">{t("settings.securities.edit.auto_updates")}</Label>
           <p className="text-muted-foreground text-xs">
             {isAutomatic
-              ? "Prices sync automatically from market data providers."
-              : "Automatic syncing is off. You manage prices manually."}
+              ? t("settings.securities.edit.auto_updates_on")
+              : t("settings.securities.edit.auto_updates_off")}
           </p>
         </div>
         <Popover open={open} onOpenChange={setOpen}>
@@ -209,32 +211,32 @@ function PricingModeToggle({
           <PopoverContent className="w-[360px] p-4" align="end">
             <div className="space-y-4">
               <h4 className="font-medium">
-                {isAutomatic ? "Disable Automatic Updates?" : "Enable Automatic Updates?"}
+                {isAutomatic
+                  ? t("settings.securities.edit.disable_auto_title")
+                  : t("settings.securities.edit.enable_auto_title")}
               </h4>
               {isAutomatic ? (
                 <>
                   <p className="text-muted-foreground text-sm">
-                    Turning this off will stop automatic price updates. You&apos;ll need to enter
-                    and maintain price data yourself.
+                    {t("settings.securities.edit.disable_auto_desc")}
                   </p>
                   <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                    Automatic price updates will be disabled.
+                    {t("settings.securities.edit.disable_auto_warning")}
                   </p>
                 </>
               ) : (
                 <>
                   <p className="text-muted-foreground text-sm">
-                    Turning this on will enable price fetching from market data providers. Your
-                    manually entered quotes will be preserved but may be overwritten on sync.
+                    {t("settings.securities.edit.enable_auto_desc")}
                   </p>
                   <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                    Manual quotes may be replaced by provider data.
+                    {t("settings.securities.edit.enable_auto_warning")}
                   </p>
                 </>
               )}
               <div className="flex justify-end space-x-2">
                 <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-                  Cancel
+                  {t("settings.shared.cancel")}
                 </Button>
                 <Button
                   variant="default"
@@ -244,7 +246,7 @@ function PricingModeToggle({
                     setOpen(false);
                   }}
                 >
-                  Confirm
+                  {t("settings.securities.edit.confirm")}
                 </Button>
               </div>
             </div>
@@ -270,6 +272,7 @@ export function AssetEditSheet({
   onOpenChange,
   defaultTab = "general",
 }: AssetEditSheetProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<EditTab>(defaultTab);
   const { data: taxonomies = [], isLoading: isTaxonomiesLoading } = useTaxonomies();
   const { updateAssetProfileMutation } = useAssetProfileMutations();
@@ -285,14 +288,14 @@ export function AssetEditSheet({
 
   const providerOptions: ResponsiveSelectOption[] = useMemo(() => {
     const options: ResponsiveSelectOption[] = [
-      { value: "__auto__", label: "Auto (default)" },
+      { value: "__auto__", label: t("settings.securities.edit.auto_default") },
       ...builtinProviders.map((p) => ({ value: p.id, label: p.name })),
     ];
     for (const cp of customProviders) {
       options.push({ value: `CUSTOM:${cp.id}`, label: cp.name });
     }
     return options;
-  }, [builtinProviders, customProviders]);
+  }, [builtinProviders, customProviders, t]);
 
   // Provider options for symbol mapping (without Auto, includes custom providers)
   const mappingProviderOptions: ResponsiveSelectOption[] = useMemo(() => {
@@ -444,10 +447,10 @@ export function AssetEditSheet({
             <TickerAvatar symbol={asset.displayCode ?? ""} className="size-10" />
             <div className="min-w-0 flex-1">
               <SheetTitle className="truncate text-lg">
-                {asset.displayCode ?? asset.name ?? "Unknown"}
+                {asset.displayCode ?? asset.name ?? t("settings.securities.table.unknown")}
               </SheetTitle>
               <SheetDescription className="truncate text-sm">
-                {asset.name || "Edit asset"}
+                {asset.name || t("settings.securities.edit.edit_asset")}
               </SheetDescription>
             </div>
           </div>
@@ -460,19 +463,19 @@ export function AssetEditSheet({
         >
           {asset.kind === "FX" ? (
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="general">General</TabsTrigger>
-              <TabsTrigger value="market-data">Market Data</TabsTrigger>
+              <TabsTrigger value="general">{t("settings.securities.edit.general")}</TabsTrigger>
+              <TabsTrigger value="market-data">{t("settings.securities.edit.market_data")}</TabsTrigger>
             </TabsList>
           ) : (
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="general" className="px-1.5 text-xs sm:px-3 sm:text-sm">
-                General
+                {t("settings.securities.edit.general")}
               </TabsTrigger>
               <TabsTrigger value="classification" className="px-1.5 text-xs sm:px-3 sm:text-sm">
-                Classification
+                {t("settings.securities.edit.classification")}
               </TabsTrigger>
               <TabsTrigger value="market-data" className="px-1.5 text-xs sm:px-3 sm:text-sm">
-                Market Data
+                {t("settings.securities.edit.market_data")}
               </TabsTrigger>
             </TabsList>
           )}
@@ -487,7 +490,9 @@ export function AssetEditSheet({
                     <div className="space-y-6">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Base Currency</label>
+                          <label className="text-sm font-medium">
+                            {t("settings.securities.edit.base_currency")}
+                          </label>
                           <Input
                             value={asset.instrumentSymbol ?? ""}
                             disabled
@@ -495,7 +500,9 @@ export function AssetEditSheet({
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Quote Currency</label>
+                          <label className="text-sm font-medium">
+                            {t("settings.securities.edit.quote_currency")}
+                          </label>
                           <Input value={asset.quoteCcy ?? ""} disabled className="bg-muted/50" />
                         </div>
                       </div>
@@ -505,9 +512,9 @@ export function AssetEditSheet({
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>{t("settings.securities.dialog.name")}</FormLabel>
                             <FormControl>
-                              <Input placeholder="Asset display name" {...field} />
+                              <Input placeholder={t("settings.securities.edit.asset_name_placeholder")} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -519,11 +526,11 @@ export function AssetEditSheet({
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Notes</FormLabel>
+                            <FormLabel>{t("settings.securities.dialog.notes")}</FormLabel>
                             <FormControl>
                               <Textarea
                                 rows={6}
-                                placeholder="Add any context or links"
+                                placeholder={t("settings.securities.edit.notes_placeholder")}
                                 {...field}
                               />
                             </FormControl>
@@ -534,10 +541,10 @@ export function AssetEditSheet({
 
                       <div className="flex justify-end gap-3 pt-4">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                          Cancel
+                          {t("settings.shared.cancel")}
                         </Button>
                         <Button type="submit" disabled={isSaving}>
-                          {isSaving ? "Saving..." : "Save Changes"}
+                          {isSaving ? t("settings.shared.saving") : t("settings.securities.edit.save_changes")}
                         </Button>
                       </div>
                     </div>
@@ -546,7 +553,7 @@ export function AssetEditSheet({
                     <div className="space-y-6">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Symbol</label>
+                          <label className="text-sm font-medium">{t("settings.securities.dialog.symbol")}</label>
                           <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
                         </div>
                         <FormField
@@ -554,12 +561,12 @@ export function AssetEditSheet({
                           name="quoteCcy"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Currency</FormLabel>
+                              <FormLabel>{t("settings.securities.dialog.currency")}</FormLabel>
                               <FormControl>
                                 <CurrencyInput
                                   value={field.value}
                                   onChange={field.onChange}
-                                  placeholder="Select currency"
+                                  placeholder={t("settings.securities.dialog.select_currency")}
                                   valueDisplay="code"
                                   allowCustom
                                 />
@@ -576,9 +583,9 @@ export function AssetEditSheet({
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>{t("settings.securities.dialog.name")}</FormLabel>
                             <FormControl>
-                              <Input placeholder="Asset display name" {...field} />
+                              <Input placeholder={t("settings.securities.edit.asset_name_placeholder")} {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -590,11 +597,11 @@ export function AssetEditSheet({
                         name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Notes</FormLabel>
+                            <FormLabel>{t("settings.securities.dialog.notes")}</FormLabel>
                             <FormControl>
                               <Textarea
                                 rows={10}
-                                placeholder="Add any context or links"
+                                placeholder={t("settings.securities.edit.notes_placeholder")}
                                 {...field}
                               />
                             </FormControl>
@@ -610,7 +617,7 @@ export function AssetEditSheet({
                           name="instrumentType"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Instrument Type</FormLabel>
+                              <FormLabel>{t("settings.securities.edit.instrument_type")}</FormLabel>
                               <Select
                                 onValueChange={field.onChange}
                                 value={field.value ?? ""}
@@ -618,7 +625,7 @@ export function AssetEditSheet({
                               >
                                 <FormControl>
                                   <SelectTrigger className="h-11">
-                                    <SelectValue placeholder="Select type" />
+                                    <SelectValue placeholder={t("settings.securities.dialog.select_type")} />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -639,14 +646,14 @@ export function AssetEditSheet({
                           name="instrumentExchangeMic"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Exchange</FormLabel>
+                              <FormLabel>{t("settings.securities.dialog.exchange")}</FormLabel>
                               <FormControl>
                                 <SearchableSelect
                                   options={exchangeOptions}
                                   value={field.value ?? ""}
                                   onValueChange={field.onChange}
-                                  placeholder="Select exchange"
-                                  searchPlaceholder="Search exchanges..."
+                                  placeholder={t("settings.securities.dialog.select_exchange")}
+                                  searchPlaceholder={t("settings.securities.dialog.search_exchanges")}
                                   className="h-11"
                                 />
                               </FormControl>
@@ -663,15 +670,15 @@ export function AssetEditSheet({
                           onClick={() => onOpenChange(false)}
                           disabled={isSaving}
                         >
-                          Cancel
+                          {t("settings.shared.cancel")}
                         </Button>
                         <Button type="submit" disabled={isSaving}>
                           {isSaving ? (
                             <span className="flex items-center gap-2">
-                              <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
+                              <Icons.Spinner className="h-4 w-4 animate-spin" /> {t("settings.shared.saving")}
                             </span>
                           ) : (
-                            "Save changes"
+                            t("settings.securities.edit.save_changes")
                           )}
                         </Button>
                       </div>
@@ -691,7 +698,7 @@ export function AssetEditSheet({
                   multiSelectTaxonomies.length === 0 && (
                     <div className="py-8 text-center">
                       <p className="text-muted-foreground text-sm">
-                        No taxonomies configured. Create taxonomies in Settings to classify assets.
+                        {t("settings.securities.edit.no_taxonomies")}
                       </p>
                     </div>
                   )}
@@ -731,7 +738,9 @@ export function AssetEditSheet({
                             <p className="text-xl font-semibold">
                               {formatAmount(latestQuote.close, latestQuote.currency)}
                             </p>
-                            <p className="text-muted-foreground text-xs">Latest price</p>
+                            <p className="text-muted-foreground text-xs">
+                              {t("settings.securities.edit.latest_price")}
+                            </p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">
@@ -748,15 +757,16 @@ export function AssetEditSheet({
                             <Badge variant="secondary" className="text-xs">
                               {latestQuote.dataSource}
                             </Badge>
-                            <p className="text-muted-foreground mt-1 text-xs">Source</p>
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              {t("settings.securities.edit.source")}
+                            </p>
                           </div>
                         </div>
                       ) : (
                         <Alert variant="destructive" className="border-0 bg-transparent p-0">
                           <Icons.AlertCircle className="h-4 w-4" />
                           <AlertDescription>
-                            Unable to fetch price data for this asset. Check if the symbol is
-                            correct or try adding a symbol mapping below.
+                            {t("settings.securities.edit.unable_fetch_price")}
                           </AlertDescription>
                         </Alert>
                       )}
@@ -780,7 +790,7 @@ export function AssetEditSheet({
                         name="preferredProvider"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Preferred Provider</FormLabel>
+                            <FormLabel>{t("settings.securities.edit.preferred_provider")}</FormLabel>
                             {customProviders.length > 0 ? (
                               <Select
                                 value={field.value ?? "__auto__"}
@@ -790,13 +800,15 @@ export function AssetEditSheet({
                               >
                                 <FormControl>
                                   <SelectTrigger className="h-11">
-                                    <SelectValue placeholder="Auto (default)" />
+                                    <SelectValue placeholder={t("settings.securities.edit.auto_default")} />
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="__auto__">Auto (default)</SelectItem>
+                                  <SelectItem value="__auto__">
+                                    {t("settings.securities.edit.auto_default")}
+                                  </SelectItem>
                                   <SelectGroup>
-                                    <SelectLabel>Built-in</SelectLabel>
+                                    <SelectLabel>{t("settings.securities.edit.builtin")}</SelectLabel>
                                     {builtinProviders.map((p) => (
                                       <SelectItem key={p.id} value={p.id}>
                                         {p.name}
@@ -804,7 +816,7 @@ export function AssetEditSheet({
                                     ))}
                                   </SelectGroup>
                                   <SelectGroup>
-                                    <SelectLabel>Custom</SelectLabel>
+                                    <SelectLabel>{t("settings.securities.edit.custom")}</SelectLabel>
                                     {customProviders.map((cp) => (
                                       <SelectItem key={cp.id} value={`CUSTOM:${cp.id}`}>
                                         {cp.name}
@@ -821,15 +833,15 @@ export function AssetEditSheet({
                                     field.onChange(v === "__auto__" ? undefined : v)
                                   }
                                   options={providerOptions}
-                                  placeholder="Auto (default)"
-                                  sheetTitle="Preferred Provider"
-                                  sheetDescription="Select which provider to use first for this asset"
+                                  placeholder={t("settings.securities.edit.auto_default")}
+                                  sheetTitle={t("settings.securities.edit.preferred_provider")}
+                                  sheetDescription={t("settings.securities.edit.preferred_provider_desc")}
                                   triggerClassName="h-11"
                                 />
                               </FormControl>
                             )}
                             <p className="text-muted-foreground text-xs">
-                              Choose which provider to try first when fetching prices.
+                              {t("settings.securities.edit.preferred_provider_hint")}
                             </p>
                           </FormItem>
                         )}
@@ -841,10 +853,11 @@ export function AssetEditSheet({
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <div>
-                            <label className="text-sm font-medium">Symbol Mapping</label>
+                            <label className="text-sm font-medium">
+                              {t("settings.securities.edit.symbol_mapping")}
+                            </label>
                             <p className="text-muted-foreground text-xs">
-                              Use a different ticker for specific providers if the default
-                              doesn&apos;t work.
+                              {t("settings.securities.edit.symbol_mapping_desc")}
                             </p>
                           </div>
                           <Button
@@ -854,7 +867,7 @@ export function AssetEditSheet({
                             onClick={() => appendOverride({ provider: "YAHOO", symbol: "" })}
                           >
                             <Icons.Plus className="mr-1 h-3 w-3" />
-                            Add
+                            {t("settings.securities.edit.add")}
                           </Button>
                         </div>
 
@@ -862,10 +875,12 @@ export function AssetEditSheet({
                           <div className="rounded-lg border border-dashed p-6 text-center">
                             <Icons.Link className="text-muted-foreground/50 mx-auto h-8 w-8" />
                             <p className="text-muted-foreground mt-2 text-sm">
-                              No symbol mappings configured
+                              {t("settings.securities.edit.no_symbol_mappings")}
                             </p>
                             <p className="text-muted-foreground text-xs">
-                              Using &quot;{asset.displayCode ?? ""}&quot; for all providers.
+                              {t("settings.securities.edit.using_default_symbol", {
+                                symbol: asset.displayCode ?? "",
+                              })}
                             </p>
                           </div>
                         ) : (
@@ -874,10 +889,10 @@ export function AssetEditSheet({
                               <thead>
                                 <tr className="bg-muted/50 border-b">
                                   <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
-                                    Provider
+                                    {t("settings.securities.edit.provider")}
                                   </th>
                                   <th className="text-muted-foreground px-4 py-2 text-left text-xs font-medium">
-                                    Symbol
+                                    {t("settings.securities.dialog.symbol")}
                                   </th>
                                   <th className="w-10"></th>
                                 </tr>
@@ -896,9 +911,11 @@ export function AssetEditSheet({
                                                 value={providerField.value}
                                                 onValueChange={providerField.onChange}
                                                 options={mappingProviderOptions}
-                                                placeholder="Select provider"
-                                                sheetTitle="Data Provider"
-                                                sheetDescription="Select the data provider for this symbol mapping"
+                                                placeholder={t("settings.securities.edit.select_provider")}
+                                                sheetTitle={t("settings.securities.edit.data_provider")}
+                                                sheetDescription={t(
+                                                  "settings.securities.edit.data_provider_desc",
+                                                )}
                                               />
                                             </FormControl>
                                           </FormItem>
@@ -913,7 +930,7 @@ export function AssetEditSheet({
                                           <FormItem className="space-y-0">
                                             <FormControl>
                                               <Input
-                                                placeholder="e.g., SHOP.TO"
+                                                placeholder={t("settings.securities.edit.symbol_example")}
                                                 {...symbolField}
                                                 className="h-9"
                                               />
@@ -950,7 +967,7 @@ export function AssetEditSheet({
                         onClick={() => onOpenChange(false)}
                         disabled={isSaving}
                       >
-                        Cancel
+                        {t("settings.shared.cancel")}
                       </Button>
                       <Button
                         type="button"
@@ -959,10 +976,10 @@ export function AssetEditSheet({
                       >
                         {isSaving ? (
                           <span className="flex items-center gap-2">
-                            <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
+                            <Icons.Spinner className="h-4 w-4 animate-spin" /> {t("settings.shared.saving")}
                           </span>
                         ) : (
-                          "Save changes"
+                          t("settings.securities.edit.save_changes")
                         )}
                       </Button>
                     </div>
@@ -980,7 +997,7 @@ export function AssetEditSheet({
             className="w-full"
             onClick={() => onOpenChange(false)}
           >
-            Close
+            {t("settings.shared.close")}
           </Button>
         </div>
       </SheetContent>

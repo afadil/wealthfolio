@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -13,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/compone
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Icons } from "@wealthfolio/ui";
+import { localizeCategoryName, localizeTaxonomyName } from "@/lib/taxonomy-i18n";
 import { cn } from "@/lib/utils";
 import {
   useTaxonomy,
@@ -103,6 +105,7 @@ export function MultiSelectTaxonomy({
   label,
   disabled = false,
 }: MultiSelectTaxonomyProps) {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const [pendingCategory, setPendingCategory] = useState<PendingCategory | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -141,6 +144,7 @@ export function MultiSelectTaxonomy({
 
   const isLoading = isLoadingTaxonomy || isLoadingAssignments;
   const isPending = assignMutation.isPending || removeMutation.isPending;
+  const taxonomyLabel = taxonomyData ? localizeTaxonomyName(t, taxonomyData.taxonomy) : label;
 
   const totalWeight = useMemo(() => {
     return assignments.reduce((sum, a) => sum + a.weight, 0) / 100;
@@ -232,7 +236,9 @@ export function MultiSelectTaxonomy({
     <div className="space-y-2">
       {/* Header with label and Add button */}
       <div className="flex items-center justify-between">
-        {label && <label className="text-muted-foreground text-sm font-medium">{label}</label>}
+        {taxonomyLabel && (
+          <label className="text-muted-foreground text-sm font-medium">{taxonomyLabel}</label>
+        )}
 
         {!disabled && (
           <Popover
@@ -250,7 +256,7 @@ export function MultiSelectTaxonomy({
                 disabled={isPending}
               >
                 <Icons.Plus className="h-3.5 w-3.5" />
-                Add
+                {t("settings.taxonomies.add")}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-[450px] p-0" align="end" sideOffset={4}>
@@ -263,11 +269,13 @@ export function MultiSelectTaxonomy({
                       style={{ backgroundColor: pendingCategory.category.color }}
                     />
                     <span className="flex-1 truncate text-sm font-medium">
-                      {pendingCategory.category.name}
+                      {localizeCategoryName(t, taxonomyData?.taxonomy, pendingCategory.category)}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    <label className="text-muted-foreground text-xs">Weight:</label>
+                    <label className="text-muted-foreground text-xs">
+                      {t("settings.taxonomies.weight_label")}
+                    </label>
                     <div className="relative flex-1">
                       <Input
                         type="text"
@@ -282,10 +290,10 @@ export function MultiSelectTaxonomy({
                         onFocus={(e) => e.target.select()}
                         autoFocus
                         className="h-8 pr-6 text-sm"
-                        placeholder="100"
+                        placeholder={t("settings.taxonomies.weight_placeholder")}
                       />
                       <span className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm">
-                        %
+                        {t("settings.taxonomies.percent")}
                       </span>
                     </div>
                     <Button
@@ -314,21 +322,25 @@ export function MultiSelectTaxonomy({
 
               {/* Category tree */}
               <Command>
-                <CommandInput placeholder="Search categories..." className="h-9" />
+                <CommandInput
+                  placeholder={t("settings.taxonomies.search_categories_command_placeholder")}
+                  className="h-9"
+                />
                 <CommandList className="max-h-72 overflow-y-auto">
-                  <CommandEmpty>No categories found.</CommandEmpty>
+                  <CommandEmpty>{t("settings.taxonomies.empty_categories")}</CommandEmpty>
                   <CommandGroup className="[&_[cmdk-group-items]]:!overflow-visible">
                     {flatCategories.map((category, index) => {
                       const isAssigned = assignedCategoryIds.has(category.id);
                       const hasChildren = category.children.length > 0;
                       const isPendingThis = pendingCategory?.category.id === category.id;
                       const showSeparator = category.level === 0 && index > 0;
+                      const displayName = localizeCategoryName(t, taxonomyData?.taxonomy, category);
 
                       return (
                         <div key={category.id}>
                           {showSeparator && <CommandSeparator className="my-1" />}
                           <CommandItem
-                            value={`${category.name} ${category.id}`}
+                            value={`${displayName} ${category.id}`}
                             onSelect={() => {
                               if (!isAssigned) {
                                 handleSelectCategory(category);
@@ -347,7 +359,7 @@ export function MultiSelectTaxonomy({
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: category.color }}
                             />
-                            <span className="flex-1 truncate">{category.name}</span>
+                            <span className="flex-1 truncate">{displayName}</span>
                             {isAssigned && (
                               <Icons.Check className="text-primary h-4 w-4 shrink-0" />
                             )}
@@ -377,7 +389,9 @@ export function MultiSelectTaxonomy({
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: category.color }}
               />
-              <span className="min-w-0 flex-1 truncate text-sm">{category.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {localizeCategoryName(t, taxonomyData?.taxonomy, category)}
+              </span>
 
               {/* Weight input */}
               <div className="relative w-20">
@@ -432,7 +446,7 @@ export function MultiSelectTaxonomy({
           {assignedCategories.length > 1 && (
             <div className="bg-muted/50 flex items-center gap-2 px-3 py-2">
               <span className="text-muted-foreground flex-1 text-right text-xs font-medium">
-                Total
+                {t("settings.taxonomies.total")}
               </span>
               <div
                 className={cn(
@@ -444,7 +458,8 @@ export function MultiSelectTaxonomy({
                       : "text-amber-600 dark:text-amber-400",
                 )}
               >
-                {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}%
+                {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}
+                {t("settings.taxonomies.percent")}
               </div>
               <div className="w-7" />
             </div>

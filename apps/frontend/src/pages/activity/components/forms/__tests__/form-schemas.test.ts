@@ -1,15 +1,26 @@
 import { describe, it, expect } from "vitest";
-import { buyFormSchema } from "../buy-form";
-import { sellFormSchema } from "../sell-form";
-import { depositFormSchema } from "../deposit-form";
-import { withdrawalFormSchema } from "../withdrawal-form";
-import { dividendFormSchema } from "../dividend-form";
-import { transferFormSchema } from "../transfer-form";
-import { splitFormSchema } from "../split-form";
-import { feeFormSchema } from "../fee-form";
-import { interestFormSchema } from "../interest-form";
-import { taxFormSchema } from "../tax-form";
+import i18n from "@/i18n/i18n";
+import { createBuyFormSchema } from "../buy-form";
+import { createSellFormSchema } from "../sell-form";
+import { createDepositWithdrawalFormSchema } from "../deposit-withdrawal-form-schema";
+import { createDividendFormSchema } from "../dividend-form";
+import { createTransferFormSchema } from "../transfer-form";
+import { createSplitFormSchema } from "../split-form";
+import { createFeeFormSchema } from "../fee-form";
+import { createInterestFormSchema } from "../interest-form";
+import { createTaxFormSchema } from "../tax-form";
 import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
+
+const buyFormSchema = createBuyFormSchema();
+const sellFormSchema = createSellFormSchema();
+const depositFormSchema = createDepositWithdrawalFormSchema();
+const withdrawalFormSchema = createDepositWithdrawalFormSchema();
+const dividendFormSchema = createDividendFormSchema();
+const transferFormSchema = createTransferFormSchema();
+const splitFormSchema = createSplitFormSchema();
+const feeFormSchema = createFeeFormSchema();
+const interestFormSchema = createInterestFormSchema();
+const taxFormSchema = createTaxFormSchema();
 
 describe("Form Schemas Validation", () => {
   describe("buyFormSchema", () => {
@@ -42,7 +53,7 @@ describe("Form Schemas Validation", () => {
       const result = buyFormSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please select an account.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.account_required"));
       }
     });
 
@@ -59,7 +70,7 @@ describe("Form Schemas Validation", () => {
       const result = buyFormSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please enter a symbol.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.enter_symbol"));
       }
     });
 
@@ -76,7 +87,7 @@ describe("Form Schemas Validation", () => {
       const result = buyFormSchema.safeParse(zeroQuantity);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Quantity must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.quantity_greater_than_zero"));
       }
 
       const negativeQuantity = {
@@ -101,7 +112,7 @@ describe("Form Schemas Validation", () => {
       const result = buyFormSchema.safeParse(zeroPrice);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Price must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.price_greater_than_zero"));
       }
     });
 
@@ -119,7 +130,7 @@ describe("Form Schemas Validation", () => {
       const result = buyFormSchema.safeParse(negativeFee);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Fee must be non-negative.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.fee_must_be_non_negative"));
       }
     });
 
@@ -184,7 +195,7 @@ describe("Form Schemas Validation", () => {
       const result = sellFormSchema.safeParse(invalidQuantity);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Quantity must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.quantity_greater_than_zero"));
       }
     });
   });
@@ -214,7 +225,7 @@ describe("Form Schemas Validation", () => {
       const result = depositFormSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please select an account.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.account_required"));
       }
     });
 
@@ -229,7 +240,7 @@ describe("Form Schemas Validation", () => {
       const result = depositFormSchema.safeParse(zeroAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
 
@@ -272,7 +283,7 @@ describe("Form Schemas Validation", () => {
       const result = withdrawalFormSchema.safeParse(invalidAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
   });
@@ -304,7 +315,7 @@ describe("Form Schemas Validation", () => {
       const result = dividendFormSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please enter a symbol.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.enter_symbol"));
       }
     });
 
@@ -320,7 +331,7 @@ describe("Form Schemas Validation", () => {
       const result = dividendFormSchema.safeParse(invalidAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
   });
@@ -613,7 +624,7 @@ describe("Form Schemas Validation", () => {
       const result = splitFormSchema.safeParse(invalidData);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please enter a symbol.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.enter_symbol"));
       }
     });
 
@@ -629,7 +640,7 @@ describe("Form Schemas Validation", () => {
       const result = splitFormSchema.safeParse(zeroRatio);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Split ratio must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.split_ratio_greater_than_zero"));
       }
     });
 
@@ -672,7 +683,7 @@ describe("Form Schemas Validation", () => {
       const result = feeFormSchema.safeParse(invalidAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
   });
@@ -702,7 +713,7 @@ describe("Form Schemas Validation", () => {
       const result = interestFormSchema.safeParse(invalidAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
   });
@@ -732,7 +743,7 @@ describe("Form Schemas Validation", () => {
       const result = taxFormSchema.safeParse(invalidAmount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Amount must be greater than 0.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.amount_greater_than_zero"));
       }
     });
 
@@ -747,7 +758,7 @@ describe("Form Schemas Validation", () => {
       const result = taxFormSchema.safeParse(missingAccount);
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe("Please select an account.");
+        expect(result.error.issues[0].message).toBe(i18n.t("activity.validation.account_required"));
       }
     });
   });

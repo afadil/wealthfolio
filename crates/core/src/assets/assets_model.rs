@@ -484,6 +484,8 @@ pub struct ProviderProfile {
     pub currency: String,
     pub data_source: String,
     pub sectors: Option<String>,
+    /// JSON array: top underlying holdings from fund profile (e.g. Yahoo topHoldings.holdings).
+    pub fund_holdings: Option<String>,
     pub industry: Option<String>,
     pub url: Option<String>,
     // Financial metrics

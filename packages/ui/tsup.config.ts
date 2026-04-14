@@ -6,7 +6,7 @@ export default defineConfig({
   dts: false,
   sourcemap: true,
   clean: true,
-  external: ["react", "react-dom", "date-fns"],
+  external: ["react", "react-dom", "react-i18next", "i18next", "date-fns"],
   treeshake: true,
   splitting: false,
   minify: false, // Keep readable for development

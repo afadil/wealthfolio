@@ -1,4 +1,9 @@
-import type { HealthCategory, HealthIssue, HealthSeverity } from "@/lib/types";
+import type { HealthIssue, HealthSeverity } from "@/lib/types";
+import {
+  getHealthFixActionLabel,
+  getHealthIssueDisplayCopy,
+  getHealthNavigateLabel,
+} from "@/lib/health-issue-copy";
 import {
   ActionConfirm,
   Badge,
@@ -11,6 +16,8 @@ import {
   SheetTitle,
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 interface IssueDetailSheetProps {
@@ -23,76 +30,50 @@ interface IssueDetailSheetProps {
   isFixing: boolean;
 }
 
-const SEVERITY_CONFIG: Record<HealthSeverity, { label: string; color: string }> = {
-  INFO: { label: "Info", color: "text-muted-foreground" },
-  WARNING: { label: "Warning", color: "text-yellow-600 dark:text-yellow-400" },
-  ERROR: { label: "Error", color: "text-destructive" },
-  CRITICAL: { label: "Critical", color: "text-destructive" },
+const SEVERITY_COLORS: Record<HealthSeverity, string> = {
+  INFO: "text-muted-foreground",
+  WARNING: "text-yellow-600 dark:text-yellow-400",
+  ERROR: "text-destructive",
+  CRITICAL: "text-destructive",
 };
 
-const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: string }> = {
-  PRICE_STALENESS: {
-    label: "Price Staleness",
-    description:
-      "Market prices are outdated and need to be refreshed. This can affect the accuracy of your portfolio valuation.",
-  },
-  FX_INTEGRITY: {
-    label: "Exchange Rates",
-    description:
-      "Missing or outdated exchange rates for currency conversion. This may impact multi-currency portfolio calculations.",
-  },
-  CLASSIFICATION: {
-    label: "Classification",
-    description:
-      "Assets are missing categories or classifications. This affects portfolio breakdowns and allocation analysis.",
-  },
-  DATA_CONSISTENCY: {
-    label: "Data Consistency",
-    description:
-      "Inconsistencies detected in portfolio data. This may cause inaccurate reporting or calculations.",
-  },
-  ACCOUNT_CONFIGURATION: {
-    label: "Account Setup",
-    description:
-      "Some accounts need configuration before data can be synced. Set tracking mode to start importing data.",
-  },
-  SETTINGS_CONFIGURATION: {
-    label: "Settings",
-    description:
-      "Some application settings need attention to ensure data is interpreted correctly.",
-  },
-};
-
-function getCategoryConfigForIssue(issue: HealthIssue): { label: string; description: string } {
+function getCategoryConfigForIssue(
+  issue: HealthIssue,
+  t: TFunction<"common">,
+): { label: string; description: string } {
   if (issue.category !== "SETTINGS_CONFIGURATION") {
-    return CATEGORY_LABELS[issue.category];
+    const cat = issue.category;
+    return {
+      label: t(`health.issue_sheet.category.${cat}.label`),
+      description: t(`health.issue_sheet.category.${cat}.description`),
+    };
   }
 
   if (issue.id.startsWith("timezone_missing:")) {
     return {
-      label: "Timezone Settings",
-      description:
-        "Your app timezone is not configured. Until you set it, user-facing dates may not match your locale.",
+      label: t("health.issue_sheet.timezone.label"),
+      description: t("health.issue_sheet.timezone.missing_description"),
     };
   }
 
   if (issue.id.startsWith("timezone_invalid:")) {
     return {
-      label: "Timezone Settings",
-      description:
-        "Your configured timezone is invalid. Update it in General settings to restore consistent date handling.",
+      label: t("health.issue_sheet.timezone.label"),
+      description: t("health.issue_sheet.timezone.invalid_description"),
     };
   }
 
   if (issue.id.startsWith("timezone_mismatch:")) {
     return {
-      label: "Timezone Settings",
-      description:
-        "Your browser timezone differs from the configured app timezone. Portfolio dates follow the configured timezone.",
+      label: t("health.issue_sheet.timezone.label"),
+      description: t("health.issue_sheet.timezone.mismatch_description"),
     };
   }
 
-  return CATEGORY_LABELS.SETTINGS_CONFIGURATION;
+  return {
+    label: t("health.issue_sheet.category.SETTINGS_CONFIGURATION.label"),
+    description: t("health.issue_sheet.category.SETTINGS_CONFIGURATION.description"),
+  };
 }
 
 export function IssueDetailSheet({
@@ -104,10 +85,16 @@ export function IssueDetailSheet({
   isDismissing,
   isFixing,
 }: IssueDetailSheetProps) {
+  const { t } = useTranslation("common");
+
   if (!issue) return null;
 
-  const severityConfig = SEVERITY_CONFIG[issue.severity];
-  const categoryConfig = getCategoryConfigForIssue(issue);
+  const displayCopy = getHealthIssueDisplayCopy(issue, t);
+  const severityConfig = {
+    label: t(`health.issue_sheet.severity.${issue.severity}`),
+    color: SEVERITY_COLORS[issue.severity],
+  };
+  const categoryConfig = getCategoryConfigForIssue(issue, t);
   const navigateActionRoute = issue.navigateAction
     ? `${issue.navigateAction.route}${
         issue.navigateAction.query
@@ -130,8 +117,8 @@ export function IssueDetailSheet({
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">{categoryConfig.label}</span>
           </div>
-          <SheetTitle className="text-xl leading-tight">{issue.title}</SheetTitle>
-          <p className="text-muted-foreground text-sm leading-relaxed">{issue.message}</p>
+          <SheetTitle className="text-xl leading-tight">{displayCopy.title}</SheetTitle>
+          <p className="text-muted-foreground text-sm leading-relaxed">{displayCopy.message}</p>
         </SheetHeader>
 
         {/* Scrollable content area */}
@@ -140,7 +127,9 @@ export function IssueDetailSheet({
           {issue.affectedItems && issue.affectedItems.length > 0 && (
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               <h4 className="text-muted-foreground shrink-0 text-xs font-medium uppercase tracking-wide">
-                Affected Items ({issue.affectedItems.length})
+                {t("health.issue_sheet.affected_items_heading", {
+                  count: issue.affectedItems.length,
+                })}
               </h4>
               <ScrollArea className="min-h-0 flex-1 rounded-md border">
                 <div className="p-1">
@@ -183,13 +172,15 @@ export function IssueDetailSheet({
             !issue.affectedItems && (
               <div className="space-y-3">
                 <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                  Impact
+                  {t("health.issue_sheet.impact_heading")}
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   {issue.affectedCount > 0 && (
                     <div>
                       <p className="text-2xl font-semibold tabular-nums">{issue.affectedCount}</p>
-                      <p className="text-muted-foreground text-xs">Affected items</p>
+                      <p className="text-muted-foreground text-xs">
+                        {t("health.issue_sheet.affected_items_caption")}
+                      </p>
                     </div>
                   )}
                   {issue.affectedMvPct != null && issue.affectedMvPct > 0 && (
@@ -197,7 +188,9 @@ export function IssueDetailSheet({
                       <p className="text-2xl font-semibold tabular-nums">
                         {(issue.affectedMvPct * 100).toFixed(1)}%
                       </p>
-                      <p className="text-muted-foreground text-xs">Portfolio impact</p>
+                      <p className="text-muted-foreground text-xs">
+                        {t("health.issue_sheet.portfolio_impact_caption")}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -208,7 +201,7 @@ export function IssueDetailSheet({
           {issue.details && (
             <div className="space-y-2">
               <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                Details
+                {t("health.issue_sheet.details_heading")}
               </h4>
               <p className="text-muted-foreground text-sm">{issue.details}</p>
             </div>
@@ -218,7 +211,7 @@ export function IssueDetailSheet({
         {/* About this issue - before actions */}
         <div className="shrink-0 space-y-2 border-t pt-6">
           <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-            About this issue
+            {t("health.issue_sheet.about_heading")}
           </h4>
           <p className="text-muted-foreground text-sm">{categoryConfig.description}</p>
         </div>
@@ -232,7 +225,7 @@ export function IssueDetailSheet({
               ) : (
                 <Icons.Wand2 className="mr-2 h-4 w-4" />
               )}
-              {issue.fixAction.label}
+              {getHealthFixActionLabel(issue.fixAction.id, t)}
             </Button>
           )}
 
@@ -240,23 +233,23 @@ export function IssueDetailSheet({
             <Button variant="outline" className="w-full" asChild>
               <Link to={navigateActionRoute ?? issue.navigateAction.route}>
                 <Icons.ArrowRight className="mr-2 h-4 w-4" />
-                {issue.navigateAction.label}
+                {getHealthNavigateLabel(issue.navigateAction.route, t)}
               </Link>
             </Button>
           )}
 
           <ActionConfirm
-            confirmTitle="Dismiss this issue?"
-            confirmMessage="This will hide the issue from your health center. It will reappear if the underlying data changes."
-            confirmButtonText="Dismiss"
+            confirmTitle={t("health.issue_sheet.dismiss_confirm_title")}
+            confirmMessage={t("health.issue_sheet.dismiss_confirm_message")}
+            confirmButtonText={t("health.issue_sheet.dismiss_button")}
             confirmButtonVariant="default"
             handleConfirm={onDismiss}
             isPending={isDismissing}
-            pendingText="Dismissing..."
+            pendingText={t("health.issue_sheet.dismiss_pending")}
             button={
               <Button variant="ghost" className="text-muted-foreground w-full">
                 <Icons.EyeOff className="mr-2 h-4 w-4" />
-                Dismiss
+                {t("health.issue_sheet.dismiss_button")}
               </Button>
             }
           />

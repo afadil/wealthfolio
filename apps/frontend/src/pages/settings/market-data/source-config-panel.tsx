@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type UseFormReturn } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -44,6 +45,7 @@ import type { FormValues } from "./custom-provider-form";
 // ---------------------------------------------------------------------------
 
 function StepIndicator({ number, completed }: { number: number; completed: boolean }) {
+  const { t } = useTranslation("common");
   return (
     <div
       className={cn(
@@ -51,12 +53,13 @@ function StepIndicator({ number, completed }: { number: number; completed: boole
         completed ? "bg-success/15 text-success" : "bg-primary/10 text-primary",
       )}
     >
-      {completed ? <Icons.Check className="h-3.5 w-3.5" /> : number}
+      {completed ? <Icons.Check className="h-3.5 w-3.5" /> : t("settings.market_data.custom_provider.step", { number })}
     </div>
   );
 }
 
 function VerificationCard({ result }: { result: TestSourceResult }) {
+  const { t } = useTranslation("common");
   return (
     <div
       className={cn(
@@ -79,7 +82,7 @@ function VerificationCard({ result }: { result: TestSourceResult }) {
               )}
             </p>
             <p className="text-muted-foreground text-xs">
-              Price verified successfully
+              {t("settings.market_data.custom_provider.price_verified")}
               {result.date ? ` (${result.date})` : ""}
             </p>
           </div>
@@ -88,7 +91,9 @@ function VerificationCard({ result }: { result: TestSourceResult }) {
         <>
           <Icons.XCircle className="text-destructive h-5 w-5 shrink-0" />
           <div>
-            <p className="text-destructive text-sm font-medium">Could not extract price</p>
+            <p className="text-destructive text-sm font-medium">
+              {t("settings.market_data.custom_provider.could_not_extract_price")}
+            </p>
             <p className="text-muted-foreground text-xs">{result.error}</p>
           </div>
         </>
@@ -108,6 +113,7 @@ function ValueCardGrid({
   onSelect: (path: string) => void;
   maxVisible?: number;
 }) {
+  const { t } = useTranslation("common");
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? entries : entries.slice(0, maxVisible);
   const hasMore = entries.length > maxVisible;
@@ -145,7 +151,9 @@ function ValueCardGrid({
           onClick={() => setShowAll(true)}
           className="text-muted-foreground hover:text-foreground mt-2 text-xs underline underline-offset-2"
         >
-          Show {entries.length - maxVisible} more values
+          {t("settings.market_data.custom_provider.show_more_values", {
+            count: entries.length - maxVisible,
+          })}
         </button>
       )}
     </div>
@@ -163,6 +171,7 @@ function HtmlElementGrid({
   onSelect: (selector: string) => void;
   maxVisible?: number;
 }) {
+  const { t } = useTranslation("common");
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? elements : elements.slice(0, maxVisible);
   const hasMore = elements.length > maxVisible;
@@ -221,7 +230,9 @@ function HtmlElementGrid({
           onClick={() => setShowAll(true)}
           className="text-muted-foreground hover:text-foreground mt-1 text-xs underline underline-offset-2"
         >
-          Show {elements.length - maxVisible} more elements
+          {t("settings.market_data.custom_provider.show_more_elements", {
+            count: elements.length - maxVisible,
+          })}
         </button>
       )}
     </div>
@@ -241,6 +252,7 @@ function HtmlTablePicker({
     volumePath?: string,
   ) => void;
 }) {
+  const { t } = useTranslation("common");
   if (tables.length === 0) return null;
 
   const roleColor: Record<string, string> = {
@@ -255,8 +267,7 @@ function HtmlTablePicker({
   return (
     <div className="space-y-3">
       <p className="text-muted-foreground text-sm">
-        {tables.length} table{tables.length > 1 ? "s" : ""} found. Click one to auto-configure
-        extraction paths.
+        {t("settings.market_data.custom_provider.tables_found", { count: tables.length })}
       </p>
       {tables.map((table) => {
         const closeCol = table.columns.find((c) => c.role === "close");
@@ -282,9 +293,14 @@ function HtmlTablePicker({
             className="hover:border-foreground/20 hover:bg-accent/50 w-full rounded-lg border p-3 text-left transition-all"
           >
             <div className="mb-2 flex items-center gap-2">
-              <span className="text-sm font-medium">Table {table.index + 1}</span>
+              <span className="text-sm font-medium">
+                {t("settings.market_data.custom_provider.table_n", { number: table.index + 1 })}
+              </span>
               <span className="text-muted-foreground text-xs">
-                {table.rowCount} rows, {table.columns.length} columns
+                {t("settings.market_data.custom_provider.table_rows_columns", {
+                  rows: table.rowCount,
+                  columns: table.columns.length,
+                })}
               </span>
             </div>
 
@@ -300,7 +316,7 @@ function HtmlTablePicker({
                       : "bg-muted text-muted-foreground",
                   )}
                 >
-                  {col.header || `Col ${col.index}`}
+                  {col.header || t("settings.market_data.custom_provider.column_n", { number: col.index })}
                   {col.role && ` (${col.role})`}
                 </span>
               ))}
@@ -314,7 +330,7 @@ function HtmlTablePicker({
                     <tr>
                       {table.columns.map((col) => (
                         <th key={col.index} className="border-b px-2 py-1 text-left font-medium">
-                          {col.header || `Col ${col.index}`}
+                          {col.header || t("settings.market_data.custom_provider.column_n", { number: col.index })}
                         </th>
                       ))}
                     </tr>
@@ -357,6 +373,7 @@ export function SourceConfigPanel({
   isHistorical = false,
   onUrlChange,
 }: SourceConfigPanelProps) {
+  const { t } = useTranslation("common");
   const [testSymbol, setTestSymbol] = useState("");
   const [testIsin, setTestIsin] = useState("");
   const [testMic, setTestMic] = useState("");
@@ -615,7 +632,9 @@ export function SourceConfigPanel({
       <div className="rounded-xl border p-4">
         <div className="mb-3 flex items-center gap-2.5">
           <StepIndicator number={1} completed={hasFetched} />
-          <h3 className="text-sm font-semibold">Connect to data source</h3>
+            <h3 className="text-sm font-semibold">
+              {t("settings.market_data.custom_provider.connect_data_source")}
+            </h3>
         </div>
 
         <div className="space-y-4">
@@ -625,18 +644,30 @@ export function SourceConfigPanel({
             name={`${prefix}.format`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Source type</FormLabel>
+                <FormLabel>{t("settings.market_data.custom_provider.source_type")}</FormLabel>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {(
                     [
-                      { value: "json", label: "JSON API", desc: "REST API returning JSON" },
-                      { value: "html", label: "Web Page", desc: "CSS selector extraction" },
+                      {
+                        value: "json",
+                        label: t("settings.market_data.custom_provider.format_json"),
+                        desc: t("settings.market_data.custom_provider.format_json_desc"),
+                      },
+                      {
+                        value: "html",
+                        label: t("settings.market_data.custom_provider.format_html"),
+                        desc: t("settings.market_data.custom_provider.format_html_desc"),
+                      },
                       {
                         value: "html_table",
-                        label: "HTML Table",
-                        desc: "Table with rows & columns",
+                        label: t("settings.market_data.custom_provider.format_html_table"),
+                        desc: t("settings.market_data.custom_provider.format_html_table_desc"),
                       },
-                      { value: "csv", label: "CSV", desc: "Comma/semicolon-separated" },
+                      {
+                        value: "csv",
+                        label: t("settings.market_data.custom_provider.format_csv"),
+                        desc: t("settings.market_data.custom_provider.format_csv_desc"),
+                      },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -669,7 +700,7 @@ export function SourceConfigPanel({
             return (
               <div>
                 <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
-                  Quick start
+                  {t("settings.market_data.custom_provider.quick_start")}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {templates.map((t) => (
@@ -697,13 +728,13 @@ export function SourceConfigPanel({
             name={`${prefix}.url`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>URL template</FormLabel>
+                <FormLabel>{t("settings.market_data.custom_provider.url_template")}</FormLabel>
                 <FormControl>
                   <Input
                     placeholder={
                       format === "json"
-                        ? "https://api.example.com/v1/price/{SYMBOL}"
-                        : "https://www.example.com/quote/{SYMBOL}"
+                        ? t("settings.market_data.custom_provider.url_placeholder_json")
+                        : t("settings.market_data.custom_provider.url_placeholder_html")
                     }
                     {...field}
                     onChange={(e) => {
@@ -713,7 +744,7 @@ export function SourceConfigPanel({
                   />
                 </FormControl>
                 <p className="text-muted-foreground text-[11px]">
-                  Placeholders:{" "}
+                  {t("settings.market_data.custom_provider.placeholders")}:{" "}
                   <code className="bg-muted rounded px-1 font-mono">{"{SYMBOL}"}</code>{" "}
                   <code className="bg-muted rounded px-1 font-mono">{"{ISIN}"}</code>{" "}
                   <code className="bg-muted rounded px-1 font-mono">{"{MIC}"}</code>{" "}
@@ -733,18 +764,20 @@ export function SourceConfigPanel({
           <div className="flex items-end gap-2">
             <div className="flex min-w-0 flex-1 gap-2">
               <div className="min-w-0 flex-1 space-y-1.5">
-                <Label className="text-sm">Test with symbol</Label>
+                <Label className="text-sm">
+                  {t("settings.market_data.custom_provider.test_with_symbol")}
+                </Label>
                 <Input
-                  placeholder="e.g. AAPL"
+                  placeholder={t("settings.market_data.custom_provider.placeholder_symbol")}
                   value={testSymbol}
                   onChange={(e) => setTestSymbol(e.target.value)}
                 />
               </div>
               {extraPlaceholders.isin && (
                 <div className="w-28 space-y-1.5">
-                  <Label className="text-sm">ISIN</Label>
+                  <Label className="text-sm">{t("settings.market_data.custom_provider.isin")}</Label>
                   <Input
-                    placeholder="e.g. US0378331005"
+                    placeholder={t("settings.market_data.custom_provider.placeholder_isin")}
                     value={testIsin}
                     onChange={(e) => setTestIsin(e.target.value)}
                   />
@@ -752,9 +785,9 @@ export function SourceConfigPanel({
               )}
               {extraPlaceholders.mic && (
                 <div className="w-24 space-y-1.5">
-                  <Label className="text-sm">MIC</Label>
+                  <Label className="text-sm">{t("settings.market_data.custom_provider.mic")}</Label>
                   <Input
-                    placeholder="e.g. XLON"
+                    placeholder={t("settings.market_data.custom_provider.placeholder_mic")}
                     value={testMic}
                     onChange={(e) => setTestMic(e.target.value)}
                   />
@@ -762,9 +795,9 @@ export function SourceConfigPanel({
               )}
               {extraPlaceholders.currency && (
                 <div className="w-20 space-y-1.5">
-                  <Label className="text-sm">Currency</Label>
+                  <Label className="text-sm">{t("settings.market_data.custom_provider.currency")}</Label>
                   <Input
-                    placeholder="e.g. USD"
+                    placeholder={t("settings.market_data.custom_provider.placeholder_currency")}
                     value={testCurrency}
                     onChange={(e) => setTestCurrency(e.target.value)}
                   />
@@ -782,7 +815,7 @@ export function SourceConfigPanel({
               ) : (
                 <Icons.PlayCircle className="mr-1.5 h-3.5 w-3.5" />
               )}
-              Fetch
+              {t("settings.market_data.custom_provider.fetch")}
             </Button>
           </div>
         </div>
@@ -797,8 +830,7 @@ export function SourceConfigPanel({
               <p className="text-destructive text-sm">{fetchError}</p>
               {/403|forbidden|denied/i.test(fetchError) && (
                 <p className="text-muted-foreground mt-1 text-xs">
-                  This site may block automated requests. Try adding custom headers in Advanced
-                  Options below.
+                  {t("settings.market_data.custom_provider.site_blocks_requests_hint")}
                 </p>
               )}
             </div>
@@ -810,7 +842,9 @@ export function SourceConfigPanel({
       {isFetching && !hasFetched && (
         <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-8">
           <Icons.Spinner className="text-muted-foreground h-4 w-4 animate-spin" />
-          <span className="text-muted-foreground text-sm">Fetching response...</span>
+          <span className="text-muted-foreground text-sm">
+            {t("settings.market_data.custom_provider.fetching_response")}
+          </span>
         </div>
       )}
 
@@ -821,12 +855,12 @@ export function SourceConfigPanel({
             <StepIndicator number={2} completed={!!testResult?.success} />
             <h3 className="text-sm font-semibold">
               {format === "html_table"
-                ? "Select a table"
+                ? t("settings.market_data.custom_provider.select_table")
                 : format === "csv"
-                  ? "Configure CSV columns"
+                  ? t("settings.market_data.custom_provider.configure_csv_columns")
                   : format === "json"
-                    ? "Select the price value"
-                    : "Find the price on the page"}
+                    ? t("settings.market_data.custom_provider.select_price_value")
+                    : t("settings.market_data.custom_provider.find_price_on_page")}
             </h3>
             <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px] font-normal">
               {format.toUpperCase().replace("_", " ")}
@@ -854,46 +888,12 @@ export function SourceConfigPanel({
                   name={`${prefix}.pricePath`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Price column (table:col)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 0:3" className="font-mono text-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={`${prefix}.datePath`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Date column (table:col)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 0:0" className="font-mono text-xs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {testResult && <VerificationCard result={testResult} />}
-            </div>
-          ) : format === "csv" ? (
-            <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
-                Enter the column name or 0-based index for each field.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name={`${prefix}.pricePath`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Price column</FormLabel>
+                      <FormLabel className="text-xs">
+                        {t("settings.market_data.custom_provider.price_column_table_col")}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder='e.g. "Close" or "3"'
+                          placeholder={t("settings.market_data.custom_provider.placeholder_table_col_price")}
                           className="font-mono text-xs"
                           {...field}
                         />
@@ -907,10 +907,60 @@ export function SourceConfigPanel({
                   name={`${prefix}.datePath`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Date column</FormLabel>
+                      <FormLabel className="text-xs">
+                        {t("settings.market_data.custom_provider.date_column_table_col")}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder='e.g. "Date" or "0"'
+                          placeholder={t("settings.market_data.custom_provider.placeholder_table_col_date")}
+                          className="font-mono text-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {testResult && <VerificationCard result={testResult} />}
+            </div>
+          ) : format === "csv" ? (
+            <div className="space-y-3">
+              <p className="text-muted-foreground text-sm">
+                {t("settings.market_data.custom_provider.enter_column_or_index")}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name={`${prefix}.pricePath`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">
+                        {t("settings.market_data.custom_provider.price_column")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t("settings.market_data.custom_provider.placeholder_close_or_3")}
+                          className="font-mono text-xs"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={`${prefix}.datePath`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">
+                        {t("settings.market_data.custom_provider.date_column")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t("settings.market_data.custom_provider.placeholder_date_or_0")}
                           className="font-mono text-xs"
                           {...field}
                         />
@@ -936,7 +986,7 @@ export function SourceConfigPanel({
                           rawResponseOpen && "rotate-90",
                         )}
                       />
-                      View raw CSV
+                      {t("settings.market_data.custom_provider.view_raw_csv")}
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -952,7 +1002,7 @@ export function SourceConfigPanel({
               {numericEntries.length > 0 ? (
                 <>
                   <p className="text-muted-foreground text-sm">
-                    Click the value that represents the price:
+                    {t("settings.market_data.custom_provider.click_price_value")}
                   </p>
                   <ValueCardGrid
                     entries={numericEntries}
@@ -962,7 +1012,7 @@ export function SourceConfigPanel({
                 </>
               ) : (
                 <p className="text-muted-foreground text-sm">
-                  No numeric values found. Enter a path manually below.
+                  {t("settings.market_data.custom_provider.no_numeric_values")}
                 </p>
               )}
 
@@ -973,16 +1023,16 @@ export function SourceConfigPanel({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-muted-foreground text-xs">
-                      Extraction path
+                      {t("settings.market_data.custom_provider.extraction_path")}
                       {numericEntries.length > 0 && (
                         <span className="ml-1 font-normal">
-                          (auto-filled when you click a value above)
+                          ({t("settings.market_data.custom_provider.extraction_path_autofill")})
                         </span>
                       )}
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g. $.data.price"
+                        placeholder={t("settings.market_data.custom_provider.placeholder_data_price")}
                         className="font-mono text-xs"
                         {...field}
                         onChange={(e) => {
@@ -1009,7 +1059,7 @@ export function SourceConfigPanel({
                     <Icons.ChevronRight
                       className={cn("h-3 w-3 transition-transform", rawResponseOpen && "rotate-90")}
                     />
-                    View raw JSON response
+                    {t("settings.market_data.custom_provider.view_raw_json")}
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -1028,7 +1078,7 @@ export function SourceConfigPanel({
           ) : (
             <div className="space-y-3">
               <p className="text-muted-foreground text-sm">
-                Page fetched. Enter a CSS selector to extract the price element.
+                {t("settings.market_data.custom_provider.page_fetched_hint")}
               </p>
 
               {/* CSS Selector input + test — primary action */}
@@ -1037,11 +1087,11 @@ export function SourceConfigPanel({
                 name={`${prefix}.pricePath`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CSS Selector</FormLabel>
+                      <FormLabel>{t("settings.market_data.custom_provider.css_selector")}</FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
                         <Input
-                          placeholder="e.g. .price-value strong"
+                          placeholder={t("settings.market_data.custom_provider.placeholder_css_selector")}
                           className="font-mono text-xs"
                           {...field}
                         />
@@ -1058,12 +1108,11 @@ export function SourceConfigPanel({
                         ) : (
                           <Icons.PlayCircle className="mr-1.5 h-3 w-3" />
                         )}
-                        Test
+                        {t("settings.market_data.custom_provider.test")}
                       </Button>
                     </div>
                     <p className="text-muted-foreground text-[11px]">
-                      Tip: Open the page in your browser, right-click the price, choose
-                      &ldquo;Inspect&rdquo;, and copy the selector.
+                      {t("settings.market_data.custom_provider.css_tip")}
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -1077,10 +1126,12 @@ export function SourceConfigPanel({
               {detectedElements.length > 0 && (
                 <div>
                   <p className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
-                    Detected elements ({detectedElements.length})
+                    {t("settings.market_data.custom_provider.detected_elements", {
+                      count: detectedElements.length,
+                    })}
                   </p>
                   <p className="text-muted-foreground mb-2 text-xs">
-                    Click one to use its selector, or type a custom one above.
+                    {t("settings.market_data.custom_provider.detected_elements_hint")}
                   </p>
                   <div className="max-h-72 overflow-y-auto rounded-lg border p-2">
                     <HtmlElementGrid
@@ -1106,7 +1157,7 @@ export function SourceConfigPanel({
                           rawResponseOpen && "rotate-90",
                         )}
                       />
-                      View page source
+                      {t("settings.market_data.custom_provider.view_page_source")}
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -1129,9 +1180,9 @@ export function SourceConfigPanel({
             name="historicalSource.datePath"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date Path</FormLabel>
+                <FormLabel>{t("settings.market_data.custom_provider.date_path")}</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. $.data[*].date" {...field} />
+                  <Input placeholder={t("settings.market_data.custom_provider.placeholder_data_date")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1142,9 +1193,9 @@ export function SourceConfigPanel({
             name="historicalSource.dateFormat"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date Format</FormLabel>
+                <FormLabel>{t("settings.market_data.custom_provider.date_format")}</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. %Y-%m-%d" {...field} />
+                  <Input placeholder={t("settings.market_data.custom_provider.placeholder_date_format")} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -1163,7 +1214,7 @@ export function SourceConfigPanel({
             <Icons.ChevronRight
               className={cn("h-3 w-3 transition-transform", advancedOpen && "rotate-90")}
             />
-            Advanced options
+            {t("settings.market_data.custom_provider.advanced_options")}
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -1173,9 +1224,9 @@ export function SourceConfigPanel({
               name={`${prefix}.currencyPath`}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Currency Path</FormLabel>
+                <FormLabel>{t("settings.market_data.custom_provider.currency_path")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. $.currency" {...field} />
+                    <Input placeholder={t("settings.market_data.custom_provider.placeholder_currency_path")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1187,12 +1238,12 @@ export function SourceConfigPanel({
               name={`${prefix}.headers`}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Custom Headers</FormLabel>
+                  <FormLabel>{t("settings.market_data.custom_provider.custom_headers")}</FormLabel>
                   <FormControl>
                     <Textarea rows={2} placeholder='{"Authorization": "Bearer token"}' {...field} />
                   </FormControl>
                   <p className="text-muted-foreground text-[11px]">
-                    Prefix secret values with __SECRET__ to encrypt them.
+                    {t("settings.market_data.custom_provider.secret_prefix_hint")}
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -1205,12 +1256,12 @@ export function SourceConfigPanel({
                 name={`${prefix}.factor`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Factor</FormLabel>
+                    <FormLabel>{t("settings.market_data.custom_provider.factor")}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="any"
-                        placeholder="e.g. 0.01"
+                        placeholder={t("settings.market_data.custom_provider.placeholder_factor")}
                         {...field}
                         value={field.value ?? ""}
                         onChange={(e) =>
@@ -1227,9 +1278,9 @@ export function SourceConfigPanel({
                 name={`${prefix}.locale`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Locale</FormLabel>
+                    <FormLabel>{t("settings.market_data.custom_provider.locale")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. de-DE" {...field} />
+                      <Input placeholder={t("settings.market_data.custom_provider.placeholder_locale")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1247,7 +1298,7 @@ export function SourceConfigPanel({
                         id={`${prefix}-invert`}
                       />
                       <Label htmlFor={`${prefix}-invert`} className="text-sm">
-                        Invert
+                        {t("settings.market_data.custom_provider.invert")}
                       </Label>
                     </div>
                     <FormMessage />
@@ -1264,7 +1315,7 @@ export function SourceConfigPanel({
                   name={`${prefix}.highPath`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>High path</FormLabel>
+                      <FormLabel>{t("settings.market_data.custom_provider.high_path")}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder={format === "csv" ? "High" : "$.high"}
@@ -1281,7 +1332,7 @@ export function SourceConfigPanel({
                   name={`${prefix}.lowPath`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Low path</FormLabel>
+                      <FormLabel>{t("settings.market_data.custom_provider.low_path")}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder={format === "csv" ? "Low" : "$.low"}
@@ -1298,7 +1349,7 @@ export function SourceConfigPanel({
                   name={`${prefix}.volumePath`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Volume path</FormLabel>
+                      <FormLabel>{t("settings.market_data.custom_provider.volume_path")}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder={format === "csv" ? "Volume" : "$.volume"}
@@ -1320,12 +1371,12 @@ export function SourceConfigPanel({
                 name={`${prefix}.defaultPrice`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Default price</FormLabel>
+                    <FormLabel>{t("settings.market_data.custom_provider.default_price")}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="any"
-                        placeholder="Static fallback price"
+                        placeholder={t("settings.market_data.custom_provider.static_fallback_price")}
                         {...field}
                         value={field.value ?? ""}
                         onChange={(e) =>
@@ -1334,7 +1385,7 @@ export function SourceConfigPanel({
                       />
                     </FormControl>
                     <p className="text-muted-foreground text-[11px]">
-                      Used when URL is empty or fetch fails.
+                      {t("settings.market_data.custom_provider.default_price_hint")}
                     </p>
                     <FormMessage />
                   </FormItem>
@@ -1345,17 +1396,17 @@ export function SourceConfigPanel({
                 name={`${prefix}.dateTimezone`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date timezone</FormLabel>
+                    <FormLabel>{t("settings.market_data.custom_provider.date_timezone")}</FormLabel>
                     <FormControl>
                       <TimezoneInput
                         value={field.value || ""}
                         onChange={field.onChange}
                         timezones={timezones}
-                        placeholder="e.g. Europe/Berlin"
+                        placeholder={t("settings.market_data.custom_provider.placeholder_europe_berlin")}
                       />
                     </FormControl>
                     <p className="text-muted-foreground text-[11px]">
-                      Timezone for scraped dates (converted to UTC).
+                      {t("settings.market_data.custom_provider.date_timezone_hint")}
                     </p>
                     <FormMessage />
                   </FormItem>

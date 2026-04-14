@@ -16,6 +16,7 @@ import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import type { AddonUpdateInfo } from "@wealthfolio/addon-sdk";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface AddonUpdateCardProps {
   addonId: string;
@@ -32,6 +33,7 @@ export function AddonUpdateCard({
   onUpdateComplete,
   disabled = false,
 }: AddonUpdateCardProps) {
+  const { t } = useTranslation("common");
   const [isUpdating, setIsUpdating] = useState(false);
   const [showReleaseNotes, setShowReleaseNotes] = useState(false);
   const { toast } = useToast();
@@ -39,8 +41,8 @@ export function AddonUpdateCard({
   const handleUpdate = async () => {
     if (!updateInfo.downloadUrl) {
       toast({
-        title: "Update not available",
-        description: "No download URL available for this update.",
+        title: t("settings.addons.update.unavailable_title"),
+        description: t("settings.addons.update.unavailable_description"),
         variant: "destructive",
       });
       return;
@@ -55,16 +57,20 @@ export function AddonUpdateCard({
       await reloadAllAddons();
 
       toast({
-        title: "Update successful",
-        description: `${addonName} has been updated to version ${updateInfo.latestVersion}.`,
+        title: t("settings.addons.update.success_title"),
+        description: t("settings.addons.update.success_description", {
+          name: addonName,
+          version: updateInfo.latestVersion,
+        }),
       });
 
       onUpdateComplete?.();
     } catch (error) {
       console.error("Error updating addon:", error);
       toast({
-        title: "Update failed",
-        description: error instanceof Error ? error.message : "Failed to update addon",
+        title: t("settings.addons.update.failed_title"),
+        description:
+          error instanceof Error ? error.message : t("settings.addons.update.failed_description"),
         variant: "destructive",
       });
     } finally {
@@ -79,8 +85,8 @@ export function AddonUpdateCard({
   };
 
   const getUpdateBadgeText = () => {
-    if (updateInfo.isCritical) return "Critical Update";
-    if (updateInfo.hasBreakingChanges) return "Breaking Changes";
+    if (updateInfo.isCritical) return t("settings.addons.update.badge_critical");
+    if (updateInfo.hasBreakingChanges) return t("settings.addons.update.badge_breaking");
     return null; // Don't show badge for regular updates
   };
 
@@ -94,7 +100,9 @@ export function AddonUpdateCard({
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <Icons.ArrowUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <h4 className="font-medium text-amber-900 dark:text-amber-100">Update Available</h4>
+            <h4 className="font-medium text-amber-900 dark:text-amber-100">
+              {t("settings.addons.update.available")}
+            </h4>
             {getUpdateBadgeText() && (
               <Badge variant={getUpdateBadgeVariant()} className="text-xs">
                 {getUpdateBadgeText()}
@@ -109,7 +117,8 @@ export function AddonUpdateCard({
             </p>
             {updateInfo.releaseDate && (
               <p className="text-xs opacity-80">
-                Released: {new Date(updateInfo.releaseDate).toLocaleDateString()}
+                {t("settings.addons.update.released")}:{" "}
+                {new Date(updateInfo.releaseDate).toLocaleDateString()}
               </p>
             )}
           </div>
@@ -127,21 +136,24 @@ export function AddonUpdateCard({
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm">
                   <Icons.FileText className="mr-1 h-3 w-3" />
-                  Release Notes
+                  {t("settings.addons.update.release_notes")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
-                    Release Notes - {addonName} v{updateInfo.latestVersion}
+                    {t("settings.addons.update.release_notes_title", {
+                      name: addonName,
+                      version: updateInfo.latestVersion,
+                    })}
                   </DialogTitle>
-                  <DialogDescription>What&apos;s new in this version</DialogDescription>
+                  <DialogDescription>{t("settings.addons.update.whats_new")}</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="max-h-96">
                   <div className="space-y-4">
                     {updateInfo.releaseNotes && (
                       <div className="space-y-2">
-                        <h4 className="font-medium">Release Notes</h4>
+                        <h4 className="font-medium">{t("settings.addons.update.release_notes")}</h4>
                         <div className="text-muted-foreground whitespace-pre-wrap text-sm">
                           {updateInfo.releaseNotes}
                         </div>
@@ -152,14 +164,14 @@ export function AddonUpdateCard({
                       <>
                         <Separator />
                         <div className="space-y-2">
-                          <h4 className="font-medium">Full Changelog</h4>
+                          <h4 className="font-medium">{t("settings.addons.update.full_changelog")}</h4>
                           <a
                             href={updateInfo.changelogUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                           >
-                            View detailed changelog
+                            {t("settings.addons.update.view_changelog")}
                             <Icons.Globe className="ml-1 h-3 w-3" />
                           </a>
                         </div>
@@ -173,11 +185,11 @@ export function AddonUpdateCard({
                           <div className="flex items-start gap-2">
                             <Icons.AlertTriangle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
                             <div>
-                              <h5 className="text-destructive font-medium">Breaking Changes</h5>
+                              <h5 className="text-destructive font-medium">
+                                {t("settings.addons.update.badge_breaking")}
+                              </h5>
                               <p className="text-destructive/80 text-sm">
-                                This update includes breaking changes that may affect addon
-                                functionality. Please review the release notes carefully before
-                                updating.
+                                {t("settings.addons.update.breaking_description")}
                               </p>
                             </div>
                           </div>
@@ -193,11 +205,10 @@ export function AddonUpdateCard({
                             <Icons.AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
                             <div>
                               <h5 className="font-medium text-red-800 dark:text-red-200">
-                                Critical Security Update
+                                {t("settings.addons.update.critical_security")}
                               </h5>
                               <p className="text-sm text-red-700 dark:text-red-300">
-                                This is a critical security update. We strongly recommend updating
-                                as soon as possible.
+                                {t("settings.addons.update.critical_description")}
                               </p>
                             </div>
                           </div>
@@ -214,12 +225,12 @@ export function AddonUpdateCard({
             {isUpdating ? (
               <>
                 <Icons.Loader className="mr-1 h-3 w-3 animate-spin" />
-                Updating...
+                {t("settings.addons.update.updating")}
               </>
             ) : (
               <>
                 <Icons.Download className="mr-1 h-3 w-3" />
-                Update
+                {t("settings.addons.update.update")}
               </>
             )}
           </Button>
@@ -230,7 +241,9 @@ export function AddonUpdateCard({
         <div className="mt-3 rounded-md bg-amber-100 p-2 dark:bg-amber-900/20">
           <p className="text-xs text-amber-800 dark:text-amber-200">
             <Icons.Info className="mr-1 inline h-3 w-3" />
-            Requires Wealthfolio {updateInfo.minWealthfolioVersion} or later
+            {t("settings.addons.update.requires_version", {
+              version: updateInfo.minWealthfolioVersion,
+            })}
           </p>
         </div>
       )}

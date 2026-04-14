@@ -5,6 +5,7 @@ import { Account, Goal, GoalAllocation } from "@/lib/types";
 import { formatAmount } from "@wealthfolio/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 interface GoalsAllocationsProps {
   goals: Goal[];
@@ -19,6 +20,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   existingAllocations,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const [allocations, setAllocations] = useState<GoalAllocation[]>(existingAllocations || []);
@@ -65,7 +67,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
   const handleSubmit = () => {
     if (isExceeding) {
       toast({
-        title: "Total allocation for an account can't exceed 100%.",
+        title: t("settings.goals.toast_allocation_exceed"),
         className: "bg-red-500 text-white border-none",
       });
       return;
@@ -80,7 +82,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
           <thead>
             <tr>
               <th className="bg-muted sticky left-0 z-10 px-4 py-2 text-sm font-normal">
-                Goals \ Accounts
+                {t("settings.goals.allocations_matrix_corner")}
               </th>
               {accounts.map((account) => (
                 <th key={account.id} className="border-l px-4 py-2 text-xs font-normal">
@@ -90,7 +92,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
             </tr>
             <tr>
               <td className="bg-muted text-muted-foreground sticky left-0 z-10 border-r border-t px-4 py-2 text-xs">
-                Total
+                {t("settings.goals.allocations_total")}
               </td>
               {accounts.map((account) => (
                 <td
@@ -138,7 +140,7 @@ const GoalsAllocations: React.FC<GoalsAllocationsProps> = ({
       </div>
       <div className="mt-4 text-right">
         <Button onClick={handleSubmit} disabled={isExceeding}>
-          Save Allocations
+          {t("settings.goals.save_allocations")}
         </Button>
       </div>
     </>

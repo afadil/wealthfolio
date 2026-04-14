@@ -12,6 +12,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { type NavLink, type NavigationProps, isPathActive } from "./app-navigation";
 import { ConnectNavItem } from "./connect-nav-item";
@@ -25,6 +26,7 @@ const modKey = isAppleDevice() ? "⌘" : "Ctrl";
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(true);
   const { logout, requiresAuth } = useAuth();
+  const { t } = useTranslation("common");
 
   return (
     <div
@@ -41,7 +43,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
             <div data-tauri-drag-region="true" className="flex-1">
               <nav
                 data-tauri-drag-region="true"
-                aria-label="Sidebar"
+                aria-label={t("nav.sidebar.aria_label")}
                 className="flex shrink-0 flex-col p-2"
               >
                 <div
@@ -139,7 +141,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                     "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
                     collapsed ? "justify-center" : "justify-start",
                   )}
-                  title="Logout"
+                  title={t("nav.sidebar.logout_title")}
                 >
                   <span aria-hidden="true">
                     <Icons.LogOut className="h-5 w-5" />
@@ -151,23 +153,23 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                       "block opacity-100": !collapsed,
                     })}
                   >
-                    Logout
+                    {t("nav.sidebar.logout")}
                   </span>
                 </Button>
               )}
               <Separator className="mt-0" />
               <div className="flex justify-end">
                 <Button
-                  title="Toggle Sidebar"
+                  title={t("nav.sidebar.toggle")}
                   variant="ghost"
                   onClick={() => setCollapsed(!collapsed)}
                   className="text-muted-foreground [&_svg]:size-5! cursor-pointer rounded-md hover:bg-transparent"
-                  aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                  aria-label={collapsed ? t("nav.sidebar.expand") : t("nav.sidebar.collapse")}
                 >
                   <Icons.PanelLeftOpen
                     size={18}
                     className={`h-5 w-5 transition-transform duration-500 ease-in-out ${!collapsed ? "rotate-180" : ""}`}
-                    aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    aria-label={collapsed ? t("nav.sidebar.expand") : t("nav.sidebar.collapse")}
                   />
                 </Button>
               </div>

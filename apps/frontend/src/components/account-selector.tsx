@@ -18,6 +18,7 @@ import { useAccounts } from "@/hooks/use-accounts";
 import { useSettings } from "@/hooks/use-settings";
 import { AccountType, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { AnimatePresence, motion } from "motion/react";
+import { useTranslation } from "react-i18next";
 
 // Custom type for UI purposes that extends the standard AccountType
 type UIAccountType = AccountType | typeof PORTFOLIO_ACCOUNT_ID;
@@ -113,7 +114,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       selectedAccount,
       setSelectedAccount,
       variant = "card",
-      buttonText = "Select Account",
+      buttonText,
       filterActive = true,
       includePortfolio = false,
       className,
@@ -123,6 +124,8 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
     },
     ref,
   ) => {
+    const { t } = useTranslation();
+    const resolvedButtonText = buttonText ?? t("account.selector.button");
     const [open, setOpen] = useState(false);
     const { accounts, isLoading: isLoadingAccounts } = useAccounts({
       filterActive,
@@ -140,7 +143,10 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
     if (includePortfolio) {
       const baseCurrency = settings?.baseCurrency ?? "USD"; // Default to USD if settings not loaded
-      const portfolioAccount = createPortfolioAccount(baseCurrency);
+      const portfolioAccount = {
+        ...createPortfolioAccount(baseCurrency),
+        name: t("account.selector.all_portfolio"),
+      };
       // Check if portfolio account already exists to avoid duplication
       const portfolioExists = accounts.some((account) => account.id === PORTFOLIO_ACCOUNT_ID);
 
@@ -164,6 +170,22 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       if (typeB === PORTFOLIO_ACCOUNT_ID) return 1;
       return 0;
     });
+
+    const accountGroupHeading = (type: string): string => {
+      if (type === PORTFOLIO_ACCOUNT_ID) {
+        return t("account.selector.group.total");
+      }
+      switch (type) {
+        case "SECURITIES":
+          return t("account.selector.group.securities");
+        case "CASH":
+          return t("account.selector.group.cash");
+        case "CRYPTOCURRENCY":
+          return t("account.selector.group.cryptocurrency");
+        default:
+          return t("account.selector.group.other");
+      }
+    };
 
     // Render skeleton for loading state
     const renderSkeleton = () => {
@@ -216,7 +238,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label="Select an account"
+              aria-label={t("account.selector.select_account")}
               className={cn(
                 "h-full w-full justify-center rounded-lg border p-2 transition-colors",
                 !selectedAccount && "border-dashed",
@@ -277,7 +299,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       >
                         <p className="text-xs font-medium">{selectedAccount.name}</p>
                         <p className="text-muted-foreground text-xs">
-                          {selectedAccount.accountType}
+                          {accountGroupHeading(selectedAccount.accountType)}
                         </p>
                       </motion.div>
                     ) : (
@@ -288,8 +310,10 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                         exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <p className="text-xs font-medium">Click to select an account</p>
-                        <p className="text-muted-foreground text-xs">Required for import</p>
+                        <p className="text-xs font-medium">{t("account.selector.click_to_select")}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {t("account.selector.required_for_import")}
+                        </p>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -334,7 +358,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                         <span>{selectedAccount.name}</span>
                       </>
                     ) : (
-                      <span className="text-muted-foreground">Select an account</span>
+                      <span className="text-muted-foreground">{t("account.selector.select_account")}</span>
                     )}
                   </div>
                   <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -366,7 +390,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                     <span className="truncate">{selectedAccount.name}</span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground">Select an account</span>
+                  <span className="text-muted-foreground">{t("account.selector.select_account")}</span>
                 )}
               </div>
               <Icons.ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -379,7 +403,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              aria-label={iconOnly ? "Add account" : undefined}
+              aria-label={iconOnly ? t("settings.accounts.add") : undefined}
               className={cn(
                 "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
                 iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -388,7 +412,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               size={iconOnly ? "icon" : "sm"}
             >
               <Icons.Briefcase className="h-4 w-4" />
-              {!iconOnly && buttonText}
+              {!iconOnly && resolvedButtonText}
             </Button>
           );
 
@@ -409,7 +433,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
           }}
         >
           <Command className="w-full">
-            <CommandInput placeholder="Search accounts..." />
+            <CommandInput placeholder={t("settings.accounts.search_placeholder")} />
             <CommandList>
               {isLoading ? (
                 <div className="px-2 py-6 text-center">
@@ -422,9 +446,9 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                 </div>
               ) : (
                 <>
-                  <CommandEmpty>No accounts found.</CommandEmpty>
+                  <CommandEmpty>{t("account.page.no_accounts_found")}</CommandEmpty>
                   {sortedGroups.map(([type, typeAccounts]) => (
-                    <CommandGroup key={type} heading={type}>
+                    <CommandGroup key={type} heading={accountGroupHeading(type)}>
                       {typeAccounts.map((account) => {
                         const IconComponent =
                           accountTypeIcons[account.accountType] ?? Icons.CreditCard;

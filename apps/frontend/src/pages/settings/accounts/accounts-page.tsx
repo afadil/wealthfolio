@@ -14,6 +14,7 @@ import {
 } from "@wealthfolio/ui";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
@@ -22,6 +23,7 @@ import { useAccountMutations } from "./components/use-account-mutations";
 type FilterType = "all" | "active" | "archived" | "hidden";
 
 const SettingsAccountsPage = () => {
+  const { t } = useTranslation("common");
   const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
 
   const { data: platforms } = useQuery<Platform[], Error>({
@@ -154,20 +156,19 @@ const SettingsAccountsPage = () => {
   return (
     <>
       <div className="space-y-6">
-        <SettingsHeader heading="Accounts" text=" Manage your investment and saving accounts.">
-          {/* Mobile: icon button; Desktop: full button */}
+        <SettingsHeader heading={t("settings.accounts.page_title")} text={t("settings.accounts.page_description")}>
           <>
             <Button
               size="icon"
               className="sm:hidden"
               onClick={() => handleAddAccount()}
-              aria-label="Add account"
+              aria-label={t("settings.accounts.add_aria")}
             >
               <Icons.Plus className="h-4 w-4" />
             </Button>
             <Button size="sm" className="hidden sm:inline-flex" onClick={() => handleAddAccount()}>
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add account
+              {t("settings.accounts.add")}
             </Button>
           </>
         </SettingsHeader>
@@ -179,7 +180,7 @@ const SettingsAccountsPage = () => {
             <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
             <Input
               type="text"
-              placeholder="Search accounts..."
+              placeholder={t("settings.accounts.search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="!h-9 pl-9 pr-9 text-sm"
@@ -189,7 +190,7 @@ const SettingsAccountsPage = () => {
                 type="button"
                 onClick={() => setSearchQuery("")}
                 className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label="Clear search"
+                aria-label={t("settings.accounts.clear_search_aria")}
               >
                 <Icons.Close className="h-4 w-4" />
               </button>
@@ -206,25 +207,25 @@ const SettingsAccountsPage = () => {
               value="all"
               className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
             >
-              All
+              {t("settings.accounts.filter_all")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="active"
               className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
             >
-              Active
+              {t("settings.accounts.filter_active")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="hidden"
               className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
             >
-              Hidden
+              {t("settings.accounts.filter_hidden")}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="archived"
               className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
             >
-              Archived
+              {t("settings.accounts.filter_archived")}
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -234,26 +235,26 @@ const SettingsAccountsPage = () => {
           {accounts.length === 0 ? (
             <EmptyPlaceholder>
               <EmptyPlaceholder.Icon name="Wallet" />
-              <EmptyPlaceholder.Title>No account added!</EmptyPlaceholder.Title>
+              <EmptyPlaceholder.Title>{t("settings.accounts.empty_title")}</EmptyPlaceholder.Title>
               <EmptyPlaceholder.Description>
-                You don&apos;t have any account yet. Start adding your investment accounts.
+                {t("settings.accounts.empty_description")}
               </EmptyPlaceholder.Description>
               <Button onClick={() => handleAddAccount()}>
                 <Icons.Plus className="mr-2 h-4 w-4" />
-                Add an account
+                {t("settings.accounts.empty_add")}
               </Button>
             </EmptyPlaceholder>
           ) : filteredAccounts.length === 0 ? (
-            <div className="text-muted-foreground py-8 text-center">
-              No accounts match your search.
-            </div>
+            <div className="text-muted-foreground py-8 text-center">{t("settings.accounts.no_match")}</div>
           ) : showSections ? (
             <>
               {/* Active Accounts Section */}
               {activeAccounts.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-muted-foreground text-sm font-medium">Active Accounts</h3>
+                    <h3 className="text-muted-foreground text-sm font-medium">
+                      {t("settings.accounts.section_active")}
+                    </h3>
                     <span className="bg-success/20 text-success rounded-full px-2 py-0.5 text-xs font-medium">
                       {counts.active}
                     </span>
@@ -268,7 +269,9 @@ const SettingsAccountsPage = () => {
               {inactiveAccounts.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-muted-foreground text-sm font-medium">Hidden & Archived</h3>
+                    <h3 className="text-muted-foreground text-sm font-medium">
+                      {t("settings.accounts.section_inactive")}
+                    </h3>
                     <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
                       {counts.hidden + counts.archived}
                     </span>

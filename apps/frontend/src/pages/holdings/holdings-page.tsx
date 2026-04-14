@@ -1,7 +1,8 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { EmptyPlaceholder } from "@wealthfolio/ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { SwipablePage, SwipablePageView } from "@/components/page";
@@ -20,6 +21,7 @@ import {
   PORTFOLIO_ACCOUNT_ID,
   HOLDING_CATEGORY_FILTERS,
   apiKindToAlternativeAssetKind,
+  createPortfolioAccount,
 } from "@/lib/constants";
 import { Account, HoldingType, AlternativeAssetHolding, AlternativeAssetKind } from "@/lib/types";
 import { canAddHoldings } from "@/lib/activity-restrictions";
@@ -46,6 +48,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 
 export const HoldingsPage = () => {
+  const { t, i18n } = useTranslation("common");
   const isMobileViewport = useIsMobileViewport();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -54,17 +57,20 @@ export const HoldingsPage = () => {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>({
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: "PORTFOLIO" as unknown as Account["accountType"],
-    balance: 0,
-    currency: baseCurrency,
-    isDefault: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Account);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => {
+    return {
+      ...createPortfolioAccount(baseCurrency),
+      name: t("account.selector.all_portfolio"),
+    } as Account;
+  });
+
+  useEffect(() => {
+    setSelectedAccount((prev) =>
+      prev?.id === PORTFOLIO_ACCOUNT_ID
+        ? { ...prev, name: t("account.selector.all_portfolio"), currency: baseCurrency }
+        : prev,
+    );
+  }, [t, i18n.language, baseCurrency]);
 
   const { holdings, isLoading } = useHoldings(selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID);
   const { accounts, isLoading: isAccountsLoading } = useAccounts();
@@ -354,11 +360,11 @@ export const HoldingsPage = () => {
         <div className="flex items-center justify-center py-16">
           <EmptyPlaceholder
             icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-            title="No holdings yet"
+            title={t("holdings.page.empty_investments_title")}
             description={
               canEditHoldings
-                ? "Get started by updating your holdings or importing from a CSV file."
-                : "Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+                ? t("holdings.page.empty_investments_desc_manual")
+                : t("holdings.page.empty_investments_desc_standard")
             }
           >
             <div className="flex flex-col items-center gap-3 sm:flex-row">
@@ -366,22 +372,22 @@ export const HoldingsPage = () => {
                 <>
                   <Button size="default" onClick={() => setIsEditMode(true)}>
                     <Icons.Pencil className="mr-2 h-4 w-4" />
-                    Update Holdings
+                    {t("holdings.page.update_holdings")}
                   </Button>
                   <Button size="default" variant="outline" onClick={() => navigate("/import")}>
                     <Icons.Import className="mr-2 h-4 w-4" />
-                    Import from CSV
+                    {t("holdings.insights.import_csv")}
                   </Button>
                 </>
               ) : (
                 <>
                   <Button size="default" onClick={() => navigate("/activities/manage")}>
                     <Icons.Plus className="mr-2 h-4 w-4" />
-                    Add Transaction
+                    {t("holdings.insights.add_transaction")}
                   </Button>
                   <Button size="default" variant="outline" onClick={() => navigate("/import")}>
                     <Icons.Import className="mr-2 h-4 w-4" />
-                    Import from CSV
+                    {t("holdings.insights.import_csv")}
                   </Button>
                 </>
               )}
@@ -436,12 +442,12 @@ export const HoldingsPage = () => {
         <div className="flex items-center justify-center py-16">
           <EmptyPlaceholder
             icon={<Icons.Wallet className="text-muted-foreground h-10 w-10" />}
-            title="No assets yet"
-            description="Add your first property, vehicle, collectible, or other asset."
+            title={t("holdings.page.empty_assets_title")}
+            description={t("holdings.page.empty_assets_desc")}
           >
             <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Asset
+              {t("holdings.page.add_asset")}
             </Button>
           </EmptyPlaceholder>
         </div>
@@ -452,8 +458,8 @@ export const HoldingsPage = () => {
             <AlternativeHoldingsTable
               holdings={assetsHoldings}
               isLoading={isDataLoading}
-              emptyTitle="No assets"
-              emptyDescription="Add your first asset using the button above."
+              emptyTitle={t("holdings.page.table_empty_assets")}
+              emptyDescription={t("holdings.page.table_empty_assets_desc")}
               onEdit={handleEditAsset}
               onUpdateValue={setUpdateValueAsset}
               onViewHistory={handleViewHistory}
@@ -482,12 +488,12 @@ export const HoldingsPage = () => {
         <div className="flex items-center justify-center py-16">
           <EmptyPlaceholder
             icon={<Icons.CreditCard className="text-muted-foreground h-10 w-10" />}
-            title="No liabilities yet"
-            description="Track your mortgages, loans, and other debts."
+            title={t("holdings.page.empty_liabilities_title")}
+            description={t("holdings.page.empty_liabilities_desc")}
           >
             <Button size="default" onClick={() => setIsAlternativeAssetModalOpen(true)}>
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Liability
+              {t("holdings.page.add_liability")}
             </Button>
           </EmptyPlaceholder>
         </div>
@@ -498,8 +504,8 @@ export const HoldingsPage = () => {
             <AlternativeHoldingsTable
               holdings={liabilitiesHoldings}
               isLoading={isDataLoading}
-              emptyTitle="No liabilities"
-              emptyDescription="Add your first liability using the button above."
+              emptyTitle={t("holdings.page.table_empty_liabilities")}
+              emptyDescription={t("holdings.page.table_empty_liabilities_desc")}
               onEdit={handleEditAsset}
               onUpdateValue={setUpdateValueAsset}
               onViewHistory={handleViewHistory}
@@ -528,7 +534,7 @@ export const HoldingsPage = () => {
         items: [
           {
             icon: Icons.Wallet,
-            label: "Add Asset",
+            label: t("holdings.page.palette_add_asset"),
             onClick: () => {
               setModalDefaultKind(undefined);
               setIsAlternativeAssetModalOpen(true);
@@ -536,7 +542,7 @@ export const HoldingsPage = () => {
           },
           {
             icon: Icons.CreditCard,
-            label: "Add Liability",
+            label: t("holdings.page.palette_add_liability"),
             onClick: () => {
               setModalDefaultKind(AlternativeAssetKind.LIABILITY);
               setIsAlternativeAssetModalOpen(true);
@@ -544,18 +550,18 @@ export const HoldingsPage = () => {
           },
           {
             icon: Icons.Plus,
-            label: "Add Activity",
+            label: t("holdings.page.palette_add_activity"),
             onClick: () => navigate("/activities/manage"),
           },
           {
             icon: Icons.Refresh,
-            label: "Update Prices",
+            label: t("holdings.page.palette_update_prices"),
             onClick: () => updatePortfolioMutation.mutate(),
           },
         ],
       },
     ],
-    [navigate, updatePortfolioMutation],
+    [navigate, updatePortfolioMutation, t],
   );
 
   // Shared actions for header
@@ -568,7 +574,7 @@ export const HoldingsPage = () => {
             variant="outline"
             className="h-9 w-9 rounded-full"
             onClick={() => setIsFilterSheetOpen(true)}
-            aria-label="Open holdings filters"
+            aria-label={t("holdings.page.aria_open_filters")}
           >
             <Icons.ListFilter className="h-4 w-4" />
           </Button>
@@ -586,7 +592,7 @@ export const HoldingsPage = () => {
         {canEditHoldings && !isEditMode && currentTab === "investments" && (
           <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
             <Icons.Pencil className="mr-2 h-4 w-4" />
-            Update
+            {t("holdings.page.update_button")}
           </Button>
         )}
         <ActionPalette
@@ -606,6 +612,7 @@ export const HoldingsPage = () => {
       currentTab,
       isActionPaletteOpen,
       actionPaletteGroups,
+      t,
     ],
   );
 
@@ -614,27 +621,27 @@ export const HoldingsPage = () => {
     () => [
       {
         value: "investments",
-        label: "Investments",
+        label: t("holdings.page.tab_investments"),
         icon: Icons.TrendingUp,
         content: investmentsContent,
         actions: sharedActions,
       },
       {
         value: "assets",
-        label: "Assets",
+        label: t("holdings.page.tab_assets"),
         icon: Icons.Wallet,
         content: assetsContent,
         actions: sharedActions,
       },
       {
         value: "liabilities",
-        label: "Liabilities",
+        label: t("holdings.page.tab_liabilities"),
         icon: Icons.CreditCard,
         content: liabilitiesContent,
         actions: sharedActions,
       },
     ],
-    [investmentsContent, assetsContent, liabilitiesContent, sharedActions],
+    [investmentsContent, assetsContent, liabilitiesContent, sharedActions, t],
   );
 
   // Determine defaultKind for modal - explicit state takes precedence, then fall back to current tab

@@ -8,6 +8,7 @@ import {
 } from "@/adapters";
 import { useAuth } from "@/context/auth-context";
 import { getPlatform } from "@/hooks/use-platform";
+import i18n from "@/i18n/i18n";
 import { CONNECT_ENABLED } from "@/lib/connect-config";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
@@ -77,8 +78,7 @@ function parseAuthCallbackUrl(url: string): AuthCallbackPayload | null {
     if (hasAccessToken) {
       return {
         type: "error",
-        message:
-          "Unexpected token callback (access_token). This app expects Auth Code + PKCE; ensure Supabase is configured for PKCE and your hosted callback forwards the ?code=... parameter.",
+        message: i18n.t("connect.provider.error_unexpected_token_callback"),
       };
     }
 
@@ -300,7 +300,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
         if (!data.session) {
           logger.error("No session returned after code exchange");
-          setError("No session returned after completing sign-in.");
+          setError(i18n.t("connect.provider.error_no_session_after_signin"));
           return;
         }
 
@@ -311,7 +311,9 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         logger.info("Auth callback completed successfully");
       } catch (err) {
         logger.error(`Error in handleAuthCallback: ${err instanceof Error ? err.message : err}`);
-        setError(err instanceof Error ? err.message : "Failed to complete sign in");
+        setError(
+          err instanceof Error ? err.message : i18n.t("connect.provider.error_complete_signin_failed"),
+        );
       }
     },
     [supabase, storeTokens],
@@ -441,7 +443,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           setUser(data.session.user);
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Sign in failed";
+        const message = err instanceof Error ? err.message : i18n.t("connect.provider.error_signin");
         setError(message);
         throw err;
       } finally {
@@ -474,10 +476,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           setUser(data.session.user);
         } else if (data.user && !data.session) {
           // Email confirmation required
-          setError("Please check your email to confirm your account.");
+          setError(i18n.t("connect.provider.error_check_email_confirm_account"));
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Sign up failed";
+        const message = err instanceof Error ? err.message : i18n.t("connect.provider.error_signup");
         setError(message);
         throw err;
       } finally {
@@ -554,7 +556,9 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           } catch (authErr) {
             // User cancelled or auth failed
             const message =
-              authErr instanceof Error ? authErr.message : "Authentication was cancelled";
+              authErr instanceof Error
+                ? authErr.message
+                : i18n.t("connect.provider.error_authentication_cancelled");
             logger.error(`ASWebAuth error: ${message}`);
             // Don't throw if user just cancelled
             if (!message.toLowerCase().includes("cancel")) {
@@ -570,7 +574,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           await openUrlInBrowser(data.url);
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "OAuth sign in failed";
+        const message =
+          err instanceof Error ? err.message : i18n.t("connect.provider.error_oauth_signin");
         setError(message);
         throw err;
       } finally {
@@ -612,7 +617,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         // Don't throw error - magic link sent successfully
         // The UI will handle showing success message
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to send magic link";
+        const message =
+          err instanceof Error ? err.message : i18n.t("connect.provider.error_magic_link_failed");
         setError(message);
         throw err;
       } finally {
@@ -645,7 +651,10 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           setUser(data.session.user);
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Invalid verification code";
+        const message =
+          err instanceof Error
+            ? err.message
+            : i18n.t("connect.provider.error_invalid_verification_code");
         setError(message);
         throw err;
       } finally {
@@ -676,7 +685,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       setSession(null);
       setUser(null);
       await storeTokens(null).catch(() => {});
-      const message = err instanceof Error ? err.message : "Sign out failed";
+      const message = err instanceof Error ? err.message : i18n.t("connect.provider.error_signout");
       setError(message);
       throw err;
     } finally {
@@ -703,7 +712,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     } catch (err) {
       logger.error("Failed to fetch user info from API.");
       setUserInfo(null);
-      const message = err instanceof Error ? err.message : "Failed to fetch user info";
+      const message =
+        err instanceof Error ? err.message : i18n.t("connect.provider.error_fetch_user_info");
       setError(message);
     } finally {
       setIsLoadingUserInfo(false);

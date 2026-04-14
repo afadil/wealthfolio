@@ -1,5 +1,5 @@
 use futures::future::join_all;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
@@ -82,6 +82,32 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                             Ok(result) => {
                                 // Convert SyncResult to legacy format for backwards compatibility
                                 let failed_syncs = result.failures;
+
+                                // Refresh provider profiles after quotes sync (ETF metadata, etc.)
+                                // Only batch-refresh profiles when the request names specific assets.
+                                // Full incremental sync (asset_ids: None) must not enrich every planned
+                                // asset here — that can take very long and feels like an endless update.
+                                let profile_refresh_ids: Vec<String> = match market_sync_mode.asset_ids() {
+                                    Some(ids) if !ids.is_empty() => ids.to_vec(),
+                                    _ => vec![],
+                                };
+                                if !profile_refresh_ids.is_empty() {
+                                    let asset_service = context.asset_service();
+                                    match asset_service
+                                        .enrich_assets(profile_refresh_ids, true)
+                                        .await
+                                    {
+                                        Ok((n, skipped, failed)) => {
+                                            debug!(
+                                                "Post-sync profile refresh: enriched={}, skipped={}, failed={}",
+                                                n, skipped, failed
+                                            );
+                                        }
+                                        Err(e) => {
+                                            warn!("Post-sync profile enrichment failed: {}", e);
+                                        }
+                                    }
+                                }
 
                                 let health_service = context.health_service();
                                 let health_clone = health_service.clone();

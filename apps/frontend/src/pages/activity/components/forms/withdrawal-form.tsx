@@ -5,7 +5,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
-import { z } from "zod";
+import { useTranslation } from "react-i18next";
 import {
   AccountSelect,
   AdvancedOptionsSection,
@@ -15,29 +15,12 @@ import {
   NotesInput,
   type AccountSelectOption,
 } from "./fields";
+import {
+  createDepositWithdrawalFormSchema,
+  type DepositWithdrawalFormValues,
+} from "./deposit-withdrawal-form-schema";
 
-// Zod schema for WithdrawalForm validation
-export const withdrawalFormSchema = z.object({
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  amount: z.coerce
-    .number({
-      required_error: "Please enter an amount.",
-      invalid_type_error: "Amount must be a number.",
-    })
-    .positive({ message: "Amount must be greater than 0." }),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  fxRate: z.coerce
-    .number({
-      invalid_type_error: "FX Rate must be a number.",
-    })
-    .positive({ message: "FX Rate must be positive." })
-    .optional(),
-});
-
-export type WithdrawalFormValues = z.infer<typeof withdrawalFormSchema>;
+export type WithdrawalFormValues = DepositWithdrawalFormValues;
 
 interface WithdrawalFormProps {
   accounts: AccountSelectOption[];
@@ -56,6 +39,8 @@ export function WithdrawalForm({
   isLoading = false,
   isEditing = false,
 }: WithdrawalFormProps) {
+  const { t, i18n } = useTranslation("common");
+  const withdrawalFormSchema = useMemo(() => createDepositWithdrawalFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -103,10 +88,10 @@ export function WithdrawalForm({
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" currency={currency} />
+            <AmountInput name="amount" label={t("activity.form.fields.amount")} currency={currency} />
 
             {/* Advanced Options - Currency and FX Rate (no subtypes for withdrawals) */}
             <AdvancedOptionsSection
@@ -118,7 +103,7 @@ export function WithdrawalForm({
             />
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -126,7 +111,7 @@ export function WithdrawalForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
@@ -136,7 +121,7 @@ export function WithdrawalForm({
             ) : (
               <Icons.MinusCircle className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : "Add Withdrawal"}
+            {isEditing ? t("activity.form.update") : t("activity.form.submit.add_withdrawal")}
           </Button>
         </div>
       </form>

@@ -11,6 +11,7 @@ import {
 import { TaxonomyAllocation } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SectorsChartProps {
   allocation?: TaxonomyAllocation;
@@ -25,6 +26,7 @@ export function SectorsChart({
   isLoading,
   onSectorSectionClick,
 }: SectorsChartProps) {
+  const { t } = useTranslation("common");
   const sectors = useMemo(() => {
     if (!allocation?.categories?.length) return [];
     return allocation.categories.filter((cat) => cat.value > 0);
@@ -37,7 +39,7 @@ export function SectorsChart({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
-            Sectors
+            {t("holdings.widgets.sectors")}
           </CardTitle>
         </div>
       </CardHeader>
@@ -56,8 +58,8 @@ export function SectorsChart({
             <div className="flex h-[330px] items-center justify-center">
               <EmptyPlaceholder
                 icon={<Icons.BarChart className="h-10 w-10" />}
-                title="No sectors data"
-                description="There is no sector data available for your holdings."
+                title={t("holdings.widgets.sectors_empty_title")}
+                description={t("holdings.widgets.sectors_empty_desc")}
               />
             </div>
           ) : (

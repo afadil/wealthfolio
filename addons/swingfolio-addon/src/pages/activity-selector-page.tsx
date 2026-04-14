@@ -23,16 +23,30 @@ import type { AddonContext } from "@wealthfolio/addon-sdk";
 import { useSwingActivities } from "../hooks/use-swing-activities";
 import { useSwingPreferences } from "../hooks/use-swing-preferences";
 import { format } from "date-fns";
+import { de, enUS } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 interface ActivitySelectorPageProps {
   ctx: AddonContext;
 }
 
+function activityTypeLabel(
+  type: string,
+  t: (key: string) => string,
+): string {
+  if (type === "BUY") return t("addon.swingfolio.activity_selector.type_buy");
+  if (type === "SELL") return t("addon.swingfolio.activity_selector.type_sell");
+  return type;
+}
+
 export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps) {
+  const { t, i18n } = useTranslation("common");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
+
+  const dateLocale = i18n.language?.startsWith("de") ? de : enUS;
 
   const { data: activities, isLoading, error } = useSwingActivities(ctx);
   const { preferences, updatePreferences, isUpdating } = useSwingPreferences(ctx);
@@ -112,14 +126,13 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
     return <ActivitySelectorSkeleton />;
   }
 
-  const pageDescription =
-    "Choose which trading activities to include in your swing portfolio analysis";
+  const pageDescription = t("addon.swingfolio.activity_selector.page_description");
 
   if (error || !activities) {
     return (
       <Page>
         <PageHeader
-          heading="Select Activities"
+          heading={t("addon.swingfolio.activity_selector.heading")}
           text={pageDescription}
           actions={
             <Button
@@ -127,7 +140,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
               onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}
             >
               <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
+              {t("addon.swingfolio.activity_selector.back_dashboard")}
             </Button>
           }
         />
@@ -135,12 +148,14 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
           <div className="flex h-[calc(100vh-200px)] items-center justify-center">
             <div className="text-center">
               <Icons.AlertCircle className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-              <h3 className="mb-2 text-lg font-semibold">Failed to load activities</h3>
+              <h3 className="mb-2 text-lg font-semibold">
+                {t("addon.swingfolio.activity_selector.error_title")}
+              </h3>
               <p className="text-muted-foreground mb-4">
-                {error?.message || "Unable to load trading activities"}
+                {error?.message || t("addon.swingfolio.activity_selector.load_failed_fallback")}
               </p>
               <Button onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}>
-                Back to Dashboard
+                {t("addon.swingfolio.activity_selector.back_dashboard")}
               </Button>
             </div>
           </div>
@@ -153,7 +168,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
     <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
       <Button variant="outline" onClick={() => ctx.api.navigation.navigate("/addons/swingfolio")}>
         <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Dashboard
+        {t("addon.swingfolio.activity_selector.back_dashboard")}
       </Button>
       <Button onClick={handleSaveSelection} disabled={isUpdating}>
         {isUpdating ? (
@@ -161,18 +176,22 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
         ) : (
           <Icons.Save className="mr-2 h-4 w-4" />
         )}
-        Save Selection
+        {t("addon.swingfolio.activity_selector.save_selection")}
       </Button>
     </div>
   );
 
   return (
     <Page>
-      <PageHeader heading="Select Activities" text={pageDescription} actions={headerActions} />
+      <PageHeader
+        heading={t("addon.swingfolio.activity_selector.heading")}
+        text={pageDescription}
+        actions={headerActions}
+      />
       <PageContent>
         <Card>
           <CardHeader>
-            <CardTitle>Auto-Selection Options</CardTitle>
+            <CardTitle>{t("addon.swingfolio.activity_selector.auto_selection_title")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-2">
@@ -182,11 +201,11 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                 onCheckedChange={handleToggleSwingTag}
               />
               <label htmlFor="swing-tag" className="text-sm font-medium">
-                Automatically include activities tagged with &quot;Swing&quot;
+                {t("addon.swingfolio.activity_selector.swing_tag_label")}
               </label>
             </div>
             <p className="text-muted-foreground mt-2 text-xs">
-              Activities with &quot;swing&quot; in their comment will be automatically included
+              {t("addon.swingfolio.activity_selector.swing_tag_hint")}
             </p>
           </CardContent>
         </Card>
@@ -194,13 +213,18 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>Manual Selection</span>
+              <span>{t("addon.swingfolio.activity_selector.manual_selection_title")}</span>
               <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <span>
-                  {filteredSelectedCount} of {filteredActivities.length} selected
+                  {t("addon.swingfolio.activity_selector.selected_of_filtered", {
+                    selected: filteredSelectedCount,
+                    total: filteredActivities.length,
+                  })}
                 </span>
                 <span>•</span>
-                <span>{selectedCount} total selected</span>
+                <span>
+                  {t("addon.swingfolio.activity_selector.total_selected", { count: selectedCount })}
+                </span>
               </div>
             </CardTitle>
           </CardHeader>
@@ -208,7 +232,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
             <div className="flex flex-col gap-4 lg:flex-row">
               <div className="flex-1">
                 <Input
-                  placeholder="Search by symbol or name..."
+                  placeholder={t("addon.swingfolio.activity_selector.search_placeholder")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="max-w-sm"
@@ -217,10 +241,12 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Select value={selectedAccount} onValueChange={setSelectedAccount}>
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All Accounts" />
+                    <SelectValue placeholder={t("addon.swingfolio.activity_selector.all_accounts")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Accounts</SelectItem>
+                    <SelectItem value="all">
+                      {t("addon.swingfolio.activity_selector.all_accounts")}
+                    </SelectItem>
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.name}>
                         {account.name}
@@ -230,12 +256,18 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                 </Select>
                 <Select value={selectedType} onValueChange={setSelectedType}>
                   <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="All Types" />
+                    <SelectValue placeholder={t("addon.swingfolio.activity_selector.all_types")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="BUY">Buy</SelectItem>
-                    <SelectItem value="SELL">Sell</SelectItem>
+                    <SelectItem value="all">
+                      {t("addon.swingfolio.activity_selector.all_types")}
+                    </SelectItem>
+                    <SelectItem value="BUY">
+                      {t("addon.swingfolio.activity_selector.type_buy")}
+                    </SelectItem>
+                    <SelectItem value="SELL">
+                      {t("addon.swingfolio.activity_selector.type_sell")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -243,10 +275,10 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
 
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                Select All Filtered
+                {t("addon.swingfolio.activity_selector.select_all_filtered")}
               </Button>
               <Button variant="outline" size="sm" onClick={handleDeselectAll}>
-                Deselect All Filtered
+                {t("addon.swingfolio.activity_selector.deselect_all_filtered")}
               </Button>
             </div>
 
@@ -270,13 +302,19 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                           }}
                         />
                       </th>
-                      <th className="p-3 text-left">Date</th>
-                      <th className="p-3 text-left">Type</th>
-                      <th className="p-3 text-left">Symbol</th>
-                      <th className="p-3 text-left">Quantity</th>
-                      <th className="p-3 text-left">Price</th>
-                      <th className="p-3 text-left">Account</th>
-                      <th className="p-3 text-left">Tags</th>
+                      <th className="p-3 text-left">{t("addon.swingfolio.activity_selector.col_date")}</th>
+                      <th className="p-3 text-left">{t("addon.swingfolio.activity_selector.col_type")}</th>
+                      <th className="p-3 text-left">
+                        {t("addon.swingfolio.activity_selector.col_symbol")}
+                      </th>
+                      <th className="p-3 text-left">
+                        {t("addon.swingfolio.activity_selector.col_quantity")}
+                      </th>
+                      <th className="p-3 text-left">{t("addon.swingfolio.activity_selector.col_price")}</th>
+                      <th className="p-3 text-left">
+                        {t("addon.swingfolio.activity_selector.col_account")}
+                      </th>
+                      <th className="p-3 text-left">{t("addon.swingfolio.activity_selector.col_tags")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -289,13 +327,13 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                           />
                         </td>
                         <td className="p-3 text-sm">
-                          {format(new Date(activity.date), "MMM dd, yyyy")}
+                          {format(new Date(activity.date), "P", { locale: dateLocale })}
                         </td>
                         <td className="p-3">
                           <Badge
                             variant={activity.activityType === "BUY" ? "default" : "secondary"}
                           >
-                            {activity.activityType}
+                            {activityTypeLabel(activity.activityType, t)}
                           </Badge>
                         </td>
                         <td className="p-3 font-medium">
@@ -307,10 +345,10 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                           )}
                         </td>
                         <td className="p-3 text-sm">
-                          {Number(activity.quantity ?? 0).toLocaleString()}
+                          {Number(activity.quantity ?? 0).toLocaleString(i18n.language)}
                         </td>
                         <td className="p-3 text-sm">
-                          {Number(activity.unitPrice ?? 0).toLocaleString("en-US", {
+                          {Number(activity.unitPrice ?? 0).toLocaleString(i18n.language, {
                             style: "currency",
                             currency: activity.currency,
                           })}
@@ -320,12 +358,12 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
                           <div className="flex gap-1">
                             {activity.hasSwingTag && (
                               <Badge variant="outline" className="text-xs">
-                                Swing
+                                {t("addon.swingfolio.activity_selector.tag_swing")}
                               </Badge>
                             )}
                             {activity.isSelected && (
                               <Badge variant="default" className="text-xs">
-                                Selected
+                                {t("addon.swingfolio.activity_selector.tag_selected")}
                               </Badge>
                             )}
                           </div>
@@ -339,7 +377,7 @@ export default function ActivitySelectorPage({ ctx }: ActivitySelectorPageProps)
 
             {filteredActivities.length === 0 && (
               <div className="text-muted-foreground py-8 text-center">
-                No activities match your current filters
+                {t("addon.swingfolio.activity_selector.empty_filters")}
               </div>
             )}
           </CardContent>

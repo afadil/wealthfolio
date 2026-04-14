@@ -1,4 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "@/pages/layouts/app-layout";
@@ -32,6 +33,7 @@ import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
+import ExternalResearchSettingsPage from "./pages/settings/general/external-research-settings-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
@@ -41,6 +43,7 @@ import FirePlannerPage from "./pages/fire-planner/fire-planner-page";
 import FirePlannerSettingsPage from "./pages/settings/fire-planner/fire-planner-settings-page";
 
 export function AppRoutes() {
+  const { t } = useTranslation("common");
   const [dynamicRoutes, setDynamicRoutes] = useState<
     { path: string; component: React.LazyExoticComponent<React.ComponentType<unknown>> }[]
   >([]);
@@ -101,7 +104,9 @@ export function AppRoutes() {
               path={path}
               element={
                 <Suspense
-                  fallback={<div className="flex h-64 items-center justify-center">Loading...</div>}
+                  fallback={
+                    <div className="flex h-64 items-center justify-center">{t("app.routes.loading")}</div>
+                  }
                 >
                   <Component />
                 </Suspense>
@@ -111,6 +116,7 @@ export function AppRoutes() {
           <Route path="settings" element={<SettingsLayout />}>
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
+            <Route path="research-links" element={<ExternalResearchSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />

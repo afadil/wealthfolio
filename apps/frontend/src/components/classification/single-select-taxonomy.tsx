@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { RadioGroup, RadioGroupItem, Label, Skeleton, Icons } from "@wealthfolio/ui";
 import {
   Command,
@@ -10,6 +11,7 @@ import {
   CommandSeparator,
 } from "@wealthfolio/ui/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
+import { localizeCategoryName, localizeTaxonomyName } from "@/lib/taxonomy-i18n";
 import { cn } from "@/lib/utils";
 import {
   useTaxonomy,
@@ -28,6 +30,29 @@ const TOP_INSTRUMENT_TYPES = [
   "DEBT_SECURITY", // Bonds
   "OTHER", // Other
 ];
+
+/** Short pill labels for the instrument-type quick row (large taxonomies only). */
+const INSTRUMENT_QUICK_LABEL_KEYS: Record<string, string> = {
+  EQUITY_SECURITY: "settings.taxonomies.instrument_quick.equity_security",
+  ETP: "settings.taxonomies.instrument_quick.etp",
+  FUND: "settings.taxonomies.instrument_quick.fund",
+  DEBT_SECURITY: "settings.taxonomies.instrument_quick.bonds",
+  OTHER: "settings.taxonomies.instrument_quick.other",
+};
+
+function pillLabelForCategory(
+  t: (key: string) => string,
+  taxonomyId: string,
+  totalCategories: number,
+  category: TaxonomyCategory,
+  localizedName: string,
+): string {
+  if (taxonomyId !== "instrument_type" || totalCategories <= MAX_RADIO_ITEMS) {
+    return localizedName;
+  }
+  const key = INSTRUMENT_QUICK_LABEL_KEYS[category.id];
+  return key ? t(key) : localizedName;
+}
 
 interface CategoryNode extends TaxonomyCategory {
   children: CategoryNode[];
@@ -81,15 +106,6 @@ function flattenTree(nodes: CategoryNode[]): CategoryNode[] {
   return result;
 }
 
-// Abbreviations for common long names
-const ABBREVIATIONS: Record<string, string> = {
-  "Exchange Traded Fund (ETF)": "ETF",
-  "Exchange Traded Fund": "ETF",
-  Cryptocurrency: "Crypto",
-  "Mutual Fund": "Fund",
-  Unknown: "N/A",
-};
-
 interface SingleSelectTaxonomyProps {
   taxonomyId: string;
   assetId: string;
@@ -109,6 +125,7 @@ export function SingleSelectTaxonomy({
   label,
   disabled = false,
 }: SingleSelectTaxonomyProps) {
+  const { t } = useTranslation("common");
   const [moreOpen, setMoreOpen] = useState(false);
   const { data: taxonomyData, isLoading: isLoadingTaxonomy } = useTaxonomy(taxonomyId);
   const { data: assignments, isLoading: isLoadingAssignments } =
@@ -179,11 +196,6 @@ export function SingleSelectTaxonomy({
     setMoreOpen(false);
   };
 
-  // Get abbreviated display name
-  const getDisplayName = (name: string): string => {
-    return ABBREVIATIONS[name] ?? name;
-  };
-
   // Loading skeleton
   if (isLoading) {
     return (
@@ -204,12 +216,15 @@ export function SingleSelectTaxonomy({
   }
 
   const isDisabled = disabled || assignMutation.isPending;
+  const taxonomyLabel = taxonomyData ? localizeTaxonomyName(t, taxonomyData.taxonomy) : label;
 
   // For taxonomies with many categories: show quick toggles + "More" tree select
   if (allCategories.length > MAX_RADIO_ITEMS) {
     return (
       <div className="space-y-2">
-        {label && <Label className="text-muted-foreground text-sm font-medium">{label}</Label>}
+        {taxonomyLabel && (
+          <Label className="text-muted-foreground text-sm font-medium">{taxonomyLabel}</Label>
+        )}
         <RadioGroup
           value={selectedCategoryId}
           onValueChange={handleSelectionChange}
@@ -220,7 +235,13 @@ export function SingleSelectTaxonomy({
           {topCategories.map((category) => {
             const isSelected =
               selectedCategoryId === category.id || selectedCategory?.parentId === category.id;
-            const displayName = getDisplayName(category.name);
+            const displayName = pillLabelForCategory(
+              t,
+              taxonomyData.taxonomy.id,
+              allCategories.length,
+              category,
+              localizeCategoryName(t, taxonomyData.taxonomy, category),
+            );
 
             return (
               <label
@@ -288,13 +309,19 @@ export function SingleSelectTaxonomy({
                       aria-hidden="true"
                     />
                     <span className="whitespace-nowrap">
-                      {getDisplayName(selectedCategory.name)}
+                      {pillLabelForCategory(
+                        t,
+                        taxonomyData.taxonomy.id,
+                        allCategories.length,
+                        selectedCategory,
+                        localizeCategoryName(t, taxonomyData.taxonomy, selectedCategory),
+                      )}
                     </span>
                   </>
                 ) : (
                   <>
                     <Icons.Ellipsis className="h-3.5 w-3.5" />
-                    <span className="whitespace-nowrap">More</span>
+                    <span className="whitespace-nowrap">{t("settings.taxonomies.more")}</span>
                   </>
                 )}
                 <Icons.ChevronDown className="h-3 w-3 opacity-50" />
@@ -302,20 +329,24 @@ export function SingleSelectTaxonomy({
             </PopoverTrigger>
             <PopoverContent className="w-[350px] p-0" align="start" sideOffset={4}>
               <Command>
-                <CommandInput placeholder="Search types..." className="h-9" />
+                <CommandInput
+                  placeholder={t("settings.taxonomies.search_types_placeholder")}
+                  className="h-9"
+                />
                 <CommandList className="max-h-72 overflow-y-auto">
-                  <CommandEmpty>No types found.</CommandEmpty>
+                  <CommandEmpty>{t("settings.taxonomies.empty_types")}</CommandEmpty>
                   <CommandGroup className="[&_[cmdk-group-items]]:!overflow-visible">
                     {flatCategories.map((category, index) => {
                       const isSelected = selectedCategoryId === category.id;
                       const hasChildren = category.children.length > 0;
                       const showSeparator = category.level === 0 && index > 0;
+                      const displayName = localizeCategoryName(t, taxonomyData.taxonomy, category);
 
                       return (
                         <div key={category.id}>
                           {showSeparator && <CommandSeparator className="my-1" />}
                           <CommandItem
-                            value={`${category.name} ${category.id}`}
+                            value={`${displayName} ${category.id}`}
                             onSelect={() => handleSelectionChange(category.id)}
                             className={cn(
                               "flex items-center gap-2",
@@ -328,7 +359,7 @@ export function SingleSelectTaxonomy({
                               className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: category.color }}
                             />
-                            <span className="flex-1 truncate">{category.name}</span>
+                            <span className="flex-1 truncate">{displayName}</span>
                             {isSelected && (
                               <Icons.Check className="text-primary h-4 w-4 shrink-0" />
                             )}
@@ -354,7 +385,9 @@ export function SingleSelectTaxonomy({
   // Use pill buttons in a wrapping layout for small taxonomies
   return (
     <div className="space-y-2">
-      {label && <Label className="text-muted-foreground text-sm font-medium">{label}</Label>}
+      {taxonomyLabel && (
+        <Label className="text-muted-foreground text-sm font-medium">{taxonomyLabel}</Label>
+      )}
       <RadioGroup
         value={selectedCategoryId}
         onValueChange={handleSelectionChange}
@@ -363,7 +396,13 @@ export function SingleSelectTaxonomy({
       >
         {allCategories.map((category) => {
           const isSelected = selectedCategoryId === category.id;
-          const displayName = getDisplayName(category.name);
+          const displayName = pillLabelForCategory(
+            t,
+            taxonomyData.taxonomy.id,
+            allCategories.length,
+            category,
+            localizeCategoryName(t, taxonomyData.taxonomy, category),
+          );
 
           return (
             <label

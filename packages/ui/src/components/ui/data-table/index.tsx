@@ -27,6 +27,8 @@ export type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   searchBy?: string;
+  /** Search input placeholder (pass translated string from the app). */
+  searchPlaceholder?: string;
   filters?: DataTableFacetedFilterProps<TData, TValue>[];
   defaultColumnVisibility?: VisibilityState;
   defaultSorting?: SortingState;
@@ -36,13 +38,18 @@ interface DataTableProps<TData, TValue> {
   manualPagination?: boolean;
   scrollable?: boolean;
   showColumnToggle?: boolean;
+  /** Label for the column visibility menu (pass translated string from the app). */
+  columnToggleLabel?: string;
   toolbarActions?: React.ReactNode;
+  /** Empty state when the table has no rows (e.g. translated). */
+  emptyMessage?: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   searchBy,
+  searchPlaceholder,
   filters,
   manualPagination = false,
   defaultColumnVisibility,
@@ -51,7 +58,9 @@ export function DataTable<TData, TValue>({
   storageKey,
   scrollable = false,
   showColumnToggle = false,
+  columnToggleLabel,
   toolbarActions,
+  emptyMessage = "No results found.",
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = storageKey
@@ -100,8 +109,10 @@ export function DataTable<TData, TValue>({
         <DataTableToolbar
           table={table}
           searchBy={searchBy}
+          searchPlaceholder={searchPlaceholder}
           filters={filters}
           showColumnToggle={showColumnToggle}
+          columnToggleLabel={columnToggleLabel}
           actions={toolbarActions}
         />
       </div>
@@ -134,7 +145,7 @@ export function DataTable<TData, TValue>({
                 <TableCell colSpan={columns.length} className="h-24 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <Icons.FileText className="text-muted-foreground mb-2 h-10 w-10" />
-                    <p className="text-muted-foreground text-sm">No results found.</p>
+                    <p className="text-muted-foreground text-sm">{emptyMessage}</p>
                   </div>
                 </TableCell>
               </TableRow>

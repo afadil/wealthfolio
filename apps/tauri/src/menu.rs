@@ -3,41 +3,55 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
-    let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
-        .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
-        .separator()
-        .item(&PredefinedMenuItem::hide(app, None).unwrap())
-        .item(&PredefinedMenuItem::hide_others(app, None).unwrap())
-        .item(&PredefinedMenuItem::show_all(app, None).unwrap())
-        .separator()
-        .item(&PredefinedMenuItem::quit(app, None)?)
-        .build()?;
+    let s = crate::shell_i18n::current_strings(app);
 
-    let edit_menu = SubmenuBuilder::new(app, "Edit")
-        .item(&PredefinedMenuItem::undo(app, None).unwrap())
-        .item(&PredefinedMenuItem::redo(app, None).unwrap())
-        .separator()
-        .item(&PredefinedMenuItem::cut(app, None).unwrap())
-        .item(&PredefinedMenuItem::copy(app, None).unwrap())
-        .item(&PredefinedMenuItem::paste(app, None).unwrap())
-        .item(&PredefinedMenuItem::select_all(app, None).unwrap())
-        .build()?;
-
-    let view_menu = SubmenuBuilder::new(app, "View")
+    let app_menu = SubmenuBuilder::new(app, &s.menu_brand)
         .item(
-            &MenuItemBuilder::with_id("toggle_fullscreen", "Toggle Fullscreen")
+            &MenuItemBuilder::with_id("open_settings", &s.menu_settings)
+                .build(app)?,
+        )
+        .separator()
+        .item(&PredefinedMenuItem::hide(app, Some(s.menu_hide.as_str())).unwrap())
+        .item(
+            &PredefinedMenuItem::hide_others(app, Some(s.menu_hide_others.as_str())).unwrap(),
+        )
+        .item(&PredefinedMenuItem::show_all(app, Some(s.menu_show_all.as_str())).unwrap())
+        .separator()
+        .item(&PredefinedMenuItem::quit(app, Some(s.menu_quit.as_str()))?)
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(app, &s.menu_edit)
+        .item(&PredefinedMenuItem::undo(app, Some(s.menu_undo.as_str())).unwrap())
+        .item(&PredefinedMenuItem::redo(app, Some(s.menu_redo.as_str())).unwrap())
+        .separator()
+        .item(&PredefinedMenuItem::cut(app, Some(s.menu_cut.as_str())).unwrap())
+        .item(&PredefinedMenuItem::copy(app, Some(s.menu_copy.as_str())).unwrap())
+        .item(&PredefinedMenuItem::paste(app, Some(s.menu_paste.as_str())).unwrap())
+        .item(
+            &PredefinedMenuItem::select_all(app, Some(s.menu_select_all.as_str())).unwrap(),
+        )
+        .build()?;
+
+    let view_menu = SubmenuBuilder::new(app, &s.menu_view)
+        .item(
+            &MenuItemBuilder::with_id("toggle_fullscreen", &s.menu_fullscreen)
                 .accelerator("F11")
                 .build(app)?,
         )
         .build()?;
 
-    let help_menu = SubmenuBuilder::new(app, "Help")
-        .item(&MenuItemBuilder::with_id("report_issue", "Report Issue").build(app)?)
+    let help_menu = SubmenuBuilder::new(app, &s.menu_help)
+        .item(
+            &MenuItemBuilder::with_id("report_issue", &s.menu_report_issue).build(app)?,
+        )
         .separator()
-        // Add the new menu item for checking updates
-        .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
+        .item(
+            &MenuItemBuilder::with_id("check_for_update", &s.menu_check_update).build(app)?,
+        )
         .separator()
-        .item(&MenuItemBuilder::with_id("show_about_dialog", "About Wealthfolio").build(app)?)
+        .item(
+            &MenuItemBuilder::with_id("show_about_dialog", &s.menu_about).build(app)?,
+        )
         .build()?;
 
     let menu = MenuBuilder::new(app)
@@ -51,6 +65,8 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
 }
 
 pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
+    let s = crate::shell_i18n::current_strings(app);
+
     match event_id {
         "open_settings" => {
             if let Some(window) = app.get_webview_window("main") {
@@ -60,8 +76,8 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
         }
         "report_issue" => {
             app.dialog()
-                .message("If you encounter any issues, please email us at support@wealthfolio.app")
-                .title("Report Issue")
+                .message(&s.dialog_report_issue_body)
+                .title(&s.dialog_report_issue_title)
                 .show(|_| {});
         }
         "toggle_fullscreen" => {
@@ -69,7 +85,6 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
                 if let Ok(is_fullscreen) = window.is_fullscreen() {
                     let _ = window.set_fullscreen(!is_fullscreen);
                 } else {
-                    // if getting fullscreen state fails just try toggling
                     let _ = window.set_fullscreen(false);
                 }
             }
@@ -77,26 +92,32 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
         "check_for_update" => {
             let app_handle = app.clone();
             let instance_id = instance_id.to_string();
+            let dialog_update_current_title = s.dialog_update_current_title.clone();
+            let dialog_update_current_body = s.dialog_update_current_body.clone();
+            let dialog_update_error_title = s.dialog_update_error_title.clone();
+            let dialog_update_error_body = s.dialog_update_error_body.clone();
+
             tauri::async_runtime::spawn(async move {
                 match crate::updater::check_for_update(app_handle.clone(), &instance_id).await {
                     Ok(Some(update_info)) => {
-                        // Update available - emit event for frontend to show dialog
                         let _ = app_handle.emit("app:update-available", &update_info);
                     }
                     Ok(None) => {
-                        // Already up-to-date - show native dialog
                         app_handle
                             .dialog()
-                            .message("You're already running the latest version of Wealthfolio.")
-                            .title("No Updates Available")
+                            .message(dialog_update_current_body)
+                            .title(dialog_update_current_title)
                             .show(|_| {});
                     }
                     Err(e) => {
-                        // Error - show native dialog
+                        let msg = crate::shell_i18n::format_update_error(
+                            &dialog_update_error_body,
+                            &e.to_string(),
+                        );
                         app_handle
                             .dialog()
-                            .message(format!("Failed to check for updates: {}", e))
-                            .title("Update Check Failed")
+                            .message(msg)
+                            .title(dialog_update_error_title)
                             .show(|_| {});
                     }
                 }
@@ -106,11 +127,10 @@ pub fn handle_menu_event(app: &AppHandle, instance_id: &str, event_id: &str) {
             let package_info = app.package_info();
             let app_name = &package_info.name;
             let app_version = &package_info.version.to_string();
-            let message = format!("{} version {}", app_name, app_version);
-            app.dialog()
-                .message(message)
-                .title(format!("About {}", app_name))
-                .show(|_| {});
+            let message =
+                crate::shell_i18n::format_about_body(&s.dialog_about_body, app_name, app_version);
+            let title = format!("{} {}", s.dialog_about_title_prefix, app_name);
+            app.dialog().message(message).title(title).show(|_| {});
         }
         _ => {}
     }

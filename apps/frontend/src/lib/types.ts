@@ -1,5 +1,5 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
-export { ImportType } from "@/lib/schemas";
+export { ImportType } from "@/lib/import-constants";
 import * as z from "zod";
 import {
   AccountType,
@@ -700,6 +700,8 @@ export interface Settings {
   autoUpdateCheckEnabled: boolean;
   menuBarVisible: boolean;
   syncEnabled: boolean;
+  /** ISO code for the assumed language of provider security notes when translating (e.g. Yahoo blurbs). */
+  translationSourceLang: string;
 }
 
 export interface SettingsContextType {
@@ -769,7 +771,7 @@ export interface DateRange {
   to: Date | undefined;
 }
 
-export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
+export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y" | "ALL";
 
 export interface AccountValuation {
   id: string;

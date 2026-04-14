@@ -2,6 +2,7 @@ import { ThreadListPrimitive } from "@assistant-ui/react";
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import { ActionConfirm } from "@wealthfolio/ui/components/common";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -105,6 +106,7 @@ interface ThreadListNewProps {
 }
 
 const ThreadListNew: FC<ThreadListNewProps> = ({ onNewThread }) => {
+  const { t } = useTranslation("common");
   return (
     <Button
       className="aui-thread-list-new hover:bg-muted data-active:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start text-xs"
@@ -112,7 +114,7 @@ const ThreadListNew: FC<ThreadListNewProps> = ({ onNewThread }) => {
       onClick={onNewThread}
     >
       <Icons.Plus className="size-3.5" />
-      New Thread
+      {t("ai.thread.new_conversation")}
     </Button>
   );
 };
@@ -123,12 +125,13 @@ interface ThreadSearchInputProps {
 }
 
 const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
+  const { t } = useTranslation("common");
   return (
     <div className="relative px-1">
       <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 size-4 -translate-y-1/2" />
       <Input
         type="text"
-        placeholder="Search threads..."
+        placeholder={t("ai.thread.search_placeholder")}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="h-8 pl-8 pr-8 text-sm"
@@ -138,7 +141,7 @@ const ThreadSearchInput: FC<ThreadSearchInputProps> = ({ value, onChange }) => {
           type="button"
           onClick={() => onChange("")}
           className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2"
-          aria-label="Clear search"
+          aria-label={t("ai.thread.clear_search_aria")}
         >
           <Icons.Close className="size-4" />
         </button>
@@ -160,6 +163,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
   switchingThreadId,
   onThreadListStateChange,
 }) => {
+  const { t } = useTranslation("common");
   // Get the runtime for thread switching
   const runtime = useRuntimeContext();
 
@@ -240,7 +244,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
   if (threads.length === 0) {
     return (
       <div className="text-muted-foreground px-3 py-4 text-center text-sm">
-        {search ? "No threads match your search." : "No conversations yet."}
+        {search ? t("ai.thread.no_matches") : t("ai.thread.empty")}
       </div>
     );
   }
@@ -252,7 +256,7 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
         <div className="flex flex-col gap-0.5">
           <div className="text-muted-foreground flex items-center gap-1.5 px-3 py-1 text-xs font-medium">
             <Icons.Pin className="size-3" />
-            Pinned
+            {t("ai.thread.section_pinned")}
           </div>
           {pinnedThreads.map((thread) => (
             <ThreadListItemCustom
@@ -273,7 +277,9 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {unpinnedThreads.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {pinnedThreads.length > 0 && (
-            <div className="text-muted-foreground px-3 py-1 text-xs font-medium">Recent</div>
+            <div className="text-muted-foreground px-3 py-1 text-xs font-medium">
+              {t("ai.thread.recent")}
+            </div>
           )}
           {unpinnedThreads.map((thread) => (
             <ThreadListItemCustom
@@ -311,13 +317,14 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
 };
 
 const ThreadListSkeleton: FC = () => {
+  const { t } = useTranslation("common");
   return (
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <div
           key={i}
           role="status"
-          aria-label="Loading threads"
+          aria-label={t("ai.thread.loading_threads_aria")}
           aria-live="polite"
           className="aui-thread-list-skeleton-wrapper flex items-center gap-2 rounded-md px-3 py-2"
         >
@@ -351,6 +358,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
   onDelete,
   onTogglePin,
 }) => {
+  const { t } = useTranslation("common");
   return (
     <div
       className={`aui-thread-list-item hover:bg-muted focus-visible:bg-muted focus-visible:ring-ring group relative rounded-lg transition-all focus-visible:outline-none focus-visible:ring-2 ${
@@ -365,7 +373,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
         disabled={isLoading || isDeleting}
       >
         <span className="aui-thread-list-item-title line-clamp-1 text-sm tracking-tighter [word-spacing:-0.2em]">
-          {thread.title || "New Chat"}
+          {thread.title || t("ai.thread.new_conversation")}
         </span>
       </button>
       {isLoading ? (
@@ -382,7 +390,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
               e.stopPropagation();
               onTogglePin(thread.id, thread.isPinned);
             }}
-            title={thread.isPinned ? "Unpin" : "Pin"}
+            title={thread.isPinned ? t("ai.thread.menu_unpin") : t("ai.thread.menu_pin")}
           >
             {thread.isPinned ? (
               <Icons.PinOff className="size-3.5" />
@@ -391,12 +399,14 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
             )}
           </Button>
           <ActionConfirm
-            confirmTitle="Delete conversation?"
-            confirmMessage={`This will permanently delete "${thread.title || "this conversation"}" and all its messages.`}
-            confirmButtonText="Delete"
+            confirmTitle={t("ai.thread.delete_title")}
+            confirmMessage={t("ai.thread.delete_description", {
+              title: thread.title || t("ai.thread.untitled_reference"),
+            })}
+            confirmButtonText={t("ai.thread.delete_confirm")}
             confirmButtonVariant="destructive"
             isPending={isDeleting ?? false}
-            pendingText="Deleting..."
+            pendingText={t("activity.delete.deleting")}
             handleConfirm={() => onDelete(thread.id)}
             side="right"
             button={

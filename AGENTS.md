@@ -136,6 +136,15 @@ Frontend → Adapter (tauri/web) → Command wrapper
 - Functional components, named exports
 - Directory names: lowercase-with-dashes
 
+### i18n (German)
+
+- In `apps/frontend/src/i18n/locales/de/common.json`, use proper Unicode **ä**, **ö**, **ü** (and **ß** where appropriate). Avoid ASCII substitutes (`ae`, `oe`, `ue`). After bulk edits, you can normalize with `node apps/frontend/scripts/fix-de-umlauts.mjs`.
+- Keep terminology consistent across taxonomy and UI:
+  - Keep these established market terms in English: `ADR`, `GDR`, `Futures`, `ETF`, `ETN`, `CFD`, `DeFi`, `NFTs`, `Stablecoins`.
+  - Prefer clear German labels for generic UI/product terms (for example: "Instrumenttyp", "Risikokategorie", "Bankeinlagen").
+  - Use mixed wording when it is the most natural domain phrasing (for example: "Agency- & supranationale Anleihen", "Darlehen / Floater").
+  - For dynamic currency buckets like `cash:CAD`, localize the prefix and keep the currency code unchanged.
+
 ### Rust
 
 - Idiomatic Rust, small focused functions

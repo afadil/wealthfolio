@@ -14,24 +14,22 @@ const baseIssue: HealthIssue = {
 };
 
 describe("getCategoryConfig", () => {
-  it("uses Settings label for settings configuration issues", () => {
+  it("uses Settings icon for settings configuration issues", () => {
     const category = getCategoryConfig({
       ...baseIssue,
       id: "timezone_missing:abc123",
     });
 
-    expect(category.label).toBe("Settings");
     expect(category.icon).toBe("Settings");
   });
 
-  it("keeps Accounts label for account configuration issues", () => {
+  it("uses Settings icon for account configuration issues", () => {
     const category = getCategoryConfig({
       ...baseIssue,
       category: "ACCOUNT_CONFIGURATION",
       id: "account_tracking_mode:abc123",
     });
 
-    expect(category.label).toBe("Accounts");
     expect(category.icon).toBe("Settings");
   });
 });

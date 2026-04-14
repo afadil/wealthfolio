@@ -1,4 +1,5 @@
 import { Button, Icons } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 interface ValueHistoryToolbarProps {
   selectedRowCount: number;
@@ -23,20 +24,23 @@ export function ValueHistoryToolbar({
   onCancel,
   isLiability = false,
 }: ValueHistoryToolbarProps) {
-  const valueLabel = isLiability ? "Balance" : "Value";
+  const { t } = useTranslation("common");
+  const addLabel = isLiability
+    ? t("holdings.value_history.add_balance")
+    : t("holdings.value_history.add_value");
 
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <Button variant="default" size="sm" onClick={onAddRow}>
           <Icons.Plus className="mr-2 h-4 w-4" />
-          Add {valueLabel}
+          {addLabel}
         </Button>
 
         {selectedRowCount > 0 && (
           <Button variant="outline" size="sm" onClick={onDeleteSelected}>
             <Icons.Trash className="mr-2 h-4 w-4" />
-            Delete ({selectedRowCount})
+            {t("holdings.value_history.delete_selected", { count: selectedRowCount })}
           </Button>
         )}
       </div>
@@ -45,16 +49,17 @@ export function ValueHistoryToolbar({
         {hasUnsavedChanges && (
           <>
             <span className="text-muted-foreground text-sm">
-              {dirtyCount > 0 && `${dirtyCount} modified`}
+              {dirtyCount > 0 && t("holdings.value_history.modified_count", { count: dirtyCount })}
               {dirtyCount > 0 && deletedCount > 0 && ", "}
-              {deletedCount > 0 && `${deletedCount} to delete`}
+              {deletedCount > 0 &&
+                t("holdings.value_history.to_delete_count", { count: deletedCount })}
             </span>
             <Button variant="ghost" size="sm" onClick={onCancel}>
-              Cancel
+              {t("holdings.value_history.cancel")}
             </Button>
             <Button variant="default" size="sm" onClick={onSave}>
               <Icons.Save className="mr-2 h-4 w-4" />
-              Save Changes
+              {t("holdings.value_history.save_changes")}
             </Button>
           </>
         )}

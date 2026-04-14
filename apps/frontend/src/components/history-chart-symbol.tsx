@@ -1,7 +1,8 @@
 import { TimePeriod } from "@/lib/types";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
-import { formatAmount } from "@wealthfolio/ui";
 import { formatDate } from "@/lib/utils";
+import { formatAmount } from "@wealthfolio/ui";
+import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 interface CustomTooltipProps<TPayload = { timestamp: string; currency: string }> {
   active: boolean;
@@ -32,13 +33,25 @@ export default function HistoryChart({
   data,
   interval,
   height = 350,
+  onPointClick,
 }: {
   data: HistoryChartData[];
   interval?: TimePeriod;
   height?: number;
+  /** ISO timestamp of the clicked quote (from chart payload). */
+  onPointClick?: (timestampIso: string) => void;
 }) {
+  const handleChartClick = (chartState: MouseHandlerDataParam) => {
+    if (!onPointClick) return;
+    const label = chartState.activeLabel;
+    if (label == null) return;
+    const asString = String(label);
+    if (!asString) return;
+    onPointClick(asString);
+  };
+
   return (
-    <div className="relative flex h-full flex-col">
+    <div className={`relative flex h-full flex-col ${onPointClick ? "cursor-pointer" : ""}`}>
       <div className="grow">
         <ResponsiveContainer width="100%" height="100%" minHeight={height}>
           <AreaChart
@@ -50,6 +63,7 @@ export default function HistoryChart({
               left: 0,
               bottom: 0,
             }}
+            onClick={onPointClick ? handleChartClick : undefined}
           >
             <defs>
               <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
@@ -59,9 +73,14 @@ export default function HistoryChart({
             </defs>
             {/* @ts-expect-error - Recharts Tooltip content typing mismatch */}
             <Tooltip content={<CustomTooltip />} />
-            {interval !== "ALL" && interval !== "1Y" ? (
+            {interval &&
+            interval !== "ALL" &&
+            interval !== "1Y" &&
+            interval !== "3Y" &&
+            interval !== "5Y" ? (
               <YAxis hide={true} type="number" domain={["auto", "auto"]} />
             ) : null}
+            <XAxis dataKey="timestamp" type="category" hide />
             <Area
               isAnimationActive={true}
               animationDuration={300}
@@ -72,6 +91,7 @@ export default function HistoryChart({
               stroke="var(--success)"
               fillOpacity={1}
               fill="url(#colorUv)"
+              style={{ pointerEvents: "none" }}
             />
           </AreaChart>
         </ResponsiveContainer>

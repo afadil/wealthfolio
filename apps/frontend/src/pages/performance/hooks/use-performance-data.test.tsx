@@ -12,6 +12,13 @@ vi.mock("@/adapters", () => ({
   calculatePerformanceHistory: mocks.calculatePerformanceHistory,
 }));
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en" },
+  }),
+}));
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },

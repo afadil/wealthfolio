@@ -2,6 +2,7 @@ import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
@@ -94,8 +95,8 @@ function normalizeAccountsResult(
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
     .map((item) => ({
       id: safeString(item.id ?? item.Id, ""),
-      name: safeString(item.name ?? item.Name, "Unknown"),
-      accountType: safeString(item.accountType ?? item.account_type ?? item.AccountType, "Unknown"),
+      name: safeString(item.name ?? item.Name, ""),
+      accountType: safeString(item.accountType ?? item.account_type ?? item.AccountType, ""),
       currency: safeString(item.currency ?? item.Currency, fallbackCurrency),
       isActive: Boolean(item.isActive ?? item.is_active ?? item.IsActive ?? true),
     }));
@@ -152,12 +153,15 @@ function AccountsLoadingSkeleton() {
 }
 
 function AccountCard({ account }: { account: AccountDto }) {
+  const { t } = useTranslation();
+  const unknownLabel = t("settings.securities.table.unknown");
+
   return (
     <div className="bg-background/60 hover:bg-background/80 flex items-center justify-between rounded-lg border p-3 transition-colors">
       <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium leading-tight">{account.name}</span>
+        <span className="text-sm font-medium leading-tight">{account.name || unknownLabel}</span>
         <span className="text-muted-foreground text-xs">
-          {formatAccountType(account.accountType)}
+          {account.accountType ? formatAccountType(account.accountType) : unknownLabel}
         </span>
       </div>
       <Badge variant="secondary" className="text-xs uppercase">
@@ -168,23 +172,23 @@ function AccountCard({ account }: { account: AccountDto }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <Card className="bg-muted/40 border-primary/10">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-        <p className="text-muted-foreground text-sm">No accounts found.</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Add accounts in Settings to track your investments.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("ai.tool.accounts.empty")}</p>
+        <p className="text-muted-foreground mt-1 text-xs">{t("ai.tool.accounts.empty_hint")}</p>
       </CardContent>
     </Card>
   );
 }
 
 function ErrorState({ message }: { message?: string }) {
+  const { t } = useTranslation();
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">Failed to load accounts</p>
+        <p className="text-destructive text-sm font-medium">{t("ai.tool.accounts.error_title")}</p>
         {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
@@ -198,6 +202,7 @@ function ErrorState({ message }: { message?: string }) {
 type AccountsToolUIContentProps = ToolCallMessagePartProps<GetAccountsArgs, GetAccountsResult>;
 
 function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -225,7 +230,7 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
 
   // Show error state for incomplete/failed status
   if (isIncomplete) {
-    return <ErrorState message="The request was interrupted or failed." />;
+    return <ErrorState message={t("ai.tool.accounts.error_incomplete")} />;
   }
 
   // Show empty state if no accounts
@@ -240,13 +245,15 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Accounts</CardTitle>
+            <CardTitle className="text-base">{t("ai.tool.accounts.title")}</CardTitle>
             <Badge variant="secondary" className="text-xs">
-              {count} {count === 1 ? "account" : "accounts"}
+              {t(count === 1 ? "ai.tool.accounts.count_one" : "ai.tool.accounts.count_other", {
+                count,
+              })}
             </Badge>
             {truncated && originalCount && (
               <Badge variant="outline" className="text-muted-foreground text-xs">
-                of {originalCount}
+                {t("ai.tool.accounts.of_total", { total: originalCount })}
               </Badge>
             )}
           </div>

@@ -5,7 +5,9 @@ import type { Account, ActivityDetails } from "@/lib/types";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
 import type { SortingState, Updater, VisibilityState } from "@tanstack/react-table";
 import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui";
+import { useDataGridColumnHeaderMenuLabels } from "@/hooks/use-data-grid-column-header-labels";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { resolveSymbolQuote } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
@@ -58,6 +60,9 @@ export function ActivityDataGrid({
   onPageChange,
   onPageSizeChange,
 }: ActivityDataGridProps) {
+  const { t } = useTranslation("common");
+  const columnHeaderMenuLabels = useDataGridColumnHeaderMenuLabels();
+
   // State management
   const {
     localTransactions,
@@ -405,6 +410,8 @@ export function ActivityDataGrid({
     enableSearch: true,
     enablePaste: true,
     manualSorting: true, // Server-side sorting - prevents row reordering during edits
+    columnHeaderMenuLabels,
+    addRowLabel: t("activity.data_grid.add_row"),
     onDataChange,
     onRowAdd,
     onRowsAdd,

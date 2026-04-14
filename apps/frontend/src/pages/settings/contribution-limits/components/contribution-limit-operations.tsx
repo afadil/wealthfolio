@@ -20,6 +20,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import type { ContributionLimit } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export interface ContributionLimitOperationsProps {
   limit: ContributionLimit;
@@ -32,6 +33,7 @@ export function ContributionLimitOperations({
   onEdit,
   onDelete,
 }: ContributionLimitOperationsProps) {
+  const { t } = useTranslation("common");
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const isDeleting = false; // You can implement loading state if needed
 
@@ -45,30 +47,28 @@ export function ContributionLimitOperations({
       <DropdownMenu>
         <DropdownMenuTrigger className="hover:bg-muted flex h-8 w-8 items-center justify-center rounded-md border transition-colors">
           <Icons.MoreVertical className="h-4 w-4" />
-          <span className="sr-only">Open</span>
+          <span className="sr-only">{t("settings.shared.open")}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(limit)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onEdit(limit)}>{t("settings.shared.edit")}</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
             onSelect={() => setShowDeleteAlert(true)}
           >
-            Delete
+            {t("settings.shared.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Are you sure you want to delete this contribution limit?
-            </AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t("settings.contribution_limits.delete_title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("settings.shared.action_cannot_undo")}</AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("settings.shared.cancel")}</AlertDialogCancel>
 
             <Button
               disabled={isDeleting}
@@ -80,7 +80,7 @@ export function ContributionLimitOperations({
               ) : (
                 <Icons.Trash className="mr-2 h-4 w-4" />
               )}
-              <span>Delete</span>
+              <span>{t("settings.shared.delete")}</span>
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

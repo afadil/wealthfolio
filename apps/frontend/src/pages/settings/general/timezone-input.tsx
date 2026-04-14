@@ -12,6 +12,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
+import { useTranslation } from "react-i18next";
 
 interface TimezoneInputProps {
   value?: string;
@@ -24,8 +25,9 @@ export function TimezoneInput({
   value,
   onChange,
   timezones,
-  placeholder = "Select a timezone",
+  placeholder,
 }: TimezoneInputProps) {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -38,7 +40,8 @@ export function TimezoneInput({
     return timezones.filter((timezone) => timezone.toLowerCase().includes(query));
   }, [searchQuery, timezones]);
 
-  const buttonLabel = value || placeholder;
+  const resolvedPlaceholder = placeholder ?? t("settings.timezone.select_placeholder");
+  const buttonLabel = value || resolvedPlaceholder;
 
   const handleSelect = (timezone: string) => {
     onChange(timezone);
@@ -66,13 +69,13 @@ export function TimezoneInput({
       <PopoverContent className="w-[360px] max-w-[calc(100vw-2rem)] p-0">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search timezone..."
+            placeholder={t("settings.timezone.search_placeholder")}
             className="h-9"
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
           <CommandList>
-            <CommandEmpty>No timezone found.</CommandEmpty>
+            <CommandEmpty>{t("settings.timezone.no_results")}</CommandEmpty>
             <CommandGroup>
               <ScrollArea className="max-h-72 overflow-y-auto">
                 {filteredTimezones.map((timezone) => (

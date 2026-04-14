@@ -8,6 +8,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ProgressIndicator } from "@wealthfolio/ui/components/ui/progress-indicator";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ImportAlert } from "../components/import-alert";
 import { useImportContext, type DraftActivity } from "../context";
 import {
@@ -81,6 +82,7 @@ function NeedsFixingRow({
   onMarkCustom,
   onCreateAsset,
 }: NeedsFixingRowProps) {
+  const { t } = useTranslation("common");
   const meaningfulErrors = Object.values(item.errors ?? {})
     .flat()
     .filter((msg) => !REDUNDANT_ERROR_PATTERNS.some((re) => re.test(msg)));
@@ -109,7 +111,7 @@ function NeedsFixingRow({
         <Icons.Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-amber-400 dark:text-amber-500/70" />
         <TickerSearchInput
           defaultValue={symbol}
-          placeholder="Search by ticker, name or ISIN…"
+          placeholder={t("import.asset_review.search_placeholder")}
           onSelectResult={(_sym, result) => onSearch(item, result)}
           className="w-full pl-8 text-xs"
         />
@@ -125,7 +127,7 @@ function NeedsFixingRow({
           className="text-muted-foreground h-7 gap-1 px-2 text-[11px] hover:text-amber-700 dark:hover:text-amber-400"
         >
           <Icons.Tag className="h-3 w-3 shrink-0" />
-          <span className="hidden sm:inline">Mark Custom</span>
+          <span className="hidden sm:inline">{t("import.asset_review.mark_custom")}</span>
         </Button>
         <Button
           type="button"
@@ -135,7 +137,7 @@ function NeedsFixingRow({
           className="h-7 gap-1 border-amber-300 px-2.5 text-[11px] text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
         >
           <Icons.Plus className="h-3 w-3 shrink-0" />
-          <span className="hidden sm:inline">Create manually</span>
+          <span className="hidden sm:inline">{t("import.asset_review.create_manually")}</span>
         </Button>
       </div>
 
@@ -183,6 +185,7 @@ function AutoResolvedRow({
   onSearch,
   onEdit,
 }: AutoResolvedRowProps) {
+  const { t } = useTranslation("common");
   const asset = item.draft;
   const assetName =
     asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
@@ -213,7 +216,7 @@ function AutoResolvedRow({
       {isSearchOpen ? (
         <TickerSearchInput
           defaultValue={asset?.instrumentSymbol || asset?.displayCode || symbol}
-          placeholder="Search by ticker, name or ISIN…"
+          placeholder={t("activity.import.search_asset_placeholder")}
           onSelectResult={(_sym, result) => onSearch(item, result)}
           className="h-8 w-full py-1 text-xs"
         />
@@ -228,7 +231,10 @@ function AutoResolvedRow({
           {isSuspicious && (
             <span
               className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300"
-              title={`CSV currency is ${csvCurrency} but resolved to ${asset?.quoteCcy}`}
+              title={t("import.asset_review.currency_mismatch_hint", {
+                csv: csvCurrency,
+                resolved: asset?.quoteCcy ?? "",
+              })}
             >
               <Icons.AlertTriangle className="h-3 w-3 shrink-0" />
               {csvCurrency} → {asset?.quoteCcy}
@@ -243,7 +249,9 @@ function AutoResolvedRow({
             </span>
           ))}
           {metaPills.length === 0 && item.resolutionSource !== "mark_custom" && (
-            <span className="text-muted-foreground text-[11px] italic">No metadata resolved</span>
+            <span className="text-muted-foreground text-[11px] italic">
+              {t("import.asset_review.no_metadata_resolved")}
+            </span>
           )}
         </div>
       )}
@@ -257,12 +265,14 @@ function AutoResolvedRow({
           onClick={onToggleSearch}
         >
           <Icons.Search className="h-3 w-3" />
-          <span className="hidden sm:inline">{isSearchOpen ? "Cancel" : "Remap"}</span>
+          <span className="hidden sm:inline">
+            {isSearchOpen ? t("activity.form.cancel") : t("activity.import.remap")}
+          </span>
         </Button>
         {!isSearchOpen && (
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={onEdit}>
             <Icons.Pencil className="h-3 w-3" />
-            <span className="hidden sm:inline">Edit</span>
+            <span className="hidden sm:inline">{t("activity.import.edit")}</span>
           </Button>
         )}
       </div>
@@ -291,6 +301,7 @@ function ReadyAssetRow({
   onSearch,
   onEdit,
 }: ReadyAssetRowProps) {
+  const { t } = useTranslation();
   const asset = item.draft;
   const assetName =
     asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
@@ -321,7 +332,7 @@ function ReadyAssetRow({
       {isSearchOpen ? (
         <TickerSearchInput
           defaultValue={asset?.instrumentSymbol || asset?.displayCode || symbol}
-          placeholder="Search by ticker, name or ISIN…"
+          placeholder={t("activity.import.search_asset_placeholder")}
           onSelectResult={(_sym, result) => onSearch(item, result)}
           className="h-8 w-full py-1 text-xs"
         />
@@ -336,7 +347,9 @@ function ReadyAssetRow({
             </span>
           ))}
           {metaPills.length === 0 && (
-            <span className="text-muted-foreground text-[11px] italic">No metadata</span>
+            <span className="text-muted-foreground text-[11px] italic">
+              {t("import.asset_review.no_metadata")}
+            </span>
           )}
         </div>
       )}
@@ -350,12 +363,14 @@ function ReadyAssetRow({
           onClick={onToggleSearch}
         >
           <Icons.Search className="h-3 w-3" />
-          <span className="hidden sm:inline">{isSearchOpen ? "Cancel" : "Remap"}</span>
+          <span className="hidden sm:inline">
+            {isSearchOpen ? t("activity.form.cancel") : t("activity.import.remap")}
+          </span>
         </Button>
         {!isSearchOpen && (
           <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={onEdit}>
             <Icons.Pencil className="h-3 w-3" />
-            <span className="hidden sm:inline">Edit</span>
+            <span className="hidden sm:inline">{t("activity.import.edit")}</span>
           </Button>
         )}
       </div>
@@ -366,6 +381,7 @@ function ReadyAssetRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AssetReviewStep() {
+  const { t } = useTranslation("common");
   const { state, dispatch, previewAssets } = useImportContext();
   const { draftActivities, assetPreviewItems, isPreviewingAssets } = state;
   const [activeSearchKey, setActiveSearchKey] = useState<string | null>(null);
@@ -618,8 +634,8 @@ export function AssetReviewStep() {
     return (
       <ImportAlert
         variant="success"
-        title="No assets require review"
-        description="This import only contains cash-style activities — you can continue to activity review."
+        title={t("import.asset_review.empty_title")}
+        description={t("import.asset_review.empty_description")}
       />
     );
   }
@@ -629,8 +645,8 @@ export function AssetReviewStep() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <ProgressIndicator
-          message="Resolving assets and matching symbols…"
-          description="This may take a few minutes."
+          message={t("import.asset_review.resolving_message")}
+          description={t("import.asset_review.resolving_description")}
           className="border-none shadow-none"
         />
       </div>
@@ -642,12 +658,12 @@ export function AssetReviewStep() {
     return (
       <ImportAlert
         variant="destructive"
-        title="Asset preview failed"
+        title={t("import.asset_review.preview_failed_title")}
         description={state.assetPreviewError}
       >
         <div className="mt-3">
           <Button size="sm" variant="outline" onClick={() => void previewAssets(draftActivities)}>
-            Retry
+            {t("import.asset_review.retry")}
           </Button>
         </div>
       </ImportAlert>
@@ -660,8 +676,8 @@ export function AssetReviewStep() {
       {needsFixing.length === 0 && autoResolvedItems.length === 0 && (
         <ImportAlert
           variant="success"
-          title="All assets resolved"
-          description="Ready to continue. You can still remap or edit any asset before confirming."
+          title={t("import.asset_review.all_resolved_title")}
+          description={t("import.asset_review.all_resolved_description")}
         />
       )}
 
@@ -679,10 +695,10 @@ export function AssetReviewStep() {
               <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
               <div className="flex-1">
                 <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                  Needs Fixing
+                  {t("import.asset_review.section_needs_fixing")}
                 </span>
                 <p className="text-muted-foreground mt-0.5 text-[11px]">
-                  Search for the correct ticker or create a custom asset for each symbol.
+                  {t("import.asset_review.section_needs_fixing_hint")}
                 </p>
               </div>
             </button>
@@ -696,7 +712,7 @@ export function AssetReviewStep() {
                 className="h-7 gap-1 border-amber-300 px-2.5 text-[11px] text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
               >
                 <Icons.Tag className="h-3 w-3 shrink-0" />
-                Mark All Custom
+                {t("import.asset_review.mark_all_custom")}
               </Button>
               <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
                 {needsFixing.length}
@@ -772,11 +788,10 @@ export function AssetReviewStep() {
                 <Icons.Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
                 <div className="flex-1">
                   <span className="text-xs font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">
-                    New Assets
+                    {t("import.asset_review.section_new_assets")}
                   </span>
                   <p className="text-muted-foreground mt-0.5 text-[11px]">
-                    Auto-resolved from market data. Review and edit if anything looks off before
-                    importing.
+                    {t("import.asset_review.section_new_assets_hint")}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -860,10 +875,10 @@ export function AssetReviewStep() {
             <Icons.CheckCircle className="text-success mt-0.5 h-3.5 w-3.5 shrink-0" />
             <div className="flex-1">
               <span className="text-success text-xs font-semibold uppercase tracking-wider">
-                Existing Assets
+                {t("import.asset_review.section_existing")}
               </span>
               <p className="text-muted-foreground mt-0.5 text-[11px]">
-                Already in your portfolio. No action needed, but you can still remap if required.
+                {t("import.asset_review.section_existing_hint")}
               </p>
             </div>
             <span className="bg-success/20 text-success rounded-full px-2 py-0.5 text-[10px] font-bold">
@@ -923,13 +938,21 @@ export function AssetReviewStep() {
       <CreateSecurityDialog
         open={assetDialog.open}
         onOpenChange={(open) => setAssetDialog((current) => ({ ...current, open }))}
-        title={assetDialog.mode === "edit" ? "Edit Asset Resolution" : "Create Asset"}
+        title={
+          assetDialog.mode === "edit"
+            ? t("import.asset_review.dialog_edit_title")
+            : t("import.asset_review.dialog_create_title")
+        }
         description={
           assetDialog.mode === "edit"
-            ? "Adjust the resolved asset details. Edits apply only to this import."
-            : "Create a new asset and link these rows to it immediately."
+            ? t("import.asset_review.dialog_edit_description")
+            : t("import.asset_review.dialog_create_description")
         }
-        submitLabel={assetDialog.mode === "edit" ? "Use Edited Asset" : "Create Asset"}
+        submitLabel={
+          assetDialog.mode === "edit"
+            ? t("import.asset_review.dialog_submit_edit")
+            : t("import.asset_review.dialog_submit_create")
+        }
         initialAsset={assetDialog.initialAsset}
         onSubmit={(payload) =>
           void (assetDialog.mode === "edit"

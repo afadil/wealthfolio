@@ -3,6 +3,7 @@
 // =====================================================================
 
 import { useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { usePairingIssuer, usePairingClaimer, useSyncStatus } from "../../hooks";
 import { logger } from "@/adapters";
 import { DisplayCode } from "./display-code";
@@ -73,6 +74,7 @@ export function PairingFlow({
 
 // Issuer Flow (trusted device - displays QR code)
 function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
+  const { t } = useTranslation("common");
   const {
     step,
     error,
@@ -113,7 +115,7 @@ function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowPro
 
   switch (step) {
     case "idle":
-      return <WaitingState title="Starting..." onCancel={onCancel} />;
+      return <WaitingState title={t("deviceSync.pairing.starting")} onCancel={onCancel} />;
 
     case "display_code":
       if (pairingCode && expiresAt) {
@@ -124,19 +126,27 @@ function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowPro
           </>
         );
       }
-      return <WaitingState title="Generating code..." onCancel={handleCancel} showQRSkeleton />;
+      return (
+        <WaitingState
+          title={t("deviceSync.pairing.generating_code")}
+          onCancel={handleCancel}
+          showQRSkeleton
+        />
+      );
 
     case "verify_sas":
       if (sas) {
         return <SASVerification sas={sas} onConfirm={confirmSAS} onReject={rejectSAS} />;
       }
-      return <WaitingState title="Computing security code..." onCancel={handleCancel} />;
+      return (
+        <WaitingState title={t("deviceSync.pairing.computing_security_code")} onCancel={handleCancel} />
+      );
 
     case "transferring":
       return (
         <WaitingState
-          title="Finishing setup..."
-          description="Preparing your data for the new device"
+          title={t("deviceSync.pairing.finishing_setup")}
+          description={t("deviceSync.pairing.finishing_setup_description")}
         />
       );
 
@@ -152,7 +162,7 @@ function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowPro
       return (
         <PairingResult
           success={false}
-          error="Session expired"
+          error={t("deviceSync.pairing.session_expired")}
           onRetry={handleRetry}
           onDone={handleCancel}
         />
@@ -165,6 +175,7 @@ function IssuerFlow({ onComplete, onCancel, title, description }: PairingFlowPro
 
 // Claimer Flow (untrusted device - enters code and receives keys)
 function ClaimerFlow({ onComplete, onCancel, title, description }: PairingFlowProps) {
+  const { t } = useTranslation("common");
   const { step, error, sas, submitCode, cancel, retry } = usePairingClaimer();
 
   const handleCancel = useCallback(async () => {
@@ -186,16 +197,23 @@ function ClaimerFlow({ onComplete, onCancel, title, description }: PairingFlowPr
       );
 
     case "connecting":
-      return <WaitingState title="Connecting..." onCancel={handleCancel} />;
+      return <WaitingState title={t("deviceSync.pairing.connecting")} onCancel={handleCancel} />;
 
     case "waiting_keys":
       return (
-        <WaitingState title="Verify Security Code" securityCode={sas} onCancel={handleCancel} />
+        <WaitingState
+          title={t("deviceSync.pairing.verify_security_code")}
+          securityCode={sas}
+          onCancel={handleCancel}
+        />
       );
 
     case "syncing":
       return (
-        <WaitingState title="Syncing your data..." description="This may take a few seconds" />
+        <WaitingState
+          title={t("deviceSync.pairing.syncing_data")}
+          description={t("deviceSync.pairing.syncing_description")}
+        />
       );
 
     case "success":

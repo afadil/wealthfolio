@@ -34,21 +34,8 @@ import {
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
-
-const INSTRUMENT_TYPE_OPTIONS = [
-  { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
-  { value: "CRYPTO", label: "Cryptocurrency" },
-  { value: "BOND", label: "Bond" },
-  { value: "OPTION", label: "Option" },
-  { value: "FX", label: "Foreign Exchange" },
-  { value: "METAL", label: "Metal (Commodity)" },
-] as const;
-
-const QUOTE_MODE_OPTIONS = [
-  { value: "MANUAL", label: "Manual" },
-  { value: "MARKET", label: "Market (auto-sync)" },
-] as const;
 
 /** Map search result quoteType to our InstrumentType form values.
  *  Returns null for unrecognized types so the caller can fall back to manual mode. */
@@ -107,11 +94,34 @@ export function CreateSecurityDialog({
   onSubmit,
   isPending = false,
   initialAsset,
-  title = "Add Security",
-  description = "Search for a security to auto-fill details, or enter them manually.",
-  submitLabel = "Create Security",
+  title,
+  description,
+  submitLabel,
 }: CreateSecurityDialogProps) {
+  const { t } = useTranslation();
   const { settings } = useSettingsContext();
+  const resolvedTitle = title ?? t("settings.securities.dialog.add_title");
+  const resolvedDescription = description ?? t("settings.securities.dialog.add_description");
+  const resolvedSubmitLabel = submitLabel ?? t("settings.securities.dialog.create_submit");
+  const instrumentTypeOptions = useMemo(
+    () => [
+      { value: "EQUITY", label: t("settings.securities.dialog.type_equity") },
+      { value: "CRYPTO", label: t("settings.securities.dialog.type_crypto") },
+      { value: "BOND", label: t("settings.securities.dialog.type_bond") },
+      { value: "OPTION", label: t("settings.securities.dialog.type_option") },
+      { value: "FX", label: t("settings.securities.dialog.type_fx") },
+      { value: "METAL", label: t("settings.securities.dialog.type_metal") },
+    ],
+    [t],
+  );
+  const quoteModeOptions = useMemo(
+    () => [
+      { value: "MANUAL", label: t("settings.securities.dialog.quote_mode_manual") },
+      { value: "MARKET", label: t("settings.securities.dialog.quote_mode_market") },
+    ],
+    [t],
+  );
+
   const defaultCurrency = settings?.baseCurrency || "USD";
   const [selectedResult, setSelectedResult] = useState<SymbolSearchResult | undefined>();
 
@@ -219,8 +229,8 @@ export function CreateSecurityDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>{resolvedTitle}</DialogTitle>
+          <DialogDescription>{resolvedDescription}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -228,10 +238,12 @@ export function CreateSecurityDialog({
             {/* Ticker search - auto-populates form fields on selection */}
             {open && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Search</label>
+                <label className="text-sm font-medium">
+                  {t("settings.securities.dialog.search")}
+                </label>
                 <TickerSearchInput
                   onSelectResult={handleTickerSelect}
-                  placeholder="Search by ticker, name or ISIN…"
+                  placeholder={t("settings.securities.dialog.search_placeholder")}
                   defaultCurrency={defaultCurrency}
                   autoFocusSearch
                   hideCustomCreate
@@ -245,10 +257,10 @@ export function CreateSecurityDialog({
                 name="symbol"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Symbol</FormLabel>
+                    <FormLabel>{t("settings.securities.dialog.symbol")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., AAPL"
+                        placeholder={t("settings.securities.dialog.symbol_placeholder")}
                         {...field}
                         onChange={(e) => {
                           const next = e.target.value.toUpperCase();
@@ -273,15 +285,15 @@ export function CreateSecurityDialog({
                 name="instrumentType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type</FormLabel>
+                    <FormLabel>{t("settings.securities.dialog.type")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
+                          <SelectValue placeholder={t("settings.securities.dialog.select_type")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {INSTRUMENT_TYPE_OPTIONS.map((option) => (
+                        {instrumentTypeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -299,9 +311,9 @@ export function CreateSecurityDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>{t("settings.securities.dialog.name")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Apple Inc." {...field} />
+                    <Input placeholder={t("settings.securities.dialog.name_placeholder")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -314,12 +326,12 @@ export function CreateSecurityDialog({
                 name="quoteCcy"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency</FormLabel>
+                    <FormLabel>{t("settings.securities.dialog.currency")}</FormLabel>
                     <FormControl>
                       <CurrencyInput
                         value={field.value}
                         onChange={field.onChange}
-                        placeholder="Select currency"
+                        placeholder={t("settings.securities.dialog.select_currency")}
                         valueDisplay="code"
                         allowCustom
                       />
@@ -334,7 +346,7 @@ export function CreateSecurityDialog({
                 name="quoteMode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quote Mode</FormLabel>
+                    <FormLabel>{t("settings.securities.dialog.quote_mode")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -342,7 +354,7 @@ export function CreateSecurityDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {QUOTE_MODE_OPTIONS.map((option) => (
+                        {quoteModeOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -361,15 +373,18 @@ export function CreateSecurityDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Exchange <span className="text-muted-foreground text-xs">(optional)</span>
+                    {t("settings.securities.dialog.exchange")}{" "}
+                    <span className="text-muted-foreground text-xs">
+                      ({t("settings.securities.dialog.optional")})
+                    </span>
                   </FormLabel>
                   <FormControl>
                     <SearchableSelect
                       options={exchangeOptions}
                       value={field.value ?? ""}
                       onValueChange={field.onChange}
-                      placeholder="Select exchange"
-                      searchPlaceholder="Search exchanges..."
+                      placeholder={t("settings.securities.dialog.select_exchange")}
+                      searchPlaceholder={t("settings.securities.dialog.search_exchanges")}
                     />
                   </FormControl>
                   <FormMessage />
@@ -383,10 +398,17 @@ export function CreateSecurityDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Notes <span className="text-muted-foreground text-xs">(optional)</span>
+                    {t("settings.securities.dialog.notes")}{" "}
+                    <span className="text-muted-foreground text-xs">
+                      ({t("settings.securities.dialog.optional")})
+                    </span>
                   </FormLabel>
                   <FormControl>
-                    <Textarea rows={2} placeholder="Any additional notes..." {...field} />
+                    <Textarea
+                      rows={2}
+                      placeholder={t("settings.securities.dialog.notes_placeholder")}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -400,7 +422,7 @@ export function CreateSecurityDialog({
                 onClick={() => onOpenChange(false)}
                 disabled={isPending}
               >
-                Cancel
+                {t("settings.shared.cancel")}
               </Button>
               <Button
                 type="button"
@@ -409,10 +431,11 @@ export function CreateSecurityDialog({
               >
                 {isPending ? (
                   <span className="flex items-center gap-2">
-                    <Icons.Spinner className="h-4 w-4 animate-spin" /> Creating...
+                    <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
+                    {t("settings.securities.dialog.creating")}
                   </span>
                 ) : (
-                  submitLabel
+                  resolvedSubmitLabel
                 )}
               </Button>
             </DialogFooter>

@@ -1,5 +1,6 @@
 import { debounce } from "lodash";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ActivityType, ActivityTypeNames, INSTRUMENT_TYPE_OPTIONS } from "@/lib/constants";
 import { Account } from "@/lib/types";
@@ -53,6 +54,7 @@ export function ActivityViewControls({
   totalRowCount,
   isFetching,
 }: ActivityViewControlsProps) {
+  const { t } = useTranslation("common");
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   // Create a stable debounced search function
@@ -84,25 +86,38 @@ export function ActivityViewControls({
 
   const activityOptions = useMemo(
     () =>
-      (Object.entries(ActivityTypeNames) as [ActivityType, string][]).map(([value, label]) => ({
+      (Object.keys(ActivityTypeNames) as ActivityType[]).map((value) => ({
         value,
-        label,
+        label: t(`activity.types.${value}`),
       })),
-    [],
+    [t],
   );
 
   const instrumentTypeOptions = useMemo(
-    () => INSTRUMENT_TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label })),
-    [],
+    () =>
+      INSTRUMENT_TYPE_OPTIONS.map((opt) => ({
+        value: opt.value,
+        label: t(`activity.instrument.${opt.value}`),
+      })),
+    [t],
   );
 
   const statusOptions = useMemo(
     () => [
-      { value: "all", label: "All Activities" },
-      { value: "pending", label: "Pending Review" },
-      { value: "validated", label: "Validated" },
+      { value: "all", label: t("activity.filters.status_all") },
+      { value: "pending", label: t("activity.filters.status_pending") },
+      { value: "validated", label: t("activity.filters.status_validated") },
     ],
-    [],
+    [t],
+  );
+
+  const filterEmptyProps = useMemo(
+    () => ({
+      emptyMessage: t("activity.filters.no_command_results"),
+      clearFiltersLabel: t("activity.filters.clear_filters"),
+      manySelectedLabel: (count: number) => t("activity.filters.selected_count", { count }),
+    }),
+    [t],
   );
 
   const hasActiveFilters =
@@ -121,34 +136,38 @@ export function ActivityViewControls({
             setLocalSearch(value);
             debouncedSearch(value);
           }}
+          placeholder={t("activity.filters.search_placeholder")}
           className="w-[160px] lg:w-[240px]"
         />
 
         <FacetedFilter
-          title="Account"
+          title={t("activity.filters.account")}
           options={accountOptions}
           selectedValues={new Set(selectedAccountIds)}
           onFilterChange={(values: Set<string>) => onAccountIdsChange(Array.from(values))}
+          {...filterEmptyProps}
         />
 
         <FacetedFilter
-          title="Type"
+          title={t("activity.filters.type")}
           options={activityOptions}
           selectedValues={new Set(selectedActivityTypes)}
           onFilterChange={(values: Set<string>) =>
             onActivityTypesChange(Array.from(values) as ActivityType[])
           }
+          {...filterEmptyProps}
         />
 
         <FacetedFilter
-          title="Instrument"
+          title={t("activity.filters.instrument")}
           options={instrumentTypeOptions}
           selectedValues={new Set(selectedInstrumentTypes)}
           onFilterChange={(values: Set<string>) => onInstrumentTypesChange(Array.from(values))}
+          {...filterEmptyProps}
         />
 
         <FacetedFilter
-          title="Status"
+          title={t("activity.filters.status")}
           options={statusOptions}
           selectedValues={new Set(statusFilter === "all" ? [] : [statusFilter])}
           onFilterChange={(values: Set<string>) => {
@@ -157,6 +176,7 @@ export function ActivityViewControls({
               selected.length === 0 ? "all" : (selected[0] as ActivityStatusFilter),
             );
           }}
+          {...filterEmptyProps}
         />
 
         {hasActiveFilters ? (
@@ -173,7 +193,7 @@ export function ActivityViewControls({
               onStatusFilterChange("all");
             }}
           >
-            Reset
+            {t("activity.filters.reset")}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         ) : null}
@@ -186,10 +206,13 @@ export function ActivityViewControls({
             {isFetching ? (
               <span className="inline-flex items-center gap-1">
                 <Icons.Spinner className="h-4 w-4 animate-spin" />
-                Loading…
+                {t("activity.filters.loading")}
               </span>
             ) : (
-              `${totalFetched} / ${totalRowCount} activities`
+              t("activity.filters.count_activities", {
+                fetched: totalFetched,
+                total: totalRowCount,
+              })
             )}
           </span>
         )}
@@ -209,20 +232,20 @@ export function ActivityViewControls({
               label: (
                 <>
                   <Icons.Rows3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">View mode</span>
+                  <span className="sr-only">{t("activity.filters.view_mode_aria")}</span>
                 </>
               ),
-              title: "View mode",
+              title: t("activity.filters.view_mode_aria"),
             },
             {
               value: "datagrid",
               label: (
                 <>
                   <Icons.Grid3x3 className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Edit mode</span>
+                  <span className="sr-only">{t("activity.filters.edit_mode_aria")}</span>
                 </>
               ),
-              title: "Edit mode",
+              title: t("activity.filters.edit_mode_aria"),
               "data-testid": "edit-mode-toggle",
             },
           ]}

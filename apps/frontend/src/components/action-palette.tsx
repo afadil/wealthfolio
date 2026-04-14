@@ -4,6 +4,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 
 export interface ActionPaletteItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -36,6 +37,7 @@ export function ActionPalette({
   align = "end",
   side = "bottom",
 }: ActionPaletteProps) {
+  const { t } = useTranslation("common");
   const { triggerHaptic } = useHapticFeedback();
 
   const handleItemClick = React.useCallback(
@@ -85,7 +87,7 @@ export function ActionPalette({
                 "transition-colors duration-150",
                 "focus-visible:ring-ring focus:outline-none focus-visible:ring-2",
               )}
-              aria-label="Close"
+              aria-label={t("app.action.close_aria")}
             >
               <Icons.X className="h-4 w-4" />
             </button>

@@ -15,7 +15,7 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     constants::PORTFOLIO_TOTAL_ACCOUNT_ID,
     portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
-    quotes::MarketSyncMode,
+    quotes::{MarketSyncMode, QuoteServiceTrait},
 };
 
 // ============================================================================
@@ -136,6 +136,7 @@ pub async fn process_portfolio_job(
 
         let sync_start = std::time::Instant::now();
         let asset_ids = config.market_sync_mode.asset_ids().cloned();
+        let asset_ids_for_profile_refresh = asset_ids.clone();
 
         // Convert MarketSyncMode to SyncMode for the quote service
         let sync_result = match config.market_sync_mode.to_sync_mode() {
@@ -149,6 +150,20 @@ pub async fn process_portfolio_job(
 
         match sync_result {
             Ok(result) => {
+                // Match desktop: only batch-enrich when specific asset IDs were requested.
+                let profile_refresh_ids: Vec<String> = match asset_ids_for_profile_refresh {
+                    Some(ref ids) if !ids.is_empty() => ids.clone(),
+                    _ => vec![],
+                };
+                if !profile_refresh_ids.is_empty() {
+                    if let Err(e) = state
+                        .asset_service
+                        .enrich_assets(profile_refresh_ids, true)
+                        .await
+                    {
+                        tracing::warn!("Profile refresh after market sync failed: {}", e);
+                    }
+                }
                 event_bus.publish(ServerEvent::with_payload(
                     MARKET_SYNC_COMPLETE,
                     json!({ "failed_syncs": result.failed }),

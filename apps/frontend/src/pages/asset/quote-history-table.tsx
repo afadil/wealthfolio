@@ -2,6 +2,7 @@ import { Quote } from "@/lib/types";
 import { format } from "date-fns";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { formatQuantity } from "@/lib/utils";
 import {
@@ -79,6 +80,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   onDeleteQuote,
   onChangeDataSource,
 }) => {
+  const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedValues, setEditedValues] = useState<Partial<Quote>>({});
   const [isAddingQuote, setIsAddingQuote] = useState(false);
@@ -169,7 +171,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
   const columns = useMemo(
     () => [
       columnHelper.accessor("timestamp", {
-        header: "Date",
+        header: t("settings.securities.quote_history.date"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -186,7 +188,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         enableSorting: true,
       }),
       columnHelper.accessor("open", {
-        header: "Open",
+        header: t("settings.securities.quote_history.open"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -203,7 +205,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         enableSorting: false,
       }),
       columnHelper.accessor("high", {
-        header: "High",
+        header: t("settings.securities.quote_history.high"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -221,7 +223,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         enableSorting: false,
       }),
       columnHelper.accessor("low", {
-        header: "Low",
+        header: t("settings.securities.quote_history.low"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -238,7 +240,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         enableSorting: false,
       }),
       columnHelper.accessor("close", {
-        header: "Close",
+        header: t("settings.securities.quote_history.close"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -255,7 +257,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         enableSorting: false,
       }),
       columnHelper.accessor("volume", {
-        header: "Volume",
+        header: t("settings.securities.quote_history.volume"),
         cell: (info) => {
           const { editingId, editedValues, handleInputChange } = info.table.options
             .meta as QuoteTableMeta;
@@ -275,7 +277,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
         ? [
             columnHelper.display({
               id: "actions",
-              header: "Actions",
+              header: t("settings.securities.quote_history.actions"),
               cell: (info) => {
                 const { editingId, handleEdit, handleSave, handleCancel, handleDelete } = info.table
                   .options.meta as QuoteTableMeta;
@@ -307,21 +309,22 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                       </PopoverTrigger>
                       <PopoverContent>
                         <div className="flex flex-col items-center space-y-2">
-                          <h4 className="font-medium">Delete Quote</h4>
+                          <h4 className="font-medium">
+                            {t("settings.securities.quote_history.delete_quote")}
+                          </h4>
                           <p className="text-muted-foreground text-center text-sm">
-                            Are you sure you want to delete this historical quote? This action
-                            cannot be undone.
+                            {t("settings.securities.quote_history.delete_quote_confirm")}
                           </p>
                           <div className="flex space-x-2">
                             <Button variant="ghost" size="sm">
-                              Cancel
+                              {t("settings.shared.cancel")}
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDelete(quote.id)}
                             >
-                              Delete
+                              {t("settings.shared.delete")}
                             </Button>
                           </div>
                         </div>
@@ -334,7 +337,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
           ]
         : []),
     ],
-    [isManualDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete],
+    [isManualDataSource, handleInputChange, handleEdit, handleSave, handleCancel, handleDelete, t],
   );
 
   const table = useReactTable({
@@ -378,45 +381,44 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                 <div className="flex items-center space-x-2">
                   <Switch id="manual-tracking" checked={isManualDataSource} />
                   <Label htmlFor="manual-tracking" className="cursor-pointer">
-                    Manual tracking
+                    {t("settings.securities.quote_history.manual_tracking")}
                   </Label>
                 </div>
               </PopoverTrigger>
               <PopoverContent className="w-[360px] p-4">
                 <div className="space-y-4">
-                  <h4 className="font-medium">Change Tracking Mode</h4>
+                  <h4 className="font-medium">
+                    {t("settings.securities.quote_history.change_tracking_mode")}
+                  </h4>
                   {isManualDataSource ? (
                     <>
                       <p className="text-muted-foreground text-sm">
-                        Switching to automatic tracking will enable data fetching from Market Data
-                        Provider. Please note that this will override any manually entered quotes on
-                        the next sync.
+                        {t("settings.securities.quote_history.switch_auto_desc")}
                       </p>
                       <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                        ⚠️ Your manually entered historical data may be lost.
+                        {t("settings.securities.quote_history.switch_auto_warning")}
                       </p>
                     </>
                   ) : (
                     <>
                       <p className="text-muted-foreground text-sm">
-                        Switching to manual tracking will stop automatic data fetching from Market
-                        Data Provider. You&apos;ll need to enter and maintain price data manually.
+                        {t("settings.securities.quote_history.switch_manual_desc")}
                       </p>
                       <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                        ⚠️ Automatic price updates will be disabled.
+                        {t("settings.securities.quote_history.switch_manual_warning")}
                       </p>
                     </>
                   )}
                   <div className="flex justify-end space-x-2">
                     <Button variant="ghost" size="sm">
-                      Cancel
+                      {t("settings.shared.cancel")}
                     </Button>
                     <Button
                       variant="default"
                       size="sm"
                       onClick={() => onChangeDataSource?.(!isManualDataSource)}
                     >
-                      Confirm Change
+                      {t("settings.securities.edit.confirm")}
                     </Button>
                   </div>
                 </div>
@@ -431,12 +433,12 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                   disabled={isAddingQuote}
                 >
                   <Icons.PlusCircle className="mr-2 h-4 w-4" />
-                  Add Quote
+                  {t("settings.securities.quote_history.add_quote")}
                 </Button>
                 <Button asChild variant="outline" size="sm">
                   <Link to="/settings/market-data/import" className="flex items-center gap-2">
                     <Icons.Import className="h-4 w-4" />
-                    Import Quotes
+                    {t("settings.securities.quote_history.import_quotes")}
                   </Link>
                 </Button>
               </div>
@@ -542,7 +544,10 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
 
       <div className="flex items-center justify-between">
         <div className="text-muted-foreground text-sm">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          {t("settings.securities.quote_history.page_of", {
+            current: table.getState().pagination.pageIndex + 1,
+            total: table.getPageCount(),
+          })}
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -551,19 +556,19 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
-            Previous
+            {t("settings.shared.previous")}
           </Button>
           <Select
             value={(table.getState().pagination.pageIndex + 1).toString()}
             onValueChange={(value) => table.setPageIndex(parseInt(value) - 1)}
           >
             <SelectTrigger className="w-[100px]">
-              <SelectValue placeholder="Page..." />
+              <SelectValue placeholder={t("settings.securities.quote_history.page_placeholder")} />
             </SelectTrigger>
             <SelectContent>
               {Array.from({ length: table.getPageCount() }, (_, i) => (
                 <SelectItem key={i + 1} value={(i + 1).toString()}>
-                  Page {i + 1}
+                  {t("settings.securities.quote_history.page_n", { page: i + 1 })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -574,7 +579,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
-            Next
+            {t("settings.shared.next")}
           </Button>
         </div>
       </div>

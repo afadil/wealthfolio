@@ -1,106 +1,86 @@
 import { FormControl, FormField, FormItem } from "@wealthfolio/ui/components/ui/form";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Icons, type IconName } from "@wealthfolio/ui/components/ui/icons";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 
-const activityTypes = [
+type ActivityTypeValue =
+  | "BUY"
+  | "SELL"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "TRANSFER_OUT"
+  | "DIVIDEND"
+  | "INTEREST"
+  | "FEE"
+  | "TAX"
+  | "SPLIT"
+  | "ADJUSTMENT";
+
+const ACTIVITY_TYPE_GROUPS: {
+  categoryKey: "trade" | "cash" | "income" | "other";
+  types: { value: ActivityTypeValue; icon: IconName }[];
+}[] = [
   {
-    category: "Trade",
+    categoryKey: "trade",
     types: [
-      {
-        value: "BUY",
-        label: "Buy",
-        icon: "ArrowDown" as const,
-        description: "Purchase an asset",
-      },
-      {
-        value: "SELL",
-        label: "Sell",
-        icon: "ArrowUp" as const,
-        description: "Sell an asset",
-      },
+      { value: "BUY", icon: "ArrowDown" },
+      { value: "SELL", icon: "ArrowUp" },
     ],
   },
   {
-    category: "Cash",
+    categoryKey: "cash",
     types: [
-      {
-        value: "DEPOSIT",
-        label: "Deposit",
-        icon: "ArrowDown" as const,
-        description: "Add funds to account",
-      },
-      {
-        value: "WITHDRAWAL",
-        label: "Withdrawal",
-        icon: "ArrowUp" as const,
-        description: "Remove funds from account",
-      },
-      {
-        value: "TRANSFER_OUT",
-        label: "Transfer",
-        icon: "ArrowLeftRight" as const,
-        description: "Move cash or securities between accounts",
-      },
+      { value: "DEPOSIT", icon: "ArrowDown" },
+      { value: "WITHDRAWAL", icon: "ArrowUp" },
+      { value: "TRANSFER_OUT", icon: "ArrowLeftRight" },
     ],
   },
   {
-    category: "Income",
+    categoryKey: "income",
     types: [
-      {
-        value: "DIVIDEND",
-        label: "Dividend",
-        icon: "Income" as const,
-        description: "Dividend payment received",
-      },
-      {
-        value: "INTEREST",
-        label: "Interest",
-        icon: "Percent" as const,
-        description: "Interest earned",
-      },
+      { value: "DIVIDEND", icon: "Income" },
+      { value: "INTEREST", icon: "Percent" },
     ],
   },
   {
-    category: "Other",
+    categoryKey: "other",
     types: [
-      {
-        value: "FEE",
-        label: "Fee",
-        icon: "DollarSign" as const,
-        description: "Account or transaction fee",
-      },
-      {
-        value: "TAX",
-        label: "Tax",
-        icon: "Receipt" as const,
-        description: "Tax payment",
-      },
-      {
-        value: "SPLIT",
-        label: "Stock Split",
-        icon: "Split" as const,
-        description: "Stock split adjustment",
-      },
-      {
-        value: "ADJUSTMENT",
-        label: "Adjustment",
-        icon: "RefreshCw" as const,
-        description: "Non-trade correction or adjustment",
-      },
+      { value: "FEE", icon: "DollarSign" },
+      { value: "TAX", icon: "Receipt" },
+      { value: "SPLIT", icon: "Split" },
+      { value: "ADJUSTMENT", icon: "RefreshCw" },
     ],
   },
 ];
 
 export function MobileActivityTypeStep() {
+  const { t } = useTranslation();
   const { control } = useFormContext();
+
+  const groups = useMemo(
+    () =>
+      ACTIVITY_TYPE_GROUPS.map((group) => ({
+        category: t(`activity.mobile.category.${group.categoryKey}`),
+        types: group.types.map((type) => ({
+          ...type,
+          label:
+            type.value === "SPLIT"
+              ? t("activity.mobile.stock_split_label")
+              : t(`activity.types.${type.value}`),
+          description: t(`activity.mobile.desc.${type.value}`),
+        })),
+      })),
+    [t],
+  );
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold">Select Transaction Type</h3>
+        <h3 className="text-lg font-semibold">{t("activity.mobile.select_transaction_type")}</h3>
       </div>
 
       <ScrollArea>
@@ -112,7 +92,7 @@ export function MobileActivityTypeStep() {
               <FormControl>
                 <RadioGroup onValueChange={field.onChange} value={field.value as string}>
                   <div className="space-y-6 pb-4">
-                    {activityTypes.map((category) => (
+                    {groups.map((category) => (
                       <div key={category.category}>
                         <h4 className="text-muted-foreground mb-3 text-sm font-medium">
                           {category.category}

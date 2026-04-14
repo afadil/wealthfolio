@@ -103,3 +103,12 @@ export const installUpdate = async (): Promise<void> => {
 export const getPlatform = async (): Promise<PlatformInfo> => {
   return invoke<PlatformInfo>("get_platform");
 };
+
+/** Keeps native menus/dialogs in sync with the web UI language (desktop only). */
+export async function syncShellLocale(locale: string): Promise<void> {
+  try {
+    await invoke<void>("set_shell_locale", { locale });
+  } catch {
+    // Non-fatal (e.g. early boot)
+  }
+}

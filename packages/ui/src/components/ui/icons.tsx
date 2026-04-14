@@ -34,6 +34,7 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   ChevronUp,
+  ClipboardPaste,
   Circle,
   CircleGauge,
   Clock,
@@ -192,6 +193,7 @@ const IconsInternal = {
   HandCoins: HandCoins,
   Home: Home,
   Copy: Copy,
+  ClipboardPaste: ClipboardPaste,
   HelpCircle: HelpCircle,
   History: History,
   ArrowRight: ArrowRight,
@@ -740,6 +742,7 @@ export type IconName =
   | "HandCoins"
   | "Home"
   | "Copy"
+  | "ClipboardPaste"
   | "HelpCircle"
   | "History"
   | "ArrowRight"

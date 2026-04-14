@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Select,
@@ -40,22 +41,6 @@ const HOLDINGS_REQUIRED_FIELDS: HoldingsFormat[] = [
   HoldingsFormat.SYMBOL,
   HoldingsFormat.QUANTITY,
 ];
-
-const HOLDINGS_TARGET_FIELDS: { value: HoldingsFormat; label: string; required: boolean }[] = [
-  { value: HoldingsFormat.DATE, label: "Date", required: true },
-  { value: HoldingsFormat.SYMBOL, label: "Symbol", required: true },
-  { value: HoldingsFormat.QUANTITY, label: "Quantity", required: true },
-  { value: HoldingsFormat.AVG_COST, label: "Avg Cost", required: false },
-  { value: HoldingsFormat.CURRENCY, label: "Currency", required: false },
-];
-
-const HOLDINGS_FIELD_LABELS: Record<HoldingsFormat, string> = {
-  [HoldingsFormat.DATE]: "Date",
-  [HoldingsFormat.SYMBOL]: "Symbol",
-  [HoldingsFormat.QUANTITY]: "Quantity",
-  [HoldingsFormat.AVG_COST]: "Avg Cost",
-  [HoldingsFormat.CURRENCY]: "Currency",
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -120,6 +105,19 @@ interface CsvPreviewProps {
 }
 
 function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
+  const { t } = useTranslation("common");
+  const fieldLabels = useMemo(
+    () =>
+      ({
+        [HoldingsFormat.DATE]: t("activity.import.mapping.holdings_field_date"),
+        [HoldingsFormat.SYMBOL]: t("activity.import.mapping.holdings_field_symbol"),
+        [HoldingsFormat.QUANTITY]: t("activity.import.mapping.holdings_field_quantity"),
+        [HoldingsFormat.AVG_COST]: t("activity.import.mapping.holdings_field_avg_cost"),
+        [HoldingsFormat.CURRENCY]: t("activity.import.mapping.holdings_field_currency"),
+      }) satisfies Record<HoldingsFormat, string>,
+    [t],
+  );
+
   const displayRows = rows.slice(0, 10);
 
   // Get reverse mapping (headerName -> field), only valid HoldingsFormat keys
@@ -141,7 +139,7 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
           <tr>
             {headers.map((header, idx) => {
               const mappedField = headerToField[header];
-              const fieldLabel = mappedField ? HOLDINGS_FIELD_LABELS[mappedField] : null;
+              const fieldLabel = mappedField ? fieldLabels[mappedField] : null;
               const isDifferent = fieldLabel && fieldLabel.toLowerCase() !== header.toLowerCase();
               return (
                 <th key={idx} className="border-r px-3 py-2 text-left font-medium last:border-r-0">
@@ -180,6 +178,38 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function HoldingsMappingStep() {
+  const { t } = useTranslation("common");
+  const holdingsTargetFields = useMemo(
+    () =>
+      [
+        {
+          value: HoldingsFormat.DATE,
+          label: t("activity.import.mapping.holdings_field_date"),
+          required: true,
+        },
+        {
+          value: HoldingsFormat.SYMBOL,
+          label: t("activity.import.mapping.holdings_field_symbol"),
+          required: true,
+        },
+        {
+          value: HoldingsFormat.QUANTITY,
+          label: t("activity.import.mapping.holdings_field_quantity"),
+          required: true,
+        },
+        {
+          value: HoldingsFormat.AVG_COST,
+          label: t("activity.import.mapping.holdings_field_avg_cost"),
+          required: false,
+        },
+        {
+          value: HoldingsFormat.CURRENCY,
+          label: t("activity.import.mapping.holdings_field_currency"),
+          required: false,
+        },
+      ],
+    [t],
+  );
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, accountId } = state;
   const hasAutoInitialized = useRef(false);
@@ -404,8 +434,11 @@ export function HoldingsMappingStep() {
         <ImportAlert
           variant={requiredFieldsMapped ? "success" : "destructive"}
           size="sm"
-          title="Columns"
-          description={`${mappedFieldsCount} of ${HOLDINGS_TARGET_FIELDS.length} mapped`}
+          title={t("import.mapping.columns")}
+          description={t("import.holdings_mapping.columns_progress", {
+            mapped: mappedFieldsCount,
+            total: holdingsTargetFields.length,
+          })}
           icon={Icons.ListChecks}
           className="mb-0"
           rightIcon={requiredFieldsMapped ? Icons.CheckCircle : Icons.AlertCircle}
@@ -416,16 +449,22 @@ export function HoldingsMappingStep() {
             <ImportAlert
               variant="info"
               size="sm"
-              title="Rows"
-              description={`${parsedRows.length} total (${parsedRows.length - cashRowCount} holdings, ${cashRowCount} cash)`}
+              title={t("import.mapping.rows")}
+              description={t("import.holdings_mapping.rows_summary", {
+                total: parsedRows.length,
+                holdings: parsedRows.length - cashRowCount,
+                cash: cashRowCount,
+              })}
               icon={Icons.FileText}
               className="mb-0"
             />
             <ImportAlert
               variant="info"
               size="sm"
-              title="Snapshots"
-              description={`${uniqueDates.size} date${uniqueDates.size !== 1 ? "s" : ""}`}
+              title={t("import.mapping.snapshots")}
+              description={t("import.holdings_mapping.snapshots_count", {
+                count: uniqueDates.size,
+              })}
               icon={Icons.Calendar}
               className="mb-0"
             />
@@ -437,7 +476,9 @@ export function HoldingsMappingStep() {
       <div className="grid gap-4">
         <Card>
           <CardHeader className="px-4 py-3">
-            <CardTitle className="text-sm font-medium">Column Mapping</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {t("activity.import.mapping.holdings_column_mapping")}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1.5 px-4 pb-4">
             {columnMappingItems.map((column) => {
@@ -493,14 +534,14 @@ export function HoldingsMappingStep() {
                         !isMapped && "text-muted-foreground border-dashed",
                       )}
                     >
-                      <SelectValue placeholder="Select field..." />
+                      <SelectValue placeholder={t("activity.import.select_field")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SKIP_FIELD_VALUE}>
-                        <span className="text-muted-foreground">Skip</span>
+                        <span className="text-muted-foreground">{t("activity.import.holdings.skip")}</span>
                       </SelectItem>
                       <SelectSeparator />
-                      {HOLDINGS_TARGET_FIELDS.map((field) => {
+                      {holdingsTargetFields.map((field) => {
                         const isUsed =
                           usedFields.has(field.value) && column.mappedField !== field.value;
                         return (
@@ -508,7 +549,9 @@ export function HoldingsMappingStep() {
                             {field.label}
                             {field.required && <span className="ml-1 text-amber-600">*</span>}
                             {isUsed && (
-                              <span className="text-muted-foreground ml-1 text-xs">(used)</span>
+                              <span className="text-muted-foreground ml-1 text-xs">
+                                {t("activity.import.mapping.holdings_field_used")}
+                              </span>
                             )}
                           </SelectItem>
                         );
@@ -525,7 +568,9 @@ export function HoldingsMappingStep() {
       {/* CSV Preview */}
       <Card>
         <CardHeader className="px-4 py-3">
-          <CardTitle className="text-sm font-medium">Data Preview</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t("activity.import.mapping.holdings_data_preview")}
+          </CardTitle>
         </CardHeader>
         <CardContent className="border-t p-0">
           <CsvPreviewTable headers={headers} rows={parsedRows} mapping={localFieldMappings} />

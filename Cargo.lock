@@ -8070,6 +8070,7 @@ dependencies = [
  "wealthfolio-device-sync",
  "wealthfolio-market-data",
  "wealthfolio-storage-sqlite",
+ "wealthfolio-translation",
  "x25519-dalek",
 ]
 
@@ -8227,6 +8228,7 @@ dependencies = [
  "wealthfolio-device-sync",
  "wealthfolio-market-data",
  "wealthfolio-storage-sqlite",
+ "wealthfolio-translation",
 ]
 
 [[package]]
@@ -8253,6 +8255,16 @@ dependencies = [
  "wealthfolio-connect",
  "wealthfolio-core",
  "wealthfolio-device-sync",
+]
+
+[[package]]
+name = "wealthfolio-translation"
+version = "3.2.1"
+dependencies = [
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

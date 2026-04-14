@@ -13,6 +13,7 @@ import {
   Switch,
 } from "@wealthfolio/ui";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { FireSettings, IncomeStream } from "../types";
 import { DEFAULT_SETTINGS } from "../lib/storage";
 import { runAutoConfig, applyAutoConfig, type AutoConfigResult } from "../lib/auto-config";
@@ -109,6 +110,7 @@ export default function SettingsPage({
   accounts,
   activeAccounts,
 }: Props) {
+  const { t } = useTranslation("common");
   const [draft, setDraft] = useState<FireSettings>(settings);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [autoConfigResult, setAutoConfigResult] = useState<AutoConfigResult | null>(null);
@@ -127,7 +129,7 @@ export default function SettingsPage({
       setAutoConfigResult(result);
     } catch (e) {
       toast({
-        title: "Auto-config failed",
+        title: t("fire.settings.toast_auto_config_failed"),
         description: (e as Error).message,
         variant: "destructive",
       });
@@ -140,7 +142,7 @@ export default function SettingsPage({
     if (!autoConfigResult) return;
     setDraft((prev) => applyAutoConfig(prev, autoConfigResult));
     setAutoConfigResult(null);
-    toast({ title: "Auto-config applied — review and save when ready." });
+    toast({ title: t("fire.settings.toast_auto_config_applied") });
   }
 
   function update<K extends keyof FireSettings>(key: K, value: FireSettings[K]) {
@@ -175,12 +177,17 @@ export default function SettingsPage({
       if (v) {
         const value = Math.round(v.totalValue * v.fxRateToBase);
         updateStream(streamId, { currentValue: value });
-        toast({ title: `Synced: ${value.toLocaleString()} ${draft.currency}` });
+        toast({
+          title: t("fire.settings.toast_synced", {
+            value: value.toLocaleString(),
+            currency: draft.currency,
+          }),
+        });
       } else {
-        toast({ title: "No valuation found for this account.", variant: "destructive" });
+        toast({ title: t("fire.settings.toast_no_valuation"), variant: "destructive" });
       }
     } catch {
-      toast({ title: "Sync failed.", variant: "destructive" });
+      toast({ title: t("fire.settings.toast_sync_failed"), variant: "destructive" });
     } finally {
       setSyncingStreamId(null);
     }
@@ -251,10 +258,9 @@ export default function SettingsPage({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-sm">Auto-configure from portfolio</CardTitle>
+            <CardTitle className="text-sm">{t("fire.settings.auto_config_title")}</CardTitle>
             <p className="text-muted-foreground mt-1 text-xs">
-              Detect monthly contribution, expected return, and target allocations from your
-              portfolio data.
+              {t("fire.settings.auto_config_description")}
             </p>
           </div>
           <Button
@@ -263,7 +269,9 @@ export default function SettingsPage({
             onClick={handleAutoConfig}
             disabled={autoConfigLoading}
           >
-            {autoConfigLoading ? "Analyzing…" : "Detect from portfolio"}
+            {autoConfigLoading
+              ? t("fire.settings.auto_config_analyzing")
+              : t("fire.settings.auto_config_detect")}
           </Button>
         </CardHeader>
 
@@ -273,7 +281,7 @@ export default function SettingsPage({
               {autoConfigResult.monthlyContribution !== null && (
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <span className="font-medium">Monthly contribution</span>
+                    <span className="font-medium">{t("fire.settings.auto_monthly_contribution")}</span>
                     <p className="text-muted-foreground">
                       {autoConfigResult.notes.monthlyContribution}
                     </p>
@@ -289,7 +297,7 @@ export default function SettingsPage({
               {autoConfigResult.expectedAnnualReturn !== null && (
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <span className="font-medium">Expected annual return</span>
+                    <span className="font-medium">{t("fire.settings.auto_expected_return")}</span>
                     <p className="text-muted-foreground">
                       {autoConfigResult.notes.expectedAnnualReturn}
                     </p>
@@ -301,7 +309,7 @@ export default function SettingsPage({
               )}
               {autoConfigResult.targetAllocations !== null && (
                 <div>
-                  <span className="font-medium">Target allocations</span>
+                  <span className="font-medium">{t("fire.settings.auto_target_allocations")}</span>
                   <p className="text-muted-foreground">
                     {autoConfigResult.notes.targetAllocations}
                   </p>
@@ -315,9 +323,7 @@ export default function SettingsPage({
               {autoConfigResult.monthlyContribution === null &&
                 autoConfigResult.expectedAnnualReturn === null &&
                 autoConfigResult.targetAllocations === null && (
-                  <p className="text-muted-foreground">
-                    No data could be detected. Add activities and holdings to Wealthfolio first.
-                  </p>
+                  <p className="text-muted-foreground">{t("fire.settings.auto_none_detected")}</p>
                 )}
             </div>
             {(autoConfigResult.monthlyContribution !== null ||
@@ -325,10 +331,10 @@ export default function SettingsPage({
               autoConfigResult.targetAllocations !== null) && (
               <div className="flex gap-2">
                 <Button size="sm" onClick={applyDetected}>
-                  Apply detected values
+                  {t("fire.settings.auto_apply")}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setAutoConfigResult(null)}>
-                  Dismiss
+                  {t("fire.settings.auto_dismiss")}
                 </Button>
               </div>
             )}
@@ -339,37 +345,37 @@ export default function SettingsPage({
       {/* FIRE Parameters */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">FIRE Parameters</CardTitle>
+          <CardTitle className="text-sm">{t("fire.settings.params_title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <NumberField
-              label={`Monthly expenses in FIRE (${draft.currency})`}
+              label={t("fire.settings.monthly_expenses_label", { currency: draft.currency })}
               value={draft.monthlyExpensesAtFire}
               onChange={(v) => update("monthlyExpensesAtFire", v)}
               min={0}
             />
             <NumberField
-              label="Current age"
+              label={t("fire.settings.current_age")}
               value={draft.currentAge}
               onChange={(v) => update("currentAge", v)}
               min={1}
             />
             <NumberField
-              label="Target FIRE age"
+              label={t("fire.settings.target_fire_age")}
               value={draft.targetFireAge}
               onChange={(v) => update("targetFireAge", v)}
               min={1}
             />
             <NumberField
-              label="Planning horizon age (life expectancy)"
+              label={t("fire.settings.planning_horizon_age")}
               value={draft.planningHorizonAge}
               onChange={(v) => update("planningHorizonAge", v)}
               min={draft.targetFireAge + 1}
             />
           </div>
           <SliderField
-            label="Safe Withdrawal Rate"
+            label={t("fire.settings.swr_label")}
             value={draft.safeWithdrawalRate}
             min={0.025}
             max={0.06}
@@ -378,7 +384,7 @@ export default function SettingsPage({
             onChange={(v) => update("safeWithdrawalRate", v)}
           />
           <div className="space-y-2">
-            <Label className="text-xs">Withdrawal Strategy</Label>
+            <Label className="text-xs">{t("fire.settings.withdrawal_strategy")}</Label>
             <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
               {(["constant-dollar", "constant-percentage"] as const).map((s) => (
                 <label key={s} className="flex cursor-pointer items-center gap-2 text-xs">
@@ -390,15 +396,17 @@ export default function SettingsPage({
                     onChange={() => update("withdrawalStrategy", s)}
                   />
                   {s === "constant-dollar"
-                    ? "Constant dollar (fixed real spending)"
-                    : "Constant percentage (% of portfolio)"}
+                    ? t("fire.settings.withdrawal_constant_dollar")
+                    : t("fire.settings.withdrawal_constant_pct")}
                 </label>
               ))}
             </div>
             <p className="text-muted-foreground text-xs">
               {(draft.withdrawalStrategy ?? "constant-dollar") === "constant-dollar"
-                ? "Withdraw a fixed inflation-adjusted amount each year. Spending is stable but the portfolio can deplete."
-                : `Withdraw ${(draft.safeWithdrawalRate * 100).toFixed(1)}% of the portfolio each year. Spending varies with market performance; the portfolio never fully depletes.`}
+                ? t("fire.settings.withdrawal_help_dollar")
+                : t("fire.settings.withdrawal_help_pct", {
+                    pct: (draft.safeWithdrawalRate * 100).toFixed(1),
+                  })}
             </p>
           </div>
         </CardContent>
@@ -407,22 +415,21 @@ export default function SettingsPage({
       {/* Healthcare Costs */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Healthcare Costs</CardTitle>
+          <CardTitle className="text-sm">{t("fire.settings.healthcare_title")}</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            Out-of-pocket healthcare expenses in retirement, on top of your living expenses. Set to
-            0 if already included above.
+            {t("fire.settings.healthcare_description")}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <NumberField
-            label={`Monthly healthcare cost at FIRE (${draft.currency}, today's money)`}
+            label={t("fire.settings.healthcare_monthly_label", { currency: draft.currency })}
             value={draft.healthcareMonthlyAtFire ?? 0}
             onChange={(v) => update("healthcareMonthlyAtFire", v > 0 ? v : undefined)}
             min={0}
           />
           {(draft.healthcareMonthlyAtFire ?? 0) > 0 && (
             <SliderField
-              label="Healthcare inflation rate (typically higher than general inflation)"
+              label={t("fire.settings.healthcare_inflation_label")}
               value={draft.healthcareInflationRate ?? draft.inflationRate}
               min={0.01}
               max={0.08}
@@ -439,18 +446,18 @@ export default function SettingsPage({
       {/* Investment Parameters */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Investment Parameters</CardTitle>
+          <CardTitle className="text-sm">{t("fire.settings.investment_title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <NumberField
-              label={`Monthly contribution (${draft.currency})`}
+              label={t("fire.settings.monthly_contribution_label", { currency: draft.currency })}
               value={draft.monthlyContribution}
               onChange={(v) => update("monthlyContribution", v)}
               min={0}
             />
             <NumberField
-              label={`Net annual salary / take-home (${draft.currency}) — optional`}
+              label={t("fire.settings.net_salary_label", { currency: draft.currency })}
               value={draft.currentAnnualSalary ?? 0}
               onChange={(v) =>
                 update("currentAnnualSalary", v > 0 ? v : (undefined as unknown as number))
@@ -460,19 +467,19 @@ export default function SettingsPage({
           </div>
           {(draft.currentAnnualSalary ?? 0) > 0 && (
             <p className="text-muted-foreground text-xs">
-              Implied savings rate:{" "}
+              {t("fire.settings.implied_savings_rate")}{" "}
               <span className="text-foreground font-medium">
                 {(((draft.monthlyContribution * 12) / draft.currentAnnualSalary!) * 100).toFixed(1)}
                 %
               </span>{" "}
-              of net salary (take-home)
+              {t("fire.settings.implied_savings_suffix")}
             </p>
           )}
           <SliderField
             label={
-              (draft.salaryGrowthRate !== undefined
-                ? "Salary growth rate (per year)"
-                : "Contribution growth rate (per year)") + " — drives annual contribution increase"
+              draft.salaryGrowthRate !== undefined
+                ? t("fire.settings.salary_growth_label")
+                : t("fire.settings.contribution_growth_label")
             }
             value={draft.salaryGrowthRate ?? draft.contributionGrowthRate}
             min={0}
@@ -490,7 +497,7 @@ export default function SettingsPage({
             }}
           />
           <SliderField
-            label="Expected annual portfolio return"
+            label={t("fire.settings.expected_return_label")}
             value={draft.expectedAnnualReturn}
             min={0.03}
             max={0.12}
@@ -499,7 +506,7 @@ export default function SettingsPage({
             onChange={(v) => update("expectedAnnualReturn", v)}
           />
           <SliderField
-            label="Return standard deviation (volatility)"
+            label={t("fire.settings.return_stddev_label")}
             value={draft.expectedReturnStdDev}
             min={0.05}
             max={0.25}
@@ -507,12 +514,9 @@ export default function SettingsPage({
             displayValue={(draft.expectedReturnStdDev * 100).toFixed(1) + "%"}
             onChange={(v) => update("expectedReturnStdDev", v)}
           />
-          <p className="text-muted-foreground text-xs">
-            Volatility is used only for Monte Carlo simulation. Higher values produce a wider fan of
-            outcomes.
-          </p>
+          <p className="text-muted-foreground text-xs">{t("fire.settings.volatility_help")}</p>
           <SliderField
-            label="Inflation rate"
+            label={t("fire.settings.inflation_rate_label")}
             value={draft.inflationRate}
             min={0.01}
             max={0.05}
@@ -528,10 +532,9 @@ export default function SettingsPage({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm">Glide Path (Bond Shift)</CardTitle>
+              <CardTitle className="text-sm">{t("fire.settings.glide_title")}</CardTitle>
               <p className="text-muted-foreground mt-1 text-xs">
-                Gradually shift from equities to bonds during retirement to reduce
-                sequence-of-returns risk.
+                {t("fire.settings.glide_description")}
               </p>
             </div>
             <Switch
@@ -562,7 +565,7 @@ export default function SettingsPage({
         {draft.glidePath?.enabled && (
           <CardContent className="space-y-4">
             <SliderField
-              label="Bond return rate"
+              label={t("fire.settings.bond_return")}
               value={draft.glidePath.bondReturnRate}
               min={0.01}
               max={0.06}
@@ -571,7 +574,7 @@ export default function SettingsPage({
               onChange={(v) => update("glidePath", { ...draft.glidePath!, bondReturnRate: v })}
             />
             <SliderField
-              label="Bond allocation at FIRE date"
+              label={t("fire.settings.bond_at_fire")}
               value={draft.glidePath.bondAllocationAtFire}
               min={0}
               max={0.6}
@@ -582,7 +585,7 @@ export default function SettingsPage({
               }
             />
             <SliderField
-              label="Bond allocation at planning horizon"
+              label={t("fire.settings.bond_at_horizon")}
               value={draft.glidePath.bondAllocationAtHorizon}
               min={0}
               max={0.9}
@@ -593,12 +596,13 @@ export default function SettingsPage({
               }
             />
             <p className="text-muted-foreground text-xs">
-              The portfolio shifts linearly from{" "}
-              {(draft.glidePath.bondAllocationAtFire * 100).toFixed(0)}% bonds at FIRE to{" "}
-              {(draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0)}% bonds at age{" "}
-              {draft.planningHorizonAge}. Equity allocation ={" "}
-              {((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0)}% →{" "}
-              {((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0)}%.
+              {t("fire.settings.glide_explanation", {
+                firePct: (draft.glidePath.bondAllocationAtFire * 100).toFixed(0),
+                horizonPct: (draft.glidePath.bondAllocationAtHorizon * 100).toFixed(0),
+                horizonAge: draft.planningHorizonAge,
+                eqFire: ((1 - draft.glidePath.bondAllocationAtFire) * 100).toFixed(0),
+                eqHorizon: ((1 - draft.glidePath.bondAllocationAtHorizon) * 100).toFixed(0),
+              })}
             </p>
           </CardContent>
         )}
@@ -607,16 +611,15 @@ export default function SettingsPage({
       {/* Portfolio Accounts */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Portfolio Accounts</CardTitle>
+          <CardTitle className="text-sm">{t("fire.settings.portfolio_accounts_title")}</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            Choose which accounts count toward your FIRE portfolio. Cash / bank accounts are
-            excluded by default.
+            {t("fire.settings.portfolio_accounts_description")}
           </p>
         </CardHeader>
         <CardContent className="space-y-2">
           {accounts.filter((a) => a.isActive && !a.isArchived).length === 0 ? (
             <p className="text-muted-foreground text-xs">
-              No active accounts found in Wealthfolio.
+              {t("fire.settings.no_active_accounts")}
             </p>
           ) : (
             accounts
@@ -666,17 +669,14 @@ export default function SettingsPage({
       {/* Additional Income Streams */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">Additional Income Streams</CardTitle>
+          <CardTitle className="text-sm">{t("fire.settings.income_streams_title")}</CardTitle>
           <Button variant="outline" size="sm" onClick={addStream}>
-            + Add
+            {t("fire.settings.income_add")}
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           {draft.additionalIncomeStreams.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              No income streams added. Examples: state pension, rental income, part-time work. Enter
-              amounts as net (after tax).
-            </p>
+            <p className="text-muted-foreground text-xs">{t("fire.settings.income_empty")}</p>
           )}
           {draft.additionalIncomeStreams.map((stream) => {
             const isDc = stream.streamType === "dc";
@@ -707,28 +707,32 @@ export default function SettingsPage({
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                   {/* Label */}
                   <div className="col-span-2 sm:col-span-1">
-                    <Label className="text-xs">Label</Label>
+                    <Label className="text-xs">{t("fire.settings.income_label_field")}</Label>
                     <Input
                       value={stream.label}
                       onChange={(e) => updateStream(stream.id, { label: e.target.value })}
-                      placeholder="e.g. State Pension"
+                      placeholder={t("fire.settings.income_placeholder_label")}
                       className="mt-1 h-8 text-sm"
                     />
                   </div>
                   {/* Monthly amount (DB only) / computed payout preview (DC) */}
                   {isDc ? (
                     <div>
-                      <Label className="text-xs">Est. monthly payout ({draft.currency})</Label>
+                      <Label className="text-xs">
+                        {t("fire.settings.income_est_payout", { currency: draft.currency })}
+                      </Label>
                       <p className="mt-1 flex h-8 items-center text-sm font-medium">
                         {Math.round(estimatedMonthlyPayout).toLocaleString()}
                         <span className="text-muted-foreground ml-1 text-xs">
-                          (derived from balance)
+                          {t("fire.settings.income_derived_balance")}
                         </span>
                       </p>
                     </div>
                   ) : (
                     <div>
-                      <Label className="text-xs">Monthly amount ({draft.currency})</Label>
+                      <Label className="text-xs">
+                        {t("fire.settings.income_monthly_amount", { currency: draft.currency })}
+                      </Label>
                       <Input
                         type="number"
                         value={stream.monthlyAmount}
@@ -745,7 +749,7 @@ export default function SettingsPage({
                   {/* Payout start age */}
                   <div>
                     <div className="flex items-center justify-between gap-2">
-                      <Label className="text-xs">Payout start age</Label>
+                      <Label className="text-xs">{t("fire.settings.payout_start_age")}</Label>
                       <label className="text-muted-foreground flex cursor-pointer items-center gap-1 text-xs">
                         <input
                           type="checkbox"
@@ -754,13 +758,15 @@ export default function SettingsPage({
                             updateStream(stream.id, { startAgeIsAuto: e.target.checked })
                           }
                         />
-                        Auto
+                        {t("fire.settings.auto_checkbox")}
                       </label>
                     </div>
                     {stream.startAgeIsAuto ? (
                       <p className="mt-1 flex h-8 items-center text-sm font-medium">
                         {draft.targetFireAge}
-                        <span className="text-muted-foreground ml-1 text-xs">(= FIRE age)</span>
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          {t("fire.settings.equals_fire_age")}
+                        </span>
                       </p>
                     ) : (
                       <Input
@@ -776,7 +782,7 @@ export default function SettingsPage({
                   </div>
                   {/* Inflation-adjusted */}
                   <div className="flex flex-col gap-2">
-                    <Label className="text-xs">Inflation-adjusted</Label>
+                    <Label className="text-xs">{t("fire.settings.inflation_adjusted")}</Label>
                     <Switch
                       checked={stream.annualGrowthRate === undefined && stream.adjustForInflation}
                       disabled={stream.annualGrowthRate !== undefined}
@@ -786,8 +792,10 @@ export default function SettingsPage({
                   {/* Custom growth rate */}
                   <div className="col-span-1 sm:col-span-2">
                     <Label className="text-xs">
-                      Custom growth rate (%/yr){" "}
-                      <span className="text-muted-foreground">— overrides inflation flag</span>
+                      {t("fire.settings.custom_growth_label")}{" "}
+                      <span className="text-muted-foreground">
+                        {t("fire.settings.custom_growth_hint")}
+                      </span>
                     </Label>
                     <div className="mt-1 flex w-40 items-center gap-1">
                       <Input
@@ -797,7 +805,7 @@ export default function SettingsPage({
                             ? Math.round(stream.annualGrowthRate * 1000) / 10
                             : ""
                         }
-                        placeholder="e.g. 1.5"
+                        placeholder={t("fire.settings.custom_growth_placeholder")}
                         min={0}
                         max={20}
                         step={0.1}
@@ -837,14 +845,16 @@ export default function SettingsPage({
                     }}
                   />
                   <Label className="text-muted-foreground cursor-pointer text-xs">
-                    Accumulation fund — payout derived from balance (pension fund, TFR…)
+                    {t("fire.settings.accumulation_fund_label")}
                   </Label>
                 </div>
 
                 {hasPension && (
                   <div className="bg-muted/40 mt-3 grid grid-cols-1 gap-3 rounded p-3 sm:grid-cols-3">
                     <div>
-                      <Label className="text-xs">Current fund value ({draft.currency})</Label>
+                      <Label className="text-xs">
+                        {t("fire.settings.current_fund_value", { currency: draft.currency })}
+                      </Label>
                       <Input
                         type="number"
                         value={stream.currentValue ?? 0}
@@ -858,7 +868,9 @@ export default function SettingsPage({
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Monthly contribution ({draft.currency})</Label>
+                      <Label className="text-xs">
+                        {t("fire.settings.monthly_contribution_fund", { currency: draft.currency })}
+                      </Label>
                       <Input
                         type="number"
                         value={stream.monthlyContribution ?? 0}
@@ -872,7 +884,7 @@ export default function SettingsPage({
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Accumulation return (%/yr)</Label>
+                      <Label className="text-xs">{t("fire.settings.accumulation_return")}</Label>
                       <Input
                         type="number"
                         value={Math.round((stream.accumulationReturn ?? 0.04) * 1000) / 10}
@@ -889,9 +901,9 @@ export default function SettingsPage({
                     </div>
                     <div className="col-span-full space-y-1">
                       <Label className="text-xs">
-                        Link to Wealthfolio account{" "}
+                        {t("fire.settings.link_account_label")}{" "}
                         <span className="text-muted-foreground">
-                          (optional — syncs current value)
+                          {t("fire.settings.link_account_hint")}
                         </span>
                       </Label>
                       <div className="flex gap-2">
@@ -904,7 +916,7 @@ export default function SettingsPage({
                           }
                           className="border-input bg-background h-8 flex-1 rounded-md border px-2 text-sm"
                         >
-                          <option value="">— Not linked —</option>
+                          <option value="">{t("fire.settings.not_linked")}</option>
                           {accounts
                             .filter((a) => a.isActive && !a.isArchived)
                             .map((a) => (
@@ -923,15 +935,15 @@ export default function SettingsPage({
                               syncStreamFromAccount(stream.id, stream.linkedAccountId!)
                             }
                           >
-                            {syncingStreamId === stream.id ? "Syncing…" : "Sync value"}
+                            {syncingStreamId === stream.id
+                              ? t("fire.settings.syncing")
+                              : t("fire.settings.sync_value")}
                           </Button>
                         )}
                       </div>
                     </div>
                     <p className="text-muted-foreground col-span-full text-xs">
-                      Phase 1 (now → FIRE): fund grows with contributions + return. Phase 2 (FIRE →
-                      payout age): contributions stop, fund keeps growing. Phase 3 (payout age+):
-                      balance converted to income using the same SWR as the main portfolio.
+                      {t("fire.settings.fund_phases_help")}
                     </p>
                   </div>
                 )}
@@ -942,7 +954,7 @@ export default function SettingsPage({
                   className="mt-2 h-6 text-xs text-red-500 hover:text-red-600"
                   onClick={() => removeStream(stream.id)}
                 >
-                  Remove
+                  {t("fire.settings.remove_stream")}
                 </Button>
               </div>
             );
@@ -954,37 +966,36 @@ export default function SettingsPage({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-sm">Target Allocations</CardTitle>
+            <CardTitle className="text-sm">{t("fire.settings.alloc_title")}</CardTitle>
             {allocEntries.length > 0 && (
               <p
                 className={`mt-1 text-xs ${allocWarning ? "text-red-500" : "text-muted-foreground"}`}
               >
-                Total: {(totalAllocPct * 100).toFixed(1)}%{allocWarning && " — must equal 100%"}
+                {t("fire.settings.alloc_total")} {(totalAllocPct * 100).toFixed(1)}%
+                {allocWarning ? t("fire.settings.alloc_must_100") : ""}
               </p>
             )}
           </div>
           <div className="flex gap-2">
             {holdings.length > 0 && (
               <Button variant="ghost" size="sm" className="text-xs" onClick={autoDetectAllocations}>
-                Auto-detect from holdings
+                {t("fire.settings.alloc_auto_detect")}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={addAllocation}>
-              + Add
+              {t("fire.settings.alloc_add")}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {allocEntries.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              Add target weights to enable drift monitoring in the Allocation tab.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("fire.settings.alloc_empty_hint")}</p>
           )}
           {allocEntries.map(([sym, weight]) => (
             <div key={sym} className="flex items-center gap-2">
               <Input
                 value={sym}
-                placeholder="Ticker / symbol"
+                placeholder={t("fire.settings.alloc_ticker_placeholder")}
                 className="h-8 flex-1 text-sm"
                 onChange={(e) => updateAllocation(sym, e.target.value, weight)}
               />
@@ -1018,12 +1029,14 @@ export default function SettingsPage({
         <div>
           {showResetConfirm ? (
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs">Reset all settings to defaults?</span>
+              <span className="text-muted-foreground text-xs">
+                {t("fire.settings.reset_confirm")}
+              </span>
               <Button variant="destructive" size="sm" onClick={handleReset}>
-                Yes, reset
+                {t("fire.settings.reset_yes")}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowResetConfirm(false)}>
-                Cancel
+                {t("settings.shared.cancel")}
               </Button>
             </div>
           ) : (
@@ -1033,12 +1046,12 @@ export default function SettingsPage({
               className="text-muted-foreground text-xs"
               onClick={() => setShowResetConfirm(true)}
             >
-              Reset to defaults
+              {t("fire.settings.reset_button")}
             </Button>
           )}
         </div>
         <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving…" : "Save Settings"}
+          {isSaving ? t("fire.settings.saving") : t("fire.settings.save")}
         </Button>
       </div>
     </div>

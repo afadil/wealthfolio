@@ -66,12 +66,14 @@ const ranges = [
   },
 ];
 
-interface DateRangeSelectorProps {
+export interface DateRangeSelectorProps {
   value: DateRange | undefined;
   onChange: (range: DateRange | undefined) => void;
+  /** Localized tooltips for preset codes (1D, 1W, …). Falls back to English names when omitted. */
+  rangeTooltips?: Partial<Record<string, string>>;
 }
 
-export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
+export function DateRangeSelector({ value, onChange, rangeTooltips }: DateRangeSelectorProps) {
   // Helper function to compare dates ignoring time
   const compareDates = (date1: Date | undefined, date2: Date | undefined) => {
     if (!date1 || !date2) return false;
@@ -96,7 +98,7 @@ export function DateRangeSelector({ value, onChange }: DateRangeSelectorProps) {
         items={ranges.map((range) => ({
           value: range.label,
           label: range.label,
-          title: range.name,
+          title: rangeTooltips?.[range.label] ?? range.name,
         }))}
         value={selectedLabel}
         onValueChange={(newValue) => {

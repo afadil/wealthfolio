@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import i18n from "@/i18n/i18n";
 import { getFireSettings, saveFireSettings } from "@/adapters";
 import { getSettings } from "@/adapters";
 import type { FireSettings } from "../types";
@@ -43,10 +44,14 @@ export function useFireSettings() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(QUERY_KEY, { ...query.data, settings: data });
-      toast({ title: "Settings saved" });
+      toast({ title: i18n.t("fire.settings.toast.saved") });
     },
     onError: (error: Error) => {
-      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      toast({
+        title: i18n.t("fire.settings.toast.save_failed"),
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 

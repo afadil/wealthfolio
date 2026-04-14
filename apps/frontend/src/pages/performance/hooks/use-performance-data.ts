@@ -1,9 +1,19 @@
 import { keepPreviousData, useQueries } from "@tanstack/react-query";
 import { calculatePerformanceHistory } from "@/adapters";
+import { de, enUS } from "date-fns/locale";
 import { format } from "date-fns";
+import type { TFunction } from "i18next";
 import { DateRange } from "react-day-picker";
+import { useTranslation } from "react-i18next";
 import { QueryKeys } from "@/lib/query-keys";
 import { TrackedItem } from "@/lib/types";
+
+function translatePerformanceErrorMessage(raw: string, t: TFunction<"common">): string {
+  if (raw.includes("Account has negative portfolio value in its history")) {
+    return t("performance.error_negative_portfolio_history");
+  }
+  return raw;
+}
 
 /**
  * Hook to calculate cumulative returns for a list of comparison items.
@@ -29,6 +39,9 @@ export function useCalculatePerformanceHistory({
   dateRange: DateRange | undefined;
   trackingMode?: "HOLDINGS" | "TRANSACTIONS";
 }) {
+  const { t, i18n } = useTranslation("common");
+  const dateLocale = i18n.language?.startsWith("de") ? de : enUS;
+
   // Filter out invalid items (defensive: handles stale localStorage data)
   const validItems = selectedItems.filter(
     (item) =>
@@ -72,7 +85,12 @@ export function useCalculatePerformanceHistory({
     .filter((query) => query.isError)
     .map((query) => query.error)
     .filter(Boolean)
-    .map((error) => (error instanceof Error ? error.message : String(error)));
+    .map((error) =>
+      translatePerformanceErrorMessage(
+        error instanceof Error ? error.message : String(error),
+        t,
+      ),
+    );
 
   // Format chart data directly from query results
   const chartData = performanceQueries
@@ -89,14 +107,16 @@ export function useCalculatePerformanceHistory({
     })
     .filter(Boolean);
 
-  const displayStartDate = dateRange?.from ? format(dateRange.from, "MMM d, yyyy") : "";
+  const displayStartDate = dateRange?.from
+    ? format(dateRange.from, "PP", { locale: dateLocale })
+    : "";
 
-  const displayEndDate = dateRange?.to ? format(dateRange.to, "MMM d, yyyy") : "";
+  const displayEndDate = dateRange?.to ? format(dateRange.to, "PP", { locale: dateLocale }) : "";
 
   const displayDateRange =
     displayStartDate && displayEndDate
       ? `${displayStartDate} - ${displayEndDate}`
-      : "Compare account performance over time";
+      : t("performance.fallback_date_subtitle");
 
   return {
     data: chartData,

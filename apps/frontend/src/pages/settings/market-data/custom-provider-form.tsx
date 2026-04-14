@@ -34,6 +34,7 @@ import type {
   CustomProviderWithSources,
   NewCustomProviderSource,
 } from "@/lib/types/custom-provider";
+import { useTranslation } from "react-i18next";
 
 import { SourceConfigPanel } from "./source-config-panel";
 
@@ -154,6 +155,7 @@ function CustomProviderFormContent({
   onOpenChange: (open: boolean) => void;
   onSavingChange: (saving: boolean) => void;
 }) {
+  const { t } = useTranslation("common");
   const isEditing = !!provider;
   const { mutate: createProvider, isPending: isCreating } = useCreateCustomProvider();
   const { mutate: updateProvider, isPending: isUpdating } = useUpdateCustomProvider();
@@ -303,9 +305,13 @@ function CustomProviderFormContent({
   return (
     <>
       <DialogHeader className="shrink-0">
-        <DialogTitle>{isEditing ? "Edit Custom Provider" : "Add Custom Provider"}</DialogTitle>
+        <DialogTitle>
+          {isEditing
+            ? t("settings.market_data.custom_provider.edit_title")
+            : t("settings.market_data.custom_provider.add_title")}
+        </DialogTitle>
         <DialogDescription>
-          Configure a custom data source to fetch market prices.
+          {t("settings.market_data.custom_provider.dialog_description")}
         </DialogDescription>
       </DialogHeader>
 
@@ -332,12 +338,12 @@ function CustomProviderFormContent({
           <Tabs defaultValue="latest" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="w-full shrink-0">
               <TabsTrigger value="latest" className="flex-1">
-                Latest Price
+                {t("settings.market_data.custom_provider.latest_price")}
               </TabsTrigger>
               <TabsTrigger value="historical" className="flex-1">
-                Historical
+                {t("settings.market_data.custom_provider.historical")}
                 <span className="text-muted-foreground ml-1 text-[10px] font-normal">
-                  (optional)
+                  ({t("settings.market_data.custom_provider.optional")})
                 </span>
               </TabsTrigger>
             </TabsList>
@@ -357,9 +363,11 @@ function CustomProviderFormContent({
                   <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8">
                     <Icons.Clock className="text-muted-foreground/40 h-8 w-8" />
                     <div className="text-center">
-                      <p className="text-muted-foreground text-sm">Historical source is optional</p>
+                      <p className="text-muted-foreground text-sm">
+                        {t("settings.market_data.custom_provider.historical_optional")}
+                      </p>
                       <p className="text-muted-foreground mt-1 text-xs">
-                        If not configured, daily prices accumulate from the latest source.
+                        {t("settings.market_data.custom_provider.historical_optional_hint")}
                       </p>
                     </div>
                     <Button
@@ -385,14 +393,14 @@ function CustomProviderFormContent({
                       }}
                     >
                       <Icons.Plus className="mr-1 h-3 w-3" />
-                      Enable Historical Source
+                      {t("settings.market_data.custom_provider.enable_historical")}
                     </Button>
                   </div>
                 ) : (
                   <div>
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-muted-foreground text-xs">
-                        Source for fetching historical price data (JSON, HTML table, or CSV).
+                        {t("settings.market_data.custom_provider.historical_source_hint")}
                       </p>
                       <Button
                         type="button"
@@ -404,7 +412,7 @@ function CustomProviderFormContent({
                           form.setValue("historicalSource", undefined);
                         }}
                       >
-                        Disable
+                        {t("settings.market_data.custom_provider.disable")}
                       </Button>
                     </div>
                     <SourceConfigPanel form={form} prefix="historicalSource" isHistorical />
@@ -421,16 +429,16 @@ function CustomProviderFormContent({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Provider Name
+                          {t("settings.market_data.custom_provider.provider_name")}
                           {!nameManuallyEdited && !isEditing && form.getValues("name") && (
                             <span className="text-muted-foreground ml-1 font-normal">
-                              (from URL)
+                              ({t("settings.market_data.custom_provider.from_url")})
                             </span>
                           )}
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="e.g. My Provider"
+                            placeholder={t("settings.market_data.custom_provider.placeholder_provider_name")}
                             {...field}
                             onChange={(e) => handleNameChange(e.target.value, field.onChange)}
                           />
@@ -445,11 +453,14 @@ function CustomProviderFormContent({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Code <span className="text-muted-foreground font-normal">(auto)</span>
+                          {t("settings.market_data.custom_provider.code")}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            ({t("settings.market_data.custom_provider.auto")})
+                          </span>
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="my-provider"
+                            placeholder={t("settings.market_data.custom_provider.placeholder_code")}
                             disabled={isEditing}
                             {...field}
                             onChange={(e) => {
@@ -467,7 +478,7 @@ function CustomProviderFormContent({
                     name="priority"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Priority</FormLabel>
+                        <FormLabel>{t("settings.market_data.priority")}</FormLabel>
                         <FormControl>
                           <Input type="number" min={1} {...field} />
                         </FormControl>
@@ -485,7 +496,7 @@ function CustomProviderFormContent({
                       className="text-muted-foreground mt-2 h-8"
                     >
                       <Icons.FileText className="mr-1 h-3 w-3" />
-                      Description
+                      {t("settings.market_data.custom_provider.description")}
                       <Icons.ChevronDown
                         className={`ml-1 h-3 w-3 transition-transform ${descriptionOpen ? "rotate-180" : ""}`}
                       />
@@ -498,7 +509,11 @@ function CustomProviderFormContent({
                       render={({ field }) => (
                         <FormItem className="mt-2">
                           <FormControl>
-                            <Textarea rows={2} placeholder="Optional description" {...field} />
+                            <Textarea
+                              rows={2}
+                              placeholder={t("settings.market_data.custom_provider.placeholder_description")}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -518,17 +533,17 @@ function CustomProviderFormContent({
               onClick={() => onOpenChange(false)}
               disabled={isSaving}
             >
-              Cancel
+              {t("settings.shared.cancel")}
             </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <span className="flex items-center gap-2">
-                  <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
+                  <Icons.Spinner className="h-4 w-4 animate-spin" /> {t("settings.shared.saving")}
                 </span>
               ) : isEditing ? (
-                "Save Changes"
+                t("settings.market_data.custom_provider.save_changes")
               ) : (
-                "Create Provider"
+                t("settings.market_data.custom_provider.create_provider")
               )}
             </Button>
           </div>

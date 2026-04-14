@@ -5,6 +5,7 @@ import { checkAddonUpdate, checkAllAddonUpdates } from "@/adapters";
 import type { AddonUpdateCheckResult } from "@wealthfolio/addon-sdk";
 import type { InstalledAddon } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
+import { useTranslation } from "react-i18next";
 
 interface UseAddonUpdatesOptions {
   installedAddons?: InstalledAddon[];
@@ -12,6 +13,7 @@ interface UseAddonUpdatesOptions {
 }
 
 export function useAddonUpdates(options: UseAddonUpdatesOptions = {}) {
+  const { t } = useTranslation();
   const { installedAddons = [], autoCheck = false } = options;
   const [updateResults, setUpdateResults] = useState<AddonUpdateCheckResult[]>([]);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
@@ -34,15 +36,19 @@ export function useAddonUpdates(options: UseAddonUpdatesOptions = {}) {
 
       if (criticalUpdates.length > 0) {
         toast({
-          title: "🚨 Critical updates available",
-          description: `${criticalUpdates.length} addon${criticalUpdates.length > 1 ? "s have" : " has"} critical security updates available.`,
+          title: t("settings.addons.hooks.critical_updates_title"),
+          description: t("settings.addons.hooks.critical_updates_description", {
+            count: criticalUpdates.length,
+          }),
           variant: "destructive",
         });
       } else if (hasUpdates) {
         const updateCount = results.filter((r) => r.updateInfo.updateAvailable).length;
         toast({
-          title: "📦 Updates available",
-          description: `${updateCount} addon${updateCount > 1 ? "s have" : " has"} updates available.`,
+          title: t("settings.addons.hooks.updates_available_title"),
+          description: t("settings.addons.hooks.updates_available_description", {
+            count: updateCount,
+          }),
         });
       }
 
@@ -75,8 +81,10 @@ export function useAddonUpdates(options: UseAddonUpdatesOptions = {}) {
       } catch (error) {
         console.error(`Error checking update for addon ${addonId}:`, error);
         toast({
-          title: "Update check failed",
-          description: `Failed to check updates for addon ${addonId}`,
+          title: t("settings.addons.hooks.update_check_failed_title"),
+          description: t("settings.addons.hooks.update_check_single_failed_description", {
+            addonId,
+          }),
           variant: "destructive",
         });
         throw error;
@@ -100,15 +108,19 @@ export function useAddonUpdates(options: UseAddonUpdatesOptions = {}) {
 
       if (criticalUpdates.length > 0) {
         toast({
-          title: "🚨 Critical updates available",
-          description: `${criticalUpdates.length} addon${criticalUpdates.length > 1 ? "s have" : " has"} critical security updates available.`,
+          title: t("settings.addons.hooks.critical_updates_title"),
+          description: t("settings.addons.hooks.critical_updates_description", {
+            count: criticalUpdates.length,
+          }),
           variant: "destructive",
         });
       } else if (hasUpdates) {
         const updateCount = results.filter((r) => r.updateInfo.updateAvailable).length;
         toast({
-          title: "📦 Updates available",
-          description: `${updateCount} addon${updateCount > 1 ? "s have" : " has"} updates available.`,
+          title: t("settings.addons.hooks.updates_available_title"),
+          description: t("settings.addons.hooks.updates_available_description", {
+            count: updateCount,
+          }),
         });
       }
 
@@ -116,15 +128,15 @@ export function useAddonUpdates(options: UseAddonUpdatesOptions = {}) {
     } catch (error) {
       console.error("Error checking all addon updates:", error);
       toast({
-        title: "Update check failed",
-        description: "Failed to check for addon updates. Please try again later.",
+        title: t("settings.addons.hooks.update_check_failed_title"),
+        description: t("settings.addons.hooks.update_check_all_failed_description"),
         variant: "destructive",
       });
       throw error;
     } finally {
       setIsCheckingUpdates(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   const getUpdateResult = useCallback(
     (addonId: string) => {

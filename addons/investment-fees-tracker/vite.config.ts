@@ -19,17 +19,19 @@ export default defineConfig({
     },
     rollupOptions: {
       // Externalize React and ReactDOM so the addon uses the host's version
-      external: ["react", "react-dom"],
+      external: ["react", "react-dom", "react-i18next"],
       plugins: [
         externalGlobals({
           react: "React",
           "react-dom": "ReactDOM",
+          "react-i18next": "ReactI18next",
         }),
       ],
       output: {
         globals: {
           react: "React", // Assumes React is available as window.React
           "react-dom": "ReactDOM", // Assumes ReactDOM is available as window.ReactDOM
+          "react-i18next": "ReactI18next", // Set in apps/frontend main.tsx (same i18n context as the app)
         },
       },
     },

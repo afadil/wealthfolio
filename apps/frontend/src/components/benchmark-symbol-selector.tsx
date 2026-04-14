@@ -17,6 +17,7 @@ import { getExchangeDisplayName } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // Predefined benchmarks with canonical asset IDs
 // exchangeMic is undefined for indices (will use "INDEX" as pseudo-MIC)
@@ -121,6 +122,7 @@ export function BenchmarkSymbolSelector({
   className,
   iconOnly = false,
 }: BenchmarkSymbolSelectorProps) {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -173,7 +175,7 @@ export function BenchmarkSymbolSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={iconOnly ? "Add benchmark" : undefined}
+          aria-label={iconOnly ? t("benchmark.selector.aria_add") : undefined}
           className={cn(
             "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
             iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
@@ -182,19 +184,19 @@ export function BenchmarkSymbolSelector({
           size={iconOnly ? "icon" : "sm"}
         >
           <Icons.TrendingUp className="h-4 w-4" />
-          {!iconOnly && "Add Benchmark"}
+          {!iconOnly && t("benchmark.selector.add")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[350px] p-0">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search benchmarks or any symbol..."
+            placeholder={t("benchmark.selector.search_placeholder")}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>
-              {isLoading ? "Searching..." : "No benchmarks or symbols found."}
+              {isLoading ? t("benchmark.selector.searching") : t("benchmark.selector.no_results")}
             </CommandEmpty>
 
             {/* Predefined benchmark groups */}
@@ -243,7 +245,7 @@ export function BenchmarkSymbolSelector({
             {/* Loading state for search results */}
             {isLoading && searchQuery.length > 2 && (
               <CommandGroup
-                heading="Search Results"
+                heading={t("benchmark.selector.search_results")}
                 className="[&_[cmdk-group-heading]]:bg-popover [&_[cmdk-group-heading]]:border-border/10 [&_[cmdk-group-heading]]:sticky [&_[cmdk-group-heading]]:top-0 [&_[cmdk-group-heading]]:z-10 [&_[cmdk-group-heading]]:border-b"
               >
                 <div className="space-y-2 p-2">
@@ -257,11 +259,11 @@ export function BenchmarkSymbolSelector({
             {/* Error state for search results */}
             {isError && searchQuery.length > 2 && (
               <CommandGroup
-                heading="Search Results"
+                heading={t("benchmark.selector.search_results")}
                 className="[&_[cmdk-group-heading]]:bg-popover [&_[cmdk-group-heading]]:border-border/10 [&_[cmdk-group-heading]]:sticky [&_[cmdk-group-heading]]:top-0 [&_[cmdk-group-heading]]:z-10 [&_[cmdk-group-heading]]:border-b"
               >
                 <div className="text-muted-foreground p-4 text-sm">
-                  Error searching for symbols. Please try again.
+                  {t("benchmark.selector.search_error")}
                 </div>
               </CommandGroup>
             )}
@@ -272,7 +274,7 @@ export function BenchmarkSymbolSelector({
               filteredSearchResults.length > 0 &&
               searchQuery.length > 2 && (
                 <CommandGroup
-                  heading="Search Results"
+                  heading={t("benchmark.selector.search_results")}
                   className="[&_[cmdk-group-heading]]:bg-popover [&_[cmdk-group-heading]]:border-border/10 [&_[cmdk-group-heading]]:sticky [&_[cmdk-group-heading]]:top-0 [&_[cmdk-group-heading]]:z-10 [&_[cmdk-group-heading]]:border-b"
                 >
                   {filteredSearchResults.slice(0, 8).map((ticker) => (

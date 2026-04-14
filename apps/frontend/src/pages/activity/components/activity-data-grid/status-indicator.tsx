@@ -1,4 +1,5 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 import type { LocalTransaction } from "./types";
 import { isPendingReview } from "./types";
 
@@ -30,6 +31,8 @@ interface StatusHeaderIndicatorProps {
  * Shows a visual indicator in the header when any visible rows need review
  */
 export function StatusHeaderIndicator({ hasRowsToReview }: StatusHeaderIndicatorProps) {
+  const { t } = useTranslation("common");
+
   if (!hasRowsToReview) {
     return null;
   }
@@ -41,8 +44,7 @@ export function StatusHeaderIndicator({ hasRowsToReview }: StatusHeaderIndicator
           <div className="text-destructive w-full cursor-help text-center">●</div>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          <p>Newly imported &</p>
-          <p>Pending verification</p>
+          <p>{t("activity.data_grid.pending_review_tooltip")}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

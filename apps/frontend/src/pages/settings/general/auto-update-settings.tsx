@@ -1,4 +1,5 @@
 import { updateSettings } from "@/adapters";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
@@ -8,6 +9,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export function AutoUpdateSettings() {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const queryClient = useQueryClient();
 
@@ -18,8 +20,8 @@ export function AutoUpdateSettings() {
     },
     onError: (error) => {
       toast({
-        title: "Error",
-        description: "Failed to update auto-update settings. Please try again.",
+        title: t("settings.auto_update.toast_error_title"),
+        description: t("settings.auto_update.toast_error_description"),
         variant: "destructive",
       });
       console.error("Failed to update settings:", error);
@@ -42,18 +44,15 @@ export function AutoUpdateSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Automatic Updates</CardTitle>
+        <CardTitle className="text-lg">{t("settings.auto_update.title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label htmlFor="auto-update-check" className="text-base">
-              Enable automatic update checks
+              {t("settings.auto_update.label")}
             </Label>
-            <p className="text-muted-foreground text-xs">
-              When enabled, Wealthfolio will automatically check for updates when the application
-              starts. You can still manually check for updates from the Help menu.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("settings.auto_update.hint")}</p>
           </div>
           <Switch
             id="auto-update-check"

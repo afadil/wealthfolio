@@ -1,5 +1,5 @@
 use chrono;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter};
 use wealthfolio_storage_sqlite::db;
 
 use crate::context::ServiceContext;
+use crate::shell_i18n::{current_strings, format_template};
 #[cfg(desktop)]
 use crate::updater::{check_for_update, install_update};
 
@@ -35,21 +36,27 @@ pub async fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, String> {
     let app_data_dir_path = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?
+        .map_err(|e| {
+            let s = current_strings(&app_handle);
+            format_template(&s.utilities_error_app_data_dir, &e.to_string())
+        })?
         .to_path_buf();
 
     let app_data_dir = app_data_dir_path
         .to_str()
-        .ok_or_else(|| "Failed to convert app data dir path to string".to_string())?
+        .ok_or_else(|| current_strings(&app_handle).utilities_error_path_to_string.clone())?
         .to_string();
 
     let db_path = db::get_db_path(&app_data_dir);
     let logs_dir = app_handle
         .path()
         .app_log_dir()
-        .map_err(|e| format!("Failed to get app log dir: {}", e))?
+        .map_err(|e| {
+            let s = current_strings(&app_handle);
+            format_template(&s.utilities_error_log_dir, &e.to_string())
+        })?
         .to_str()
-        .ok_or_else(|| "Failed to convert app log dir path to string".to_string())?
+        .ok_or_else(|| current_strings(&app_handle).utilities_error_path_to_string.clone())?
         .to_string();
 
     Ok(AppInfo {
@@ -67,7 +74,7 @@ pub async fn check_for_updates(app_handle: AppHandle) -> Result<Option<serde_jso
         let instance_id = app_handle
             .try_state::<std::sync::Arc<ServiceContext>>()
             .map(|state| state.instance_id.clone())
-            .ok_or_else(|| "Failed to access service context".to_string())?;
+            .ok_or_else(|| current_strings(&app_handle).utilities_error_service_context.clone())?;
 
         let result = check_for_update(app_handle, &instance_id).await?;
         Ok(result.map(|info| serde_json::to_value(info).unwrap()))
@@ -99,17 +106,21 @@ pub async fn backup_database(app_handle: AppHandle) -> Result<(String, Vec<u8>),
     let backup_path = db::backup_database(&app_data_dir).map_err(|e| e.to_string())?;
 
     // Read the backup file
-    let mut file =
-        File::open(&backup_path).map_err(|e| format!("Failed to open backup file: {}", e))?;
+    let mut file = File::open(&backup_path).map_err(|e| {
+        let s = current_strings(&app_handle);
+        format_template(&s.utilities_error_backup_open, &e.to_string())
+    })?;
     let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .map_err(|e| format!("Failed to read backup file: {}", e))?;
+    file.read_to_end(&mut buffer).map_err(|e| {
+        let s = current_strings(&app_handle);
+        format_template(&s.utilities_error_backup_read, &e.to_string())
+    })?;
 
     // Get the filename
     let filename = Path::new(&backup_path)
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| "Failed to get backup filename".to_string())?
+        .ok_or_else(|| current_strings(&app_handle).utilities_error_backup_filename.clone())?
         .to_string();
 
     Ok((filename, buffer))
@@ -138,8 +149,10 @@ pub async fn backup_database_to_path(
 
     let backup_path_str = backup_path.to_string_lossy().to_string();
 
-    db::backup_database_to_file(&app_data_dir, &backup_path_str)
-        .map_err(|e| format!("Failed to backup database: {}", e))?;
+    db::backup_database_to_file(&app_data_dir, &backup_path_str).map_err(|e| {
+        let s = current_strings(&app_handle);
+        format_template(&s.utilities_error_backup_to_path, &e.to_string())
+    })?;
 
     Ok(backup_path_str)
 }
@@ -170,27 +183,32 @@ pub async fn restore_database(
     }
 
     // Use the safe restore function that handles Windows file locking issues
-    db::restore_database_safe(&app_data_dir, &normalized_backup_path).map_err(|e| e.to_string())?;
+    db::restore_database_safe(&app_data_dir, &normalized_backup_path).map_err(|e| {
+        let msg = e.to_string();
+        let s = current_strings(&app_handle);
+        if msg.contains("BACKUP_FILE_NOT_FOUND") {
+            s.utilities_backup_file_not_found.clone()
+        } else {
+            msg
+        }
+    })?;
 
     // After successful restore, emit event and show restart dialog
-    app_handle
-        .emit("database-restored", ())
-        .map_err(|e| format!("Failed to emit database-restored event: {}", e))?;
+    app_handle.emit("database-restored", ()).map_err(|e| {
+        let s = current_strings(&app_handle);
+        format_template(&s.utilities_error_restore_emit, &e.to_string())
+    })?;
 
     // On desktop builds prompt for restart, but skip showing dialogs on iOS/Android
     #[cfg(not(any(target_os = "ios", target_os = "android")))]
     {
         use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
+        let shell = current_strings(&app_handle);
         let should_restart = app_handle
             .dialog()
-            .message(
-                "Database restored successfully!\n\n\
-                 For the best experience, it's recommended to restart the application \
-                 to ensure all data is properly refreshed.\n\n\
-                 Would you like to restart now?",
-            )
-            .title("Database Restored - Restart Required")
+            .message(shell.dialog_database_restored_message.clone())
+            .title(shell.dialog_database_restored_title.clone())
             .buttons(MessageDialogButtons::OkCancel)
             .kind(MessageDialogKind::Info)
             .blocking_show();
@@ -201,4 +219,25 @@ pub async fn restore_database(
     }
 
     Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslateTextRequest {
+    pub text: String,
+    pub source_lang: String,
+    pub target_lang: String,
+}
+
+/// Best-effort translation via MyMemory (outbound HTTPS). Not for confidential text.
+#[tauri::command]
+pub async fn translate_text(req: TranslateTextRequest) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    wealthfolio_translation::translate_mymemory(
+        &client,
+        &req.text,
+        &req.source_lang,
+        &req.target_lang,
+    )
+    .await
 }

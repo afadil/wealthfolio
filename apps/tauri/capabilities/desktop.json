@@ -39,6 +39,8 @@
     "core:app:allow-set-app-theme",
     "core:window:allow-set-theme",
     "core:window:allow-theme",
+    "core:window:allow-create",
+    "core:webview:allow-create-webview-window",
     "updater:default",
     "log:default",
     "window-state:default"

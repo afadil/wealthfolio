@@ -1,5 +1,5 @@
 // Activity Commands
-import { ImportType } from "@/lib/types";
+import { ImportType } from "@/lib/import-constants";
 import type {
   Activity,
   ActivityBulkMutationRequest,

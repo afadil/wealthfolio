@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { createAccount, updateAccount, deleteAccount, logger } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { QueryKeys } from "@/lib/query-keys";
 interface UseAccountMutationsProps {
   onSuccess?: () => void;
@@ -16,10 +17,10 @@ export function useAccountMutations({ onSuccess = () => undefined }: UseAccountM
     }
   };
 
-  const handleError = (action: string) => {
+  const handleError = (actionLabel: string) => {
     toast({
-      title: `Uh oh! Something went wrong ${action} this account.`,
-      description: "Please try again or report an issue if the problem persists.",
+      title: i18n.t("settings.accounts.toast_error_title", { action: actionLabel }),
+      description: i18n.t("settings.accounts.toast_error_description"),
       variant: "destructive",
     });
   };
@@ -27,12 +28,12 @@ export function useAccountMutations({ onSuccess = () => undefined }: UseAccountM
   const createAccountMutation = useMutation({
     mutationFn: createAccount,
     onSuccess: () => {
-      handleSuccess("Account created successfully.");
+      handleSuccess(i18n.t("settings.accounts.toast_create_success"));
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ACCOUNTS] });
     },
     onError: (e) => {
       logger.error(`Error creating account: ${e}`);
-      handleError("creating");
+      handleError(i18n.t("settings.accounts.toast_action_creating"));
     },
   });
 
@@ -44,7 +45,7 @@ export function useAccountMutations({ onSuccess = () => undefined }: UseAccountM
     },
     onError: (e) => {
       logger.error(`Error updating account: ${e}`);
-      handleError("updating");
+      handleError(i18n.t("settings.accounts.toast_action_updating"));
     },
   });
 
@@ -56,7 +57,7 @@ export function useAccountMutations({ onSuccess = () => undefined }: UseAccountM
     },
     onError: (e) => {
       logger.error(`Error deleting account: ${e}`);
-      handleError("deleting");
+      handleError(i18n.t("settings.accounts.toast_action_deleting"));
     },
   });
 

@@ -4,7 +4,10 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
+import { format, isValid, parseISO } from "date-fns";
+import { de, enUS } from "date-fns/locale";
 import { useId, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Area, AreaChart, ReferenceDot, Tooltip, XAxis, YAxis } from "recharts";
 import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
 
@@ -43,12 +46,18 @@ interface CustomTooltipProps extends TooltipBaseProps {
   isChartHovered: boolean;
 }
 
+function dateFnsLocale(language: string | undefined) {
+  return language?.startsWith("de") ? de : enUS;
+}
+
 const CustomTooltip = ({
   active,
   payload,
   isBalanceHidden,
   isChartHovered,
 }: CustomTooltipProps) => {
+  const { t, i18n } = useTranslation("common");
+
   if (!active || !payload?.length) {
     return null;
   }
@@ -71,14 +80,21 @@ const CustomTooltip = ({
 
   const tooltipColor = tvPayload.totalValue >= 0 ? "var(--success)" : "var(--destructive)";
 
+  const parsed = parseISO(tvPayload.date);
+  const dateLabel = isValid(parsed)
+    ? format(parsed, "PP", { locale: dateFnsLocale(i18n.language) })
+    : formatDate(tvPayload.date);
+
   return (
     <div className="bg-popover pointer-events-none grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-      <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
+      <p className="text-muted-foreground text-xs">{dateLabel}</p>
 
       <div className="flex items-center justify-between space-x-2">
         <div className="flex items-center space-x-1.5">
           <span className="block h-0.5 w-3" style={{ backgroundColor: tooltipColor }} />
-          <span className="text-muted-foreground text-xs">Total Value:</span>
+          <span className="text-muted-foreground text-xs">
+            {t("dashboard.history_chart.tooltip.total_value")}:
+          </span>
         </div>
         <AmountDisplay
           value={tvPayload.totalValue}
@@ -94,7 +110,9 @@ const CustomTooltip = ({
               className="block h-0 w-3 border-b-2 border-dashed"
               style={{ borderColor: "var(--muted-foreground)" }}
             />
-            <span className="text-muted-foreground text-xs">Net Deposit:</span>
+            <span className="text-muted-foreground text-xs">
+              {t("dashboard.history_chart.tooltip.net_deposit")}:
+            </span>
           </div>
           <AmountDisplay
             value={ncPayload.netContribution}
@@ -115,6 +133,7 @@ export function HistoryChart({
   showMarkers,
   onMarkerClick,
 }: HistoryChartProps) {
+  const { t } = useTranslation("common");
   const { triggerHaptic } = useHapticFeedback();
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
@@ -127,14 +146,18 @@ export function HistoryChart({
   const fillGradientId = `historyFill-${id}`;
   const strokeGradientId = `historyStroke-${id}`;
 
-  const chartConfig = {
-    totalValue: {
-      label: "Total Value",
-    },
-    netContribution: {
-      label: "Net Contribution",
-    },
-  } satisfies ChartConfig;
+  const chartConfig = useMemo(
+    () =>
+      ({
+        totalValue: {
+          label: t("dashboard.history_chart.tooltip.total_value"),
+        },
+        netContribution: {
+          label: t("dashboard.history_chart.tooltip.net_deposit"),
+        },
+      }) satisfies ChartConfig,
+    [t],
+  );
 
   // Compute where y=0 falls in the gradient (0=top, 1=bottom)
   // to split green (positive) / red (negative) fill & stroke
@@ -195,6 +218,7 @@ export function HistoryChart({
 
   // Gradient stops for fill and stroke based on zero crossing
   const zeroPercent = `${(zeroOffset * 100).toFixed(1)}%`;
+  const shouldAnimateSeries = data.length <= 260;
 
   const maybeTriggerScrubHaptic = (chartState: MouseHandlerDataParam) => {
     if (!isMobile || !isTouchScrubbingRef.current || !chartState.isTooltipActive) {
@@ -223,9 +247,10 @@ export function HistoryChart({
 
   const handleChartMove = (chartState: MouseHandlerDataParam) => {
     if (!showMarkers || chartState.activeLabel == null) {
-      setHoveredMarker(false);
+      setHoveredMarker((prev) => (prev ? false : prev));
     } else {
-      setHoveredMarker(markerDateSet.has(String(chartState.activeLabel)));
+      const isMarker = markerDateSet.has(String(chartState.activeLabel));
+      setHoveredMarker((prev) => (prev === isMarker ? prev : isMarker));
     }
 
     maybeTriggerScrubHaptic(chartState);
@@ -326,7 +351,7 @@ export function HistoryChart({
           domain={[(dataMin: number) => dataMin - Math.abs(dataMin) * 0.02, "auto"]}
         />
         <Area
-          isAnimationActive={true}
+          isAnimationActive={shouldAnimateSeries}
           animationDuration={300}
           animationEasing="ease-out"
           connectNulls={true}
@@ -338,7 +363,7 @@ export function HistoryChart({
           style={{ pointerEvents: "none" }}
         />
         <Area
-          isAnimationActive={true}
+          isAnimationActive={shouldAnimateSeries}
           animationDuration={300}
           animationEasing="ease-out"
           connectNulls={true}

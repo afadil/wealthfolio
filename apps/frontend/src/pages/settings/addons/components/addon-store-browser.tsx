@@ -17,6 +17,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAddonActions } from "../hooks/use-addon-actions";
 import { useAddonStore } from "../hooks/use-addon-store";
 import { PermissionDialog } from "./addon-permission-dialog";
@@ -34,6 +35,7 @@ const isAddonDisplayable = (listing: AddonStoreListing) => {
 };
 
 export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: AddonStoreBrowserProps) {
+  const { t } = useTranslation("common");
   const {
     storeListings,
     isLoadingStore,
@@ -211,7 +213,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         <div className="relative flex-1">
           <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
-            placeholder="Search addons..."
+            placeholder={t("settings.addons.store.search_placeholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -226,13 +228,13 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
           }
         >
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Sort by..." />
+            <SelectValue placeholder={t("settings.addons.store.sort_placeholder")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="popular">Most Popular</SelectItem>
-            <SelectItem value="rating">Highest Rated</SelectItem>
-            <SelectItem value="recent">Recently Updated</SelectItem>
-            <SelectItem value="name">Name (A-Z)</SelectItem>
+            <SelectItem value="popular">{t("settings.addons.store.sort_popular")}</SelectItem>
+            <SelectItem value="rating">{t("settings.addons.store.sort_rating")}</SelectItem>
+            <SelectItem value="recent">{t("settings.addons.store.sort_recent")}</SelectItem>
+            <SelectItem value="name">{t("settings.addons.store.sort_name")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -242,11 +244,15 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
           onValueChange={(value: string) => setFilterBy(value as "all" | "uninstalled")}
         >
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter by..." />
+            <SelectValue placeholder={t("settings.addons.store.filter_placeholder")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All ({counts.total})</SelectItem>
-            <SelectItem value="uninstalled">Not Installed ({counts.uninstalled})</SelectItem>
+            <SelectItem value="all">
+              {t("settings.addons.store.filter_all", { count: counts.total })}
+            </SelectItem>
+            <SelectItem value="uninstalled">
+              {t("settings.addons.store.filter_uninstalled", { count: counts.uninstalled })}
+            </SelectItem>
           </SelectContent>
         </Select>
 
@@ -256,7 +262,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
           size="icon"
           onClick={() => fetchStoreListings()}
           disabled={isLoadingStore}
-          title="Refresh addon store"
+          title={t("settings.addons.store.refresh_title")}
         >
           <Icons.Refresh className="h-4 w-4" />
         </Button>
@@ -267,11 +273,15 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         {/* Results summary */}
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground text-sm">
-            Showing {filteredAndSortedListings.length} of {storeListings.length} addons
+            {t("settings.addons.store.results_summary", {
+              shown: filteredAndSortedListings.length,
+              total: storeListings.length,
+            })}
             {searchQuery && (
               <>
                 {" "}
-                for &quot;<span className="font-medium">{searchQuery}</span>&quot;
+                {t("settings.addons.store.results_for")} &quot;
+                <span className="font-medium">{searchQuery}</span>&quot;
               </>
             )}
           </p>
@@ -284,7 +294,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
               className="h-auto p-1 text-xs"
             >
               <Icons.Close className="mr-1 h-3 w-3" />
-              Clear search
+              {t("settings.addons.store.clear_search")}
             </Button>
           )}
         </div>
@@ -293,20 +303,20 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         {filteredAndSortedListings.length === 0 ? (
           <EmptyPlaceholder>
             <EmptyPlaceholder.Icon name="Search" />
-            <EmptyPlaceholder.Title>No addons found</EmptyPlaceholder.Title>
+            <EmptyPlaceholder.Title>{t("settings.addons.store.empty_title")}</EmptyPlaceholder.Title>
             <EmptyPlaceholder.Description>
               {searchQuery
-                ? `No addons match your search for "${searchQuery}". Try different keywords or clear your search.`
-                : "No addons match your current filters. Try adjusting your filters or refreshing the store."}
+                ? t("settings.addons.store.empty_with_search", { query: searchQuery })
+                : t("settings.addons.store.empty_without_search")}
             </EmptyPlaceholder.Description>
             <div className="flex gap-2">
               {searchQuery && (
                 <Button variant="outline" onClick={() => setSearchQuery("")}>
-                  Clear Search
+                  {t("settings.addons.store.clear_search")}
                 </Button>
               )}
               <Button variant="outline" onClick={() => setFilterBy("all")}>
-                Show All Addons
+                {t("settings.addons.store.show_all")}
               </Button>
             </div>
           </EmptyPlaceholder>
@@ -333,7 +343,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
         <div className="space-y-4">
           <Separator />
           <div>
-            <h3 className="mb-3 text-lg font-semibold">Categories</h3>
+            <h3 className="mb-3 text-lg font-semibold">{t("settings.addons.store.categories")}</h3>
             <div className="flex flex-wrap gap-2">
               {popularTags.map((tag) => (
                 <Badge
@@ -362,7 +372,7 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
             onClick={() => setSelectedTag(null)}
             className="h-6 px-2 text-xs"
           >
-            Clear filter
+            {t("settings.addons.store.clear_filter")}
           </Button>
         </div>
       )}

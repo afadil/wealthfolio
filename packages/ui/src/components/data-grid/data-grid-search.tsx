@@ -5,9 +5,31 @@ import { Input } from "../ui/input";
 import { Icons } from "../ui/icons";
 import * as React from "react";
 import { useDebouncedCallback } from "../../hooks/use-debounced-callback";
-import type { SearchState } from "./data-grid-types";
+import type { DataGridSearchLabels, SearchState } from "./data-grid-types";
 
 type DataGridSearchProps = SearchState;
+
+const defaultSearchLabels: DataGridSearchLabels = {
+  placeholder: "Find in table...",
+  noResults: "No results",
+  typeToSearch: "Type to search",
+  matchProgress: (current, total) => `${current} of ${total}`,
+  ariaPreviousMatch: "Previous match",
+  ariaNextMatch: "Next match",
+  ariaCloseSearch: "Close search",
+};
+
+function mergeSearchLabels(partial?: Partial<DataGridSearchLabels>): DataGridSearchLabels {
+  return {
+    placeholder: partial?.placeholder ?? defaultSearchLabels.placeholder,
+    noResults: partial?.noResults ?? defaultSearchLabels.noResults,
+    typeToSearch: partial?.typeToSearch ?? defaultSearchLabels.typeToSearch,
+    matchProgress: partial?.matchProgress ?? defaultSearchLabels.matchProgress,
+    ariaPreviousMatch: partial?.ariaPreviousMatch ?? defaultSearchLabels.ariaPreviousMatch,
+    ariaNextMatch: partial?.ariaNextMatch ?? defaultSearchLabels.ariaNextMatch,
+    ariaCloseSearch: partial?.ariaCloseSearch ?? defaultSearchLabels.ariaCloseSearch,
+  };
+}
 
 export const DataGridSearch = React.memo(DataGridSearchImpl, (prev, next) => {
   if (prev.searchOpen !== next.searchOpen) return false;
@@ -17,6 +39,8 @@ export const DataGridSearch = React.memo(DataGridSearchImpl, (prev, next) => {
   if (prev.searchQuery !== next.searchQuery || prev.matchIndex !== next.matchIndex) {
     return false;
   }
+
+  if (prev.searchLabels !== next.searchLabels) return false;
 
   if (prev.searchMatches.length !== next.searchMatches.length) return false;
 
@@ -44,8 +68,11 @@ function DataGridSearchImpl({
   onSearch,
   onNavigateToNextMatch,
   onNavigateToPrevMatch,
+  searchLabels,
 }: DataGridSearchProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const labels = React.useMemo(() => mergeSearchLabels(searchLabels), [searchLabels]);
 
   React.useEffect(() => {
     if (searchOpen) {
@@ -146,7 +173,7 @@ function DataGridSearchImpl({
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          placeholder="Find in table..."
+          placeholder={labels.placeholder}
           className="h-8 w-64"
           ref={inputRef}
           value={searchQuery}
@@ -155,7 +182,7 @@ function DataGridSearchImpl({
         />
         <div className="flex items-center gap-1">
           <Button
-            aria-label="Previous match"
+            aria-label={labels.ariaPreviousMatch}
             variant="ghost"
             size="icon"
             className="size-7"
@@ -166,7 +193,7 @@ function DataGridSearchImpl({
             <Icons.ChevronUp />
           </Button>
           <Button
-            aria-label="Next match"
+            aria-label={labels.ariaNextMatch}
             variant="ghost"
             size="icon"
             className="size-7"
@@ -176,20 +203,18 @@ function DataGridSearchImpl({
           >
             <Icons.ChevronDown />
           </Button>
-          <Button aria-label="Close search" variant="ghost" size="icon" className="size-7" onClick={onClose}>
+          <Button aria-label={labels.ariaCloseSearch} variant="ghost" size="icon" className="size-7" onClick={onClose}>
             <Icons.X />
           </Button>
         </div>
       </div>
       <div className="text-muted-foreground flex items-center gap-1 whitespace-nowrap text-xs">
         {searchMatches.length > 0 ? (
-          <span>
-            {matchIndex + 1} of {searchMatches.length}
-          </span>
+          <span>{labels.matchProgress(matchIndex + 1, searchMatches.length)}</span>
         ) : searchQuery ? (
-          <span>No results</span>
+          <span>{labels.noResults}</span>
         ) : (
-          <span>Type to search</span>
+          <span>{labels.typeToSearch}</span>
         )}
       </div>
     </div>

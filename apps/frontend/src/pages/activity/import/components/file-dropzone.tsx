@@ -2,6 +2,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 
 interface FileDropzoneProps {
   file: File | null;
@@ -20,6 +21,7 @@ export const FileDropzone = ({
   isValid = true,
   error = null,
 }: FileDropzoneProps) => {
+  const { t } = useTranslation("common");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,7 +149,7 @@ export const FileDropzone = ({
           <div className="flex flex-col items-center gap-3">
             <Button size="sm" onClick={handleRemoveFile} className="flex items-center gap-1.5 px-3">
               <Icons.Trash className="h-4 w-4" />
-              <span>Remove File</span>
+              <span>{t("import.file_dropzone.remove_file")}</span>
             </Button>
           </div>
         </div>
@@ -225,7 +227,7 @@ export const FileDropzone = ({
                 transition={{ duration: 0.2 }}
                 className="text-xs font-medium"
               >
-                Processing file...
+                {t("import.file_dropzone.processing")}
               </motion.p>
             ) : file && (!isValid || error) ? (
               <motion.div
@@ -262,9 +264,12 @@ export const FileDropzone = ({
                 transition={{ duration: 0.2 }}
               >
                 <p className="text-xs font-medium">
-                  <span className="text-primary">Click to upload</span> or drop
+                  <Trans
+                    i18nKey="import.file_dropzone.upload_cta"
+                    components={{ highlight: <span className="text-primary" /> }}
+                  />
                 </p>
-                <p className="text-muted-foreground text-xs">CSV only</p>
+                <p className="text-muted-foreground text-xs">{t("import.file_dropzone.csv_only")}</p>
               </motion.div>
             )}
           </AnimatePresence>

@@ -4,7 +4,10 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
+import { format, isValid, parseISO } from "date-fns";
+import { de, enUS } from "date-fns/locale";
 import { useId, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Area, AreaChart, Tooltip, YAxis } from "recharts";
 import type { NetWorthHistoryPoint } from "@/lib/types";
 import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
@@ -36,7 +39,13 @@ interface CustomTooltipProps extends TooltipBaseProps {
   isBalanceHidden: boolean;
 }
 
+function dateFnsLocale(language: string | undefined) {
+  return language?.startsWith("de") ? de : enUS;
+}
+
 const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps) => {
+  const { t, i18n } = useTranslation("common");
+
   if (!active || !payload?.length) {
     return null;
   }
@@ -49,15 +58,22 @@ const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps)
   const hasLiabilities = entry.totalLiabilities > 0;
   const tooltipColor = entry.netWorth >= 0 ? CHART_COLOR : NEGATIVE_COLOR;
 
+  const parsed = parseISO(entry.date);
+  const dateLabel = isValid(parsed)
+    ? format(parsed, "PP", { locale: dateFnsLocale(i18n.language) })
+    : formatDate(entry.date);
+
   return (
     <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
-      <p className="text-muted-foreground text-xs">{formatDate(entry.date)}</p>
+      <p className="text-muted-foreground text-xs">{dateLabel}</p>
 
       {/* Net Worth - primary value */}
       <div className="flex items-center justify-between space-x-4">
         <div className="flex items-center space-x-1.5">
           <span className="block h-0.5 w-3" style={{ backgroundColor: tooltipColor }} />
-          <span className="text-muted-foreground text-xs">Net Worth:</span>
+          <span className="text-muted-foreground text-xs">
+            {t("net_worth.balance_sheet.net_worth")}:
+          </span>
         </div>
         <AmountDisplay
           value={entry.netWorth}
@@ -71,7 +87,9 @@ const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps)
       {hasLiabilities && (
         <div className="border-border mt-1 border-t pt-1.5">
           <div className="flex items-center justify-between space-x-4">
-            <span className="text-muted-foreground/70 text-xs">Assets:</span>
+            <span className="text-muted-foreground/70 text-xs">
+              {t("net_worth.balance_sheet.assets")}:
+            </span>
             <AmountDisplay
               value={entry.totalAssets}
               currency={entry.currency}
@@ -80,7 +98,9 @@ const CustomTooltip = ({ active, payload, isBalanceHidden }: CustomTooltipProps)
             />
           </div>
           <div className="flex items-center justify-between space-x-4">
-            <span className="text-muted-foreground/70 text-xs">Liabilities:</span>
+            <span className="text-muted-foreground/70 text-xs">
+              {t("net_worth.balance_sheet.liabilities")}:
+            </span>
             <span className="text-muted-foreground text-xs">
               -
               <AmountDisplay
@@ -116,6 +136,7 @@ interface NetWorthChartProps {
 }
 
 export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
+  const { t } = useTranslation("common");
   const { triggerHaptic } = useHapticFeedback();
   const { isBalanceHidden } = useBalancePrivacy();
   const isMobile = useIsMobileViewport();
@@ -130,7 +151,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
 
   const chartConfig = {
     netWorth: {
-      label: "Net Worth",
+      label: t("net_worth.balance_sheet.net_worth"),
     },
   } satisfies ChartConfig;
 
@@ -238,6 +259,8 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
         </defs>
         <Tooltip
           position={isMobile ? { y: 60 } : { y: -20 }}
+          // Default Recharts cursor is a full-height band; keep only the small tooltip card.
+          cursor={false}
           content={(props) => (
             <CustomTooltip
               {...(props as unknown as TooltipBaseProps)}

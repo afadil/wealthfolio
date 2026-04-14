@@ -10,6 +10,7 @@ import {
   openFileSaveDialog,
   openFolderDialog,
 } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { getPlatform as getRuntimePlatform } from "@/hooks/use-platform";
 import { formatData } from "@/lib/export-utils";
 import { QueryKeys } from "@/lib/query-keys";
@@ -97,29 +98,29 @@ export function useExportData() {
       } else {
         let exportedData: string | undefined;
         let fileName: string;
-        let datasetLabel: string | null = null;
+        let nothingExportKey: string | null = null;
 
         const currentDate = new Date().toISOString().split("T")[0];
         switch (desiredData) {
           case "accounts":
             exportedData = await fetchAndFormatData(fetchAccounts, format);
             fileName = `accounts_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = "accounts";
+            nothingExportKey = "settings.exports.toast.nothing_accounts";
             break;
           case "activities":
             exportedData = await fetchAndFormatData(fetchActivities, format);
             fileName = `activities_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = "activities";
+            nothingExportKey = "settings.exports.toast.nothing_activities";
             break;
           case "goals":
             exportedData = await fetchAndFormatData(fetchGoals, format);
             fileName = `goals_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = "goals";
+            nothingExportKey = "settings.exports.toast.nothing_goals";
             break;
           case "portfolio-history":
             exportedData = await fetchAndFormatData(fetchPortfolioHistory, format);
             fileName = `portfolio-history_${currentDate}.${format.toLowerCase()}`;
-            datasetLabel = "portfolio history records";
+            nothingExportKey = "settings.exports.toast.nothing_portfolio_history";
             break;
         }
 
@@ -127,10 +128,10 @@ export function useExportData() {
           return openFileSaveDialog(exportedData, fileName);
         }
 
-        if (datasetLabel) {
+        if (nothingExportKey) {
           toast({
-            title: "Nothing to export.",
-            description: `No ${datasetLabel} available to export right now.`,
+            title: i18n.t("settings.exports.toast.nothing_title"),
+            description: i18n.t(nothingExportKey),
           });
         }
 
@@ -146,19 +147,19 @@ export function useExportData() {
       if (result && typeof result === "object" && "mode" in result && result.mode === "sqlite") {
         const description =
           result.target === "server"
-            ? `Backup created on the server as ${result.value}`
-            : `Backup saved as ${result.value}`;
+            ? i18n.t("settings.exports.toast.backup_path_server", { path: result.value })
+            : i18n.t("settings.exports.toast.backup_path_local", { path: result.value });
 
         toast({
-          title: "Database backup completed successfully.",
+          title: i18n.t("settings.exports.toast.database_backup_success_title"),
           description,
           variant: "success",
         });
       } else {
         // Regular export success
         toast({
-          title: "Export completed",
-          description: "File saved successfully. Check your download location.",
+          title: i18n.t("settings.exports.toast.export_file_success_title"),
+          description: i18n.t("settings.exports.toast.export_file_success_description"),
           variant: "success",
         });
       }
@@ -166,7 +167,7 @@ export function useExportData() {
     onError: (e) => {
       logger.error(`Error while exporting: ${String(e)}`);
       toast({
-        title: "Something went wrong.",
+        title: i18n.t("settings.exports.toast.export_failed_title"),
         variant: "destructive",
       });
     },

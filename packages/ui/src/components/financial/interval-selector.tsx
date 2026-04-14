@@ -3,9 +3,9 @@ import { useIsMobile } from "../../hooks/use-mobile";
 import { usePersistentState } from "../../hooks/use-persistent-state";
 import { cn } from "../../lib/utils";
 import { startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 
-export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
+export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "3Y" | "5Y" | "ALL";
 export interface DateRange {
   from: Date | undefined;
   to: Date | undefined;
@@ -25,8 +25,23 @@ const intervalDescriptions: Record<TimePeriod, string> = {
   "6M": "past 6 months",
   YTD: "year to date",
   "1Y": "past year",
+  "3Y": "past 3 years",
   "5Y": "past 5 years",
-  ALL: "All Time",
+  ALL: "all time",
+};
+
+/** Default pill text (English). Override via `intervalButtonLabels` for i18n (e.g. 1J, 3J). */
+const defaultIntervalButtonLabels: Record<TimePeriod, string> = {
+  "1D": "1D",
+  "1W": "1W",
+  "1M": "1M",
+  "3M": "3M",
+  "6M": "6M",
+  YTD: "YTD",
+  "1Y": "1Y",
+  "3Y": "3Y",
+  "5Y": "5Y",
+  ALL: "ALL",
 };
 
 const intervals: IntervalData[] = [
@@ -66,6 +81,11 @@ const intervals: IntervalData[] = [
     calculateRange: () => ({ from: subYears(new Date(), 1), to: new Date() }),
   },
   {
+    code: "3Y",
+    description: intervalDescriptions["3Y"],
+    calculateRange: () => ({ from: subYears(new Date(), 3), to: new Date() }),
+  },
+  {
     code: "5Y",
     description: intervalDescriptions["5Y"],
     calculateRange: () => ({ from: subYears(new Date(), 5), to: new Date() }),
@@ -93,6 +113,10 @@ interface IntervalSelectorProps {
   storageKey?: string;
   /** Optional callback for haptic feedback */
   onHaptic?: () => void;
+  /** Override built-in English interval tooltips (e.g. i18n). */
+  intervalLabels?: Partial<Record<TimePeriod, string>>;
+  /** Short labels on the pill toggles (e.g. DE: 1J, 3J, «Alle»). */
+  intervalButtonLabels?: Partial<Record<TimePeriod, string>>;
 }
 
 const IntervalSelector: React.FC<IntervalSelectorProps> = ({
@@ -101,8 +125,18 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   defaultValue = DEFAULT_INTERVAL_CODE,
   storageKey,
   onHaptic,
+  intervalLabels,
+  intervalButtonLabels,
 }) => {
   const isMobile = useIsMobile();
+  const mergedDescriptions = useMemo(
+    () => ({ ...intervalDescriptions, ...intervalLabels }),
+    [intervalLabels],
+  );
+  const mergedButtonLabels = useMemo(
+    () => ({ ...defaultIntervalButtonLabels, ...intervalButtonLabels }),
+    [intervalButtonLabels],
+  );
   // State for selection - persisted or local
   const [persistedValue, setPersistedValue] = usePersistentState<TimePeriod>(
     storageKey ?? "__interval_selector__",
@@ -122,17 +156,17 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
       }
       // Notify parent
       const data = getIntervalData(value);
-      onIntervalSelect(data.code, data.description, data.calculateRange());
+      onIntervalSelect(value, mergedDescriptions[value], data.calculateRange());
       // Trigger haptic feedback
       onHaptic?.();
     },
-    [onIntervalSelect, storageKey, setPersistedValue, onHaptic],
+    [onIntervalSelect, storageKey, setPersistedValue, onHaptic, mergedDescriptions],
   );
 
   const items = intervals.map((interval) => ({
     value: interval.code,
-    label: interval.code,
-    title: interval.description,
+    label: mergedButtonLabels[interval.code],
+    title: mergedDescriptions[interval.code],
   }));
 
   return (
@@ -161,11 +195,15 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
 };
 
 /** Helper to get interval data for a given code - use to derive range/description from a code */
-const getInitialIntervalData = (code: TimePeriod = DEFAULT_INTERVAL_CODE) => {
+const getInitialIntervalData = (
+  code: TimePeriod = DEFAULT_INTERVAL_CODE,
+  intervalLabels?: Partial<Record<TimePeriod, string>>,
+) => {
+  const merged = { ...intervalDescriptions, ...intervalLabels };
   const data = getIntervalData(code);
   return {
     code: data.code,
-    description: data.description,
+    description: merged[code],
     range: data.calculateRange(),
   };
 };

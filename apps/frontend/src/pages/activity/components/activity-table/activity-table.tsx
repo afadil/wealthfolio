@@ -44,6 +44,7 @@ import {
 } from "@tanstack/react-table";
 import { Button, formatAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
@@ -65,6 +66,7 @@ export const ActivityTable = ({
   handleEdit,
   handleDelete,
 }: ActivityTableProps) => {
+  const { t } = useTranslation("common");
   const { duplicateActivityMutation } = useActivityMutations();
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
@@ -107,7 +109,9 @@ export const ActivityTable = ({
         id: "activityType",
         accessorKey: "activityType",
         enableHiding: false,
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity.table.col.type")} />
+        ),
         cell: ({ row }) => {
           const activityType = row.getValue("activityType");
           return (
@@ -132,7 +136,9 @@ export const ActivityTable = ({
         id: "date",
         accessorKey: "date",
         enableHiding: false,
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity.table.col.date")} />
+        ),
         cell: ({ row }) => {
           const dateVal = row.getValue("date");
           const formattedDate =
@@ -150,7 +156,9 @@ export const ActivityTable = ({
       {
         id: "assetSymbol",
         accessorKey: "assetSymbol",
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Symbol" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity.table.col.symbol")} />
+        ),
         cell: ({ row }) => {
           const symbol = String(row.getValue("assetSymbol"));
           const assetId = row.original.assetId;
@@ -168,7 +176,11 @@ export const ActivityTable = ({
           const isOptionActivity = instrumentType === "OPTION";
           const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
 
-          const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
+          const displaySymbol = isCash
+            ? t("activity.display.cash")
+            : parsedOption
+              ? parsedOption.underlying
+              : symbol;
           const avatarSymbol = isCash ? "$CASH" : symbol;
           const normalizedSymbol = (parsedOption?.underlying ?? symbol).trim().toUpperCase();
           const shouldShowExchange =
@@ -221,13 +233,13 @@ export const ActivityTable = ({
         enableHiding: true,
         enableSorting: false,
         meta: {
-          label: "Quantity",
+          label: t("activity.table.col.quantity"),
         },
         header: ({ column }) => (
           <DataTableColumnHeader
             className="justify-end text-right"
             column={column}
-            title="Quantity"
+            title={t("activity.table.col.quantity")}
           />
         ),
         cell: ({ row }) => {
@@ -276,13 +288,13 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Price / Amount",
+          label: t("activity.table.meta.price_amount"),
         },
         header: ({ column }) => (
           <DataTableColumnHeader
             className="justify-end text-right"
             column={column}
-            title="Price/Amount"
+            title={t("activity.table.col.price_amount")}
           />
         ),
         cell: ({ row }) => {
@@ -324,10 +336,14 @@ export const ActivityTable = ({
         enableHiding: true,
         enableSorting: false,
         meta: {
-          label: "Fee",
+          label: t("activity.table.col.fee"),
         },
         header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Fee" />
+          <DataTableColumnHeader
+            className="justify-end text-right"
+            column={column}
+            title={t("activity.table.col.fee")}
+          />
         ),
         cell: ({ row }) => {
           const activityType = String(row.getValue("activityType"));
@@ -351,10 +367,14 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Total",
+          label: t("activity.table.col.total"),
         },
         header: ({ column }) => (
-          <DataTableColumnHeader className="justify-end text-right" column={column} title="Total" />
+          <DataTableColumnHeader
+            className="justify-end text-right"
+            column={column}
+            title={t("activity.table.col.total")}
+          />
         ),
         cell: ({ row }) => {
           const activity = row.original;
@@ -375,9 +395,11 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Account",
+          label: t("activity.table.col.account"),
         },
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity.table.col.account")} />
+        ),
         cell: ({ row }) => {
           const accountName = row.getValue("account");
           const accountCurrency = row.getValue("accountCurrency");
@@ -397,9 +419,11 @@ export const ActivityTable = ({
         enableSorting: false,
         enableHiding: true,
         meta: {
-          label: "Currency",
+          label: t("activity.table.col.currency"),
         },
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Currency" />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("activity.table.col.currency")} />
+        ),
         cell: ({ row }) => <div>{row.getValue("currency")}</div>,
       },
       {
@@ -437,7 +461,7 @@ export const ActivityTable = ({
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 rounded-lg"
-                    title="Toggle columns"
+                    title={t("activity.table.toggle_columns")}
                   >
                     <Icons.ChevronDown className="h-4 w-4" />
                   </Button>
@@ -474,7 +498,7 @@ export const ActivityTable = ({
         enableHiding: false,
       },
     ],
-    [handleEdit, handleDelete, handleDuplicate, symbolExchangeCountMap],
+    [handleEdit, handleDelete, handleDuplicate, symbolExchangeCountMap, t, appTimezone],
   );
 
   const handleSortingChange = React.useCallback<OnChangeFn<SortingState>>(
@@ -504,7 +528,7 @@ export const ActivityTable = ({
   if (isLoading) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
-        Loading...
+        {t("activity.table.loading")}
       </div>
     );
   }
@@ -544,8 +568,13 @@ export const ActivityTable = ({
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No activity found.
+                <TableCell colSpan={columns.length} className="h-32 text-center align-middle">
+                  <div className="flex flex-col items-center justify-center gap-1 py-6">
+                    <p className="text-base font-medium">{t("activity.table.empty_title")}</p>
+                    <p className="text-muted-foreground max-w-md text-sm">
+                      {t("activity.table.empty_hint")}
+                    </p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}

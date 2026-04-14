@@ -6,12 +6,15 @@ import {
   type TreeNode,
 } from "@wealthfolio/ui/components/ui/tree-view";
 import { useTaxonomies, useTaxonomy, useExportTaxonomy } from "@/hooks/use-taxonomies";
+import { localizeCategoryName, localizeTaxonomyName } from "@/lib/taxonomy-i18n";
 import { SettingsHeader } from "../settings-header";
 import { CategoryForm } from "./components/category-form";
 import { MigrationBanner } from "./migration-banner";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export default function TaxonomiesPage() {
+  const { t } = useTranslation("common");
   const { data: taxonomies = [], isLoading: isLoadingTaxonomies } = useTaxonomies();
   const [selectedTaxonomyId, setSelectedTaxonomyId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -29,10 +32,18 @@ export default function TaxonomiesPage() {
     useTaxonomy(activeTaxonomyId);
 
   // Build tree from categories
-  const categoryTree = useMemo(() => {
+  const localizedCategories = useMemo(() => {
     if (!taxonomyWithCategories?.categories) return [];
-    return buildCategoryTree(taxonomyWithCategories.categories);
-  }, [taxonomyWithCategories?.categories]);
+    return taxonomyWithCategories.categories.map((category) => ({
+      ...category,
+      name: localizeCategoryName(t, activeTaxonomy, category),
+    }));
+  }, [taxonomyWithCategories?.categories, activeTaxonomy, t]);
+
+  const categoryTree = useMemo(() => {
+    if (localizedCategories.length === 0) return [];
+    return buildCategoryTree(localizedCategories);
+  }, [localizedCategories]);
 
   // Find selected category
   const selectedCategory = useMemo(() => {
@@ -65,9 +76,9 @@ export default function TaxonomiesPage() {
       a.download = `${activeTaxonomy?.name ?? "taxonomy"}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Classification exported successfully");
+      toast.success(t("settings.taxonomies.toast_export_success"));
     } catch {
-      toast.error("Failed to export classification");
+      toast.error(t("settings.taxonomies.toast_export_error"));
     }
   };
 
@@ -76,17 +87,17 @@ export default function TaxonomiesPage() {
   return (
     <div className="space-y-6">
       <SettingsHeader
-        heading="Classifications"
-        text="Manage asset classification hierarchies like sectors, regions, and asset classes."
+        heading={t("settings.taxonomies.heading")}
+        text={t("settings.taxonomies.description")}
       />
 
       <MigrationBanner />
 
       {/* Taxonomy tabs */}
       {isLoadingTaxonomies ? (
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <div className="text-muted-foreground text-sm">{t("settings.taxonomies.loading")}</div>
       ) : taxonomies.length === 0 ? (
-        <div className="text-muted-foreground text-sm">No classifications found</div>
+        <div className="text-muted-foreground text-sm">{t("settings.taxonomies.empty")}</div>
       ) : (
         <Tabs
           value={activeTaxonomyId ?? undefined}
@@ -107,7 +118,7 @@ export default function TaxonomiesPage() {
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: taxonomy.color }}
                   />
-                  <span>{taxonomy.name.replace(" (GICS)", "")}</span>
+                  <span>{localizeTaxonomyName(t, taxonomy).replace(" (GICS)", "")}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -126,9 +137,13 @@ export default function TaxonomiesPage() {
                 style={{ backgroundColor: activeTaxonomy?.color }}
               />
               <div>
-                <h3 className="font-semibold">{activeTaxonomy?.name}</h3>
+                <h3 className="font-semibold">
+                  {activeTaxonomy ? localizeTaxonomyName(t, activeTaxonomy) : ""}
+                </h3>
                 <p className="text-muted-foreground text-xs">
-                  {taxonomyWithCategories.categories.length} categories
+                  {t("settings.taxonomies.count_categories", {
+                    count: taxonomyWithCategories.categories.length,
+                  })}
                 </p>
               </div>
             </div>
@@ -136,12 +151,12 @@ export default function TaxonomiesPage() {
               {isEditableTaxonomy && (
                 <Button variant="default" size="sm" onClick={handleAddCategory}>
                   <Icons.Plus className="mr-2 h-4 w-4" />
-                  Add Category
+                  {t("settings.taxonomies.add_category")}
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Icons.Download className="mr-2 h-4 w-4" />
-                Export
+                {t("settings.taxonomies.export")}
               </Button>
             </div>
           </div>
@@ -152,9 +167,13 @@ export default function TaxonomiesPage() {
             <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-r">
               <ScrollArea className="h-[300px] lg:h-[500px]">
                 {isLoadingCategories ? (
-                  <div className="text-muted-foreground p-4 text-center text-sm">Loading...</div>
+                  <div className="text-muted-foreground p-4 text-center text-sm">
+                    {t("settings.taxonomies.loading")}
+                  </div>
                 ) : categoryTree.length === 0 ? (
-                  <div className="text-muted-foreground p-4 text-center text-sm">No categories</div>
+                  <div className="text-muted-foreground p-4 text-center text-sm">
+                    {t("settings.taxonomies.no_categories")}
+                  </div>
                 ) : (
                   <TreeView
                     data={categoryTree}
@@ -187,7 +206,7 @@ export default function TaxonomiesPage() {
                 <div className="text-muted-foreground flex h-full items-center justify-center text-sm">
                   <div className="text-center">
                     <Icons.Info className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                    <p>Select a category to view details</p>
+                    <p>{t("settings.taxonomies.select_category_details")}</p>
                   </div>
                 </div>
               )}
@@ -198,14 +217,14 @@ export default function TaxonomiesPage() {
         <Card className="flex h-64 items-center justify-center">
           <div className="text-muted-foreground text-center">
             <Icons.Loader className="mx-auto mb-2 h-6 w-6 animate-spin" />
-            <p>Loading classifications...</p>
+            <p>{t("settings.taxonomies.loading_classifications")}</p>
           </div>
         </Card>
       ) : (
         <Card className="flex h-64 items-center justify-center">
           <div className="text-muted-foreground text-center">
             <Icons.Blocks className="mx-auto mb-2 h-8 w-8 opacity-50" />
-            <p>Select a classification to view categories</p>
+            <p>{t("settings.taxonomies.select_classification")}</p>
           </div>
         </Card>
       )}

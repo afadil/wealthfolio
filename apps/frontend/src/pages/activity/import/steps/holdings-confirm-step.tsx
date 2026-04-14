@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/
 
 import { useMemo, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { createAsset, importHoldingsCsv, saveAccountImportMapping, logger } from "@/adapters";
 import { useImportContext } from "../context";
@@ -45,6 +46,7 @@ function isSamePersistedResolution(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function HoldingsConfirmStep() {
+  const { t } = useTranslation("common");
   const { state, dispatch } = useImportContext();
   const {
     headers,
@@ -325,35 +327,44 @@ export function HoldingsConfirmStep() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader className="px-4 py-3">
-          <CardTitle className="text-sm font-medium">Confirm Holdings Import</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            {t("activity.import.holdings_confirm.title")}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <Alert>
               <Icons.AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Important</AlertTitle>
+              <AlertTitle>{t("activity.import.holdings_confirm.important_title")}</AlertTitle>
               <AlertDescription>
-                Importing will create or update snapshots for each date in your CSV. Existing
-                snapshots for the same dates will be replaced.
+                {t("activity.import.holdings_confirm.important_description")}
               </AlertDescription>
             </Alert>
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-primary text-2xl font-bold">{snapshots.length}</div>
-                <div className="text-muted-foreground text-xs">Snapshots</div>
+                <div className="text-muted-foreground text-xs">
+                  {t("activity.import.holdings_confirm.snapshots")}
+                </div>
               </div>
               <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{totalPositions}</div>
-                <div className="text-muted-foreground text-xs">Positions</div>
+                <div className="text-muted-foreground text-xs">
+                  {t("activity.import.holdings_confirm.positions")}
+                </div>
               </div>
               <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{totalCashEntries}</div>
-                <div className="text-muted-foreground text-xs">Cash Balances</div>
+                <div className="text-muted-foreground text-xs">
+                  {t("activity.import.holdings_confirm.cash_balances")}
+                </div>
               </div>
               <div className="bg-muted/30 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{parsedRows.length}</div>
-                <div className="text-muted-foreground text-xs">CSV Rows</div>
+                <div className="text-muted-foreground text-xs">
+                  {t("activity.import.holdings_confirm.csv_rows")}
+                </div>
               </div>
             </div>
 
@@ -372,25 +383,27 @@ export function HoldingsConfirmStep() {
       {prepareError && (
         <Alert variant="destructive">
           <Icons.AlertCircle className="h-4 w-4" />
-          <AlertTitle>Import preparation failed</AlertTitle>
+          <AlertTitle>{t("activity.import.holdings_confirm.prepare_failed")}</AlertTitle>
           <AlertDescription>{prepareError}</AlertDescription>
         </Alert>
       )}
 
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={handleCancel} disabled={isImporting}>
-          Cancel
+          {t("activity.import.holdings_confirm.cancel")}
         </Button>
         <Button onClick={handleImport} disabled={isImporting || snapshots.length === 0}>
           {isImporting ? (
             <>
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              {isPreparingAssets ? "Preparing assets..." : "Importing..."}
+              {isPreparingAssets
+                ? t("activity.import.holdings_confirm.preparing_assets")
+                : t("activity.import.holdings_confirm.importing")}
             </>
           ) : (
             <>
               <Icons.Upload className="mr-2 h-4 w-4" />
-              Import {snapshots.length} Snapshot{snapshots.length !== 1 ? "s" : ""}
+              {t("activity.import.holdings_confirm.import_snapshot_count", { count: snapshots.length })}
             </>
           )}
         </Button>

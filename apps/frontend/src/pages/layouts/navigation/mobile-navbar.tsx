@@ -15,6 +15,7 @@ import {
 } from "@wealthfolio/ui";
 import { motion } from "motion/react";
 import React, { useCallback, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { type NavigationProps, isPathActive } from "./app-navigation";
 
@@ -23,6 +24,7 @@ interface MobileNavBarProps {
 }
 
 export function MobileNavBar({ navigation }: MobileNavBarProps) {
+  const { t } = useTranslation("common");
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -64,7 +66,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
   const addonItems = navigation?.addons ?? [];
 
   const searchItem = {
-    title: "Search",
+    title: t("nav.mobile.search"),
     href: "#search",
     icon: <Icons.Search2 className="size-6" />,
   };
@@ -87,7 +89,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
           className={cn("pointer-events-auto w-full px-1 py-1", "h-[var(--mobile-nav-ui-height)]")}
         >
           <nav
-            aria-label="Primary navigation"
+            aria-label={t("nav.mobile.primary")}
             className={cn("grid place-items-center gap-2")}
             style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
           >
@@ -149,7 +151,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                 <DropdownMenuTrigger asChild>
                   <button
                     onClick={triggerHaptic}
-                    aria-label="More options"
+                    aria-label={t("nav.mobile.more_options")}
                     className="text-foreground relative z-10 flex h-14 w-full items-center justify-center rounded-full transition-colors"
                   >
                     {(menuItems.some((item) => isPathActive(location.pathname, item.href)) ||
@@ -219,7 +221,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                       <span className="flex size-6 shrink-0 items-center justify-center">
                         <SyncStatusIcon status={syncStatus} className="size-5" />
                       </span>
-                      <span className="truncate text-left">Connect</span>
+                      <span className="truncate text-left">{t("settings.nav.connect.title")}</span>
                     </Link>
                   </LiquidGlass>
 
@@ -236,7 +238,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
                         <span className="flex size-6 shrink-0 items-center justify-center">
                           <Icons.Addons className="size-5" />
                         </span>
-                        <span className="truncate text-left">Add-ons</span>
+                        <span className="truncate text-left">{t("settings.nav.addons.title")}</span>
                       </button>
                     </LiquidGlass>
                   )}
@@ -251,7 +253,7 @@ export function MobileNavBar({ navigation }: MobileNavBarProps) {
       <Sheet open={addonsSheetOpen} onOpenChange={setAddonsSheetOpen}>
         <SheetContent side="bottom" className="px-4 pb-8">
           <SheetHeader>
-            <SheetTitle>Add-ons</SheetTitle>
+            <SheetTitle>{t("settings.nav.addons.title")}</SheetTitle>
           </SheetHeader>
           <div className="mt-4 flex flex-col gap-2">
             {addonItems.map((item) => {

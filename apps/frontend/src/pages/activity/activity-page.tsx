@@ -26,8 +26,10 @@ import { useActivitySearch, type ActivityStatusFilter } from "./hooks/use-activi
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
 import { AlternativeAssetQuickAddModal } from "@/pages/asset/alternative-assets";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
+import { useTranslation } from "react-i18next";
 
 const ActivityPage = () => {
+  const { t } = useTranslation("common");
   const [showForm, setShowForm] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Partial<ActivityDetails> | undefined>();
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -192,28 +194,28 @@ const ActivityPage = () => {
         items: [
           {
             icon: Icons.Activity,
-            label: "Add Transaction",
+            label: t("activity.page.add_transaction"),
             onClick: () => handleEdit(undefined),
           },
           {
             icon: Icons.UploadSimple,
-            label: "Import from CSV",
+            label: t("activity.page.import_csv"),
             onClick: () => navigate("/import"),
           },
           {
             icon: Icons.Holdings,
-            label: "Transfer Holdings",
+            label: t("activity.page.transfer_holdings"),
             onClick: () => setShowBulkHoldingsForm(true),
           },
           {
             icon: Icons.House,
-            label: "Add Personal Asset",
+            label: t("activity.page.add_personal_asset"),
             onClick: () => setShowAlternativeAssetModal(true),
           },
         ],
       },
     ],
-    [handleEdit, navigate],
+    [handleEdit, navigate, t],
   );
 
   const headerActions = (
@@ -228,7 +230,7 @@ const ActivityPage = () => {
           trigger={
             <Button size="sm">
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Activities
+              {t("activity.page.add_activities")}
             </Button>
           }
         />
@@ -236,12 +238,12 @@ const ActivityPage = () => {
 
       {/* Mobile add button */}
       <div className="flex items-center gap-2 sm:hidden">
-        <Button size="icon" title="Import" variant="outline" asChild>
+        <Button size="icon" title={t("activity.page.import_aria")} variant="outline" asChild>
           <Link to={"/import"}>
             <Icons.Import className="size-4" />
           </Link>
         </Button>
-        <Button size="icon" title="Add" onClick={() => handleEdit(undefined)}>
+        <Button size="icon" title={t("activity.page.add_aria")} onClick={() => handleEdit(undefined)}>
           <Icons.Plus className="size-4" />
         </Button>
       </div>
@@ -250,7 +252,7 @@ const ActivityPage = () => {
 
   return (
     <Page>
-      <PageHeader heading="Activity" actions={headerActions} />
+      <PageHeader heading={t("activity.page.title")} actions={headerActions} />
       <PageContent className="pb-2 md:pb-4 lg:pb-5">
         <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
           {/* Unified Controls */}

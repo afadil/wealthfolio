@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useSettings } from "@/hooks/use-settings";
 import { ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +7,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
   AccountSelect,
@@ -17,23 +19,23 @@ import {
   type AccountSelectOption,
 } from "./fields";
 
-// Zod schema for FeeForm validation
-export const feeFormSchema = z.object({
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  amount: z.coerce
-    .number({
-      required_error: "Please enter an amount.",
-      invalid_type_error: "Amount must be a number.",
-    })
-    .positive({ message: "Amount must be greater than 0." }),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  subtype: z.string().optional().nullable(),
-});
+export function createFeeFormSchema() {
+  return z.object({
+    accountId: z.string().min(1, { message: i18n.t("activity.validation.account_required") }),
+    activityDate: z.date({ required_error: i18n.t("activity.validation.select_date") }),
+    amount: z.coerce
+      .number({
+        required_error: i18n.t("activity.validation.enter_amount"),
+        invalid_type_error: i18n.t("activity.validation.amount_invalid_type"),
+      })
+      .positive({ message: i18n.t("activity.validation.amount_greater_than_zero") }),
+    comment: z.string().optional().nullable(),
+    currency: z.string().min(1, { message: i18n.t("activity.validation.currency_required") }),
+    subtype: z.string().optional().nullable(),
+  });
+}
 
-export type FeeFormValues = z.infer<typeof feeFormSchema>;
+export type FeeFormValues = z.infer<ReturnType<typeof createFeeFormSchema>>;
 
 interface FeeFormProps {
   accounts: AccountSelectOption[];
@@ -52,6 +54,8 @@ export function FeeForm({
   isLoading = false,
   isEditing = false,
 }: FeeFormProps) {
+  const { t, i18n } = useTranslation();
+  const feeFormSchema = useMemo(() => createFeeFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -99,10 +103,10 @@ export function FeeForm({
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" currency={currency} />
+            <AmountInput name="amount" label={t("activity.form.fields.amount")} currency={currency} />
 
             {/* Advanced Options */}
             <AdvancedOptionsSection
@@ -114,7 +118,7 @@ export function FeeForm({
             />
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -122,7 +126,7 @@ export function FeeForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
@@ -132,7 +136,7 @@ export function FeeForm({
             ) : (
               <Icons.Plus className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : "Add Fee"}
+            {isEditing ? t("activity.form.update") : t("activity.form.submit.add_fee")}
           </Button>
         </div>
       </form>

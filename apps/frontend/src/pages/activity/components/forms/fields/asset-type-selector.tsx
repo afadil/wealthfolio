@@ -2,20 +2,21 @@ import { useController, type Control, type FieldValues, type FieldPath } from "r
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { useId } from "react";
+import { useId, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 export type AssetType = "stock" | "option" | "bond";
 
-interface AssetTypeOption {
+interface AssetTypeDef {
   value: AssetType;
-  label: string;
+  labelKey: string;
   icon: keyof typeof Icons;
 }
 
-const assetTypes: AssetTypeOption[] = [
-  { value: "stock", label: "Stock", icon: "TrendingUp" },
-  { value: "option", label: "Option", icon: "BarChart" },
-  { value: "bond", label: "Bond", icon: "FileText" },
+const ASSET_TYPE_DEFS: AssetTypeDef[] = [
+  { value: "stock", labelKey: "activity.form.asset.stock", icon: "TrendingUp" },
+  { value: "option", labelKey: "activity.form.asset.option", icon: "BarChart" },
+  { value: "bond", labelKey: "activity.form.asset.bond", icon: "FileText" },
 ];
 
 interface AssetTypeSelectorProps<TFieldValues extends FieldValues = FieldValues> {
@@ -33,7 +34,13 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
   onValueChange,
   className,
 }: AssetTypeSelectorProps<TFieldValues>) {
+  const { t } = useTranslation("common");
   const uniqueId = useId();
+
+  const assetTypes = useMemo(
+    () => ASSET_TYPE_DEFS.map((def) => ({ ...def, label: t(def.labelKey) })),
+    [t],
+  );
 
   const { field } = useController({
     name,

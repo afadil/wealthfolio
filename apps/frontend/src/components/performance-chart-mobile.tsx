@@ -7,11 +7,14 @@ import {
   ChartTooltipContent,
 } from "@wealthfolio/ui/components/ui/chart";
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
+import { getDateFnsLocale } from "@/lib/date-fns-locale";
 import { ReturnData } from "@/lib/types";
 import { formatPercent } from "@wealthfolio/ui";
 import { differenceInDays, differenceInMonths, format, parseISO } from "date-fns";
+import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { useTranslation } from "react-i18next";
 
 interface PerformanceChartMobileProps {
   data: {
@@ -22,16 +25,32 @@ interface PerformanceChartMobileProps {
 }
 
 export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
-  const formattedData = data[0]?.returns?.map((item) => {
-    const dataPoint: Record<string, number | string> = { date: item.date };
-    data.forEach((series) => {
-      const matchingPoint = series.returns?.find((p) => p.date === item.date);
-      if (matchingPoint) {
-        dataPoint[series.id] = matchingPoint.value;
+  const { i18n } = useTranslation();
+  const dateLocale = getDateFnsLocale(i18n.language);
+
+  const formattedData = useMemo(() => {
+    const base = data[0]?.returns ?? [];
+    if (base.length === 0) return [];
+
+    const seriesByDate = data.map((series) => {
+      const map = new Map<string, number>();
+      for (const point of series.returns ?? []) {
+        map.set(point.date, point.value);
       }
+      return { id: series.id, map };
     });
-    return dataPoint;
-  });
+
+    return base.map((item) => {
+      const dataPoint: Record<string, number | string> = { date: item.date };
+      for (const series of seriesByDate) {
+        const value = series.map.get(item.date);
+        if (value !== undefined) {
+          dataPoint[series.id] = value;
+        }
+      }
+      return dataPoint;
+    });
+  }, [data]);
 
   // Calculate appropriate tick interval based on date range - more aggressive for mobile
   const getTickInterval = () => {
@@ -62,18 +81,18 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
     const daysDiff = differenceInDays(lastDate, firstDate);
 
     if (daysDiff <= 7) {
-      return format(date, "MMM d"); // e.g., "Sep 15"
+      return format(date, "MMM d", { locale: dateLocale });
     }
     if (daysDiff <= 31) {
-      return format(date, "MMM d"); // e.g., "Sep 15"
+      return format(date, "MMM d", { locale: dateLocale });
     }
     if (monthsDiff <= 12) {
-      return format(date, "MMM"); // e.g., "Sep"
+      return format(date, "MMM", { locale: dateLocale });
     }
     if (monthsDiff <= 36) {
-      return format(date, "MMM yy"); // e.g., "Sep 23"
+      return format(date, "MMM yy", { locale: dateLocale });
     }
-    return format(date, "yyyy"); // e.g., "2023"
+    return format(date, "yyyy", { locale: dateLocale });
   };
 
   const chartConfig = data.reduce((config, series, index) => {
@@ -93,7 +112,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
   };
 
   const tooltipLabelFormatter = (label: React.ReactNode) =>
-    typeof label === "string" ? format(parseISO(label), "MMM d, yyyy") : "";
+    typeof label === "string" ? format(parseISO(label), "PP", { locale: dateLocale }) : "";
 
   return (
     <div className="h-full w-full">

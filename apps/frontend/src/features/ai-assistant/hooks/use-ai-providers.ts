@@ -9,6 +9,7 @@ import {
   getSecret,
   deleteSecret,
 } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import type { UpdateProviderSettingsRequest, SetDefaultProviderRequest } from "@/lib/types";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
@@ -76,7 +77,7 @@ export function useAiProviderApiKey(providerId: string) {
     onError: (error) => {
       logger.error(`Failed to save API key for ${providerId}: ${error}`);
       toast({
-        title: "Failed to save API key",
+        title: i18n.t("settings.ai_providers.toast.api_key_save_failed"),
         description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
@@ -90,7 +91,7 @@ export function useAiProviderApiKey(providerId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: AI_PROVIDERS_KEY });
       toast({
-        title: "API key deleted",
+        title: i18n.t("settings.ai_providers.toast.api_key_deleted"),
         variant: "success",
         duration: 1500,
       });
@@ -98,7 +99,7 @@ export function useAiProviderApiKey(providerId: string) {
     onError: (error) => {
       logger.error(`Failed to delete API key for ${providerId}: ${error}`);
       toast({
-        title: "Failed to delete API key",
+        title: i18n.t("settings.ai_providers.toast.api_key_delete_failed"),
         description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });

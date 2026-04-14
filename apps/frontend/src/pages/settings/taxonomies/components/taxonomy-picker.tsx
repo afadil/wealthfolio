@@ -17,6 +17,8 @@ import { buildCategoryTree, type TreeNode } from "@wealthfolio/ui/components/ui/
 import { cn } from "@/lib/utils";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import type { TaxonomyCategory } from "@/lib/types";
+import { localizeCategoryName } from "@/lib/taxonomy-i18n";
+import { useTranslation } from "react-i18next";
 
 interface TaxonomyPickerProps {
   taxonomyId: string;
@@ -29,6 +31,7 @@ interface TaxonomyPickerProps {
 interface FlattenedCategory {
   id: string;
   name: string;
+  key: string;
   color: string;
   level: number;
   parentId?: string | null;
@@ -45,6 +48,7 @@ function flattenTreeWithLevels(nodes: TreeNode[], level = 0): FlattenedCategory[
     result.push({
       id: node.id,
       name: node.name,
+      key: categoryData?.key ?? node.id,
       color: categoryData?.color ?? "#808080",
       level,
       parentId: categoryData?.parentId,
@@ -65,6 +69,7 @@ export function TaxonomyPicker({
   placeholder = "Select category...",
   disabled = false,
 }: TaxonomyPickerProps) {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const { data: taxonomyData, isLoading, isError } = useTaxonomy(taxonomyId);
 
@@ -84,6 +89,11 @@ export function TaxonomyPicker({
     if (!value || !taxonomyData?.categories) return null;
     return taxonomyData.categories.find((cat) => cat.id === value) ?? null;
   }, [value, taxonomyData?.categories]);
+
+  const selectedCategoryLabel = useMemo(() => {
+    if (!selectedCategory) return null;
+    return localizeCategoryName(t, taxonomyData?.taxonomy, selectedCategory);
+  }, [selectedCategory, taxonomyData?.taxonomy, t]);
 
   const handleSelect = useCallback(
     (categoryId: string) => {
@@ -120,7 +130,7 @@ export function TaxonomyPicker({
   if (isError) {
     return (
       <Button variant="outline" className="text-destructive w-full justify-between" disabled>
-        <span>Error loading taxonomy</span>
+        <span>{t("settings.taxonomies.picker.error_loading_taxonomy")}</span>
         <Icons.AlertCircle className="ml-2 h-4 w-4 shrink-0" />
       </Button>
     );
@@ -130,7 +140,7 @@ export function TaxonomyPicker({
   if (!taxonomyData?.categories || taxonomyData.categories.length === 0) {
     return (
       <Button variant="outline" className="w-full justify-between" disabled>
-        <span className="text-muted-foreground">No categories available</span>
+        <span className="text-muted-foreground">{t("settings.taxonomies.picker.no_categories")}</span>
         <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </Button>
     );
@@ -143,7 +153,7 @@ export function TaxonomyPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label="Select a category"
+          aria-label={t("settings.taxonomies.picker.aria_select_category")}
           className={cn("w-full justify-between", !selectedCategory && "text-muted-foreground")}
           disabled={disabled}
         >
@@ -154,7 +164,7 @@ export function TaxonomyPicker({
                   className="h-3 w-3 shrink-0 rounded-full"
                   style={{ backgroundColor: selectedCategory.color }}
                 />
-                <span className="truncate">{selectedCategory.name}</span>
+                <span className="truncate">{selectedCategoryLabel}</span>
               </>
             ) : (
               <span>{placeholder}</span>
@@ -186,14 +196,14 @@ export function TaxonomyPicker({
         style={{ minWidth: "var(--radix-popover-trigger-width)" }}
       >
         <Command>
-          <CommandInput placeholder="Search categories..." />
+          <CommandInput placeholder={t("settings.taxonomies.picker.search_placeholder")} />
           <CommandList>
-            <CommandEmpty>No categories found.</CommandEmpty>
+            <CommandEmpty>{t("settings.taxonomies.picker.no_categories_found")}</CommandEmpty>
             <CommandGroup>
               {flattenedCategories.map((category) => (
                 <CommandItem
                   key={category.id}
-                  value={`${category.name} ${category.id}`}
+                  value={`${localizeCategoryName(t, taxonomyData?.taxonomy, { name: category.name, key: category.key })} ${category.id}`}
                   onSelect={() => handleSelect(category.id)}
                   className="flex items-center py-1.5"
                 >
@@ -208,7 +218,12 @@ export function TaxonomyPicker({
                       style={{ backgroundColor: category.color }}
                     />
                     {/* Category name */}
-                    <span className="truncate">{category.name}</span>
+                    <span className="truncate">
+                      {localizeCategoryName(t, taxonomyData?.taxonomy, {
+                        name: category.name,
+                        key: category.key,
+                      })}
+                    </span>
                   </div>
                   {/* Check icon for selected item */}
                   <Icons.Check

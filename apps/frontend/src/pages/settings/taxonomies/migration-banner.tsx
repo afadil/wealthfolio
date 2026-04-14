@@ -1,8 +1,10 @@
 import { Alert, AlertDescription, AlertTitle, Button, Icons } from "@wealthfolio/ui";
 import { useMigrationStatus, useMigrateLegacyClassifications } from "@/hooks/use-taxonomies";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 export function MigrationBanner() {
+  const { t } = useTranslation("common");
   const { data: status, isLoading } = useMigrationStatus();
   const migrateMutation = useMigrateLegacyClassifications();
 
@@ -15,33 +17,41 @@ export function MigrationBanner() {
     try {
       const result = await migrateMutation.mutateAsync();
       toast.success(
-        `Migration complete! ${result.sectorsMigrated} sectors and ${result.countriesMigrated} countries migrated.`,
+        t("settings.taxonomies.migration.toast_success", {
+          sectors: result.sectorsMigrated,
+          countries: result.countriesMigrated,
+        }),
       );
       if (result.errors.length > 0) {
-        toast.warning(`${result.errors.length} items could not be matched and were skipped.`);
+        toast.warning(
+          t("settings.taxonomies.migration.toast_warning_unmatched", {
+            count: result.errors.length,
+          }),
+        );
       }
     } catch (_error) {
-      toast.error("Migration failed. Please try again.");
+      toast.error(t("settings.taxonomies.migration.toast_error"));
     }
   };
 
   return (
     <Alert className="mb-6">
       <Icons.Info className="h-4 w-4" />
-      <AlertTitle>Migrate Legacy Classifications</AlertTitle>
+      <AlertTitle>{t("settings.taxonomies.migration.title")}</AlertTitle>
       <AlertDescription className="mt-2">
         <p className="mb-3">
-          {status.assetsWithLegacyData} assets have legacy sector/country data that can be migrated
-          to the new taxonomy system for better organization and analytics.
+          {t("settings.taxonomies.migration.description", {
+            count: status.assetsWithLegacyData,
+          })}
         </p>
         <Button onClick={handleMigrate} disabled={migrateMutation.isPending} size="sm">
           {migrateMutation.isPending ? (
             <>
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-              Migrating...
+              {t("settings.taxonomies.migration.migrating")}
             </>
           ) : (
-            "Start Migration"
+            t("settings.taxonomies.migration.start")
           )}
         </Button>
       </AlertDescription>

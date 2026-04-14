@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Carousel,
   CarouselContent,
@@ -22,27 +24,33 @@ export type ActivityType = PrimaryActivityType | SecondaryActivityType;
 
 interface ActivityTypeConfig<T extends string> {
   value: T;
-  label: string;
   icon: IconName;
 }
 
+type ResolvedActivityType = ActivityTypeConfig<ActivityType> & { label: string };
+
 const PRIMARY_ACTIVITY_TYPES: ActivityTypeConfig<PrimaryActivityType>[] = [
-  { value: "BUY", label: "Buy", icon: "TrendingUp" },
-  { value: "SELL", label: "Sell", icon: "TrendingDown" },
-  { value: "DEPOSIT", label: "Deposit", icon: "ArrowDownLeft" },
-  { value: "WITHDRAWAL", label: "Withdrawal", icon: "ArrowUpRight" },
-  { value: "DIVIDEND", label: "Dividend", icon: "Coins" },
-  { value: "TRANSFER", label: "Transfer", icon: "ArrowLeftRight" },
+  { value: "BUY", icon: "TrendingUp" },
+  { value: "SELL", icon: "TrendingDown" },
+  { value: "DEPOSIT", icon: "ArrowDownLeft" },
+  { value: "WITHDRAWAL", icon: "ArrowUpRight" },
+  { value: "DIVIDEND", icon: "Coins" },
+  { value: "TRANSFER", icon: "ArrowLeftRight" },
 ];
 
 const SECONDARY_ACTIVITY_TYPES: ActivityTypeConfig<SecondaryActivityType>[] = [
-  { value: "SPLIT", label: "Split", icon: "Split" },
-  { value: "FEE", label: "Fee", icon: "Receipt" },
-  { value: "INTEREST", label: "Interest", icon: "Percent" },
-  { value: "TAX", label: "Tax", icon: "ReceiptText" },
+  { value: "SPLIT", icon: "Split" },
+  { value: "FEE", icon: "Receipt" },
+  { value: "INTEREST", icon: "Percent" },
+  { value: "TAX", icon: "ReceiptText" },
 ];
 
-const ALL_ACTIVITY_TYPES = [...PRIMARY_ACTIVITY_TYPES, ...SECONDARY_ACTIVITY_TYPES];
+function buildResolvedActivityTypes(t: TFunction): ResolvedActivityType[] {
+  return [...PRIMARY_ACTIVITY_TYPES, ...SECONDARY_ACTIVITY_TYPES].map((def) => ({
+    ...def,
+    label: t(`activity.types.${def.value}`),
+  }));
+}
 
 interface ActivityTypePickerProps {
   value?: ActivityType;
@@ -61,7 +69,7 @@ function ActivityTypeButton({
   buttonRef,
   compact = false,
 }: {
-  type: ActivityTypeConfig<ActivityType>;
+  type: ResolvedActivityType;
   isSelected: boolean;
   onClick: () => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
@@ -111,7 +119,7 @@ function CarouselView({
 }: {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
-  types: ActivityTypeConfig<ActivityType>[];
+  types: ResolvedActivityType[];
 }) {
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
@@ -179,10 +187,12 @@ function GridView({
   value,
   onSelect,
   types,
+  ariaGroupLabel,
 }: {
   value?: ActivityType;
   onSelect: (type: ActivityType) => void;
-  types: ActivityTypeConfig<ActivityType>[];
+  types: ResolvedActivityType[];
+  ariaGroupLabel: string;
 }) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -228,7 +238,7 @@ function GridView({
 
   return (
     <div className="p-1">
-      <div role="group" aria-label="All activity types" className="grid grid-cols-5 gap-2">
+      <div role="group" aria-label={ariaGroupLabel} className="grid grid-cols-5 gap-2">
         {types.map((type, index) => (
           <ActivityTypeButton
             key={type.value}
@@ -248,16 +258,22 @@ function GridView({
 }
 
 export function ActivityTypePicker({ value, onSelect, allowedTypes }: ActivityTypePickerProps) {
+  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>("carousel");
+
+  const allTypes = useMemo(() => buildResolvedActivityTypes(t), [t]);
+
+  const filteredTypes = useMemo(
+    () =>
+      allowedTypes
+        ? allTypes.filter((type) => allowedTypes.includes(type.value))
+        : allTypes,
+    [allTypes, allowedTypes],
+  );
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === "carousel" ? "grid" : "carousel"));
   }, []);
-
-  // Filter types if allowedTypes is provided
-  const filteredTypes = allowedTypes
-    ? ALL_ACTIVITY_TYPES.filter((type) => allowedTypes.includes(type.value))
-    : ALL_ACTIVITY_TYPES;
 
   return (
     <div className="space-y-1 overflow-hidden">
@@ -265,7 +281,12 @@ export function ActivityTypePicker({ value, onSelect, allowedTypes }: ActivityTy
       {viewMode === "carousel" ? (
         <CarouselView value={value} onSelect={onSelect} types={filteredTypes} />
       ) : (
-        <GridView value={value} onSelect={onSelect} types={filteredTypes} />
+        <GridView
+          value={value}
+          onSelect={onSelect}
+          types={filteredTypes}
+          ariaGroupLabel={t("activity.types_picker.aria_all_types")}
+        />
       )}
 
       {/* View toggle at bottom */}
@@ -274,7 +295,11 @@ export function ActivityTypePicker({ value, onSelect, allowedTypes }: ActivityTy
           type="button"
           onClick={toggleViewMode}
           className="text-muted-foreground hover:text-foreground flex items-center gap-1 py-1 transition-colors"
-          aria-label={viewMode === "carousel" ? "Expand to show all types" : "Collapse"}
+          aria-label={
+            viewMode === "carousel"
+              ? t("activity.types_picker.expand")
+              : t("activity.types_picker.collapse")
+          }
         >
           <Icons.ChevronDown
             className={cn(

@@ -11,8 +11,10 @@ import {
   Input,
 } from "@wealthfolio/ui";
 import { FormEvent, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export function LoginPage() {
+  const { t } = useTranslation("common");
   const { login, loginLoading, loginError, clearError } = useAuth();
   const [password, setPassword] = useState("");
 
@@ -42,8 +44,8 @@ export function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <CardTitle>Wealthfolio</CardTitle>
-              <CardDescription>Your private portfolio tracker.</CardDescription>
+              <CardTitle>{t("auth.login.title")}</CardTitle>
+              <CardDescription>{t("auth.login.subtitle")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -62,7 +64,7 @@ export function LoginPage() {
                   }}
                   disabled={loginLoading}
                   required
-                  placeholder="Enter your password"
+                  placeholder={t("auth.login.password_placeholder")}
                   className="h-12 rounded-full shadow-none"
                 />
                 {loginError ? (
@@ -73,7 +75,7 @@ export function LoginPage() {
               </div>
 
               <Button type="submit" className="w-full" disabled={loginLoading}>
-                {loginLoading ? "Signing in..." : "Sign In"}
+                {loginLoading ? t("auth.login.signing_in") : t("auth.login.sign_in")}
               </Button>
             </form>
           </CardContent>

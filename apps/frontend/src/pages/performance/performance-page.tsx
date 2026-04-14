@@ -1,11 +1,5 @@
 import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
-import {
-  ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
-  MAX_DRAWDOWN_INFO as maxDrawdownInfo,
-  MetricLabelWithInfo,
-  TIME_WEIGHTED_RETURN_INFO as totalReturnInfo,
-  VOLATILITY_INFO as volatilityInfo,
-} from "@/components/metric-display";
+import { MetricLabelWithInfo } from "@/components/metric-display";
 import { PerformanceChart } from "@/components/performance-chart";
 import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 
@@ -40,6 +34,7 @@ import {
 } from "@wealthfolio/ui";
 import { subMonths } from "date-fns";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AccountSelector } from "../../components/account-selector";
 import { AccountSelectorMobile } from "../../components/account-selector-mobile";
 import { BenchmarkSymbolSelectorMobile } from "../../components/benchmark-symbol-selector-mobile";
@@ -77,6 +72,7 @@ function PerformanceContent({
   errorMessages: string[];
   isMobile: boolean;
 }) {
+  const { t } = useTranslation("common");
   return (
     <div className="relative flex h-full w-full flex-col">
       {chartData && chartData.length > 0 && (
@@ -93,8 +89,8 @@ function PerformanceContent({
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center"
           icon={<Icons.BarChart className="h-10 w-10" />}
-          title="No performance data"
-          description="Select accounts to compare their performance over time."
+          title={t("performance.empty_title")}
+          description={t("performance.empty_description")}
         />
       )}
 
@@ -108,7 +104,7 @@ function PerformanceContent({
             <div className="bg-background/80 rounded-md border px-3 py-1.5 shadow-sm backdrop-blur-sm">
               <p className="text-muted-foreground flex items-center text-xs font-medium">
                 <span className="bg-primary mr-2 inline-block h-2 w-2 animate-pulse rounded-full"></span>
-                Calculating...
+                {t("performance.calculating")}
               </p>
             </div>
           </div>
@@ -118,7 +114,7 @@ function PerformanceContent({
       {/* Error display using AlertFeedback component */}
       {hasErrors && (
         <div className="w-full">
-          <AlertFeedback title="Error calculating performance data" variant="error">
+          <AlertFeedback title={t("performance.error_title")} variant="error">
             <div>
               {errorMessages.map((error, index) => (
                 <p key={index} className="text-sm">
@@ -128,7 +124,7 @@ function PerformanceContent({
             </div>
             <div className="mt-4 flex justify-end">
               <Button size="sm" onClick={() => window.location.reload()} variant="default">
-                Retry
+                {t("performance.retry")}
               </Button>
             </div>
           </AlertFeedback>
@@ -151,6 +147,9 @@ const SelectedItemBadge = ({
   onDelete: (e: React.MouseEvent) => void;
   color?: string;
 }) => {
+  const { t } = useTranslation("common");
+  const displayName =
+    item.id === PORTFOLIO_ACCOUNT_ID ? t("account.selector.all_portfolio") : item.name;
   return (
     <Badge
       className={cn(
@@ -184,7 +183,7 @@ const SelectedItemBadge = ({
           style={color ? { backgroundColor: color } : undefined}
         />
         <span className="group-hover:text-foreground text-xs font-medium transition-colors sm:text-sm">
-          {item.name}
+          {displayName}
         </span>
       </div>
       <Button
@@ -196,7 +195,7 @@ const SelectedItemBadge = ({
           "focus-visible:ring-destructive/50 focus-visible:ring-2",
         )}
         onClick={onDelete}
-        aria-label={`Remove ${item.name}`}
+        aria-label={t("performance.remove_item_aria", { name: displayName })}
       >
         <Icons.Close className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
       </Button>
@@ -205,6 +204,7 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
+  const { t } = useTranslation("common");
   const isMobile = useIsMobileViewport();
   const [selectedItems, setSelectedItems] = usePersistentState<TrackedItem[]>(
     "performance:selectedItems",
@@ -250,6 +250,22 @@ export default function PerformancePage() {
     dateRange,
   });
 
+  const rangeTooltips = useMemo(
+    () => ({
+      "1D": t("performance.range.1D"),
+      "1W": t("performance.range.1W"),
+      "1M": t("performance.range.1M"),
+      "3M": t("performance.range.3M"),
+      "6M": t("performance.range.6M"),
+      YTD: t("performance.range.YTD"),
+      "1Y": t("performance.range.1Y"),
+      "3Y": t("performance.range.3Y"),
+      "5Y": t("performance.range.5Y"),
+      ALL: t("performance.range.ALL"),
+    }),
+    [t],
+  );
+
   // Calculate derived chart data
   const chartData = useMemo(() => {
     if (!performanceData || !selectedItems) return [];
@@ -264,12 +280,15 @@ export default function PerformancePage() {
         .map(
           (perfItem): ChartDataItem => ({
             id: perfItem.id,
-            name: perfItem.name, // Can now safely access name from perfItem
+            name:
+              perfItem.id === PORTFOLIO_ACCOUNT_ID
+                ? t("account.selector.all_portfolio")
+                : perfItem.name,
             returns: perfItem.returns,
           }),
         )
     );
-  }, [performanceData, selectedItems]);
+  }, [performanceData, selectedItems, t]);
 
   const chartColorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -286,7 +305,11 @@ export default function PerformancePage() {
     if (!targetId) return null;
     const found = performanceData.find((item) => item?.id === targetId);
     if (!found) return null;
-    const name = selectedItems.find((item) => item.id === found.id)?.name ?? "Unknown";
+    const rawName = selectedItems.find((item) => item.id === found.id)?.name;
+    const name =
+      found.id === PORTFOLIO_ACCOUNT_ID
+        ? t("account.selector.all_portfolio")
+        : (rawName ?? t("performance.unknown_item"));
     return {
       id: found.id,
       name: name,
@@ -295,7 +318,7 @@ export default function PerformancePage() {
       volatility: Number(found.volatility),
       maxDrawdown: Number(found.maxDrawdown),
     };
-  }, [selectedItemId, performanceData, selectedItems]);
+  }, [selectedItemId, performanceData, selectedItems, t]);
 
   const handleAccountSelect = (account: { id: string; name: string }) => {
     const accountId = String(account.id);
@@ -355,12 +378,20 @@ export default function PerformancePage() {
     <>
       {/* Date range selector - fixed position in header area */}
       <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
-        <DateRangeSelector value={dateRange} onChange={setDateRange} />
+        <DateRangeSelector
+          value={dateRange}
+          onChange={setDateRange}
+          rangeTooltips={rangeTooltips}
+        />
       </div>
 
       <div className="flex h-full flex-col space-y-4">
         <div className="flex justify-end md:hidden">
-          <DateRangeSelector value={dateRange} onChange={setDateRange} />
+          <DateRangeSelector
+            value={dateRange}
+            onChange={setDateRange}
+            rangeTooltips={rangeTooltips}
+          />
         </div>
 
         {/* Mobile: Carousel + Plus button in same row */}
@@ -397,7 +428,7 @@ export default function PerformancePage() {
                 variant="outline"
                 size="icon"
                 className="bg-secondary/30 hover:bg-muted/80 size-9 flex-shrink-0 rounded-md border-[1.5px] border-none"
-                aria-label="Add item"
+                aria-label={t("performance.add_item_aria")}
               >
                 <Icons.Plus className="h-4 w-4" />
               </Button>
@@ -405,14 +436,14 @@ export default function PerformancePage() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={() => setAccountSheetOpen(true)} className="py-4 md:py-2">
                 <Icons.Briefcase className="mr-2 h-4 w-4" />
-                Add Account
+                {t("performance.add_account_menu")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => setBenchmarkSheetOpen(true)}
                 className="py-4 md:py-2"
               >
                 <Icons.TrendingUp className="mr-2 h-4 w-4" />
-                Add Benchmark
+                {t("performance.add_benchmark_menu")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -455,7 +486,7 @@ export default function PerformancePage() {
             <AccountSelector
               setSelectedAccount={handleAccountSelect}
               variant="button"
-              buttonText="Add account"
+              buttonText={t("performance.add_account")}
               includePortfolio={true}
             />
             <BenchmarkSymbolSelector onSelect={handleSymbolSelect} />
@@ -490,7 +521,7 @@ export default function PerformancePage() {
                 <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
                   <div>
                     <CardTitle className={cn("text-lg sm:text-xl", isMobile && "text-sm")}>
-                      Performance
+                      {t("performance.page.title")}
                     </CardTitle>
                     <CardDescription
                       className={cn("text-xs sm:text-sm", isMobile && "text-[10px]")}
@@ -513,7 +544,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
-                                  Total Return
+                                  {t("performance.metric_total_return")}
                                 </span>
                                 <span
                                   className={cn(
@@ -535,7 +566,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
-                                  Annualized
+                                  {t("performance.metric_annualized_short")}
                                 </span>
                                 <span
                                   className={cn(
@@ -557,7 +588,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
-                                  Volatility
+                                  {t("performance.metric_volatility")}
                                 </span>
                                 <span className="text-foreground text-base font-bold">
                                   <NumberFlow
@@ -575,7 +606,7 @@ export default function PerformancePage() {
                             <CarouselItem className="basis-[38%] pl-2 md:pl-4">
                               <div className="bg-muted/30 flex flex-col gap-0.5 rounded-lg px-3 py-2">
                                 <span className="text-muted-foreground text-[9px] font-medium uppercase tracking-wide">
-                                  Max Drawdown
+                                  {t("performance.metric_max_drawdown")}
                                 </span>
                                 <span className="text-destructive text-base font-bold">
                                   <NumberFlow
@@ -595,7 +626,10 @@ export default function PerformancePage() {
                         /* Desktop metrics */
                         <div className="grid grid-cols-2 gap-3 rounded-lg p-2 backdrop-blur-sm sm:gap-4 md:grid-cols-4 md:gap-6">
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Total Return" infoText={totalReturnInfo} />
+                            <MetricLabelWithInfo
+                              label={t("performance.metric_total_return")}
+                              infoText={t("performance.metric.twr_info")}
+                            />
                             <div className="flex items-baseline justify-center">
                               <span
                                 className={`text-base sm:text-lg ${
@@ -615,8 +649,8 @@ export default function PerformancePage() {
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
                             <MetricLabelWithInfo
-                              label="Annualized Return"
-                              infoText={annualizedReturnInfo}
+                              label={t("performance.metric_annualized_return")}
+                              infoText={t("performance.metric.annualized_return_info")}
                             />
                             <div className="flex items-baseline justify-center">
                               <span
@@ -636,7 +670,10 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Volatility" infoText={volatilityInfo} />
+                            <MetricLabelWithInfo
+                              label={t("performance.metric_volatility")}
+                              infoText={t("performance.metric.volatility_info")}
+                            />
                             <div className="flex items-baseline justify-center">
                               <span className="text-foreground text-base sm:text-lg">
                                 <NumberFlow
@@ -652,7 +689,10 @@ export default function PerformancePage() {
                           </div>
 
                           <div className="flex flex-col items-center space-y-0.5 sm:space-y-1">
-                            <MetricLabelWithInfo label="Max Drawdown" infoText={maxDrawdownInfo} />
+                            <MetricLabelWithInfo
+                              label={t("performance.metric_max_drawdown")}
+                              infoText={t("performance.metric.max_drawdown_info")}
+                            />
                             <div className="flex items-baseline justify-center">
                               <span className="text-destructive text-base sm:text-lg">
                                 <NumberFlow
