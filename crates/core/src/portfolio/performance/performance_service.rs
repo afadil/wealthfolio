@@ -58,6 +58,22 @@ const TRADING_DAYS_PER_YEAR: u32 = 252;
 const DAYS_PER_YEAR_DECIMAL: Decimal = dec!(365.25);
 const SQRT_TRADING_DAYS_APPROX: Decimal = dec!(15.874507866); // sqrt(252)
 
+/// One day's return sample emitted by `compute_compounded_daily_returns`.
+///
+/// `twr` is that day's time-weighted return (e.g. `0.01` = +1%).
+/// `cumulative_twr_to_date` is the compounded TWR from the first day of the
+/// series up to and including this day.
+///
+/// Daily MWR is computed internally by `compute_compounded_daily_returns` but
+/// not surfaced here — no caller currently needs a per-day MWR series; the
+/// final cumulative MWR is returned by the function itself. If a future caller
+/// needs it, add an `mwr` field rather than recomputing.
+#[derive(Clone, Copy, Debug)]
+struct DailyReturnSample {
+    twr: Decimal,
+    cumulative_twr_to_date: Decimal,
+}
+
 impl PerformanceService {
     pub fn new(
         valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
@@ -87,57 +103,139 @@ impl PerformanceService {
         user_today(tz)
     }
 
-    fn get_account_boundary_data(
-        &self,
-        account_id: &str,
-        start_date_opt: Option<NaiveDate>,
-        end_date_opt: Option<NaiveDate>,
-    ) -> Result<(
-        DailyAccountValuation,
-        DailyAccountValuation,
-        NaiveDate,
-        NaiveDate,
-        String,
-    )> {
-        let full_history = self.valuation_service.get_historical_valuations(
-            account_id,
-            start_date_opt,
-            end_date_opt,
-        )?;
+    // =========================================================================
+    // Shared performance math
+    //
+    // These helpers are the single source of truth for the formulas used by
+    // both the "full" and "summary" account-performance paths. Having two
+    // slightly-diverging copies of this math was the root cause of the
+    // dashboard-vs-account-page percentage mismatch — keep them consolidated.
+    // =========================================================================
 
-        if full_history.len() < 2 {
-            warn!(
-                "Account '{}': Not enough history data ({} points). Cannot calculate performance.",
-                account_id,
-                full_history.len()
-            );
-            return Err(errors::Error::Calculation(
-                errors::CalculatorError::Calculation(format!(
-                    "Account '{}': Not enough history data ({} points).",
-                    account_id,
-                    full_history.len()
-                )),
-            ));
+    /// Iterates consecutive valuation pairs and emits per-day TWR/MWR samples
+    /// (and their compounded totals) to `visit`. The callback is the only thing
+    /// that differs between callers: the full path records a `ReturnData` per
+    /// day and collects daily returns for risk metrics; the summary path
+    /// ignores the samples entirely.
+    ///
+    /// Returns `(cumulative_twr, cumulative_mwr)` as returns (not factors):
+    /// `0.05` == +5% for the whole series.
+    ///
+    /// # Errors
+    /// Returns [`ValidationError::InvalidInput`] if any day's `total_value` is
+    /// negative. A negative portfolio value almost always indicates missing
+    /// activity data (e.g. a buy without a funding deposit), which makes every
+    /// downstream percentage meaningless — better to surface that to the user
+    /// than to emit an absurd number.
+    fn compute_compounded_daily_returns<F>(
+        history: &[DailyAccountValuation],
+        mut visit: F,
+    ) -> Result<(Decimal, Decimal)>
+    where
+        F: FnMut(&DailyAccountValuation, &DailyAccountValuation, &DailyReturnSample),
+    {
+        let one = Decimal::ONE;
+        let two = dec!(2.0);
+        let mut cumulative_twr_factor = one;
+        let mut cumulative_mwr_factor = one;
+
+        for window in history.windows(2) {
+            let prev_point = &window[0];
+            let curr_point = &window[1];
+
+            if prev_point.total_value.is_sign_negative()
+                || curr_point.total_value.is_sign_negative()
+            {
+                return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                    "Account has negative portfolio value in its history. This may be caused by missing buy activities. Please review your transactions on the Activities page.".to_string(),
+                )));
+            }
+
+            let cash_flow = curr_point.net_contribution - prev_point.net_contribution;
+
+            // TWR for the day: measure market-only return by netting out cash
+            // flows in the denominator (money deposited today doesn't earn
+            // yet). Guards against a degenerate zero denominator.
+            let twr = {
+                let denominator = prev_point.total_value + cash_flow;
+                if denominator.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    (curr_point.total_value / denominator) - one
+                }
+            };
+
+            // MWR (Modified Dietz) for the day: weights cash flow as if it
+            // arrived mid-day. More forgiving than TWR when flows are large.
+            let mwr = {
+                let numerator = curr_point.total_value - prev_point.total_value - cash_flow;
+                let denominator = prev_point.total_value + (cash_flow / two);
+                if denominator.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    numerator / denominator
+                }
+            };
+
+            cumulative_twr_factor *= one + twr;
+            cumulative_mwr_factor *= one + mwr;
+
+            let sample = DailyReturnSample {
+                twr,
+                cumulative_twr_to_date: cumulative_twr_factor - one,
+            };
+            visit(prev_point, curr_point, &sample);
         }
 
-        let start_point: DailyAccountValuation = full_history.first().unwrap().clone();
-        let end_point: DailyAccountValuation = full_history.last().unwrap().clone();
-
-        let actual_start_date = start_point.valuation_date;
-        let actual_end_date = end_point.valuation_date;
-        let currency = start_point.account_currency.clone();
-
-        Ok((
-            start_point,
-            end_point,
-            actual_start_date,
-            actual_end_date,
-            currency,
-        ))
+        Ok((cumulative_twr_factor - one, cumulative_mwr_factor - one))
     }
 
-    /// Internal function for calculating account performance (Full)
-    /// For HOLDINGS mode accounts, uses SOTA price-based performance calculations
+    /// Simple (start-to-end) total return. Returns zero when the starting
+    /// portfolio value is non-positive — ratio is undefined there and the
+    /// signed-division result would be misleading, so we surface zero and let
+    /// the caller decide whether to display the percentage at all.
+    fn compute_simple_total_return(start_value: Decimal, gain_loss_amount: Decimal) -> Decimal {
+        if start_value <= Decimal::ZERO {
+            Decimal::ZERO
+        } else {
+            gain_loss_amount / start_value
+        }
+    }
+
+    /// HOLDINGS-mode period gain and return.
+    ///
+    /// HOLDINGS mode doesn't track cash flows at the transaction level, so
+    /// TWR/MWR aren't meaningful — we measure unrealized P&L growth instead.
+    ///
+    /// * `is_all_time` — when `true`, divides by ending `cost_basis` (the full
+    ///   amount invested). When `false`, divides by `investment_market_value`
+    ///   at the period start. Zero-guard returns 0% in either case.
+    fn compute_holdings_period_return(
+        start_point: &DailyAccountValuation,
+        end_point: &DailyAccountValuation,
+        is_all_time: bool,
+    ) -> (Decimal, Decimal) {
+        let start_unrealized_pnl = start_point.investment_market_value - start_point.cost_basis;
+        let end_unrealized_pnl = end_point.investment_market_value - end_point.cost_basis;
+        let period_gain = end_unrealized_pnl - start_unrealized_pnl;
+
+        let period_return = if is_all_time {
+            if end_point.cost_basis.is_zero() {
+                Decimal::ZERO
+            } else {
+                end_unrealized_pnl / end_point.cost_basis
+            }
+        } else if start_point.investment_market_value.is_zero() {
+            Decimal::ZERO
+        } else {
+            period_gain / start_point.investment_market_value
+        };
+
+        (period_gain, period_return)
+    }
+
+    /// Full account performance calculation including per-day `returns[]`,
+    /// volatility, and max-drawdown. Used by the account-detail page.
     async fn calculate_account_performance(
         &self,
         account_id: &str,
@@ -164,221 +262,17 @@ impl PerformanceService {
             return Ok(PerformanceService::empty_response(account_id));
         }
 
-        let start_point: &DailyAccountValuation = full_history.first().unwrap();
-        let end_point: &DailyAccountValuation = full_history.last().unwrap();
-        let actual_start_date = start_point.valuation_date;
-        let actual_end_date = end_point.valuation_date;
-        let currency = start_point.account_currency.clone();
-
-        let is_holdings_mode = matches!(tracking_mode, Some(TrackingMode::Holdings));
-
-        let capacity = full_history.len();
-        let mut returns = Vec::with_capacity(capacity);
-        let mut daily_twr_returns = Vec::with_capacity(capacity - 1);
-        // Separate list for risk metrics that excludes days with holdings changes
-        // (detected via cost_basis changes, which indicate position additions/removals)
-        let mut daily_returns_for_risk = Vec::with_capacity(capacity - 1);
-
-        returns.push(ReturnData {
-            date: actual_start_date,
-            value: Decimal::ZERO,
-        });
-
-        let one = Decimal::ONE;
-        let two = dec!(2.0);
-        let mut cumulative_twr_value = one;
-        let mut cumulative_mwr_value = one;
-
-        for window in full_history.windows(2) {
-            let prev_point = &window[0];
-            let curr_point = &window[1];
-
-            if prev_point.total_value.is_sign_negative()
-                || curr_point.total_value.is_sign_negative()
-            {
-                return Err(errors::Error::Validation(ValidationError::InvalidInput(
-                    "Account has negative portfolio value in its history. This may be caused by missing buy activities. Please review your transactions on the Activities page.".to_string(),
-                )));
-            }
-
-            let prev_total_value = prev_point.total_value;
-            let prev_net_contribution = prev_point.net_contribution;
-            let current_total_value = curr_point.total_value;
-            let current_net_contribution = curr_point.net_contribution;
-
-            let cash_flow = current_net_contribution - prev_net_contribution;
-
-            let twr_period_return = {
-                let denominator = prev_total_value + cash_flow;
-                if denominator.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    (current_total_value / denominator) - one
-                }
-            };
-
-            let mwr_period_return = {
-                let numerator = current_total_value - prev_total_value - cash_flow;
-                let denominator = prev_total_value + (cash_flow / two);
-                if denominator.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    numerator / denominator
-                }
-            };
-
-            daily_twr_returns.push(twr_period_return);
-
-            // For risk metrics (volatility, max drawdown), filter logic depends on tracking mode:
-            // - TRANSACTIONS mode: TWR already handles cash flows, use all daily returns
-            // - HOLDINGS mode: exclude days with detected holdings/contribution changes
-            //   (since we can't distinguish market returns from contribution-driven changes)
-            let should_exclude = if is_holdings_mode {
-                // Primary detection: cost_basis change indicates position additions/removals
-                let cost_basis_changed = prev_point.cost_basis != curr_point.cost_basis;
-                // Fallback detection: if cost_basis is zero/missing, check net_contribution
-                // changes which indicate deposits/withdrawals
-                let contribution_changed = prev_point.cost_basis.is_zero()
-                    && prev_point.net_contribution != curr_point.net_contribution;
-                cost_basis_changed || contribution_changed
-            } else {
-                // TRANSACTIONS mode: TWR is already cash-flow adjusted, no filtering needed
-                false
-            };
-
-            if !should_exclude {
-                daily_returns_for_risk.push(twr_period_return);
-            }
-
-            cumulative_twr_value *= one + twr_period_return;
-            cumulative_mwr_value *= one + mwr_period_return;
-
-            let cumulative_twr_to_date = cumulative_twr_value - one;
-
-            returns.push(ReturnData {
-                date: curr_point.valuation_date,
-                value: cumulative_twr_to_date.round_dp(DECIMAL_PRECISION),
-            });
-        }
-
-        let cumulative_twr = returns.last().map_or(Decimal::ZERO, |r| r.value);
-        let annualized_twr =
-            Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_twr);
-        // Risk metrics use filtered returns:
-        // - TRANSACTIONS mode: all returns (TWR handles cash flows)
-        // - HOLDINGS mode: excludes days with detected holdings/contribution changes
-        let volatility = Self::calculate_volatility(&daily_returns_for_risk);
-        let max_drawdown = Self::calculate_max_drawdown(&daily_returns_for_risk);
-
-        let start_net_contribution = start_point.net_contribution;
-        let end_net_contribution = end_point.net_contribution;
-        let net_cash_flow = end_net_contribution - start_net_contribution;
-
-        let start_value_for_gain_calc = start_point.total_value;
-
-        let gain_loss_amount = end_point.total_value - start_value_for_gain_calc - net_cash_flow;
-
-        let simple_total_return = if start_value_for_gain_calc.is_zero() {
-            if gain_loss_amount.is_zero() {
-                Decimal::ZERO
-            } else {
-                warn!("Simple total return calculation: start_value_for_gain_calc is zero but gain_loss_amount is non-zero for account_id: {}. Returning 0.", account_id);
-                Decimal::ZERO
-            }
-        } else {
-            gain_loss_amount / start_value_for_gain_calc
-        };
-
-        let annualized_simple_return = Self::calculate_annualized_return(
-            actual_start_date,
-            actual_end_date,
-            simple_total_return,
-        );
-
-        let cumulative_mwr = cumulative_mwr_value - one;
-        let annualized_mwr =
-            Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_mwr);
-
-        // SOTA calculations for HOLDINGS mode
-        // period_gain = Change in Unrealized P&L (excludes contributions)
-        // period_return = period_gain / start_investment_value (rolling) or unrealized_pnl / cost_basis (ALL time)
-        let (period_gain, period_return) = if is_holdings_mode {
-            // Unrealized P&L = Investment Market Value - Cost Basis
-            let start_unrealized_pnl = start_point.investment_market_value - start_point.cost_basis;
-            let end_unrealized_pnl = end_point.investment_market_value - end_point.cost_basis;
-            let period_gain = end_unrealized_pnl - start_unrealized_pnl;
-
-            // Determine if this is ALL time (no start_date specified) or a rolling period
-            let period_return = if start_date_opt.is_none() {
-                // ALL time: return = unrealized_pnl / cost_basis
-                if end_point.cost_basis.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    end_unrealized_pnl / end_point.cost_basis
-                }
-            } else {
-                // Rolling period: return = period_gain / start_investment_value
-                if start_point.investment_market_value.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    period_gain / start_point.investment_market_value
-                }
-            };
-
-            (period_gain, Some(period_return))
-        } else {
-            // TRANSACTIONS mode: use standard calculations
-            // Return is undefined when starting value is zero (division by zero)
-            let period_return = if start_value_for_gain_calc.is_zero() {
-                None
-            } else {
-                Some(simple_total_return)
-            };
-            (gain_loss_amount, period_return)
-        };
-
-        let result = PerformanceMetrics {
-            id: account_id.to_string(),
-            returns,
-            period_start_date: Some(actual_start_date),
-            period_end_date: Some(actual_end_date),
-            currency,
-            period_gain: period_gain.round_dp(DECIMAL_PRECISION),
-            period_return: period_return.map(|r| r.round_dp(DECIMAL_PRECISION)),
-            // For HOLDINGS mode, TWR/MWR are not meaningful (no cash flow tracking)
-            cumulative_twr: if is_holdings_mode {
-                None
-            } else {
-                Some(cumulative_twr.round_dp(DECIMAL_PRECISION))
+        Self::compute_account_performance(&full_history, tracking_mode, start_date_opt, true).map(
+            |mut metrics| {
+                metrics.id = account_id.to_string();
+                metrics
             },
-            gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: if is_holdings_mode {
-                None
-            } else {
-                Some(annualized_twr.round_dp(DECIMAL_PRECISION))
-            },
-            simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
-            annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: if is_holdings_mode {
-                None
-            } else {
-                Some(cumulative_mwr.round_dp(DECIMAL_PRECISION))
-            },
-            annualized_mwr: if is_holdings_mode {
-                None
-            } else {
-                Some(annualized_mwr.round_dp(DECIMAL_PRECISION))
-            },
-            volatility: volatility.round_dp(DECIMAL_PRECISION),
-            max_drawdown: max_drawdown.round_dp(DECIMAL_PRECISION),
-            is_holdings_mode,
-        };
-
-        Ok(result)
+        )
     }
 
-    /// Internal function for calculating account performance (Summary)
-    /// For HOLDINGS mode accounts, uses SOTA price-based performance calculations
+    /// Summary account performance calculation (no `returns[]`, no risk
+    /// metrics). Used by the dashboard card. Shares the same TWR/MWR chain as
+    /// the full path so percentages match the account-detail page.
     async fn calculate_account_performance_summary(
         &self,
         account_id: &str,
@@ -386,106 +280,195 @@ impl PerformanceService {
         end_date_opt: Option<NaiveDate>,
         tracking_mode: Option<TrackingMode>,
     ) -> Result<PerformanceMetrics> {
-        let (start_point, end_point, actual_start_date, actual_end_date, currency): (
-            DailyAccountValuation,
-            DailyAccountValuation,
-            NaiveDate,
-            NaiveDate,
-            String,
-        ) = self.get_account_boundary_data(account_id, start_date_opt, end_date_opt)?;
+        if let (Some(start), Some(end)) = (start_date_opt, end_date_opt) {
+            if start > end {
+                return Err(errors::Error::Validation(ValidationError::InvalidInput(
+                    "Start date must be before end date".to_string(),
+                )));
+            }
+        }
+
+        let full_history = self.valuation_service.get_historical_valuations(
+            account_id,
+            start_date_opt,
+            end_date_opt,
+        )?;
+
+        if full_history.len() < 2 {
+            warn!(
+                "Account '{}': Not enough history data ({} points). Cannot calculate performance.",
+                account_id,
+                full_history.len()
+            );
+            return Err(errors::Error::Calculation(
+                errors::CalculatorError::Calculation(format!(
+                    "Account '{}': Not enough history data ({} points).",
+                    account_id,
+                    full_history.len()
+                )),
+            ));
+        }
+
+        Self::compute_account_performance(&full_history, tracking_mode, start_date_opt, false).map(
+            |mut metrics| {
+                metrics.id = account_id.to_string();
+                metrics
+            },
+        )
+    }
+
+    /// Pure computation shared by the full and summary paths. Takes a
+    /// pre-fetched valuation history and produces the same `PerformanceMetrics`
+    /// both call sites need.
+    ///
+    /// * `include_returns_series` — when `true`, populates `returns[]` with a
+    ///   per-day cumulative TWR and computes volatility/max-drawdown. The full
+    ///   path sets this; the summary doesn't to save allocation on dashboards
+    ///   with many accounts.
+    ///
+    /// `id` is left empty — callers set it after.
+    ///
+    /// # Precondition
+    /// `full_history.len() >= 2`. Callers check this first so they can respond
+    /// differently to insufficient history (empty response vs. error).
+    fn compute_account_performance(
+        full_history: &[DailyAccountValuation],
+        tracking_mode: Option<TrackingMode>,
+        start_date_opt: Option<NaiveDate>,
+        include_returns_series: bool,
+    ) -> Result<PerformanceMetrics> {
+        debug_assert!(full_history.len() >= 2);
+
+        let start_point = full_history.first().unwrap();
+        let end_point = full_history.last().unwrap();
+        let actual_start_date = start_point.valuation_date;
+        let actual_end_date = end_point.valuation_date;
+        let currency = start_point.account_currency.clone();
 
         let is_holdings_mode = matches!(tracking_mode, Some(TrackingMode::Holdings));
 
+        // Set up per-day collectors. When we're not building the series, these
+        // stay empty and the closure below skips the pushes entirely.
+        let capacity = full_history.len();
+        let mut returns: Vec<ReturnData> = Vec::new();
+        let mut daily_returns_for_risk: Vec<Decimal> = Vec::new();
+        if include_returns_series {
+            returns.reserve(capacity);
+            daily_returns_for_risk.reserve(capacity - 1);
+            returns.push(ReturnData {
+                date: actual_start_date,
+                value: Decimal::ZERO,
+            });
+        }
+
+        // Shared TWR/MWR chain. The closure decides what to record per day.
+        let (cumulative_twr, cumulative_mwr) = Self::compute_compounded_daily_returns(
+            full_history,
+            |prev_point, curr_point, sample| {
+                if !include_returns_series {
+                    return;
+                }
+
+                // Risk metrics (volatility, max drawdown) use filtered daily
+                // TWR returns. TRANSACTIONS mode: TWR already nets out cash
+                // flows, use all days. HOLDINGS mode: drop days where the
+                // holdings set changed, since we can't separate market moves
+                // from position-change-driven value shifts.
+                let should_exclude_from_risk = if is_holdings_mode {
+                    let cost_basis_changed = prev_point.cost_basis != curr_point.cost_basis;
+                    let contribution_changed = prev_point.cost_basis.is_zero()
+                        && prev_point.net_contribution != curr_point.net_contribution;
+                    cost_basis_changed || contribution_changed
+                } else {
+                    false
+                };
+                if !should_exclude_from_risk {
+                    daily_returns_for_risk.push(sample.twr);
+                }
+
+                returns.push(ReturnData {
+                    date: curr_point.valuation_date,
+                    value: sample.cumulative_twr_to_date.round_dp(DECIMAL_PRECISION),
+                });
+            },
+        )?;
+
+        let annualized_twr =
+            Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_twr);
+        let annualized_mwr =
+            Self::calculate_annualized_return(actual_start_date, actual_end_date, cumulative_mwr);
+
+        // Simple (start-to-end) total return. Always populated in the response
+        // for consumers that want the unweighted figure (e.g. the account page
+        // uses this for HOLDINGS mode and for the ALL-time interval).
         let start_value = start_point.total_value;
-        let end_value = end_point.total_value;
-        let start_net_contribution = start_point.net_contribution;
-        let end_net_contribution = end_point.net_contribution;
-        let net_cash_flow = end_net_contribution - start_net_contribution;
-
-        let gain_loss_amount = end_value - start_value - net_cash_flow;
-
-        let simple_total_return = if start_value <= Decimal::ZERO {
-            Decimal::ZERO
-        } else {
-            (end_value - start_value - net_cash_flow) / start_value
-        };
-
+        let net_cash_flow = end_point.net_contribution - start_point.net_contribution;
+        let gain_loss_amount = end_point.total_value - start_value - net_cash_flow;
+        let simple_total_return = Self::compute_simple_total_return(start_value, gain_loss_amount);
         let annualized_simple_return = Self::calculate_annualized_return(
             actual_start_date,
             actual_end_date,
             simple_total_return,
         );
 
-        // SOTA calculations for HOLDINGS mode
-        let (period_gain, period_return) = if is_holdings_mode {
-            let start_unrealized_pnl = start_point.investment_market_value - start_point.cost_basis;
-            let end_unrealized_pnl = end_point.investment_market_value - end_point.cost_basis;
-            let period_gain = end_unrealized_pnl - start_unrealized_pnl;
-
-            let period_return = if start_date_opt.is_none() {
-                // ALL time: return = unrealized_pnl / cost_basis
-                if end_point.cost_basis.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    end_unrealized_pnl / end_point.cost_basis
-                }
-            } else {
-                // Rolling period: return = period_gain / start_investment_value
-                if start_point.investment_market_value.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    period_gain / start_point.investment_market_value
-                }
-            };
-
-            (period_gain, Some(period_return))
+        // Risk metrics only make sense when we built the per-day series.
+        let (volatility, max_drawdown) = if include_returns_series {
+            (
+                Self::calculate_volatility(&daily_returns_for_risk),
+                Self::calculate_max_drawdown(&daily_returns_for_risk),
+            )
         } else {
-            // Return is undefined when starting value is non-positive (division by zero or sign inversion)
-            let period_return = if start_value <= Decimal::ZERO {
-                None
-            } else {
-                Some(simple_total_return)
-            };
-            (gain_loss_amount, period_return)
+            (Decimal::ZERO, Decimal::ZERO)
         };
 
-        let result = PerformanceMetrics {
-            id: account_id.to_string(),
-            returns: Vec::new(),
+        // `period_return` is the headline number displayed on the card. Mode
+        // matters:
+        //
+        // * HOLDINGS: unrealized-P&L-based, since we don't see cash flows at
+        //   transaction granularity.
+        // * TRANSACTIONS (full path / account page): MWR matches the dashboard
+        //   and handles cash flows per-day without blow-ups when the initial
+        //   value is small.
+        // * TRANSACTIONS (summary): MWR for the same reason — prior use of
+        //   `gain / start_value` was the source of the dashboard-side bug.
+        let (period_gain, period_return) = if is_holdings_mode {
+            let (gain, ret) = Self::compute_holdings_period_return(
+                start_point,
+                end_point,
+                start_date_opt.is_none(),
+            );
+            (gain, Some(ret))
+        } else {
+            (gain_loss_amount, Some(cumulative_mwr))
+        };
+
+        let wrap_non_holdings = |value: Decimal| {
+            if is_holdings_mode {
+                None
+            } else {
+                Some(value.round_dp(DECIMAL_PRECISION))
+            }
+        };
+
+        Ok(PerformanceMetrics {
+            id: String::new(),
+            returns,
             period_start_date: Some(actual_start_date),
             period_end_date: Some(actual_end_date),
             currency,
             period_gain: period_gain.round_dp(DECIMAL_PRECISION),
             period_return: period_return.map(|r| r.round_dp(DECIMAL_PRECISION)),
-            cumulative_twr: if is_holdings_mode {
-                None
-            } else {
-                Some(Decimal::ZERO)
-            },
+            cumulative_twr: wrap_non_holdings(cumulative_twr),
             gain_loss_amount: Some(gain_loss_amount.round_dp(DECIMAL_PRECISION)),
-            annualized_twr: if is_holdings_mode {
-                None
-            } else {
-                Some(Decimal::ZERO)
-            },
+            annualized_twr: wrap_non_holdings(annualized_twr),
             simple_return: simple_total_return.round_dp(DECIMAL_PRECISION),
             annualized_simple_return: annualized_simple_return.round_dp(DECIMAL_PRECISION),
-            cumulative_mwr: if is_holdings_mode {
-                None
-            } else {
-                Some(Decimal::ZERO)
-            },
-            annualized_mwr: if is_holdings_mode {
-                None
-            } else {
-                Some(Decimal::ZERO)
-            },
-            volatility: Decimal::ZERO,
-            max_drawdown: Decimal::ZERO,
+            cumulative_mwr: wrap_non_holdings(cumulative_mwr),
+            annualized_mwr: wrap_non_holdings(annualized_mwr),
+            volatility: volatility.round_dp(DECIMAL_PRECISION),
+            max_drawdown: max_drawdown.round_dp(DECIMAL_PRECISION),
             is_holdings_mode,
-        };
-
-        Ok(result)
+        })
     }
 
     /// Internal function for calculating symbol/benchmark performance (Full)
@@ -959,5 +942,281 @@ impl PerformanceServiceTrait for PerformanceService {
         }
 
         Ok(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{DateTime, Utc};
+
+    fn valuation(
+        date: &str,
+        total_value: Decimal,
+        net_contribution: Decimal,
+        investment_market_value: Decimal,
+        cost_basis: Decimal,
+    ) -> DailyAccountValuation {
+        DailyAccountValuation {
+            id: format!("acct-{}", date),
+            account_id: "acct".to_string(),
+            valuation_date: NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            account_currency: "CAD".to_string(),
+            base_currency: "CAD".to_string(),
+            fx_rate_to_base: Decimal::ONE,
+            cash_balance: total_value - investment_market_value,
+            investment_market_value,
+            total_value,
+            cost_basis,
+            net_contribution,
+            calculated_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+        }
+    }
+
+    /// Build the fixture used by the divergence / invariant tests: Feb 15 seed
+    /// of 100 CAD, Mar 15 deposit of 2000 CAD + buy of 7 × 260, then a synthetic
+    /// linear drift in holdings value to 1809.16 by Apr 14. Mirrors the shape
+    /// of the user's Reproduce account that originally surfaced the bug.
+    fn fixture_small_seed_then_large_deposit() -> Vec<DailyAccountValuation> {
+        let mut history = Vec::new();
+
+        // Feb 15 → Mar 14: $100 cash, no activity.
+        let mut d = NaiveDate::parse_from_str("2026-02-15", "%Y-%m-%d").unwrap();
+        let pre_deposit_end = NaiveDate::parse_from_str("2026-03-14", "%Y-%m-%d").unwrap();
+        while d <= pre_deposit_end {
+            history.push(valuation(
+                &d.format("%Y-%m-%d").to_string(),
+                dec!(100),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ));
+            d = d.succ_opt().unwrap();
+        }
+
+        // Mar 15: deposit 2000, buy 7 × 260 = 1820 same day. Net contribution
+        // 2100, total_value 2100 (cash 280 + holdings at cost 1820).
+        history.push(valuation(
+            "2026-03-15",
+            dec!(2100),
+            dec!(2100),
+            dec!(1820),
+            dec!(1820),
+        ));
+
+        // Mar 16 → Apr 13: holdings drift down by ~0.7/day (~$20 total over ~29 days).
+        let mut d = NaiveDate::parse_from_str("2026-03-16", "%Y-%m-%d").unwrap();
+        let drift_end = NaiveDate::parse_from_str("2026-04-13", "%Y-%m-%d").unwrap();
+        let mut imv = dec!(1820);
+        while d <= drift_end {
+            imv -= dec!(0.7);
+            history.push(valuation(
+                &d.format("%Y-%m-%d").to_string(),
+                dec!(280) + imv,
+                dec!(2100),
+                imv,
+                dec!(1820),
+            ));
+            d = d.succ_opt().unwrap();
+        }
+
+        // Apr 14: final row — value matches the dashboard screenshot.
+        history.push(valuation(
+            "2026-04-14",
+            dec!(2089.16),
+            dec!(2100),
+            dec!(1809.16),
+            dec!(1820),
+        ));
+
+        history
+    }
+
+    fn date(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    /// Regression test for the reporter's bug. Pre-fix, `period_return` was
+    /// `gain / start_value` = -10.84/100 = -10.84%. Post-fix, it's daily-linked
+    /// MWR — should end up near zero, dominated by the synthetic ~1.1% AAPL
+    /// drift between Mar 15 and Apr 14.
+    #[test]
+    fn perf_does_not_explode_when_start_value_tiny_vs_cash_flow() {
+        let history = fixture_small_seed_then_large_deposit();
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            Some(date("2026-01-01")),
+            false, // summary path — matches the dashboard
+        )
+        .expect("summary should compute");
+
+        let period_return = result.period_return.expect("period_return should be Some");
+
+        // Old formula: -0.1084. New: small (market-drift-dominated). Bounds are
+        // wide — the fixture uses synthetic linear drift and exact precision
+        // isn't what we're testing; we're testing that the percentage is sane.
+        assert!(
+            period_return > dec!(-0.05),
+            "period_return = {} should be > -5% (was -10.84% with the old formula)",
+            period_return
+        );
+        assert!(
+            period_return < dec!(0.01),
+            "period_return = {} should be < 1% (asset drifted down slightly)",
+            period_return
+        );
+
+        // $ gain is unchanged — end - start - cash_flow = 2089.16 - 100 - 2000.
+        assert_eq!(result.period_gain, dec!(-10.84));
+        // The legacy `simple_return` field preserves the start-based ratio so
+        // any frontend reading it explicitly still gets consistent semantics.
+        assert_eq!(result.simple_return.round_dp(4), dec!(-0.1084));
+        // TWR and MWR are now populated (were zero placeholders in the summary
+        // path before the refactor).
+        assert!(result.cumulative_twr.is_some());
+        assert!(result.cumulative_mwr.is_some());
+    }
+
+    /// Invariant: summary and full paths must agree on `period_return`. This is
+    /// the core guarantee the refactor is meant to enforce — the dashboard card
+    /// and account-detail page showing different percentages for the same
+    /// account / range was the original user complaint.
+    #[test]
+    fn perf_full_and_summary_paths_agree_on_period_return() {
+        let history = fixture_small_seed_then_large_deposit();
+        let start = Some(date("2026-01-01"));
+
+        let full = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            start,
+            true,
+        )
+        .expect("full should compute");
+
+        let summary = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            start,
+            false,
+        )
+        .expect("summary should compute");
+
+        // Headline percentage must match exactly — that's the user-visible
+        // invariant. Everything else (returns series, risk metrics) is summary
+        // vs full differentiation.
+        assert_eq!(full.period_return, summary.period_return);
+        assert_eq!(full.cumulative_mwr, summary.cumulative_mwr);
+        assert_eq!(full.cumulative_twr, summary.cumulative_twr);
+        assert_eq!(full.period_gain, summary.period_gain);
+        assert_eq!(full.simple_return, summary.simple_return);
+
+        // Differentiation: full path populates returns[] and risk metrics;
+        // summary stays empty/zero to save allocation on the dashboard.
+        assert!(!full.returns.is_empty());
+        assert!(summary.returns.is_empty());
+        assert!(full.volatility > Decimal::ZERO);
+        assert_eq!(summary.volatility, Decimal::ZERO);
+    }
+
+    /// Well-formed account (`start_value == net_contribution`) stays sane —
+    /// the common case shouldn't regress.
+    #[test]
+    fn perf_well_formed_account_remains_sane() {
+        let history = vec![
+            valuation(
+                "2026-02-15",
+                dec!(1000),
+                dec!(1000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation(
+                "2026-02-16",
+                dec!(1000),
+                dec!(1000),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation("2026-04-14", dec!(999.48), dec!(1000), dec!(259), dec!(260)),
+        ];
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            Some(date("2026-01-01")),
+            false,
+        )
+        .expect("summary should compute");
+
+        let period_return = result.period_return.expect("period_return should be Some");
+        assert!(
+            period_return.abs() < dec!(0.01),
+            "period_return = {} should be small for well-formed account",
+            period_return
+        );
+        assert_eq!(result.period_gain.round_dp(2), dec!(-0.52));
+    }
+
+    /// Negative portfolio value (like TEST's unfunded-BUY shape) surfaces as a
+    /// validation error in both paths — downstream percentages are meaningless
+    /// when the underlying data is broken.
+    #[test]
+    fn perf_rejects_negative_portfolio_value() {
+        let history = vec![
+            valuation(
+                "2026-04-01",
+                dec!(100),
+                dec!(100),
+                Decimal::ZERO,
+                Decimal::ZERO,
+            ),
+            valuation("2026-04-02", dec!(-50), dec!(100), dec!(-50), Decimal::ZERO),
+        ];
+
+        for include_series in [true, false] {
+            let err = PerformanceService::compute_account_performance(
+                &history,
+                Some(TrackingMode::Transactions),
+                None,
+                include_series,
+            )
+            .expect_err("should error on negative portfolio value");
+
+            assert!(
+                format!("{}", err).contains("negative portfolio value"),
+                "expected 'negative portfolio value' in error (include_series={}), got: {}",
+                include_series,
+                err
+            );
+        }
+    }
+
+    /// HOLDINGS mode uses the cost-basis formula in both paths. TWR/MWR are
+    /// returned as `None` because they aren't meaningful without per-transaction
+    /// cash-flow tracking.
+    #[test]
+    fn perf_holdings_mode_uses_cost_basis_formula() {
+        let history = vec![
+            valuation("2026-02-15", dec!(1000), dec!(1000), dec!(1000), dec!(1000)),
+            valuation("2026-04-14", dec!(900), dec!(1000), dec!(900), dec!(1000)),
+        ];
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Holdings),
+            None, // ALL-time branch
+            false,
+        )
+        .expect("holdings should compute");
+
+        // end_unrealized_pnl = 900 - 1000 = -100; return = -100 / 1000 = -0.10.
+        let period_return = result.period_return.expect("period_return should be Some");
+        assert_eq!(period_return.round_dp(4), dec!(-0.1));
+        assert!(result.cumulative_twr.is_none());
+        assert!(result.cumulative_mwr.is_none());
+        assert!(result.is_holdings_mode);
     }
 }
