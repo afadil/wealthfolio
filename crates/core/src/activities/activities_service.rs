@@ -28,7 +28,7 @@ use crate::assets::{
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
 use crate::fx::FxServiceTrait;
-use crate::quotes::constants::{DATA_SOURCE_BROKER, DATA_SOURCE_MANUAL};
+use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::Result;
 use log::warn;
@@ -1414,8 +1414,14 @@ impl ActivityService {
             }
 
             // Create a quote from the activity price as a fallback, but only
-            // for activity types where unit_price is a real asset price.
-            if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
+            // for MANUAL-mode assets. For MARKET-mode assets the unit price is
+            // a cost input, not a market price, and writing it here would
+            // shadow provider quotes.
+            let is_manual_mode = asset.quote_mode == QuoteMode::Manual
+                || matches!(parsed_quote_mode, Some(QuoteMode::Manual));
+            if is_manual_mode
+                && PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str())
+            {
                 if let Some(unit_price) = activity.unit_price {
                     let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
@@ -1792,8 +1798,14 @@ impl ActivityService {
             }
 
             // Create a quote from the activity price as a fallback, but only
-            // for activity types where unit_price is a real asset price.
-            if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
+            // for MANUAL-mode assets. For MARKET-mode assets the unit price is
+            // a cost input, not a market price, and writing it here would
+            // shadow provider quotes.
+            let is_manual_mode = asset.quote_mode == QuoteMode::Manual
+                || matches!(parsed_quote_mode, Some(QuoteMode::Manual));
+            if is_manual_mode
+                && PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str())
+            {
                 if let Some(Some(unit_price)) = activity.unit_price {
                     let source = DATA_SOURCE_MANUAL.to_string();
                     self.create_quote_from_activity(
@@ -4051,30 +4063,32 @@ impl ActivityService {
             }
 
             // 6. Create a quote from the activity price as a fallback, but only
-            // for activity types where unit_price is a real asset price.
+            // for MANUAL-mode assets. For MARKET-mode assets the unit price is
+            // a cost input, not a market price; writing it as BROKER would
+            // misattribute user input as broker-sourced (BROKER is reserved
+            // for connect-synced activities) and can shadow provider quotes.
             if PRICE_BEARING_ACTIVITY_TYPES.contains(&activity.activity_type.as_str()) {
                 if let Some(ref asset_id) = resolved_asset_id {
                     if let Some(unit_price) = activity.unit_price {
-                        let source = ensure_result
+                        let is_manual_mode = ensure_result
                             .assets
                             .get(asset_id)
-                            .filter(|a| a.quote_mode == QuoteMode::Manual)
-                            .map_or(DATA_SOURCE_BROKER.to_string(), |_| {
-                                DATA_SOURCE_MANUAL.to_string()
-                            });
-                        let currency = if !activity.currency.is_empty() {
-                            &activity.currency
-                        } else {
-                            &account_currency
-                        };
-                        self.create_quote_from_activity(
-                            asset_id,
-                            unit_price,
-                            currency,
-                            &activity.activity_date,
-                            source,
-                        )
-                        .await?;
+                            .is_some_and(|a| a.quote_mode == QuoteMode::Manual);
+                        if is_manual_mode {
+                            let currency = if !activity.currency.is_empty() {
+                                &activity.currency
+                            } else {
+                                &account_currency
+                            };
+                            self.create_quote_from_activity(
+                                asset_id,
+                                unit_price,
+                                currency,
+                                &activity.activity_date,
+                                DATA_SOURCE_MANUAL.to_string(),
+                            )
+                            .await?;
+                        }
                     }
                 }
             }
