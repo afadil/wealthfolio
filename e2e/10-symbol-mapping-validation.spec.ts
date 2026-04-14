@@ -89,14 +89,14 @@ test.describe("Symbol Mapping Validation", () => {
     for (let attempt = 0; attempt < 5 && !editClicked; attempt++) {
       try {
         await actionsBtn.click({ timeout: 5000 });
-        await page.waitForTimeout(300);
         const editItem = page.getByRole("menuitem", { name: "Edit" });
         await expect(editItem).toBeVisible({ timeout: 3000 });
         await editItem.click({ force: true });
         editClicked = true;
       } catch {
         // button detached or menu closed before click landed — retry
-        await page.waitForTimeout(200);
+        // Brief pause before retry is unavoidable here (no observable DOM state).
+        await page.waitForTimeout(100);
       }
     }
     if (!editClicked) throw new Error("Could not click Edit menu item after 5 attempts");
@@ -147,9 +147,12 @@ test.describe("Symbol Mapping Validation", () => {
     while (true) {
       const rows = mappingTable.locator("tbody tr");
       if ((await rows.count()) === 0) break;
+      const rowCountBefore = await rows.count();
       const deleteBtn = rows.first().locator("button").last();
       await deleteBtn.click();
-      await page.waitForTimeout(100);
+      await expect(mappingTable.locator("tbody tr")).not.toHaveCount(rowCountBefore, {
+        timeout: 3000,
+      });
     }
   }
 
@@ -163,8 +166,11 @@ test.describe("Symbol Mapping Validation", () => {
     const rowIndex = await mappingTable.locator("tbody tr").count();
 
     // Click Add to create a new mapping row
+    const rowCountBefore = await mappingTable.locator("tbody tr").count();
     await page.getByRole("button", { name: "Add" }).click();
-    await page.waitForTimeout(300); // wait for row to appear — no observable state to poll here
+    await expect(mappingTable.locator("tbody tr")).toHaveCount(rowCountBefore + 1, {
+      timeout: 3000,
+    });
 
     // The row's provider combobox defaults to YAHOO; change if needed
     if (provider !== "Yahoo Finance") {
