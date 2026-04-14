@@ -710,8 +710,6 @@ export interface SettingsContextType {
   updateBaseCurrency: (currency: Settings["baseCurrency"]) => Promise<void>;
   accountsGrouped: boolean;
   setAccountsGrouped: (value: boolean) => void;
-  groupingMode: "none" | "accountGroup" | "taxTreatment";
-  setGroupingMode: (value: "none" | "accountGroup" | "taxTreatment") => void;
 }
 
 export interface Goal {

@@ -1014,6 +1014,7 @@ mod tests {
             provider_account_id: None,
             is_archived: false,
             tracking_mode: crate::accounts::TrackingMode::NotSet,
+            tax_treatment: crate::accounts::TaxTreatment::Taxable,
         }
     }
 
@@ -4594,6 +4595,7 @@ mod tests {
             provider_account_id: None,
             is_archived,
             tracking_mode: crate::accounts::TrackingMode::NotSet,
+            tax_treatment: crate::accounts::TaxTreatment::Taxable,
         }
     }
 

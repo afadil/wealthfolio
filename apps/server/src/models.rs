@@ -1,5 +1,8 @@
+use std::str::FromStr;
+
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use utoipa::ToSchema;
 use wealthfolio_core::accounts as core_accounts;
 
@@ -98,7 +101,13 @@ fn parse_tracking_mode(s: &str) -> core_accounts::TrackingMode {
 }
 
 fn parse_tax_treatment(s: &str) -> core_accounts::TaxTreatment {
-    core_accounts::TaxTreatment::from_str(s)
+    core_accounts::TaxTreatment::from_str(s).unwrap_or_else(|err| {
+        warn!(
+            "Unrecognized tax_treatment '{}' in HTTP payload ({}); defaulting to TAXABLE",
+            s, err
+        );
+        core_accounts::TaxTreatment::Taxable
+    })
 }
 
 impl From<NewAccount> for core_accounts::NewAccount {

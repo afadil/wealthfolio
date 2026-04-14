@@ -1,7 +1,10 @@
 //! Database model for accounts.
 
+use std::str::FromStr;
+
 use chrono::NaiveDateTime;
 use diesel::prelude::*;
+use log::warn;
 use serde::{Deserialize, Serialize};
 
 use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount, TaxTreatment, TrackingMode};
@@ -52,7 +55,13 @@ impl From<AccountDB> for Account {
             "HOLDINGS" => TrackingMode::Holdings,
             _ => TrackingMode::NotSet,
         };
-        let tax_treatment = TaxTreatment::from_str(&db.tax_treatment);
+        let tax_treatment = TaxTreatment::from_str(&db.tax_treatment).unwrap_or_else(|err| {
+            warn!(
+                "Unrecognized tax_treatment '{}' for account '{}' ({}); defaulting to TAXABLE",
+                db.tax_treatment, db.id, err
+            );
+            TaxTreatment::Taxable
+        });
         Self {
             id: db.id,
             name: db.name,
@@ -118,10 +127,13 @@ impl From<AccountUpdate> for AccountDB {
             })
             .unwrap_or("NOT_SET")
             .to_string();
+        // When `tax_treatment` is not provided on the update, leave an empty
+        // placeholder; the repository is responsible for populating it from the
+        // existing record (same pattern as `currency` and `created_at`).
         let tax_treatment = domain
             .tax_treatment
             .map(|tt| tt.as_str().to_string())
-            .unwrap_or_else(|| "TAXABLE".to_string());
+            .unwrap_or_default();
         Self {
             id: domain.id.unwrap_or_default(),
             name: domain.name,

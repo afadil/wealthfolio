@@ -1,5 +1,7 @@
 //! Account domain models.
 
+use std::str::FromStr;
+
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
@@ -39,12 +41,20 @@ impl TaxTreatment {
             TaxTreatment::TaxDeferred => "TAX_DEFERRED",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for TaxTreatment {
+    type Err = ValidationError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "TAX_FREE" => TaxTreatment::TaxFree,
-            "TAX_DEFERRED" => TaxTreatment::TaxDeferred,
-            _ => TaxTreatment::Taxable,
+            "TAXABLE" => Ok(TaxTreatment::Taxable),
+            "TAX_FREE" => Ok(TaxTreatment::TaxFree),
+            "TAX_DEFERRED" => Ok(TaxTreatment::TaxDeferred),
+            other => Err(ValidationError::InvalidInput(format!(
+                "Unknown tax treatment value: {}",
+                other
+            ))),
         }
     }
 }

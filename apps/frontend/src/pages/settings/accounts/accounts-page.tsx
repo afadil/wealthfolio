@@ -57,17 +57,21 @@ const SettingsAccountsPage = () => {
   };
 
   const handleArchiveAccount = (account: Account, archive: boolean) => {
+    // Only toggle `isArchived`; omit `taxTreatment` so the backend preserves
+    // the existing value rather than risking a fallback to TAXABLE.
+    const { taxTreatment: _taxTreatment, ...rest } = account;
     updateAccountMutation.mutate({
-      ...account,
-      taxTreatment: (account.taxTreatment || "TAXABLE") as "TAXABLE" | "TAX_FREE" | "TAX_DEFERRED",
+      ...rest,
       isArchived: archive,
     });
   };
 
   const handleHideAccount = (account: Account, hide: boolean) => {
+    // Only toggle `isActive`; omit `taxTreatment` so the backend preserves
+    // the existing value rather than risking a fallback to TAXABLE.
+    const { taxTreatment: _taxTreatment, ...rest } = account;
     updateAccountMutation.mutate({
-      ...account,
-      taxTreatment: (account.taxTreatment || "TAXABLE") as "TAXABLE" | "TAX_FREE" | "TAX_DEFERRED",
+      ...rest,
       isActive: !hide,
     });
   };

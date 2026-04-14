@@ -27,17 +27,17 @@ export const createAccount = async (account: NewAccount): Promise<Account> => {
 
 export const updateAccount = async (account: NewAccount): Promise<Account> => {
   try {
-    // Platform-aware: desktop strips currency (immutable after creation)
+    // Platform-aware: desktop strips currency (immutable after creation).
+    // `taxTreatment` is Option-typed on the backend; when the caller omits it,
+    // JSON.stringify drops the undefined key and the repository preserves
+    // the existing value.
     const payload = isDesktop
       ? (() => {
           const { currency: _, ...rest } = account;
           return rest;
         })()
       : account;
-    // Remove taxTreatment from payload if not explicitly provided (will be preserved by backend)
-    const { taxTreatment, ...updatePayload } = payload;
-    const finalPayload = taxTreatment ? { ...updatePayload, taxTreatment } : updatePayload;
-    return await invoke<Account>("update_account", { accountUpdate: finalPayload });
+    return await invoke<Account>("update_account", { accountUpdate: payload });
   } catch (error) {
     logger.error("Error updating account.");
     throw error;
