@@ -30,6 +30,8 @@ interface DataTableProps<TData, TValue> {
   /** Search input placeholder (pass translated string from the app). */
   searchPlaceholder?: string;
   filters?: DataTableFacetedFilterProps<TData, TValue>[];
+  /** Label for reset button in toolbar (pass translated string from app). */
+  resetLabel?: string;
   defaultColumnVisibility?: VisibilityState;
   defaultSorting?: SortingState;
   defaultColumnFilters?: ColumnFiltersState;
@@ -51,6 +53,7 @@ export function DataTable<TData, TValue>({
   searchBy,
   searchPlaceholder,
   filters,
+  resetLabel,
   manualPagination = false,
   defaultColumnVisibility,
   defaultSorting,
@@ -111,6 +114,7 @@ export function DataTable<TData, TValue>({
           searchBy={searchBy}
           searchPlaceholder={searchPlaceholder}
           filters={filters}
+          resetLabel={resetLabel}
           showColumnToggle={showColumnToggle}
           columnToggleLabel={columnToggleLabel}
           actions={toolbarActions}

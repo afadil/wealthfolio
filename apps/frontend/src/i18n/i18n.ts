@@ -43,6 +43,17 @@ function resolveInitialLocale(): UiLocale {
 
 const initialLocale = resolveInitialLocale();
 
+function scheduleInitialShellLocaleSync(locale: UiLocale) {
+  // On desktop, app startup can race native command registration.
+  // Retry a few times so menu/dialog locale is eventually applied.
+  const delaysMs = [0, 400, 1200, 2500];
+  for (const delay of delaysMs) {
+    window.setTimeout(() => {
+      void syncShellLocale(locale);
+    }, delay);
+  }
+}
+
 void i18n.use(initReactI18next).init({
   resources: {
     en: { common: enCommon },
@@ -59,7 +70,11 @@ if (typeof document !== "undefined") {
   document.documentElement.lang = i18n.language;
 }
 
-void syncShellLocale(initialLocale);
+if (typeof window !== "undefined") {
+  scheduleInitialShellLocaleSync(initialLocale);
+} else {
+  void syncShellLocale(initialLocale);
+}
 
 i18n.on("languageChanged", (lng) => {
   persistLocale(lng);

@@ -1,5 +1,6 @@
 import { logger, updateSettings } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import i18n from "@/i18n/i18n";
 import { QueryKeys } from "@/lib/query-keys";
 import { Settings } from "@/lib/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,8 +21,8 @@ export function useSettingsMutation(
         "onboardingCompleted" in variables || !updatedSettings.onboardingCompleted;
       if (!isOnboarding) {
         toast({
-          title: "Settings updated",
-          description: "Your settings have been updated successfully.",
+          title: i18n.t("toast.settings.updated_title"),
+          description: i18n.t("toast.settings.updated_description"),
           variant: "success",
           duration: 1000,
         });
@@ -30,8 +31,8 @@ export function useSettingsMutation(
     onError: (error) => {
       logger.error(`Error updating settings: ${error}`);
       toast({
-        title: "Uh oh! Something went wrong.",
-        description: "There was a problem updating your settings.",
+        title: i18n.t("toast.settings.update_failed_title"),
+        description: i18n.t("toast.settings.update_failed_description"),
         variant: "destructive",
       });
     },

@@ -51,6 +51,16 @@ interface ProviderSettingsProps {
   isLast?: boolean;
 }
 
+function getLocalizedProviderDescription(
+  provider: MarketDataProviderSetting,
+  t: (key: string) => string,
+): string | null {
+  if (!provider.description) return null;
+  const key = `settings.market_data.provider_description.${provider.id.toLowerCase()}`;
+  const localized = t(key);
+  return localized === key ? provider.description : localized;
+}
+
 function ProviderSettings({
   provider,
   priorityValue,
@@ -225,7 +235,9 @@ function ProviderSettings({
             </div>
             {/* Description - smaller text */}
             {provider.description && (
-              <p className="text-muted-foreground mt-0.5 text-xs">{provider.description}</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {getLocalizedProviderDescription(provider, t)}
+              </p>
             )}
             {/* Capability features */}
             {provider.capabilities && provider.capabilities.features.length > 0 && (

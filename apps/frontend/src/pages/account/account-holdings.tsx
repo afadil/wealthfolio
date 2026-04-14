@@ -62,10 +62,21 @@ const AccountHoldings = ({
     return selectedAccount ? [selectedAccount] : [];
   }, [selectedAccount]);
 
-  const filteredHoldings = holdings?.filter((holding) => holding.holdingType !== HoldingType.CASH);
+  const filteredHoldings = useMemo(() => {
+    if (!holdings) return [];
+
+    // Hide closed/cleared positions that remain with zero quantity/value.
+    const EPSILON = 1e-8;
+    return holdings.filter((holding) => {
+      if (holding.holdingType === HoldingType.CASH) return false;
+
+      const quantity = Math.abs(holding.quantity ?? 0);
+      const marketValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+      return quantity > EPSILON || marketValue > EPSILON;
+    });
+  }, [holdings]);
 
   const typeOptions = useMemo(() => {
-    if (!filteredHoldings) return [];
     const seen = new Set<string>();
     const options: { value: string; label: string }[] = [];
     for (const h of filteredHoldings) {

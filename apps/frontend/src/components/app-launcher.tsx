@@ -544,11 +544,12 @@ export function AppLauncher() {
   };
 
   const handleSelectRecent = (item: RecentItem) => {
+    const resolvedLabel = getRecentDisplayLabel(item);
     // Update the timestamp for this item (move to front)
     addRecentItem({
       type: item.type,
       id: item.id,
-      label: item.label,
+      label: resolvedLabel,
     });
 
     setSearch("");
@@ -566,6 +567,25 @@ export function AppLauncher() {
         break;
     }
   };
+
+  const getRecentDisplayLabel = useCallback(
+    (item: RecentItem) => {
+      if (item.type === "action") {
+        const match = actionItems.find((action) => action.href === item.id);
+        return match ? (match.label ?? match.title) : item.label;
+      }
+      if (item.type === "holding") {
+        const match = holdingOptions.find((holding) => holding.id === item.id);
+        if (match) return match.name ? `${match.symbol} - ${match.name}` : match.symbol;
+      }
+      if (item.type === "account") {
+        const match = accountOptions.find((account) => account.id === item.id);
+        if (match) return match.name;
+      }
+      return item.label;
+    },
+    [accountOptions, actionItems, holdingOptions],
+  );
 
   // Filter items based on search
   const searchLower = search.toLowerCase();
@@ -589,7 +609,7 @@ export function AppLauncher() {
   // Filter recent items based on search (only show when searching or when no search)
   const filteredRecent = recentItems.filter((item) => {
     if (!searchLower) return true;
-    return item.label.toLowerCase().includes(searchLower);
+    return getRecentDisplayLabel(item).toLowerCase().includes(searchLower);
   });
 
   // Show recent items only when there's no search, or when searching and they match
@@ -639,6 +659,7 @@ export function AppLauncher() {
         {showRecent && (
           <CommandGroup heading={t("launcher.group_recent")}>
             {(searchLower ? filteredRecent : recentItems).map((item) => {
+              const displayLabel = getRecentDisplayLabel(item);
               const getRecentIcon = () => {
                 switch (item.type) {
                   case "holding":
@@ -655,12 +676,12 @@ export function AppLauncher() {
               return (
                 <CommandItem
                   key={`${item.type}-${item.id}`}
-                  value={`recent-${item.label}`}
+                  value={`recent-${displayLabel}`}
                   onSelect={() => handleSelectRecent(item)}
                   className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                 >
                   {getRecentIcon()}
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium">{displayLabel}</span>
                   <span className="text-muted-foreground ml-auto text-xs capitalize">
                     {t(`launcher.recent_type.${item.type}`)}
                   </span>

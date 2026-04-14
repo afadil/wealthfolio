@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,61 +34,72 @@ import type {
   CustomProviderWithSources,
   NewCustomProviderSource,
 } from "@/lib/types/custom-provider";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { SourceConfigPanel } from "./source-config-panel";
 
-const sourceSchema = z.object({
-  format: z.enum(["json", "html", "html_table", "csv"]),
-  url: z
-    .string()
-    .min(1, "URL is required")
-    .refine((val) => /^https?:\/\//i.test(val), {
-      message: "URL must start with http:// or https://",
-    }),
-  pricePath: z.string().min(1, "Price path is required"),
-  datePath: z.string().optional(),
-  dateFormat: z.string().optional(),
-  currencyPath: z.string().optional(),
-  factor: z.coerce.number().optional(),
-  invert: z.boolean().optional(),
-  locale: z.string().optional(),
-  headers: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val || val.trim() === "") return true;
-        try {
-          JSON.parse(val);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { message: "Headers must be valid JSON" },
-    ),
-  highPath: z.string().optional(),
-  lowPath: z.string().optional(),
-  volumePath: z.string().optional(),
-  defaultPrice: z.coerce.number().optional(),
-  dateTimezone: z.string().optional(),
-});
+function createSourceSchema(t: TFunction<"common">) {
+  return z.object({
+    format: z.enum(["json", "html", "html_table", "csv"]),
+    url: z
+      .string()
+      .min(1, t("settings.market_data.custom_provider.validation.url_required"))
+      .refine((val) => /^https?:\/\//i.test(val), {
+        message: t("settings.market_data.custom_provider.validation.url_http_required"),
+      }),
+    pricePath: z
+      .string()
+      .min(1, t("settings.market_data.custom_provider.validation.price_path_required")),
+    datePath: z.string().optional(),
+    dateFormat: z.string().optional(),
+    currencyPath: z.string().optional(),
+    factor: z.coerce.number().optional(),
+    invert: z.boolean().optional(),
+    locale: z.string().optional(),
+    headers: z
+      .string()
+      .optional()
+      .refine(
+        (val) => {
+          if (!val || val.trim() === "") return true;
+          try {
+            JSON.parse(val);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: t("settings.market_data.custom_provider.validation.headers_json_invalid") },
+      ),
+    highPath: z.string().optional(),
+    lowPath: z.string().optional(),
+    volumePath: z.string().optional(),
+    defaultPrice: z.coerce.number().optional(),
+    dateTimezone: z.string().optional(),
+  });
+}
 
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  code: z
-    .string()
-    .min(1, "Code is required")
-    .regex(/^[a-z0-9-]+$/, "Lowercase alphanumeric and hyphens only"),
-  description: z.string().optional(),
-  priority: z.coerce.number().int().min(1).default(50),
-  latestSource: sourceSchema,
-  historicalEnabled: z.boolean(),
-  historicalSource: sourceSchema.optional(),
-});
+function createFormSchema(t: TFunction<"common">) {
+  const sourceSchema = createSourceSchema(t);
+  return z.object({
+    name: z.string().min(1, t("settings.market_data.custom_provider.validation.name_required")),
+    code: z
+      .string()
+      .min(1, t("settings.market_data.custom_provider.validation.code_required"))
+      .regex(
+        /^[a-z0-9-]+$/,
+        t("settings.market_data.custom_provider.validation.code_format"),
+      ),
+    description: z.string().optional(),
+    priority: z.coerce.number().int().min(1).default(50),
+    latestSource: sourceSchema,
+    historicalEnabled: z.boolean(),
+    historicalSource: sourceSchema.optional(),
+  });
+}
 
-export type FormValues = z.infer<typeof formSchema>;
+export type FormValues = z.infer<ReturnType<typeof createFormSchema>>;
 
 function generateCode(name: string): string {
   return name
@@ -164,6 +175,7 @@ function CustomProviderFormContent({
 
   const latestSource = provider?.sources.find((s) => s.kind === "latest");
   const historicalSource = provider?.sources.find((s) => s.kind === "historical");
+  const formSchema = useMemo(() => createFormSchema(t), [t]);
 
   const form = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

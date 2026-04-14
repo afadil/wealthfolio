@@ -1,4 +1,5 @@
-import { isDesktop, logger } from "@/adapters";
+import { isDesktop, logger, syncShellLocale } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
@@ -62,6 +63,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (data) {
       setSettings(data);
       applySettingsToDocument(data);
+      // Ensure native desktop menu/dialog locale is applied after settings/context are ready.
+      void syncShellLocale(i18n.resolvedLanguage ?? i18n.language);
     }
   }, [data]);
 

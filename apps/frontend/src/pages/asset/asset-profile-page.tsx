@@ -16,6 +16,7 @@ import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { useAssetTaxonomyAssignments, useTaxonomy } from "@/hooks/use-taxonomies";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { localizeCategoryName } from "@/lib/taxonomy-i18n";
 import {
   EXTERNAL_RESEARCH_SETTINGS_CHANGED_EVENT,
   type ExternalResearchAssetRef,
@@ -457,9 +458,10 @@ export const AssetProfilePage = () => {
         (c) => c.id === assetClassAssignment.categoryId,
       );
       if (category) {
+        const localizedName = localizeCategoryName(t, assetClassesTaxonomy?.taxonomy, category);
         badges.push({
           id: category.id,
-          categoryName: category.name,
+          categoryName: localizedName,
           categoryColor: category.color,
           taxonomyName: t("asset.profile.badge.taxonomy.class"),
         });
@@ -473,12 +475,15 @@ export const AssetProfilePage = () => {
         (c) => c.id === typeAssignment.categoryId,
       );
       if (category) {
+        const normalizedCategoryKey = (category.key ?? "").toUpperCase();
+        const isEtfCategory =
+          normalizedCategoryKey === "ETF" ||
+          normalizedCategoryKey === "ETP" ||
+          normalizedCategoryKey === "EXCHANGE_TRADED_FUND_ETF";
+        const localizedName = localizeCategoryName(t, typeOfSecurityTaxonomy?.taxonomy, category);
         badges.push({
           id: category.id,
-          categoryName:
-            category.name === "Exchange Traded Fund (ETF)"
-              ? t("asset.profile.badge.etf_short")
-              : category.name,
+          categoryName: isEtfCategory ? t("asset.profile.badge.etf_short") : localizedName,
           categoryColor: category.color,
           taxonomyName: t("asset.profile.badge.taxonomy.type"),
         });
@@ -492,9 +497,10 @@ export const AssetProfilePage = () => {
         (c) => c.id === riskAssignment.categoryId,
       );
       if (category) {
+        const localizedName = localizeCategoryName(t, riskCategoryTaxonomy?.taxonomy, category);
         badges.push({
           id: category.id,
-          categoryName: t("asset.profile.badge.risk_label", { name: category.name }),
+          categoryName: t("asset.profile.badge.risk_label", { name: localizedName }),
           categoryColor: category.color,
           taxonomyName: t("asset.profile.badge.taxonomy.risk"),
         });
@@ -510,9 +516,10 @@ export const AssetProfilePage = () => {
       for (const assignment of industryAssignments) {
         const category = industriesTaxonomy.categories.find((c) => c.id === assignment.categoryId);
         if (category) {
+          const localizedName = localizeCategoryName(t, industriesTaxonomy?.taxonomy, category);
           badges.push({
             id: `industry-${category.id}`,
-            categoryName: category.name,
+            categoryName: localizedName,
             categoryColor: category.color,
             taxonomyName: t("asset.profile.badge.taxonomy.industry"),
           });
@@ -529,9 +536,10 @@ export const AssetProfilePage = () => {
       for (const assignment of regionAssignments) {
         const category = regionsTaxonomy.categories.find((c) => c.id === assignment.categoryId);
         if (category) {
+          const localizedName = localizeCategoryName(t, regionsTaxonomy?.taxonomy, category);
           badges.push({
             id: `region-${category.id}`,
-            categoryName: category.name,
+            categoryName: localizedName,
             categoryColor: category.color,
             taxonomyName: t("asset.profile.badge.taxonomy.region"),
           });

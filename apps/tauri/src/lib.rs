@@ -70,7 +70,11 @@ mod desktop {
 
         // Make context available to all commands
         handle.manage(Arc::clone(&context));
-        handle.manage(crate::shell_i18n::ShellLocale::default());
+        let initial_shell_locale = crate::shell_i18n::load_persisted_shell_locale(app_data_dir);
+        log::info!("Desktop startup shell locale: {}", initial_shell_locale);
+        handle.manage(crate::shell_i18n::ShellLocale::from_code(
+            &initial_shell_locale,
+        ));
 
         // Start the domain event queue worker now that context is managed
         // This must be done in an async context since it spawns a tokio task

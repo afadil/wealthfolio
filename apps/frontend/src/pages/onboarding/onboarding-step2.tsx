@@ -122,7 +122,7 @@ interface OnboardingStep2Props {
 
 export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2Props>(
   ({ onNext, onValidityChange }, ref) => {
-    const { t } = useTranslation("common");
+    const { t, i18n } = useTranslation("common");
     const { settings, updateSettings } = useSettingsContext();
     const onboardingSettingsSchema = useMemo(() => createOnboardingSettingsSchema(t), [t]);
     const [initialValuesSet, setInitialValuesSet] = useState(false);
@@ -157,6 +157,9 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
     const allTimezones = useMemo(() => getSupportedTimezones(), []);
     const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
     const currentTimezone = form.watch("timezone");
+    const currentUiLanguage = (i18n.resolvedLanguage ?? i18n.language)?.toLowerCase().startsWith("de")
+      ? "de"
+      : "en";
 
     const filteredTimezones = allTimezones.filter((tz) =>
       tz.toLowerCase().includes(timezoneSearch.toLowerCase()),
@@ -220,10 +223,54 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     return (
       <>
-        <div className="w-full max-w-2xl space-y-4">
+        <div className="w-full max-w-4xl space-y-4">
           <div className="text-center">
             <p className="text-muted-foreground">{t("onboarding.step2.intro")}</p>
           </div>
+          <Card>
+            <CardContent className="grid gap-5 p-5 sm:grid-cols-2 sm:gap-6 sm:p-6">
+              <div className="space-y-2">
+                <div className="mb-1 flex items-center gap-3">
+                  <div className="bg-muted rounded-lg p-2">
+                    <Icons.Globe className="text-muted-foreground h-4 w-4" />
+                  </div>
+                  <p className="text-sm font-medium">{t("onboarding.step2.language_section_title")}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["de", "en"] as const).map((locale) => (
+                    <button
+                      key={locale}
+                      type="button"
+                      onClick={() => {
+                        void i18n.changeLanguage(locale);
+                      }}
+                      className={`rounded-lg border-2 px-4 py-2.5 text-left text-sm font-semibold transition-all ${
+                        currentUiLanguage === locale
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50 hover:bg-accent"
+                      }`}
+                    >
+                      {t(`settings.language.option.${locale}`)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground max-w-[52ch] text-sm leading-relaxed">
+                  {t("onboarding.step2.language_section_hint")}
+                </p>
+              </div>
+              <div className="flex items-start gap-3 sm:pt-1">
+                <div className="bg-muted mt-0.5 shrink-0 rounded-lg p-2">
+                  <Icons.InfoCircle className="text-muted-foreground h-4 w-4" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{t("onboarding.step2.research_links_title")}</p>
+                  <p className="text-muted-foreground max-w-[52ch] text-sm leading-relaxed">
+                    {t("onboarding.step2.research_links_hint")}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card className="border-none bg-transparent">
             <CardContent className="p-0 sm:p-6">
               <Form {...form}>
@@ -249,7 +296,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 type="button"
                                 data-testid={`currency-${curr.toLowerCase()}-button`}
                                 onClick={() => field.onChange(curr)}
-                                className={`rounded-lg border-2 p-4 font-semibold transition-all ${
+                              className={`rounded-lg border-2 px-4 py-3 font-semibold transition-all ${
                                   field.value === curr
                                     ? "border-primary bg-primary/10"
                                     : "border-border hover:border-primary/50 hover:bg-accent"
@@ -296,7 +343,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                                 type="button"
                                 data-testid={`timezone-${tz.toLowerCase().replace(/\//g, "-")}-button`}
                                 onClick={() => field.onChange(tz)}
-                                className={`rounded-lg border-2 p-4 font-semibold transition-all ${
+                              className={`rounded-lg border-2 px-4 py-3 font-semibold transition-all ${
                                   field.value === tz
                                     ? "border-primary bg-primary/10"
                                     : "border-border hover:border-primary/50 hover:bg-accent"

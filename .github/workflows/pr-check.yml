@@ -43,6 +43,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Guard taxonomy name-based logic
+        run: pnpm guard:taxonomy-name-logic
+
       - name: Type check
         run: pnpm type-check
 

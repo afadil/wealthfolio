@@ -342,21 +342,25 @@ export function AssetsTable({
         id: "holdingStatus",
         title: t("settings.securities.table.filter_portfolio"),
         options: holdingStatusOptions,
+        clearFiltersLabel: t("activity.filters.clear_filters"),
       },
       {
         id: "kind",
         title: t("settings.securities.table.filter_kind"),
         options: kindOptions,
+        clearFiltersLabel: t("activity.filters.clear_filters"),
       },
       {
         id: "quoteMode",
         title: t("settings.securities.table.filter_mode"),
         options: quoteModeOptions,
+        clearFiltersLabel: t("activity.filters.clear_filters"),
       },
       {
         id: "isStale",
         title: t("settings.securities.table.filter_market_data"),
         options: priceStaleOptions,
+        clearFiltersLabel: t("activity.filters.clear_filters"),
       },
     ],
     [kindOptions, quoteModeOptions, t, holdingStatusOptions, priceStaleOptions],
@@ -432,7 +436,9 @@ export function AssetsTable({
       data={assetsWithStaleFlag}
       columns={columns}
       searchBy="symbol"
+      searchPlaceholder={t("settings.securities.mobile.search_placeholder")}
       filters={filters}
+      resetLabel={t("settings.securities.mobile.reset")}
       defaultColumnVisibility={{
         quoteCcy: false,
         isStale: false,

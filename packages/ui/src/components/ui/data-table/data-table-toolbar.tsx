@@ -16,6 +16,8 @@ interface DataTableToolbarProps<TData> {
   searchBy?: string;
   searchPlaceholder?: string;
   filters?: DataTableFacetedFilterProps<TData, unknown>[];
+  /** Label for resetting active table filters/search. */
+  resetLabel?: string;
   showColumnToggle?: boolean;
   /** Label for the column visibility dropdown (e.g. translated). */
   columnToggleLabel?: string;
@@ -27,6 +29,7 @@ export function DataTableToolbar<TData>({
   searchBy,
   searchPlaceholder = "Search ...",
   filters,
+  resetLabel = "Reset",
   showColumnToggle = false,
   columnToggleLabel = "Columns",
   actions,
@@ -52,6 +55,9 @@ export function DataTableToolbar<TData>({
             column={table.getColumn(filter.id)}
             title={filter.title}
             options={filter.options}
+            clearFiltersLabel={filter.clearFiltersLabel}
+            emptyMessage={filter.emptyMessage}
+            manySelectedLabel={filter.manySelectedLabel}
           />
         ))}
         {isFiltered && (
@@ -63,7 +69,7 @@ export function DataTableToolbar<TData>({
             }}
             className="h-8 px-2 lg:px-3"
           >
-            Reset
+            {resetLabel}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         )}

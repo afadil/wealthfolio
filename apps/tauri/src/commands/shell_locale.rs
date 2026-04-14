@@ -11,9 +11,8 @@ pub fn set_shell_locale(
     locale: String,
     ctx: State<'_, Arc<ServiceContext>>,
 ) -> Result<(), String> {
-    if locale != "en" && locale != "de" {
-        return Err(format!("Unsupported locale: {}", locale));
-    }
+    let locale = crate::shell_i18n::normalize_shell_locale(&locale).to_string();
+    log::info!("set_shell_locale requested: {}", locale);
 
     #[cfg(desktop)]
     {
@@ -21,6 +20,12 @@ pub fn set_shell_locale(
             if let Ok(mut g) = shell.0.write() {
                 *g = locale.clone();
             }
+        } else {
+            log::warn!("set_shell_locale: ShellLocale state missing");
+        }
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            let app_data_dir = app_data_dir.to_string_lossy().to_string();
+            crate::shell_i18n::persist_shell_locale(&app_data_dir, &locale);
         }
 
         let show_menu = ctx
@@ -30,12 +35,15 @@ pub fn set_shell_locale(
             .menu_bar_visible;
 
         if show_menu {
-            match crate::menu::create_menu(&app) {
+            match crate::menu::create_menu_for_locale(&app, &locale) {
                 Ok(menu) => {
                     let _ = app.set_menu(menu);
+                    log::info!("set_shell_locale applied menu locale: {}", locale);
                 }
                 Err(e) => log::warn!("Failed to rebuild menu after locale change: {}", e),
             }
+        } else {
+            log::debug!("set_shell_locale skipped menu rebuild (menu hidden)");
         }
     }
 

@@ -1,10 +1,11 @@
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export const OnboardingStep1: React.FC = () => {
   const { t } = useTranslation("common");
+  const [selectedMode, setSelectedMode] = useState<"holdings" | "transactions">("holdings");
   return (
     <div className="w-full max-w-5xl space-y-4 md:space-y-6">
       <div className="text-center">
@@ -12,7 +13,22 @@ export const OnboardingStep1: React.FC = () => {
       </div>
 
       <div className="mx-auto grid gap-5 px-2 md:grid-cols-2 md:gap-6 md:px-4 lg:gap-8">
-        <Card className="border-border/50 from-card to-card/80 hover:border-primary/50 bg-linear-to-br group relative flex flex-col overflow-hidden border-2 p-5 transition-all duration-300 hover:shadow-lg md:p-6">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedMode("holdings")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSelectedMode("holdings");
+            }
+          }}
+          className={`from-card to-card/80 bg-linear-to-br group relative flex cursor-pointer flex-col overflow-hidden border-2 p-5 transition-all duration-300 md:p-6 ${
+            selectedMode === "holdings"
+              ? "border-primary ring-primary/20 ring-2"
+              : "border-border/50 hover:border-primary/50 hover:shadow-lg"
+          }`}
+        >
           <div className="bg-linear-to-br absolute inset-0 from-green-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
           {/* Header */}
@@ -60,7 +76,22 @@ export const OnboardingStep1: React.FC = () => {
           </div>
         </Card>
 
-        <Card className="border-border/50 from-card to-card/80 hover:border-primary/50 bg-linear-to-br group relative flex flex-col overflow-hidden border-2 p-5 transition-all duration-300 hover:shadow-lg md:p-6">
+        <Card
+          role="button"
+          tabIndex={0}
+          onClick={() => setSelectedMode("transactions")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSelectedMode("transactions");
+            }
+          }}
+          className={`from-card to-card/80 bg-linear-to-br group relative flex cursor-pointer flex-col overflow-hidden border-2 p-5 transition-all duration-300 md:p-6 ${
+            selectedMode === "transactions"
+              ? "border-primary ring-primary/20 ring-2"
+              : "border-border/50 hover:border-primary/50 hover:shadow-lg"
+          }`}
+        >
           <div className="bg-linear-to-br absolute inset-0 from-blue-500/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
           {/* Header */}

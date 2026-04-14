@@ -1,5 +1,6 @@
 //! Bundled strings for native menus and dialogs (desktop). Locales: `apps/tauri/locales/<code>/shell.json`.
 use serde::Deserialize;
+use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 use tauri::{AppHandle, Manager};
 
@@ -48,6 +49,7 @@ pub struct ShellStrings {
 
 static EN: OnceLock<ShellStrings> = OnceLock::new();
 static DE: OnceLock<ShellStrings> = OnceLock::new();
+const SHELL_LOCALE_FILENAME: &str = "shell-locale.txt";
 
 fn en_strings() -> &'static ShellStrings {
     EN.get_or_init(|| {
@@ -68,6 +70,35 @@ pub fn shell_strings(locale: &str) -> &'static ShellStrings {
     }
 }
 
+pub fn normalize_shell_locale(locale: &str) -> &'static str {
+    let normalized = locale.to_lowercase();
+    if normalized == "de" || normalized.starts_with("de-") {
+        "de"
+    } else {
+        "en"
+    }
+}
+
+fn shell_locale_path(app_data_dir: &str) -> std::path::PathBuf {
+    Path::new(app_data_dir).join(SHELL_LOCALE_FILENAME)
+}
+
+pub fn load_persisted_shell_locale(app_data_dir: &str) -> String {
+    let path = shell_locale_path(app_data_dir);
+    match std::fs::read_to_string(path) {
+        Ok(raw) => normalize_shell_locale(raw.trim()).to_string(),
+        Err(_) => "en".to_string(),
+    }
+}
+
+pub fn persist_shell_locale(app_data_dir: &str, locale: &str) {
+    let path = shell_locale_path(app_data_dir);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(path, normalize_shell_locale(locale));
+}
+
 /// Holds the active shell locale (`en` or `de`), kept in sync with the webview language.
 pub struct ShellLocale(pub Arc<RwLock<String>>);
 
@@ -78,6 +109,10 @@ impl Default for ShellLocale {
 }
 
 impl ShellLocale {
+    pub fn from_code(code: &str) -> Self {
+        Self(Arc::new(RwLock::new(normalize_shell_locale(code).to_string())))
+    }
+
     pub fn current_code<R: tauri::Runtime>(app: &AppHandle<R>) -> String {
         app.try_state::<ShellLocale>()
             .and_then(|s| s.0.read().ok().map(|g| g.clone()))

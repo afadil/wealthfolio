@@ -3,7 +3,15 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
-    let s = crate::shell_i18n::current_strings(app);
+    let code = crate::shell_i18n::ShellLocale::current_code(app);
+    create_menu_for_locale(app, &code)
+}
+
+pub fn create_menu_for_locale<R: Runtime>(
+    app: &AppHandle<R>,
+    locale: &str,
+) -> Result<Menu<R>, tauri::Error> {
+    let s = crate::shell_i18n::shell_strings(locale);
 
     let app_menu = SubmenuBuilder::new(app, &s.menu_brand)
         .item(

@@ -25,6 +25,11 @@ interface HoldingsInsightsPageProps {
   accountId?: string;
 }
 
+function isUnknownAllocationCategory(categoryId: string): boolean {
+  const normalized = (categoryId ?? "").toUpperCase();
+  return normalized === "UNKNOWN" || normalized === "__UNKNOWN__";
+}
+
 export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsightsPageProps) => {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
@@ -45,19 +50,27 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
   const [initialCategoryId, setInitialCategoryId] = useState<string | null>(null);
 
   const { cashHoldings, nonCashHoldings } = useMemo(() => {
-    const cash = holdings?.filter((holding) => holding.holdingType?.toLowerCase() === "cash") ?? [];
+    const EPSILON = 1e-8;
+    const cash =
+      holdings?.filter((holding) => {
+        if (holding.holdingType?.toLowerCase() !== "cash") return false;
+        const cashValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+        return cashValue > EPSILON;
+      }) ?? [];
     const nonCash =
       holdings?.filter((holding) => {
         if (holding.holdingType?.toLowerCase() === "cash") return false;
         if (holding.assetKind && isAlternativeAssetKind(holding.assetKind as AssetKind))
           return false;
-        return true;
+        const quantity = Math.abs(holding.quantity ?? 0);
+        const marketValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+        return quantity > EPSILON || marketValue > EPSILON;
       }) ?? [];
 
     return { cashHoldings: cash, nonCashHoldings: nonCash };
   }, [holdings]);
 
-  const hasNoHoldingsAtAll = !isLoading && (!holdings || holdings.length === 0);
+  const hasNoHoldingsAtAll = !isLoading && cashHoldings.length === 0 && nonCashHoldings.length === 0;
 
   const hasRiskAllocations =
     allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
@@ -113,7 +126,7 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
       (taxonomy) =>
         taxonomy.categories.length > 0 &&
         taxonomy.categories.some(
-          (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
+          (cat) => cat.value > 0 && !isUnknownAllocationCategory(cat.categoryId),
         ),
     ) ?? false;
 
@@ -310,7 +323,7 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
                 (taxonomy) =>
                   taxonomy.categories.length > 0 &&
                   taxonomy.categories.some(
-                    (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
+                    (cat) => cat.value > 0 && !isUnknownAllocationCategory(cat.categoryId),
                   ) && (
                     <SegmentedAllocationBar
                       key={taxonomy.taxonomyId}

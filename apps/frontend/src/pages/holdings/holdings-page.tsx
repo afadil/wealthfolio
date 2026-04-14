@@ -301,8 +301,14 @@ export const HoldingsPage = () => {
 
   // Process investment holdings
   const { nonCashHoldings, filteredHoldings, availableTypeOptions } = useMemo(() => {
+    const EPSILON = 1e-8;
     const nonCash =
-      holdings?.filter((holding) => holding.holdingType?.toLowerCase() !== HoldingType.CASH) ?? [];
+      holdings?.filter((holding) => {
+        if (holding.holdingType?.toLowerCase() === HoldingType.CASH) return false;
+        const quantity = Math.abs(holding.quantity ?? 0);
+        const marketValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+        return quantity > EPSILON || marketValue > EPSILON;
+      }) ?? [];
 
     let filtered = nonCash;
     if (investmentsFilter?.assetKinds) {

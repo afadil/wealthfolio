@@ -73,11 +73,19 @@ export function CategoryForm({
   const createMutation = useCreateCategory();
   const updateMutation = useUpdateCategory();
   const deleteMutation = useDeleteCategory();
+  const isReadonlySystemCategory = !isCreateMode && Boolean(isSystem);
+  const localizedNameForDisplay = category
+    ? localizeCategoryName(
+        t,
+        isSystem ? { id: taxonomyId, isSystem: true } : undefined,
+        category,
+      )
+    : "";
 
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
-      name: category?.name ?? "",
+      name: localizedNameForDisplay,
       key: category?.key ?? "",
       color: category?.color ?? taxonomyColor ?? "#808080",
       description: category?.description ?? "",
@@ -87,12 +95,12 @@ export function CategoryForm({
   // Reset form when category changes
   useEffect(() => {
     form.reset({
-      name: category?.name ?? "",
+      name: localizedNameForDisplay,
       key: category?.key ?? "",
       color: category?.color ?? taxonomyColor ?? "#808080",
       description: category?.description ?? "",
     });
-  }, [category, taxonomyColor, form]);
+  }, [localizedNameForDisplay, category, taxonomyColor, form]);
 
   // Auto-generate key from name in create mode
   const watchName = form.watch("name");
@@ -185,7 +193,11 @@ export function CategoryForm({
               <FormItem>
                 <FormLabel>{t("settings.taxonomies.form.label_name")}</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder={t("settings.taxonomies.form.placeholder_name")} />
+                  <Input
+                    {...field}
+                    disabled={isReadonlySystemCategory}
+                    placeholder={t("settings.taxonomies.form.placeholder_name")}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -204,10 +216,12 @@ export function CategoryForm({
                       type="color"
                       value={field.value}
                       onChange={field.onChange}
+                      disabled={isReadonlySystemCategory}
                       className="h-9 w-12 cursor-pointer rounded border p-1"
                     />
                     <Input
                       {...field}
+                      disabled={isReadonlySystemCategory}
                       className="flex-1 font-mono"
                       placeholder={t("settings.taxonomies.form.placeholder_color_hex")}
                     />
@@ -228,6 +242,7 @@ export function CategoryForm({
                   <Textarea
                     {...field}
                     value={field.value ?? ""}
+                    disabled={isReadonlySystemCategory}
                     placeholder={t("settings.taxonomies.form.placeholder_description")}
                     rows={3}
                   />
@@ -239,32 +254,36 @@ export function CategoryForm({
 
           <div className="flex items-center justify-between pt-4">
             <div className="flex items-center gap-2">
-              <Button
-                type="submit"
-                disabled={isPending || (!isCreateMode && !form.formState.isDirty)}
-              >
-                {isPending ? (
-                  <>
-                    <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
-                    {isCreateMode
-                      ? t("settings.taxonomies.form.creating")
-                      : t("settings.taxonomies.form.saving")}
-                  </>
-                ) : isCreateMode ? (
-                  t("settings.taxonomies.form.submit_create")
-                ) : (
-                  t("settings.taxonomies.form.submit_save")
-                )}
-              </Button>
-              {!isCreateMode && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => form.reset()}
-                  disabled={!form.formState.isDirty}
-                >
-                  {t("settings.taxonomies.form.reset")}
-                </Button>
+              {!isReadonlySystemCategory && (
+                <>
+                  <Button
+                    type="submit"
+                    disabled={isPending || (!isCreateMode && !form.formState.isDirty)}
+                  >
+                    {isPending ? (
+                      <>
+                        <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                        {isCreateMode
+                          ? t("settings.taxonomies.form.creating")
+                          : t("settings.taxonomies.form.saving")}
+                      </>
+                    ) : isCreateMode ? (
+                      t("settings.taxonomies.form.submit_create")
+                    ) : (
+                      t("settings.taxonomies.form.submit_save")
+                    )}
+                  </Button>
+                  {!isCreateMode && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => form.reset()}
+                      disabled={!form.formState.isDirty}
+                    >
+                      {t("settings.taxonomies.form.reset")}
+                    </Button>
+                  )}
+                </>
               )}
             </div>
 
