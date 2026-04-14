@@ -721,7 +721,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       params.set("symbol", symbol);
       if (exchangeMic) params.set("exchangeMic", exchangeMic);
       if (instrumentType) params.set("instrumentType", instrumentType);
-      if (providerId) params.set("provider_id", providerId);
+      if (providerId) params.set("providerId", providerId);
       url += `?${params.toString()}`;
       break;
     }
