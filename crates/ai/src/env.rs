@@ -10,6 +10,7 @@ use wealthfolio_core::{
     accounts::AccountServiceTrait,
     activities::ActivityServiceTrait,
     goals::GoalServiceTrait,
+    health::HealthServiceTrait,
     portfolio::{
         allocation::AllocationServiceTrait, holdings::HoldingsServiceTrait,
         income::IncomeServiceTrait, performance::PerformanceServiceTrait,
@@ -70,6 +71,9 @@ pub trait AiEnvironment: Send + Sync {
 
     /// Get the income service for income/dividend summaries.
     fn income_service(&self) -> Arc<dyn IncomeServiceTrait>;
+
+    /// Get the health service for portfolio health diagnostics.
+    fn health_service(&self) -> Arc<dyn HealthServiceTrait>;
 }
 
 #[cfg(test)]
@@ -88,9 +92,16 @@ pub mod test_env {
             ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, ImportTemplateScope,
             NewActivity, SaveBrokerSyncProfileRulesRequest, Sort,
         },
-        assets::{Asset, ProviderProfile},
+        assets::{Asset, AssetServiceTrait, ProviderProfile},
         errors::DatabaseError,
         goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
+        health::{
+            checks::{
+                AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo,
+                QuoteSyncErrorInfo, UnclassifiedAssetInfo, UnconfiguredAccountInfo,
+            },
+            FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
+        },
         holdings::{Holding, HoldingsServiceTrait},
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
@@ -102,6 +113,7 @@ pub mod test_env {
         },
         secrets::SecretStore,
         settings::{Settings, SettingsServiceTrait, SettingsUpdate},
+        taxonomies::TaxonomyServiceTrait,
         valuation::{
             DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
         },
@@ -1151,6 +1163,7 @@ pub mod test_env {
         pub allocation_service: Arc<dyn AllocationServiceTrait>,
         pub performance_service: Arc<dyn PerformanceServiceTrait>,
         pub income_service: Arc<dyn IncomeServiceTrait>,
+        pub health_service: Arc<dyn HealthServiceTrait>,
     }
 
     impl Default for MockEnvironment {
@@ -1175,6 +1188,7 @@ pub mod test_env {
                 allocation_service: Arc::new(MockAllocationService),
                 performance_service: Arc::new(MockPerformanceService),
                 income_service: Arc::new(MockIncomeService),
+                health_service: Arc::new(MockHealthService::default()),
             }
         }
 
@@ -1236,6 +1250,85 @@ pub mod test_env {
 
         fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
             self.income_service.clone()
+        }
+
+        fn health_service(&self) -> Arc<dyn HealthServiceTrait> {
+            self.health_service.clone()
+        }
+    }
+
+    #[derive(Default)]
+    pub struct MockHealthService {
+        pub cached_status: Option<HealthStatus>,
+    }
+
+    #[async_trait::async_trait]
+    impl HealthServiceTrait for MockHealthService {
+        async fn run_checks(&self, _base_currency: &str) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn run_checks_with_data(
+            &self,
+            _base_currency: &str,
+            _total_portfolio_value: f64,
+            _holdings: &[AssetHoldingInfo],
+            _latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+            _quote_sync_errors: &[QuoteSyncErrorInfo],
+            _fx_pairs: &[FxPairInfo],
+            _unclassified_assets: &[UnclassifiedAssetInfo],
+            _consistency_issues: &[ConsistencyIssueInfo],
+            _legacy_migration_info: &Option<LegacyMigrationInfo>,
+            _unconfigured_accounts: &[UnconfiguredAccountInfo],
+            _configured_timezone: Option<&str>,
+            _client_timezone: Option<&str>,
+        ) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn run_full_checks(
+            &self,
+            _base_currency: &str,
+            _account_service: Arc<dyn wealthfolio_core::accounts::AccountServiceTrait>,
+            _holdings_service: Arc<dyn HoldingsServiceTrait>,
+            _quote_service: Arc<dyn QuoteServiceTrait>,
+            _asset_service: Arc<dyn AssetServiceTrait>,
+            _taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+            _valuation_service: Arc<dyn ValuationServiceTrait>,
+            _configured_timezone: Option<&str>,
+            _client_timezone: Option<&str>,
+        ) -> CoreResult<HealthStatus> {
+            Ok(HealthStatus::healthy())
+        }
+
+        async fn get_cached_status(&self) -> Option<HealthStatus> {
+            self.cached_status.clone()
+        }
+
+        async fn dismiss_issue(&self, _issue_id: &str, _data_hash: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn restore_issue(&self, _issue_id: &str) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn get_dismissed_ids(&self) -> CoreResult<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        async fn execute_fix(&self, _action: &FixAction) -> CoreResult<()> {
+            Ok(())
+        }
+
+        async fn clear_cache(&self) {}
+
+        async fn get_config(&self) -> HealthConfig {
+            HealthConfig::default()
+        }
+
+        async fn update_config(&self, _config: HealthConfig) -> CoreResult<()> {
+            Ok(())
         }
     }
 }

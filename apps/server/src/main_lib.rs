@@ -378,6 +378,12 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             ai_catalog_json,
         )?);
 
+    // Health service for portfolio health diagnostics
+    let health_dismissal_repository =
+        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
+    let health_service: Arc<dyn HealthServiceTrait + Send + Sync> =
+        Arc::new(HealthService::new(health_dismissal_repository));
+
     // AI chat repository for thread/message persistence
     let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
 
@@ -396,6 +402,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         allocation_service.clone(),
         performance_service.clone(),
         income_service.clone(),
+        health_service.clone(),
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
@@ -409,12 +416,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         device_display_name,
         app_version,
     ));
-
-    // Health service for portfolio health diagnostics
-    let health_dismissal_repository =
-        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
-    let health_service: Arc<dyn HealthServiceTrait + Send + Sync> =
-        Arc::new(HealthService::new(health_dismissal_repository));
 
     let event_bus = EventBus::new(256);
     let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());

@@ -742,6 +742,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             if is_allowed("import_csv") {
                 allowed_tools.push(Box::new(tool_set.import_csv));
             }
+            if is_allowed("get_health_status") {
+                allowed_tools.push(Box::new(tool_set.health_status));
+            }
 
             let mut builder = $client
                 .agent(&model_id)

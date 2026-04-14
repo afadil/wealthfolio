@@ -37,6 +37,7 @@ pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "record_activity",
     "record_activities",
     "import_csv",
+    "get_health_status",
 ];
 
 /// Maximum size in bytes for persisted message content (256KB).
