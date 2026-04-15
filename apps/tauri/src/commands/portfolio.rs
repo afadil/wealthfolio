@@ -16,7 +16,7 @@ use tauri::{AppHandle, State};
 use wealthfolio_core::{
     accounts::TrackingMode,
     allocation::{AllocationHoldings, PortfolioAllocations},
-    holdings::Holding,
+    holdings::{Holding, LotView},
     income::IncomeSummary,
     performance::{PerformanceMetrics, SimplePerformanceMetrics},
     portfolio::snapshot::{
@@ -102,6 +102,20 @@ pub async fn get_holding(
         .get_holding(&account_id, &asset_id, &base_currency)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_asset_lots(
+    state: State<'_, Arc<ServiceContext>>,
+    asset_id: String,
+) -> Result<Vec<LotView>, String> {
+    debug!("Get lots for asset {} across all accounts", asset_id);
+    let lots = state
+        .lots_repository
+        .get_lots_for_asset(&asset_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(lots.iter().filter_map(LotView::from_record).collect())
 }
 
 #[tauri::command]
