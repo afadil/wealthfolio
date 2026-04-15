@@ -849,8 +849,18 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Ollama: pass think parameter to enable/disable thinking mode
     // When false, models like qwen3 and deepseek-r1 skip chain-of-thought reasoning
     // Note: Some models may ignore the API parameter and still emit thinking.
+    // Ollama options: control thinking + set defensive sampling params against
+    // degenerate loops. llama.cpp defaults to repeat_penalty=1.1 (sweet spot for
+    // tool-calling; Jan ships 1.12, higher values degrade JSON formatting). We
+    // also cap num_predict so a runaway model can't stream forever at the
+    // decoding level. Note: recent Ollama Go runners may silently drop these
+    // for some models (ollama/ollama#14493), so the rig-level hook is the
+    // real safety net.
     let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
-        "think": capabilities.thinking
+        "think": capabilities.thinking,
+        "repeat_penalty": 1.1,
+        "repeat_last_n": 64,
+        "num_predict": 4096,
     }));
 
     // Anthropic: extended thinking with budget_tokens
@@ -1295,8 +1305,18 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     message_id: String,
     title_ctx: TitleContext<E>,
 ) -> Result<(), AiError> {
-    // Start multi-turn streaming (up to 6 tool rounds)
-    let mut stream = agent.stream_chat(prompt, history).multi_turn(6).await;
+    // Attach a per-run hook that deduplicates repeated tool calls, caps the
+    // total tool-call count, and aborts stuck text-token loops. Cheap to clone
+    // (state is behind an Arc<Mutex<_>>).
+    let hook = crate::stream_hook::WealthfolioStreamHook::new();
+
+    // Start multi-turn streaming (up to 6 tool rounds). The hook provides the
+    // finer-grained guards inside those turns.
+    let mut stream = agent
+        .stream_chat(prompt, history)
+        .with_hook(hook)
+        .multi_turn(6)
+        .await;
 
     // Generate/refine title concurrently so it can update the UI during streaming.
     let should_attempt_title = title_ctx.is_new_thread
