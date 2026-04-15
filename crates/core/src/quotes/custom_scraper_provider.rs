@@ -9,7 +9,7 @@ use log::debug;
 use rust_decimal::Decimal;
 
 use crate::custom_provider::model::{
-    expand_template, extract_html_value, validate_url_resolved, TemplateContext, MAX_RESPONSE_BYTES,
+    expand_template, extract_html_value, validate_url, TemplateContext, MAX_RESPONSE_BYTES,
 };
 use crate::custom_provider::service::{
     detect_html_locale, parse_csv_records, parse_number_string, resolve_csv_column,
@@ -218,13 +218,10 @@ impl CustomScraperProvider {
 
         let url = self.expand_url(&source.url, symbol, context, from, to);
 
-        // SSRF check (includes DNS resolution to catch rebinding attacks)
-        validate_url_resolved(&url)
-            .await
-            .map_err(|e| MarketDataError::ProviderError {
-                provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
-                message: e.to_string(),
-            })?;
+        validate_url(&url).map_err(|e| MarketDataError::ProviderError {
+            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+            message: e.to_string(),
+        })?;
 
         let headers = self.build_headers(source)?;
 

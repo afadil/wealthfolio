@@ -136,9 +136,7 @@ impl CustomProviderService {
         };
         let url = expand_template(&payload.url, &tctx);
 
-        validate_url_resolved(&url)
-            .await
-            .map_err(|e| crate::Error::Unexpected(e.to_string()))?;
+        validate_url(&url).map_err(|e| crate::Error::Unexpected(e.to_string()))?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(15))
