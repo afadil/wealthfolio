@@ -1,3 +1,4 @@
+use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
@@ -97,6 +98,7 @@ pub struct ValuationService {
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
     lot_repository: Arc<dyn LotRepositoryTrait>,
+    asset_repository: Arc<dyn AssetRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
 }
@@ -107,6 +109,7 @@ impl ValuationService {
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
@@ -115,6 +118,7 @@ impl ValuationService {
             valuation_repository,
             snapshot_service,
             lot_repository,
+            asset_repository,
             quote_service,
             fx_service,
         }
@@ -319,7 +323,31 @@ impl ValuationServiceTrait for ValuationService {
         let actual_calculation_start_date = snapshots_to_process.first().unwrap().snapshot_date;
         let calculation_end_date = snapshots_to_process.last().unwrap().snapshot_date;
 
-        let mut required_asset_ids = HashSet::new();
+        // Security positions: fetch all lots for this account once so we can filter per date
+        // in memory rather than issuing one query per day in the range.
+        // For the TOTAL pseudo-account, aggregate lots across all accounts.
+        let all_lots = if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+            self.lot_repository.get_all_lots().await?
+        } else {
+            self.lot_repository
+                .get_all_lots_for_account(account_id)
+                .await?
+        };
+
+        // Pre-fetch asset metadata for all assets referenced by lots.
+        let lot_asset_ids: Vec<String> = all_lots
+            .iter()
+            .map(|l| l.asset_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let assets = self.asset_repository.list_by_asset_ids(&lot_asset_ids)?;
+        let asset_map: HashMap<String, _> = assets
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
+        let mut required_asset_ids: HashSet<String> = lot_asset_ids.into_iter().collect();
         let mut required_fx_pairs = HashSet::new();
         let base_curr = {
             let base_guard = self.base_currency.read().unwrap();
@@ -335,9 +363,10 @@ impl ValuationServiceTrait for ValuationService {
             if account_curr != base_curr {
                 required_fx_pairs.insert((account_curr.to_string(), base_curr.clone()));
             }
-            for (asset_id, position) in &snapshot.positions {
+            // Gather FX pairs for position currencies from asset metadata.
+            for (asset_id, asset) in &asset_map {
                 required_asset_ids.insert(asset_id.clone());
-                let position_currency = normalize_currency_code(&position.currency);
+                let position_currency = normalize_currency_code(&asset.quote_ccy);
                 if position_currency != account_curr {
                     required_fx_pairs
                         .insert((position_currency.to_string(), account_curr.to_string()));
@@ -403,6 +432,19 @@ impl ValuationServiceTrait for ValuationService {
                 .await?
         };
 
+        // Pre-fetch asset metadata for all assets referenced by lots.
+        let lot_asset_ids: Vec<String> = all_lots
+            .iter()
+            .map(|l| l.asset_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        let assets = self.asset_repository.list_by_asset_ids(&lot_asset_ids)?;
+        let asset_map: HashMap<String, _> = assets
+            .into_iter()
+            .map(|a| (a.id.clone(), a))
+            .collect();
+
         let newly_calculated_valuations: Vec<DailyAccountValuation> = snapshots_to_process
             .into_iter()
             .filter_map(|holdings_snapshot| {
@@ -412,10 +454,6 @@ impl ValuationServiceTrait for ValuationService {
                 let date_str = current_date.format("%Y-%m-%d").to_string();
 
                 // Build security positions from lots active on current_date.
-                // NOTE: currency, is_alternative, and contract_multiplier are still read from
-                // the snapshot's position entries because the lot table does not store currency
-                // (it's redundant with assets.quote_ccy). This snapshot dependency will be
-                // removed once ValuationService has direct access to the asset repository.
                 let mut aggregated: HashMap<String, (Decimal, Decimal)> = HashMap::new();
                 for lot in &all_lots {
                     if lot.open_date.as_str() > date_str.as_str() {
@@ -452,9 +490,9 @@ impl ValuationServiceTrait for ValuationService {
                     .filter(|(_, (qty, _))| !qty.is_zero())
                     .map(|(asset_id, (quantity, total_cost_basis))| {
                         let (currency, is_alternative, contract_multiplier) =
-                            holdings_snapshot.positions.get(&asset_id).map_or(
+                            asset_map.get(&asset_id).map_or(
                                 (String::new(), false, Decimal::ONE),
-                                |p| (p.currency.clone(), p.is_alternative, p.contract_multiplier),
+                                |a| (a.quote_ccy.clone(), a.is_alternative(), a.contract_multiplier()),
                             );
                         let average_cost = if quantity > Decimal::ZERO {
                             total_cost_basis / quantity

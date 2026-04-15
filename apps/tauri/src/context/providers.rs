@@ -227,6 +227,7 @@ pub async fn initialize_context(
         valuation_repository.clone(),
         snapshot_service.clone(),
         lots_repository.clone(),
+        asset_repository.clone(),
         quote_service.clone(),
         fx_service.clone(),
     ));
@@ -293,6 +294,7 @@ pub async fn initialize_context(
         )
         .with_event_sink(domain_event_sink.clone())
         .with_snapshot_service(snapshot_service.clone())
+        .with_lot_repository(lots_repository.clone())
         .with_quote_store(market_data_repo.clone()),
     );
 

@@ -9,6 +9,8 @@ use std::sync::Arc;
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
+use std::collections::HashMap;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::lots::{HoldingPeriod, LotClosure, LotRecord, LotRepositoryTrait};
 
@@ -233,6 +235,8 @@ impl LotRepositoryTrait for LotsRepository {
                         .on_conflict(dsl::id)
                         .do_update()
                         .set((
+                            dsl::original_quantity
+                                .eq(diesel::upsert::excluded(dsl::original_quantity)),
                             dsl::remaining_quantity
                                 .eq(diesel::upsert::excluded(dsl::remaining_quantity)),
                             dsl::total_cost_basis
@@ -344,6 +348,19 @@ impl LotRepositoryTrait for LotsRepository {
                 Ok(())
             })
             .await
+    }
+
+    async fn get_open_position_quantities(&self) -> Result<HashMap<String, Decimal>> {
+        let lots = self.get_all_open_lots().await?;
+        let mut quantities: HashMap<String, Decimal> = HashMap::new();
+        for lot in &lots {
+            let qty = lot
+                .remaining_quantity
+                .parse::<Decimal>()
+                .unwrap_or(Decimal::ZERO);
+            *quantities.entry(lot.asset_id.clone()).or_default() += qty;
+        }
+        Ok(quantities)
     }
 
     fn count_lots(&self) -> Result<i64> {

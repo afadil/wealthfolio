@@ -105,6 +105,10 @@ pub trait LotRepositoryTrait: Send + Sync {
         closures: &[LotClosure],
     ) -> Result<()>;
 
+    /// Returns total quantity per asset across all open lots (all accounts).
+    /// Used for quote sync planning — determines which assets need price data.
+    async fn get_open_position_quantities(&self) -> Result<HashMap<String, Decimal>>;
+
     /// Returns the total number of lot rows (open and closed) in the lots table.
     /// Used by the startup backfill to check if the table is empty.
     fn count_lots(&self) -> Result<i64>;
