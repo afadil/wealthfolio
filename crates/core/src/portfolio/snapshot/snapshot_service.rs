@@ -9,6 +9,10 @@ use crate::constants::{DECIMAL_PRECISION, PORTFOLIO_TOTAL_ACCOUNT_ID};
 use crate::errors::{CalculatorError, Error, Result};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
+use crate::lots::{
+    check_lot_quantity_consistency, extract_lot_records, DisposalMethod, LotRecord,
+    LotRepositoryTrait,
+};
 use crate::portfolio::performance::{classify_flow_for_scope, FlowType, PerformanceScope};
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position, SnapshotSource,
@@ -108,6 +112,17 @@ pub trait SnapshotServiceTrait: Send + Sync {
     /// If only 1 non-calculated snapshot exists, creates a synthetic snapshot 3 months prior.
     /// This enables history charting, valuation engines, and provides an inception boundary.
     async fn ensure_holdings_history(&self, account_id: &str) -> Result<()>;
+
+    /// After a manual snapshot is deleted, re-derives lots from the new latest snapshot
+    /// (if it is MANUAL or IMPORTED) or clears the lots table for the account (if no
+    /// snapshot remains). CALCULATED snapshots are ignored — those accounts have their
+    /// lots managed by the transaction-replay pipeline.
+    async fn refresh_lots_from_latest_snapshot(&self, account_id: &str) -> Result<()>;
+
+    /// Populates the lots table for all HOLDINGS-mode accounts by deriving lots from
+    /// each account's latest snapshot. Called during startup backfill because
+    /// `recalculate_holdings_snapshots` only processes TRANSACTIONS-mode accounts.
+    async fn backfill_lots_for_holdings_accounts(&self) -> Result<usize>;
 }
 
 // --- Service Implementation ---
@@ -119,6 +134,7 @@ pub struct SnapshotService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
+    lot_repository: Option<Arc<dyn LotRepositoryTrait>>,
     holdings_calculator: HoldingsCalculator,
     event_sink: Arc<dyn DomainEventSink>,
 }
@@ -171,6 +187,7 @@ impl SnapshotService {
             account_repository,
             activity_repository,
             snapshot_repository,
+            lot_repository: None,
             holdings_calculator,
             event_sink: Arc::new(NoOpDomainEventSink),
         }
@@ -189,6 +206,15 @@ impl SnapshotService {
     /// Sets the domain event sink for emitting HoldingsChanged events.
     pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
         self.event_sink = event_sink;
+        self
+    }
+
+    /// Attaches a lot repository so that lot rows are written alongside JSON
+    /// snapshots on every recalculation. When set, the service writes lot rows
+    /// for every non-TOTAL account after each holdings recalculation and logs
+    /// any quantity mismatches at ERROR severity.
+    pub fn with_lot_repository(mut self, lot_repository: Arc<dyn LotRepositoryTrait>) -> Self {
+        self.lot_repository = Some(lot_repository);
         self
     }
 
@@ -286,7 +312,7 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        let (_final_holdings_states, keyframes_to_save, calculation_warnings) = self
+        let (final_holdings_states, keyframes_to_save, calculation_warnings) = self
             .calculate_daily_holdings_snapshots(
                 &accounts_needing_calculation,
                 &activities_by_account_date,
@@ -335,10 +361,10 @@ impl SnapshotService {
             }
         }
 
-        // Clean up stale snapshots for accounts that were explicitly requested but
-        // had no remaining activities (e.g., last activity deleted). These accounts
+        // Clean up stale snapshots and lots for accounts that were explicitly requested
+        // but had no remaining activities (e.g., last activity deleted). These accounts
         // were skipped by determine_calculation_range_and_initial_state, so their
-        // old snapshots must be removed here.
+        // old snapshots and lots must be removed here.
         if let SnapshotRecalcMode::SinceDate(since) = &mode {
             for acc_id in accounts_to_process.keys() {
                 if !accounts_needing_calculation.contains_key(acc_id) {
@@ -354,6 +380,36 @@ impl SnapshotService {
                             &[], // empty = delete old snapshots, insert nothing
                         )
                         .await?;
+
+                    // Also clear lots — they were orphaned when activities were deleted
+                    if let Some(lot_repo) = &self.lot_repository {
+                        if let Err(e) = lot_repo.replace_lots_for_account(acc_id, &[]).await {
+                            warn!(
+                                "Failed to clear lots for account {} after activity deletion: {}",
+                                acc_id, e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Write lot rows alongside the JSON snapshots so both representations can
+        // be compared during validation. Skips the virtual TOTAL account because it
+        // has no activities of its own and its positions are derived at query time.
+        if let Some(lot_repo) = &self.lot_repository {
+            for (acc_id, snapshot) in &final_holdings_states {
+                if acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+                    continue;
+                }
+                let open_lots = extract_lot_records(snapshot);
+                let _ = check_lot_quantity_consistency(snapshot, &open_lots);
+                let closures = self.holdings_calculator.take_disposed_lots(acc_id);
+                if let Err(e) = lot_repo
+                    .sync_lots_for_account(acc_id, &open_lots, &closures)
+                    .await
+                {
+                    error!("Failed to sync lot rows for account {}: {}", acc_id, e);
                 }
             }
         }
@@ -683,8 +739,9 @@ impl SnapshotService {
         let mut all_warnings: Vec<HoldingsCalculationWarning> = Vec::new();
         let date_range = get_days_between(calculation_min_date, calculation_end_date);
 
-        // Clear lot-level transfer cache from any previous run
+        // Clear lot-level caches from any previous run
         self.holdings_calculator.clear_transfer_lots_cache();
+        self.holdings_calculator.clear_disposed_lots();
 
         for current_date in date_range {
             // Process only accounts whose effective start date is today or earlier.
@@ -1719,6 +1776,63 @@ impl SnapshotServiceTrait for SnapshotService {
             account_id, snapshot.snapshot_date
         );
 
+        // Write lots from the snapshot positions — but only if this is the latest snapshot
+        // for the account (i.e. don't overwrite current open lots with stale historical data).
+        if let Some(ref lot_repo) = self.lot_repository {
+            let later_snapshots = self
+                .snapshot_repository
+                .get_snapshots_by_account(account_id, snapshot.snapshot_date.succ_opt(), None)
+                .unwrap_or_default();
+            let is_latest = later_snapshots.is_empty();
+
+            if is_latest {
+                let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+                let open_date = snapshot.snapshot_date.format("%Y-%m-%d").to_string();
+                let lot_records: Vec<LotRecord> = snapshot
+                    .positions
+                    .values()
+                    .filter(|p| p.quantity > Decimal::ZERO)
+                    .map(|p| LotRecord {
+                        id: format!("HOLDINGS-{}-{}", account_id, p.asset_id),
+                        account_id: account_id.to_string(),
+                        asset_id: p.asset_id.clone(),
+                        open_date: open_date.clone(),
+                        open_activity_id: None,
+                        original_quantity: p.quantity.to_string(),
+                        remaining_quantity: p.quantity.to_string(),
+                        cost_per_unit: p.average_cost.to_string(),
+                        total_cost_basis: p.total_cost_basis.to_string(),
+                        fee_allocated: "0".to_string(),
+                        disposal_method: DisposalMethod::Fifo,
+                        is_closed: false,
+                        close_date: None,
+                        close_activity_id: None,
+                        is_wash_sale: false,
+                        holding_period: None,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    })
+                    .collect();
+
+                if let Err(e) = lot_repo
+                    .replace_lots_for_account(account_id, &lot_records)
+                    .await
+                {
+                    warn!(
+                        "Failed to write lots for HOLDINGS account {} from manual snapshot: {}",
+                        account_id, e
+                    );
+                } else {
+                    info!(
+                        "Wrote {} lot(s) for HOLDINGS account {} from snapshot on {}",
+                        lot_records.len(),
+                        account_id,
+                        snapshot.snapshot_date
+                    );
+                }
+            }
+        }
+
         // Emit HoldingsChanged event after successful save
         let asset_ids: Vec<String> = snapshot
             .positions
@@ -1729,6 +1843,85 @@ impl SnapshotServiceTrait for SnapshotService {
 
         // Ensure holdings history has at least 2 snapshots
         self.ensure_holdings_history(account_id).await?;
+
+        Ok(())
+    }
+
+    async fn refresh_lots_from_latest_snapshot(&self, account_id: &str) -> Result<()> {
+        let lot_repo = match &self.lot_repository {
+            Some(r) => r,
+            None => return Ok(()),
+        };
+
+        let latest = self.get_latest_holdings_snapshot(account_id)?;
+
+        match latest {
+            None => {
+                // No snapshot left — clear lots for this account.
+                if let Err(e) = lot_repo.replace_lots_for_account(account_id, &[]).await {
+                    warn!(
+                        "Failed to clear lots for account {} after snapshot delete: {}",
+                        account_id, e
+                    );
+                }
+            }
+            Some(snapshot)
+                if matches!(
+                    snapshot.source,
+                    SnapshotSource::ManualEntry
+                        | SnapshotSource::BrokerImported
+                        | SnapshotSource::CsvImport
+                ) =>
+            {
+                let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+                let open_date = snapshot.snapshot_date.format("%Y-%m-%d").to_string();
+                let lot_records: Vec<LotRecord> = snapshot
+                    .positions
+                    .values()
+                    .filter(|p| p.quantity > Decimal::ZERO)
+                    .map(|p| LotRecord {
+                        id: format!("HOLDINGS-{}-{}", account_id, p.asset_id),
+                        account_id: account_id.to_string(),
+                        asset_id: p.asset_id.clone(),
+                        open_date: open_date.clone(),
+                        open_activity_id: None,
+                        original_quantity: p.quantity.to_string(),
+                        remaining_quantity: p.quantity.to_string(),
+                        cost_per_unit: p.average_cost.to_string(),
+                        total_cost_basis: p.total_cost_basis.to_string(),
+                        fee_allocated: "0".to_string(),
+                        disposal_method: DisposalMethod::Fifo,
+                        is_closed: false,
+                        close_date: None,
+                        close_activity_id: None,
+                        is_wash_sale: false,
+                        holding_period: None,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    })
+                    .collect();
+
+                if let Err(e) = lot_repo
+                    .replace_lots_for_account(account_id, &lot_records)
+                    .await
+                {
+                    warn!(
+                        "Failed to refresh lots for account {} after snapshot delete: {}",
+                        account_id, e
+                    );
+                } else {
+                    info!(
+                        "Refreshed {} lot(s) for account {} from new latest snapshot on {}",
+                        lot_records.len(),
+                        account_id,
+                        snapshot.snapshot_date
+                    );
+                }
+            }
+            Some(_) => {
+                // Latest snapshot is CALCULATED — lots are managed by the transaction-replay pipeline.
+            }
+        }
 
         Ok(())
     }
@@ -1830,6 +2023,59 @@ impl SnapshotServiceTrait for SnapshotService {
         );
 
         Ok(())
+    }
+
+    async fn backfill_lots_for_holdings_accounts(&self) -> Result<usize> {
+        let lot_repo = match &self.lot_repository {
+            Some(r) => r,
+            None => return Ok(0),
+        };
+
+        let accounts = self.account_repository.list(Some(true), None, None)?;
+        let holdings_accounts: Vec<_> = accounts
+            .into_iter()
+            .filter(|a| a.tracking_mode == TrackingMode::Holdings)
+            .collect();
+
+        if holdings_accounts.is_empty() {
+            return Ok(0);
+        }
+
+        let mut total_lots = 0usize;
+        for acc in &holdings_accounts {
+            match self.refresh_lots_from_latest_snapshot(&acc.id).await {
+                Ok(()) => {
+                    // Count lots written by checking what's now in the table for this account
+                    match lot_repo.get_open_lots_for_account(&acc.id).await {
+                        Ok(lots) => {
+                            total_lots += lots.len();
+                            if !lots.is_empty() {
+                                info!(
+                                    "Backfilled {} lot(s) for HOLDINGS account {}",
+                                    lots.len(),
+                                    acc.id
+                                );
+                            }
+                        }
+                        Err(e) => warn!(
+                            "Could not count backfilled lots for account {}: {}",
+                            acc.id, e
+                        ),
+                    }
+                }
+                Err(e) => warn!(
+                    "Failed to backfill lots for HOLDINGS account {}: {}",
+                    acc.id, e
+                ),
+            }
+        }
+
+        info!(
+            "HOLDINGS lot backfill complete: {} lot(s) across {} account(s)",
+            total_lots,
+            holdings_accounts.len()
+        );
+        Ok(total_lots)
     }
 }
 

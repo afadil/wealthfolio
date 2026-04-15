@@ -714,6 +714,240 @@ impl FxServiceTrait for MockFxService {
     }
 }
 
+struct MockLotRepository {
+    lots: Vec<crate::lots::LotRecord>,
+}
+
+impl MockLotRepository {
+    fn new(lots: Vec<crate::lots::LotRecord>) -> Self {
+        Self { lots }
+    }
+}
+
+#[async_trait]
+impl crate::lots::LotRepositoryTrait for MockLotRepository {
+    async fn replace_lots_for_account(
+        &self,
+        _account_id: &str,
+        _lots: &[crate::lots::LotRecord],
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_open_lots_for_account(
+        &self,
+        _account_id: &str,
+    ) -> Result<Vec<crate::lots::LotRecord>> {
+        Ok(vec![])
+    }
+
+    async fn get_all_open_lots(&self) -> Result<Vec<crate::lots::LotRecord>> {
+        Ok(self.lots.iter().filter(|l| !l.is_closed).cloned().collect())
+    }
+
+    async fn get_lots_as_of_date(
+        &self,
+        account_ids: &[String],
+        date: NaiveDate,
+    ) -> Result<Vec<crate::lots::LotRecord>> {
+        let date_str = date.format("%Y-%m-%d").to_string();
+        Ok(self
+            .lots
+            .iter()
+            .filter(|l| account_ids.contains(&l.account_id))
+            .filter(|l| l.open_date.as_str() <= date_str.as_str())
+            .filter(|l| {
+                !l.is_closed
+                    || l.close_date
+                        .as_deref()
+                        .is_none_or(|d| d > date_str.as_str())
+            })
+            .cloned()
+            .collect())
+    }
+
+    async fn get_all_lots_for_account(
+        &self,
+        _account_id: &str,
+    ) -> Result<Vec<crate::lots::LotRecord>> {
+        Ok(vec![])
+    }
+
+    async fn get_all_lots(&self) -> Result<Vec<crate::lots::LotRecord>> {
+        Ok(self.lots.clone())
+    }
+
+    async fn sync_lots_for_account(
+        &self,
+        _account_id: &str,
+        _open_lots: &[crate::lots::LotRecord],
+        _closures: &[crate::lots::LotClosure],
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    fn count_lots(&self) -> Result<i64> {
+        Ok(self.lots.iter().filter(|l| !l.is_closed).count() as i64)
+    }
+}
+
+struct MockActivityRepository;
+impl MockActivityRepository {
+    fn new() -> Self {
+        Self
+    }
+}
+#[async_trait]
+impl crate::activities::ActivityRepositoryTrait for MockActivityRepository {
+    fn get_activity(&self, _: &str) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    fn get_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_activities_by_account_id(&self, _: &str) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_activities_by_account_ids(
+        &self,
+        _: &[String],
+    ) -> Result<Vec<crate::activities::Activity>> {
+        Ok(Vec::new())
+    }
+    fn get_trading_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_income_activities(&self) -> Result<Vec<crate::activities::Activity>> {
+        unimplemented!()
+    }
+    fn get_contribution_activities(
+        &self,
+        _: &[String],
+        _: DateTime<Utc>,
+        _: DateTime<Utc>,
+    ) -> Result<Vec<crate::limits::ContributionActivity>> {
+        unimplemented!()
+    }
+    fn search_activities(
+        &self,
+        _: i64,
+        _: i64,
+        _: Option<Vec<String>>,
+        _: Option<Vec<String>>,
+        _: Option<String>,
+        _: Option<crate::activities::Sort>,
+        _: Option<bool>,
+        _: Option<NaiveDate>,
+        _: Option<NaiveDate>,
+        _: Option<Vec<String>>,
+    ) -> Result<crate::activities::ActivitySearchResponse> {
+        unimplemented!()
+    }
+    async fn create_activity(
+        &self,
+        _: crate::activities::NewActivity,
+    ) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn update_activity(
+        &self,
+        _: crate::activities::ActivityUpdate,
+    ) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn delete_activity(&self, _: String) -> Result<crate::activities::Activity> {
+        unimplemented!()
+    }
+    async fn bulk_mutate_activities(
+        &self,
+        _: Vec<crate::activities::NewActivity>,
+        _: Vec<crate::activities::ActivityUpdate>,
+        _: Vec<String>,
+    ) -> Result<crate::activities::ActivityBulkMutationResult> {
+        unimplemented!()
+    }
+    async fn create_activities(&self, _: Vec<crate::activities::NewActivity>) -> Result<usize> {
+        unimplemented!()
+    }
+    fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> {
+        unimplemented!()
+    }
+    fn get_import_mapping(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<crate::activities::ImportMapping>> {
+        unimplemented!()
+    }
+    async fn save_import_mapping(&self, _: &crate::activities::ImportMapping) -> Result<()> {
+        unimplemented!()
+    }
+    async fn link_account_template(&self, _: &str, _: &str, _: &str) -> Result<()> {
+        unimplemented!()
+    }
+    fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+        Ok(Vec::new())
+    }
+    fn get_import_template(&self, _: &str) -> Result<Option<crate::activities::ImportTemplate>> {
+        Ok(None)
+    }
+    async fn save_import_template(&self, _: &crate::activities::ImportTemplate) -> Result<()> {
+        unimplemented!()
+    }
+    async fn delete_import_template(&self, _: &str) -> Result<()> {
+        unimplemented!()
+    }
+    fn get_broker_sync_profile(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<crate::activities::ImportTemplate>> {
+        Ok(None)
+    }
+    async fn save_broker_sync_profile(&self, _: &crate::activities::ImportTemplate) -> Result<()> {
+        Ok(())
+    }
+    async fn link_broker_sync_profile(&self, _: &str, _: &str, _: &str) -> Result<()> {
+        Ok(())
+    }
+    fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> {
+        unimplemented!()
+    }
+    fn get_income_activities_data(
+        &self,
+        _: Option<&str>,
+    ) -> Result<Vec<crate::activities::IncomeData>> {
+        unimplemented!()
+    }
+    fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> {
+        unimplemented!()
+    }
+    fn get_activity_bounds_for_assets(
+        &self,
+        _: &[String],
+    ) -> Result<HashMap<String, (Option<NaiveDate>, Option<NaiveDate>)>> {
+        Ok(HashMap::new())
+    }
+    fn check_existing_duplicates(&self, _: &[String]) -> Result<HashMap<String, String>> {
+        Ok(HashMap::new())
+    }
+    async fn bulk_upsert(
+        &self,
+        _: Vec<crate::activities::ActivityUpsert>,
+    ) -> Result<crate::activities::BulkUpsertResult> {
+        unimplemented!()
+    }
+    async fn reassign_asset(&self, _: &str, _: &str) -> Result<u32> {
+        Ok(0)
+    }
+    async fn get_activity_accounts_and_currencies_by_asset_id(
+        &self,
+        _: &str,
+    ) -> Result<(Vec<String>, Vec<String>)> {
+        Ok((Vec::new(), Vec::new()))
+    }
+}
+
 struct MockValuationRepository {
     valuations: Vec<DailyAccountValuation>,
 }
@@ -924,6 +1158,41 @@ fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &s
     }
 }
 
+/// Build lot records from snapshot positions so the lots-based net worth
+/// service produces the same results the old snapshot path did.
+fn lots_from_snapshots(snapshots: &[AccountStateSnapshot]) -> Vec<crate::lots::LotRecord> {
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+    let mut lots = Vec::new();
+    for snap in snapshots {
+        for (asset_id, pos) in &snap.positions {
+            if pos.quantity.is_zero() {
+                continue;
+            }
+            lots.push(crate::lots::LotRecord {
+                id: format!("LOT-{}-{}", snap.account_id, asset_id),
+                account_id: snap.account_id.clone(),
+                asset_id: asset_id.clone(),
+                open_date: snap.snapshot_date.format("%Y-%m-%d").to_string(),
+                open_activity_id: None,
+                original_quantity: pos.quantity.to_string(),
+                remaining_quantity: pos.quantity.to_string(),
+                cost_per_unit: pos.average_cost.to_string(),
+                total_cost_basis: pos.total_cost_basis.to_string(),
+                fee_allocated: "0".to_string(),
+                disposal_method: crate::lots::DisposalMethod::Fifo,
+                is_closed: false,
+                close_date: None,
+                close_activity_id: None,
+                is_wash_sale: false,
+                holding_period: None,
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            });
+        }
+    }
+    lots
+}
+
 fn create_net_worth_service(
     accounts: Vec<Account>,
     assets: Vec<Asset>,
@@ -943,17 +1212,21 @@ fn create_net_worth_service_with_valuations(
     let base_currency = Arc::new(RwLock::new("USD".to_string()));
     let account_repo = Arc::new(MockAccountRepository::new(accounts));
     let asset_repo = Arc::new(MockAssetRepository::new(assets));
+    let lot_repo = Arc::new(MockLotRepository::new(lots_from_snapshots(&snapshots)));
     let snapshot_repo = Arc::new(MockSnapshotRepository::new(snapshots));
-    let market_data_repo = Arc::new(MockMarketDataRepository::new(quotes));
+    let quote_service = Arc::new(MockMarketDataRepository::new(quotes));
     let valuation_repo = Arc::new(MockValuationRepository::new(valuations));
     let fx_service = Arc::new(MockFxService::new("USD"));
 
+    let activity_repo = Arc::new(MockActivityRepository::new());
     NetWorthService::new(
         base_currency,
         account_repo,
         asset_repo,
         snapshot_repo,
-        market_data_repo,
+        lot_repo,
+        activity_repo,
+        quote_service,
         valuation_repo,
         fx_service,
     )

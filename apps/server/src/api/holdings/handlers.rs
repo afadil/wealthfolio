@@ -20,7 +20,10 @@ use wealthfolio_core::{
     },
 };
 
-use crate::{error::ApiResult, main_lib::AppState};
+use crate::{
+    error::{ApiError, ApiResult},
+    main_lib::AppState,
+};
 
 use super::dto::{
     AllocationHoldingsQuery, AssetHoldingsQuery, CheckHoldingsImportRequest,
@@ -188,26 +191,17 @@ pub async fn get_snapshot_by_date(
     Query(q): Query<SnapshotDateQuery>,
 ) -> ApiResult<Json<Vec<Holding>>> {
     let target_date = parse_date(&q.date, "date")?;
-
-    // Get keyframes for this specific date
-    let snapshots = state.snapshot_service.get_holdings_keyframes(
-        &q.account_id,
-        Some(target_date),
-        Some(target_date),
-    )?;
-
-    let snapshot = snapshots
-        .into_iter()
-        .find(|s| s.snapshot_date == target_date)
-        .ok_or_else(|| anyhow::anyhow!("No snapshot found for date {}", q.date))?;
-
-    // Convert snapshot to holdings using core service
     let base_currency = state.base_currency.read().unwrap().clone();
+    // Security positions come from lots table; cash from snapshot (if any).
+    // NOTE: snapshot dependency carried here only for cash_balances;
+    // will be removed once cash is tracked independently of snapshots.
     let holdings = state
         .holdings_service
-        .holdings_from_snapshot(&snapshot, &base_currency)
+        .holdings_from_snapshot(&q.account_id, target_date, &base_currency)
         .await?;
-
+    if holdings.is_empty() {
+        return Err(ApiError::NotFound);
+    }
     Ok(Json(holdings))
 }
 
@@ -248,6 +242,15 @@ pub async fn delete_snapshot_handler(
         q.account_id,
         q.date
     );
+
+    // Refresh lots from the new latest snapshot (or clear them if none remains).
+    if let Err(e) = state
+        .snapshot_service
+        .refresh_lots_from_latest_snapshot(&q.account_id)
+        .await
+    {
+        tracing::warn!("Failed to refresh lots after snapshot delete: {}", e);
+    }
 
     // Recalculate valuations for the affected account
     if let Err(e) = state

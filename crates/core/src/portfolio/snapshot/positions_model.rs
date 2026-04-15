@@ -77,6 +77,13 @@ pub struct Lot {
     pub position_id: String,
     pub acquisition_date: DateTime<Utc>,
     pub quantity: Decimal,
+    /// The quantity when the lot was first created. Never modified by sells or
+    /// splits. Used as the anchor for historical as-of queries (replay reducing
+    /// activities forward from this value). Defaults to zero when deserializing
+    /// old snapshots that predate this field; callers should fall back to
+    /// `quantity` when `original_quantity` is zero.
+    #[serde(default)]
+    pub original_quantity: Decimal,
     /// Represents the total amount paid for the entire lot in the Position's currency, including any fees or commissions if applicable (e.g., for Buy).
     pub cost_basis: Decimal,
     /// Represents the price per share/unit in the Position's currency at the time of purchase.
@@ -100,6 +107,9 @@ pub struct FifoReductionResult {
     /// The lots that were fully or partially removed, with their removed quantities.
     /// Each lot preserves the original acquisition date, price, and fee data.
     pub removed_lots: Vec<Lot>,
+    /// IDs of lots that were fully consumed (remaining_quantity → 0) by this reduction.
+    /// Used by the lot persistence layer to mark those rows as closed.
+    pub fully_consumed_lot_ids: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -260,6 +270,7 @@ impl Position {
             position_id: self.id.clone(),
             acquisition_date: activity.activity_date,
             quantity,
+            original_quantity: quantity,
             cost_basis,                // Store unrounded in position currency
             acquisition_price,         // Store unrounded in position currency
             acquisition_fees,          // Store unrounded in position currency
@@ -323,6 +334,7 @@ impl Position {
             position_id: self.id.clone(),
             acquisition_date,
             quantity,
+            original_quantity: quantity,
             cost_basis,
             acquisition_price: unit_price,
             acquisition_fees: fee,
@@ -386,6 +398,7 @@ impl Position {
                 position_id: self.id.clone(),
                 acquisition_date: src_lot.acquisition_date, // Preserve original date
                 quantity: src_lot.quantity,
+                original_quantity: src_lot.quantity,
                 cost_basis,
                 acquisition_price: price,
                 acquisition_fees: fee,
@@ -427,6 +440,7 @@ impl Position {
                 quantity_reduced: Decimal::ZERO,
                 cost_basis_removed: Decimal::ZERO,
                 removed_lots: Vec::new(),
+                fully_consumed_lot_ids: Vec::new(),
             });
         }
 
@@ -450,6 +464,8 @@ impl Position {
         let mut cost_basis_of_sold_lots_asset_currency = Decimal::ZERO;
         // Track removed lots for transfer carry-over
         let mut removed_lots: Vec<Lot> = Vec::new();
+        // Track fully consumed lot IDs for persistence (mark as closed)
+        let mut fully_consumed_lot_ids: Vec<String> = Vec::new();
 
         // Iterate over the sorted Vec
         for (index, lot) in vec_lots.iter().enumerate() {
@@ -483,6 +499,7 @@ impl Position {
                 position_id: lot.position_id.clone(),
                 acquisition_date: lot.acquisition_date,
                 quantity: qty_from_this_lot,
+                original_quantity: qty_from_this_lot,
                 cost_basis: cost_basis_removed,
                 acquisition_price: lot.acquisition_price,
                 acquisition_fees: fees_removed,
@@ -497,6 +514,7 @@ impl Position {
 
             if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
                 lot_indices_to_remove.push(index);
+                fully_consumed_lot_ids.push(lot.id.clone());
             } else {
                 // Calculate remaining cost basis and fees (asset currency)
                 let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
@@ -541,10 +559,17 @@ impl Position {
             quantity_reduced: actual_quantity_reduced,
             cost_basis_removed: cost_basis_of_sold_lots_asset_currency,
             removed_lots,
+            fully_consumed_lot_ids,
         })
     }
 
-    /// Applies stock split.
+    /// Applies a stock split by scaling each lot's quantity by `split_ratio` and
+    /// adjusting the per-unit acquisition price inversely.
+    ///
+    /// Reverse splits (ratio < 1) and non-integer forward splits (e.g. 3-for-2)
+    /// can leave fractional shares. Most exchanges cash out fractional remainders;
+    /// that cash-out is not modelled here. Users should record a separate SELL
+    /// activity for any fractional shares that were liquidated by the broker.
     pub fn apply_split(&mut self, split_ratio: Decimal, activity_id: &str) -> Result<()> {
         if !split_ratio.is_sign_positive() {
             return Err(CalculatorError::InvalidActivity(format!(

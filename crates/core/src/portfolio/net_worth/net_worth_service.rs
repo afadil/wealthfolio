@@ -13,11 +13,13 @@ use super::net_worth_model::{
 };
 use super::net_worth_traits::NetWorthServiceTrait;
 use crate::accounts::{account_types, AccountRepositoryTrait};
+use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
 use crate::fx::currency::normalize_amount;
 use crate::fx::FxServiceTrait;
+use crate::lots::LotRepositoryTrait;
 use crate::portfolio::snapshot::SnapshotRepositoryTrait;
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 use crate::quotes::QuoteServiceTrait;
@@ -31,6 +33,8 @@ pub struct NetWorthService {
     account_repository: Arc<dyn AccountRepositoryTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
     snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
+    lot_repository: Arc<dyn LotRepositoryTrait>,
+    activity_repository: Arc<dyn ActivityRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
@@ -44,6 +48,8 @@ impl NetWorthService {
         account_repository: Arc<dyn AccountRepositoryTrait>,
         asset_repository: Arc<dyn AssetRepositoryTrait>,
         snapshot_repository: Arc<dyn SnapshotRepositoryTrait>,
+        lot_repository: Arc<dyn LotRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         valuation_repository: Arc<dyn ValuationRepositoryTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
@@ -53,6 +59,8 @@ impl NetWorthService {
             account_repository,
             asset_repository,
             snapshot_repository,
+            lot_repository,
+            activity_repository,
             quote_service,
             valuation_repository,
             fx_service,
@@ -263,7 +271,21 @@ impl NetWorthServiceTrait for NetWorthService {
         // Get account IDs
         let account_ids: Vec<String> = accounts.iter().map(|a| a.id.clone()).collect();
 
-        // Get latest snapshots for all accounts as of the target date
+        // Security positions: read from lots table, then replay activities to
+        // get correct point-in-time quantities.
+        let raw_lots = self
+            .lot_repository
+            .get_lots_as_of_date(&account_ids, date)
+            .await?;
+        let activities = self
+            .activity_repository
+            .get_activities_by_account_ids(&account_ids)?;
+        let lots = crate::lots::replay_lots_to_date(raw_lots, &activities, date);
+
+        // Cash balances: still read from snapshots.
+        // NOTE: snapshots are fetched here only for cash_balances; security positions
+        // now come from the lots table. This snapshot dependency will be removed once
+        // cash is tracked independently of snapshots.
         let snapshots = self
             .snapshot_repository
             .get_latest_snapshots_before_date(&account_ids, date)?;
@@ -277,8 +299,44 @@ impl NetWorthServiceTrait for NetWorthService {
 
         let mut valuations: Vec<ValuationInfo> = Vec::new();
 
-        // Process each account's snapshot
-        for (account_id, snapshot) in &snapshots {
+        // Aggregate lot quantities and cost basis by (account_id, asset_id).
+        let mut lots_by_account: HashMap<String, HashMap<String, (Decimal, Decimal)>> =
+            HashMap::new();
+        for lot in &lots {
+            let qty = lot
+                .remaining_quantity
+                .parse::<Decimal>()
+                .unwrap_or_else(|e| {
+                    log::error!(
+                        "Lot {} has malformed remaining_quantity '{}': {}",
+                        lot.id,
+                        lot.remaining_quantity,
+                        e
+                    );
+                    Decimal::ZERO
+                });
+            let cost = lot.total_cost_basis.parse::<Decimal>().unwrap_or_else(|e| {
+                log::error!(
+                    "Lot {} has malformed total_cost_basis '{}': {}",
+                    lot.id,
+                    lot.total_cost_basis,
+                    e
+                );
+                Decimal::ZERO
+            });
+            lots_by_account
+                .entry(lot.account_id.clone())
+                .or_default()
+                .entry(lot.asset_id.clone())
+                .and_modify(|(q, c)| {
+                    *q += qty;
+                    *c += cost;
+                })
+                .or_insert((qty, cost));
+        }
+
+        // Process security positions from lots.
+        for (account_id, asset_totals) in &lots_by_account {
             let account = match account_map.get(account_id) {
                 Some(acc) => acc,
                 None => {
@@ -286,16 +344,13 @@ impl NetWorthServiceTrait for NetWorthService {
                     continue;
                 }
             };
-
             let account_category = Self::categorize_by_account_type(&account.account_type);
 
-            // Process positions (securities, alternative assets)
-            for (asset_id, position) in &snapshot.positions {
-                if position.quantity.is_zero() {
+            for (asset_id, (quantity, total_cost_basis)) in asset_totals {
+                if quantity.is_zero() {
                     continue;
                 }
 
-                // Get asset info to determine category more precisely
                 let asset = asset_map.get(asset_id);
                 let asset_name = asset.and_then(|a| {
                     a.name
@@ -310,21 +365,18 @@ impl NetWorthServiceTrait for NetWorthService {
                 } else {
                     account_category
                 };
+                let asset_currency = asset.map(|a| a.quote_ccy.clone()).unwrap_or_default();
+                let contract_multiplier = asset
+                    .map(|a| a.contract_multiplier())
+                    .unwrap_or(Decimal::ONE);
 
-                // Get the latest quote for this asset as of the date
                 let (price, quote_currency, valuation_date) =
                     match self.get_latest_quote_as_of(asset_id, date) {
                         Some((p, c, d)) => (p, c, d),
                         None => {
-                            // No quote found, use cost basis as fallback
-                            if position.quantity > Decimal::ZERO {
-                                let implied_price = position.total_cost_basis / position.quantity;
-                                // Use snapshot date as valuation date; cost basis is in position.currency (major unit)
-                                (
-                                    implied_price,
-                                    position.currency.clone(),
-                                    snapshot.snapshot_date,
-                                )
+                            if *quantity > Decimal::ZERO {
+                                let implied_price = *total_cost_basis / *quantity;
+                                (implied_price, asset_currency, date)
                             } else {
                                 warn!(
                                     "No quote found for {} and cannot derive from cost basis",
@@ -335,15 +387,13 @@ impl NetWorthServiceTrait for NetWorthService {
                         }
                     };
 
-                // Normalize minor-currency quotes (e.g. GBp → GBP, ZAc → ZAR) before valuation.
                 let (normalized_price, normalized_currency) =
                     normalize_amount(price, &quote_currency);
 
-                // Calculate market value in base currency
                 let market_value_base = match self.calculate_market_value(
-                    position.quantity,
+                    *quantity,
                     normalized_price,
-                    position.contract_multiplier,
+                    contract_multiplier,
                     normalized_currency,
                     &base_currency,
                     date,
@@ -354,7 +404,7 @@ impl NetWorthServiceTrait for NetWorthService {
                             "Failed to calculate market value for {}: {}. Using local value.",
                             asset_id, e
                         );
-                        position.quantity * price * position.contract_multiplier
+                        *quantity * price * contract_multiplier
                     }
                 };
 
@@ -366,14 +416,15 @@ impl NetWorthServiceTrait for NetWorthService {
                     category,
                 });
             }
+        }
 
-            // Process cash balances
+        // Process cash balances from snapshots.
+        for snapshot in snapshots.values() {
             for (currency, &amount) in &snapshot.cash_balances {
                 if amount.is_zero() {
                     continue;
                 }
 
-                // Convert cash to base currency
                 let cash_base = if currency == &base_currency {
                     amount
                 } else {
