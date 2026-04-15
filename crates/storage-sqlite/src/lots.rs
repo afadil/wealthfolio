@@ -205,6 +205,19 @@ impl LotRepositoryTrait for LotsRepository {
         Ok(rows.into_iter().map(LotRecord::from).collect())
     }
 
+    async fn get_lots_for_asset(&self, asset_id: &str) -> Result<Vec<LotRecord>> {
+        use crate::schema::lots::dsl;
+
+        let asset_id = asset_id.to_string();
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<LotRecordDB> = dsl::lots
+            .filter(dsl::asset_id.eq(&asset_id))
+            .order(dsl::open_date.asc())
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(LotRecord::from).collect())
+    }
+
     async fn get_all_lots(&self) -> Result<Vec<LotRecord>> {
         use crate::schema::lots::dsl;
 
@@ -336,9 +349,14 @@ impl LotRepositoryTrait for LotsRepository {
                         );
                     }
                 } else {
+                    // Only delete orphaned OPEN lots. Closed lots (is_closed=1)
+                    // are preserved even when not in the current known_ids set,
+                    // because a subsequent recalc may not reproduce closures
+                    // (take_disposed_lots drains the closure list on first call).
                     diesel::delete(
                         dsl::lots
                             .filter(dsl::account_id.eq(&account_id))
+                            .filter(dsl::is_closed.eq(0))
                             .filter(diesel::dsl::not(dsl::id.eq_any(&known_ids))),
                     )
                     .execute(conn)

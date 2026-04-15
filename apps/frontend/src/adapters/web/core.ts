@@ -32,6 +32,7 @@ export const COMMANDS: CommandMap = {
   get_holdings: { method: "GET", path: "/holdings" },
   get_holding: { method: "GET", path: "/holdings/item" },
   get_asset_holdings: { method: "GET", path: "/holdings/by-asset" },
+  get_asset_lots: { method: "GET", path: "/lots" },
   get_historical_valuations: { method: "GET", path: "/valuations/history" },
   get_latest_valuations: { method: "GET", path: "/valuations/latest" },
   get_portfolio_allocations: { method: "GET", path: "/allocations" },
@@ -380,6 +381,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "get_asset_holdings": {
+      const p = payload as { assetId: string };
+      url += `?assetId=${encodeURIComponent(p.assetId)}`;
+      break;
+    }
+    case "get_asset_lots": {
       const p = payload as { assetId: string };
       url += `?assetId=${encodeURIComponent(p.assetId)}`;
       break;

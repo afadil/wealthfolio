@@ -773,6 +773,15 @@ impl crate::lots::LotRepositoryTrait for MockLotRepository {
         Ok(vec![])
     }
 
+    async fn get_lots_for_asset(&self, asset_id: &str) -> Result<Vec<crate::lots::LotRecord>> {
+        Ok(self
+            .lots
+            .iter()
+            .filter(|l| l.asset_id == asset_id)
+            .cloned()
+            .collect())
+    }
+
     async fn get_all_lots(&self) -> Result<Vec<crate::lots::LotRecord>> {
         Ok(self.lots.clone())
     }

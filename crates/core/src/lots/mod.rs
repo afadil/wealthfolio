@@ -88,6 +88,9 @@ pub trait LotRepositoryTrait: Send + Sync {
     /// and filter in memory using the `open_date` / `close_date` fields.
     async fn get_all_lots_for_account(&self, account_id: &str) -> Result<Vec<LotRecord>>;
 
+    /// Returns every lot row (open and closed) for the given asset across all accounts.
+    async fn get_lots_for_asset(&self, asset_id: &str) -> Result<Vec<LotRecord>>;
+
     /// Returns every lot row (open and closed) across all accounts.
     /// Used when computing valuations for the TOTAL pseudo-account.
     async fn get_all_lots(&self) -> Result<Vec<LotRecord>>;
