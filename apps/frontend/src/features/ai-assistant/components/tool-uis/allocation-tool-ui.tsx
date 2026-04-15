@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
   formatPercent,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 
@@ -162,7 +162,9 @@ type AllocationContentProps = ToolCallMessagePartProps<
   GetAssetAllocationOutput
 >;
 
-function AllocationContent({ args, result, status }: AllocationContentProps) {
+const AllocationContent = memo(AllocationContentImpl);
+
+function AllocationContentImpl({ args, result, status }: AllocationContentProps) {
   const typedArgs = args as GetAssetAllocationArgs | undefined;
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";

@@ -638,6 +638,13 @@ export function useChatRuntime(config?: ChatModelConfig) {
         )) {
           if (signal.aborted) break;
 
+          // Replace a part with a new object so downstream memoization can detect changes
+          // by reference instead of deep-comparing content. Other unchanged parts keep
+          // their identity, allowing memoized tool UIs to skip re-renders during text streaming.
+          const replacePart = (index: number, next: ExternalMessagePart) => {
+            streamParts[index] = next;
+          };
+
           switch (event.type) {
             case "system":
               // Capture thread ID from system event
@@ -712,7 +719,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (textPartIndex !== null) {
                 const part = streamParts[textPartIndex];
                 if (part?.type === "text") {
-                  part.content += event.delta;
+                  replacePart(textPartIndex, {
+                    type: "text",
+                    content: part.content + event.delta,
+                  });
                 }
               } else {
                 textPartIndex = streamParts.length;
@@ -727,7 +737,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (reasoningPartIndex !== null) {
                 const part = streamParts[reasoningPartIndex];
                 if (part?.type === "reasoning") {
-                  part.content += event.delta;
+                  replacePart(reasoningPartIndex, {
+                    type: "reasoning",
+                    content: part.content + event.delta,
+                  });
                 }
               } else {
                 reasoningPartIndex = streamParts.length;
@@ -758,12 +771,16 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (tcIdx !== undefined) {
                 const part = streamParts[tcIdx];
                 if (part?.type === "toolCall") {
-                  part.result = event.result.success
+                  const nextResult = event.result.success
                     ? event.result.meta
                       ? { data: event.result.data, meta: event.result.meta }
                       : event.result.data
                     : { error: event.result.error };
-                  part.meta = event.result.meta;
+                  replacePart(tcIdx, {
+                    ...part,
+                    result: nextResult,
+                    meta: event.result.meta,
+                  });
                 }
               }
               updateAssistantMessage();

@@ -9,7 +9,7 @@ import {
   Progress,
   Skeleton,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -333,7 +333,7 @@ function ErrorState({ message }: { message?: string }) {
 
 type GoalsToolUIContentProps = ToolCallMessagePartProps<GetGoalsArgs, GetGoalsResult>;
 
-function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
+function GoalsToolUIContentImpl({ result, status }: GoalsToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -410,6 +410,8 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
 // ============================================================================
 // Export
 // ============================================================================
+
+const GoalsToolUIContent = memo(GoalsToolUIContentImpl);
 
 export const GoalsToolUI = makeAssistantToolUI<GetGoalsArgs, GetGoalsResult>({
   toolName: "get_goals",

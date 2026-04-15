@@ -1,7 +1,7 @@
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -196,7 +196,7 @@ type PerformanceToolUIContentProps = ToolCallMessagePartProps<
   PerformanceResult
 >;
 
-function PerformanceToolUIContent({ args, result, status }: PerformanceToolUIContentProps) {
+function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -372,6 +372,8 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
 // ============================================================================
 // Export
 // ============================================================================
+
+const PerformanceToolUIContent = memo(PerformanceToolUIContentImpl);
 
 export const PerformanceToolUI = makeAssistantToolUI<GetPerformanceArgs, PerformanceResult>({
   toolName: "get_performance",

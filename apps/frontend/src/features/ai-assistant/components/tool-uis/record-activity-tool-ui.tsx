@@ -27,7 +27,7 @@ import {
 } from "@wealthfolio/ui";
 import { CurrencyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useForm, FormProvider } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -1135,7 +1135,7 @@ type RecordActivityToolUIContentProps = ToolCallMessagePartProps<
   RecordActivityOutput
 >;
 
-function RecordActivityToolUIContent({
+function RecordActivityToolUIContentImpl({
   result,
   status,
   toolCallId,
@@ -1214,6 +1214,8 @@ function RecordActivityToolUIContent({
 // ============================================================================
 // Export
 // ============================================================================
+
+const RecordActivityToolUIContent = memo(RecordActivityToolUIContentImpl);
 
 export const RecordActivityToolUI = makeAssistantToolUI<RecordActivityArgs, RecordActivityOutput>({
   toolName: "record_activity",

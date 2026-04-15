@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui";
-import { useMemo, type FC } from "react";
+import { memo, useMemo, type FC } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from "recharts";
@@ -313,6 +313,8 @@ const TreemapTooltip: FC<TreemapTooltipProps> = ({ active, payload, currency = "
 // Tool UI Component
 // ============================================================================
 
+const HoldingsContent = memo(HoldingsContentImpl);
+
 export const HoldingsToolUI = makeAssistantToolUI<GetHoldingsArgs, GetHoldingsOutput>({
   toolName: "get_holdings",
   render: (props) => {
@@ -322,7 +324,7 @@ export const HoldingsToolUI = makeAssistantToolUI<GetHoldingsArgs, GetHoldingsOu
 
 type HoldingsContentProps = ToolCallMessagePartProps<GetHoldingsArgs, GetHoldingsOutput>;
 
-function HoldingsContent({ args, result, status }: HoldingsContentProps) {
+function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();

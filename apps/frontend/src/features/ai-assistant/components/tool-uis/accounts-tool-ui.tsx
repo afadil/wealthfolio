@@ -1,7 +1,7 @@
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useSettingsContext } from "@/lib/settings-provider";
 
 // ============================================================================
@@ -197,7 +197,7 @@ function ErrorState({ message }: { message?: string }) {
 
 type AccountsToolUIContentProps = ToolCallMessagePartProps<GetAccountsArgs, GetAccountsResult>;
 
-function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
+function AccountsToolUIContentImpl({ result, status }: AccountsToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -267,6 +267,8 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
 // ============================================================================
 // Export
 // ============================================================================
+
+const AccountsToolUIContent = memo(AccountsToolUIContentImpl);
 
 export const AccountsToolUI = makeAssistantToolUI<GetAccountsArgs, GetAccountsResult>({
   toolName: "get_accounts",

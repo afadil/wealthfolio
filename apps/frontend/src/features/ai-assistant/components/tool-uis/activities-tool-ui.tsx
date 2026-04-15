@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -165,7 +165,9 @@ type ActivitiesContentProps = ToolCallMessagePartProps<
   SearchActivitiesOutput
 >;
 
-function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
+const ActivitiesContent = memo(ActivitiesContentImpl);
+
+function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();

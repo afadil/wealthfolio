@@ -21,7 +21,7 @@ import {
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { searchTicker } from "@/adapters";
 import { saveActivities, updateToolResult } from "@/adapters";
@@ -873,7 +873,7 @@ function AbstainState({ globalErrors }: AbstainStateProps) {
 
 type ImportCsvToolUIContentProps = ToolCallMessagePartProps<ImportCsvArgs, ImportCsvOutput>;
 
-function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIContentProps) {
+function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -962,6 +962,8 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
 // ============================================================================
 // Export
 // ============================================================================
+
+const ImportCsvToolUIContent = memo(ImportCsvToolUIContentImpl);
 
 export const ImportCsvToolUI = makeAssistantToolUI<ImportCsvArgs, ImportCsvOutput>({
   toolName: "import_csv",
