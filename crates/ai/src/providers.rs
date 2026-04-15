@@ -14,7 +14,7 @@ use crate::env::AiEnvironment;
 use crate::error::AiError;
 use crate::provider_model::{
     AiProviderSettings, CapabilityInfo, ConnectionField, ModelCapabilities, ProviderDefaultConfig,
-    AI_PROVIDER_SETTINGS_KEY,
+    ProviderTuning, AI_PROVIDER_SETTINGS_KEY,
 };
 
 // ============================================================================
@@ -54,6 +54,9 @@ struct ProviderCatalogEntry {
     title_model_id: Option<String>,
     #[serde(default)]
     documentation_url: Option<String>,
+    /// Sampling/output defaults for this provider (temperature, max_tokens, etc.).
+    #[serde(default)]
+    tuning: Option<ProviderTuning>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -371,6 +374,37 @@ impl<E: AiEnvironment> ProviderService<E> {
             .providers
             .get(provider_id)
             .and_then(|p| p.tools_allowlist.clone())
+    }
+
+    /// Resolve effective provider tuning: catalog defaults merged with any
+    /// user overrides persisted under `ai_provider_settings`. Returns an empty
+    /// (all-`None`) `ProviderTuning` when neither the catalog nor the user has
+    /// set anything — callers treat that as "leave provider defaults alone."
+    pub fn get_resolved_tuning(&self, provider_id: &str) -> ProviderTuning {
+        let catalog_tuning = PROVIDER_CATALOG
+            .providers
+            .get(provider_id)
+            .and_then(|p| p.tuning.clone())
+            .unwrap_or_default();
+
+        let stored: AiProviderSettings = self
+            .env
+            .settings_service()
+            .get_setting_value(AI_PROVIDER_SETTINGS_KEY)
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+
+        let user_overrides = stored
+            .providers
+            .get(provider_id)
+            .and_then(|p| p.tuning_overrides.clone());
+
+        match user_overrides {
+            Some(ovr) => catalog_tuning.apply_overrides(&ovr),
+            None => catalog_tuning,
+        }
     }
 
     /// Get provider URL (for local providers like Ollama).

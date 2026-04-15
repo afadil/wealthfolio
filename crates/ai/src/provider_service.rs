@@ -11,8 +11,9 @@ use wealthfolio_core::settings::SettingsRepositoryTrait;
 use crate::provider_model::{
     default_priority, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
     ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
-    ProviderApiError, ProviderConfig, ProviderUserSettings, SetDefaultProviderRequest,
-    UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY, AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
+    ProviderApiError, ProviderConfig, ProviderTuning, ProviderUserSettings,
+    SetDefaultProviderRequest, UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY,
+    AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
 
 /// Service trait for AI provider operations.
@@ -38,6 +39,11 @@ pub trait AiProviderServiceTrait: Send + Sync {
     /// Get the title model ID for a provider (fast model for generating thread titles).
     /// Falls back to the default model if not configured.
     fn get_title_model(&self, provider_id: &str) -> Option<String>;
+
+    /// Resolve the effective tuning for a provider by merging catalog defaults
+    /// with any user-supplied overrides. Returns a default-empty `ProviderTuning`
+    /// when the provider has no catalog tuning and the user hasn't customized.
+    fn resolve_tuning(&self, provider_id: &str) -> ProviderTuning;
 
     /// List available models from a provider.
     /// Fetches models from the provider's API using backend-stored secrets.
@@ -290,6 +296,17 @@ impl AiProviderServiceTrait for AiProviderService {
                 // Check if provider supports dynamic model listing
                 let supports_model_listing = Self::provider_supports_model_listing(id);
 
+                // Resolve the three tuning views for the UI: catalog-only,
+                // user-only, and the effective merged value the runtime uses.
+                let catalog_tuning = catalog_provider.tuning.clone();
+                let tuning_overrides = user.tuning_overrides.clone();
+                let resolved_tuning = match (&catalog_tuning, &tuning_overrides) {
+                    (Some(cat), Some(ovr)) => Some(cat.apply_overrides(ovr)),
+                    (Some(cat), None) => Some(cat.clone()),
+                    (None, Some(ovr)) => Some(ProviderTuning::default().apply_overrides(ovr)),
+                    (None, None) => None,
+                };
+
                 MergedProvider {
                     id: id.clone(),
                     name: catalog_provider.name.clone(),
@@ -317,6 +334,9 @@ impl AiProviderServiceTrait for AiProviderService {
                     has_api_key: self.has_api_key(id),
                     is_default: user_settings.default_provider.as_ref() == Some(id),
                     supports_model_listing,
+                    catalog_tuning,
+                    tuning_overrides,
+                    resolved_tuning,
                 }
             })
             .collect();
@@ -394,6 +414,29 @@ impl AiProviderServiceTrait for AiProviderService {
             provider_settings.tools_allowlist = tools_allowlist;
         }
 
+        // Handle tuning overrides update
+        // Some(Some(overrides)) = set/update overrides, Some(None) = reset to catalog defaults.
+        // Empty overrides (every field None) are also treated as a reset to keep storage tidy.
+        if let Some(tuning_update) = request.tuning_overrides {
+            match tuning_update {
+                Some(overrides) => {
+                    overrides.validate().map_err(|msg| {
+                        wealthfolio_core::errors::Error::Validation(ValidationError::InvalidInput(
+                            format!("tuning_overrides: {}", msg),
+                        ))
+                    })?;
+                    if overrides.is_empty() {
+                        provider_settings.tuning_overrides = None;
+                    } else {
+                        provider_settings.tuning_overrides = Some(overrides);
+                    }
+                }
+                None => {
+                    provider_settings.tuning_overrides = None;
+                }
+            }
+        }
+
         // Update schema version
         settings.schema_version = AI_PROVIDER_SETTINGS_SCHEMA_VERSION;
 
@@ -454,6 +497,24 @@ impl AiProviderServiceTrait for AiProviderService {
                 .clone()
                 .unwrap_or_else(|| p.default_model.clone())
         })
+    }
+
+    fn resolve_tuning(&self, provider_id: &str) -> ProviderTuning {
+        let catalog_tuning = self
+            .catalog
+            .providers
+            .get(provider_id)
+            .and_then(|p| p.tuning.clone())
+            .unwrap_or_default();
+        let user_overrides = self
+            .load_user_settings()
+            .providers
+            .get(provider_id)
+            .and_then(|s| s.tuning_overrides.clone());
+        match user_overrides {
+            Some(ovr) => catalog_tuning.apply_overrides(&ovr),
+            None => catalog_tuning,
+        }
     }
 
     async fn list_models(

@@ -13,7 +13,7 @@ import {
   useAiProviderApiKey,
   useListAiModels,
 } from "@/features/ai-assistant";
-import type { ModelCapabilityOverrides } from "@/lib/types";
+import type { ModelCapabilityOverrides, ProviderTuningOverrides } from "@/lib/types";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -53,6 +53,13 @@ export default function AiProvidersPage() {
 
   const handleToolsAllowlistChange = (providerId: string, tools: string[] | null) => {
     updateSettings({ providerId, toolsAllowlist: tools });
+  };
+
+  const handleTuningOverridesChange = (
+    providerId: string,
+    overrides: ProviderTuningOverrides | null,
+  ) => {
+    updateSettings({ providerId, tuningOverrides: overrides });
   };
 
   if (isLoading) {
@@ -144,6 +151,9 @@ export default function AiProvidersPage() {
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
                 }
                 onToolsAllowlistChange={(tools) => handleToolsAllowlistChange(provider.id, tools)}
+                onTuningOverridesChange={(overrides) =>
+                  handleTuningOverridesChange(provider.id, overrides)
+                }
               />
             ))}
           </div>
@@ -166,6 +176,7 @@ function ProviderSettingsCardWrapper({
   onSetFavoriteModels,
   onSetCapabilityOverride,
   onToolsAllowlistChange,
+  onTuningOverridesChange,
 }: {
   provider: Parameters<typeof ProviderSettingsCard>[0]["provider"];
   isLast: boolean;
@@ -176,6 +187,7 @@ function ProviderSettingsCardWrapper({
   onSetFavoriteModels: (modelIds: string[]) => void;
   onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange: (tools: string[] | null) => void;
+  onTuningOverridesChange: (overrides: ProviderTuningOverrides | null) => void;
 }) {
   const { setApiKey, deleteApiKey, revealApiKey } = useAiProviderApiKey(provider.id);
   const [modelComboboxOpen, setModelComboboxOpen] = useState(false);
@@ -209,6 +221,7 @@ function ProviderSettingsCardWrapper({
       onSetFavoriteModels={onSetFavoriteModels}
       onSetCapabilityOverride={onSetCapabilityOverride}
       onToolsAllowlistChange={onToolsAllowlistChange}
+      onTuningOverridesChange={onTuningOverridesChange}
       modelComboboxOpen={modelComboboxOpen}
       onModelComboboxOpenChange={setModelComboboxOpen}
       fetchedModels={fetchedModels}

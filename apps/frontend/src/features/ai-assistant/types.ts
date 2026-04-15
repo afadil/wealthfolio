@@ -12,6 +12,8 @@ export type {
   ModelCapabilityOverrideUpdate,
   FetchedModel,
   ListModelsResponse,
+  ProviderTuning,
+  ProviderTuningOverrides,
 } from "@/lib/types";
 
 // ============================================================================

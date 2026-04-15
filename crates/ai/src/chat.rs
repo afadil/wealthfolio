@@ -701,6 +701,50 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         }
     }
 
+    // Resolve effective tuning (catalog defaults merged with user overrides) once.
+    // Drives temperature, max_tokens, and provider-specific extra_options for
+    // every builder path below.
+    let resolved_tuning = provider_service.get_resolved_tuning(&provider_id);
+
+    // Merge catalog's extra_options with per-call thinking params. The thinking
+    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking.budget_tokens`,
+    // Gemini's `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`,
+    // OpenAI's `reasoning_effort`) that can't live in the JSON catalog because
+    // they're dynamic per-capability. Catalog holds the rest
+    // (Ollama's `num_ctx`/`repeat_penalty`, Gemini's `safetySettings`).
+    fn merge_json_into(dest: &mut serde_json::Value, src: serde_json::Value) {
+        match (dest, src) {
+            (serde_json::Value::Object(dest_map), serde_json::Value::Object(src_map)) => {
+                for (k, v) in src_map {
+                    if let Some(existing) = dest_map.get_mut(&k) {
+                        merge_json_into(existing, v);
+                    } else {
+                        dest_map.insert(k, v);
+                    }
+                }
+            }
+            (dest_slot, src_val) => {
+                *dest_slot = src_val;
+            }
+        }
+    }
+
+    let combine_params = |thinking_params: Option<serde_json::Value>| -> Option<serde_json::Value> {
+        let mut combined = resolved_tuning.extra_options.clone();
+        if let Some(thinking) = thinking_params {
+            if combined.is_null() {
+                combined = thinking;
+            } else {
+                merge_json_into(&mut combined, thinking);
+            }
+        }
+        match &combined {
+            serde_json::Value::Null => None,
+            serde_json::Value::Object(m) if m.is_empty() => None,
+            _ => Some(combined),
+        }
+    };
+
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
         ($client:expr, $thinking_params:expr) => {
@@ -761,21 +805,25 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tools(allowed_tools)
                 .tool_choice(ToolChoice::Auto);
 
-            // Ollama cannot enforce tool_choice and some local models are brittle at
-            // higher temperatures. 0.2 is low enough to keep tool-call JSON reliable
-            // while breaking out of deterministic failure modes we saw at 0.0 — most
-            // notably post-tool-call language drift (the model locks onto a single
-            // non-English token distribution after processing English tool output
-            // and never recovers because temp=0 = no sampling).
-            if provider_id == "ollama" {
-                builder = builder.temperature(0.2);
+            // Temperature from resolved tuning. Providers that shouldn't set
+            // temperature (e.g. Anthropic, per their own guidance) simply omit
+            // it from the catalog.
+            if let Some(temp) = resolved_tuning.temperature {
+                builder = builder.temperature(temp);
             }
 
-            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+            // Max output tokens — prefer caller-supplied ($max_tokens), fall
+            // back to the mode-appropriate value from resolved tuning.
+            let caller_max: Option<u64> = Into::<Option<u64>>::into($max_tokens);
+            let effective_max =
+                caller_max.or_else(|| resolved_tuning.max_tokens_for_mode(capabilities.thinking));
+            if let Some(tokens) = effective_max {
                 builder = builder.max_tokens(tokens);
             }
 
-            if let Some(params) = $thinking_params {
+            // Provider-specific additional params: catalog extra_options merged
+            // with per-call thinking params.
+            if let Some(params) = combine_params($thinking_params) {
                 builder = builder.additional_params(params);
             }
 
@@ -796,11 +844,18 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let mut builder = $client.agent(&model_id).preamble(&preamble);
 
-            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+            if let Some(temp) = resolved_tuning.temperature {
+                builder = builder.temperature(temp);
+            }
+
+            let caller_max: Option<u64> = Into::<Option<u64>>::into($max_tokens);
+            let effective_max =
+                caller_max.or_else(|| resolved_tuning.max_tokens_for_mode(capabilities.thinking));
+            if let Some(tokens) = effective_max {
                 builder = builder.max_tokens(tokens);
             }
 
-            if let Some(params) = $thinking_params {
+            if let Some(params) = combine_params($thinking_params) {
                 builder = builder.additional_params(params);
             }
 
@@ -859,32 +914,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None
     };
 
-    // Ollama: pass think parameter to enable/disable thinking mode
-    // When false, models like qwen3 and deepseek-r1 skip chain-of-thought reasoning
-    // Note: Some models may ignore the API parameter and still emit thinking.
-    // Ollama options:
-    // - `think`: thinking mode on/off per model capability.
-    // - `num_ctx`: context window. CRITICAL — Ollama defaults to 2048 tokens,
-    //   which is smaller than our system prompt alone (~2200 tokens). Without
-    //   this, Ollama silently truncates input from the front and the chat
-    //   history never reaches the model, causing apparent "context loss"
-    //   between turns. 16384 fits prompt + tool schemas + long history and is
-    //   supported by every modern Ollama-served model (gemma3n/qwen2.5/mistral
-    //   all support ≥32K). Cost: proportional VRAM — acceptable for a desktop
-    //   app.
-    // - `repeat_penalty=1.1` (llama.cpp default, Jan ships 1.12) — softens
-    //   degenerate token loops without hurting JSON formatting for tool calls.
-    // - `num_predict=4096` caps output tokens so a runaway model can't stream
-    //   forever at the decoding level.
-    // Note: recent Ollama Go runners may silently drop penalty params for some
-    // models (ollama/ollama#14493) — the rig-level stream hook is the real
-    // safety net for that failure mode.
+    // Ollama: only the dynamic `think` flag is built inline. Static options
+    // (num_ctx, repeat_penalty, repeat_last_n) live in the catalog's
+    // `tuning.extraOptions` and are merged in via `combine_params`.
     let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
         "think": capabilities.thinking,
-        "num_ctx": 16384,
-        "repeat_penalty": 1.1,
-        "repeat_last_n": 64,
-        "num_predict": 4096,
     }));
 
     // Anthropic: extended thinking with budget_tokens
@@ -899,9 +933,6 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     } else {
         None
     };
-    // Anthropic requires max_tokens on the CompletionRequest (not in additional_params).
-    // With thinking enabled, budget_tokens counts against max_tokens so it must be larger.
-    let anthropic_max_tokens: u64 = if capabilities.thinking { 16000 } else { 8096 };
 
     // OpenAI: reasoning_effort for o1/o3 models
     // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
@@ -940,11 +971,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(
-                    client,
-                    anthropic_thinking_params.clone(),
-                    Some(anthropic_max_tokens)
-                )
+                build_with_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
@@ -976,11 +1003,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(
-                    client,
-                    anthropic_thinking_params.clone(),
-                    Some(anthropic_max_tokens)
-                )
+                build_without_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
