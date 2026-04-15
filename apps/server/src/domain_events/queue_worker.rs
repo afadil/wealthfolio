@@ -43,6 +43,8 @@ pub struct QueueWorkerDeps {
     /// Shared token lifecycle state; must be the same instance used by API handlers.
     pub token_lifecycle: Arc<TokenLifecycleState>,
     pub lots_repository: Arc<dyn wealthfolio_core::lots::LotRepositoryTrait + Send + Sync>,
+    /// Global portfolio job lock — shared with API handlers to prevent concurrent recalcs.
+    pub portfolio_job_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// Runs the event queue worker.
@@ -267,6 +269,9 @@ async fn run_portfolio_job(
     use serde_json::json;
     use wealthfolio_core::accounts::AccountServiceTrait;
     use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
+
+    // Acquire the global portfolio job lock to prevent concurrent recalculations.
+    let _lock = deps.portfolio_job_lock.lock().await;
 
     let event_bus = deps.event_bus.clone();
 

@@ -120,6 +120,10 @@ pub async fn process_portfolio_job(
     state: Arc<AppState>,
     config: PortfolioJobConfig,
 ) -> ApiResult<()> {
+    // Acquire the global portfolio job lock to prevent concurrent recalculations.
+    // A second job arriving while one is running will wait until the first completes.
+    let _lock = state.portfolio_job_lock.lock().await;
+
     let event_bus = state.event_bus.clone();
     let snapshot_mode = config
         .since_date
