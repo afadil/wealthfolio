@@ -147,12 +147,14 @@ export function useAlternativeAssetMutations(options: UseAlternativeAssetMutatio
       metadata,
       name,
       notes,
+      accountId,
     }: {
       assetId: string;
       metadata: Record<string, string>;
       name?: string;
       notes?: string | null;
-    }) => updateAlternativeAssetMetadata(assetId, metadata, name, notes),
+      accountId?: string | null;
+    }) => updateAlternativeAssetMetadata(assetId, metadata, name, notes, accountId),
     onSuccess: () => {
       invalidateQueries();
       options.onMetadataUpdateSuccess?.();

@@ -560,6 +560,7 @@ impl ActivityService {
             provider_config: asset.provider_config.clone(),
             notes: asset.notes.clone(),
             metadata: asset.metadata.clone(),
+            account_id: asset.account_id.clone(),
         }
     }
 
@@ -594,6 +595,7 @@ impl ActivityService {
             provider_config: None,
             notes: None,
             metadata: None,
+            account_id: None,
         })
     }
 
