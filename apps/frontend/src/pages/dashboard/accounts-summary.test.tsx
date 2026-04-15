@@ -137,6 +137,7 @@ function createValuation(overrides: Partial<AccountValuation>): AccountValuation
     costBasis: overrides.costBasis ?? 0,
     netContribution: overrides.netContribution ?? 0,
     calculatedAt: overrides.calculatedAt ?? "2026-03-17T00:00:00Z",
+    alternativeMarketValue: overrides.alternativeMarketValue ?? 0,
   };
 }
 

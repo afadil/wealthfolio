@@ -394,17 +394,13 @@ async fn run_portfolio_job(
         }
     }
 
-    if !account_ids
-        .iter()
-        .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        account_ids.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-    }
+    // Remove TOTAL from the account list — portfolio valuations are aggregated separately.
+    account_ids.retain(|id| id != PORTFOLIO_TOTAL_ACCOUNT_ID);
 
-    for account_id in account_ids {
+    for account_id in &account_ids {
         if let Err(err) = deps
             .valuation_service
-            .calculate_valuation_history(&account_id, config.valuation_mode.clone())
+            .calculate_valuation_history(account_id, config.valuation_mode.clone())
             .await
         {
             let err_msg = format!(
@@ -417,6 +413,15 @@ async fn run_portfolio_job(
                 json!(err_msg),
             ));
         }
+    }
+
+    // Aggregate per-account valuations into portfolio-level rows.
+    if let Err(err) = deps
+        .valuation_service
+        .calculate_valuation_history(PORTFOLIO_TOTAL_ACCOUNT_ID, config.valuation_mode)
+        .await
+    {
+        tracing::warn!("Portfolio valuation aggregation failed: {}", err);
     }
 
     event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_COMPLETE));

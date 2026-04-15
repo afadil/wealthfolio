@@ -416,19 +416,14 @@ async fn run_portfolio_calculation(
         }
     }
 
-    // Ensure TOTAL is included in valuation calculation
-    if !account_ids_vec
-        .iter()
-        .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        account_ids_vec.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-    }
+    // Remove TOTAL — portfolio valuations are aggregated separately.
+    account_ids_vec.retain(|id| id != PORTFOLIO_TOTAL_ACCOUNT_ID);
 
     // Calculate valuation history for each account
     let valuation_service = context.valuation_service();
-    for account_id in account_ids_vec {
+    for account_id in &account_ids_vec {
         if let Err(err) = valuation_service
-            .calculate_valuation_history(&account_id, valuation_mode.clone())
+            .calculate_valuation_history(account_id, valuation_mode.clone())
             .await
         {
             let err_msg = format!(
@@ -438,6 +433,14 @@ async fn run_portfolio_calculation(
             warn!("{}", err_msg);
             let _ = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg);
         }
+    }
+
+    // Aggregate per-account valuations into portfolio-level rows.
+    if let Err(err) = valuation_service
+        .calculate_valuation_history(PORTFOLIO_TOTAL_ACCOUNT_ID, valuation_mode)
+        .await
+    {
+        warn!("Portfolio valuation aggregation failed: {}", err);
     }
 
     // Emit completion event
