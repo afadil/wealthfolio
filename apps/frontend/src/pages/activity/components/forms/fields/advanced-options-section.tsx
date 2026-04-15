@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useFormContext, type FieldPath, type FieldValues } from "react-hook-form";
+import { useFormContext, useWatch, type FieldPath, type FieldValues } from "react-hook-form";
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui";
+import { FormDescription } from "@wealthfolio/ui/components/ui/form";
 import { CurrencyInput, MoneyInput } from "@wealthfolio/ui/components/financial";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -74,6 +75,23 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
   const isMobile = variant === "mobile";
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const { control } = useFormContext<TFieldValues>();
+
+  const watchedCurrency = useWatch({
+    control,
+    name: currencyName as FieldPath<TFieldValues>,
+    disabled: !currencyName,
+  }) as string | undefined;
+  const fromCurrency = watchedCurrency || assetCurrency;
+
+  const watchedFxRate = useWatch({
+    control,
+    name: fxRateName as FieldPath<TFieldValues>,
+    disabled: !fxRateName,
+  }) as number | undefined;
+  const fxRateDisplay =
+    typeof watchedFxRate === "number" && Number.isFinite(watchedFxRate) && watchedFxRate > 0
+      ? watchedFxRate.toString()
+      : "?";
 
   // Get available subtypes for the current activity type
   const availableSubtypes = useMemo(() => {
@@ -198,6 +216,11 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
                       data-testid="fx-rate-input"
                     />
                   </FormControl>
+                  {fromCurrency && accountCurrency && fromCurrency !== accountCurrency && (
+                    <FormDescription className="text-xs">
+                      1 {fromCurrency} = {fxRateDisplay} {accountCurrency}
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
