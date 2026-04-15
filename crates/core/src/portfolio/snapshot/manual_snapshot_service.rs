@@ -6,7 +6,7 @@ use log::debug;
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crate::assets::{AssetKind, AssetMetadata, AssetServiceTrait};
+use crate::assets::{AssetKind, AssetMetadata, AssetServiceTrait, QuoteMode};
 use crate::errors::Result;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
@@ -137,8 +137,13 @@ impl ManualSnapshotService {
                 }
             }
 
-            // Create a quote from the snapshot price as a fallback
-            if !holding.average_cost.is_zero() {
+            // Create a quote from the snapshot price as a fallback.
+            // Only for MANUAL-mode assets: average cost is a cost basis, not a market
+            // price, and writing it for MARKET-mode assets would overwrite provider
+            // quotes for the snapshot date.
+            let is_manual_mode = asset.quote_mode == QuoteMode::Manual
+                || matches!(quote_mode.as_deref(), Some(DATA_SOURCE_MANUAL));
+            if is_manual_mode && !holding.average_cost.is_zero() {
                 let source = DATA_SOURCE_MANUAL.to_string();
                 self.create_quote_from_snapshot(
                     &asset.id,
