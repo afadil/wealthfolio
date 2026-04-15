@@ -250,9 +250,11 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         // take messages from most recent backwards until the budget is exhausted.
         let mut history_messages: Vec<SimpleChatMessage> = Vec::new();
         let mut budget = MAX_HISTORY_CHARS;
+        let mut skipped_empty: usize = 0;
         for msg in previous_messages.iter().rev() {
             let text = msg.content.get_text_content();
             if text.is_empty() {
+                skipped_empty += 1;
                 continue;
             }
             let simple = match msg.role {
@@ -267,6 +269,13 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             history_messages.push(simple);
         }
         history_messages.reverse();
+        debug!(
+            "Thread {} history: {} msgs sent, {} stored in db, {} skipped (empty text_content)",
+            thread_id,
+            history_messages.len(),
+            previous_messages.len(),
+            skipped_empty,
+        );
 
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();
@@ -849,15 +858,26 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Ollama: pass think parameter to enable/disable thinking mode
     // When false, models like qwen3 and deepseek-r1 skip chain-of-thought reasoning
     // Note: Some models may ignore the API parameter and still emit thinking.
-    // Ollama options: control thinking + set defensive sampling params against
-    // degenerate loops. llama.cpp defaults to repeat_penalty=1.1 (sweet spot for
-    // tool-calling; Jan ships 1.12, higher values degrade JSON formatting). We
-    // also cap num_predict so a runaway model can't stream forever at the
-    // decoding level. Note: recent Ollama Go runners may silently drop these
-    // for some models (ollama/ollama#14493), so the rig-level hook is the
-    // real safety net.
+    // Ollama options:
+    // - `think`: thinking mode on/off per model capability.
+    // - `num_ctx`: context window. CRITICAL — Ollama defaults to 2048 tokens,
+    //   which is smaller than our system prompt alone (~2200 tokens). Without
+    //   this, Ollama silently truncates input from the front and the chat
+    //   history never reaches the model, causing apparent "context loss"
+    //   between turns. 16384 fits prompt + tool schemas + long history and is
+    //   supported by every modern Ollama-served model (gemma3n/qwen2.5/mistral
+    //   all support ≥32K). Cost: proportional VRAM — acceptable for a desktop
+    //   app.
+    // - `repeat_penalty=1.1` (llama.cpp default, Jan ships 1.12) — softens
+    //   degenerate token loops without hurting JSON formatting for tool calls.
+    // - `num_predict=4096` caps output tokens so a runaway model can't stream
+    //   forever at the decoding level.
+    // Note: recent Ollama Go runners may silently drop penalty params for some
+    // models (ollama/ollama#14493) — the rig-level stream hook is the real
+    // safety net for that failure mode.
     let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
         "think": capabilities.thinking,
+        "num_ctx": 16384,
         "repeat_penalty": 1.1,
         "repeat_last_n": 64,
         "num_predict": 4096,
