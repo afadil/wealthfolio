@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use log::debug;
 use rust_decimal::Decimal;
 
@@ -734,6 +734,13 @@ const COMMON_DATE_FORMATS: &[&str] = &[
     "%Y%m%d",
 ];
 
+const COMMON_DATETIME_FORMATS: &[&str] = &[
+    "%Y-%m-%dT%H:%M:%S%.f",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S%.f",
+    "%Y-%m-%d %H:%M:%S",
+];
+
 fn parse_date(s: &str, explicit_format: Option<&str>) -> Option<NaiveDate> {
     let s = s.trim();
     if s.is_empty() {
@@ -742,11 +749,18 @@ fn parse_date(s: &str, explicit_format: Option<&str>) -> Option<NaiveDate> {
     if let Some(fmt) = explicit_format {
         return NaiveDate::parse_from_str(s, fmt).ok();
     }
-    // Try unix timestamp (seconds or milliseconds)
     if let Ok(n) = s.parse::<i64>() {
-        let secs = if n > 9_999_999_999 { n / 1000 } else { n };
-        if let Some(dt) = DateTime::from_timestamp(secs, 0) {
-            return Some(dt.naive_utc().date());
+        return parse_numeric_date(n);
+    }
+    // ISO 8601 / RFC 3339 datetime with timezone (e.g. "2026-03-30T12:00:00Z", "...+00:00").
+    // Use the local date from the offset so later date_timezone handling stays consistent
+    // with how bare dates are interpreted downstream.
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.date_naive());
+    }
+    for fmt in COMMON_DATETIME_FORMATS {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
+            return Some(dt.date());
         }
     }
     for fmt in COMMON_DATE_FORMATS {
@@ -755,6 +769,18 @@ fn parse_date(s: &str, explicit_format: Option<&str>) -> Option<NaiveDate> {
         }
     }
     None
+}
+
+fn parse_numeric_date(n: i64) -> Option<NaiveDate> {
+    // Excel/Lotus day serial: days since 1899-12-30 (accounts for the 1900 leap-year bug).
+    // Values below 100_000 cover years 1900–2173, which excludes plausible unix-second
+    // price timestamps (Jan 1970 + 100_000 s = Jan 2 1970, never a real quote date).
+    if (1..100_000).contains(&n) {
+        let base = NaiveDate::from_ymd_opt(1899, 12, 30)?;
+        return base.checked_add_signed(chrono::Duration::days(n));
+    }
+    let secs = if n > 9_999_999_999 { n / 1000 } else { n };
+    DateTime::from_timestamp(secs, 0).map(|dt| dt.naive_utc().date())
 }
 
 /// Extract text from a table cell, preferring the first child element's text
@@ -1079,3 +1105,90 @@ fn extract_json_string(body: &str, path: &str) -> Option<String> {
 
 // extract_html_value imported from crate::custom_provider::model
 // parse_number_string imported from crate::custom_provider::service
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    #[test]
+    fn parse_date_iso_date_only() {
+        assert_eq!(parse_date("2026-03-30", None), Some(ymd(2026, 3, 30)));
+    }
+
+    #[test]
+    fn parse_date_iso_datetime_with_z() {
+        assert_eq!(
+            parse_date("2026-03-30T12:00:00Z", None),
+            Some(ymd(2026, 3, 30))
+        );
+    }
+
+    #[test]
+    fn parse_date_iso_datetime_with_offset() {
+        assert_eq!(
+            parse_date("2026-04-03T07:39:00+00:00", None),
+            Some(ymd(2026, 4, 3))
+        );
+    }
+
+    #[test]
+    fn parse_date_iso_datetime_preserves_local_date() {
+        // 23:00 local on Apr 3 (UTC-05:00) is Apr 4 in UTC — we want the source's local date.
+        assert_eq!(
+            parse_date("2026-04-03T23:00:00-05:00", None),
+            Some(ymd(2026, 4, 3))
+        );
+    }
+
+    #[test]
+    fn parse_date_iso_datetime_with_fractional_seconds() {
+        assert_eq!(
+            parse_date("2026-03-30T12:00:00.123Z", None),
+            Some(ymd(2026, 3, 30))
+        );
+    }
+
+    #[test]
+    fn parse_date_iso_datetime_naive() {
+        assert_eq!(
+            parse_date("2026-03-30T12:00:00", None),
+            Some(ymd(2026, 3, 30))
+        );
+    }
+
+    #[test]
+    fn parse_date_unix_seconds() {
+        // 2024-04-01 00:00:00 UTC
+        assert_eq!(parse_date("1711929600", None), Some(ymd(2024, 4, 1)));
+    }
+
+    #[test]
+    fn parse_date_unix_millis() {
+        assert_eq!(parse_date("1711929600000", None), Some(ymd(2024, 4, 1)));
+    }
+
+    #[test]
+    fn parse_date_excel_serial() {
+        // Excel day serial 45383 → 2024-04-01 (1899-12-30 + 45383 days)
+        assert_eq!(parse_date("45383", None), Some(ymd(2024, 4, 1)));
+    }
+
+    #[test]
+    fn parse_date_explicit_format() {
+        assert_eq!(
+            parse_date("2026-04-03T07:39:00+00:00", Some("%Y-%m-%dT%H:%M:%S%:z")),
+            Some(ymd(2026, 4, 3))
+        );
+    }
+
+    #[test]
+    fn parse_date_empty_and_garbage() {
+        assert_eq!(parse_date("", None), None);
+        assert_eq!(parse_date("   ", None), None);
+        assert_eq!(parse_date("not a date", None), None);
+    }
+}
