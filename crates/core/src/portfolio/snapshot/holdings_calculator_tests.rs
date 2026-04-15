@@ -698,6 +698,7 @@ mod tests {
                 acquisition_price: dec!(150),
                 acquisition_fees: dec!(5),
                 fx_rate_to_position: None,
+                source_activity_id: None,
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
@@ -3151,6 +3152,7 @@ mod tests {
                 acquisition_price: dec!(100),
                 acquisition_fees: dec!(0),
                 fx_rate_to_position: None,
+                source_activity_id: None,
             }]),
             created_at: Utc::now(),
             last_updated: Utc::now(),
@@ -3646,6 +3648,7 @@ mod tests {
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
             fx_rate_to_position: None,
+            source_activity_id: None,
         }]);
         previous_snapshot
             .positions
@@ -3765,6 +3768,7 @@ mod tests {
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
             fx_rate_to_position: None,
+            source_activity_id: None,
         }]);
         previous_snapshot
             .positions
@@ -4104,6 +4108,7 @@ mod tests {
                     acquisition_price: dec!(150),
                     acquisition_fees: dec!(0),
                     fx_rate_to_position: None,
+                    source_activity_id: None,
                 }]),
                 created_at: Utc::now(),
                 last_updated: Utc::now(),

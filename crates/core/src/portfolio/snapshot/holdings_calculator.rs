@@ -97,21 +97,36 @@ impl HoldingsCalculator {
         }
     }
 
-    /// Records a lot closure in the disposed lots log.
+    /// Records a lot closure in the disposed lots log, carrying the full lot
+    /// data so the persistence layer can INSERT the closed lot if it was never
+    /// written to the database (e.g. during a full recalc/replay).
     fn record_lot_closure(
         &self,
         account_id: &str,
-        lot_id: &str,
+        asset_id: &str,
+        lot: &super::Lot,
         close_date: &str,
         activity_id: &str,
     ) {
+        let orig_qty = if lot.original_quantity.is_zero() {
+            lot.quantity
+        } else {
+            lot.original_quantity
+        };
         if let Ok(mut log) = self.disposed_lots.lock() {
             log.entry(account_id.to_string())
                 .or_default()
                 .push(LotClosure {
-                    lot_id: lot_id.to_string(),
+                    lot_id: lot.id.clone(),
                     close_date: close_date.to_string(),
                     close_activity_id: Some(activity_id.to_string()),
+                    account_id: account_id.to_string(),
+                    asset_id: asset_id.to_string(),
+                    open_date: lot.acquisition_date.format("%Y-%m-%d").to_string(),
+                    original_quantity: orig_qty.to_string(),
+                    cost_per_unit: lot.acquisition_price.to_string(),
+                    total_cost_basis: lot.cost_basis.to_string(),
+                    fee_allocated: lot.acquisition_fees.to_string(),
                 });
         }
     }
@@ -347,6 +362,7 @@ impl HoldingsCalculator {
             fee_for_lot,
             activity.activity_date,
             fx_rate_used,
+            Some(activity.id.clone()),
         )?;
 
         // Book cash outflow
@@ -403,8 +419,8 @@ impl HoldingsCalculator {
         if let Some(position) = state.positions.get_mut(asset_id) {
             let reduction = position.reduce_lots_fifo(activity.qty())?;
             let close_date = self.activity_local_date(activity).to_string();
-            for lot_id in &reduction.fully_consumed_lot_ids {
-                self.record_lot_closure(&state.account_id, lot_id, &close_date, &activity.id);
+            for lot in &reduction.fully_consumed_lots {
+                self.record_lot_closure(&state.account_id, asset_id, lot, &close_date, &activity.id);
             }
         } else {
             warn!(
@@ -719,6 +735,7 @@ impl HoldingsCalculator {
                     fee_for_lot,
                     activity.activity_date,
                     fx_rate_used,
+                    Some(activity.id.clone()),
                 )?
             };
 
@@ -824,8 +841,8 @@ impl HoldingsCalculator {
 
                 // Record fully consumed lots as closed
                 let close_date = activity_date.to_string();
-                for lot_id in &reduction.fully_consumed_lot_ids {
-                    self.record_lot_closure(&state.account_id, lot_id, &close_date, &activity.id);
+                for lot in &reduction.fully_consumed_lots {
+                    self.record_lot_closure(&state.account_id, asset_id, lot, &close_date, &activity.id);
                 }
 
                 // Cache removed lots for paired TRANSFER_IN (lot-level transfer)
@@ -895,10 +912,11 @@ impl HoldingsCalculator {
                     let qty = activity.qty();
                     let reduction = position.reduce_lots_fifo(qty)?;
                     let close_date = self.activity_local_date(activity).to_string();
-                    for lot_id in &reduction.fully_consumed_lot_ids {
+                    for lot in &reduction.fully_consumed_lots {
                         self.record_lot_closure(
                             &state.account_id,
-                            lot_id,
+                            asset_id,
+                            lot,
                             &close_date,
                             &activity.id,
                         );

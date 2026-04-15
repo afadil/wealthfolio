@@ -32,6 +32,12 @@ use crate::portfolio::snapshot::AccountStateSnapshot;
 // ── Repository trait ──────────────────────────────────────────────────────────
 
 /// Records a lot that was fully disposed (remaining_quantity → 0).
+///
+/// Carries the full lot data so that `sync_lots_for_account` can INSERT the
+/// closed lot even if it was never previously written to the database.  This
+/// happens during a full recalc/replay: the lot is created and consumed
+/// entirely within a single pass, so `extract_lot_records` (which only sees
+/// lots still in the in-memory VecDeque) never produces a row for it.
 #[derive(Debug, Clone)]
 pub struct LotClosure {
     pub lot_id: String,
@@ -39,6 +45,20 @@ pub struct LotClosure {
     pub close_date: String,
     /// The activity that fully disposed the lot, if known.
     pub close_activity_id: Option<String>,
+
+    // ── Fields needed to INSERT the lot if it doesn't exist yet ──
+    pub account_id: String,
+    pub asset_id: String,
+    /// ISO 8601 date the lot was opened ("YYYY-MM-DD").
+    pub open_date: String,
+    /// Quantity when the lot was first created.
+    pub original_quantity: String,
+    /// Cost per unit in the asset's quote currency.
+    pub cost_per_unit: String,
+    /// Total cost basis (cost_per_unit × original_quantity + fee).
+    pub total_cost_basis: String,
+    /// Transaction fees allocated to this lot.
+    pub fee_allocated: String,
 }
 
 /// Persistence interface for lot rows.
@@ -180,7 +200,10 @@ pub enum HoldingPeriod {
 /// suitable for persisting to the `lots` table.
 ///
 /// Each open lot in every position of the snapshot becomes one row.
-/// `open_activity_id` is always `None` — see the module-level doc for the reason.
+/// `open_activity_id` is set from the in-memory `Lot.source_activity_id` so
+/// the FK CASCADE removes the row when its activity is deleted. For
+/// HOLDINGS-mode lots and synthetic lots that don't correspond to an
+/// activity row, `source_activity_id` is `None` and the column stays NULL.
 /// `original_quantity` comes from `lot.original_quantity` when available (new
 /// snapshots). For old snapshots that predate the field (where it deserializes
 /// as zero), falls back to `lot.quantity` (the remaining amount).
@@ -200,7 +223,7 @@ pub fn extract_lot_records(snapshot: &AccountStateSnapshot) -> Vec<LotRecord> {
                 account_id: snapshot.account_id.clone(),
                 asset_id: position.asset_id.clone(),
                 open_date: lot.acquisition_date.format("%Y-%m-%d").to_string(),
-                open_activity_id: None,
+                open_activity_id: lot.source_activity_id.clone(),
                 original_quantity: orig_qty.to_string(),
                 remaining_quantity: lot.quantity.to_string(),
                 cost_per_unit: lot.acquisition_price.to_string(),
@@ -441,6 +464,7 @@ mod tests {
             acquisition_price: price,
             acquisition_fees: fee,
             fx_rate_to_position: None,
+            source_activity_id: None,
         }
     }
 

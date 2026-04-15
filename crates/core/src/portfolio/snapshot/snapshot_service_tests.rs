@@ -1312,6 +1312,7 @@ mod tests {
             acquisition_price: dec!(100),
             acquisition_fees: dec!(0),
             fx_rate_to_position: None,
+            source_activity_id: None,
         };
 
         let lot2 = Lot {
@@ -1331,6 +1332,7 @@ mod tests {
             acquisition_price: dec!(110),
             acquisition_fees: dec!(0),
             fx_rate_to_position: None,
+            source_activity_id: None,
         };
 
         let mut snap1 = create_blank_snapshot(&acc1.id, &acc1.currency, target_date_str);
@@ -5676,6 +5678,23 @@ mod tests {
             closures[0].close_activity_id.as_deref(),
             Some("sell-aapl"),
             "close_activity_id = sell activity id"
+        );
+
+        // Verify the closure carries full lot data for DB insertion
+        assert_eq!(closures[0].account_id, "acc-sell-001");
+        assert_eq!(closures[0].asset_id, "AAPL");
+        assert_eq!(closures[0].open_date, "2024-01-15");
+        assert_eq!(
+            closures[0].original_quantity,
+            dec!(50).to_string(),
+            "original_quantity = buy quantity"
+        );
+        // Parse as Decimal to avoid trailing-zero formatting differences
+        let cost_per_unit: Decimal = closures[0].cost_per_unit.parse().unwrap();
+        assert_eq!(
+            cost_per_unit,
+            dec!(185),
+            "cost_per_unit = buy price"
         );
     }
 }

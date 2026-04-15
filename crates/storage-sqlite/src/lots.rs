@@ -247,17 +247,44 @@ impl LotRepositoryTrait for LotsRepository {
                         .map_err(StorageError::from)?;
                 }
 
-                // Mark closed lots
+                // Upsert closed lots — INSERT the full record if it doesn't exist
+                // yet (happens during full recalc when a lot is created and fully
+                // consumed in one pass), or UPDATE if it was previously open.
+                let now = chrono::Utc::now()
+                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                    .to_string();
                 for closure in &closures {
-                    diesel::update(dsl::lots.filter(dsl::id.eq(&closure.lot_id)))
+                    let closed_lot = LotRecordDB {
+                        id: closure.lot_id.clone(),
+                        account_id: closure.account_id.clone(),
+                        asset_id: closure.asset_id.clone(),
+                        open_date: closure.open_date.clone(),
+                        open_activity_id: None,
+                        original_quantity: closure.original_quantity.clone(),
+                        remaining_quantity: "0".to_string(),
+                        cost_per_unit: closure.cost_per_unit.clone(),
+                        total_cost_basis: closure.total_cost_basis.clone(),
+                        fee_allocated: closure.fee_allocated.clone(),
+                        disposal_method: "FIFO".to_string(),
+                        is_closed: 1,
+                        close_date: Some(closure.close_date.clone()),
+                        close_activity_id: closure.close_activity_id.clone(),
+                        is_wash_sale: 0,
+                        holding_period: None,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    };
+                    diesel::insert_into(dsl::lots)
+                        .values(&closed_lot)
+                        .on_conflict(dsl::id)
+                        .do_update()
                         .set((
                             dsl::is_closed.eq(1),
-                            dsl::close_date.eq(&closure.close_date),
-                            dsl::close_activity_id.eq(&closure.close_activity_id),
+                            dsl::close_date.eq(diesel::upsert::excluded(dsl::close_date)),
+                            dsl::close_activity_id
+                                .eq(diesel::upsert::excluded(dsl::close_activity_id)),
                             dsl::remaining_quantity.eq("0"),
-                            dsl::updated_at.eq(chrono::Utc::now()
-                                .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                                .to_string()),
+                            dsl::updated_at.eq(diesel::upsert::excluded(dsl::updated_at)),
                         ))
                         .execute(conn)
                         .map_err(StorageError::from)?;
@@ -267,6 +294,16 @@ impl LotRepositoryTrait for LotsRepository {
                 // this recalculation. Orphans arise when activities are deleted
                 // (FK SET NULL on open_activity_id) and a subsequent rebuild
                 // creates new lots with new IDs, leaving the old ones behind.
+                //
+                // Safety: when both open_lots and closures are empty we do NOT
+                // wipe the account's lots. An empty result here means the
+                // calculation either failed mid-flight (e.g. an activity with a
+                // bad asset_id errored) or it ran for an account with no
+                // activities at all. In the latter case, callers that legitimately
+                // want to clear an account use `replace_lots_for_account(id, &[])`
+                // explicitly. In the former case, wiping would destroy correct
+                // data — leaving the existing rows stale until the next successful
+                // recalc is the safer outcome.
                 let known_ids: Vec<&str> = db_lots
                     .iter()
                     .map(|l| l.id.as_str())
@@ -274,10 +311,26 @@ impl LotRepositoryTrait for LotsRepository {
                     .collect();
 
                 if known_ids.is_empty() {
-                    // No lots produced — delete everything for this account
-                    diesel::delete(dsl::lots.filter(dsl::account_id.eq(&account_id)))
-                        .execute(conn)
+                    // Check whether existing lots would have been destroyed by the
+                    // old wipe-all behaviour and warn loudly so the underlying
+                    // calculator failure can be investigated.
+                    let existing: i64 = dsl::lots
+                        .filter(dsl::account_id.eq(&account_id))
+                        .count()
+                        .get_result(conn)
                         .map_err(StorageError::from)?;
+                    if existing > 0 {
+                        log::warn!(
+                            "sync_lots_for_account: skipping orphan cleanup for account {} \
+                             because the recalculation produced no lots and no closures. \
+                             {} existing lot row(s) preserved. This usually indicates a \
+                             holdings_calculator error during recalc; check the logs for \
+                             'Failed to process activity' or 'Invalid asset_id' messages. \
+                             Use replace_lots_for_account explicitly if a wipe is intended.",
+                            account_id,
+                            existing
+                        );
+                    }
                 } else {
                     diesel::delete(
                         dsl::lots
@@ -475,5 +528,85 @@ mod tests {
 
         repo.replace_lots_for_account("acc1", &[]).await.unwrap();
         assert_eq!(repo.count_lots().unwrap(), 0);
+    }
+
+    /// Regression test for the data-corruption bug where a recalculation that
+    /// failed (e.g. activity with empty asset_id) would produce empty results,
+    /// and `sync_lots_for_account` would then wipe every lot for the account.
+    ///
+    /// `sync_lots_for_account` must NEVER delete an account's existing lots
+    /// when it is given empty inputs. Callers that legitimately want to clear
+    /// an account use `replace_lots_for_account(id, &[])` explicitly.
+    #[tokio::test]
+    async fn sync_with_empty_inputs_does_not_wipe_existing_lots() {
+        let (repo, pool, _dir) = setup().await;
+        insert_account(&pool, "acc1");
+        insert_asset(&pool, "AAPL");
+        insert_asset(&pool, "MSFT");
+
+        // Seed the account with some lots.
+        let initial = vec![
+            make_lot_record("l1", "acc1", "AAPL", "50"),
+            make_lot_record("l2", "acc1", "AAPL", "30"),
+            make_lot_record("l3", "acc1", "MSFT", "100"),
+        ];
+        repo.sync_lots_for_account("acc1", &initial, &[])
+            .await
+            .unwrap();
+        assert_eq!(repo.count_lots().unwrap(), 3);
+
+        // Simulate a failed recalc that produced nothing for this account.
+        // The function MUST NOT wipe the existing lots.
+        repo.sync_lots_for_account("acc1", &[], &[]).await.unwrap();
+        assert_eq!(
+            repo.count_lots().unwrap(),
+            3,
+            "sync_lots_for_account with empty inputs must preserve existing lots \
+             (failed recalcs would otherwise wipe correct data)"
+        );
+
+        // Verify the actual rows are unchanged.
+        let lots = repo.get_all_lots_for_account("acc1").await.unwrap();
+        assert_eq!(lots.len(), 3);
+        let ids: Vec<&str> = lots.iter().map(|l| l.id.as_str()).collect();
+        assert!(ids.contains(&"l1"));
+        assert!(ids.contains(&"l2"));
+        assert!(ids.contains(&"l3"));
+
+        // Sanity check: the explicit wipe path still works for the legitimate
+        // "account drained" case.
+        repo.replace_lots_for_account("acc1", &[]).await.unwrap();
+        assert_eq!(repo.count_lots().unwrap(), 0);
+    }
+
+    /// `sync_lots_for_account` should still remove orphaned lots when given a
+    /// non-empty new set (the partial-replacement case for incremental recalc).
+    #[tokio::test]
+    async fn sync_with_partial_inputs_removes_orphans() {
+        let (repo, pool, _dir) = setup().await;
+        insert_account(&pool, "acc1");
+        insert_asset(&pool, "AAPL");
+        insert_asset(&pool, "MSFT");
+
+        let initial = vec![
+            make_lot_record("l1", "acc1", "AAPL", "50"),
+            make_lot_record("l2", "acc1", "AAPL", "30"),
+            make_lot_record("l3", "acc1", "MSFT", "100"),
+        ];
+        repo.sync_lots_for_account("acc1", &initial, &[])
+            .await
+            .unwrap();
+        assert_eq!(repo.count_lots().unwrap(), 3);
+
+        // Recalc keeps only l1; l2 and l3 should be orphaned and removed.
+        let kept = vec![make_lot_record("l1", "acc1", "AAPL", "50")];
+        repo.sync_lots_for_account("acc1", &kept, &[])
+            .await
+            .unwrap();
+        assert_eq!(repo.count_lots().unwrap(), 1);
+
+        let lots = repo.get_all_lots_for_account("acc1").await.unwrap();
+        assert_eq!(lots.len(), 1);
+        assert_eq!(lots[0].id, "l1");
     }
 }

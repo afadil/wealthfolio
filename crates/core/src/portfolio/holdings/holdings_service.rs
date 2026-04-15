@@ -429,6 +429,7 @@ fn lot_records_to_display_lots(
                 acquisition_price,
                 acquisition_fees,
                 fx_rate_to_position: None,
+                source_activity_id: r.open_activity_id.clone(),
             })
         })
         .collect()
@@ -925,6 +926,7 @@ mod tests {
                 acquisition_price: dec!(3000),
                 acquisition_fees: dec!(0),
                 fx_rate_to_position: None,
+                source_activity_id: None,
             }])),
             contract_multiplier: Decimal::ONE,
             local_currency: "GBp".to_string(),
