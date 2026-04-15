@@ -761,10 +761,14 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tools(allowed_tools)
                 .tool_choice(ToolChoice::Auto);
 
-            // Ollama cannot enforce tool_choice and some local models are brittle at higher
-            // temperatures; use a deterministic temperature to improve tool-call reliability.
+            // Ollama cannot enforce tool_choice and some local models are brittle at
+            // higher temperatures. 0.2 is low enough to keep tool-call JSON reliable
+            // while breaking out of deterministic failure modes we saw at 0.0 — most
+            // notably post-tool-call language drift (the model locks onto a single
+            // non-English token distribution after processing English tool output
+            // and never recovers because temp=0 = no sampling).
             if provider_id == "ollama" {
-                builder = builder.temperature(0.0);
+                builder = builder.temperature(0.2);
             }
 
             if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
