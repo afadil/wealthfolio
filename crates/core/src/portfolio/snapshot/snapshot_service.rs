@@ -1336,7 +1336,7 @@ impl SnapshotService {
             return Ok(0);
         }
 
-        let all_individual_keyframes = self
+        let mut all_individual_keyframes = self
             .snapshot_repository
             .get_all_non_archived_account_snapshots(None, None)?;
 
@@ -1347,6 +1347,30 @@ impl SnapshotService {
                 .await?;
             info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
             return Ok(0);
+        }
+
+        // Enrich non-calculated snapshots that have empty positions (loaded from DB
+        // without JSON parsing) by batch-loading from snapshot_positions table.
+        {
+            let snap_ids_to_enrich: Vec<String> = all_individual_keyframes
+                .iter()
+                .filter(|s| s.positions.is_empty() && s.source.is_non_calculated())
+                .map(|s| s.id.clone())
+                .collect();
+
+            if !snap_ids_to_enrich.is_empty() {
+                let mut positions_by_snapshot = self
+                    .snapshot_repository
+                    .get_snapshot_positions_batch(&snap_ids_to_enrich)?;
+
+                for keyframe in &mut all_individual_keyframes {
+                    if keyframe.positions.is_empty() && keyframe.source.is_non_calculated() {
+                        if let Some(pos_map) = positions_by_snapshot.remove(&keyframe.id) {
+                            keyframe.positions = pos_map;
+                        }
+                    }
+                }
+            }
         }
 
         let mut keyframes_by_account: HashMap<String, BTreeMap<NaiveDate, AccountStateSnapshot>> =
@@ -1774,7 +1798,14 @@ impl SnapshotServiceTrait for SnapshotService {
             Some(snapshot.snapshot_date),
         )?;
 
-        if let Some(existing) = same_date_snapshots.into_iter().next() {
+        if let Some(mut existing) = same_date_snapshots.into_iter().next() {
+            // Enrich with positions from snapshot_positions table (DB load
+            // no longer parses positions JSON).
+            if existing.positions.is_empty() && existing.source.is_non_calculated() {
+                existing.positions = self
+                    .snapshot_repository
+                    .get_snapshot_positions(&existing.id)?;
+            }
             if existing.is_content_equal(&snapshot) {
                 debug!(
                     "Snapshot content unchanged for account {} on {}, skipping save",
@@ -1892,12 +1923,17 @@ impl SnapshotServiceTrait for SnapshotService {
                     SnapshotSource::ManualEntry
                         | SnapshotSource::BrokerImported
                         | SnapshotSource::CsvImport
+                        | SnapshotSource::Synthetic
                 ) =>
             {
+                // Load positions from snapshot_positions table
+                let positions = self
+                    .snapshot_repository
+                    .get_snapshot_positions(&snapshot.id)?;
+
                 let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
                 let open_date = snapshot.snapshot_date.format("%Y-%m-%d").to_string();
-                let lot_records: Vec<LotRecord> = snapshot
-                    .positions
+                let lot_records: Vec<LotRecord> = positions
                     .values()
                     .filter(|p| p.quantity > Decimal::ZERO)
                     .map(|p| LotRecord {
@@ -1993,13 +2029,21 @@ impl SnapshotServiceTrait for SnapshotService {
             .snapshot_repository
             .get_earliest_non_calculated_snapshot(account_id)?;
 
-        let earliest = match earliest {
+        let mut earliest = match earliest {
             Some(s) => s,
             None => {
                 debug!("No earliest snapshot found for account {}", account_id);
                 return Ok(());
             }
         };
+
+        // Enrich positions from snapshot_positions table (DB load no longer
+        // parses positions JSON).
+        if earliest.positions.is_empty() && earliest.source.is_non_calculated() {
+            earliest.positions = self
+                .snapshot_repository
+                .get_snapshot_positions(&earliest.id)?;
+        }
 
         // Calculate synthetic date: 3 months before earliest
         let synthetic_date = earliest

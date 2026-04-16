@@ -257,6 +257,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    snapshot_positions (id) {
+        id -> Integer,
+        snapshot_id -> Text,
+        asset_id -> Text,
+        quantity -> Text,
+        average_cost -> Text,
+        total_cost_basis -> Text,
+        currency -> Text,
+        inception_date -> Text,
+        is_alternative -> Integer,
+        contract_multiplier -> Text,
+        created_at -> Text,
+        last_updated -> Text,
+    }
+}
+
+diesel::table! {
     holdings_snapshots (id) {
         id -> Text,
         account_id -> Text,
@@ -510,6 +527,8 @@ diesel::joinable!(quotes -> assets (asset_id));
 diesel::joinable!(taxonomy_categories -> taxonomies (taxonomy_id));
 
 diesel::joinable!(import_account_templates -> import_templates (template_id));
+diesel::joinable!(snapshot_positions -> holdings_snapshots (snapshot_id));
+diesel::joinable!(snapshot_positions -> assets (asset_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     import_account_templates,
@@ -537,6 +556,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     platforms,
     quote_sync_state,
     quotes,
+    snapshot_positions,
     sync_applied_events,
     sync_cursor,
     sync_device_config,
