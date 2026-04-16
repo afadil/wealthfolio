@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
 
 /// Valid source kinds.
 pub const VALID_SOURCE_KINDS: &[&str] = &["latest", "historical"];
@@ -53,43 +52,11 @@ pub fn expand_template(template: &str, ctx: &TemplateContext<'_>) -> String {
     out
 }
 
-/// Returns true if the IP address is private, loopback, or otherwise reserved.
-fn is_private_or_reserved(addr: IpAddr) -> bool {
-    match addr {
-        IpAddr::V4(ip) => {
-            let octets = ip.octets();
-            let is_shared = octets[0] == 100 && (octets[1] & 0xC0) == 64; // 100.64.0.0/10 (CGNAT)
-            let is_benchmarking = octets[0] == 198 && (octets[1] & 0xFE) == 18; // 198.18.0.0/15
-            let is_multicast = octets[0] >= 224 && octets[0] <= 239; // 224.0.0.0/4
-            let is_reserved = octets[0] >= 240; // 240.0.0.0/4
-            ip.is_loopback()
-                || ip.is_private()
-                || ip.is_link_local()
-                || ip.is_broadcast()
-                || ip.is_unspecified()
-                || is_shared
-                || is_benchmarking
-                || is_multicast
-                || is_reserved
-        }
-        IpAddr::V6(ip) => {
-            let segs = ip.segments();
-            let is_unique_local = (segs[0] & 0xfe00) == 0xfc00; // fc00::/7
-            let is_link_local = (segs[0] & 0xffc0) == 0xfe80; // fe80::/10
-            let is_multicast = (segs[0] & 0xff00) == 0xff00; // ff00::/8
-            ip.is_loopback()
-                || ip.is_unspecified()
-                || is_unique_local
-                || is_link_local
-                || is_multicast
-        }
-    }
-}
-
-/// Validate that a URL is safe to fetch (no SSRF).
+/// Validate that a URL parses and uses an http(s) scheme.
 ///
-/// Rejects non-HTTP(S) schemes and URLs with literal private/loopback addresses.
-/// Does NOT resolve DNS — call [`validate_url_resolved`] after this for full protection.
+/// The user is the author of their provider URLs, so we don't restrict which
+/// hosts they can target (self-hosted providers on private networks are
+/// supported). Only rejects malformed URLs and non-HTTP(S) schemes.
 pub fn validate_url(raw: &str) -> Result<(), anyhow::Error> {
     let parsed =
         url::Url::parse(raw).map_err(|e| anyhow::anyhow!("Invalid URL '{}': {}", raw, e))?;
@@ -104,67 +71,8 @@ pub fn validate_url(raw: &str) -> Result<(), anyhow::Error> {
         }
     }
 
-    match parsed.host() {
-        Some(url::Host::Domain(domain)) => {
-            if domain == "localhost" {
-                return Err(anyhow::anyhow!("URLs targeting localhost are not allowed"));
-            }
-        }
-        Some(url::Host::Ipv4(ip)) => {
-            if is_private_or_reserved(IpAddr::V4(ip)) {
-                return Err(anyhow::anyhow!(
-                    "URLs targeting private/reserved IP address {} are not allowed",
-                    ip
-                ));
-            }
-        }
-        Some(url::Host::Ipv6(ip)) => {
-            if is_private_or_reserved(IpAddr::V6(ip)) {
-                return Err(anyhow::anyhow!(
-                    "URLs targeting private/reserved IP address {} are not allowed",
-                    ip
-                ));
-            }
-        }
-        None => return Err(anyhow::anyhow!("URL '{}' has no host", raw)),
-    }
-
-    Ok(())
-}
-
-/// Validate a URL by resolving its hostname and checking the resolved IPs.
-///
-/// Catches DNS-based SSRF where a public-looking hostname resolves to a
-/// private/loopback address.
-pub async fn validate_url_resolved(raw: &str) -> Result<(), anyhow::Error> {
-    // First run the fast syntactic check
-    validate_url(raw)?;
-
-    let parsed = url::Url::parse(raw)?;
-
-    // Only domain hostnames need DNS resolution; literal IPs were already checked.
-    if let Some(url::Host::Domain(domain)) = parsed.host() {
-        let port = parsed.port_or_known_default().unwrap_or(443);
-        let host_port = format!("{}:{}", domain, port);
-
-        let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host(&host_port).await?.collect();
-
-        if addrs.is_empty() {
-            return Err(anyhow::anyhow!(
-                "DNS resolution for '{}' returned no addresses",
-                domain
-            ));
-        }
-
-        for addr in &addrs {
-            if is_private_or_reserved(addr.ip()) {
-                return Err(anyhow::anyhow!(
-                    "DNS for '{}' resolves to private/reserved address {} — not allowed",
-                    domain,
-                    addr.ip()
-                ));
-            }
-        }
+    if parsed.host().is_none() {
+        return Err(anyhow::anyhow!("URL '{}' has no host", raw));
     }
 
     Ok(())
