@@ -18,9 +18,11 @@ import { Goal, GoalAllocation } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 export function SavingGoals() {
+  const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
   const { accounts, isLoading: isLoadingAccounts } = useAccounts();
@@ -56,7 +58,7 @@ export function SavingGoals() {
     return (
       <Card className="w-full border-0 bg-transparent shadow-none">
         <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
+          <CardTitle className="text-md">{t("dashboard.goals.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Card className="w-full shadow-sm">
@@ -77,16 +79,16 @@ export function SavingGoals() {
   if (!hasGoals) {
     return (
       <div className="flex flex-wrap gap-4 pb-4">
-        <h2 className="text-md font-semibold">Saving Goals</h2>
+        <h2 className="text-md font-semibold">{t("dashboard.goals.title")}</h2>
         <Card className="border-border/50 bg-success/10 shadow-xs w-full">
           <CardContent className="px-4 py-6">
             <div className="text-center">
-              <p className="text-sm">No saving goals set.</p>
+              <p className="text-sm">{t("dashboard.goals.empty")}</p>
               <Link
                 to="/settings/goals"
                 className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
               >
-                Create your first goal
+                {t("dashboard.goals.create_first")}
                 <Icons.ChevronRight className="h-3 w-3" />
               </Link>
             </div>
@@ -98,7 +100,7 @@ export function SavingGoals() {
 
   return (
     <div className="flex flex-wrap gap-4 pb-4">
-      <h2 className="text-md font-semibold">Saving Goals</h2>
+      <h2 className="text-md font-semibold">{t("dashboard.goals.title")}</h2>
       <Card className="shadow-xs w-full">
         <CardContent className="bg-transparent px-4 pt-6">
           {[...goals]
@@ -133,10 +135,11 @@ export function SavingGoals() {
                     <h3 className="text-md text-muted-foreground font-bold">{goal.title}</h3>
                     <ul className="list-inside list-disc text-xs">
                       <li>
-                        Progress: <b>{formatPercent(currentProgress)}</b>
+                        {t("dashboard.goals.tooltip.progress")}{" "}
+                        <b>{formatPercent(currentProgress)}</b>
                       </li>
                       <li>
-                        Current Value:{" "}
+                        {t("dashboard.goals.tooltip.current_value")}{" "}
                         <b>
                           <AmountDisplay
                             value={currentValue}
@@ -146,7 +149,7 @@ export function SavingGoals() {
                         </b>
                       </li>
                       <li>
-                        Target Value:{" "}
+                        {t("dashboard.goals.tooltip.target_value")}{" "}
                         <b>
                           <AmountDisplay
                             value={goal.targetAmount}
@@ -158,7 +161,7 @@ export function SavingGoals() {
                     </ul>
                     {!progressData && (
                       <p className="text-muted-foreground text-xs italic">
-                        Progress calculation pending or not applicable.
+                        {t("dashboard.goals.tooltip.pending")}
                       </p>
                     )}
                   </TooltipContent>

@@ -2,6 +2,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import { hasBrokerSync } from "../lib/plan-capabilities";
 import { useAggregatedSyncStatus, useSyncBrokerData } from "../hooks";
@@ -29,6 +30,7 @@ const statusColors: Record<AggregatedSyncStatus, string> = {
  * Only visible when Connect is enabled and user has an active subscription.
  */
 export function SyncButton({ className, showLabel = false, size = "icon" }: SyncButtonProps) {
+  const { t } = useTranslation("common");
   const { isEnabled, isConnected, userInfo } = useWealthfolioConnect();
   const { status, lastSyncTime } = useAggregatedSyncStatus();
   const { mutate: syncBrokerData, isPending: isSyncing } = useSyncBrokerData();
@@ -42,8 +44,10 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
   const colorClass = statusColors[status];
 
   const tooltipContent = lastSyncTime
-    ? `Last synced ${formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true })}`
-    : "Never synced";
+    ? t("connect.sync.last_synced", {
+        when: formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true }),
+      })
+    : t("connect.sync.never_synced");
 
   return (
     <Tooltip>
@@ -60,11 +64,13 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
           ) : (
             <Icons.RefreshCw className={`h-4 w-4 ${colorClass}`} />
           )}
-          {showLabel && <span className="ml-2">{isRunning ? "Syncing..." : "Sync"}</span>}
+          {showLabel && (
+            <span className="ml-2">{isRunning ? t("connect.page.syncing") : t("connect.sync.action")}</span>
+          )}
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        <p>{isRunning ? "Syncing..." : tooltipContent}</p>
+        <p>{isRunning ? t("connect.page.syncing") : tooltipContent}</p>
       </TooltipContent>
     </Tooltip>
   );

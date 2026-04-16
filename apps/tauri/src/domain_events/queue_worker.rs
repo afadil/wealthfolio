@@ -139,7 +139,7 @@ async fn process_event_batch(
         for chunk in enrichment_asset_ids.chunks(chunk_size) {
             match tokio::time::timeout(
                 Duration::from_secs(30),
-                asset_service.enrich_assets(chunk.to_vec()),
+                asset_service.enrich_assets(chunk.to_vec(), false),
             )
             .await
             {

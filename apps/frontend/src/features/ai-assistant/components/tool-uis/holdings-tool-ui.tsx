@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui";
 import { useMemo, type FC } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from "recharts";
@@ -104,7 +105,7 @@ function normalizeResult(result: unknown, fallbackCurrency: string): GetHoldings
       holdingType:
         (entry.holdingType as string | undefined) ??
         (entry.holding_type as string | undefined) ??
-        "Security",
+        "",
       quantity: Number(entry.quantity ?? 0),
       marketValueBase: Number(
         (entry.marketValueBase as number | string | undefined) ??
@@ -278,6 +279,7 @@ interface TreemapTooltipProps {
 }
 
 const TreemapTooltip: FC<TreemapTooltipProps> = ({ active, payload, currency = "USD" }) => {
+  const { t } = useTranslation("common");
   if (!active || !payload?.length) return null;
   const data = payload[0].payload;
   const value = payload[0].value;
@@ -293,11 +295,11 @@ const TreemapTooltip: FC<TreemapTooltipProps> = ({ active, payload, currency = "
         </div>
         <div className="border-t pt-2">
           <div className="flex items-center justify-between gap-4 text-xs">
-            <span className="text-muted-foreground">Value</span>
+            <span className="text-muted-foreground">{t("ai.tool.common.table.value")}</span>
             <span className="font-medium">{formatAmount(value, currency)}</span>
           </div>
           <div className="flex items-center justify-between gap-4 text-xs">
-            <span className="text-muted-foreground">Today</span>
+            <span className="text-muted-foreground">{t("holdings.toolbar.return_column_today")}</span>
             <span className={cn("font-medium", isPositive ? "text-success" : "text-destructive")}>
               {isPositive ? "+" : ""}
               {formatPercent(gain)}
@@ -323,6 +325,7 @@ export const HoldingsToolUI = makeAssistantToolUI<GetHoldingsArgs, GetHoldingsOu
 type HoldingsContentProps = ToolCallMessagePartProps<GetHoldingsArgs, GetHoldingsOutput>;
 
 function HoldingsContent({ args, result, status }: HoldingsContentProps) {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -413,7 +416,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-sm font-medium">Holdings</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("ai.tool.holdings.title")}</CardTitle>
               <Skeleton className="mt-1 h-3 w-16" />
             </div>
             <Skeleton className="h-5 w-20" />
@@ -428,10 +431,12 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4 text-xs">Symbol</TableHead>
-                  <TableHead className="text-right text-xs">Value</TableHead>
-                  <TableHead className="hidden text-right text-xs sm:table-cell">Weight</TableHead>
-                  <TableHead className="pr-4 text-right text-xs">Gain</TableHead>
+                  <TableHead className="pl-4 text-xs">{t("ai.tool.common.table.symbol")}</TableHead>
+                  <TableHead className="text-right text-xs">{t("ai.tool.common.table.value")}</TableHead>
+                  <TableHead className="hidden text-right text-xs sm:table-cell">
+                    {t("ai.tool.common.table.weight")}
+                  </TableHead>
+                  <TableHead className="pr-4 text-right text-xs">{t("ai.tool.common.table.gain")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -464,7 +469,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     return (
       <Card className="bg-muted/40 border-destructive/30 w-full">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm">Failed to load holdings data.</p>
+          <p className="text-destructive text-sm">{t("ai.tool.holdings.error_load")}</p>
         </CardContent>
       </Card>
     );
@@ -475,7 +480,7 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
-          <p className="text-muted-foreground text-sm">No holdings found for this account.</p>
+          <p className="text-muted-foreground text-sm">{t("ai.tool.holdings.empty_account")}</p>
         </CardContent>
       </Card>
     );
@@ -484,16 +489,21 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   // Determine view mode: use response viewMode, fallback to args, then default to "treemap"
   const viewMode = parsed?.viewMode ?? args?.viewMode ?? "treemap";
   const canShowTreemap = hasData && treemapData.length > 0;
-  const returnLabel = returnType === "daily" ? "Today" : "Total Return";
+  const returnLabel =
+    returnType === "daily"
+      ? t("holdings.toolbar.return_column_today")
+      : t("holdings.mobile.total_return");
 
   // Treemap view component
   const TreemapView = () => (
     <div className="pb-2 pt-4">
       <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2">
         <div>
-          <p className="text-sm font-medium">Your Portfolio {returnLabel}</p>
+          <p className="text-sm font-medium">
+            {t("ai.tool.holdings.portfolio_return", { label: returnLabel })}
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            {holdingsCount} position{holdingsCount !== 1 ? "s" : ""} · {returnLabel}
+            {t("ai.tool.holdings.positions", { count: holdingsCount })} · {returnLabel}
             {accountLabel !== "TOTAL" && (
               <Badge variant="outline" className="ml-2 text-xs uppercase">
                 {accountLabel}
@@ -511,7 +521,10 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
               )}
             >
               {totalChange > 0 ? "+" : ""}
-              {formatPercent(totalChange)} {returnLabel === "Today" ? "today" : "total"}
+              {formatPercent(totalChange)}{" "}
+              {returnType === "daily"
+                ? t("holdings.toolbar.gain_suffix_today")
+                : t("holdings.toolbar.gain_suffix_total")}
             </p>
           )}
         </div>
@@ -541,9 +554,11 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
         {showHeader && (
           <div className="flex flex-wrap items-start justify-between gap-2 px-4 pb-2">
             <div>
-              <p className="text-sm font-medium">Holdings {returnLabel}</p>
+              <p className="text-sm font-medium">
+                {t("ai.tool.holdings.header_with_return", { label: returnLabel })}
+              </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                {holdingsCount} position{holdingsCount !== 1 ? "s" : ""}
+                {t("ai.tool.holdings.positions", { count: holdingsCount })}
                 {accountLabel !== "TOTAL" && (
                   <Badge variant="outline" className="ml-2 text-xs uppercase">
                     {accountLabel}
@@ -577,11 +592,13 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="pl-4 text-xs">Symbol</TableHead>
-                <TableHead className="text-right text-xs">Value</TableHead>
-                <TableHead className="hidden text-right text-xs sm:table-cell">Weight</TableHead>
+                <TableHead className="pl-4 text-xs">{t("ai.tool.common.table.symbol")}</TableHead>
+                <TableHead className="text-right text-xs">{t("ai.tool.common.table.value")}</TableHead>
+                <TableHead className="hidden text-right text-xs sm:table-cell">
+                  {t("ai.tool.common.table.weight")}
+                </TableHead>
                 <TableHead className="pr-4 text-right text-xs">
-                  {returnType === "daily" ? "Today" : "Total"}
+                  {returnType === "daily" ? t("ai.tool.common.today") : t("ai.tool.common.total")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -639,8 +656,8 @@ function HoldingsContent({ args, result, status }: HoldingsContentProps) {
   const ReturnTypeToggle = (
     <AnimatedToggleGroup
       items={[
-        { value: "daily", label: "Daily" },
-        { value: "total", label: "Total" },
+        { value: "daily", label: t("holdings.toolbar.toggle_daily") },
+        { value: "total", label: t("holdings.toolbar.toggle_total") },
       ]}
       value={returnType}
       onValueChange={(value: ReturnType) => setReturnType(value)}

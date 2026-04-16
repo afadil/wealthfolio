@@ -71,3 +71,9 @@ export const openUrlInBrowser = (url: string): Promise<void> => {
   window.open(url, "_blank");
   return Promise.resolve();
 };
+
+/** Web: new browser tab (no in-app webview). */
+export const openUrlInAppWebviewWindow = (url: string, _title: string): Promise<void> => {
+  window.open(url, "_blank", "noopener,noreferrer");
+  return Promise.resolve();
+};

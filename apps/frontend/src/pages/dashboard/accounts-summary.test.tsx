@@ -96,6 +96,7 @@ const mockSettings: Settings = {
   autoUpdateCheckEnabled: true,
   menuBarVisible: true,
   syncEnabled: false,
+  translationSourceLang: "en",
 };
 
 function createAccount(overrides: Partial<Account>): Account {

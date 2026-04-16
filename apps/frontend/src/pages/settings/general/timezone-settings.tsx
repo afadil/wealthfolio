@@ -1,5 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TFunction } from "i18next";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -21,11 +23,13 @@ import {
 import { useSettingsContext } from "@/lib/settings-provider";
 import { TimezoneInput } from "./timezone-input";
 
-const timezoneFormSchema = z.object({
-  timezone: z.string().min(1, "Please select a timezone."),
-});
+function createTimezoneFormSchema(t: TFunction) {
+  return z.object({
+    timezone: z.string().min(1, t("settings.timezone.validation.required")),
+  });
+}
 
-type TimezoneFormValues = z.infer<typeof timezoneFormSchema>;
+type TimezoneFormValues = z.infer<ReturnType<typeof createTimezoneFormSchema>>;
 
 const TIMEZONE_FALLBACKS = [
   "UTC",
@@ -80,9 +84,11 @@ export function resolveInitialTimezone(configuredTimezone: string | null | undef
 }
 
 export function TimezoneSettings() {
+  const { t } = useTranslation("common");
   const { settings, updateSettings } = useSettingsContext();
   const browserTimezone = useMemo(() => detectBrowserTimezone(), []);
   const initialTimezone = resolveInitialTimezone(settings?.timezone);
+  const timezoneFormSchema = useMemo(() => createTimezoneFormSchema(t), [t]);
   const timezones = useMemo(() => {
     const supported = getSupportedTimezones();
     // Put detected browser timezone first for easy access
@@ -108,10 +114,8 @@ export function TimezoneSettings() {
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-lg">Timezone</CardTitle>
-          <CardDescription>
-            Choose the timezone used for dates, daily buckets, and yearly contribution boundaries.
-          </CardDescription>
+          <CardTitle className="text-lg">{t("settings.timezone.title")}</CardTitle>
+          <CardDescription>{t("settings.timezone.description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -133,7 +137,7 @@ export function TimezoneSettings() {
                 </FormItem>
               )}
             />
-            <Button type="submit">Save Timezone</Button>
+            <Button type="submit">{t("settings.timezone.save")}</Button>
           </form>
         </Form>
       </CardContent>

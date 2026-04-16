@@ -1,50 +1,67 @@
 import { AccountSelector } from "@/components/account-selector";
 import { SwipablePage, SwipablePageView } from "@/components/page";
-import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { createPortfolioAccount, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type { Account } from "@/lib/types";
 import IncomePage from "@/pages/income/income-page";
 import PerformancePage from "@/pages/performance/performance-page";
 import { Icons } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import HoldingsInsightsPage from "../holdings/holdings-insights-page";
 
 // Loading skeleton to show while the dashboard is loading
-const DashboardLoader = () => (
-  <div className="flex h-full w-full flex-col space-y-4 p-4">
-    <Card>
-      <CardHeader className="space-y-2">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
-        <Skeleton className="h-64 w-full" />
-      </CardContent>
-    </Card>
-    <div className="flex items-center justify-center py-8">
-      <span className="text-muted-foreground text-sm">Loading dashboard...</span>
+function DashboardLoader() {
+  const { t } = useTranslation("common");
+  return (
+    <div className="flex h-full w-full flex-col space-y-4 p-4">
+      <Card>
+        <CardHeader className="space-y-2">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </CardContent>
+      </Card>
+      <div className="flex items-center justify-center py-8">
+        <span className="text-muted-foreground text-sm">
+          {t("portfolio.insights.loading_dashboard")}
+        </span>
+      </div>
     </div>
-  </div>
-);
+  );
+}
 
 export default function PortfolioInsightsPage() {
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>({
-    id: PORTFOLIO_ACCOUNT_ID,
-    name: "All Portfolio",
-    accountType: "PORTFOLIO" as unknown as Account["accountType"],
-    balance: 0,
-    currency: "USD",
-    isDefault: false,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Account);
+  const { t, i18n } = useTranslation("common");
+  const { settings } = useSettingsContext();
+  const baseCurrency = settings?.baseCurrency ?? "USD";
+
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(() => {
+    return {
+      ...createPortfolioAccount(baseCurrency),
+      name: t("account.selector.all_portfolio"),
+    } as Account;
+  });
+
+  useEffect(() => {
+    setSelectedAccount((prev) => {
+      if (!prev || prev.id !== PORTFOLIO_ACCOUNT_ID) return prev;
+      return {
+        ...prev,
+        name: t("account.selector.all_portfolio"),
+        currency: baseCurrency,
+      };
+    });
+  }, [t, i18n.language, baseCurrency]);
 
   const accountId = selectedAccount?.id ?? PORTFOLIO_ACCOUNT_ID;
 
@@ -67,7 +84,7 @@ export default function PortfolioInsightsPage() {
     () => [
       {
         value: "holdings",
-        label: "Holdings",
+        label: t("portfolio.insights.tab_holdings"),
         icon: Icons.PieChart,
         content: (
           <Suspense fallback={<DashboardLoader />}>
@@ -78,7 +95,7 @@ export default function PortfolioInsightsPage() {
       },
       {
         value: "performance",
-        label: "Performance",
+        label: t("portfolio.insights.tab_performance"),
         icon: Icons.TrendingUp,
         content: (
           <Suspense fallback={<DashboardLoader />}>
@@ -88,7 +105,7 @@ export default function PortfolioInsightsPage() {
       },
       {
         value: "income",
-        label: "Income",
+        label: t("portfolio.insights.tab_income"),
         icon: Icons.HandCoins,
         content: (
           <Suspense fallback={<DashboardLoader />}>
@@ -97,7 +114,7 @@ export default function PortfolioInsightsPage() {
         ),
       },
     ],
-    [accountId, holdingsActions],
+    [accountId, holdingsActions, t],
   );
 
   return <SwipablePage views={views} defaultView="holdings" withPadding={true} />;

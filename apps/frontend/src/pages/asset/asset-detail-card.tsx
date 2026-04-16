@@ -6,6 +6,7 @@ import { formatPercent } from "@wealthfolio/ui";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { QuantityDisplay } from "@wealthfolio/ui";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useTranslation } from "react-i18next";
 
 interface AssetDetail {
   numShares: number;
@@ -46,6 +47,7 @@ interface AssetDetailProps {
 }
 
 const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) => {
+  const { t } = useTranslation("common");
   const { isBalanceHidden } = useBalancePrivacy();
 
   const {
@@ -67,18 +69,18 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
 
   const holdingRows = [
     {
-      label: "Book value",
+      label: t("asset.detail_card.book_value"),
       value: <AmountDisplay value={costBasis} currency={currency} isHidden={isBalanceHidden} />,
     },
     {
-      label: "Average cost",
+      label: t("asset.detail_card.average_cost"),
       value: <AmountDisplay value={averagePrice} currency={currency} isHidden={isBalanceHidden} />,
     },
-    { label: "% of my portfolio", value: formatPercent(portfolioPercent) },
+    { label: t("asset.detail_card.portfolio_percent"), value: formatPercent(portfolioPercent) },
     ...(todaysReturn !== null && todaysReturnPercent !== null
       ? [
           {
-            label: "Today's return",
+            label: t("asset.detail_card.todays_return"),
             value: (
               <>
                 <AmountDisplay
@@ -94,7 +96,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
         ]
       : []),
     {
-      label: "Total return",
+      label: t("asset.detail_card.total_return"),
       value: (
         <>
           <AmountDisplay value={totalReturn} currency={currency} isHidden={isBalanceHidden} /> (
@@ -113,7 +115,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div>
               <QuantityDisplay value={numShares} isHidden={isBalanceHidden} />
             </div>
-            <div className="text-muted-foreground text-sm font-normal">shares</div>
+            <div className="text-muted-foreground text-sm font-normal">{t("holdings.table.unit_shares")}</div>
           </div>
           <div>
             <div className="text-xl font-extrabold">
@@ -141,7 +143,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">Open</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("settings.securities.quote_history.open")}
+                  </span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.open}
@@ -151,7 +155,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-muted-foreground text-xs">Close</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("settings.securities.quote_history.close")}
+                  </span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.close}
@@ -161,7 +167,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">High</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("settings.securities.quote_history.high")}
+                  </span>
                   <div className="text-success text-sm font-medium">
                     <AmountDisplay
                       value={quote.high}
@@ -171,7 +179,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-muted-foreground text-xs">Low</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("settings.securities.quote_history.low")}
+                  </span>
                   <div className="text-destructive text-sm font-medium">
                     <AmountDisplay
                       value={quote.low}
@@ -181,7 +191,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">Adj Close</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("asset.detail_card.adj_close")}
+                  </span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={quote.adjclose}
@@ -191,7 +203,9 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
                   </div>
                 </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-muted-foreground text-xs">Volume</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("settings.securities.quote_history.volume")}
+                  </span>
                   <span className="text-sm font-medium">
                     {new Intl.NumberFormat().format(quote.volume)}
                   </span>
@@ -207,10 +221,10 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div className="grid grid-cols-2 gap-x-6">
               {bondSpec.couponRate != null && (
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">Coupon</span>
+                  <span className="text-muted-foreground text-xs">{t("asset.detail_card.coupon")}</span>
                   <span className="text-sm font-medium">
                     {bondSpec.couponFrequency === "ZERO"
-                      ? "Zero coupon"
+                      ? t("asset.detail_card.zero_coupon")
                       : `${(bondSpec.couponRate * 100).toFixed(3)}%`}
                     {bondSpec.couponFrequency &&
                       bondSpec.couponFrequency !== "ZERO" &&
@@ -220,7 +234,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
               )}
               {bondSpec.maturityDate && (
                 <div className="flex flex-col items-end">
-                  <span className="text-muted-foreground text-xs">Maturity</span>
+                  <span className="text-muted-foreground text-xs">{t("asset.detail_card.maturity")}</span>
                   <span className="text-sm font-medium">
                     {new Date(bondSpec.maturityDate + "T00:00:00").toLocaleDateString(undefined, {
                       year: "numeric",
@@ -240,13 +254,13 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
             <div className="grid grid-cols-3 gap-x-4">
               {optionSpec.right && (
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">Type</span>
+                  <span className="text-muted-foreground text-xs">{t("asset.detail_card.type")}</span>
                   <span className="text-sm font-medium">{optionSpec.right}</span>
                 </div>
               )}
               {optionSpec.strike != null && (
                 <div className="flex flex-col">
-                  <span className="text-muted-foreground text-xs">Strike</span>
+                  <span className="text-muted-foreground text-xs">{t("asset.detail_card.strike")}</span>
                   <div className="text-sm font-medium">
                     <AmountDisplay
                       value={optionSpec.strike}
@@ -258,7 +272,7 @@ const AssetDetailCard: React.FC<AssetDetailProps> = ({ assetData, className }) =
               )}
               {optionSpec.expiration && (
                 <div className="flex flex-col items-end">
-                  <span className="text-muted-foreground text-xs">Expiry</span>
+                  <span className="text-muted-foreground text-xs">{t("asset.detail_card.expiry")}</span>
                   <span className="text-sm font-medium">
                     {new Date(optionSpec.expiration + "T00:00:00").toLocaleDateString(undefined, {
                       year: "numeric",

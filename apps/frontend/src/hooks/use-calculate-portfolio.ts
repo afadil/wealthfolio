@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { updatePortfolio, recalculatePortfolio } from "@/adapters";
@@ -11,8 +12,8 @@ export function useUpdatePortfolioMutation() {
     onError: (error) => {
       queryClient.invalidateQueries();
       toast({
-        title: "Failed to update portfolio data.",
-        description: "Please try again or report an issue if the problem persists.",
+        title: i18n.t("toast.portfolio.update_failed_title"),
+        description: i18n.t("toast.portfolio.update_failed_description"),
         variant: "destructive",
       });
       logger.error(`Error calculating historical data: ${String(error)}`);
@@ -27,8 +28,8 @@ export function useRecalculatePortfolioMutation() {
     onError: (error) => {
       queryClient.invalidateQueries();
       toast({
-        title: "Failed to recalculate portfolio.",
-        description: "Please try again or report an issue if the problem persists.",
+        title: i18n.t("toast.portfolio.recalculate_failed_title"),
+        description: i18n.t("toast.portfolio.update_failed_description"),
         variant: "destructive",
       });
       console.warn("Error recalculating portfolio:", error);

@@ -688,6 +688,7 @@ impl MarketDataClient {
                 .country
                 .map(|c| format!("[{{\"name\":\"{}\",\"weight\":1}}]", c)),
             sectors,
+            fund_holdings: profile.fund_holdings,
             industry: profile.industry,
             categories: None,
             classes: None,

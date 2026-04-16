@@ -9,6 +9,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ContributionLimit, NewContributionLimit, DepositsCalculation } from "@/lib/types";
 import { logger } from "@/adapters";
+import i18n from "@/i18n/i18n";
 
 export const useContributionLimitProgress = (limitId: string) => {
   return useQuery<DepositsCalculation>({
@@ -19,8 +20,8 @@ export const useContributionLimitProgress = (limitId: string) => {
       } catch (e) {
         logger.error(`Error calculating deposits for limit: ${String(e)}`);
         toast({
-          title: "Error calculating deposits",
-          description: "There was a problem calculating the deposits for this limit.",
+          title: i18n.t("settings.contribution_limits.toast_progress_error_title"),
+          description: i18n.t("settings.contribution_limits.toast_progress_error_description"),
           variant: "destructive",
         });
         throw e;
@@ -45,37 +46,39 @@ export const useContributionLimitMutations = () => {
 
   const handleError = (action: string) => {
     toast({
-      title: "Uh oh! Something went wrong.",
-      description: `There was a problem ${action}.`,
+      title: i18n.t("settings.contribution_limits.toast_error_title"),
+      description: i18n.t("settings.contribution_limits.toast_error_description", { action }),
       variant: "destructive",
     });
   };
 
   const addContributionLimitMutation = useMutation({
     mutationFn: createContributionLimit,
-    onSuccess: (limit) => handleSuccess("Contribution limit added successfully.", limit),
+    onSuccess: (limit) => handleSuccess(i18n.t("settings.contribution_limits.toast_add_success"), limit),
     onError: (e) => {
       logger.error(`Error adding contribution limit: ${String(e)}`);
-      handleError("adding this contribution limit");
+      handleError(i18n.t("settings.contribution_limits.toast_action_adding"));
     },
   });
 
   const updateContributionLimitMutation = useMutation({
     mutationFn: (params: { id: string; updatedLimit: NewContributionLimit }) =>
       updateContributionLimit(params.id, params.updatedLimit),
-    onSuccess: (limit) => handleSuccess("Contribution limit updated successfully.", limit),
+    onSuccess: (limit) =>
+      handleSuccess(i18n.t("settings.contribution_limits.toast_update_success"), limit),
     onError: (e) => {
       logger.error(`Error updating contribution limit: ${String(e)}`);
-      handleError("updating this contribution limit");
+      handleError(i18n.t("settings.contribution_limits.toast_action_updating"));
     },
   });
 
   const deleteContributionLimitMutation = useMutation({
     mutationFn: deleteContributionLimit,
-    onSuccess: () => handleSuccess("Contribution limit deleted successfully.", undefined),
+    onSuccess: () =>
+      handleSuccess(i18n.t("settings.contribution_limits.toast_delete_success"), undefined),
     onError: (e) => {
       logger.error(`Error deleting contribution limit: ${String(e)}`);
-      handleError("deleting this contribution limit");
+      handleError(i18n.t("settings.contribution_limits.toast_action_deleting"));
     },
   });
 

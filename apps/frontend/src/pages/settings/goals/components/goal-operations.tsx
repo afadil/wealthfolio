@@ -20,6 +20,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
 import type { Goal } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export interface GoalOperationsProps {
   goal: Goal;
@@ -28,6 +29,7 @@ export interface GoalOperationsProps {
 }
 
 export function GoalOperations({ goal, onEdit, onDelete }: GoalOperationsProps) {
+  const { t } = useTranslation("common");
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   //const navigation = useNavigation();
   const isDeleting = false; //navigation?.formData?.get('intent') === 'delete';
@@ -41,31 +43,29 @@ export function GoalOperations({ goal, onEdit, onDelete }: GoalOperationsProps) 
       <DropdownMenu>
         <DropdownMenuTrigger className="hover:bg-muted flex h-8 w-8 items-center justify-center rounded-md border transition-colors">
           <Icons.MoreVertical className="h-4 w-4" />
-          <span className="sr-only">Open</span>
+          <span className="sr-only">{t("settings.shared.open")}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(goal)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onEdit(goal)}>{t("settings.shared.edit")}</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive flex cursor-pointer items-center"
             onSelect={() => setShowDeleteAlert(true)}
           >
-            Delete
+            {t("settings.shared.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Are you sure you want to delete this goal and its allocations?
-            </AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t("settings.goals.delete_title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("settings.shared.action_cannot_undo")}</AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter>
             <input type="hidden" name="id" value={goal.id} />
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("settings.shared.cancel")}</AlertDialogCancel>
 
             <Button
               disabled={isDeleting}
@@ -77,7 +77,7 @@ export function GoalOperations({ goal, onEdit, onDelete }: GoalOperationsProps) 
               ) : (
                 <Icons.Trash className="mr-2 h-4 w-4" />
               )}
-              <span>Delete</span>
+              <span>{t("settings.shared.delete")}</span>
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -14,16 +14,24 @@ interface ColumnMeta {
 interface DataTableToolbarProps<TData> {
   table: Table<TData>;
   searchBy?: string;
+  searchPlaceholder?: string;
   filters?: DataTableFacetedFilterProps<TData, unknown>[];
+  /** Label for resetting active table filters/search. */
+  resetLabel?: string;
   showColumnToggle?: boolean;
+  /** Label for the column visibility dropdown (e.g. translated). */
+  columnToggleLabel?: string;
   actions?: React.ReactNode;
 }
 
 export function DataTableToolbar<TData>({
   table,
   searchBy,
+  searchPlaceholder = "Search ...",
   filters,
+  resetLabel = "Reset",
   showColumnToggle = false,
+  columnToggleLabel = "Columns",
   actions,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0 || table.getState().globalFilter;
@@ -34,7 +42,7 @@ export function DataTableToolbar<TData>({
       <div className="flex flex-1 items-center space-x-2">
         {searchBy && (
           <SearchInput
-            placeholder="Search ..."
+            placeholder={searchPlaceholder}
             value={table.getState().globalFilter ?? ""}
             onChange={(value) => table.setGlobalFilter(value)}
             className="w-[150px] lg:w-[250px]"
@@ -47,6 +55,9 @@ export function DataTableToolbar<TData>({
             column={table.getColumn(filter.id)}
             title={filter.title}
             options={filter.options}
+            clearFiltersLabel={filter.clearFiltersLabel}
+            emptyMessage={filter.emptyMessage}
+            manySelectedLabel={filter.manySelectedLabel}
           />
         ))}
         {isFiltered && (
@@ -58,7 +69,7 @@ export function DataTableToolbar<TData>({
             }}
             className="h-8 px-2 lg:px-3"
           >
-            Reset
+            {resetLabel}
             <Icons.Close className="ml-2 h-4 w-4" />
           </Button>
         )}
@@ -73,7 +84,7 @@ export function DataTableToolbar<TData>({
                 size="sm"
                 className="bg-secondary/30 hover:bg-muted/80 ml-auto gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium"
               >
-                Columns <Icons.ChevronDown className="ml-2 h-4 w-4" />
+                {columnToggleLabel} <Icons.ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

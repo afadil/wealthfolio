@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 
@@ -94,6 +95,7 @@ function buildHoldingsRows(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function HoldingsReviewStep() {
+  const { t } = useTranslation("common");
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, parseConfig, accountId, draftActivities } = state;
 
@@ -226,24 +228,26 @@ export function HoldingsReviewStep() {
         <ImportAlert
           variant="info"
           size="sm"
-          title="Snapshots"
-          description={`${snapshots.length} date${snapshots.length !== 1 ? "s" : ""}`}
+          title={t("import.holdings_review.snapshots")}
+          description={t("import.holdings_review.snapshot_date_count", {
+            count: snapshots.length,
+          })}
           icon={Icons.Calendar}
           className="mb-0"
         />
         <ImportAlert
           variant="info"
           size="sm"
-          title="Positions"
-          description={`${totalPositions} holdings`}
+          title={t("import.holdings_review.positions")}
+          description={t("import.holdings_review.holdings_total", { count: totalPositions })}
           icon={Icons.BarChart}
           className="mb-0"
         />
         <ImportAlert
           variant="info"
           size="sm"
-          title="Cash Balances"
-          description={`${totalCashEntries} entr${totalCashEntries !== 1 ? "ies" : "y"}`}
+          title={t("import.holdings_review.cash_balances")}
+          description={t("import.holdings_review.cash_entry_count", { count: totalCashEntries })}
           icon={Icons.Wallet}
           className="mb-0"
         />
@@ -253,8 +257,10 @@ export function HoldingsReviewStep() {
           <ImportAlert
             variant="destructive"
             size="sm"
-            title="Validation Errors"
-            description={`${checkResult.validationErrors.length} error${checkResult.validationErrors.length !== 1 ? "s" : ""}`}
+            title={t("import.holdings_review.validation_errors")}
+            description={t("import.holdings_review.error_count", {
+              count: checkResult.validationErrors.length,
+            })}
             icon={Icons.AlertTriangle}
             className="mb-0"
           />
@@ -262,8 +268,8 @@ export function HoldingsReviewStep() {
           <ImportAlert
             variant="success"
             size="sm"
-            title="Ready to Import"
-            description={`${holdingsRows.length} rows`}
+            title={t("import.holdings_review.ready_title")}
+            description={t("import.holdings_review.row_count", { count: holdingsRows.length })}
             icon={Icons.CheckCircle}
             className="mb-0"
             rightIcon={Icons.CheckCircle}
@@ -275,17 +281,25 @@ export function HoldingsReviewStep() {
       {checkResult && (
         <div className="flex flex-col gap-3">
           {checkResult.existingDates.length > 0 && (
-            <ImportAlert variant="warning" size="sm" title="Existing Snapshots Will Be Overwritten">
+            <ImportAlert
+              variant="warning"
+              size="sm"
+              title={t("import.holdings_review.overwrite_snapshots_title")}
+            >
               <p className="text-xs">
-                {checkResult.existingDates.length} snapshot date
-                {checkResult.existingDates.length !== 1 ? "s" : ""} already exist
-                {checkResult.existingDates.length === 1 ? "s" : ""} and will be overwritten:{" "}
+                {t("import.holdings_review.overwrite_lead", {
+                  count: checkResult.existingDates.length,
+                })}{" "}
                 {checkResult.existingDates.sort().join(", ")}
               </p>
             </ImportAlert>
           )}
           {checkResult.validationErrors.length > 0 && (
-            <ImportAlert variant="destructive" size="sm" title="Validation Errors">
+            <ImportAlert
+              variant="destructive"
+              size="sm"
+              title={t("import.holdings_review.validation_errors")}
+            >
               <ul className="list-inside list-disc text-xs">
                 {checkResult.validationErrors.map((err, i) => (
                   <li key={i}>{err}</li>

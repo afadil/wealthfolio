@@ -1,6 +1,7 @@
 import { useWealthfolioConnect } from "@/features/wealthfolio-connect";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -9,33 +10,29 @@ import { useNavigate } from "react-router-dom";
  * then redirects to the connect settings page.
  */
 export default function AuthCallbackPage() {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { isConnected, isLoading, error } = useWealthfolioConnect();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   useEffect(() => {
-    // Wait for the context to finish loading
     if (isLoading) {
       return;
     }
 
     setHasCheckedAuth(true);
 
-    // If connected, redirect to sync settings
     if (isConnected) {
       navigate("/settings/connect", { replace: true });
       return;
     }
 
-    // If there's an error, still redirect but show error on the settings page
     if (error) {
       console.error("Auth error:", error);
       navigate("/settings/connect", { replace: true });
       return;
     }
 
-    // If not connected after checking, wait a bit more then redirect
-    // (the context might still be processing)
     const timer = setTimeout(() => {
       navigate("/settings/connect", { replace: true });
     }, 5000);
@@ -49,8 +46,8 @@ export default function AuthCallbackPage() {
         <Icons.Spinner className="text-muted-foreground h-8 w-8 animate-spin" />
         <p className="text-muted-foreground text-sm">
           {hasCheckedAuth && !isConnected
-            ? "Processing authentication..."
-            : "Completing sign in..."}
+            ? t("connect.auth_callback.processing")
+            : t("connect.auth_callback.completing")}
         </p>
         {error && <p className="text-destructive text-sm">{error}</p>}
       </div>

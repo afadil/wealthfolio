@@ -18,6 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface AccountHoldingsProps {
   accountId: string;
@@ -30,6 +31,7 @@ const AccountHoldings = ({
   showEmptyState = true,
   onAddHoldings,
 }: AccountHoldingsProps) => {
+  const { t } = useTranslation("common");
   const isMobile = useIsMobileViewport();
   const navigate = useNavigate();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -60,10 +62,21 @@ const AccountHoldings = ({
     return selectedAccount ? [selectedAccount] : [];
   }, [selectedAccount]);
 
-  const filteredHoldings = holdings?.filter((holding) => holding.holdingType !== HoldingType.CASH);
+  const filteredHoldings = useMemo(() => {
+    if (!holdings) return [];
+
+    // Hide closed/cleared positions that remain with zero quantity/value.
+    const EPSILON = 1e-8;
+    return holdings.filter((holding) => {
+      if (holding.holdingType === HoldingType.CASH) return false;
+
+      const quantity = Math.abs(holding.quantity ?? 0);
+      const marketValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+      return quantity > EPSILON || marketValue > EPSILON;
+    });
+  }, [holdings]);
 
   const typeOptions = useMemo(() => {
-    if (!filteredHoldings) return [];
     const seen = new Set<string>();
     const options: { value: string; label: string }[] = [];
     for (const h of filteredHoldings) {
@@ -93,18 +106,18 @@ const AccountHoldings = ({
         <div className="flex items-center justify-center py-16">
           <EmptyPlaceholder
             icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-            title="No holdings yet"
+            title={t("account.page.holdings_empty_title")}
             description={
               canEditHoldingsDirectly
-                ? "Add your current holdings snapshot or import from a CSV file to get started."
-                : "Holdings will be synced from your connected account."
+                ? t("account.page.holdings_empty_desc_holdings_manual")
+                : t("account.page.holdings_empty_desc_holdings_synced")
             }
           >
             {canEditHoldingsDirectly && (
               <div className="flex flex-col items-center gap-3 sm:flex-row">
                 <Button size="default" onClick={onAddHoldings}>
                   <Icons.Plus className="mr-2 h-4 w-4" />
-                  Add Holdings
+                  {t("account.page.holdings_empty_add_holdings")}
                 </Button>
                 <Button
                   size="default"
@@ -112,7 +125,7 @@ const AccountHoldings = ({
                   onClick={() => navigate(`/import?account=${accountId}`)}
                 >
                   <Icons.Import className="mr-2 h-4 w-4" />
-                  Import from CSV
+                  {t("account.page.holdings_empty_import_csv")}
                 </Button>
               </div>
             )}
@@ -126,8 +139,8 @@ const AccountHoldings = ({
       <div className="flex items-center justify-center py-16">
         <EmptyPlaceholder
           icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-          title="No holdings yet"
-          description="Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+          title={t("account.page.holdings_empty_title")}
+          description={t("account.page.holdings_empty_desc_transactions")}
         >
           <div className="flex flex-col items-center gap-3 sm:flex-row">
             <Button
@@ -139,7 +152,7 @@ const AccountHoldings = ({
               }
             >
               <Icons.Plus className="mr-2 h-4 w-4" />
-              Add Transaction
+              {t("account.page.holdings_empty_add_transaction")}
             </Button>
             <Button
               size="default"
@@ -147,7 +160,7 @@ const AccountHoldings = ({
               onClick={() => navigate(`/import?account=${accountId}`)}
             >
               <Icons.Import className="mr-2 h-4 w-4" />
-              Import from CSV
+              {t("account.page.holdings_empty_import_csv")}
             </Button>
           </div>
         </EmptyPlaceholder>
@@ -162,7 +175,7 @@ const AccountHoldings = ({
   return (
     <div>
       <div className="flex items-center justify-between py-4">
-        <h3 className="text-lg font-bold">Holdings</h3>
+        <h3 className="text-lg font-bold">{t("account.page.actions.holdings")}</h3>
         {canEditHoldingsDirectly && onAddHoldings && (
           <TooltipProvider>
             <Tooltip>
@@ -172,7 +185,7 @@ const AccountHoldings = ({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Update holdings</p>
+                <p>{t("account.page.update_holdings")}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

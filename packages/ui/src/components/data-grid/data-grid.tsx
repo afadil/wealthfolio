@@ -50,6 +50,7 @@ export function DataGrid<TData>({
   contextMenu,
   pasteDialog,
   onRowAdd,
+  addRowLabel = "Add row",
   height,
   stretchColumns = false,
   className,
@@ -225,7 +226,7 @@ export function DataGrid<TData>({
               >
                 <div className="text-muted-foreground sticky start-0 flex items-center gap-2 px-3">
                   <Icons.Plus className="size-3.5" />
-                  <span className="text-sm">Add row</span>
+                  <span className="text-sm">{addRowLabel}</span>
                 </div>
               </div>
             </div>

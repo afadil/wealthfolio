@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useSettings } from "@/hooks/use-settings";
 import { ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +7,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
   AccountSelect,
@@ -18,34 +20,33 @@ import {
   type AccountSelectOption,
 } from "./fields";
 
-// Zod schema for InterestForm validation
-export const interestFormSchema = z.object({
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  // Optional symbol (e.g., for bond interest)
-  symbol: z.string().optional().nullable(),
-  exchangeMic: z.string().nullable().optional(),
-  amount: z.coerce
-    .number({
-      required_error: "Please enter an amount.",
-      invalid_type_error: "Amount must be a number.",
-    })
-    .positive({ message: "Amount must be greater than 0." }),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  fxRate: z.coerce
-    .number({
-      invalid_type_error: "FX Rate must be a number.",
-    })
-    .positive({ message: "FX Rate must be positive." })
-    .optional(),
-  subtype: z.string().optional().nullable(),
-  symbolQuoteCcy: z.string().nullable().optional(),
-  symbolInstrumentType: z.string().nullable().optional(),
-});
+export function createInterestFormSchema() {
+  return z.object({
+    accountId: z.string().min(1, { message: i18n.t("activity.validation.account_required") }),
+    activityDate: z.date({ required_error: i18n.t("activity.validation.select_date") }),
+    symbol: z.string().optional().nullable(),
+    exchangeMic: z.string().nullable().optional(),
+    amount: z.coerce
+      .number({
+        required_error: i18n.t("activity.validation.enter_amount"),
+        invalid_type_error: i18n.t("activity.validation.amount_invalid_type"),
+      })
+      .positive({ message: i18n.t("activity.validation.amount_greater_than_zero") }),
+    comment: z.string().optional().nullable(),
+    currency: z.string().min(1, { message: i18n.t("activity.validation.currency_required") }),
+    fxRate: z.coerce
+      .number({
+        invalid_type_error: i18n.t("activity.validation.fx_rate_must_be_number"),
+      })
+      .positive({ message: i18n.t("activity.validation.fx_rate_positive_short") })
+      .optional(),
+    subtype: z.string().optional().nullable(),
+    symbolQuoteCcy: z.string().nullable().optional(),
+    symbolInstrumentType: z.string().nullable().optional(),
+  });
+}
 
-export type InterestFormValues = z.infer<typeof interestFormSchema>;
+export type InterestFormValues = z.infer<ReturnType<typeof createInterestFormSchema>>;
 
 interface InterestFormProps {
   accounts: AccountSelectOption[];
@@ -64,6 +65,8 @@ export function InterestForm({
   isLoading = false,
   isEditing = false,
 }: InterestFormProps) {
+  const { t, i18n } = useTranslation();
+  const interestFormSchema = useMemo(() => createInterestFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -115,7 +118,7 @@ export function InterestForm({
             {/* Optional Symbol (e.g., for bond interest) */}
             <SymbolSearch
               name="symbol"
-              label="Symbol (optional)"
+              label={t("activity.form.fields.symbol_optional")}
               exchangeMicName="exchangeMic"
               currencyName="currency"
               quoteCcyName="symbolQuoteCcy"
@@ -125,10 +128,10 @@ export function InterestForm({
             <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" currency={currency} />
+            <AmountInput name="amount" label={t("activity.form.fields.amount")} currency={currency} />
 
             {/* Advanced Options */}
             <AdvancedOptionsSection
@@ -141,7 +144,7 @@ export function InterestForm({
             />
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -149,7 +152,7 @@ export function InterestForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
@@ -159,7 +162,7 @@ export function InterestForm({
             ) : (
               <Icons.Plus className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : "Add Interest"}
+            {isEditing ? t("activity.form.update") : t("activity.form.submit.add_interest")}
           </Button>
         </div>
       </form>

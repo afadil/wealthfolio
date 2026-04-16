@@ -1,10 +1,11 @@
 // AI Assistant Types Tests
 // Tests for stream event parsing, error handling, and type utilities
 
+import i18n from "@/i18n/i18n";
 import { describe, it, expect } from "vitest";
 import {
   parseErrorCode,
-  ERROR_CODE_MAP,
+  ERROR_CODE_CONFIG,
   type AiStreamEvent,
   type ChatThread,
   type ChatMessage,
@@ -50,13 +51,14 @@ function createTextMessage(
 
 describe("parseErrorCode", () => {
   it("should parse known error codes with correct messages", () => {
-    const knownCodes = Object.keys(ERROR_CODE_MAP);
+    const knownCodes = Object.keys(ERROR_CODE_CONFIG);
 
     for (const code of knownCodes) {
       const result = parseErrorCode(code);
+      const cfg = ERROR_CODE_CONFIG[code];
       expect(result.code).toBe(code);
-      expect(result.message).toBe(ERROR_CODE_MAP[code].message);
-      expect(result.retryable).toBe(ERROR_CODE_MAP[code].retryable);
+      expect(result.message).toBe(i18n.t(cfg.messageKey));
+      expect(result.retryable).toBe(cfg.retryable);
     }
   });
 
@@ -110,11 +112,11 @@ describe("parseErrorCode", () => {
 
   it("should ignore rawMessage for known codes", () => {
     const result = parseErrorCode("missingApiKey", "This should be ignored");
-    expect(result.message).toBe(ERROR_CODE_MAP.missingApiKey.message);
+    expect(result.message).toBe(i18n.t(ERROR_CODE_CONFIG.missingApiKey.messageKey));
   });
 });
 
-describe("ERROR_CODE_MAP", () => {
+describe("ERROR_CODE_CONFIG", () => {
   it("should have all expected error codes", () => {
     const expectedCodes = [
       "providerNotConfigured",
@@ -132,15 +134,15 @@ describe("ERROR_CODE_MAP", () => {
     ];
 
     for (const code of expectedCodes) {
-      expect(ERROR_CODE_MAP).toHaveProperty(code);
-      expect(ERROR_CODE_MAP[code]).toHaveProperty("message");
-      expect(ERROR_CODE_MAP[code]).toHaveProperty("retryable");
+      expect(ERROR_CODE_CONFIG).toHaveProperty(code);
+      expect(ERROR_CODE_CONFIG[code]).toHaveProperty("messageKey");
+      expect(ERROR_CODE_CONFIG[code]).toHaveProperty("retryable");
     }
   });
 
-  it("should have non-empty messages for all codes", () => {
-    for (const [, config] of Object.entries(ERROR_CODE_MAP)) {
-      expect(config.message.length).toBeGreaterThan(0);
+  it("should have non-empty message keys for all codes", () => {
+    for (const [, config] of Object.entries(ERROR_CODE_CONFIG)) {
+      expect(i18n.t(config.messageKey).length).toBeGreaterThan(0);
       expect(typeof config.retryable).toBe("boolean");
     }
   });

@@ -21,7 +21,9 @@ import {
   usePersistentState,
 } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { buildIntervalButtonLabels, buildIntervalLabels } from "@/lib/interval-labels";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AccountsSummary } from "./accounts-summary";
 import Balance from "./balance";
 import SavingGoals from "./goals";
@@ -31,6 +33,10 @@ const DEFAULT_INTERVAL: UITimePeriod = "3M";
 const INTERVAL_STORAGE_KEY = "dashboard-interval";
 
 export function DashboardContent() {
+  const { t } = useTranslation();
+  const intervalLabels = useMemo(() => buildIntervalLabels(t), [t]);
+  const intervalButtonLabels = useMemo(() => buildIntervalButtonLabels(t), [t]);
+
   // Use the same persisted state as IntervalSelector for the interval code
   const [intervalCode] = usePersistentState<UITimePeriod>(INTERVAL_STORAGE_KEY, DEFAULT_INTERVAL);
 
@@ -38,8 +44,9 @@ export function DashboardContent() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
     () => getInitialIntervalData(intervalCode).range,
   );
-  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
-    () => getInitialIntervalData(intervalCode).description,
+  const selectedIntervalDescription = useMemo(
+    () => getInitialIntervalData(intervalCode, intervalLabels).description,
+    [intervalCode, intervalLabels],
   );
   const [isAllTime, setIsAllTime] = useState<boolean>(() => intervalCode === "ALL");
 
@@ -98,12 +105,7 @@ export function DashboardContent() {
   const isNegative = totalValue < 0;
 
   // Callback for IntervalSelector
-  const handleIntervalSelect = (
-    code: TimePeriod,
-    description: string,
-    range: DateRange | undefined,
-  ) => {
-    setSelectedIntervalDescription(description);
+  const handleIntervalSelect = (code: TimePeriod, _description: string, range: DateRange | undefined) => {
     setDateRange(range);
     setIsAllTime(code === "ALL");
   };
@@ -172,6 +174,8 @@ export function DashboardContent() {
                 isLoading={isValuationHistoryLoading}
                 storageKey={INTERVAL_STORAGE_KEY}
                 defaultValue={DEFAULT_INTERVAL}
+                intervalLabels={intervalLabels}
+                intervalButtonLabels={intervalButtonLabels}
               />
             </div>
           )}

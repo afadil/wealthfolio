@@ -29,6 +29,7 @@ export const COMMANDS: CommandMap = {
   backup_database: { method: "POST", path: "/utilities/database/backup" },
   backup_database_to_path: { method: "POST", path: "/utilities/database/backup-to-path" },
   restore_database: { method: "POST", path: "/utilities/database/restore" },
+  translate_text: { method: "POST", path: "/utilities/translate" },
   get_holdings: { method: "GET", path: "/holdings" },
   get_holding: { method: "GET", path: "/holdings/item" },
   get_asset_holdings: { method: "GET", path: "/holdings/by-asset" },
@@ -359,6 +360,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "restore_database": {
       const { backupFilePath } = payload as { backupFilePath: string };
       body = JSON.stringify({ backupFilePath });
+      break;
+    }
+    case "translate_text": {
+      const { text, sourceLang, targetLang } = payload as {
+        text: string;
+        sourceLang: string;
+        targetLang: string;
+      };
+      body = JSON.stringify({ text, sourceLang, targetLang });
       break;
     }
     case "update_settings": {

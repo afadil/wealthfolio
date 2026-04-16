@@ -115,3 +115,22 @@ export const openUrlInBrowser = async (url: string): Promise<void> => {
   const { open: openShell } = await import("@tauri-apps/plugin-shell");
   await openShell(url);
 };
+
+/** Opens a URL in a secondary app window (embedded webview, no browser chrome). */
+export const openUrlInAppWebviewWindow = async (url: string, title: string): Promise<void> => {
+  const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+  const { nanoid } = await import("nanoid");
+  const label = `ext-${nanoid(12)}`;
+  const win = new WebviewWindow(label, {
+    url,
+    title,
+    width: 1024,
+    height: 768,
+    center: true,
+    resizable: true,
+    focus: true,
+  });
+  win.once("tauri://error", (e) => {
+    console.error("WebviewWindow failed:", e);
+  });
+};

@@ -746,6 +746,12 @@ impl AssetServiceTrait for AssetService {
                 serde_json::Value::String(sectors.clone()),
             );
         }
+        if let Some(ref fund_holdings) = provider_profile.fund_holdings {
+            profile_metadata.insert(
+                "fundHoldings".to_string(),
+                serde_json::Value::String(fund_holdings.clone()),
+            );
+        }
         if let Some(ref industry) = provider_profile.industry {
             profile_metadata.insert(
                 "industry".to_string(),
@@ -923,7 +929,11 @@ impl AssetServiceTrait for AssetService {
     }
 
     /// Enriches multiple assets in batch, with deduplication and sync state tracking.
-    async fn enrich_assets(&self, asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+    async fn enrich_assets(
+        &self,
+        asset_ids: Vec<String>,
+        force_profile_refresh: bool,
+    ) -> Result<(usize, usize, usize)> {
         if asset_ids.is_empty() {
             return Ok((0, 0, 0));
         }
@@ -942,21 +952,25 @@ impl AssetServiceTrait for AssetService {
 
         let unique_ids_len = unique_ids.len();
 
-        // Filter to only assets that need enrichment
-        let ids_to_enrich: Vec<String> = unique_ids
-            .into_iter()
-            .filter(|asset_id| {
-                let needs = match self.quote_service.get_sync_state(asset_id) {
-                    Ok(Some(state)) => state.needs_profile_enrichment(),
-                    Ok(None) => true,
-                    Err(_) => true,
-                };
-                if !needs {
-                    debug!("Skipping enrichment for {} - already enriched", asset_id);
-                }
-                needs
-            })
-            .collect();
+        // Filter to only assets that need enrichment (unless forced, e.g. after market sync)
+        let ids_to_enrich: Vec<String> = if force_profile_refresh {
+            unique_ids
+        } else {
+            unique_ids
+                .into_iter()
+                .filter(|asset_id| {
+                    let needs = match self.quote_service.get_sync_state(asset_id) {
+                        Ok(Some(state)) => state.needs_profile_enrichment(),
+                        Ok(None) => true,
+                        Err(_) => true,
+                    };
+                    if !needs {
+                        debug!("Skipping enrichment for {} - already enriched", asset_id);
+                    }
+                    needs
+                })
+                .collect()
+        };
 
         let skipped_count = unique_ids_len - ids_to_enrich.len();
 

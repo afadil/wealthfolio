@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from "@wealthfolio/ui";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useBalanceUpdate } from "./use-balance-update";
 
@@ -31,6 +32,7 @@ interface EditableBalanceProps {
 }
 
 const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalance, currency }) => {
+  const { t } = useTranslation("common");
   const [isEditing, setIsEditing] = useState(false);
   const [balance, setBalance] = useState(initialBalance);
   const { updateBalance, isPending } = useBalanceUpdate(account);
@@ -71,7 +73,7 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Click to update the cash balance</p>
+          <p>{t("account.metrics.tooltip_update_cash_balance")}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -101,6 +103,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   hideBalanceEdit = false,
   isHoldingsMode = false,
 }) => {
+  const { t } = useTranslation("common");
   // Full skeleton only when valuation data itself is loading
   if (isLoading || !valuation)
     return (
@@ -148,7 +151,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   const rows = isHoldingsMode
     ? [
         {
-          label: "Investments",
+          label: t("account.metrics.investments"),
           value: (
             <PrivacyAmount
               value={valuation?.investmentMarketValue || 0}
@@ -157,11 +160,11 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           ),
         },
         {
-          label: "Cost Basis",
+          label: t("account.metrics.cost_basis"),
           value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
         },
         {
-          label: "Unrealized P&L",
+          label: t("account.metrics.unrealized_pnl"),
           value: (
             <span className="flex items-center gap-1">
               <GainAmount value={unrealizedPnL} currency={displayCurrency} className="text-sm" />
@@ -172,7 +175,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
       ]
     : [
         {
-          label: "Investments",
+          label: t("account.metrics.investments"),
           value: (
             <PrivacyAmount
               value={valuation?.investmentMarketValue || 0}
@@ -181,13 +184,13 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
           ),
         },
         {
-          label: "Net Contribution",
+          label: t("account.metrics.net_contribution"),
           value: (
             <PrivacyAmount value={valuation?.netContribution || 0} currency={displayCurrency} />
           ),
         },
         {
-          label: "Cost Basis",
+          label: t("account.metrics.cost_basis"),
           value: <PrivacyAmount value={valuation?.costBasis || 0} currency={displayCurrency} />,
         },
       ];
@@ -199,7 +202,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   return (
     <Card className={cn("flex flex-col", className)}>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-bold">Cash Balance</CardTitle>
+        <CardTitle className="text-lg font-bold">{t("account.metrics.cash_balance")}</CardTitle>
         {valuation && !hideBalanceEdit ? (
           <EditableBalance
             account={valuation}
@@ -233,20 +236,22 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
       <CardFooter className="mt-auto flex flex-col items-start gap-1 px-3">
         {performanceError ? (
           <p className="text-muted-foreground m-0 p-0 text-xs">
-            {lastUpdated && <>Last updated: {lastUpdated}</>}
+            {lastUpdated && t("account.metrics.last_updated", { date: lastUpdated })}
           </p>
         ) : isHoldingsMode ? (
           <>
             <p className="text-muted-foreground m-0 p-0 text-xs">
-              TWR/MWR not available. Requires transaction tracking.
+              {t("account.metrics.holdings_mode_note")}
             </p>
             {lastUpdated && (
-              <p className="text-muted-foreground m-0 p-0 text-xs">Last updated: {lastUpdated}</p>
+              <p className="text-muted-foreground m-0 p-0 text-xs">
+                {t("account.metrics.last_updated", { date: lastUpdated })}
+              </p>
             )}
           </>
         ) : (
           <p className="text-muted-foreground m-0 p-0 text-xs">
-            From {formattedStartDate} to {formattedEndDate}
+            {t("account.metrics.period_from_to", { from: formattedStartDate, to: formattedEndDate })}
           </p>
         )}
       </CardFooter>

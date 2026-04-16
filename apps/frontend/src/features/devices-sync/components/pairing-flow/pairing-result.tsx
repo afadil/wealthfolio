@@ -5,6 +5,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui";
+import { useTranslation } from "react-i18next";
 
 interface PairingResultProps {
   success: boolean;
@@ -15,21 +16,22 @@ interface PairingResultProps {
   doneLabel?: string;
 }
 
-function formatError(error: string | null | undefined): string {
-  if (!error) return "Something went wrong. Please try again.";
+function formatError(error: string | null | undefined, t: (key: string) => string): string {
+  if (!error) return t("deviceSync.pairing.error.generic");
   const e = error.toLowerCase();
 
   if (e.includes("sync_source_restore_required"))
-    return "Sync needs to be restored from this device before you can connect another device.";
+    return t("deviceSync.pairing.error.sync_source_restore_required");
   if (e.includes("snapshot") && e.includes("failed"))
-    return "Devices paired but data sync failed. Please try pairing again.";
-  if (e.includes("invalid") && e.includes("code")) return "Invalid code. Check and try again.";
-  if (e.includes("expired")) return "Session expired. Please start again.";
-  if (e.includes("cancel")) return "Pairing was canceled.";
-  if (e.includes("network") || e.includes("fetch")) return "Network error. Check your connection.";
-  if (e.includes("timeout")) return "Connection timed out.";
-  if (e.includes("not found")) return "Session not found or expired.";
-  if (e.includes("decrypt") || e.includes("authentication")) return "Security verification failed.";
+    return t("deviceSync.pairing.error.snapshot_failed");
+  if (e.includes("invalid") && e.includes("code")) return t("deviceSync.pairing.error.invalid_code");
+  if (e.includes("expired")) return t("deviceSync.pairing.error.session_expired_restart");
+  if (e.includes("cancel")) return t("deviceSync.pairing.error.cancelled");
+  if (e.includes("network") || e.includes("fetch")) return t("deviceSync.pairing.error.network");
+  if (e.includes("timeout")) return t("deviceSync.pairing.error.timeout");
+  if (e.includes("not found")) return t("deviceSync.pairing.error.not_found");
+  if (e.includes("decrypt") || e.includes("authentication"))
+    return t("deviceSync.pairing.error.security_verification_failed");
 
   return error.length > 100 ? error.slice(0, 97) + "..." : error;
 }
@@ -42,6 +44,7 @@ export function PairingResult({
   retryLabel,
   doneLabel,
 }: PairingResultProps) {
+  const { t } = useTranslation("common");
   const hasCalledDone = useRef(false);
 
   // Auto-close on success - call immediately
@@ -61,11 +64,13 @@ export function PairingResult({
           <Icons.CheckCircle className="h-10 w-10 text-green-600 dark:text-green-500" />
         </div>
         <div className="mb-6 text-center">
-          <p className="text-foreground text-lg font-semibold">You&apos;re all set!</p>
-          <p className="text-muted-foreground mt-2 text-sm">Device connected successfully</p>
+          <p className="text-foreground text-lg font-semibold">{t("deviceSync.pairing.success_title")}</p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            {t("deviceSync.pairing.success_description")}
+          </p>
         </div>
         <Button className="w-full max-w-[200px]" onClick={onDone}>
-          Done
+          {t("common.done")}
         </Button>
       </div>
     );
@@ -77,17 +82,17 @@ export function PairingResult({
         <Icons.XCircle className="h-10 w-10 text-red-600 dark:text-red-500" />
       </div>
       <div className="mb-6 text-center">
-        <p className="text-foreground text-base font-semibold">Connection failed</p>
-        <p className="text-muted-foreground mt-2 max-w-[240px] text-sm">{formatError(error)}</p>
+        <p className="text-foreground text-base font-semibold">{t("deviceSync.pairing.connection_failed")}</p>
+        <p className="text-muted-foreground mt-2 max-w-[240px] text-sm">{formatError(error, t)}</p>
       </div>
       <div className="flex gap-3">
         {onRetry && (
           <Button variant="outline" onClick={onRetry}>
-            {retryLabel ?? "Try Again"}
+            {retryLabel ?? t("common.try_again")}
           </Button>
         )}
         <Button variant={onRetry ? "ghost" : "default"} onClick={onDone}>
-          {doneLabel ?? (onRetry ? "Cancel" : "Close")}
+          {doneLabel ?? (onRetry ? t("common.cancel") : t("common.close"))}
         </Button>
       </div>
     </div>

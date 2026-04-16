@@ -18,7 +18,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@wealthfolio/ui";
-import { useMemo, useState } from "react";
+import { buildIntervalButtonLabels, buildIntervalLabels } from "@/lib/interval-labels";
+import { useCallback, useMemo, useState } from "react";
 
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { PrivacyToggle } from "@/components/privacy-toggle";
@@ -67,6 +68,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { format, parseISO, subMonths } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AccountContributionLimit } from "./account-contribution-limit";
 import AccountHoldings from "./account-holdings";
 import AccountMetrics from "./account-metrics";
@@ -104,6 +106,9 @@ const formatDate = (dateStr: string): string => {
 const INITIAL_INTERVAL_CODE: TimePeriod = "3M";
 
 const AccountPage = () => {
+  const { t } = useTranslation();
+  const intervalLabels = useMemo(() => buildIntervalLabels(t), [t]);
+  const intervalButtonLabels = useMemo(() => buildIntervalButtonLabels(t), [t]);
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { id = "" } = useParams<{ id: string }>();
@@ -223,6 +228,22 @@ const AccountPage = () => {
     return Object.entries(grouped);
   }, [accounts]);
 
+  const accountTypeLabel = useCallback(
+    (type: string) => {
+      switch (type) {
+        case "SECURITIES":
+          return t("account.selector.group.securities");
+        case "CASH":
+          return t("account.selector.group.cash");
+        case "CRYPTOCURRENCY":
+          return t("account.selector.group.cryptocurrency");
+        default:
+          return t("account.selector.group.other");
+      }
+    },
+    [t],
+  );
+
   const accountTrackedItem: TrackedItem | undefined = useMemo(() => {
     if (account) {
       return { id: account.id, type: "account", name: account.name };
@@ -311,11 +332,11 @@ const AccountPage = () => {
               canEditHoldingsDirectly
                 ? ([
                     {
-                      title: "Holdings",
+                          title: t("account.page.actions.holdings"),
                       items: [
                         {
                           icon: Icons.Pencil,
-                          label: "Update Holdings",
+                          label: t("account.page.actions.update_holdings"),
                           onClick: () => {
                             setEditingSnapshotDate(null);
                             setIsEditingHoldings(true);
@@ -323,17 +344,17 @@ const AccountPage = () => {
                         },
                         {
                           icon: Icons.Import,
-                          label: "Import CSV",
+                          label: t("account.page.actions.import_csv"),
                           onClick: () => navigate(`/import?account=${id}`),
                         },
                       ],
                     },
                     {
-                      title: "Manage",
+                      title: t("account.page.actions.manage"),
                       items: [
                         {
                           icon: Icons.Clock,
-                          label: "Recalculate History",
+                          label: t("account.page.actions.recalculate_history"),
                           onClick: () => recalculatePortfolioMutation.mutate(),
                         },
                       ],
@@ -341,11 +362,11 @@ const AccountPage = () => {
                   ] satisfies ActionPaletteGroup[])
                 : ([
                     {
-                      title: "Transactions",
+                      title: t("account.page.actions.transactions"),
                       items: [
                         {
                           icon: Icons.Plus,
-                          label: "Record Transaction",
+                          label: t("account.page.actions.record_transaction"),
                           onClick: () => navigate(`/activities/manage?account=${id}`),
                         },
                         ...(isHoldingsMode
@@ -353,23 +374,23 @@ const AccountPage = () => {
                           : [
                               {
                                 icon: Icons.Holdings,
-                                label: "Transfer Holdings",
+                                label: t("account.page.actions.transfer_holdings"),
                                 onClick: () => setShowBulkHoldingsForm(true),
                               },
                             ]),
                         {
                           icon: Icons.Import,
-                          label: "Import CSV",
+                          label: t("account.page.actions.import_csv"),
                           onClick: () => navigate(`/import?account=${id}`),
                         },
                       ],
                     },
                     {
-                      title: "Manage",
+                      title: t("account.page.actions.manage"),
                       items: [
                         {
                           icon: Icons.Clock,
-                          label: "Recalculate History",
+                          label: t("account.page.actions.recalculate_history"),
                           onClick: () => recalculatePortfolioMutation.mutate(),
                         },
                       ],
@@ -393,7 +414,7 @@ const AccountPage = () => {
           <div className="flex min-w-0 flex-col justify-center">
             <div className="flex items-center gap-1">
               <h1 className="truncate text-base font-semibold leading-tight md:text-lg">
-                {account?.name ?? "Account"}
+                {account?.name ?? t("account.page.account_fallback")}
               </h1>
               {/* Desktop account selector */}
               <div className="hidden sm:block">
@@ -403,18 +424,18 @@ const AccountPage = () => {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 rounded-full"
-                      aria-label="Switch account"
+                      aria-label={t("account.page.switch_account")}
                     >
                       <Icons.ChevronDown className="text-muted-foreground size-5" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-60 p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Search accounts..." />
+                      <CommandInput placeholder={t("account.page.search_accounts")} />
                       <CommandList>
-                        <CommandEmpty>No accounts found.</CommandEmpty>
+                        <CommandEmpty>{t("account.page.no_accounts_found")}</CommandEmpty>
                         {accountsByType.map(([type, typeAccounts]) => (
-                          <CommandGroup key={type} heading={type}>
+                          <CommandGroup key={type} heading={accountTypeLabel(type)}>
                             {typeAccounts.map((acc) => {
                               const IconComponent =
                                 accountTypeIcons[acc.accountType] ?? Icons.CreditCard;
@@ -454,22 +475,22 @@ const AccountPage = () => {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 rounded-full"
-                      aria-label="Switch account"
+                      aria-label={t("account.page.switch_account")}
                     >
                       <Icons.ChevronDown className="text-muted-foreground h-5 w-5" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="bottom" className="rounded-t-4xl mx-1 h-[80vh] p-0">
                     <SheetHeader className="border-border border-b px-6 py-4">
-                      <SheetTitle>Switch Account</SheetTitle>
-                      <SheetDescription>Choose an account to view</SheetDescription>
+                      <SheetTitle>{t("account.page.switch_account_title")}</SheetTitle>
+                      <SheetDescription>{t("account.page.switch_account_description")}</SheetDescription>
                     </SheetHeader>
                     <ScrollArea className="h-[calc(80vh-5rem)] px-6 py-4">
                       <div className="space-y-6">
                         {accountsByType.map(([type, typeAccounts]) => (
                           <div key={type}>
                             <h3 className="text-muted-foreground mb-3 text-sm font-medium">
-                              {type}
+                              {accountTypeLabel(type)}
                             </h3>
                             <div className="space-y-2">
                               {typeAccounts.map((acc) => {
@@ -571,7 +592,11 @@ const AccountPage = () => {
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{showSnapshotMarkers ? "Hide" : "Show"} snapshot markers</p>
+                          <p>
+                            {showSnapshotMarkers
+                              ? t("account.page.hide_snapshot_markers")
+                              : t("account.page.show_snapshot_markers")}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -603,6 +628,8 @@ const AccountPage = () => {
                           onIntervalSelect={handleIntervalSelect}
                           isLoading={isValuationHistoryLoading}
                           defaultValue={INITIAL_INTERVAL_CODE}
+                          intervalLabels={intervalLabels}
+                          intervalButtonLabels={intervalButtonLabels}
                         />
                       </div>
                     </div>
@@ -641,9 +668,9 @@ const AccountPage = () => {
         <Sheet open={isEditingHoldings} onOpenChange={setIsEditingHoldings}>
           <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-2xl">
             <SheetHeader className="border-b px-6 py-4">
-              <SheetTitle>Update Holdings</SheetTitle>
+              <SheetTitle>{t("account.page.update_holdings")}</SheetTitle>
               <SheetDescription>
-                Edit positions and cash balances for {account.name}
+                {t("account.page.update_holdings_description", { name: account.name })}
               </SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-hidden px-6">
@@ -667,10 +694,14 @@ const AccountPage = () => {
         <SheetContent side="right" className="flex h-full w-full flex-col p-0 sm:max-w-md">
           <SheetHeader className="border-b px-6 py-4">
             <SheetTitle>
-              Activities on {selectedActivityDate ? formatDate(selectedActivityDate) : ""}
+              {t("account.page.activities_on_date", {
+                date: selectedActivityDate ? formatDate(selectedActivityDate) : "",
+              })}
             </SheetTitle>
             <SheetDescription>
-              {dateActivities?.length ?? 0} activities recorded on this date
+              {t("account.page.activities_recorded_count", {
+                count: dateActivities?.length ?? 0,
+              })}
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-auto px-4 py-4">

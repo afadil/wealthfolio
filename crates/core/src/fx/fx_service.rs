@@ -22,6 +22,56 @@ pub struct FxService {
 impl FxService {
     pub const DEFAULT_DATA_SOURCE: &'static str = DATA_SOURCE_MANUAL;
 
+    /// Creates/updates one FX asset and stores its latest quote.
+    async fn persist_exchange_rate_pair(&self, new_rate: &NewExchangeRate) -> Result<ExchangeRate> {
+        let asset_id = self
+            .repository
+            .create_fx_asset(
+                &new_rate.from_currency,
+                &new_rate.to_currency,
+                new_rate.source.as_str(),
+            )
+            .await?;
+
+        let rate = ExchangeRate {
+            id: asset_id,
+            from_currency: new_rate.from_currency.clone(),
+            to_currency: new_rate.to_currency.clone(),
+            rate: new_rate.rate,
+            source: new_rate.source.clone(),
+            timestamp: Utc::now(),
+        };
+
+        self.repository.save_exchange_rate(rate).await
+    }
+
+    /// Builds the inverse pair (e.g. CHF/CAD → CAD/CHF). Manual rates use 1/r; provider rows keep the same placeholder rate.
+    fn inverse_new_rate(original: &NewExchangeRate, saved: &ExchangeRate) -> Option<NewExchangeRate> {
+        if original.source.as_str() == DATA_SOURCE_MANUAL && original.rate.is_zero() {
+            return None;
+        }
+
+        let inv_rate = match Decimal::ONE.checked_div(original.rate) {
+            Some(r) => r,
+            None => {
+                log::warn!(
+                    "Skipping inverse FX pair for {}/{}: cannot invert rate {}",
+                    saved.from_currency,
+                    saved.to_currency,
+                    original.rate
+                );
+                return None;
+            }
+        };
+
+        Some(NewExchangeRate {
+            from_currency: saved.to_currency.clone(),
+            to_currency: saved.from_currency.clone(),
+            rate: inv_rate,
+            source: original.source.clone(),
+        })
+    }
+
     pub fn new(repository: Arc<dyn FxRepositoryTrait>) -> Self {
         Self {
             repository,
@@ -185,26 +235,31 @@ impl FxServiceTrait for FxService {
     }
 
     async fn add_exchange_rate(&self, new_rate: NewExchangeRate) -> Result<ExchangeRate> {
-        // Create/get the FX asset — returns the asset UUID
-        let asset_id = self
-            .repository
-            .create_fx_asset(
-                &new_rate.from_currency,
-                &new_rate.to_currency,
-                new_rate.source.as_str(),
-            )
-            .await?;
+        let saved = self.persist_exchange_rate_pair(&new_rate).await?;
 
-        let rate = ExchangeRate {
-            id: asset_id,
-            from_currency: new_rate.from_currency,
-            to_currency: new_rate.to_currency,
-            rate: new_rate.rate,
-            source: new_rate.source,
-            timestamp: Utc::now(),
-        };
+        let nf = normalize_currency_code(&saved.from_currency);
+        let nt = normalize_currency_code(&saved.to_currency);
+        if nf != nt {
+            if let Some(inverse) = Self::inverse_new_rate(&new_rate, &saved) {
+                if let Err(e) = self.persist_exchange_rate_pair(&inverse).await {
+                    log::warn!(
+                        "Added {}/{} but inverse pair could not be saved: {}",
+                        saved.from_currency,
+                        saved.to_currency,
+                        e
+                    );
+                }
+            }
+        }
 
-        self.repository.save_exchange_rate(rate).await
+        if let Err(e) = self.initialize_converter() {
+            log::error!(
+                "Failed to refresh currency converter after add_exchange_rate: {}",
+                e
+            );
+        }
+
+        Ok(saved)
     }
 
     fn get_historical_rates(&self, from: &str, to: &str, days: i64) -> Result<Vec<ExchangeRate>> {

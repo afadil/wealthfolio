@@ -22,6 +22,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useMemo, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { searchTicker } from "@/adapters";
 import { saveActivities, updateToolResult } from "@/adapters";
@@ -334,22 +335,22 @@ interface SuccessStateProps {
 }
 
 function SuccessState({ activityCount }: SuccessStateProps) {
+  const { t } = useTranslation("common");
   return (
     <Card className="bg-muted/40 border-success/30">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Icons.CheckCircle className="text-success h-5 w-5" />
-          <CardTitle className="text-base">Import Complete</CardTitle>
+          <CardTitle className="text-base">{t("assistant.import_csv.success_title")}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-muted-foreground text-sm">
-          Successfully imported <span className="text-foreground font-medium">{activityCount}</span>{" "}
-          activities.
+          {t("assistant.import_csv.success_description", { count: activityCount })}
         </p>
         <Button variant="outline" size="sm" onClick={() => window.open("/activities", "_blank")}>
           <Icons.ExternalLink className="mr-2 h-4 w-4" />
-          View Activities
+          {t("assistant.import_csv.view_activities")}
         </Button>
       </CardContent>
     </Card>
@@ -366,6 +367,7 @@ interface MappingQualityBadgeProps {
 }
 
 function MappingQualityBadge({ mapping, usedSavedProfile }: MappingQualityBadgeProps) {
+  const { t } = useTranslation("common");
   // Calculate quality from number of mapped fields (out of 6 core fields)
   const coreFields = ["date", "activityType", "symbol", "quantity", "unitPrice", "amount"];
   const mappedCount = coreFields.filter(
@@ -378,16 +380,25 @@ function MappingQualityBadge({ mapping, usedSavedProfile }: MappingQualityBadgeP
 
   if (usedSavedProfile) {
     className = "bg-blue-500/10 text-blue-500 border-blue-500/30";
-    label = "Saved profile";
+    label = t("assistant.import_csv.saved_profile");
   } else if (quality >= 0.8) {
     className = "bg-success/10 text-success border-success/30";
-    label = `${mappedCount}/${coreFields.length} fields mapped`;
+    label = t("assistant.import_csv.fields_mapped", {
+      mapped: mappedCount,
+      total: coreFields.length,
+    });
   } else if (quality >= 0.5) {
     className = "bg-warning/10 text-warning border-warning/30";
-    label = `${mappedCount}/${coreFields.length} fields mapped`;
+    label = t("assistant.import_csv.fields_mapped", {
+      mapped: mappedCount,
+      total: coreFields.length,
+    });
   } else {
     className = "bg-destructive/10 text-destructive border-destructive/30";
-    label = `${mappedCount}/${coreFields.length} fields mapped`;
+    label = t("assistant.import_csv.fields_mapped", {
+      mapped: mappedCount,
+      total: coreFields.length,
+    });
   }
 
   return (
@@ -406,6 +417,7 @@ interface CleaningActionsSummaryProps {
 }
 
 function CleaningActionsSummary({ actions }: CleaningActionsSummaryProps) {
+  const { t } = useTranslation("common");
   if (actions.length === 0) return null;
 
   return (
@@ -419,7 +431,7 @@ function CleaningActionsSummary({ actions }: CleaningActionsSummaryProps) {
           <span className="flex items-center gap-2">
             <Icons.Sparkles className="h-4 w-4" />
             <span className="text-xs">
-              {actions.length} auto-cleaning action{actions.length > 1 ? "s" : ""} applied
+              {t("assistant.import_csv.cleaning_actions", { count: actions.length })}
             </span>
           </span>
           <Icons.ChevronDown className="h-4 w-4" />
@@ -448,14 +460,15 @@ interface ValidationSummaryProps {
 }
 
 function ValidationSummaryBadges({ validation }: ValidationSummaryProps) {
+  const { t } = useTranslation("common");
   return (
     <div className="flex items-center gap-2 text-xs">
       <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-        {validation.validRows} valid
+        {t("assistant.import_csv.valid_rows", { count: validation.validRows })}
       </Badge>
       {validation.warningRows > 0 && (
         <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-          {validation.warningRows} warnings
+          {t("assistant.import_csv.warning_rows", { count: validation.warningRows })}
         </Badge>
       )}
       {validation.errorRows > 0 && (
@@ -463,7 +476,7 @@ function ValidationSummaryBadges({ validation }: ValidationSummaryProps) {
           variant="outline"
           className="bg-destructive/10 text-destructive border-destructive/30"
         >
-          {validation.errorRows} errors
+          {t("assistant.import_csv.error_rows", { count: validation.errorRows })}
         </Badge>
       )}
     </div>
@@ -474,6 +487,7 @@ function ValidationSummaryBadges({ validation }: ValidationSummaryProps) {
 // Import Data Grid Columns (uses shared columns from import-columns.tsx)
 // ============================================================================
 
+import { useDataGridColumnHeaderMenuLabels } from "@/hooks/use-data-grid-column-header-labels";
 import { useImportColumns } from "@/pages/activity/import/components/import-columns";
 
 // ============================================================================
@@ -487,10 +501,12 @@ interface ImportFormProps {
 }
 
 function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
+  const { t } = useTranslation("common");
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
+  const columnHeaderMenuLabels = useDataGridColumnHeaderMenuLabels();
 
   // Convert drafts to local transactions
   const initialTransactions = useMemo(
@@ -653,6 +669,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
     enableColumnFilters: false,
     enableSearch: false,
     enablePaste: true,
+    columnHeaderMenuLabels,
     onDataChange,
     initialState: {
       columnVisibility: {
@@ -716,11 +733,13 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
       onSuccess(createdIds);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to import activities");
+      setSubmitError(
+        error instanceof Error ? error.message : t("assistant.import_csv.submit_failed"),
+      );
     } finally {
       setIsSubmitting(false);
     }
-  }, [transactions, selectedAccountId, threadId, toolCallId, onSuccess]);
+  }, [transactions, selectedAccountId, threadId, toolCallId, onSuccess, t]);
 
   return (
     <Card className="bg-muted/40 border-primary/10">
@@ -728,7 +747,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icons.FileSpreadsheet className="text-primary h-5 w-5" />
-            <CardTitle className="text-base">CSV Import Preview</CardTitle>
+            <CardTitle className="text-base">{t("assistant.import_csv.preview_title")}</CardTitle>
             <MappingQualityBadge
               mapping={data.appliedMapping}
               usedSavedProfile={data.usedSavedProfile}
@@ -743,10 +762,12 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
 
         {/* Account selector */}
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-sm">Target account:</span>
+          <span className="text-muted-foreground text-sm">
+            {t("assistant.import_csv.target_account")}
+          </span>
           <Select value={selectedAccountId ?? ""} onValueChange={handleAccountChange}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select account" />
+              <SelectValue placeholder={t("activity.import.upload.select_account")} />
             </SelectTrigger>
             <SelectContent>
               {data.availableAccounts.map((account) => (
@@ -763,7 +784,10 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
           <div className="border-warning/50 bg-warning/10 text-warning flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
             <Icons.AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
-              CSV was truncated. Showing first {transactions.length} of {data.totalRows} rows.
+              {t("assistant.import_csv.truncated", {
+                shown: transactions.length,
+                total: data.totalRows ?? transactions.length,
+              })}
             </span>
           </div>
         )}
@@ -790,7 +814,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
           <div className="text-muted-foreground text-xs">
             {errorCount > 0 && (
               <span className="text-destructive">
-                {errorCount} row{errorCount > 1 ? "s" : ""} with errors will be skipped
+                {t("assistant.import_csv.rows_errors_skipped", { count: errorCount })}
               </span>
             )}
           </div>
@@ -800,7 +824,7 @@ function ImportForm({ data, toolCallId, onSuccess }: ImportFormProps) {
             ) : (
               <Icons.Download className="mr-2 h-4 w-4" />
             )}
-            Import {validCount} Activities
+            {t("assistant.import_csv.import_button", { count: validCount })}
           </Button>
         </div>
 
@@ -834,19 +858,17 @@ interface AbstainStateProps {
 }
 
 function AbstainState({ globalErrors }: AbstainStateProps) {
+  const { t } = useTranslation("common");
   return (
     <Card className="border-warning/30 bg-warning/5">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Icons.AlertTriangle className="text-warning h-5 w-5" />
-          <CardTitle className="text-base">Manual Mapping Required</CardTitle>
+          <CardTitle className="text-base">{t("assistant.import_csv.abstain_title")}</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-muted-foreground text-sm">
-          The AI was unable to confidently map the CSV columns. Please use the manual import flow or
-          provide more context about your CSV format.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("assistant.import_csv.abstain_description")}</p>
         {globalErrors.length > 0 && (
           <ul className="text-muted-foreground list-inside list-disc text-sm">
             {globalErrors.map((err, i) => (
@@ -860,7 +882,7 @@ function AbstainState({ globalErrors }: AbstainStateProps) {
           onClick={() => window.open("/activities/import", "_blank")}
         >
           <Icons.ExternalLink className="mr-2 h-4 w-4" />
-          Use Manual Import
+          {t("assistant.import_csv.abstain_manual_import")}
         </Button>
       </CardContent>
     </Card>
@@ -874,6 +896,7 @@ function AbstainState({ globalErrors }: AbstainStateProps) {
 type ImportCsvToolUIContentProps = ToolCallMessagePartProps<ImportCsvArgs, ImportCsvOutput>;
 
 function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIContentProps) {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -895,9 +918,11 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">Failed to parse CSV</p>
+          <p className="text-destructive text-sm font-medium">
+            {t("assistant.import_csv.parse_failed_title")}
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            The request was interrupted or failed.
+            {t("assistant.import_csv.parse_failed_description")}
           </p>
         </CardContent>
       </Card>
@@ -908,7 +933,9 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-destructive/30 bg-destructive/5">
         <CardContent className="py-4">
-          <p className="text-destructive text-sm font-medium">No import data available</p>
+          <p className="text-destructive text-sm font-medium">
+            {t("assistant.import_csv.no_data_title")}
+          </p>
         </CardContent>
       </Card>
     );
@@ -927,9 +954,11 @@ function ImportCsvToolUIContent({ result, status, toolCallId }: ImportCsvToolUIC
     return (
       <Card className="border-warning/30 bg-warning/5">
         <CardContent className="py-4">
-          <p className="text-warning text-sm font-medium">No activities found in CSV</p>
+          <p className="text-warning text-sm font-medium">
+            {t("assistant.import_csv.empty_csv_title")}
+          </p>
           <p className="text-muted-foreground mt-1 text-xs">
-            The CSV file was parsed but no valid activity rows were detected.
+            {t("assistant.import_csv.empty_csv_description")}
           </p>
         </CardContent>
       </Card>

@@ -19,6 +19,7 @@ import {
 } from "@/hooks/use-updater";
 import { Icons } from "@wealthfolio/ui";
 import { usePersistentState } from "@wealthfolio/ui/hooks/use-persistent-state";
+import { useTranslation } from "react-i18next";
 
 interface DismissedUpdate {
   version: string;
@@ -56,6 +57,7 @@ function formatReleaseDate(pubDate?: string) {
 }
 
 export function UpdateDialog() {
+  const { t } = useTranslation("common");
   const { data: updateInfo } = useCheckUpdateOnStartup();
   const clearUpdate = useClearUpdate();
   const [isOpen, setIsOpen] = useState(false);
@@ -115,8 +117,8 @@ export function UpdateDialog() {
       await openUrlInBrowser(updateInfo.storeUrl);
     } catch (error) {
       toast({
-        title: "Unable to open the link",
-        description: "Try opening the link manually.",
+        title: t("update_dialog.toast_open_link_failed_title"),
+        description: t("update_dialog.toast_open_link_failed_desc"),
         variant: "destructive",
       });
       console.error("Failed to open store for update", error);
@@ -130,8 +132,8 @@ export function UpdateDialog() {
       await openUrlInBrowser(updateInfo.changelogUrl);
     } catch (error) {
       toast({
-        title: "Unable to open changelog",
-        description: "Try opening the changelog manually in your browser.",
+        title: t("update_dialog.toast_changelog_failed_title"),
+        description: t("update_dialog.toast_changelog_failed_desc"),
         variant: "destructive",
       });
       console.error("Failed to open changelog", error);
@@ -159,7 +161,7 @@ export function UpdateDialog() {
             <button
               onClick={handleDismiss}
               className="bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground absolute right-4 top-4 rounded-full p-2 transition-all duration-200 hover:scale-105"
-              aria-label="Close dialog"
+              aria-label={t("update_dialog.close_aria")}
             >
               <Icons.Close className="h-4 w-4" />
             </button>
@@ -197,7 +199,7 @@ export function UpdateDialog() {
                       <div className="border-border bg-secondary/30 relative aspect-video overflow-hidden rounded-xl border">
                         <img
                           src={screenshotUrl}
-                          alt={`Screenshot ${index + 1}`}
+                          alt={t("update_dialog.screenshot_alt", { index: index + 1 })}
                           className="object-cover"
                         />
                       </div>
@@ -223,7 +225,7 @@ export function UpdateDialog() {
               {phase === "downloading" ? (
                 <>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Downloading update...</span>
+                    <span className="text-muted-foreground">{t("update_dialog.downloading")}</span>
                     <span className="text-muted-foreground tabular-nums">
                       {progress.total
                         ? `${formatBytes(progress.downloaded)} / ${formatBytes(progress.total)}`
@@ -240,7 +242,7 @@ export function UpdateDialog() {
               ) : (
                 <div className="flex items-center gap-2 text-sm">
                   <Icons.Spinner className="h-4 w-4 animate-spin" />
-                  <span className="text-muted-foreground">Installing update...</span>
+                  <span className="text-muted-foreground">{t("update_dialog.installing")}</span>
                 </div>
               )}
             </div>
@@ -248,20 +250,20 @@ export function UpdateDialog() {
             // Error state with retry
             <div className="flex items-center justify-between gap-4">
               <p className="text-destructive text-sm">
-                {error || "Update failed. Please try again."}
+                {error || t("update_dialog.error_default")}
               </p>
               <div className="flex items-center gap-3">
                 <Button variant="ghost" onClick={handleDismiss}>
-                  Close
+                  {t("update_dialog.close")}
                 </Button>
-                <Button onClick={handleInstall}>Retry</Button>
+                <Button onClick={handleInstall}>{t("update_dialog.retry")}</Button>
               </div>
             </div>
           ) : (
             // Default actions
             <div className="flex items-center justify-between gap-4">
               <Button variant="ghost" onClick={handleSnooze}>
-                Remind me later
+                {t("update_dialog.remind_later")}
               </Button>
               <div className="flex items-center gap-3">
                 {updateInfo.changelogUrl && (
@@ -272,18 +274,18 @@ export function UpdateDialog() {
                 {isDesktopEnv ? (
                   updateInfo.isAppStoreBuild ? (
                     <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
-                      Open App Store
+                      {t("update_dialog.open_app_store")}
                     </Button>
                   ) : (
                     <Button onClick={handleInstall}>
                       <Icons.Download className="mr-2 h-4 w-4" />
-                      Update Now
+                      {t("update_dialog.update_now")}
                     </Button>
                   )
                 ) : (
                   <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
                     <Icons.ExternalLink className="mr-2 h-4 w-4" />
-                    View Release
+                    {t("update_dialog.view_release")}
                   </Button>
                 )}
               </div>

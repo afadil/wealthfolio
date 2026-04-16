@@ -3,7 +3,7 @@
 //! These models are used for parsing the quoteSummary API responses
 //! which provide richer data than the standard quote endpoints.
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// Main response wrapper for quoteSummary API
 #[derive(Debug, Deserialize)]
@@ -82,6 +82,97 @@ pub struct YahooSummaryDetail {
     // Note: forward_pe, dividend_rate, beta, etc. exist but not in AssetProfile model
 }
 
+/// Parse `"19.26%"` / `"19.26"` into a percentage number (same scale as Yahoo `raw` when present).
+fn percent_from_fmt_string(s: &str) -> Option<f64> {
+    let t = s.trim().trim_end_matches('%').trim();
+    if t.is_empty() {
+        return None;
+    }
+    t.parse::<f64>().ok()
+}
+
+#[derive(Deserialize)]
+struct YahooHoldingPercentObject {
+    #[serde(default)]
+    raw: Option<f64>,
+    #[serde(default)]
+    fmt: Option<String>,
+}
+
+fn percent_from_holding_object(o: YahooHoldingPercentObject) -> Option<f64> {
+    if let Some(r) = o.raw {
+        return Some(r);
+    }
+    o.fmt.as_deref().and_then(percent_from_fmt_string)
+}
+
+/// Deserialize `holdingPercent` as a plain number, string, or `{ raw, fmt }` (Yahoo varies by symbol;
+/// TSX / wrapped ETFs often send `fmt` only without `raw`).
+fn deserialize_fund_holding_percent<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum HoldingPercent {
+        Number(f64),
+        String(String),
+        /// Prefer this over a `raw`-only struct so `fmt` is used when `raw` is null.
+        Object(YahooHoldingPercentObject),
+    }
+
+    match Option::<HoldingPercent>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(HoldingPercent::Number(n)) => Ok(Some(n)),
+        Some(HoldingPercent::String(s)) => Ok(percent_from_fmt_string(&s)),
+        Some(HoldingPercent::Object(o)) => Ok(percent_from_holding_object(o)),
+    }
+}
+
+/// Normalize Yahoo fund line weight to 0..1 (same scale as [`sectorWeightings`]).
+#[inline]
+pub(crate) fn normalize_fund_holding_weight(raw: f64) -> f64 {
+    if raw > 1.0 {
+        raw / 100.0
+    } else {
+        raw
+    }
+}
+
+/// Single line in the `holdings` array (top positions inside an ETF / fund).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct YahooFundHolding {
+    pub symbol: Option<String>,
+    /// Yahoo usually sends `holdingName`; some symbols use `companyName` or `longName`.
+    #[serde(default, alias = "companyName", alias = "longName")]
+    pub holding_name: Option<String>,
+    #[serde(
+        default,
+        alias = "pctOfAssets",
+        alias = "percentHeld",
+        deserialize_with = "deserialize_fund_holding_percent"
+    )]
+    pub holding_percent: Option<f64>,
+}
+
+impl YahooFundHolding {
+    /// Weight 0..1 for the shared `AssetProfile.sectors` JSON format.
+    pub fn weight_fraction(&self) -> Option<f64> {
+        self.holding_percent.map(normalize_fund_holding_weight)
+    }
+
+    pub fn line_label(&self) -> Option<String> {
+        let name = self.holding_name.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        let sym = self.symbol.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        match (name, sym) {
+            (Some(n), _) => Some(n.to_string()),
+            (None, Some(s)) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+}
+
 /// Top holdings data for ETFs and Mutual Funds
 /// Contains sector weightings and other fund-specific data
 #[derive(Debug, Deserialize)]
@@ -91,6 +182,9 @@ pub struct YahooTopHoldings {
     /// e.g., [{"technology": {"raw": 0.30}}, {"healthcare": {"raw": 0.15}}]
     #[serde(default)]
     pub sector_weightings: Vec<std::collections::HashMap<String, YahooPriceDetail>>,
+    /// Top equity/bond positions (common when `sectorWeightings` is empty, e.g. some TSX-listed ETFs).
+    #[serde(default)]
+    pub holdings: Vec<YahooFundHolding>,
 }
 
 #[cfg(test)]
@@ -207,5 +301,38 @@ mod tests {
         let json = r#"{"sectorWeightings": []}"#;
         let holdings: YahooTopHoldings = serde_json::from_str(json).unwrap();
         assert!(holdings.sector_weightings.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_top_holdings_positions_only() {
+        let json = r#"{
+            "sectorWeightings": [],
+            "holdings": [
+                {"holdingName": "Apple Inc", "symbol": "AAPL", "holdingPercent": 8.5},
+                {"holdingName": "Microsoft", "holdingPercent": {"raw": 7.2, "fmt": "7.2%"}}
+            ]
+        }"#;
+        let th: YahooTopHoldings = serde_json::from_str(json).unwrap();
+        assert!(th.sector_weightings.is_empty());
+        assert_eq!(th.holdings.len(), 2);
+        assert_eq!(th.holdings[0].line_label().as_deref(), Some("Apple Inc"));
+        assert_eq!(th.holdings[0].weight_fraction(), Some(0.085));
+        assert_eq!(th.holdings[1].line_label().as_deref(), Some("Microsoft"));
+        assert!((th.holdings[1].weight_fraction().unwrap() - 0.072).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_holding_percent_fmt_only_object() {
+        let json = r#"{"holdingName":"Hamilton","symbol":"HMAX.TO","holdingPercent":{"raw":null,"fmt":"19.26%"}}"#;
+        let h: YahooFundHolding = serde_json::from_str(json).unwrap();
+        let wf = h.weight_fraction().expect("weight");
+        assert!((wf - 0.1926).abs() < 1e-4, "got {wf}");
+    }
+
+    #[test]
+    fn test_holding_company_name_alias() {
+        let json = r#"{"companyName":"Hamilton Canadian","symbol":"HMAX.TO","holdingPercent":8.5}"#;
+        let h: YahooFundHolding = serde_json::from_str(json).unwrap();
+        assert_eq!(h.holding_name.as_deref(), Some("Hamilton Canadian"));
     }
 }

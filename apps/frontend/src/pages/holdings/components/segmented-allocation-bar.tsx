@@ -11,6 +11,7 @@ import {
 import { TaxonomyAllocation } from "@/lib/types";
 import { formatPercent, PrivacyAmount } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 interface SegmentedAllocationBarProps {
   title?: string;
@@ -29,6 +30,7 @@ export function SegmentedAllocationBar({
   onSegmentClick,
   compact = false,
 }: SegmentedAllocationBarProps) {
+  const { t } = useTranslation("common");
   const categories = useMemo(() => {
     if (!allocation?.categories?.length) return [];
     return allocation.categories.filter((cat) => cat.value > 0);
@@ -36,7 +38,7 @@ export function SegmentedAllocationBar({
 
   const total = useMemo(() => categories.reduce((sum, c) => sum + c.value, 0), [categories]);
 
-  const displayTitle = title || allocation?.taxonomyName || "Allocation";
+  const displayTitle = title || allocation?.taxonomyName || t("holdings.widgets.allocation_default");
 
   if (isLoading) {
     return (
@@ -68,7 +70,7 @@ export function SegmentedAllocationBar({
             <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
               {displayTitle}
             </p>
-            <span className="text-muted-foreground text-xs">No data</span>
+            <span className="text-muted-foreground text-xs">{t("holdings.widgets.segment_no_data")}</span>
           </div>
         </Card>
       );
@@ -83,8 +85,8 @@ export function SegmentedAllocationBar({
         <CardContent>
           <EmptyPlaceholder
             icon={<Icons.BarChart className="h-8 w-8" />}
-            title="No data"
-            description={`No ${displayTitle.toLowerCase()} assignments yet.`}
+            title={t("holdings.widgets.segment_empty_title")}
+            description={t("holdings.widgets.segment_empty_desc", { label: displayTitle })}
             className="py-4"
           />
         </CardContent>

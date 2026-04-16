@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { describe, it, expect } from "vitest";
 import { validateTransferFields, type TransferValidationInput } from "../mobile-activity-form";
 
@@ -29,7 +30,10 @@ describe("validateTransferFields", () => {
         // transferMode, isExternal, direction all undefined — simulates new form
         amount: undefined,
       });
-      expect(result).toEqual({ field: "amount", message: "Please enter an amount." });
+      expect(result).toEqual({
+        field: "amount",
+        message: i18n.t("activity.validation.transfer_amount"),
+      });
     });
 
     it("defaults isExternal to false and rejects missing toAccountId", () => {
@@ -40,7 +44,7 @@ describe("validateTransferFields", () => {
       });
       expect(result).toEqual({
         field: "toAccountId",
-        message: "Please select a destination account.",
+        message: i18n.t("activity.validation.transfer_destination"),
       });
     });
 
@@ -62,17 +66,26 @@ describe("validateTransferFields", () => {
         transferMode: "cash",
         amount: undefined,
       });
-      expect(result).toEqual({ field: "amount", message: "Please enter an amount." });
+      expect(result).toEqual({
+        field: "amount",
+        message: i18n.t("activity.validation.transfer_amount"),
+      });
     });
 
     it("rejects zero amount", () => {
       const result = validateTransferFields({ ...base, transferMode: "cash", amount: 0 });
-      expect(result).toEqual({ field: "amount", message: "Please enter an amount." });
+      expect(result).toEqual({
+        field: "amount",
+        message: i18n.t("activity.validation.transfer_amount"),
+      });
     });
 
     it("rejects negative amount", () => {
       const result = validateTransferFields({ ...base, transferMode: "cash", amount: -100 });
-      expect(result).toEqual({ field: "amount", message: "Please enter an amount." });
+      expect(result).toEqual({
+        field: "amount",
+        message: i18n.t("activity.validation.transfer_amount"),
+      });
     });
 
     it("accepts valid external cash transfer", () => {
@@ -103,27 +116,42 @@ describe("validateTransferFields", () => {
 
     it("rejects missing assetId", () => {
       const result = validateTransferFields({ ...securitiesBase, assetId: null });
-      expect(result).toEqual({ field: "assetId", message: "Please select a symbol." });
+      expect(result).toEqual({
+        field: "assetId",
+        message: i18n.t("activity.validation.transfer_symbol"),
+      });
     });
 
     it("rejects empty assetId", () => {
       const result = validateTransferFields({ ...securitiesBase, assetId: "  " });
-      expect(result).toEqual({ field: "assetId", message: "Please select a symbol." });
+      expect(result).toEqual({
+        field: "assetId",
+        message: i18n.t("activity.validation.transfer_symbol"),
+      });
     });
 
     it("rejects missing quantity", () => {
       const result = validateTransferFields({ ...securitiesBase, quantity: null });
-      expect(result).toEqual({ field: "quantity", message: "Please enter a quantity." });
+      expect(result).toEqual({
+        field: "quantity",
+        message: i18n.t("activity.validation.transfer_quantity"),
+      });
     });
 
     it("rejects zero quantity", () => {
       const result = validateTransferFields({ ...securitiesBase, quantity: 0 });
-      expect(result).toEqual({ field: "quantity", message: "Please enter a quantity." });
+      expect(result).toEqual({
+        field: "quantity",
+        message: i18n.t("activity.validation.transfer_quantity"),
+      });
     });
 
     it("rejects negative quantity", () => {
       const result = validateTransferFields({ ...securitiesBase, quantity: -5 });
-      expect(result).toEqual({ field: "quantity", message: "Please enter a quantity." });
+      expect(result).toEqual({
+        field: "quantity",
+        message: i18n.t("activity.validation.transfer_quantity"),
+      });
     });
 
     it("accepts external transfer out without unitPrice", () => {
@@ -143,7 +171,10 @@ describe("validateTransferFields", () => {
         direction: "in",
         unitPrice: null,
       });
-      expect(result).toEqual({ field: "unitPrice", message: "Please enter a cost basis." });
+      expect(result).toEqual({
+        field: "unitPrice",
+        message: i18n.t("activity.validation.transfer_cost_basis"),
+      });
     });
 
     it("rejects external transfer in with zero unitPrice", () => {
@@ -153,7 +184,10 @@ describe("validateTransferFields", () => {
         direction: "in",
         unitPrice: 0,
       });
-      expect(result).toEqual({ field: "unitPrice", message: "Please enter a cost basis." });
+      expect(result).toEqual({
+        field: "unitPrice",
+        message: i18n.t("activity.validation.transfer_cost_basis"),
+      });
     });
 
     it("accepts external transfer in with valid unitPrice", () => {
@@ -187,7 +221,7 @@ describe("validateTransferFields", () => {
       });
       expect(result).toEqual({
         field: "toAccountId",
-        message: "Please select a destination account.",
+        message: i18n.t("activity.validation.transfer_destination"),
       });
     });
 
@@ -199,7 +233,7 @@ describe("validateTransferFields", () => {
       });
       expect(result).toEqual({
         field: "toAccountId",
-        message: "Please select a destination account.",
+        message: i18n.t("activity.validation.transfer_destination"),
       });
     });
 

@@ -4,6 +4,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { isPathActive } from "./app-navigation";
 
@@ -12,13 +13,16 @@ interface ConnectNavItemProps {
 }
 
 export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
+  const { t } = useTranslation("common");
   const location = useLocation();
   const { status, lastSyncTime } = useAggregatedSyncStatus();
   const isActive = isPathActive(location.pathname, "/connect");
 
   const tooltipContent = lastSyncTime
-    ? `Connect - Last synced ${formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true })}`
-    : "Connect";
+    ? t("nav.connect.tooltip_last_sync", {
+        time: formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true }),
+      })
+    : t("nav.connect.title");
 
   return (
     <Tooltip>
@@ -31,7 +35,7 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
             collapsed ? "justify-center" : "justify-start",
           )}
         >
-          <Link to="/connect" title="Connect" aria-current={isActive ? "page" : undefined}>
+          <Link to="/connect" title={t("nav.connect.title")} aria-current={isActive ? "page" : undefined}>
             <span aria-hidden="true">
               <SyncStatusIcon status={status} className="size-5" />
             </span>
@@ -43,7 +47,7 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
                 "block opacity-100": !collapsed,
               })}
             >
-              Connect
+              {t("nav.connect.title")}
             </span>
           </Link>
         </Button>

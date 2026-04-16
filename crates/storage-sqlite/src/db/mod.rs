@@ -234,8 +234,9 @@ pub fn restore_database(app_data_dir: &str, backup_file_path: &str) -> Result<()
 
     // Verify backup file exists
     if !Path::new(backup_file_path).exists() {
+        // Stable token; localized in the Tauri command layer (see utilities + shell.json).
         return Err(Error::Database(DatabaseError::BackupFailed(
-            "Backup file not found".to_string(),
+            "BACKUP_FILE_NOT_FOUND".to_string(),
         )));
     }
 

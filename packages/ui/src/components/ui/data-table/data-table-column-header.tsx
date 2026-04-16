@@ -1,4 +1,5 @@
 import { Column } from "@tanstack/react-table";
+import { useTranslation } from "react-i18next";
 import { Button } from "../button";
 import {
   DropdownMenu,
@@ -22,6 +23,8 @@ export function DataTableColumnHeader<TData, TValue>({
   title,
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
+  const { t } = useTranslation("common");
+
   if (!column.getCanSort()) {
     return <div className={cn(className)}>{title}</div>;
   }
@@ -43,18 +46,18 @@ export function DataTableColumnHeader<TData, TValue>({
         <DropdownMenuContent align="start">
           <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
             <Icons.ArrowUp className="text-muted-foreground/70 mr-2 h-3.5 w-3.5" />
-            Asc
+            {t("ui.data_table.sort_asc")}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
             <Icons.ArrowDown className="text-muted-foreground/70 mr-2 h-3.5 w-3.5" />
-            Desc
+            {t("ui.data_table.sort_desc")}
           </DropdownMenuItem>
           {!!column.getCanHide() && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
                 <Icons.EyeOff className="text-muted-foreground/70 mr-2 h-3.5 w-3.5" />
-                Hide
+                {t("ui.data_table.hide_column")}
               </DropdownMenuItem>
             </>
           )}

@@ -7,12 +7,15 @@ import {
   useDataGrid,
   formatAmount,
 } from "@wealthfolio/ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import type { AssetKind, Quote } from "@/lib/types";
 import { QuoteHistoryToolbar } from "./quote-history-toolbar";
 import { format } from "date-fns";
+import { useDataGridColumnHeaderMenuLabels } from "@/hooks/use-data-grid-column-header-labels";
+import { useDataGridTableOverlayLabels } from "@/hooks/use-data-grid-table-overlay-labels";
 import { useIsMobileViewport } from "@/hooks/use-platform";
+import { useTranslation } from "react-i18next";
 
 // Helper to normalize date values (handles both Date objects and strings from DateCell)
 const normalizeDate = (value: Date | string): Date => {
@@ -68,6 +71,12 @@ interface QuoteHistoryDataGridProps {
   onDeleteQuote: (quoteId: string) => void;
   /** Callback to change data source mode */
   onChangeDataSource?: (isManual: boolean) => void;
+  /** ISO timestamp from chart / deep link; pair with `jumpRequestId` */
+  jumpToQuoteAt?: string | null;
+  /** Increment when `jumpToQuoteAt` should be applied (e.g. chart click). */
+  jumpRequestId?: number;
+  /** Called after the jump was applied or if no matching row exists. */
+  onQuoteJumpHandled?: () => void;
 }
 
 // Generate a temporary ID for new entries
@@ -130,7 +139,14 @@ export function QuoteHistoryDataGrid({
   onSaveQuote,
   onDeleteQuote,
   onChangeDataSource,
+  jumpToQuoteAt = null,
+  jumpRequestId = 0,
+  onQuoteJumpHandled,
 }: QuoteHistoryDataGridProps) {
+  const { t } = useTranslation();
+  const { t: tCommon } = useTranslation("common");
+  const columnHeaderMenuLabels = useDataGridColumnHeaderMenuLabels();
+  const { contextMenuLabels, pasteDialogLabels, searchLabels } = useDataGridTableOverlayLabels();
   const isMobile = useIsMobileViewport();
   // Get decimal precision based on asset kind
   const decimalPrecision = getDecimalPrecision(assetKind);
@@ -147,6 +163,13 @@ export function QuoteHistoryDataGrid({
   const [localEntries, setLocalEntries] = useState<QuoteEntry[]>(initialEntries);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [scrollToCellRequest, setScrollToCellRequest] = useState<{
+    rowIndex: number;
+    columnId: string;
+    nonce: number;
+    scrollAlign?: "start" | "center" | "end";
+  } | null>(null);
+  const processedJumpIdRef = useRef<number | null>(null);
 
   // Sync with external data changes
   useMemo(() => {
@@ -184,32 +207,32 @@ export function QuoteHistoryDataGrid({
   const columns = useMemo(
     () => [
       columnHelper.accessor("date", {
-        header: "Date",
+        header: t("settings.securities.quote_history.date"),
         size: 140,
         meta: { cell: { variant: "date-input" } },
       }),
       columnHelper.accessor("open", {
-        header: "Open",
+        header: t("settings.securities.quote_history.open"),
         size: 120,
         meta: { cell: { variant: "number", min: 0, step: stepValue } },
       }),
       columnHelper.accessor("high", {
-        header: "High",
+        header: t("settings.securities.quote_history.high"),
         size: 120,
         meta: { cell: { variant: "number", min: 0, step: stepValue } },
       }),
       columnHelper.accessor("low", {
-        header: "Low",
+        header: t("settings.securities.quote_history.low"),
         size: 120,
         meta: { cell: { variant: "number", min: 0, step: stepValue } },
       }),
       columnHelper.accessor("close", {
-        header: "Close",
+        header: t("settings.securities.quote_history.close"),
         size: 120,
         meta: { cell: { variant: "number", min: 0, step: stepValue } },
       }),
       columnHelper.accessor("volume", {
-        header: "Volume",
+        header: t("settings.securities.quote_history.volume"),
         size: 120,
         meta: { cell: { variant: "number", min: 0 } },
       }),
@@ -239,7 +262,7 @@ export function QuoteHistoryDataGrid({
           ]
         : []),
     ],
-    [columnHelper, stepValue, isManualDataSource, handleDeleteRow],
+    [columnHelper, stepValue, isManualDataSource, handleDeleteRow, t],
   );
 
   // Handle data changes from the grid
@@ -357,10 +380,16 @@ export function QuoteHistoryDataGrid({
     enableSorting: true,
     enableSearch: true,
     enablePaste: true,
+    columnHeaderMenuLabels,
+    contextMenuLabels,
+    pasteDialogLabels,
+    searchLabels,
+    addRowLabel: tCommon("activity.data_grid.add_row"),
     onDataChange,
     onRowAdd,
     onRowsAdd,
     onRowsDelete,
+    scrollToCellRequest,
     initialState: {
       sorting: [{ id: "date", desc: true }],
     },
@@ -413,6 +442,55 @@ export function QuoteHistoryDataGrid({
     () => [...localEntries].sort((a, b) => b.date.getTime() - a.date.getTime()),
     [localEntries],
   );
+
+  useEffect(() => {
+    if (!jumpToQuoteAt || !jumpRequestId) return;
+    if (processedJumpIdRef.current === jumpRequestId) return;
+    processedJumpIdRef.current = jumpRequestId;
+
+    const targetKey = format(new Date(jumpToQuoteAt), "yyyy-MM-dd");
+
+    if (isMobile) {
+      const index = sortedEntries.findIndex((e) => format(e.date, "yyyy-MM-dd") === targetKey);
+      if (index >= 0) {
+        setMobilePage(Math.floor(index / MOBILE_PAGE_SIZE));
+        queueMicrotask(() => {
+          document
+            .querySelector<HTMLElement>(`[data-quote-jump-date="${targetKey}"]`)
+            ?.scrollIntoView({ block: "start", behavior: "smooth" });
+        });
+      }
+      onQuoteJumpHandled?.();
+      return;
+    }
+
+    const rows = dataGrid.table.getRowModel().rows;
+    const idx = rows.findIndex((r) => format(r.original.date, "yyyy-MM-dd") === targetKey);
+    if (idx < 0) {
+      onQuoteJumpHandled?.();
+      return;
+    }
+
+    setScrollToCellRequest({
+      rowIndex: idx,
+      columnId: "date",
+      nonce: jumpRequestId,
+      scrollAlign: "start",
+    });
+    const timer = window.setTimeout(() => {
+      setScrollToCellRequest(null);
+      onQuoteJumpHandled?.();
+    }, 550);
+    return () => window.clearTimeout(timer);
+  }, [
+    jumpToQuoteAt,
+    jumpRequestId,
+    isMobile,
+    sortedEntries,
+    dataGrid.table,
+    onQuoteJumpHandled,
+  ]);
+
   const mobilePageCount = Math.max(1, Math.ceil(sortedEntries.length / MOBILE_PAGE_SIZE));
   const mobilePageEntries = sortedEntries.slice(
     mobilePage * MOBILE_PAGE_SIZE,
@@ -455,17 +533,25 @@ export function QuoteHistoryDataGrid({
 
         <div className="divide-y rounded-md border">
           {mobilePageEntries.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-center text-sm">No quotes available.</p>
+            <p className="text-muted-foreground p-6 text-center text-sm">
+              {t("settings.securities.table.no_quotes")}
+            </p>
           ) : (
             mobilePageEntries.map((entry) => {
               const isEditing = mobileEditingId === entry.id;
 
               if (isEditing && isManualDataSource) {
                 return (
-                  <div key={entry.id} className="bg-muted/30 space-y-3 p-3">
+                  <div
+                    key={entry.id}
+                    className="bg-muted/30 space-y-3 p-3"
+                    data-quote-jump-date={format(entry.date, "yyyy-MM-dd")}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium uppercase tracking-wide">
-                        {entry.isNew ? "New Quote" : "Edit Quote"}
+                        {entry.isNew
+                          ? t("settings.securities.quote_history.new_quote")
+                          : t("settings.securities.quote_history.edit_quote")}
                       </span>
                       <div className="flex gap-1">
                         <Button
@@ -480,7 +566,9 @@ export function QuoteHistoryDataGrid({
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <label className="text-muted-foreground mb-1 block text-xs">Date</label>
+                        <label className="text-muted-foreground mb-1 block text-xs">
+                          {t("settings.securities.quote_history.date")}
+                        </label>
                         <DatePickerInput
                           value={entry.date}
                           onChange={(date) =>
@@ -490,7 +578,9 @@ export function QuoteHistoryDataGrid({
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">Close</label>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            {t("settings.securities.quote_history.close")}
+                          </label>
                           <Input
                             type="number"
                             value={entry.close || ""}
@@ -506,7 +596,9 @@ export function QuoteHistoryDataGrid({
                           />
                         </div>
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">Open</label>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            {t("settings.securities.quote_history.open")}
+                          </label>
                           <Input
                             type="number"
                             value={entry.open || ""}
@@ -522,7 +614,9 @@ export function QuoteHistoryDataGrid({
                           />
                         </div>
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">High</label>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            {t("settings.securities.quote_history.high")}
+                          </label>
                           <Input
                             type="number"
                             value={entry.high || ""}
@@ -538,7 +632,9 @@ export function QuoteHistoryDataGrid({
                           />
                         </div>
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">Low</label>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            {t("settings.securities.quote_history.low")}
+                          </label>
                           <Input
                             type="number"
                             value={entry.low || ""}
@@ -554,7 +650,9 @@ export function QuoteHistoryDataGrid({
                           />
                         </div>
                         <div>
-                          <label className="text-muted-foreground mb-1 block text-xs">Volume</label>
+                          <label className="text-muted-foreground mb-1 block text-xs">
+                            {t("settings.securities.quote_history.volume")}
+                          </label>
                           <Input
                             type="number"
                             value={entry.volume || ""}
@@ -578,6 +676,7 @@ export function QuoteHistoryDataGrid({
                 <div
                   key={entry.id}
                   className={`space-y-1.5 p-3 ${isManualDataSource ? "active:bg-muted/40 cursor-pointer" : ""}`}
+                  data-quote-jump-date={format(entry.date, "yyyy-MM-dd")}
                   onClick={isManualDataSource ? () => setMobileEditingId(entry.id) : undefined}
                 >
                   <div className="flex items-center justify-between">
@@ -603,25 +702,25 @@ export function QuoteHistoryDataGrid({
                   </div>
                   <div className="text-muted-foreground grid grid-cols-4 gap-x-2 text-xs">
                     <div>
-                      <span className="block">Open</span>
+                      <span className="block">{t("settings.securities.quote_history.open")}</span>
                       <span className="text-foreground">
                         {formatAmount(entry.open, entry.currency, false)}
                       </span>
                     </div>
                     <div>
-                      <span className="block">High</span>
+                      <span className="block">{t("settings.securities.quote_history.high")}</span>
                       <span className="text-foreground">
                         {formatAmount(entry.high, entry.currency, false)}
                       </span>
                     </div>
                     <div>
-                      <span className="block">Low</span>
+                      <span className="block">{t("settings.securities.quote_history.low")}</span>
                       <span className="text-foreground">
                         {formatAmount(entry.low, entry.currency, false)}
                       </span>
                     </div>
                     <div>
-                      <span className="block">Vol</span>
+                      <span className="block">{t("settings.securities.quote_history.vol_short")}</span>
                       <span className="text-foreground">{entry.volume.toLocaleString()}</span>
                     </div>
                   </div>
@@ -635,7 +734,10 @@ export function QuoteHistoryDataGrid({
         {mobilePageCount > 1 && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              Page {mobilePage + 1} of {mobilePageCount}
+              {t("settings.securities.quote_history.page_of", {
+                current: mobilePage + 1,
+                total: mobilePageCount,
+              })}
             </span>
             <div className="flex gap-2">
               <Button
@@ -644,7 +746,7 @@ export function QuoteHistoryDataGrid({
                 onClick={() => setMobilePage((p) => p - 1)}
                 disabled={mobilePage === 0}
               >
-                Previous
+                {t("settings.shared.previous")}
               </Button>
               <Button
                 variant="outline"
@@ -652,7 +754,7 @@ export function QuoteHistoryDataGrid({
                 onClick={() => setMobilePage((p) => p + 1)}
                 disabled={mobilePage >= mobilePageCount - 1}
               >
-                Next
+                {t("settings.shared.next")}
               </Button>
             </div>
           </div>

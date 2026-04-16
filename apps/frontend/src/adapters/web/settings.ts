@@ -174,3 +174,6 @@ export const getPlatform = (): Promise<PlatformInfo> => {
     },
   });
 };
+
+/** No-op on web (no native shell). */
+export async function syncShellLocale(_locale: string): Promise<void> {}

@@ -7,32 +7,34 @@ import {
   CardTitle,
 } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { useTranslation } from "react-i18next";
 import { useBackupRestore } from "./use-backup-restore";
 
-const desktopNotes = [
-  "Backup includes WAL and SHM files for complete data integrity.",
-  "Restore will replace ALL current data with backup data.",
-  "A pre-restore backup is automatically created before restoration.",
-  "You will be prompted to restart the application after restoration.",
-] as const;
-
-const webNotes = [
-  "Backups include WAL and SHM files and are stored in the server data directory.",
-  "Download or copy backup files directly from the host environment when needed.",
-  "Restores are only available in the desktop application.",
-  "Create backups regularly, especially before bulk imports or migrations.",
-] as const;
-
-const mobileNotes = [
-  "Backups include WAL and SHM files for complete data integrity.",
-  "When you tap backup, the native share sheet opens so you can Save to Files.",
-  "Restore is available on iOS and desktop.",
-  "Create backups regularly, especially before bulk imports or migrations.",
-] as const;
-
 export const BackupRestoreForm = () => {
+  const { t } = useTranslation("common");
   const { performBackup, performRestore, isBackingUp, isRestoring, canRestore, platformMode } =
     useBackupRestore();
+
+  const desktopNotes = [
+    t("settings.exports.note_desktop_1"),
+    t("settings.exports.note_desktop_2"),
+    t("settings.exports.note_desktop_3"),
+    t("settings.exports.note_desktop_4"),
+  ] as const;
+
+  const webNotes = [
+    t("settings.exports.note_web_1"),
+    t("settings.exports.note_web_2"),
+    t("settings.exports.note_web_3"),
+    t("settings.exports.note_web_4"),
+  ] as const;
+
+  const mobileNotes = [
+    t("settings.exports.note_mobile_1"),
+    t("settings.exports.note_mobile_2"),
+    t("settings.exports.note_mobile_3"),
+    t("settings.exports.note_mobile_4"),
+  ] as const;
 
   return platformMode === "desktop" ? (
     <DesktopBackupPanel
@@ -40,6 +42,8 @@ export const BackupRestoreForm = () => {
       performRestore={performRestore}
       isBackingUp={isBackingUp}
       isRestoring={isRestoring}
+      notes={desktopNotes}
+      t={t}
     />
   ) : platformMode === "mobile" ? (
     <MobileBackupPanel
@@ -48,9 +52,11 @@ export const BackupRestoreForm = () => {
       isBackingUp={isBackingUp}
       isRestoring={isRestoring}
       canRestore={canRestore}
+      notes={mobileNotes}
+      t={t}
     />
   ) : (
-    <WebBackupPanel performBackup={performBackup} isBackingUp={isBackingUp} />
+    <WebBackupPanel performBackup={performBackup} isBackingUp={isBackingUp} notes={webNotes} t={t} />
   );
 };
 
@@ -59,6 +65,8 @@ interface DesktopPanelProps {
   performRestore: () => Promise<void>;
   isBackingUp: boolean;
   isRestoring: boolean;
+  notes: readonly string[];
+  t: (key: string) => string;
 }
 
 const DesktopBackupPanel = ({
@@ -66,30 +74,32 @@ const DesktopBackupPanel = ({
   performRestore,
   isBackingUp,
   isRestoring,
+  notes,
+  t,
 }: DesktopPanelProps) => {
   return (
     <div className="space-y-6">
-      <PanelIntro />
+      <PanelIntro t={t} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <BackupCard
-          title="Create Backup"
-          description="Create a complete backup of your database, including WAL and SHM files, and save it to any folder you choose."
+          title={t("settings.exports.create_backup")}
+          description={t("settings.exports.create_backup_desc_desktop")}
           isLoading={isBackingUp}
           disabled={isBackingUp || isRestoring}
-          actionLabel="Backup Database"
+          actionLabel={t("settings.exports.backup_database")}
           onAction={performBackup}
+          t={t}
         />
 
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Icons.DatabaseBackup className="h-5 w-5" />
-              Restore Backup
+              {t("settings.exports.restore_backup")}
             </CardTitle>
             <CardDescription>
-              Restore your database from a previous backup file. This will replace all current data.
-              Then restart the application to apply changes.
+              {t("settings.exports.restore_backup_desc_desktop")}
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
@@ -102,12 +112,12 @@ const DesktopBackupPanel = ({
               {isRestoring ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Restoring...
+                  {t("settings.exports.restoring")}
                 </>
               ) : (
                 <>
                   <Icons.Import className="mr-2 h-4 w-4" />
-                  Restore Database
+                  {t("settings.exports.restore_database")}
                 </>
               )}
             </Button>
@@ -115,7 +125,7 @@ const DesktopBackupPanel = ({
         </Card>
       </div>
 
-      <ImportantNotes notes={desktopNotes} />
+      <ImportantNotes notes={notes} t={t} />
     </div>
   );
 };
@@ -123,23 +133,26 @@ const DesktopBackupPanel = ({
 interface WebPanelProps {
   performBackup: () => Promise<void>;
   isBackingUp: boolean;
+  notes: readonly string[];
+  t: (key: string) => string;
 }
 
-const WebBackupPanel = ({ performBackup, isBackingUp }: WebPanelProps) => {
+const WebBackupPanel = ({ performBackup, isBackingUp, notes, t }: WebPanelProps) => {
   return (
     <div className="space-y-6">
-      <PanelIntro />
+      <PanelIntro t={t} />
 
       <BackupCard
-        title="Create Backup"
-        description="Create a complete backup with WAL and SHM files stored automatically in the server data directory for safekeeping."
+        title={t("settings.exports.create_backup")}
+        description={t("settings.exports.create_backup_desc_web")}
         isLoading={isBackingUp}
         disabled={isBackingUp}
-        actionLabel="Backup Database"
+        actionLabel={t("settings.exports.backup_database")}
         onAction={performBackup}
+        t={t}
       />
 
-      <ImportantNotes notes={webNotes} />
+      <ImportantNotes notes={notes} t={t} />
     </div>
   );
 };
@@ -156,31 +169,34 @@ const MobileBackupPanel = ({
   isBackingUp,
   isRestoring,
   canRestore,
+  notes,
+  t,
 }: MobilePanelProps) => {
   return (
     <div className="space-y-6">
-      <PanelIntro />
+      <PanelIntro t={t} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <BackupCard
-          title="Create Backup"
-          description="Create a complete backup and choose destination via the native share sheet."
+          title={t("settings.exports.create_backup")}
+          description={t("settings.exports.create_backup_desc_mobile")}
           isLoading={isBackingUp}
           disabled={isBackingUp}
-          actionLabel="Backup Database"
+          actionLabel={t("settings.exports.backup_database")}
           onAction={performBackup}
+          t={t}
         />
 
         <Card className="flex h-full flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Icons.DatabaseBackup className="h-5 w-5" />
-              Restore Backup
+              {t("settings.exports.restore_backup")}
             </CardTitle>
             <CardDescription>
               {canRestore
-                ? "Restore your database from a previous backup file. This will replace all current data."
-                : "Restore is currently available on desktop and iOS only."}
+                ? t("settings.exports.restore_backup_desc_mobile")
+                : t("settings.exports.restore_unavailable_mobile")}
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-auto">
@@ -193,12 +209,12 @@ const MobileBackupPanel = ({
               {isRestoring ? (
                 <>
                   <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Restoring...
+                  {t("settings.exports.restoring")}
                 </>
               ) : (
                 <>
                   <Icons.Import className="mr-2 h-4 w-4" />
-                  Restore Database
+                  {t("settings.exports.restore_database")}
                 </>
               )}
             </Button>
@@ -206,17 +222,15 @@ const MobileBackupPanel = ({
         </Card>
       </div>
 
-      <ImportantNotes notes={mobileNotes} />
+      <ImportantNotes notes={notes} t={t} />
     </div>
   );
 };
 
-const PanelIntro = () => (
+const PanelIntro = ({ t }: { t: (key: string) => string }) => (
   <div>
-    <h3 className="text-lg font-semibold">Database Backup & Restore</h3>
-    <p className="text-muted-foreground text-sm">
-      Create complete database backups and restore from previous backups.
-    </p>
+    <h3 className="text-lg font-semibold">{t("settings.exports.panel_title")}</h3>
+    <p className="text-muted-foreground text-sm">{t("settings.exports.panel_description")}</p>
   </div>
 );
 
@@ -227,6 +241,7 @@ interface BackupCardProps {
   isLoading: boolean;
   actionLabel: string;
   disabled?: boolean;
+  t: (key: string) => string;
 }
 
 const BackupCard = ({
@@ -236,6 +251,7 @@ const BackupCard = ({
   isLoading,
   actionLabel,
   disabled,
+  t,
 }: BackupCardProps) => (
   <Card className="flex h-full flex-col">
     <CardHeader>
@@ -250,7 +266,7 @@ const BackupCard = ({
         {isLoading ? (
           <>
             <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-            Creating Backup...
+            {t("settings.exports.creating_backup")}
           </>
         ) : (
           <>
@@ -263,13 +279,15 @@ const BackupCard = ({
   </Card>
 );
 
-const ImportantNotes = ({ notes }: { notes: readonly string[] }) => (
+const ImportantNotes = ({ notes, t }: { notes: readonly string[]; t: (key: string) => string }) => (
   <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
     <CardContent className="pt-6">
       <div className="flex items-start gap-3">
         <Icons.AlertTriangle className="mt-0.5 h-5 w-5 text-orange-600" />
         <div className="text-sm">
-          <p className="font-medium text-orange-800 dark:text-orange-200">Important Notes:</p>
+          <p className="font-medium text-orange-800 dark:text-orange-200">
+            {t("settings.exports.important_notes")}
+          </p>
           <ul className="mt-2 list-inside list-disc space-y-1 text-orange-700 dark:text-orange-300">
             {notes.map((note) => (
               <li key={note}>{note}</li>

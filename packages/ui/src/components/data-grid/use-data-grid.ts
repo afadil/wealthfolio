@@ -21,6 +21,10 @@ import { toast } from "sonner";
 import type {
   CellPosition,
   ContextMenuState,
+  DataGridColumnHeaderMenuLabels,
+  DataGridContextMenuLabels,
+  DataGridPasteDialogLabels,
+  DataGridSearchLabels,
   Direction,
   FileCellData,
   NavigationDirection,
@@ -109,10 +113,18 @@ function useStore<T>(store: DataGridStore, selector: (state: DataGridState) => T
   return React.useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
-interface UseDataGridProps<TData> extends Omit<
+type UseDataGridProps<TData> = Omit<
   TableOptions<TData>,
   "pageCount" | "getCoreRowModel"
-> {
+> & {
+  /** Labels for the column header dropdown (sort / pin / hide / resize). Merged into table `meta`. */
+  columnHeaderMenuLabels?: Partial<DataGridColumnHeaderMenuLabels>;
+  /** Labels for cell context menu (copy / cut / paste / …). Merged into table `meta`. */
+  contextMenuLabels?: Partial<DataGridContextMenuLabels>;
+  /** Labels for paste row-expansion dialog. Merged into table `meta`. */
+  pasteDialogLabels?: Partial<DataGridPasteDialogLabels>;
+  /** Labels for in-grid search (Ctrl+F). */
+  searchLabels?: Partial<DataGridSearchLabels>;
   onDataChange?: (data: TData[]) => void;
   onRowAdd?: (
     event?: React.MouseEvent<HTMLDivElement>,
@@ -141,7 +153,20 @@ interface UseDataGridProps<TData> extends Omit<
   readOnly?: boolean;
   /** When true, sorting is handled externally (server-side). Rows won't re-sort during edits. */
   manualSorting?: boolean;
-}
+  /** Footer label for the add-row control (e.g. i18n). */
+  addRowLabel?: string;
+  /**
+   * Imperative scroll + focus: set a new `nonce` when the target row should be revealed
+   * (e.g. after switching tabs). Cleared by the caller after handling.
+   */
+  scrollToCellRequest?: {
+    rowIndex: number;
+    columnId?: string;
+    nonce: number;
+    /** Passed to the row virtualizer (`scrollToIndex`). Defaults to start/end by row index. */
+    scrollAlign?: "start" | "center" | "end";
+  } | null;
+};
 
 function useDataGrid<TData>({
   data,
@@ -151,6 +176,12 @@ function useDataGrid<TData>({
   rowHeight: rowHeightProp = DEFAULT_ROW_HEIGHT,
   dir: dirProp,
   initialState,
+  columnHeaderMenuLabels,
+  contextMenuLabels,
+  pasteDialogLabels,
+  searchLabels,
+  addRowLabel,
+  scrollToCellRequest,
   ...props
 }: UseDataGridProps<TData>) {
   const dir = useDirection(dirProp);
@@ -165,6 +196,11 @@ function useDataGrid<TData>({
 
   const propsRef = useAsRef({
     ...props,
+    scrollToCellRequest,
+    columnHeaderMenuLabels,
+    contextMenuLabels,
+    pasteDialogLabels,
+    searchLabels,
     data,
     columns,
     initialState,
@@ -2166,6 +2202,17 @@ function useDataGrid<TData>({
       get readOnly() {
         return propsRef.current.readOnly;
       },
+      get columnHeaderMenuLabels() {
+        return (
+          propsRef.current.columnHeaderMenuLabels ?? propsRef.current.meta?.columnHeaderMenuLabels
+        );
+      },
+      get contextMenuLabels() {
+        return propsRef.current.contextMenuLabels ?? propsRef.current.meta?.contextMenuLabels;
+      },
+      get pasteDialogLabels() {
+        return propsRef.current.pasteDialogLabels ?? propsRef.current.meta?.pasteDialogLabels;
+      },
       getIsCellSelected,
       getIsSearchMatch,
       getIsActiveSearchMatch,
@@ -2187,6 +2234,7 @@ function useDataGrid<TData>({
       onCellEditingStop,
       onCellsCopy,
       onCellsCut,
+      onCellsPaste: propsRef.current.enablePaste ? onCellsPaste : undefined,
       onFilesUpload: propsRef.current.onFilesUpload ? propsRef.current.onFilesUpload : undefined,
       onFilesDelete: propsRef.current.onFilesDelete ? propsRef.current.onFilesDelete : undefined,
       onContextMenuOpenChange,
@@ -2215,6 +2263,7 @@ function useDataGrid<TData>({
     onCellEditingStop,
     onCellsCopy,
     onCellsCut,
+    onCellsPaste,
     onContextMenuOpenChange,
     onPasteDialogOpenChange,
     onPasteWithExpansion,
@@ -2315,9 +2364,10 @@ function useDataGrid<TData>({
   }
 
   const onScrollToRow = React.useCallback(
-    async (opts: Partial<CellPosition>) => {
+    async (opts: Partial<CellPosition> & { scrollAlign?: "start" | "center" | "end" }) => {
       const rowIndex = opts?.rowIndex ?? 0;
       const columnId = opts?.columnId;
+      const scrollAlignOverride = opts.scrollAlign;
 
       focusGuardRef.current = true;
 
@@ -2351,8 +2401,10 @@ function useDataGrid<TData>({
         const safeRowIndex = Math.min(rowIndex, Math.max(0, currentRowCount - 1));
 
         const isBottomHalf = safeRowIndex > currentRowCount / 2;
+        const align =
+          scrollAlignOverride ?? (isBottomHalf ? ("end" as const) : ("start" as const));
         rowVirtualizer.scrollToIndex(safeRowIndex, {
-          align: isBottomHalf ? "end" : "start",
+          align,
         });
 
         await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -2410,6 +2462,15 @@ function useDataGrid<TData>({
     },
     [rowVirtualizer, propsRef, store, releaseFocusGuard],
   );
+
+  React.useEffect(() => {
+    if (!scrollToCellRequest) return;
+    void onScrollToRow({
+      rowIndex: scrollToCellRequest.rowIndex,
+      columnId: scrollToCellRequest.columnId,
+      scrollAlign: scrollToCellRequest.scrollAlign,
+    });
+  }, [scrollToCellRequest, onScrollToRow]);
 
   const onRowAdd = React.useCallback(
     async (event?: React.MouseEvent<HTMLDivElement>) => {
@@ -2957,6 +3018,7 @@ function useDataGrid<TData>({
       onSearch,
       onNavigateToNextMatch,
       onNavigateToPrevMatch,
+      searchLabels: propsRef.current.searchLabels,
     };
   }, [
     propsRef,
@@ -3254,6 +3316,7 @@ function useDataGrid<TData>({
       contextMenu,
       pasteDialog,
       onRowAdd: propsRef.current.onRowAdd ? onRowAdd : undefined,
+      addRowLabel,
     }),
     [
       propsRef,
@@ -3275,6 +3338,7 @@ function useDataGrid<TData>({
       contextMenu,
       pasteDialog,
       onRowAdd,
+      addRowLabel,
     ],
   );
 }

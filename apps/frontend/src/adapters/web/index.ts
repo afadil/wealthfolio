@@ -69,6 +69,8 @@ export const RUN_ENV: RunEnv = RunEnvs.WEB;
 // Shared domain modules (identical logic for both platforms)
 // ============================================================================
 
+export { translateText } from "../translation";
+
 // Account Commands
 export { createAccount, deleteAccount, getAccounts, updateAccount } from "../shared/accounts";
 
@@ -331,6 +333,7 @@ export {
   openFileSaveDialog,
   openFolderDialog,
   openUrlInBrowser,
+  openUrlInAppWebviewWindow,
 } from "./files";
 
 // Settings Commands (web-specific API for backups and updates)
@@ -344,6 +347,7 @@ export {
   installUpdate,
   isAutoUpdateCheckEnabled,
   restoreDatabase,
+  syncShellLocale,
   updateSettings,
 } from "./settings";
 

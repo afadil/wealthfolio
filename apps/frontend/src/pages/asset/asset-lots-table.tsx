@@ -12,6 +12,18 @@ import { formatDate, formatQuantity } from "@/lib/utils";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { GainAmount } from "@wealthfolio/ui";
 import { GainPercent } from "@wealthfolio/ui";
+import { format, isValid, parseISO } from "date-fns";
+import { de, enUS } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
+
+function formatAcquisitionDateDisplay(dateStr: string, language: string | undefined): string {
+  const parsed = parseISO(dateStr);
+  if (!isValid(parsed)) {
+    return formatDate(dateStr);
+  }
+  const locale = language?.startsWith("de") ? de : enUS;
+  return format(parsed, "PP", { locale });
+}
 
 interface AssetLotsTableProps {
   lots: Lot[];
@@ -20,6 +32,8 @@ interface AssetLotsTableProps {
 }
 
 export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTableProps) => {
+  const { t, i18n } = useTranslation("common");
+
   if (!lots || lots.length === 0) {
     return null;
   }
@@ -36,13 +50,13 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
           <Table>
             <TableHeader className="bg-muted">
               <TableRow>
-                <TableHead className="w-[160px]">Acquired Date</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Acquisition Price</TableHead>
-                <TableHead className="text-right">Fees</TableHead>
-                <TableHead className="text-right">Cost Basis</TableHead>
-                <TableHead className="text-right">Market Value</TableHead>
-                <TableHead className="text-right">Gain/Loss</TableHead>
+                <TableHead className="w-[160px]">{t("asset.lots.col_acquired_date")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_quantity")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_acquisition_price")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_fees")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_cost_basis")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_market_value")}</TableHead>
+                <TableHead className="text-right">{t("asset.lots.col_gain_loss")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -53,7 +67,9 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
 
                 return (
                   <TableRow key={lot.id}>
-                    <TableCell className="font-medium">{formatDate(lot.acquisitionDate)}</TableCell>
+                    <TableCell className="font-medium">
+                      {formatAcquisitionDateDisplay(lot.acquisitionDate, i18n.language)}
+                    </TableCell>
                     <TableCell className="text-right">{formatQuantity(lot.quantity)}</TableCell>
                     <TableCell className="text-right">
                       {formatAmount(lot.acquisitionPrice, currency)}
@@ -94,7 +110,9 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
             return (
               <div key={lot.id} className="space-y-2 p-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{formatDate(lot.acquisitionDate)}</span>
+                  <span className="text-sm font-medium">
+                    {formatAcquisitionDateDisplay(lot.acquisitionDate, i18n.language)}
+                  </span>
                   <div className="flex items-center space-x-2">
                     <GainAmount
                       value={gainLossAmount}
@@ -105,21 +123,21 @@ export const AssetLotsTable = ({ lots, currency, marketPrice }: AssetLotsTablePr
                   </div>
                 </div>
                 <div className="text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <span>Quantity</span>
+                  <span>{t("asset.lots.col_quantity")}</span>
                   <span className="text-foreground text-right">{formatQuantity(lot.quantity)}</span>
-                  <span>Acq. Price</span>
+                  <span>{t("asset.lots.mobile_acq_price_short")}</span>
                   <span className="text-foreground text-right">
                     {formatAmount(lot.acquisitionPrice, currency)}
                   </span>
-                  <span>Fees</span>
+                  <span>{t("asset.lots.col_fees")}</span>
                   <span className="text-foreground text-right">
                     {formatAmount(lot.acquisitionFees, currency)}
                   </span>
-                  <span>Cost Basis</span>
+                  <span>{t("asset.lots.col_cost_basis")}</span>
                   <span className="text-foreground text-right">
                     {formatAmount(lot.costBasis, currency)}
                   </span>
-                  <span>Market Value</span>
+                  <span>{t("asset.lots.col_market_value")}</span>
                   <span className="text-foreground text-right">
                     {formatAmount(marketValue, currency)}
                   </span>

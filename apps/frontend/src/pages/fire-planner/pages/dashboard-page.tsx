@@ -10,6 +10,7 @@ import {
 } from "@wealthfolio/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useMemo } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import type { FireSettings, IncomeStream } from "../types";
 import {
   calculateFireTarget,
@@ -57,6 +58,7 @@ function singleStreamIncome(
 }
 
 export default function DashboardPage({ settings, portfolioData, isLoading }: Props) {
+  const { t } = useTranslation();
   const { totalValue, error } = portfolioData;
   const currency = settings.currency;
 
@@ -138,7 +140,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
   if (error) {
     return (
       <div className="text-destructive p-4 text-sm">
-        Failed to load portfolio data: {error.message}
+        {t("fire_planner.dash.error_load", { message: error.message })}
       </div>
     );
   }
@@ -148,10 +150,11 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       {/* Warning: retirement triggered by age, not by FI */}
       {!projection.fundedAtRetirement && (
         <div className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-          <strong>Underfunded plan:</strong> at the current trajectory the portfolio does not reach
-          the FIRE target by age {settings.targetFireAge}. Retirement starts at the target age
-          anyway, but withdrawals may deplete the portfolio early. Increase contributions, extend
-          the target age, or reduce planned expenses.
+          <Trans
+            i18nKey="fire_planner.dash.underfunded"
+            values={{ age: settings.targetFireAge }}
+            components={{ 0: <strong /> }}
+          />
         </div>
       )}
       {/* KPI Cards */}
@@ -161,18 +164,19 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             <CardTitle className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
               <Tooltip>
                 <TooltipTrigger className="cursor-help underline decoration-dotted">
-                  FIRE Target (net)
+                  {t("fire_planner.dash.kpi_fire_target_net")}
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs text-xs">
                   <p>
-                    <strong>Net target</strong> — portfolio needed after subtracting income streams
-                    that start at or before your FIRE age.
+                    <Trans i18nKey="fire_planner.dash.kpi_net_tooltip_p1" components={{ 0: <strong /> }} />
                   </p>
                   {netFireTarget < fireTarget && (
                     <p className="mt-1">
-                      The <strong>FIRE (gross)</strong> goal on the Goals page shows{" "}
-                      {fmt(fireTarget, currency)} — the full amount before income offsets. Both
-                      numbers are correct; they measure different things.
+                      <Trans
+                        i18nKey="fire_planner.dash.kpi_net_tooltip_p2"
+                        values={{ gross: fmt(fireTarget, currency) }}
+                        components={{ 0: <strong /> }}
+                      />
                     </p>
                   )}
                 </TooltipContent>
@@ -183,13 +187,18 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             <p className="text-xl font-bold">{fmt(netFireTarget, currency)}</p>
             {netFireTarget < fireTarget ? (
               <p className="text-muted-foreground text-xs">
-                Gross {fmt(fireTarget, currency)} − {fmt(totalActiveIncome, currency)}/mo income
-                already covers {fmt(fireTarget - netFireTarget, currency)}
+                {t("fire_planner.dash.kpi_gross_line", {
+                  gross: fmt(fireTarget, currency),
+                  income: fmt(totalActiveIncome, currency),
+                  covers: fmt(fireTarget - netFireTarget, currency),
+                })}
               </p>
             ) : (
               <p className="text-muted-foreground text-xs">
-                {pct(settings.safeWithdrawalRate)} SWR ·{" "}
-                {fmt(settings.monthlyExpensesAtFire, currency)}/mo
+                {t("fire_planner.dash.kpi_swr_line", {
+                  swr: pct(settings.safeWithdrawalRate),
+                  expenses: fmt(settings.monthlyExpensesAtFire, currency),
+                })}
               </p>
             )}
           </CardContent>
@@ -198,7 +207,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              Portfolio Value
+              {t("fire_planner.dash.kpi_portfolio_value")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -207,8 +216,12 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
               className={`text-xs ${totalValue >= netFireTarget ? "text-green-600" : "text-muted-foreground"}`}
             >
               {totalValue >= netFireTarget
-                ? `${fmt(totalValue - netFireTarget, currency)} above target`
-                : `${fmt(netFireTarget - totalValue, currency)} to go`}
+                ? t("fire_planner.dash.kpi_above_target", {
+                    amount: fmt(totalValue - netFireTarget, currency),
+                  })
+                : t("fire_planner.dash.kpi_to_go", {
+                    amount: fmt(netFireTarget - totalValue, currency),
+                  })}
             </p>
           </CardContent>
         </Card>
@@ -216,31 +229,37 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              Progress
+              {t("fire_planner.dash.kpi_progress")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xl font-bold">{pct(progress)}</p>
-            <p className="text-muted-foreground text-xs">toward FIRE target</p>
+            <p className="text-muted-foreground text-xs">{t("fire_planner.dash.kpi_toward_fire")}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-              Est. FIRE Age
+              {t("fire_planner.dash.kpi_est_fire_age")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold">{projection.fireAge ?? "Not reached"}</p>
+            <p className="text-xl font-bold">
+              {projection.fireAge ?? t("fire_planner.dash.not_reached")}
+            </p>
             <p className="text-muted-foreground text-xs">
               {projection.fireAge != null
                 ? projection.fireAge < settings.targetFireAge
-                  ? `${settings.targetFireAge - projection.fireAge} yrs ahead of target`
+                  ? t("fire_planner.dash.yrs_ahead", {
+                      n: settings.targetFireAge - projection.fireAge,
+                    })
                   : projection.fireAge === settings.targetFireAge
-                    ? `on target (age ${settings.targetFireAge})`
-                    : `target age ${settings.targetFireAge}`
-                : `not reached by age ${settings.planningHorizonAge}`}
+                    ? t("fire_planner.dash.on_target", { age: settings.targetFireAge })
+                    : t("fire_planner.dash.target_age_only", { age: settings.targetFireAge })
+                : t("fire_planner.dash.not_reached_by", {
+                    age: settings.planningHorizonAge,
+                  })}
             </p>
           </CardContent>
         </Card>
@@ -249,12 +268,12 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       {/* Progress Bars */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">FIRE Progress</CardTitle>
+          <CardTitle className="text-sm">{t("fire_planner.dash.fire_progress_title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <div className="mb-1 flex justify-between text-xs">
-              <span>Portfolio vs FIRE Target</span>
+              <span>{t("fire_planner.dash.portfolio_vs_target")}</span>
               <span>{pct(progress)}</span>
             </div>
             <div className="bg-muted h-3 w-full overflow-hidden rounded-full">
@@ -271,14 +290,14 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-sm">
-            Coast FIRE
+            {t("fire_planner.dash.coast_title")}
             {projection.coastFireReached ? (
               <Badge variant="default" className="bg-green-600 text-xs">
-                Reached ✓
+                {t("fire_planner.dash.coast_reached")}
               </Badge>
             ) : (
               <Badge variant="secondary" className="text-xs">
-                Not yet
+                {t("fire_planner.dash.coast_not_yet")}
               </Badge>
             )}
           </CardTitle>
@@ -286,16 +305,18 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
         <CardContent>
           <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-3">
             <div>
-              <p className="text-muted-foreground text-xs">Coast FIRE amount needed today</p>
+              <p className="text-muted-foreground text-xs">{t("fire_planner.dash.coast_amount_label")}</p>
               <p className="font-semibold">{fmt(coastAmount, currency)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground text-xs">Current portfolio</p>
+              <p className="text-muted-foreground text-xs">{t("fire_planner.dash.current_portfolio")}</p>
               <p className="font-semibold">{fmt(totalValue, currency)}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">
-                {projection.coastFireReached ? "Surplus" : "Gap"}
+                {projection.coastFireReached
+                  ? t("fire_planner.dash.surplus")
+                  : t("fire_planner.dash.gap")}
               </p>
               <p
                 className={`font-semibold ${projection.coastFireReached ? "text-green-600" : "text-red-500"}`}
@@ -305,8 +326,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             </div>
           </div>
           <p className="text-muted-foreground mt-3 text-xs">
-            Coast FIRE means your current portfolio, growing at your expected return with no further
-            contributions, would reach your FIRE target by age {settings.targetFireAge}.
+            {t("fire_planner.dash.coast_help", { age: settings.targetFireAge })}
           </p>
         </CardContent>
       </Card>
@@ -314,20 +334,25 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       {/* Monthly Budget at FIRE */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Monthly Budget at FIRE</CardTitle>
+          <CardTitle className="text-sm">{t("fire_planner.dash.monthly_budget_title")}</CardTitle>
           <p className="text-muted-foreground text-xs">
-            How your {fmt(totalBudget, currency)}/mo is funded at each phase of retirement
+            {t("fire_planner.dash.monthly_budget_sub", { total: fmt(totalBudget, currency) })}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Phase 1: at FIRE age */}
           <div>
             <p className="mb-2 text-xs font-medium">
-              At FIRE age {fireAgeForBudget} — {fmt(totalBudget, currency)}/mo total
+              {t("fire_planner.dash.at_fire_age", {
+                age: fireAgeForBudget,
+                total: fmt(totalBudget, currency),
+              })}
               {healthcareMonthly > 0 && (
                 <span className="text-muted-foreground ml-1">
-                  ({fmt(settings.monthlyExpensesAtFire, currency)} living +{" "}
-                  {fmt(healthcareMonthly, currency)} healthcare)
+                  {t("fire_planner.dash.living_plus_healthcare", {
+                    living: fmt(settings.monthlyExpensesAtFire, currency),
+                    health: fmt(healthcareMonthly, currency),
+                  })}
                 </span>
               )}
             </p>
@@ -361,7 +386,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             <div className="space-y-1">
               {healthcareMonthly > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Living expenses</span>
+                  <span className="text-muted-foreground">{t("fire_planner.dash.living_expenses")}</span>
                   <span className="text-muted-foreground">
                     {fmt(settings.monthlyExpensesAtFire, currency)}/mo
                   </span>
@@ -369,7 +394,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
               )}
               {healthcareMonthly > 0 && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Healthcare</span>
+                  <span className="text-muted-foreground">{t("fire_planner.dash.healthcare")}</span>
                   <span className="text-muted-foreground">
                     {fmt(healthcareMonthly, currency)}/mo
                   </span>
@@ -386,7 +411,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                         className="inline-block h-2.5 w-2.5 rounded-full"
                         style={{ background: colors[i % colors.length] }}
                       />
-                      {s.label || "Income stream"}
+                      {s.label || t("fire_planner.dash.income_stream_fallback")}
                     </span>
                     <span className="text-muted-foreground">
                       {fmt(monthly, currency)}/mo{" "}
@@ -398,7 +423,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
               <div className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-2">
                   <span className="bg-muted-foreground/30 inline-block h-2.5 w-2.5 rounded-full" />
-                  Portfolio withdrawal
+                  {t("fire_planner.dash.portfolio_withdrawal")}
                 </span>
                 <span className="text-muted-foreground">
                   {fmt(portfolioWithdrawalAtFire, currency)}/mo{" "}
@@ -416,7 +441,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
           {/* Deferred phases */}
           {deferredStreams.length > 0 && (
             <div className="space-y-3 border-t pt-3">
-              <p className="text-muted-foreground text-xs">How the mix evolves over time:</p>
+              <p className="text-muted-foreground text-xs">{t("fire_planner.dash.mix_evolve")}</p>
               {deferredStreams.map((s) => {
                 // Cumulative income available from this stream's start age onwards
                 const cumulativeIncome =
@@ -430,24 +455,25 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                 return (
                   <div key={s.id} className="bg-muted/40 rounded p-2 text-xs">
                     <p className="font-medium">
-                      From age {s.startAge}: +{fmt(resolvedMonthly(s), currency)}/mo ({s.label})
+                      {t("fire_planner.dash.from_age_stream", {
+                        age: s.startAge,
+                        amount: fmt(resolvedMonthly(s), currency),
+                        label: s.label,
+                      })}
                     </p>
                     {extraBudget > 0 ? (
                       <p className="text-muted-foreground mt-0.5">
-                        Income exceeds base expenses — portfolio withdrawal drops to{" "}
-                        <span className="font-medium text-green-600">€0</span> and you have{" "}
-                        <span className="font-medium text-green-600">
-                          {fmt(extraBudget, currency)}/mo
-                        </span>{" "}
-                        extra spending power
+                        {t("fire_planner.dash.income_exceeds", {
+                          zero: fmt(0, currency),
+                          extra: fmt(extraBudget, currency),
+                        })}
                       </p>
                     ) : (
                       <p className="text-muted-foreground mt-0.5">
-                        Portfolio withdrawal drops to{" "}
-                        <span className="font-medium text-green-600">
-                          {fmt(newPortfolioWithdrawal, currency)}/mo
-                        </span>{" "}
-                        (was {fmt(portfolioWithdrawalAtFire, currency)}/mo at FIRE)
+                        {t("fire_planner.dash.withdrawal_drops", {
+                          newW: fmt(newPortfolioWithdrawal, currency),
+                          oldW: fmt(portfolioWithdrawalAtFire, currency),
+                        })}
                       </p>
                     )}
                   </div>
@@ -457,10 +483,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
           )}
 
           {settings.additionalIncomeStreams.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              No income streams configured. Add pension, part-time work, or annuity streams in
-              Settings to see how they reduce your portfolio withdrawal.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("fire_planner.dash.no_income_streams")}</p>
           )}
         </CardContent>
       </Card>
@@ -469,12 +492,10 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       {tableSnapshots.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Year-by-Year Snapshot</CardTitle>
+            <CardTitle className="text-sm">{t("fire_planner.dash.snapshot_title")}</CardTitle>
             {hasPensionFunds && (
               <p className="text-muted-foreground mt-1 text-xs">
-                Pension fund balances grow with contributions until FIRE, then on investment return
-                only. Accumulation-fund payouts are derived from the projected balance at payout
-                age.
+                {t("fire_planner.dash.snapshot_pension_note")}
               </p>
             )}
           </CardHeader>
@@ -482,18 +503,22 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground border-b">
-                  <th className="pb-2 text-left">Age</th>
-                  <th className="pb-2 text-left">Year</th>
-                  <th className="pb-2 text-left">Phase</th>
-                  <th className="pb-2 text-right">Portfolio</th>
-                  {hasPensionFunds && <th className="pb-2 text-right">Pension Fund</th>}
-                  <th className="pb-2 text-right">Contribution/yr</th>
+                  <th className="pb-2 text-left">{t("fire_planner.dash.th_age")}</th>
+                  <th className="pb-2 text-left">{t("fire_planner.dash.th_year")}</th>
+                  <th className="pb-2 text-left">{t("fire_planner.dash.th_phase")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.dash.th_portfolio")}</th>
+                  {hasPensionFunds && (
+                    <th className="pb-2 text-right">{t("fire_planner.dash.th_pension_fund")}</th>
+                  )}
+                  <th className="pb-2 text-right">{t("fire_planner.dash.th_contrib_yr")}</th>
                   {settings.additionalIncomeStreams.map((s) => (
                     <th key={s.id} className="whitespace-nowrap pb-2 text-right">
-                      {s.label || "Income"}/yr
+                      {t("fire_planner.dash.th_income_yr", {
+                        label: s.label || t("fire_planner.dash.income_label"),
+                      })}
                     </th>
                   ))}
-                  <th className="pb-2 text-right">Net Withdrawal/yr</th>
+                  <th className="pb-2 text-right">{t("fire_planner.dash.th_net_withdrawal")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,7 +543,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
                       <td className="py-1.5">{snap.year}</td>
                       <td className="py-1.5">
                         <Badge variant={isFire ? "default" : "secondary"} className="text-xs">
-                          {isFire ? "FIRE" : "Acc."}
+                          {isFire ? t("fire_planner.dash.phase_fire") : t("fire_planner.dash.phase_acc")}
                         </Badge>
                       </td>
                       <td className="py-1.5 text-right">{fmt(snap.portfolioValue, currency)}</td>
@@ -561,8 +586,7 @@ export default function DashboardPage({ settings, portfolioData, isLoading }: Pr
       {totalValue === 0 && (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
-            No portfolio data found. Add accounts and holdings in Wealthfolio to see your FIRE
-            projection.
+            {t("fire_planner.dash.no_portfolio")}
           </CardContent>
         </Card>
       )}

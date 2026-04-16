@@ -10,6 +10,7 @@ import {
   Skeleton,
 } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -108,7 +109,7 @@ function normalizeGoalsResult(candidate: Record<string, unknown>): GetGoalsResul
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
     .map((item) => ({
       id: safeString(item.id ?? item.Id, ""),
-      title: safeString(item.title ?? item.Title, "Untitled Goal"),
+      title: safeString(item.title ?? item.Title, ""),
       description:
         (item.description as string | undefined) ??
         (item.Description as string | undefined) ??
@@ -242,6 +243,7 @@ function GoalCard({
   formatter: Intl.NumberFormat;
   isBalanceHidden: boolean;
 }) {
+  const { t } = useTranslation("common");
   const progressColor = getProgressColor(goal.progressPercent, goal.deadline);
 
   const formatValue = (value: number) => {
@@ -261,7 +263,9 @@ function GoalCard({
           ) : (
             <Icons.Target className="text-muted-foreground h-4 w-4 flex-shrink-0" />
           )}
-          <span className="text-sm font-medium leading-tight">{goal.title}</span>
+          <span className="text-sm font-medium leading-tight">
+            {goal.title || t("ai.tool.goals.untitled")}
+          </span>
         </div>
         <Badge
           variant={goal.isAchieved ? "default" : "secondary"}
@@ -303,24 +307,26 @@ function GoalCard({
 }
 
 function EmptyState() {
+  const { t } = useTranslation("common");
+
   return (
     <Card className="bg-muted/40 border-primary/10">
       <CardContent className="flex flex-col items-center justify-center py-8 text-center">
         <Icons.Target className="text-muted-foreground mb-2 h-8 w-8" />
-        <p className="text-muted-foreground text-sm">No goals set up yet.</p>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Create investment goals in Settings to track your progress.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("ai.tool.goals.empty")}</p>
+        <p className="text-muted-foreground mt-1 text-xs">{t("ai.tool.goals.empty_hint")}</p>
       </CardContent>
     </Card>
   );
 }
 
 function ErrorState({ message }: { message?: string }) {
+  const { t } = useTranslation("common");
+
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">Failed to load goals</p>
+        <p className="text-destructive text-sm font-medium">{t("ai.tool.goals.error_load")}</p>
         {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
@@ -334,6 +340,7 @@ function ErrorState({ message }: { message?: string }) {
 type GoalsToolUIContentProps = ToolCallMessagePartProps<GetGoalsArgs, GetGoalsResult>;
 
 function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -361,7 +368,7 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
 
   // Show error state for incomplete/failed status
   if (isIncomplete) {
-    return <ErrorState message="The request was interrupted or failed." />;
+    return <ErrorState message={t("ai.tool.common.error_incomplete")} />;
   }
 
   // Show empty state if no goals
@@ -376,19 +383,19 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Goals</CardTitle>
+            <CardTitle className="text-base">{t("ai.tool.goals.title")}</CardTitle>
             <Badge variant="secondary" className="text-xs">
-              {count} {count === 1 ? "goal" : "goals"}
+              {t("ai.tool.goals.count", { count })}
             </Badge>
             {truncated && originalCount && (
               <Badge variant="outline" className="text-muted-foreground text-xs">
-                of {originalCount}
+                {t("ai.tool.goals.of_total", { total: originalCount })}
               </Badge>
             )}
           </div>
           {achievedCount > 0 && (
             <Badge variant="default" className="bg-success text-success-foreground text-xs">
-              {achievedCount} achieved
+              {t("ai.tool.goals.achieved_count", { count: achievedCount })}
             </Badge>
           )}
         </div>

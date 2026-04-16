@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { AmountDisplay, Icons } from "@wealthfolio/ui";
 import type { FeeAnalytics } from "../lib/fee-calculation.service";
+import { useTranslation } from "react-i18next";
 
 // Simple EmptyPlaceholder component since it's not exported from UI package
 function EmptyPlaceholder({
@@ -42,6 +43,7 @@ export function AccountBreakdown({
   currency,
   isBalanceHidden,
 }: AccountBreakdownProps) {
+  const { t } = useTranslation("common");
   const { accountFeeAnalysis } = feeAnalytics;
 
   // Get top 10 accounts
@@ -51,14 +53,14 @@ export function AccountBreakdown({
     return (
       <Card className="flex h-full flex-col">
         <CardHeader>
-          <CardTitle className="text-xl">Account Breakdown</CardTitle>
+          <CardTitle className="text-xl">{t("addon.investment_fees.account_breakdown.title")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-1 items-center justify-center">
           <EmptyPlaceholder
             className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
             icon={<Icons.CreditCard className="h-10 w-10" />}
-            title="No fee data available"
-            description="There are no recorded fees for the selected period. Try selecting a different time range or check back later."
+            title={t("addon.investment_fees.account_breakdown.empty_title")}
+            description={t("addon.investment_fees.account_breakdown.empty_description")}
           />
         </CardContent>
       </Card>
@@ -70,7 +72,7 @@ export function AccountBreakdown({
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
-        <CardTitle className="text-xl">Account Breakdown</CardTitle>
+        <CardTitle className="text-xl">{t("addon.investment_fees.account_breakdown.title")}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
         <div className="space-y-6">
@@ -94,7 +96,9 @@ export function AccountBreakdown({
                 ...(otherTotal > 0
                   ? [
                       {
-                        name: `${otherAccounts.length} other accounts`,
+                        name: t("addon.investment_fees.account_breakdown.other_accounts", {
+                          count: otherAccounts.length,
+                        }),
                         fees: otherTotal,
                         isOther: true,
                       },
@@ -135,7 +139,9 @@ export function AccountBreakdown({
                           />
                         </div>
                         <div className="text-muted-foreground text-xs">
-                          {percentage.toFixed(1)}% of total fees
+                          {t("addon.investment_fees.account_breakdown.tooltip_pct_of_fees", {
+                            percent: percentage.toFixed(1),
+                          })}
                         </div>
                         {/* Tooltip arrow */}
                         <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>
@@ -160,7 +166,11 @@ export function AccountBreakdown({
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{account.accountName}</span>
                       <div className="text-muted-foreground flex items-center space-x-2 text-xs">
-                        <span>{account.transactionCount} transactions</span>
+                        <span>
+                          {t("addon.investment_fees.account_breakdown.transactions", {
+                            count: account.transactionCount,
+                          })}
+                        </span>
                         <span>•</span>
                         <span>
                           <AmountDisplay
@@ -168,7 +178,7 @@ export function AccountBreakdown({
                             currency={currency}
                             isHidden={isBalanceHidden}
                           />{" "}
-                          avg
+                          {t("addon.investment_fees.account_breakdown.avg_label")}
                         </span>
                       </div>
                     </div>

@@ -8,6 +8,7 @@ import {
   openFolderDialog,
   restoreDatabase,
 } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { getPlatform as getRuntimePlatform, usePlatform } from "@/hooks/use-platform";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
@@ -61,11 +62,11 @@ export function useBackupRestore() {
 
       const description =
         result.location === "server"
-          ? `Backup created on the server as ${result.value}`
-          : `Backup saved as ${result.value}`;
+          ? i18n.t("settings.exports.toast.backup_path_server", { path: result.value })
+          : i18n.t("settings.exports.toast.backup_path_local", { path: result.value });
 
       toast({
-        title: "Backup completed successfully",
+        title: i18n.t("settings.exports.toast.backup_panel_success_title"),
         description,
         variant: "success",
       });
@@ -73,8 +74,9 @@ export function useBackupRestore() {
     onError: (error) => {
       logger.error(`Error during backup: ${String(error)}`);
       toast({
-        title: "Backup failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        title: i18n.t("settings.exports.toast.backup_failed_title"),
+        description:
+          error instanceof Error ? error.message : i18n.t("settings.exports.toast.unknown_error"),
         variant: "destructive",
       });
     },
@@ -112,8 +114,9 @@ export function useBackupRestore() {
     onError: (error) => {
       logger.error(`Error during restore: ${String(error)}`);
       toast({
-        title: "Restore failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        title: i18n.t("settings.exports.toast.restore_failed_title"),
+        description:
+          error instanceof Error ? error.message : i18n.t("settings.exports.toast.unknown_error"),
         variant: "destructive",
       });
     },
@@ -131,8 +134,8 @@ export function useBackupRestore() {
     const runtimePlatform = await getRuntimePlatform();
     if (!runtimePlatform.is_desktop && runtimePlatform.os !== "ios") {
       toast({
-        title: "Restore unavailable",
-        description: "Please use the desktop app or iOS app to restore backups.",
+        title: i18n.t("settings.exports.toast.restore_unavailable_title"),
+        description: i18n.t("settings.exports.toast.restore_unavailable_description"),
       });
       return;
     }

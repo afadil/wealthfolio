@@ -14,7 +14,37 @@ import {
 } from "../ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
+import type { DataGridColumnHeaderMenuLabels } from "./data-grid-types";
 import { getColumnVariant } from "./data-grid-utils";
+
+const DEFAULT_COLUMN_HEADER_MENU_LABELS: DataGridColumnHeaderMenuLabels = {
+  sortAsc: "Sort ascending",
+  sortDesc: "Sort descending",
+  removeSort: "Remove sort",
+  pinToLeft: "Pin to left",
+  unpinFromLeft: "Unpin from left",
+  pinToRight: "Pin to right",
+  unpinFromRight: "Unpin from right",
+  hideColumn: "Hide column",
+  resizeColumnAria: (columnLabel) => `Resize ${columnLabel} column`,
+};
+
+function mergeColumnHeaderMenuLabels(
+  overrides?: Partial<DataGridColumnHeaderMenuLabels>,
+): DataGridColumnHeaderMenuLabels {
+  const d = DEFAULT_COLUMN_HEADER_MENU_LABELS;
+  return {
+    sortAsc: overrides?.sortAsc ?? d.sortAsc,
+    sortDesc: overrides?.sortDesc ?? d.sortDesc,
+    removeSort: overrides?.removeSort ?? d.removeSort,
+    pinToLeft: overrides?.pinToLeft ?? d.pinToLeft,
+    unpinFromLeft: overrides?.unpinFromLeft ?? d.unpinFromLeft,
+    pinToRight: overrides?.pinToRight ?? d.pinToRight,
+    unpinFromRight: overrides?.unpinFromRight ?? d.unpinFromRight,
+    hideColumn: overrides?.hideColumn ?? d.hideColumn,
+    resizeColumnAria: overrides?.resizeColumnAria ?? d.resizeColumnAria,
+  };
+}
 
 interface DataGridColumnHeaderProps<TData, TValue> extends React.ComponentProps<typeof DropdownMenuTrigger> {
   header: Header<TData, TValue>;
@@ -29,6 +59,11 @@ export function DataGridColumnHeader<TData, TValue>({
   ...props
 }: DataGridColumnHeaderProps<TData, TValue>) {
   const column = header.column;
+  const menuLabels = React.useMemo(
+    () => mergeColumnHeaderMenuLabels(table.options.meta?.columnHeaderMenuLabels),
+    [table.options.meta?.columnHeaderMenuLabels],
+  );
+
   const label = column.columnDef.meta?.label
     ? column.columnDef.meta.label
     : typeof column.columnDef.header === "string"
@@ -122,7 +157,7 @@ export function DataGridColumnHeader<TData, TValue>({
                 onClick={() => onSortingChange("asc")}
               >
                 <Icons.ChevronUp />
-                Sort asc
+                {menuLabels.sortAsc}
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 className="[&_svg]:text-muted-foreground relative ltr:pl-2 ltr:pr-8 rtl:pl-8 rtl:pr-2 [&>span:first-child]:ltr:left-auto [&>span:first-child]:ltr:right-2 [&>span:first-child]:rtl:left-2 [&>span:first-child]:rtl:right-auto"
@@ -130,12 +165,12 @@ export function DataGridColumnHeader<TData, TValue>({
                 onClick={() => onSortingChange("desc")}
               >
                 <Icons.ChevronDown />
-                Sort desc
+                {menuLabels.sortDesc}
               </DropdownMenuCheckboxItem>
               {column.getIsSorted() && (
                 <DropdownMenuItem onClick={onSortRemove}>
                   <Icons.X />
-                  Remove sort
+                  {menuLabels.removeSort}
                 </DropdownMenuItem>
               )}
             </>
@@ -147,23 +182,23 @@ export function DataGridColumnHeader<TData, TValue>({
               {isPinnedLeft ? (
                 <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onUnpin}>
                   <Icons.PinOff />
-                  Unpin from left
+                  {menuLabels.unpinFromLeft}
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onLeftPin}>
                   <Icons.Pin />
-                  Pin to left
+                  {menuLabels.pinToLeft}
                 </DropdownMenuItem>
               )}
               {isPinnedRight ? (
                 <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onUnpin}>
                   <Icons.PinOff />
-                  Unpin from right
+                  {menuLabels.unpinFromRight}
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem className="[&_svg]:text-muted-foreground" onClick={onRightPin}>
                   <Icons.Pin />
-                  Pin to right
+                  {menuLabels.pinToRight}
                 </DropdownMenuItem>
               )}
             </>
@@ -176,13 +211,20 @@ export function DataGridColumnHeader<TData, TValue>({
                 onClick={() => column.toggleVisibility(false)}
               >
                 <Icons.EyeOff />
-                Hide column
+                {menuLabels.hideColumn}
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {header.column.getCanResize() && <DataGridColumnResizer header={header} table={table} label={label} />}
+      {header.column.getCanResize() && (
+        <DataGridColumnResizer
+          header={header}
+          table={table}
+          label={label}
+          resizeColumnAria={menuLabels.resizeColumnAria}
+        />
+      )}
     </>
   );
 }
@@ -197,14 +239,22 @@ const DataGridColumnResizer = React.memo(DataGridColumnResizerImpl, (prev, next)
 
   if (prev.label !== next.label) return false;
 
+  if (prev.resizeColumnAria !== next.resizeColumnAria) return false;
+
   return true;
 }) as typeof DataGridColumnResizerImpl;
 
 interface DataGridColumnResizerProps<TData, TValue> extends DataGridColumnHeaderProps<TData, TValue> {
   label: string;
+  resizeColumnAria: (columnLabel: string) => string;
 }
 
-function DataGridColumnResizerImpl<TData, TValue>({ header, table, label }: DataGridColumnResizerProps<TData, TValue>) {
+function DataGridColumnResizerImpl<TData, TValue>({
+  header,
+  table,
+  label,
+  resizeColumnAria,
+}: DataGridColumnResizerProps<TData, TValue>) {
   const defaultColumnDef = table._getDefaultColumnDef();
 
   const onDoubleClick = React.useCallback(() => {
@@ -215,7 +265,7 @@ function DataGridColumnResizerImpl<TData, TValue>({ header, table, label }: Data
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label={`Resize ${label} column`}
+      aria-label={resizeColumnAria(label)}
       aria-valuenow={header.column.getSize()}
       aria-valuemin={defaultColumnDef.minSize}
       aria-valuemax={defaultColumnDef.maxSize}

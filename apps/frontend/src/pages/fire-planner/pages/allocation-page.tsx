@@ -10,6 +10,7 @@ import {
 } from "@wealthfolio/ui";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "@wealthfolio/ui/chart";
 import { useMemo } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import type { FireSettings } from "../types";
 import { checkAllocationDrift } from "../lib/fire-math";
 
@@ -51,6 +52,7 @@ export default function AllocationPage({
   isLoading,
   onSetupTargets,
 }: Props) {
+  const { t } = useTranslation();
   const { targetAllocations, currency } = settings;
   const hasTargets = Object.keys(targetAllocations).length > 0;
 
@@ -116,13 +118,11 @@ export default function AllocationPage({
         <Card>
           <CardContent className="py-10 text-center">
             <p className="text-muted-foreground mb-4 text-sm">
-              Set your target allocation to enable drift monitoring.
-              <br />
-              Go to <strong>Settings → Target Allocations</strong>.
+              <Trans i18nKey="fire_planner.alloc.empty_hint" components={{ 0: <strong /> }} />
             </p>
             {onSetupTargets && (
               <Button variant="outline" size="sm" onClick={onSetupTargets}>
-                Go to Settings
+                {t("fire_planner.alloc.go_settings")}
               </Button>
             )}
           </CardContent>
@@ -132,7 +132,7 @@ export default function AllocationPage({
         {currentPieData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Current Portfolio Composition</CardTitle>
+              <CardTitle className="text-sm">{t("fire_planner.alloc.current_composition")}</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
@@ -168,26 +168,23 @@ export default function AllocationPage({
       {/* Drift Monitor */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Allocation Drift Monitor</CardTitle>
+          <CardTitle className="text-sm">{t("fire_planner.alloc.drift_title")}</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {driftData.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No matching holdings found for your target allocations. Check that your target symbols
-              match your holding symbols.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("fire_planner.alloc.no_matching")}</p>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground border-b">
-                  <th className="pb-2 text-left">Asset</th>
-                  <th className="pb-2 text-right">Current %</th>
-                  <th className="pb-2 text-right">Target %</th>
-                  <th className="pb-2 text-right">Drift</th>
-                  <th className="pb-2 text-center">Status</th>
-                  <th className="pb-2 text-right">Value</th>
-                  <th className="pb-2 text-right">Days since buy</th>
-                  <th className="pb-2 pl-4 text-left">Action</th>
+                  <th className="pb-2 text-left">{t("fire_planner.alloc.th_asset")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.alloc.th_current_pct")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.alloc.th_target_pct")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.alloc.th_drift")}</th>
+                  <th className="pb-2 text-center">{t("fire_planner.alloc.th_status")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.alloc.th_value")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.alloc.th_days_since_buy")}</th>
+                  <th className="pb-2 pl-4 text-left">{t("fire_planner.alloc.th_action")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,9 +214,9 @@ export default function AllocationPage({
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${DRIFT_COLORS[item.status]}`}
                       >
-                        {item.status === "underweight" && "↓ Under"}
-                        {item.status === "overweight" && "↑ Over"}
-                        {item.status === "ok" && "✓ OK"}
+                        {item.status === "underweight" && t("fire_planner.alloc.status_under")}
+                        {item.status === "overweight" && t("fire_planner.alloc.status_over")}
+                        {item.status === "ok" && t("fire_planner.alloc.status_ok")}
                       </span>
                     </td>
                     <td className="py-1.5 text-right">
@@ -231,12 +228,12 @@ export default function AllocationPage({
                     <td className="py-1.5 pl-4 text-left">
                       {item.status === "underweight" && (
                         <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
-                          Buy
+                          {t("fire_planner.alloc.action_buy")}
                         </span>
                       )}
                       {item.status === "overweight" && (
                         <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400">
-                          Hold
+                          {t("fire_planner.alloc.action_hold")}
                         </span>
                       )}
                     </td>
@@ -252,7 +249,7 @@ export default function AllocationPage({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Current Allocation</CardTitle>
+            <CardTitle className="text-sm">{t("fire_planner.alloc.current_alloc")}</CardTitle>
           </CardHeader>
           <CardContent>
             {currentPieData.length > 0 ? (
@@ -275,14 +272,16 @@ export default function AllocationPage({
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-muted-foreground py-6 text-center text-sm">No holdings found</p>
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                {t("fire_planner.alloc.no_holdings")}
+              </p>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Target Allocation</CardTitle>
+            <CardTitle className="text-sm">{t("fire_planner.alloc.target_alloc")}</CardTitle>
           </CardHeader>
           <CardContent>
             {targetPieData.length > 0 ? (
@@ -306,7 +305,7 @@ export default function AllocationPage({
               </ResponsiveContainer>
             ) : (
               <p className="text-muted-foreground py-6 text-center text-sm">
-                No target allocations set
+                {t("fire_planner.alloc.no_targets")}
               </p>
             )}
           </CardContent>

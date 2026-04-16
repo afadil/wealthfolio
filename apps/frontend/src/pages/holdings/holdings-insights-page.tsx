@@ -7,8 +7,10 @@ import { useHoldings } from "@/hooks/use-holdings";
 import { usePortfolioAllocations } from "@/hooks/use-portfolio-allocations";
 import { PORTFOLIO_ACCOUNT_ID, isAlternativeAssetKind, type AssetKind } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { localizeAllocationCategoryName } from "@/lib/taxonomy-i18n";
 import type { TaxonomyAllocation } from "@/lib/types";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AllocationDetailSheet } from "./components/allocation-detail-sheet";
 import { CashHoldingsWidget } from "./components/cash-holdings-widget";
 import { CompactAllocationStrip } from "./components/compact-allocation-strip";
@@ -23,7 +25,13 @@ interface HoldingsInsightsPageProps {
   accountId?: string;
 }
 
+function isUnknownAllocationCategory(categoryId: string): boolean {
+  const normalized = (categoryId ?? "").toUpperCase();
+  return normalized === "UNKNOWN" || normalized === "__UNKNOWN__";
+}
+
 export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsightsPageProps) => {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -41,29 +49,110 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
   );
   const [initialCategoryId, setInitialCategoryId] = useState<string | null>(null);
 
+  const { cashHoldings, nonCashHoldings } = useMemo(() => {
+    const EPSILON = 1e-8;
+    const cash =
+      holdings?.filter((holding) => {
+        if (holding.holdingType?.toLowerCase() !== "cash") return false;
+        const cashValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+        return cashValue > EPSILON;
+      }) ?? [];
+    const nonCash =
+      holdings?.filter((holding) => {
+        if (holding.holdingType?.toLowerCase() === "cash") return false;
+        if (holding.assetKind && isAlternativeAssetKind(holding.assetKind as AssetKind))
+          return false;
+        const quantity = Math.abs(holding.quantity ?? 0);
+        const marketValue = Math.abs(holding.marketValue?.base ?? holding.marketValue?.local ?? 0);
+        return quantity > EPSILON || marketValue > EPSILON;
+      }) ?? [];
+
+    return { cashHoldings: cash, nonCashHoldings: nonCash };
+  }, [holdings]);
+
+  const hasNoHoldingsAtAll = !isLoading && cashHoldings.length === 0 && nonCashHoldings.length === 0;
+
+  const hasRiskAllocations =
+    allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
+
+  const localizeAllocation = useCallback(
+    (allocation: TaxonomyAllocation | undefined): TaxonomyAllocation | undefined => {
+      if (!allocation) return allocation;
+      return {
+        ...allocation,
+        categories: allocation.categories.map((category) => ({
+          ...category,
+          categoryName: localizeAllocationCategoryName(
+            t,
+            allocation.taxonomyId,
+            category.categoryName,
+          ),
+          children: category.children?.map((child) => ({
+            ...child,
+            categoryName: localizeAllocationCategoryName(
+              t,
+              allocation.taxonomyId,
+              child.categoryName,
+            ),
+          })),
+        })),
+      };
+    },
+    [t],
+  );
+
+  const localizedAllocations = useMemo(
+    () => ({
+      assetClasses: localizeAllocation(allocations?.assetClasses),
+      sectors: localizeAllocation(allocations?.sectors),
+      regions: localizeAllocation(allocations?.regions),
+      riskCategory: localizeAllocation(allocations?.riskCategory),
+      securityTypes: localizeAllocation(allocations?.securityTypes),
+      customGroups: allocations?.customGroups?.map((taxonomy) => localizeAllocation(taxonomy)!),
+    }),
+    [
+      allocations?.assetClasses,
+      allocations?.customGroups,
+      allocations?.regions,
+      allocations?.riskCategory,
+      allocations?.sectors,
+      allocations?.securityTypes,
+      localizeAllocation,
+    ],
+  );
+
+  const hasCustomGroups =
+    localizedAllocations.customGroups?.some(
+      (taxonomy) =>
+        taxonomy.categories.length > 0 &&
+        taxonomy.categories.some(
+          (cat) => cat.value > 0 && !isUnknownAllocationCategory(cat.categoryId),
+        ),
+    ) ?? false;
+
   // Map filter types to allocations
   const getAllocationForType = useCallback(
     (type: string): TaxonomyAllocation | undefined => {
       switch (type) {
         case "class":
-          return allocations?.assetClasses;
+          return localizedAllocations.assetClasses;
         case "sector":
-          return allocations?.sectors;
+          return localizedAllocations.sectors;
         case "country":
-          return allocations?.regions;
+          return localizedAllocations.regions;
         case "risk":
-          return allocations?.riskCategory;
+          return localizedAllocations.riskCategory;
         case "securityType":
-          return allocations?.securityTypes;
+          return localizedAllocations.securityTypes;
         default:
           // Check custom groups
-          if (type === "custom" && allocations?.customGroups?.length) {
-            return allocations.customGroups[0];
+          if (type === "custom" && localizedAllocations.customGroups?.length) {
+            return localizedAllocations.customGroups[0];
           }
           return undefined;
       }
     },
-    [allocations],
+    [localizedAllocations],
   );
 
   // Handle chart section click - opens sheet with clicked category pre-selected
@@ -88,48 +177,21 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
     }
   }, []);
 
-  const { cashHoldings, nonCashHoldings } = useMemo(() => {
-    const cash = holdings?.filter((holding) => holding.holdingType?.toLowerCase() === "cash") ?? [];
-    const nonCash =
-      holdings?.filter((holding) => {
-        if (holding.holdingType?.toLowerCase() === "cash") return false;
-        if (holding.assetKind && isAlternativeAssetKind(holding.assetKind as AssetKind))
-          return false;
-        return true;
-      }) ?? [];
-
-    return { cashHoldings: cash, nonCashHoldings: nonCash };
-  }, [holdings]);
-
-  const hasNoHoldingsAtAll = !isLoading && (!holdings || holdings.length === 0);
-
-  const hasRiskAllocations =
-    allocations?.riskCategory && allocations.riskCategory.categories.length > 0;
-
-  const hasCustomGroups =
-    allocations?.customGroups?.some(
-      (taxonomy) =>
-        taxonomy.categories.length > 0 &&
-        taxonomy.categories.some(
-          (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
-        ),
-    ) ?? false;
-
   const renderEmptyState = () => (
     <div className="flex items-center justify-center py-16">
       <EmptyPlaceholder
         icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-        title="No holdings yet"
-        description="Get started by adding your first transaction or quickly import your existing holdings from a CSV file."
+        title={t("holdings.insights.empty_title")}
+        description={t("holdings.insights.empty_description")}
       >
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <Button size="default" onClick={() => navigate("/activities/manage")}>
             <Icons.Plus className="mr-2 h-4 w-4" />
-            Add Transaction
+            {t("holdings.insights.add_transaction")}
           </Button>
           <Button size="default" variant="outline" onClick={() => navigate("/import")}>
             <Icons.Import className="mr-2 h-4 w-4" />
-            Import from CSV
+            {t("holdings.insights.import_csv")}
           </Button>
         </div>
       </EmptyPlaceholder>
@@ -153,42 +215,46 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCurrencySectionClick={(currencyName) =>
-              handleChartSectionClick("currency", currencyName, `Holdings in ${currencyName}`)
+              handleChartSectionClick(
+                "currency",
+                currencyName,
+                t("holdings.allocation_sheet.holdings_in") + " " + currencyName,
+              )
             }
           />
 
           <DrillableAccountChart isLoading={isLoading} />
 
           <DrillableDonutChart
-            title="Classes"
-            allocation={allocations?.assetClasses}
+            title={t("holdings.insights.title_classes")}
+            allocation={localizedAllocations.assetClasses}
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCategoryClick={(categoryId, categoryName) =>
               handleChartSectionClick(
                 "class",
                 categoryName,
-                `Asset Class: ${categoryName}`,
+                `${t("holdings.insights.title_classes")}: ${categoryName}`,
                 categoryId,
               )
             }
-            onCardClick={() => openAllocationSheet(allocations?.assetClasses)}
+            onCardClick={() => openAllocationSheet(localizedAllocations.assetClasses)}
           />
 
           <DrillableDonutChart
-            title="Regions"
-            allocation={allocations?.regions}
+            title={t("holdings.insights.title_regions")}
+            allocation={localizedAllocations.regions}
             baseCurrency={baseCurrency}
             isLoading={isLoading}
             onCategoryClick={(categoryId, categoryName) =>
               handleChartSectionClick(
                 "country",
                 categoryName,
-                `Holdings in ${categoryName}`,
+                t("holdings.allocation_sheet.holdings_in") + " " + categoryName,
                 categoryId,
               )
             }
-            onCardClick={() => openAllocationSheet(allocations?.regions)}
+            onCardClick={() => openAllocationSheet(localizedAllocations.regions)}
           />
         </div>
 
@@ -201,8 +267,8 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
           <div className="col-span-1 space-y-4">
             {hasRiskAllocations && (
               <CompactAllocationStrip
-                title="Risk Composition"
-                allocation={allocations?.riskCategory}
+                title={t("holdings.insights.risk_composition")}
+                allocation={localizedAllocations.riskCategory}
                 baseCurrency={baseCurrency}
                 isLoading={isLoading}
                 variant="risk-composition"
@@ -210,7 +276,7 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
                   handleChartSectionClick(
                     "risk",
                     categoryName,
-                    `Risk Category: ${categoryName}`,
+                `${t("holdings.insights.risk_composition")}: ${categoryName}`,
                     categoryId,
                   )
                 }
@@ -218,8 +284,8 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
             )}
 
             <CompactAllocationStrip
-              title="Security Types"
-              allocation={allocations?.securityTypes}
+              title={t("holdings.insights.security_types")}
+              allocation={localizedAllocations.securityTypes}
               baseCurrency={baseCurrency}
               isLoading={isLoading}
               variant="security-types"
@@ -227,21 +293,21 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
                 handleChartSectionClick(
                   "securityType",
                   categoryName,
-                  `Type: ${categoryName}`,
+                `${t("holdings.insights.security_types")}: ${categoryName}`,
                   categoryId,
                 )
               }
             />
 
             <SectorsChart
-              allocation={allocations?.sectors}
+              allocation={localizedAllocations.sectors}
               baseCurrency={baseCurrency}
               isLoading={isLoading}
               onSectorSectionClick={(categoryId, categoryName) =>
                 handleChartSectionClick(
                   "sector",
                   categoryName,
-                  `Holdings in Sector: ${categoryName}`,
+                t("holdings.widgets.sectors") + ": " + categoryName,
                   categoryId,
                 )
               }
@@ -253,11 +319,11 @@ export const HoldingsInsightsPage = ({ accountId: accountIdProp }: HoldingsInsig
         {hasCustomGroups && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
             <div className="col-span-1 space-y-4 lg:col-span-3">
-              {allocations?.customGroups?.map(
+              {localizedAllocations.customGroups?.map(
                 (taxonomy) =>
                   taxonomy.categories.length > 0 &&
                   taxonomy.categories.some(
-                    (cat) => cat.value > 0 && cat.categoryName.toLowerCase() !== "unknown",
+                    (cat) => cat.value > 0 && !isUnknownAllocationCategory(cat.categoryId),
                   ) && (
                     <SegmentedAllocationBar
                       key={taxonomy.taxonomyId}

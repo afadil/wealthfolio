@@ -20,50 +20,61 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
 import { IncomeMobileFilterSheet } from "./income-mobile-filter-sheet";
 
-const periods = [
-  { value: "YTD" as const, label: "Year to Date" },
-  { value: "LAST_YEAR" as const, label: "Last Year" },
-  { value: "TOTAL" as const, label: "All Time" },
-];
-
-const mobilePeriods = [
-  { value: "YTD" as const, label: "YTD" },
-  { value: "LAST_YEAR" as const, label: "Last Yr" },
-  { value: "TOTAL" as const, label: "All" },
-];
-
 const IncomePeriodSelector: React.FC<{
   selectedPeriod: "TOTAL" | "YTD" | "LAST_YEAR";
   onPeriodSelect: (period: "TOTAL" | "YTD" | "LAST_YEAR") => void;
-}> = ({ selectedPeriod, onPeriodSelect }) => (
-  <>
-    <div className="hidden sm:block">
-      <AnimatedToggleGroup
-        variant="secondary"
-        size="sm"
-        items={periods}
-        value={selectedPeriod}
-        onValueChange={onPeriodSelect}
-      />
-    </div>
-    <div className="block sm:hidden">
-      <AnimatedToggleGroup
-        variant="secondary"
-        size="xs"
-        items={mobilePeriods}
-        value={selectedPeriod}
-        onValueChange={onPeriodSelect}
-      />
-    </div>
-  </>
-);
+}> = ({ selectedPeriod, onPeriodSelect }) => {
+  const { t } = useTranslation("common");
+  const periods = useMemo(
+    () =>
+      [
+        { value: "YTD" as const, label: t("income.page.period_year_to_date") },
+        { value: "LAST_YEAR" as const, label: t("income.page.period_last_year") },
+        { value: "TOTAL" as const, label: t("income.page.period_all_time") },
+      ] as const,
+    [t],
+  );
+  const mobilePeriods = useMemo(
+    () =>
+      [
+        { value: "YTD" as const, label: t("income.page.period_ytd_short") },
+        { value: "LAST_YEAR" as const, label: t("income.page.period_last_yr_short") },
+        { value: "TOTAL" as const, label: t("income.page.period_all_short") },
+      ] as const,
+    [t],
+  );
+  return (
+    <>
+      <div className="hidden sm:block">
+        <AnimatedToggleGroup
+          variant="secondary"
+          size="sm"
+          items={[...periods]}
+          value={selectedPeriod}
+          onValueChange={onPeriodSelect}
+        />
+      </div>
+      <div className="block sm:hidden">
+        <AnimatedToggleGroup
+          variant="secondary"
+          size="xs"
+          items={[...mobilePeriods]}
+          value={selectedPeriod}
+          onValueChange={onPeriodSelect}
+        />
+      </div>
+    </>
+  );
+};
 
 export default function IncomePage() {
+  const { t, i18n } = useTranslation("common");
   const [selectedPeriod, setSelectedPeriod] = useState<"TOTAL" | "YTD" | "LAST_YEAR">("TOTAL");
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
@@ -73,6 +84,14 @@ export default function IncomePage() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(
     () => createPortfolioAccount(baseCurrency) as Account,
   );
+
+  useEffect(() => {
+    setSelectedAccount((prev) =>
+      prev?.id === PORTFOLIO_ACCOUNT_ID
+        ? { ...prev, name: t("account.selector.all_portfolio"), currency: baseCurrency }
+        : prev,
+    );
+  }, [t, i18n.language, baseCurrency]);
 
   const accountId = selectedAccount?.id === PORTFOLIO_ACCOUNT_ID ? undefined : selectedAccount?.id;
 
@@ -90,7 +109,13 @@ export default function IncomePage() {
   }
 
   if (error || !incomeData) {
-    return <div>Failed to load income summary: {error?.message || "Unknown error"}</div>;
+    return (
+      <div>
+        {t("income.page.load_error", {
+          message: error?.message || t("income.page.unknown_error"),
+        })}
+      </div>
+    );
   }
 
   const periodSummary = incomeData.find((summary) => summary.period === selectedPeriod);
@@ -132,8 +157,8 @@ export default function IncomePage() {
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
           icon={<Icons.DollarSign className="h-10 w-10" />}
-          title="No income data available"
-          description="There is no income data for the selected period. Try selecting a different time range or check back later."
+          title={t("income.page.no_data_title")}
+          description={t("income.page.no_data_description")}
         />
         <IncomeMobileFilterSheet
           open={isFilterSheetOpen}
@@ -244,10 +269,10 @@ export default function IncomePage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 {selectedPeriod === "TOTAL"
-                  ? "All Time Income"
+                  ? t("income.page.card_all_time_income")
                   : selectedPeriod === "LAST_YEAR"
-                    ? "Last Year Income"
-                    : "This Year Income"}
+                    ? t("income.page.card_last_year_income")
+                    : t("income.page.card_this_year_income")}
               </CardTitle>
               <Icons.DollarSign className="text-muted-foreground h-4 w-4" />
             </CardHeader>
@@ -270,12 +295,12 @@ export default function IncomePage() {
                           animated={true}
                         />
                         <span className="text-muted-foreground ml-2 text-xs">
-                          Year-over-year growth
+                          {t("income.page.yoy_growth")}
                         </span>
                       </div>
                     ) : (
                       <p className="text-muted-foreground text-xs">
-                        Cumulative income since inception
+                        {t("income.page.cumulative_since_inception")}
                       </p>
                     )}
                   </div>
@@ -309,7 +334,7 @@ export default function IncomePage() {
           </Card>
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Average</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("income.page.monthly_average")}</CardTitle>
               <Icons.DollarSign className="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
@@ -322,20 +347,22 @@ export default function IncomePage() {
               </div>
               <div className="flex items-center text-xs">
                 <GainPercent value={monthlyAverageChange} className="text-left text-xs" />
-                <span className="text-muted-foreground ml-2 text-xs">Since last period</span>
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {t("income.page.since_last_period")}
+                </span>
               </div>
             </CardContent>
           </Card>
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Income Sources</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("income.page.income_sources")}</CardTitle>
               <Icons.PieChart className="text-muted-foreground h-4 w-4" />
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {[
                   {
-                    name: "Dividends",
+                    name: t("income.page.dividends"),
                     amount: (
                       <AmountDisplay
                         value={dividendIncome}
@@ -346,7 +373,7 @@ export default function IncomePage() {
                     percentage: dividendPercentage,
                   },
                   {
-                    name: "Interest",
+                    name: t("income.page.interest"),
                     amount: (
                       <AmountDisplay
                         value={interestIncome}
@@ -400,15 +427,17 @@ export default function IncomePage() {
           />
           <Card className="flex flex-col">
             <CardHeader>
-              <CardTitle className="text-sm font-medium">Top 10 Dividend Sources</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {t("income.page.top_dividend_sources")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
                 <EmptyPlaceholder
                   className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
                   icon={<Icons.DollarSign className="h-10 w-10" />}
-                  title="No dividend income recorded"
-                  description="There are no dividend sources for the selected period. Try selecting a different time range or check back later."
+                  title={t("income.page.no_dividend_title")}
+                  description={t("income.page.no_dividend_description")}
                 />
               ) : (
                 <div className="space-y-6">
@@ -429,8 +458,10 @@ export default function IncomePage() {
                         ...(otherTotal > 0
                           ? [
                               {
-                                symbol: "Other",
-                                companyName: `${otherStocks.length} other sources`,
+                                symbol: t("income.page.other_symbol"),
+                                companyName: t("income.page.other_sources", {
+                                  count: otherStocks.length,
+                                }),
                                 income: otherTotal,
                                 isOther: true,
                               },
@@ -471,7 +502,9 @@ export default function IncomePage() {
                                   <PrivacyAmount value={item.income} currency={currency} />
                                 </div>
                                 <div className="text-muted-foreground text-xs">
-                                  {percentage.toFixed(1)}% of total
+                                  {t("income.page.percent_of_total", {
+                                    pct: percentage.toFixed(1),
+                                  })}
                                 </div>
                                 {/* Tooltip arrow */}
                                 <div className="border-t-border absolute left-1/2 top-full h-0 w-0 -translate-x-1/2 transform border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"></div>

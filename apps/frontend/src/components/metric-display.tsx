@@ -10,24 +10,17 @@ import {
 import { cn } from "@/lib/utils";
 import { GainPercent } from "@wealthfolio/ui";
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
-// Explanatory texts for info popovers
-export const TIME_WEIGHTED_RETURN_INFO =
-  "Time-Weighted Return (TWR) measures the compound growth rate of a portfolio, ignoring the impact of cash flows (deposits/withdrawals). It isolates the performance of the underlying investments.";
-export const MONEY_WEIGHTED_RETURN_INFO =
-  "Money-Weighted Return (MWR) measures the performance of a portfolio taking into account the size and timing of cash flows. It represents the internal rate of return (IRR) of the portfolio.";
-export const VOLATILITY_INFO =
-  "Volatility measures the dispersion of returns for a given investment. Higher volatility means the price of the investment can change dramatically over a short time period in either direction.";
-export const MAX_DRAWDOWN_INFO =
-  "Maximum Drawdown represents the largest percentage decline from a peak to a subsequent trough in portfolio value during the specified period. It indicates downside risk.";
-export const ANNUALIZED_RETURN_INFO =
-  "Annualized Return shows the geometric average amount of money earned by an investment each year over the selected period, as if the returns were compounded annually.";
-
-// Holdings mode specific info texts (value-based, not cash-flow adjusted)
-export const HOLDINGS_MODE_VOLATILITY_INFO =
-  "Volatility of account value changes. Based on daily valuations without adjusting for deposits or withdrawals. Reflects how much the market value fluctuates.";
-export const HOLDINGS_MODE_MAX_DRAWDOWN_INFO =
-  "Largest peak-to-trough decline in account value. Based on daily valuations without adjusting for deposits or withdrawals.";
+// Info text keys for metric popovers
+export const TIME_WEIGHTED_RETURN_INFO_KEY = "performance.metric.twr_info";
+export const MONEY_WEIGHTED_RETURN_INFO_KEY = "performance.metric.mwr_info";
+export const VOLATILITY_INFO_KEY = "performance.metric.volatility_info";
+export const MAX_DRAWDOWN_INFO_KEY = "performance.metric.max_drawdown_info";
+export const ANNUALIZED_RETURN_INFO_KEY = "performance.metric.annualized_return_info";
+// Holdings mode specific info keys (value-based, not cash-flow adjusted)
+export const HOLDINGS_MODE_VOLATILITY_INFO_KEY = "performance.metric.holdings_mode_volatility_info";
+export const HOLDINGS_MODE_MAX_DRAWDOWN_INFO_KEY = "performance.metric.holdings_mode_max_drawdown_info";
 
 export interface MetricDisplayProps {
   label: string;
@@ -50,6 +43,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
   valueClassName,
   labelComponent,
 }) => {
+  const { t } = useTranslation("common");
   const [mobilePopoverOpen, setMobilePopoverOpen] = useState(false);
 
   const displayValue =
@@ -73,7 +67,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
             className="ml-1 hidden h-4 w-4 rounded-full p-0 md:inline-flex"
           >
             <Icons.Info className="h-3 w-3" />
-            <span className="sr-only">More info about {label}</span>
+            <span className="sr-only">{t("metric_display.more_info_about", { label })}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-60 text-xs" side="top" align="center">
@@ -95,7 +89,8 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-xs">
-                Annualized: <GainPercent value={annualizedValue} animated={false} />
+                {t("metric_display.annualized_prefix")}{" "}
+                <GainPercent value={annualizedValue} animated={false} />
               </p>
             </TooltipContent>
           </Tooltip>
@@ -139,6 +134,7 @@ export const MetricLabelWithInfo: React.FC<MetricLabelWithInfoProps> = ({
   infoText,
   className,
 }) => {
+  const { t } = useTranslation("common");
   return (
     <div className={cn("text-muted-foreground flex items-center text-xs font-light", className)}>
       <span>{label}</span>
@@ -146,7 +142,7 @@ export const MetricLabelWithInfo: React.FC<MetricLabelWithInfoProps> = ({
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="ml-1 h-4 w-4 rounded-full p-0">
             <Icons.Info className="h-3 w-3" />
-            <span className="sr-only">More info about {label}</span>
+            <span className="sr-only">{t("metric_display.more_info_about", { label })}</span>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-60 text-xs" side="top" align="center">

@@ -1,5 +1,6 @@
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
   result,
   status,
 }) => {
+  const { t } = useTranslation("common");
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const isCancelled = status?.type === "incomplete" && status.reason === "cancelled";
@@ -61,13 +63,13 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
             isCancelled && "text-muted-foreground line-through",
           )}
         >
-          {isCancelled ? "Cancelled tool: " : "Used tool: "}
+          {isCancelled ? t("ai.tool_fallback.cancelled_tool_prefix") : t("ai.tool_fallback.used_tool_prefix")}
           <b>{toolName}</b>
         </p>
         {isTruncated && (
           <Badge variant="secondary" className="text-muted-foreground gap-1 text-xs">
             <Icons.AlertTriangle className="size-3" />
-            Result truncated
+            {t("ai.tool_fallback.result_truncated")}
           </Badge>
         )}
         <Button onClick={() => setIsCollapsed(!isCollapsed)}>
@@ -79,7 +81,7 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
           {cancelledReason && (
             <div className="aui-tool-fallback-cancelled-root px-4">
               <p className="aui-tool-fallback-cancelled-header text-muted-foreground font-semibold">
-                Cancelled reason:
+                {t("ai.tool_fallback.cancelled_reason")}
               </p>
               <p className="aui-tool-fallback-cancelled-reason text-muted-foreground">
                 {cancelledReason}
@@ -92,9 +94,11 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
           {!isCancelled && resultData !== undefined && (
             <div className="aui-tool-fallback-result-root border-t border-dashed px-4 pt-2">
               <div className="aui-tool-fallback-result-header flex items-center gap-2">
-                <p className="font-semibold">Result:</p>
+                <p className="font-semibold">{t("ai.tool_fallback.result_label")}</p>
                 {isTruncated && (
-                  <span className="text-muted-foreground text-xs">(showing partial data)</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t("ai.tool_fallback.showing_partial_data")}
+                  </span>
                 )}
               </div>
               <pre className="aui-tool-fallback-result-content whitespace-pre-wrap">

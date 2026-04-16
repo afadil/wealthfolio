@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { AlternativeAssetKind } from "@/lib/types";
 import { parseLocalDate } from "@/lib/utils";
+import i18n from "@/i18n/i18n";
 
 // Property types
 export const PROPERTY_TYPES = [
@@ -36,12 +37,21 @@ export const WEIGHT_UNITS = [
 
 // Liability types (re-exported for convenience)
 export const LIABILITY_TYPES = [
-  { value: "mortgage", label: "Mortgage" },
-  { value: "auto_loan", label: "Auto Loan" },
-  { value: "student_loan", label: "Student Loan" },
-  { value: "credit_card", label: "Credit Card" },
-  { value: "personal_loan", label: "Personal Loan" },
-  { value: "heloc", label: "HELOC" },
+  { value: "mortgage", label: i18n.t("asset.alternative.quick_add.liability_option.mortgage") },
+  { value: "auto_loan", label: i18n.t("asset.alternative.quick_add.liability_option.auto_loan") },
+  {
+    value: "student_loan",
+    label: i18n.t("asset.alternative.quick_add.liability_option.student_loan"),
+  },
+  {
+    value: "credit_card",
+    label: i18n.t("asset.alternative.quick_add.liability_option.credit_card"),
+  },
+  {
+    value: "personal_loan",
+    label: i18n.t("asset.alternative.quick_add.liability_option.personal_loan"),
+  },
+  { value: "heloc", label: i18n.t("asset.alternative.quick_add.liability_option.heloc") },
 ] as const;
 
 // Vehicle types (optional, for future use)

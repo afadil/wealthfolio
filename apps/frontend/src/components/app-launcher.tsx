@@ -1,5 +1,4 @@
 import { useAccounts } from "@/hooks/use-accounts";
-import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import {
   useRecalculatePortfolioMutation,
   useUpdatePortfolioMutation,
@@ -29,8 +28,10 @@ import {
   SheetHeader,
   SheetTitle,
   type Icon,
+  useBalancePrivacy,
 } from "@wealthfolio/ui";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 
 interface RecentItem {
@@ -70,6 +71,7 @@ const accountTypeIcons: Record<AccountType | typeof PORTFOLIO_ACCOUNT_ID, Icon> 
 };
 
 export function AppLauncher() {
+  const { t } = useTranslation("common");
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -199,7 +201,9 @@ export function AppLauncher() {
         ? []
         : [
             {
-              title: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+              title: isLaunchBar
+                ? t("launcher.switch_to_sidebar")
+                : t("launcher.switch_to_floating"),
               href: isLaunchBar ? "#use-sidebar-navigation" : "#use-launchbar-navigation",
               icon: isLaunchBar ? (
                 <Icons.PanelLeft className="size-6" />
@@ -207,18 +211,20 @@ export function AppLauncher() {
                 <Icons.RectangleEllipsis className="size-6" />
               ),
               keywords: ["navigation", "sidebar", "floating", "bottom", "switch", "layout"],
-              label: isLaunchBar ? "Switch to Sidebar Navigation" : "Switch to Floating Navigation",
+              label: isLaunchBar
+                ? t("launcher.switch_to_sidebar")
+                : t("launcher.switch_to_floating"),
             },
             {
-              title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
+              title: t("launcher.toggle_focus_mode"),
               href: "#toggle-focus-mode",
               icon: <Icons.Fullscreen className="size-6" />,
               keywords: ["focus", "hide navigation", "minimal", "distraction-free", "layout"],
-              label: "Toggle Focus Mode",
+              label: t("launcher.toggle_focus_mode"),
             },
           ]),
       {
-        title: isBalanceHidden ? "Show Balance" : "Hide Balance",
+        title: isBalanceHidden ? t("launcher.show_balance") : t("launcher.hide_balance"),
         href: "#toggle-privacy",
         icon: isBalanceHidden ? (
           <Icons.Eye className="size-6" />
@@ -226,31 +232,31 @@ export function AppLauncher() {
           <Icons.EyeOff className="size-6" />
         ),
         keywords: ["privacy", "hide", "show", "balance", "toggle", "visibility"],
-        label: isBalanceHidden ? "Show Balance" : "Hide Balance",
+        label: isBalanceHidden ? t("launcher.show_balance") : t("launcher.hide_balance"),
       },
       {
-        title: "Theme → Light",
+        title: t("launcher.theme_light"),
         href: "#theme-light",
         icon: <Icons.Sun className="size-6" />,
         keywords: ["theme", "light", "appearance", "mode"],
-        label: "Theme → Light",
+        label: t("launcher.theme_light"),
       },
       {
-        title: "Theme → Dark",
+        title: t("launcher.theme_dark"),
         href: "#theme-dark",
         icon: <Icons.Moon className="size-6" />,
         keywords: ["theme", "dark", "appearance", "mode"],
-        label: "Theme → Dark",
+        label: t("launcher.theme_dark"),
       },
       {
-        title: "Theme → System",
+        title: t("launcher.theme_system"),
         href: "#theme-system",
         icon: <Icons.Monitor className="size-6" />,
         keywords: ["theme", "system", "appearance", "mode", "auto"],
-        label: "Theme → System",
+        label: t("launcher.theme_system"),
       },
       {
-        title: "Update Quotes",
+        title: t("launcher.update_quotes"),
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
@@ -258,11 +264,11 @@ export function AppLauncher() {
           <Icons.Refresh className="size-6" />
         ),
         keywords: ["update", "portfolio", "market data", "quotes", "refresh", "sync"],
-        label: isUpdatingPortfolio ? "Updating quotes..." : "Update quotes",
+        label: isUpdatingPortfolio ? t("launcher.updating_quotes") : t("launcher.update_quotes"),
         disabled: isUpdatingPortfolio,
       },
       {
-        title: "Rebuild Full History",
+        title: t("launcher.rebuild_full_history"),
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
           <Icons.Spinner className="size-6 animate-spin" />
@@ -270,99 +276,101 @@ export function AppLauncher() {
           <Icons.Clock className="size-6" />
         ),
         keywords: ["rebuild", "history", "recalculate", "portfolio", "backfill", "full"],
-        label: isRecalculatingPortfolio ? "Rebuilding history..." : "Rebuild full history",
+        label: isRecalculatingPortfolio
+          ? t("launcher.rebuilding_history")
+          : t("launcher.rebuild_full_history"),
         disabled: isRecalculatingPortfolio,
       },
       {
-        title: "Record Buy",
+        title: t("launcher.record_buy"),
         href: buildTransactionUrl("BUY"),
         icon: <Icons.Plus className="size-6" />,
         keywords: ["buy", "purchase", "trade", "stock", "shares", "record"],
-        label: "Record Buy",
+        label: t("launcher.record_buy"),
       },
       {
-        title: "Record Sell",
+        title: t("launcher.record_sell"),
         href: buildTransactionUrl("SELL"),
         icon: <Icons.TrendingDown className="size-6" />,
         keywords: ["sell", "sale", "trade", "stock", "shares", "record"],
-        label: "Record Sell",
+        label: t("launcher.record_sell"),
       },
       {
-        title: "Record Dividend",
+        title: t("launcher.record_dividend"),
         href: buildTransactionUrl("DIVIDEND"),
         icon: <Icons.Income className="size-6" />,
         keywords: ["dividend", "income", "payout", "distribution", "record"],
-        label: "Record Dividend",
+        label: t("launcher.record_dividend"),
       },
       {
-        title: "Record Deposit",
+        title: t("launcher.record_deposit"),
         href: buildTransactionUrl("DEPOSIT"),
         icon: <Icons.DollarSign className="size-6" />,
         keywords: ["deposit", "add", "money", "cash", "fund", "record"],
-        label: "Record Deposit",
+        label: t("launcher.record_deposit"),
       },
       {
-        title: "Record Withdrawal",
+        title: t("launcher.record_withdrawal"),
         href: buildTransactionUrl("WITHDRAWAL"),
         icon: <Icons.ArrowDown className="size-6" />,
         keywords: ["withdrawal", "withdraw", "money", "cash", "take out", "record"],
-        label: "Record Withdrawal",
+        label: t("launcher.record_withdrawal"),
       },
       {
-        title: "Add Holding",
+        title: t("launcher.add_holding"),
         href: "/activities/add?tab=holdings",
         icon: <Icons.Wallet className="size-6" />,
         keywords: ["holding", "add", "position", "import", "record"],
-        label: "Add Holding",
+        label: t("launcher.add_holding"),
       },
       {
-        title: "Record Interest",
+        title: t("launcher.record_interest"),
         href: buildTransactionUrl("INTEREST"),
         icon: <Icons.Percent className="size-6" />,
         keywords: ["interest", "income", "earned", "bank", "record"],
-        label: "Record Interest",
+        label: t("launcher.record_interest"),
       },
       {
-        title: "Add Transaction",
+        title: t("launcher.add_transaction"),
         href: buildTransactionUrl(),
         icon: <Icons.Activity className="size-6" />,
         keywords: ["add", "new", "create", "transaction", "activity", "any"],
-        label: "Add Transaction",
+        label: t("launcher.add_transaction"),
       },
       {
-        title: "Import Activities",
+        title: t("launcher.import_activities"),
         href: "/import",
         icon: <Icons.Import className="size-6" />,
         keywords: ["import", "csv", "upload", "file", "bulk"],
-        label: "Import Activities",
+        label: t("launcher.import_activities"),
       },
       {
-        title: "Manage Securities",
+        title: t("launcher.manage_securities"),
         href: "/settings/securities",
         icon: <Icons.BadgeDollarSign className="size-6" />,
         keywords: ["securities", "assets", "stocks", "manage", "edit", "settings"],
-        label: "Manage Securities",
+        label: t("launcher.manage_securities"),
       },
       {
-        title: "Manage Accounts",
+        title: t("launcher.manage_accounts"),
         href: "/settings/accounts",
         icon: <Icons.CreditCard className="size-6" />,
         keywords: ["accounts", "manage", "edit", "settings"],
-        label: "Manage Accounts",
+        label: t("launcher.manage_accounts"),
       },
       {
-        title: "Manage Goals",
+        title: t("launcher.manage_goals"),
         href: "/settings/goals",
         icon: <Icons.Goal className="size-6" />,
         keywords: ["goals", "manage", "edit", "settings"],
-        label: "Manage Goals",
+        label: t("launcher.manage_goals"),
       },
       {
-        title: "Manage Contribution Limits",
+        title: t("launcher.manage_contribution_limits"),
         href: "/settings/contribution-limits",
         icon: <Icons.TrendingUp className="size-6" />,
         keywords: ["contribution", "limits", "manage", "edit", "settings"],
-        label: "Manage Contribution Limits",
+        label: t("launcher.manage_contribution_limits"),
       },
     ];
 
@@ -382,6 +390,7 @@ export function AppLauncher() {
     location.pathname,
     navigation,
     isFocusMode,
+    t,
   ]);
 
   const holdingOptions = useMemo<LauncherHoldingItem[]>(() => {
@@ -535,11 +544,12 @@ export function AppLauncher() {
   };
 
   const handleSelectRecent = (item: RecentItem) => {
+    const resolvedLabel = getRecentDisplayLabel(item);
     // Update the timestamp for this item (move to front)
     addRecentItem({
       type: item.type,
       id: item.id,
-      label: item.label,
+      label: resolvedLabel,
     });
 
     setSearch("");
@@ -557,6 +567,25 @@ export function AppLauncher() {
         break;
     }
   };
+
+  const getRecentDisplayLabel = useCallback(
+    (item: RecentItem) => {
+      if (item.type === "action") {
+        const match = actionItems.find((action) => action.href === item.id);
+        return match ? (match.label ?? match.title) : item.label;
+      }
+      if (item.type === "holding") {
+        const match = holdingOptions.find((holding) => holding.id === item.id);
+        if (match) return match.name ? `${match.symbol} - ${match.name}` : match.symbol;
+      }
+      if (item.type === "account") {
+        const match = accountOptions.find((account) => account.id === item.id);
+        if (match) return match.name;
+      }
+      return item.label;
+    },
+    [accountOptions, actionItems, holdingOptions],
+  );
 
   // Filter items based on search
   const searchLower = search.toLowerCase();
@@ -580,7 +609,7 @@ export function AppLauncher() {
   // Filter recent items based on search (only show when searching or when no search)
   const filteredRecent = recentItems.filter((item) => {
     if (!searchLower) return true;
-    return item.label.toLowerCase().includes(searchLower);
+    return getRecentDisplayLabel(item).toLowerCase().includes(searchLower);
   });
 
   // Show recent items only when there's no search, or when searching and they match
@@ -614,7 +643,7 @@ export function AppLauncher() {
   const commandContent = (
     <>
       <CommandInput
-        placeholder="Search actions, holdings, or accounts..."
+        placeholder={t("launcher.search_placeholder")}
         autoFocus={!isMobileViewport && open}
         value={search}
         onValueChange={setSearch}
@@ -626,10 +655,11 @@ export function AppLauncher() {
           isMobileViewport ? "max-h-[calc(80vh-160px)] px-2 pb-8" : "max-h-[420px]",
         )}
       >
-        {!hasResults && <CommandEmpty>No matches found.</CommandEmpty>}
+        {!hasResults && <CommandEmpty>{t("launcher.no_matches")}</CommandEmpty>}
         {showRecent && (
-          <CommandGroup heading="Recent">
+          <CommandGroup heading={t("launcher.group_recent")}>
             {(searchLower ? filteredRecent : recentItems).map((item) => {
+              const displayLabel = getRecentDisplayLabel(item);
               const getRecentIcon = () => {
                 switch (item.type) {
                   case "holding":
@@ -646,14 +676,14 @@ export function AppLauncher() {
               return (
                 <CommandItem
                   key={`${item.type}-${item.id}`}
-                  value={`recent-${item.label}`}
+                  value={`recent-${displayLabel}`}
                   onSelect={() => handleSelectRecent(item)}
                   className={cn(isMobileViewport ? "gap-3 py-4 text-base" : undefined)}
                 >
                   {getRecentIcon()}
-                  <span className="font-medium">{item.label}</span>
+                  <span className="font-medium">{displayLabel}</span>
                   <span className="text-muted-foreground ml-auto text-xs capitalize">
-                    {item.type}
+                    {t(`launcher.recent_type.${item.type}`)}
                   </span>
                 </CommandItem>
               );
@@ -661,7 +691,7 @@ export function AppLauncher() {
           </CommandGroup>
         )}
         {filteredActions.length > 0 && (
-          <CommandGroup heading="Actions">
+          <CommandGroup heading={t("launcher.group_actions")}>
             {filteredActions.map((action, index) => {
               const resizedIcon = renderIcon(action.icon);
               const displayText = action.label ?? action.title;
@@ -683,10 +713,10 @@ export function AppLauncher() {
           </CommandGroup>
         )}
         {(isHoldingsLoading || filteredHoldings.length > 0) && (
-          <CommandGroup heading="Holdings">
+          <CommandGroup heading={t("launcher.group_holdings")}>
             {isHoldingsLoading ? (
               <CommandItem disabled className={cn(isMobileViewport ? "py-4 text-base" : undefined)}>
-                Loading holdings...
+                {t("launcher.loading_holdings")}
               </CommandItem>
             ) : (
               filteredHoldings.map((holding) => (
@@ -714,10 +744,10 @@ export function AppLauncher() {
           </CommandGroup>
         )}
         {(isAccountsLoading || filteredAccounts.length > 0) && (
-          <CommandGroup heading="Accounts">
+          <CommandGroup heading={t("launcher.group_accounts")}>
             {isAccountsLoading ? (
               <CommandItem disabled className={cn(isMobileViewport ? "py-4 text-base" : undefined)}>
-                Loading accounts...
+                {t("launcher.loading_accounts")}
               </CommandItem>
             ) : (
               filteredAccounts.map((account) => {
@@ -752,7 +782,7 @@ export function AppLauncher() {
           className="mx-auto flex h-[85vh] w-full max-w-screen-sm flex-col overflow-hidden rounded-t-3xl border-none px-0 pb-6 pt-4"
         >
           <SheetHeader className="px-6">
-            <SheetTitle>Quick launch</SheetTitle>
+            <SheetTitle>{t("launcher.sheet_title")}</SheetTitle>
           </SheetHeader>
           <Command
             className={cn(
@@ -773,10 +803,8 @@ export function AppLauncher() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <DialogTitle className="sr-only">Command palette</DialogTitle>
-      <DialogDescription className="sr-only">
-        Search for actions, holdings, accounts, or navigation destinations.
-      </DialogDescription>
+      <DialogTitle className="sr-only">{t("launcher.dialog_title")}</DialogTitle>
+      <DialogDescription className="sr-only">{t("launcher.dialog_description")}</DialogDescription>
       {commandContent}
     </CommandDialog>
   );

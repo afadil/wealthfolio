@@ -44,9 +44,14 @@ pub trait AssetServiceTrait: Send + Sync {
     async fn enrich_asset_profile(&self, asset_id: &str) -> Result<Asset>;
 
     /// Enriches multiple assets in batch, with deduplication and sync state tracking.
-    /// Checks if each asset needs enrichment before fetching profile data.
+    /// When `force_profile_refresh` is false, skips assets that already have `profile_enriched_at`.
+    /// Use `true` after a targeted market sync so profiles (e.g. ETF holdings) refresh.
     /// Returns (enriched_count, skipped_count, failed_count).
-    async fn enrich_assets(&self, asset_ids: Vec<String>) -> Result<(usize, usize, usize)>;
+    async fn enrich_assets(
+        &self,
+        asset_ids: Vec<String>,
+        force_profile_refresh: bool,
+    ) -> Result<(usize, usize, usize)>;
 
     /// Removes the $.legacy structure from asset metadata after migration.
     /// Preserves $.identifiers if present.
@@ -256,7 +261,11 @@ mod tests {
             unimplemented!()
         }
 
-        async fn enrich_assets(&self, _asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+        async fn enrich_assets(
+            &self,
+            _asset_ids: Vec<String>,
+            _force_profile_refresh: bool,
+        ) -> Result<(usize, usize, usize)> {
             unimplemented!()
         }
 

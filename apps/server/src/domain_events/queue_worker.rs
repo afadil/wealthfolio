@@ -150,7 +150,7 @@ async fn process_event_batch(events: &[DomainEvent], deps: Arc<QueueWorkerDeps>)
         for chunk in enrichment_assets.chunks(chunk_size) {
             match tokio::time::timeout(
                 Duration::from_secs(30),
-                deps.asset_service.enrich_assets(chunk.to_vec()),
+                deps.asset_service.enrich_assets(chunk.to_vec(), false),
             )
             .await
             {

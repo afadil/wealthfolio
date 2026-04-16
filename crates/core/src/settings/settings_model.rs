@@ -14,6 +14,8 @@ pub struct Settings {
     pub auto_update_check_enabled: bool,
     pub menu_bar_visible: bool,
     pub sync_enabled: bool,
+    /// ISO language code for translating provider security notes (e.g. Yahoo blurbs), default `en`.
+    pub translation_source_lang: String,
 }
 
 impl Default for Settings {
@@ -28,6 +30,7 @@ impl Default for Settings {
             auto_update_check_enabled: true,
             menu_bar_visible: true,
             sync_enabled: true,
+            translation_source_lang: "en".to_string(),
         }
     }
 }
@@ -43,6 +46,7 @@ pub struct SettingsUpdate {
     pub auto_update_check_enabled: Option<bool>,
     pub menu_bar_visible: Option<bool>,
     pub sync_enabled: Option<bool>,
+    pub translation_source_lang: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

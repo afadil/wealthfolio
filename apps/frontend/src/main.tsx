@@ -1,7 +1,9 @@
 import { isDesktop, getPlatform } from "@/adapters";
+import "@/i18n/i18n";
 import React from "react";
 import * as ReactDOMLegacy from "react-dom";
 import ReactDOM from "react-dom/client";
+import * as ReactI18next from "react-i18next";
 import { debugAddonState, isAddonDevModeEnabled, loadAllAddons } from "./addons/addons-loader";
 import "./addons/addons-runtime-context";
 import App from "./App";
@@ -25,6 +27,9 @@ if (isAddonDevModeEnabled) {
 // ReactDOM/client only has createRoot/hydrateRoot, but addons need createPortal from react-dom
 window.React = React;
 window.ReactDOM = ReactDOMLegacy;
+
+// Same module instance as the app bundle so addons can use `useTranslation` with this i18n context
+(window as unknown as { ReactI18next: typeof ReactI18next }).ReactI18next = ReactI18next;
 
 // Make debug function available globally for debugging
 globalThis.debugAddons = debugAddonState;

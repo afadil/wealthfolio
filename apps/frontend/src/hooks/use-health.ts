@@ -9,6 +9,7 @@ import {
   runHealthChecks,
   updateHealthConfig,
 } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { QueryKeys } from "@/lib/query-keys";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
@@ -39,18 +40,25 @@ export function useRunHealthChecks(options?: { navigate?: (path: string) => void
       queryClient.setQueryData([QueryKeys.HEALTH_STATUS], data);
       const issueCount = data.issues?.length ?? 0;
       if (issueCount === 0) {
-        toast.success("All checks passed", { description: "No issues found." });
+        toast.success(i18n.t("toast.health.checks_passed_title"), {
+          description: i18n.t("toast.health.checks_passed_description"),
+        });
       } else {
-        toast.error(`${issueCount} issue${issueCount > 1 ? "s" : ""} found`, {
-          description: "Review the details in the Health Center.",
+        const issuesKey =
+          issueCount === 1 ? "toast.health.issues_found_one" : "toast.health.issues_found_other";
+        toast.error(i18n.t(issuesKey, { count: issueCount }), {
+          description: i18n.t("toast.health.issues_review_description"),
           action: options?.navigate
-            ? { label: "View", onClick: () => options.navigate!("/health") }
+            ? {
+                label: i18n.t("toast.global.action_view"),
+                onClick: () => options.navigate!("/health"),
+              }
             : undefined,
         });
       }
     },
     onError: (error: Error) => {
-      toast.error("Health check failed", { description: error.message });
+      toast.error(i18n.t("toast.health.check_failed_title"), { description: error.message });
     },
   });
 }
@@ -66,10 +74,10 @@ export function useDismissHealthIssue() {
       dismissHealthIssue(issueId, dataHash),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast.success("Issue dismissed");
+      toast.success(i18n.t("toast.health.issue_dismissed"));
     },
     onError: (error: Error) => {
-      toast.error("Failed to dismiss issue", { description: error.message });
+      toast.error(i18n.t("toast.health.dismiss_failed_title"), { description: error.message });
     },
   });
 }
@@ -84,10 +92,10 @@ export function useRestoreHealthIssue() {
     mutationFn: restoreHealthIssue,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast.success("Issue restored");
+      toast.success(i18n.t("toast.health.issue_restored"));
     },
     onError: (error: Error) => {
-      toast.error("Failed to restore issue", { description: error.message });
+      toast.error(i18n.t("toast.health.restore_failed_title"), { description: error.message });
     },
   });
 }
@@ -114,11 +122,11 @@ export function useExecuteHealthFix() {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
       // Skip toast for sync actions — global event listeners handle feedback
       if (actionId !== "sync_prices" && actionId !== "retry_sync") {
-        toast.success("Fix applied successfully");
+        toast.success(i18n.t("toast.health.fix_applied"));
       }
     },
     onError: (error: Error) => {
-      toast.error("Fix failed", { description: error.message });
+      toast.error(i18n.t("toast.health.fix_failed_title"), { description: error.message });
     },
   });
 }
@@ -147,10 +155,10 @@ export function useUpdateHealthConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_CONFIG] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HEALTH_STATUS] });
-      toast.success("Configuration updated");
+      toast.success(i18n.t("toast.health.config_updated"));
     },
     onError: (error: Error) => {
-      toast.error("Failed to update configuration", { description: error.message });
+      toast.error(i18n.t("toast.health.config_update_failed_title"), { description: error.message });
     },
   });
 }

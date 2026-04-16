@@ -12,6 +12,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { FC } from "react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import type { MergedModel } from "../types";
@@ -19,6 +20,7 @@ import { useChatModelContext } from "../hooks/use-chat-model-context";
 import { ThinkingToggle } from "./thinking-toggle";
 
 export const ModelPicker: FC = () => {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { isLoading, currentProvider, currentModelId, selectModel } = useChatModelContext();
@@ -92,7 +94,7 @@ export const ModelPicker: FC = () => {
     return (
       <div className="flex items-center">
         <div className="text-muted-foreground flex items-center gap-1.5 px-3 text-xs">
-          <span>{currentModel ? getDisplayName(currentModel.id) : "No model"}</span>
+          <span>{currentModel ? getDisplayName(currentModel.id) : t("ai.model_picker.no_model")}</span>
         </div>
         <ThinkingToggle />
       </div>
@@ -107,15 +109,15 @@ export const ModelPicker: FC = () => {
             variant="ghost"
             size="sm"
             className="text-muted-foreground hover:text-foreground h-8 gap-1.5 px-3 text-xs font-normal"
-            aria-label="Select model"
+            aria-label={t("ai.model_picker.select_model_aria")}
           >
-            <span>{currentModel ? getDisplayName(currentModel.id) : "Select model"}</span>
+            <span>{currentModel ? getDisplayName(currentModel.id) : t("ai.model_picker.select_model")}</span>
             <Icons.ChevronDown className="size-3 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-fit min-w-56 p-1.5" align="start" sideOffset={8}>
           <Command>
-            <CommandEmpty>No models available</CommandEmpty>
+            <CommandEmpty>{t("ai.model_picker.no_models_available")}</CommandEmpty>
             <CommandGroup>
               {selectedModels.map((model) => {
                 const isSelected = model.id === currentModelId;
@@ -142,7 +144,7 @@ export const ModelPicker: FC = () => {
                 className="text-muted-foreground flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs"
               >
                 <Icons.Plus className="h-3 w-3 shrink-0" />
-                <span className="whitespace-nowrap">Add models...</span>
+                <span className="whitespace-nowrap">{t("ai.model_picker.add_models")}</span>
               </CommandItem>
             </CommandGroup>
           </Command>

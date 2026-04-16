@@ -31,7 +31,7 @@ use crate::models::{
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 use crate::resolver::{yahoo_exchange_to_mic, ResolverChain};
 
-use models::{YahooQuoteSummaryResponse, YahooQuoteSummaryResult};
+use models::{YahooQuoteSummaryResponse, YahooQuoteSummaryResult, YahooTopHoldings};
 
 // ============================================================================
 // Crumb/Cookie Authentication
@@ -635,6 +635,99 @@ impl YahooProvider {
     // Profile Fetching
     // ========================================================================
 
+    /// Build `AssetProfile.sectors` JSON from Yahoo `topHoldings.sectorWeightings` (preferred).
+    fn etf_sectors_from_sector_weightings(th: &YahooTopHoldings) -> Option<String> {
+        if th.sector_weightings.is_empty() {
+            return None;
+        }
+        let sector_data: Vec<serde_json::Value> = th
+            .sector_weightings
+            .iter()
+            .flat_map(|sw| {
+                sw.iter().filter_map(|(sector_name, weight)| {
+                    weight.raw.map(|w| {
+                        serde_json::json!({
+                            "name": format_sector(sector_name),
+                            "weight": w
+                        })
+                    })
+                })
+            })
+            .collect();
+        if sector_data.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&sector_data).ok()
+        }
+    }
+
+    /// Fallback: many ETFs (e.g. some TSX listings, NEOS products) expose `topHoldings.holdings`
+    /// while `sectorWeightings` is empty.
+    fn etf_sectors_from_fund_holdings(th: &YahooTopHoldings) -> Option<String> {
+        if th.holdings.is_empty() {
+            return None;
+        }
+        let rows: Vec<serde_json::Value> = th
+            .holdings
+            .iter()
+            .filter_map(|h| {
+                let name = h.line_label()?;
+                let w = h.weight_fraction()?;
+                Some(serde_json::json!({ "name": name, "weight": w }))
+            })
+            .collect();
+        if rows.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&rows).ok()
+        }
+    }
+
+    fn etf_sectors_json_from_top_holdings(th: &YahooTopHoldings) -> Option<String> {
+        Self::etf_sectors_from_sector_weightings(th).or_else(|| Self::etf_sectors_from_fund_holdings(th))
+    }
+
+    /// Top equity/bond lines in `topHoldings.holdings` (Yahoo "Top Holdings"), for UI separate from sector weights.
+    fn etf_fund_top_holdings_json(th: &YahooTopHoldings) -> Option<String> {
+        if th.holdings.is_empty() {
+            return None;
+        }
+        let rows: Vec<serde_json::Value> = th
+            .holdings
+            .iter()
+            .take(30)
+            .filter_map(|h| {
+                let w = h.weight_fraction()?;
+                let symbol = h
+                    .symbol
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("")
+                    .to_string();
+                let description = h
+                    .holding_name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("")
+                    .to_string();
+                let name = h.line_label().unwrap_or_default();
+                Some(serde_json::json!({
+                    "symbol": symbol,
+                    "description": description,
+                    "name": name,
+                    "weight": w
+                }))
+            })
+            .collect();
+        if rows.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&rows).ok()
+        }
+    }
+
     /// Fetch profile using quoteSummary API (richest data source).
     async fn fetch_quote_summary_profile(
         &self,
@@ -763,32 +856,11 @@ impl YahooProvider {
 
         // Build sector/sectors based on asset type
         let (sector, sectors) = match quote_type_upper.as_str() {
-            "ETF" | "MUTUALFUND" => {
-                // For ETFs/Mutual Funds: extract sector weightings from topHoldings
-                let sectors_json = top_holdings.and_then(|th| {
-                    if th.sector_weightings.is_empty() {
-                        return None;
-                    }
-                    let sector_data: Vec<serde_json::Value> = th
-                        .sector_weightings
-                        .iter()
-                        .flat_map(|sw| {
-                            sw.iter().filter_map(|(sector_name, weight)| {
-                                weight.raw.map(|w| {
-                                    serde_json::json!({
-                                        "name": format_sector(sector_name),
-                                        "weight": w
-                                    })
-                                })
-                            })
-                        })
-                        .collect();
-                    if sector_data.is_empty() {
-                        None
-                    } else {
-                        serde_json::to_string(&sector_data).ok()
-                    }
-                });
+            "ETF" | "MUTUALFUND" | "ETP" => {
+                // Prefer sector weightings; fallback to `holdings` positions when empty (common for
+                // some TSX ETFs, NEOS funds, etc.).
+                let sectors_json =
+                    top_holdings.and_then(Self::etf_sectors_json_from_top_holdings);
                 (None, sectors_json)
             }
             _ => {
@@ -800,6 +872,11 @@ impl YahooProvider {
             }
         };
 
+        let fund_holdings = match quote_type_upper.as_str() {
+            "ETF" | "MUTUALFUND" | "ETP" => top_holdings.and_then(Self::etf_fund_top_holdings_json),
+            _ => None,
+        };
+
         let profile = AssetProfile {
             source: Some("YAHOO".to_string()),
             name: Some(name),
@@ -808,6 +885,7 @@ impl YahooProvider {
                 .map(|t| t.to_uppercase()),
             sector,
             sectors,
+            fund_holdings,
             industry: summary.and_then(|s| s.industry.clone()),
             website: summary.and_then(|s| s.website.clone()),
             description: summary

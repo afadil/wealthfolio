@@ -2,6 +2,7 @@ import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -150,10 +151,12 @@ function EmptyState() {
 }
 
 function ErrorState({ message }: { message?: string }) {
+  const { t } = useTranslation("common");
+
   return (
     <Card className="border-destructive/30 bg-destructive/5">
       <CardContent className="py-4">
-        <p className="text-destructive text-sm font-medium">Failed to load performance data</p>
+        <p className="text-destructive text-sm font-medium">{t("ai.tool.performance.error_load")}</p>
         {message && <p className="text-muted-foreground mt-1 text-xs">{message}</p>}
       </CardContent>
     </Card>
@@ -197,6 +200,7 @@ type PerformanceToolUIContentProps = ToolCallMessagePartProps<
 >;
 
 function PerformanceToolUIContent({ args, result, status }: PerformanceToolUIContentProps) {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -244,16 +248,16 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
           day: "numeric",
           year: "numeric",
         })
-      : "Start";
+      : t("ai.tool.common.start");
     const end = parsed.periodEndDate
       ? new Date(parsed.periodEndDate).toLocaleDateString(undefined, {
           month: "short",
           day: "numeric",
           year: "numeric",
         })
-      : "Today";
+      : t("ai.tool.common.today");
     return `${start} - ${end}`;
-  }, [parsed?.periodStartDate, parsed?.periodEndDate]);
+  }, [parsed?.periodStartDate, parsed?.periodEndDate, t]);
 
   // Show loading skeleton while running
   if (isLoading) {
@@ -262,7 +266,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
 
   // Show error state for incomplete/failed status
   if (isIncomplete) {
-    return <ErrorState message="The request was interrupted or failed." />;
+    return <ErrorState message={t("ai.tool.common.error_incomplete")} />;
   }
 
   // Show empty state if no valid data
@@ -271,7 +275,7 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
   }
 
   const typedArgs = args as GetPerformanceArgs | undefined;
-  const accountLabel = parsed.id ?? typedArgs?.accountId ?? "Portfolio";
+  const accountLabel = parsed.id ?? typedArgs?.accountId ?? t("ai.tool.performance.portfolio_label");
   // Hide UUID-like IDs (e.g., "29628C36-3333-46A2-A1FB-B4D8514D0A74")
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
     accountLabel,
@@ -284,8 +288,10 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Performance</CardTitle>
-            {accountLabel !== "TOTAL" && accountLabel !== "Portfolio" && !isUuid && (
+            <CardTitle className="text-base">{t("ai.tool.performance.title")}</CardTitle>
+            {accountLabel !== "TOTAL" &&
+              accountLabel !== t("ai.tool.performance.portfolio_label") &&
+              !isUuid && (
               <Badge variant="outline" className="text-xs uppercase">
                 {accountLabel}
               </Badge>
@@ -334,23 +340,23 @@ function PerformanceToolUIContent({ args, result, status }: PerformanceToolUICon
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
-            label="Annualized TWR"
+            label={t("performance.ai_tool.annualized_twr")}
             value={formatPercentSigned(parsed.annualizedTwr)}
             isPositive={parsed.annualizedTwr >= 0}
           />
           <MetricCard
-            label="Money-Weighted (MWR)"
+            label={t("performance.ai_tool.money_weighted_mwr")}
             value={formatPercentSigned(parsed.cumulativeMwr)}
-            subValue={`${formatPercentSigned(parsed.annualizedMwr)} ann.`}
+            subValue={`${formatPercentSigned(parsed.annualizedMwr)} ${t("performance.ai_tool.mwr_ann_suffix")}`}
             isPositive={parsed.cumulativeMwr >= 0}
           />
           <MetricCard
-            label="Volatility"
+            label={t("performance.metric_volatility")}
             value={formatPercent(parsed.volatility)}
             isPositive={null}
           />
           <MetricCard
-            label="Max Drawdown"
+            label={t("performance.metric_max_drawdown")}
             value={formatPercent(parsed.maxDrawdown)}
             isPositive={parsed.maxDrawdown > 0 ? false : null}
           />

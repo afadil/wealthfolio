@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
 import { ACTIVITY_SKIP } from "../utils/draft-utils";
 
@@ -47,6 +48,7 @@ export function MappingHeaderCell({
   headers: string[];
   handleColumnMapping: (field: ImportFormat, value: string) => void;
 }) {
+  const { t } = useTranslation("common");
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
   const mappedHeader = mapping.fieldMappings[field];
   const displayHeader = Array.isArray(mappedHeader) ? mappedHeader[0] : mappedHeader;
@@ -74,17 +76,23 @@ export function MappingHeaderCell({
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
           <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
-            <SelectValue placeholder={isRequired ? "Select column" : "Optional"} />
+            <SelectValue
+              placeholder={
+                isRequired
+                  ? t("activity.import.mapping.select_column")
+                  : t("activity.import.mapping.optional")
+              }
+            />
           </SelectTrigger>
           <SelectContent className="max-h-[300px] overflow-y-auto">
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>
                   {field === ImportFormat.CURRENCY
-                    ? "Account Currency"
+                    ? t("activity.import.mapping.account_currency")
                     : field === ImportFormat.ACCOUNT
-                      ? "Default Account"
-                      : "Ignore"}
+                      ? t("activity.import.mapping.default_account")
+                      : t("activity.import.mapping.ignore")}
                 </SelectItem>
                 <SelectSeparator />
               </>
@@ -103,7 +111,8 @@ export function MappingHeaderCell({
           className="text-muted-foreground h-8 rounded-md py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
-          {displayHeader || (isRequired ? "Select column" : "Ignore")}
+          {displayHeader ||
+            (isRequired ? t("activity.import.mapping.select_column") : t("activity.import.mapping.ignore"))}
         </Button>
       )}
     </div>
@@ -122,6 +131,7 @@ function ActivityTypeDisplayCell({
   subtype,
   handleActivityTypeMapping,
 }: ActivityTypeDisplayCellProps) {
+  const { t } = useTranslation("common");
   const trimmedCsvType = csvType.trim().toUpperCase();
   const displayValue =
     trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
@@ -152,7 +162,7 @@ function ActivityTypeDisplayCell({
             )}
             onClick={() => handleActivityTypeMapping(trimmedCsvType, "" as ActivityType)}
           >
-            {appType === ACTIVITY_SKIP ? "Skipped" : appType}
+            {appType === ACTIVITY_SKIP ? t("activity.import.stat.skipped") : appType}
           </Badge>
         ) : (
           <SearchableSelect
@@ -170,7 +180,7 @@ function ActivityTypeDisplayCell({
             onValueChange={(newType) =>
               handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
             }
-            placeholder="Map type"
+            placeholder={t("import.mapping.placeholder_type")}
             className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-[140px]")}
           />
         )}
@@ -191,9 +201,10 @@ function AccountIdDisplayCell({
   isInvalid,
   handleAccountIdMapping,
 }: AccountIdDisplayCellProps) {
+  const { t } = useTranslation("common");
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const trimmedAccountId = csvAccountId.trim();
-  const sourceLabel = trimmedAccountId || "Missing account";
+  const sourceLabel = trimmedAccountId || t("import.mapping.missing_account");
 
   if (mappedAccountId) {
     // When csvAccountId is empty the account comes from the default (no CSV column),
@@ -269,6 +280,7 @@ function SymbolDisplayCell({
   isInvalid,
   handleSymbolMapping,
 }: SymbolDisplayCellProps) {
+  const { t } = useTranslation("common");
   const [isEditing, setIsEditing] = useState(false);
 
   // Don't show anything if the symbol is empty/doesn't exist AND it's not invalid
@@ -287,7 +299,7 @@ function SymbolDisplayCell({
             "shrink-0 truncate text-xs",
             isInvalid ? "text-destructive" : "text-muted-foreground",
           )}
-          title={csvSymbol || "Empty symbol"}
+          title={csvSymbol || t("import.mapping.empty_symbol")}
         >
           {csvSymbol || "-"}
         </span>
@@ -295,7 +307,7 @@ function SymbolDisplayCell({
         <div className="ml-auto min-w-[180px]">
           <TickerSearchInput
             defaultValue={mappedSymbol || ""}
-            placeholder="Map symbol"
+            placeholder={t("import.mapping.placeholder_symbol")}
             onSelectResult={(newSymbol, searchResult) => {
               handleSymbolMapping(csvSymbol, newSymbol, searchResult);
               setIsEditing(false);

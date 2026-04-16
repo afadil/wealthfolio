@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useSettings } from "@/hooks/use-settings";
 import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,6 +7,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
   AccountSelect,
@@ -19,46 +21,45 @@ import {
   type AccountSelectOption,
 } from "./fields";
 
-// Zod schema for DividendForm validation
-export const dividendFormSchema = z.object({
-  accountId: z.string().min(1, { message: "Please select an account." }),
-  symbol: z.string().min(1, { message: "Please enter a symbol." }),
-  exchangeMic: z.string().nullable().optional(),
-  activityDate: z.date({ required_error: "Please select a date." }),
-  amount: z.coerce
-    .number({
-      required_error: "Please enter an amount.",
-      invalid_type_error: "Amount must be a number.",
-    })
-    .positive({ message: "Amount must be greater than 0." }),
-  comment: z.string().optional().nullable(),
-  // Advanced options
-  currency: z.string().min(1, { message: "Currency is required." }),
-  fxRate: z.coerce
-    .number({
-      invalid_type_error: "FX Rate must be a number.",
-    })
-    .positive({ message: "FX Rate must be positive." })
-    .optional(),
-  subtype: z.string().optional().nullable(),
-  // DRIP fields (price & quantity of reinvested shares)
-  unitPrice: z.coerce
-    .number({
-      invalid_type_error: "Price must be a number.",
-    })
-    .positive({ message: "Price must be greater than 0." })
-    .optional(),
-  quantity: z.coerce
-    .number({
-      invalid_type_error: "Quantity must be a number.",
-    })
-    .positive({ message: "Quantity must be greater than 0." })
-    .optional(),
-  symbolQuoteCcy: z.string().nullable().optional(),
-  symbolInstrumentType: z.string().nullable().optional(),
-});
+export function createDividendFormSchema() {
+  return z.object({
+    accountId: z.string().min(1, { message: i18n.t("activity.validation.account_required") }),
+    symbol: z.string().min(1, { message: i18n.t("activity.validation.enter_symbol") }),
+    exchangeMic: z.string().nullable().optional(),
+    activityDate: z.date({ required_error: i18n.t("activity.validation.select_date") }),
+    amount: z.coerce
+      .number({
+        required_error: i18n.t("activity.validation.enter_amount"),
+        invalid_type_error: i18n.t("activity.validation.amount_invalid_type"),
+      })
+      .positive({ message: i18n.t("activity.validation.amount_greater_than_zero") }),
+    comment: z.string().optional().nullable(),
+    currency: z.string().min(1, { message: i18n.t("activity.validation.currency_required") }),
+    fxRate: z.coerce
+      .number({
+        invalid_type_error: i18n.t("activity.validation.fx_rate_must_be_number"),
+      })
+      .positive({ message: i18n.t("activity.validation.fx_rate_positive_short") })
+      .optional(),
+    subtype: z.string().optional().nullable(),
+    unitPrice: z.coerce
+      .number({
+        invalid_type_error: i18n.t("activity.validation.price_must_be_number"),
+      })
+      .positive({ message: i18n.t("activity.validation.price_greater_than_zero") })
+      .optional(),
+    quantity: z.coerce
+      .number({
+        invalid_type_error: i18n.t("activity.validation.quantity_must_be_number"),
+      })
+      .positive({ message: i18n.t("activity.validation.quantity_greater_than_zero") })
+      .optional(),
+    symbolQuoteCcy: z.string().nullable().optional(),
+    symbolInstrumentType: z.string().nullable().optional(),
+  });
+}
 
-export type DividendFormValues = z.infer<typeof dividendFormSchema>;
+export type DividendFormValues = z.infer<ReturnType<typeof createDividendFormSchema>>;
 
 interface DividendFormProps {
   accounts: AccountSelectOption[];
@@ -83,6 +84,8 @@ export function DividendForm({
   isManualSymbol = false,
   assetCurrency,
 }: DividendFormProps) {
+  const { t, i18n } = useTranslation("common");
+  const dividendFormSchema = useMemo(() => createDividendFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency;
 
@@ -137,7 +140,7 @@ export function DividendForm({
             {/* Symbol Search/Input */}
             <SymbolSearch
               name="symbol"
-              label="Symbol"
+              label={t("activity.form.fields.symbol")}
               isManualAsset={isManualSymbol}
               exchangeMicName="exchangeMic"
               currencyName="currency"
@@ -148,10 +151,10 @@ export function DividendForm({
             <input type="hidden" {...form.register("symbolInstrumentType")} />
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} />
 
             {/* Amount */}
-            <AmountInput name="amount" label="Amount" currency={currency} />
+            <AmountInput name="amount" label={t("activity.form.fields.amount")} currency={currency} />
 
             {/* Advanced Options */}
             <AdvancedOptionsSection
@@ -170,16 +173,16 @@ export function DividendForm({
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <AmountInput
                   name="unitPrice"
-                  label="Price"
+                  label={t("activity.form.fields.unitPrice")}
                   maxDecimalPlaces={4}
                   currency={currency}
                 />
-                <QuantityInput name="quantity" label="Quantity" />
+                <QuantityInput name="quantity" label={t("activity.form.fields.quantity")} />
               </div>
             )}
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -187,7 +190,7 @@ export function DividendForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
@@ -197,7 +200,7 @@ export function DividendForm({
             ) : (
               <Icons.Plus className="mr-2 h-4 w-4" />
             )}
-            {isEditing ? "Update" : "Add Dividend"}
+            {isEditing ? t("activity.form.update") : t("activity.form.submit.add_dividend")}
           </Button>
         </div>
       </form>

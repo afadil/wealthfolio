@@ -1,4 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TFunction } from "i18next";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -12,6 +14,7 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { CurrencyInput } from "@wealthfolio/ui";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -20,14 +23,18 @@ import {
   CardTitle,
 } from "@wealthfolio/ui/components/ui/card";
 
-const baseCurrencyFormSchema = z.object({
-  baseCurrency: z.string({ required_error: "Please select a base currency." }),
-});
+function createBaseCurrencyFormSchema(t: TFunction) {
+  return z.object({
+    baseCurrency: z.string({ required_error: t("settings.currency.validation.required") }),
+  });
+}
 
-type BaseCurrencyFormValues = z.infer<typeof baseCurrencyFormSchema>;
+type BaseCurrencyFormValues = z.infer<ReturnType<typeof createBaseCurrencyFormSchema>>;
 
 // Extracted form component
 export function BaseCurrencyForm() {
+  const { t } = useTranslation("common");
+  const baseCurrencyFormSchema = useMemo(() => createBaseCurrencyFormSchema(t), [t]);
   const { settings, updateBaseCurrency } = useSettingsContext();
   const defaultValues: Partial<BaseCurrencyFormValues> = {
     baseCurrency: settings?.baseCurrency || "USD",
@@ -62,7 +69,7 @@ export function BaseCurrencyForm() {
             </FormItem>
           )}
         />
-        <Button type="submit">Save Currency</Button> {/* Changed button text slightly */}
+        <Button type="submit">{t("settings.currency.save")}</Button>
       </form>
     </Form>
   );
@@ -70,12 +77,13 @@ export function BaseCurrencyForm() {
 
 // Original component now uses the extracted form inside a Card
 export function BaseCurrencySettings() {
+  const { t } = useTranslation("common");
   return (
     <Card>
       <CardHeader>
         <div>
-          <CardTitle className="text-lg">Base Currency</CardTitle>
-          <CardDescription>Select your portfolio base currency.</CardDescription>
+          <CardTitle className="text-lg">{t("settings.currency.title")}</CardTitle>
+          <CardDescription>{t("settings.currency.description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

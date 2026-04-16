@@ -66,6 +66,8 @@ export type {
 // Shared domain modules (identical logic for both platforms)
 // ============================================================================
 
+export { translateText } from "../translation";
+
 // Account Commands
 export * from "../shared/accounts";
 
@@ -128,6 +130,7 @@ export {
   checkForUpdates,
   installUpdate,
   getPlatform,
+  syncShellLocale,
 } from "./settings";
 
 // Addon Commands (platform-specific)
@@ -185,6 +188,7 @@ export {
   openDatabaseFileDialog,
   openFileSaveDialog,
   openUrlInBrowser,
+  openUrlInAppWebviewWindow,
 } from "./files";
 
 // Crypto Commands (sync crypto operations)

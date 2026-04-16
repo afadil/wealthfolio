@@ -1,11 +1,20 @@
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { HistoryChart } from "@/components/history-chart";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { buildIntervalButtonLabels, buildIntervalLabels } from "@/lib/interval-labels";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { makeAssistantToolUI } from "@assistant-ui/react";
-import { Badge, Card, CardContent, CardHeader, CardTitle, IntervalSelector } from "@wealthfolio/ui";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  IntervalSelector,
+} from "@wealthfolio/ui";
 import { isAfter, parseISO, subMonths } from "date-fns";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -115,6 +124,9 @@ export const ValuationToolUI = makeAssistantToolUI<ValuationArgs, ValuationResul
 type ValuationContentProps = ToolCallMessagePartProps<ValuationArgs, ValuationResult>;
 
 function ValuationContent({ args, result, status }: ValuationContentProps) {
+  const { t } = useTranslation();
+  const intervalLabels = useMemo(() => buildIntervalLabels(t), [t]);
+  const intervalButtonLabels = useMemo(() => buildIntervalButtonLabels(t), [t]);
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const [period, setPeriod] = useState<TimePeriod>("3M");
@@ -181,7 +193,7 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
       <CardHeader className="flex flex-col gap-2 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Valuation history</CardTitle>
+            <CardTitle className="text-base">{t("ai.tool.valuation.title")}</CardTitle>
             <Badge variant="secondary" className="uppercase">
               {accountLabel}
             </Badge>
@@ -191,11 +203,16 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
             isLoading={isRunning}
             defaultValue={period}
             className="w-full max-w-xs"
+            intervalLabels={intervalLabels}
+            intervalButtonLabels={intervalButtonLabels}
           />
         </div>
         {(typedArgs?.startDate || typedArgs?.endDate) && (
           <p className="text-muted-foreground text-xs">
-            Range {typedArgs?.startDate ?? "start"} - {typedArgs?.endDate ?? "latest"}
+            {t("ai.tool.valuation.range", {
+              start: typedArgs?.startDate ?? t("ai.tool.valuation.start"),
+              end: typedArgs?.endDate ?? t("ai.tool.valuation.latest"),
+            })}
           </p>
         )}
       </CardHeader>
@@ -208,12 +225,12 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
               {isRunning ? (
                 <>
                   <Icons.Spinner className="h-5 w-5 animate-spin" />
-                  <span>Fetching valuation history...</span>
+                  <span>{t("ai.tool.valuation.loading")}</span>
                 </>
               ) : isIncomplete ? (
-                <span>Request was cancelled.</span>
+                <span>{t("ai.tool.valuation.cancelled")}</span>
               ) : (
-                <span>No valuation history available.</span>
+                <span>{t("ai.tool.valuation.empty")}</span>
               )}
             </div>
           )}

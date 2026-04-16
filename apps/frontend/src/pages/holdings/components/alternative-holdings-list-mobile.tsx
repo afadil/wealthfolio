@@ -1,6 +1,7 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { translateAlternativeAssetKind } from "@/lib/alternative-asset-kind-i18n";
 import type { AlternativeAssetHolding } from "@/lib/types";
-import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 import { AmountDisplay, GainPercent, Separator } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -17,6 +18,7 @@ export function AlternativeHoldingsListMobile({
   isLoading,
   onRowClick,
 }: AlternativeHoldingsListMobileProps) {
+  const { t } = useTranslation("common");
   const { isBalanceHidden } = useBalancePrivacy();
 
   if (isLoading) {
@@ -40,10 +42,7 @@ export function AlternativeHoldingsListMobile({
   return (
     <div className="space-y-2">
       {sorted.map((holding) => {
-        const kindDisplay =
-          ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES[
-            holding.kind.toUpperCase() as keyof typeof ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES
-          ] ?? holding.kind;
+        const kindDisplay = translateAlternativeAssetKind(t, holding.kind);
 
         const gain = holding.unrealizedGain ? parseFloat(holding.unrealizedGain) : null;
         const gainPct = holding.unrealizedGainPct ? parseFloat(holding.unrealizedGainPct) : null;

@@ -13,6 +13,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CSVFileViewer } from "../components/csv-file-viewer";
 import { ImportAlert } from "../components/import-alert";
@@ -44,6 +45,7 @@ import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
 import { ImportType } from "@/lib/types";
 
 export function MappingStepUnified() {
+  const { t } = useTranslation();
   const { state, dispatch } = useImportContext();
   const { headers, parsedRows, mapping, accountId } = state;
   const queryClient = useQueryClient();
@@ -259,23 +261,30 @@ export function MappingStepUnified() {
   const accountsDescription = useMemo(() => {
     if (!localMapping.fieldMappings[ImportFormat.ACCOUNT]) {
       return accountId
-        ? "Using selected account"
-        : "Select a default account or map an account column";
+        ? t("activity.import.mapping.account_using_selected")
+        : t("activity.import.mapping.account_pick_or_map");
     }
 
     if (missingAccountRowsCount > 0) {
-      return `${missingAccountRowsCount} row${missingAccountRowsCount === 1 ? "" : "s"} missing account`;
+      return missingAccountRowsCount === 1
+        ? t("activity.import.mapping.account_rows_missing", { count: missingAccountRowsCount })
+        : t("activity.import.mapping.account_rows_missing_plural", { count: missingAccountRowsCount });
     }
 
     if (localMapping.fieldMappings[ImportFormat.ACCOUNT] && localMapping.accountMappings?.[""]) {
-      return "Blank account rows assigned";
+      return t("activity.import.mapping.account_blank_assigned");
     }
 
     if (distinctAccountIds.length > 0) {
-      return `${distinctAccountIds.length - accountsToMapCount} of ${distinctAccountIds.length} mapped`;
+      return t("activity.import.mapping.account_ids_progress", {
+        mapped: distinctAccountIds.length - accountsToMapCount,
+        total: distinctAccountIds.length,
+      });
     }
 
-    return accountId ? "Using selected account for all rows" : "No unmapped account IDs";
+    return accountId
+      ? t("activity.import.mapping.account_all_rows")
+      : t("activity.import.mapping.account_no_unmapped");
   }, [
     accountId,
     accountsToMapCount,
@@ -283,6 +292,7 @@ export function MappingStepUnified() {
     localMapping.accountMappings,
     localMapping.fieldMappings,
     missingAccountRowsCount,
+    t,
   ]);
 
   const symbolsToMapCount = useMemo(() => {
@@ -442,7 +452,7 @@ export function MappingStepUnified() {
     },
     onError: (error) => {
       setTemplateError(
-        error instanceof Error ? error.message : "Failed to save the import template.",
+        error instanceof Error ? error.message : t("activity.import.mapping.err_save"),
       );
     },
   });
@@ -457,7 +467,7 @@ export function MappingStepUnified() {
     },
     onError: (error) => {
       setTemplateError(
-        error instanceof Error ? error.message : "Failed to delete the import template.",
+        error instanceof Error ? error.message : t("activity.import.mapping.err_delete"),
       );
     },
   });
@@ -474,7 +484,7 @@ export function MappingStepUnified() {
 
         const template = templates.find((item) => item.id === templateId);
         if (!template) {
-          setTemplateError("The selected template is no longer available.");
+          setTemplateError(t("activity.import.mapping.err_unavailable"));
           return;
         }
 
@@ -511,7 +521,7 @@ export function MappingStepUnified() {
         dispatch(setSelectedTemplate(template.id, template.scope));
       } catch (error) {
         setTemplateError(
-          error instanceof Error ? error.message : "Failed to apply the import template.",
+          error instanceof Error ? error.message : t("activity.import.mapping.err_apply"),
         );
       }
     },
@@ -524,6 +534,7 @@ export function MappingStepUnified() {
       state.parseConfig,
       templates,
       updateMapping,
+      t,
     ],
   );
 
@@ -546,7 +557,7 @@ export function MappingStepUnified() {
   const handleSaveTemplate = useCallback(() => {
     const name = templateName.trim();
     if (!name) {
-      setTemplateError("Template name is required.");
+      setTemplateError(t("activity.import.mapping.template_name_required"));
       return;
     }
 
@@ -562,23 +573,30 @@ export function MappingStepUnified() {
     state.selectedTemplateId,
     state.selectedTemplateScope,
     templateName,
+    t,
   ]);
 
   const handleSaveAsNewTemplate = useCallback(() => {
     const name = templateName.trim();
     if (!name) {
-      setTemplateError("Template name is required.");
+      setTemplateError(t("activity.import.mapping.template_name_required"));
       return;
     }
 
     saveTemplateMutation.mutate(buildTemplatePayload(crypto.randomUUID()));
-  }, [buildTemplatePayload, saveTemplateMutation, templateName]);
+  }, [buildTemplatePayload, saveTemplateMutation, templateName, t]);
 
   const handleDeleteTemplate = useCallback(() => {
     if (!state.selectedTemplateId || state.selectedTemplateScope !== "USER") {
       return;
     }
-    if (!window.confirm(`Delete template "${templateName || localMapping.name}"?`)) {
+    if (
+      !window.confirm(
+        t("activity.import.mapping.delete_confirm", {
+          name: templateName || localMapping.name || "",
+        }),
+      )
+    ) {
       return;
     }
     deleteTemplateMutation.mutate(state.selectedTemplateId);
@@ -588,14 +606,15 @@ export function MappingStepUnified() {
     state.selectedTemplateId,
     state.selectedTemplateScope,
     templateName,
+    t,
   ]);
 
   if (!data || data.length === 0) {
     return (
       <ImportAlert
         variant="destructive"
-        title="No CSV data available"
-        description="Please go back and upload a valid file."
+        title={t("activity.import.mapping.no_csv_title")}
+        description={t("activity.import.mapping.no_csv_desc")}
         icon={Icons.AlertCircle}
       />
     );
@@ -606,7 +625,7 @@ export function MappingStepUnified() {
       <div className="bg-muted/20 mb-4 rounded-lg border p-4">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <div className="space-y-1.5">
-            <Label>Template</Label>
+            <Label>{t("activity.import.mapping.template_label")}</Label>
             <TemplatePicker
               templates={templates}
               selectedTemplateId={effectiveSelectedTemplateId}
@@ -615,7 +634,7 @@ export function MappingStepUnified() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="import-template-name">Template Name</Label>
+            <Label htmlFor="import-template-name">{t("activity.import.mapping.template_name_label")}</Label>
             <Input
               id="import-template-name"
               value={templateName}
@@ -624,7 +643,7 @@ export function MappingStepUnified() {
                 setTemplateError(null);
                 updateMapping({ name: event.target.value });
               }}
-              placeholder="e.g. Interactive Brokers - Trades"
+              placeholder={t("activity.import.mapping.template_name_placeholder")}
             />
           </div>
 
@@ -634,12 +653,12 @@ export function MappingStepUnified() {
               disabled={saveTemplateMutation.isPending || templateName.trim() === ""}
             >
               {saveTemplateMutation.isPending
-                ? "Saving..."
+                ? t("activity.import.mapping.saving")
                 : state.selectedTemplateId &&
                     !isDefaultActivityTemplateId(state.selectedTemplateId) &&
                     state.selectedTemplateScope === "USER"
-                  ? "Update Template"
-                  : "Save Template"}
+                  ? t("activity.import.mapping.update_template")
+                  : t("activity.import.mapping.save_template")}
             </Button>
             {state.selectedTemplateId && state.selectedTemplateScope === "USER" && (
               <>
@@ -648,14 +667,14 @@ export function MappingStepUnified() {
                   onClick={handleSaveAsNewTemplate}
                   disabled={saveTemplateMutation.isPending || templateName.trim() === ""}
                 >
-                  Save as New
+                  {t("activity.import.mapping.save_as_new")}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={handleDeleteTemplate}
                   disabled={deleteTemplateMutation.isPending}
                 >
-                  Delete
+                  {t("activity.import.mapping.delete")}
                 </Button>
               </>
             )}
@@ -666,7 +685,7 @@ export function MappingStepUnified() {
           <ImportAlert
             variant="destructive"
             size="sm"
-            title="Template Error"
+            title={t("activity.import.mapping.template_error_title")}
             description={templateError}
             className="mb-0 mt-3"
           />
@@ -678,8 +697,11 @@ export function MappingStepUnified() {
         <ImportAlert
           variant={requiredFieldsMapped ? "success" : "destructive"}
           size="sm"
-          title="Fields"
-          description={`${mappedFieldsCount} of ${totalFields} mapped`}
+          title={t("activity.import.mapping.section_fields")}
+          description={t("activity.import.mapping.progress_fields", {
+            mapped: mappedFieldsCount,
+            total: totalFields,
+          })}
           icon={Icons.ListChecks}
           className="mb-0"
           rightIcon={requiredFieldsMapped ? Icons.CheckCircle : Icons.AlertCircle}
@@ -688,8 +710,11 @@ export function MappingStepUnified() {
         <ImportAlert
           variant={activitiesToMapCount === 0 ? "success" : "destructive"}
           size="sm"
-          title="Activities"
-          description={`${distinctActivityTypes.length - activitiesToMapCount} of ${distinctActivityTypes.length} mapped`}
+          title={t("activity.import.mapping.section_activities")}
+          description={t("activity.import.mapping.progress_types", {
+            mapped: distinctActivityTypes.length - activitiesToMapCount,
+            total: distinctActivityTypes.length,
+          })}
           icon={Icons.Activity}
           className="mb-0"
           rightIcon={activitiesToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
@@ -698,8 +723,11 @@ export function MappingStepUnified() {
         <ImportAlert
           variant={symbolsToMapCount === 0 ? "success" : "destructive"}
           size="sm"
-          title="Symbols"
-          description={`${distinctSymbols.length - symbolsToMapCount} of ${distinctSymbols.length} mapped`}
+          title={t("activity.import.mapping.section_symbols")}
+          description={t("activity.import.mapping.progress_symbols", {
+            mapped: distinctSymbols.length - symbolsToMapCount,
+            total: distinctSymbols.length,
+          })}
           icon={Icons.Tag}
           className="mb-0"
           rightIcon={symbolsToMapCount === 0 ? Icons.CheckCircle : Icons.AlertCircle}
@@ -708,7 +736,7 @@ export function MappingStepUnified() {
         <ImportAlert
           variant={accountsReady ? "success" : "destructive"}
           size="sm"
-          title="Accounts"
+          title={t("activity.import.mapping.section_accounts")}
           description={accountsDescription}
           icon={Icons.Wallet}
           className="mb-0"
@@ -721,11 +749,17 @@ export function MappingStepUnified() {
           <ImportAlert
             variant="destructive"
             size="sm"
-            title="Account assignment required"
+            title={t("activity.import.mapping.account_required_title")}
             description={
               missingAccountRowsCount > 0
-                ? `Map every CSV row to an account. ${missingAccountRowsCount} row${missingAccountRowsCount === 1 ? " is" : "s are"} still blank, so choose a default account in Upload or fill the account column.`
-                : "Choose a default account in Upload or map the CSV account column before continuing."
+                ? missingAccountRowsCount === 1
+                  ? t("activity.import.mapping.account_required_blank_rows", {
+                      count: missingAccountRowsCount,
+                    })
+                  : t("activity.import.mapping.account_required_blank_rows_plural", {
+                      count: missingAccountRowsCount,
+                    })
+                : t("activity.import.mapping.account_required_default")
             }
           />
         )}
@@ -736,21 +770,22 @@ export function MappingStepUnified() {
           <div className="py-2">
             <div className="flex items-center justify-between">
               <div className="text-muted-foreground hidden px-3 text-sm md:block">
-                <span className="font-medium">{totalRows} </span>total row
-                {totalRows !== 1 ? "s" : ""}
+                {totalRows === 1
+                  ? t("activity.import.mapping.total_rows", { count: totalRows })
+                  : t("activity.import.mapping.total_rows_plural", { count: totalRows })}
               </div>
               <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
                 <TabsTrigger
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="preview"
                 >
-                  Activity Preview
+                  {t("activity.import.mapping.tab_activity_preview")}
                 </TabsTrigger>
                 <TabsTrigger
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary data-[state=active]:hover:bg-primary/90 h-8 rounded-full px-2 text-sm"
                   value="raw"
                 >
-                  File Preview
+                  {t("activity.import.mapping.tab_file_preview")}
                 </TabsTrigger>
               </TabsList>
             </div>

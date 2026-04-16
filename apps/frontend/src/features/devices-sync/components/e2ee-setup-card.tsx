@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@wealthfolio/ui/components/ui/card";
+import { useTranslation } from "react-i18next";
 import { useSyncActions, useSyncStatus } from "../hooks";
 import { SyncStates } from "../types";
 
@@ -21,6 +22,7 @@ interface E2EESetupCardProps {
 }
 
 export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
+  const { t } = useTranslation("common");
   const { syncState, trustedDevices } = useSyncStatus();
   const { enableSync } = useSyncActions();
   const hasTrustedDevices = trustedDevices.length > 0;
@@ -41,8 +43,8 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium">Device Sync</CardTitle>
-        <CardDescription>Sync your data securely across all your devices.</CardDescription>
+        <CardTitle className="text-base font-medium">{t("deviceSync.setup.title")}</CardTitle>
+        <CardDescription>{t("deviceSync.setup.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -50,17 +52,17 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
             <Icons.CloudSync className="h-6 w-6 opacity-60" />
           </div>
           <p className="text-foreground font-medium">
-            {hasTrustedDevices ? "Connect this device to sync" : "Keep your devices in sync"}
+            {hasTrustedDevices ? t("deviceSync.setup.connect_this_device") : t("deviceSync.setup.keep_in_sync")}
           </p>
           <p className="text-muted-foreground mt-1 max-w-xs text-xs">
             {hasTrustedDevices
-              ? "Other connected devices were found on your account. Continue to connect this device."
-              : "Your data is end-to-end encrypted. Only your devices can read it."}
+              ? t("deviceSync.setup.found_other_devices")
+              : t("deviceSync.setup.e2ee_note")}
           </p>
 
           {hasTrustedDevices && (
             <div className="bg-muted/40 mt-3 w-full max-w-xs rounded-lg border px-3 py-2 text-left">
-              <p className="text-xs font-medium">Other connected devices</p>
+              <p className="text-xs font-medium">{t("deviceSync.setup.other_connected_devices")}</p>
               <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
                 {trustedDevicePreview.map((device) => (
                   <li key={device.id} className="truncate">
@@ -68,7 +70,11 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
                   </li>
                 ))}
                 {trustedDevices.length > trustedDevicePreview.length && (
-                  <li>+{trustedDevices.length - trustedDevicePreview.length} more</li>
+                  <li>
+                    {t("deviceSync.setup.more_devices", {
+                      count: trustedDevices.length - trustedDevicePreview.length,
+                    })}
+                  </li>
                 )}
               </ul>
             </div>
@@ -79,7 +85,7 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
               <AlertDescription>
                 {enableSync.error instanceof Error
                   ? enableSync.error.message
-                  : "Failed to enable device sync"}
+                  : t("deviceSync.error_enable_failed")}
               </AlertDescription>
             </Alert>
           )}
@@ -92,12 +98,14 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
             {enableSync.isPending ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Setting up...
+                {t("deviceSync.setup.setting_up")}
               </>
             ) : (
               <>
                 <Icons.Shield className="mr-2 h-4 w-4" />
-                {hasTrustedDevices ? "Connect This Device" : "Enable Device Sync"}
+                {hasTrustedDevices
+                  ? t("deviceSync.setup.connect_this_device_button")
+                  : t("deviceSync.setup.enable_button")}
               </>
             )}
           </Button>

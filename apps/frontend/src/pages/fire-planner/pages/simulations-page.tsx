@@ -22,6 +22,8 @@ import {
   YAxis,
 } from "@wealthfolio/ui/chart";
 import { useState, useMemo, useEffect } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { FireSettings, MonteCarloResult } from "../types";
 import {
   calculateNetFireTarget,
@@ -49,6 +51,24 @@ function fmtCompact(value: number) {
   return value.toFixed(0);
 }
 
+const SORR_BASE_LABEL = "Base (constant)";
+
+const SIM_SCENARIO_LABEL_KEYS: Record<string, string> = {
+  Pessimistic: "fire_planner.sim.label_pessimistic",
+  "Base case": "fire_planner.sim.label_base_case",
+  Optimistic: "fire_planner.sim.label_optimistic",
+  [SORR_BASE_LABEL]: "fire_planner.sim.label_base_constant",
+  "Crash Year 1 (−30%)": "fire_planner.sim.label_crash_y1",
+  "Crash Year 5 (−30%)": "fire_planner.sim.label_crash_y5",
+  "Double Crash": "fire_planner.sim.label_double_crash",
+  "Lost Decade": "fire_planner.sim.label_lost_decade",
+};
+
+function translateSimScenarioLabel(label: string, t: TFunction): string {
+  const key = SIM_SCENARIO_LABEL_KEYS[label];
+  return key ? String(t(key)) : label;
+}
+
 // ─── Monte Carlo Section ───────────────────────────────────────────────────────
 
 function MonteCarloSection({
@@ -67,8 +87,13 @@ function MonteCarloSection({
   } | null>(null);
   const [comparing, setComparing] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+  const { t } = useTranslation("common");
   const fireTarget = useMemo(() => calculateNetFireTarget(settings), [settings]);
   const strategy = settings.withdrawalStrategy ?? "constant-dollar";
+  const strategyLabel =
+    strategy === "constant-dollar"
+      ? t("fire_planner.sim.strategy_constant_dollar")
+      : t("fire_planner.sim.strategy_constant_pct");
 
   // Invalidate stale results whenever settings change
   useEffect(() => {
@@ -119,22 +144,25 @@ function MonteCarloSection({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle className="text-sm">Monte Carlo Simulation</CardTitle>
+          <CardTitle className="text-sm">{t("fire_planner.sim.mc_title")}</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            100,000 simulations · fat-tailed two-regime returns (μ={" "}
-            {(settings.expectedAnnualReturn * 100).toFixed(1)}%, σ={" "}
-            {(settings.expectedReturnStdDev * 100).toFixed(1)}%) · stochastic inflation ·{" "}
-            <span className="font-medium">
-              {strategy === "constant-dollar" ? "constant-dollar" : "constant-%"} strategy
-            </span>
+            {t("fire_planner.sim.mc_subline_core", {
+              mu: (settings.expectedAnnualReturn * 100).toFixed(1),
+              sigma: (settings.expectedReturnStdDev * 100).toFixed(1),
+            })}{" "}
+            <span className="font-medium">{strategyLabel}</span>
           </p>
         </div>
         <div className="flex gap-2">
           <Button onClick={compare} disabled={comparing || running} variant="outline" size="sm">
-            {comparing ? "Comparing…" : "Compare Strategies"}
+            {comparing ? t("fire_planner.sim.btn_comparing") : t("fire_planner.sim.btn_compare")}
           </Button>
           <Button onClick={run} disabled={running || comparing} size="sm">
-            {running ? "Running…" : result ? "Re-run" : "Run Simulation"}
+            {running
+              ? t("fire_planner.sim.btn_running")
+              : result
+                ? t("fire_planner.sim.btn_rerun")
+                : t("fire_planner.sim.btn_run")}
           </Button>
         </div>
       </CardHeader>
@@ -154,7 +182,7 @@ function MonteCarloSection({
             {/* Summary stats */}
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <div>
-                <p className="text-muted-foreground text-xs">Success Rate</p>
+                <p className="text-muted-foreground text-xs">{t("fire_planner.sim.success_rate")}</p>
                 <p
                   className={`text-lg font-bold ${
                     result.successRate >= 0.9
@@ -168,7 +196,7 @@ function MonteCarloSection({
                 </p>
               </div>
               <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-950/30">
-                <p className="text-muted-foreground text-xs">Median FI Age</p>
+                <p className="text-muted-foreground text-xs">{t("fire_planner.sim.median_fi_age")}</p>
                 {result.medianFireAge !== null ? (
                   <>
                     <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
@@ -179,17 +207,17 @@ function MonteCarloSection({
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm font-semibold text-red-500">Not reached</p>
+                  <p className="text-sm font-semibold text-red-500">{t("fire_planner.sim.not_reached")}</p>
                 )}
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">P50 Portfolio at Horizon</p>
+                <p className="text-muted-foreground text-xs">{t("fire_planner.sim.p50_portfolio_horizon")}</p>
                 <p className="text-lg font-bold">
                   {fmt(result.finalPortfolioAtHorizon.p50, settings.currency)}
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">P10 Portfolio at Horizon</p>
+                <p className="text-muted-foreground text-xs">{t("fire_planner.sim.p10_portfolio_horizon")}</p>
                 <p className="text-lg font-bold">
                   {fmt(result.finalPortfolioAtHorizon.p10, settings.currency)}
                 </p>
@@ -203,26 +231,26 @@ function MonteCarloSection({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="age"
-                    label={{ value: "Age", position: "insideBottom", offset: -2 }}
+                    label={{ value: t("fire_planner.sim.chart_age"), position: "insideBottom", offset: -2 }}
                   />
                   <YAxis tickFormatter={fmtCompact} />
                   <Tooltip
                     formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
-                    labelFormatter={(age) => `Age ${age}`}
+                    labelFormatter={(age) => t("fire_planner.sim.tooltip_age", { age })}
                   />
                   <Legend />
                   <ReferenceLine
                     y={fireTarget}
                     stroke="orange"
                     strokeDasharray="6 3"
-                    label={{ value: "FIRE Target", position: "right", fontSize: 10 }}
+                    label={{ value: t("fire_planner.sim.ref_fire_target"), position: "right", fontSize: 10 }}
                   />
                   <ReferenceLine
                     x={settings.targetFireAge}
                     stroke="#94a3b8"
                     strokeDasharray="4 2"
                     label={{
-                      value: "Target",
+                      value: t("fire_planner.sim.ref_target"),
                       position: "insideTopRight",
                       fontSize: 9,
                       fill: "#94a3b8",
@@ -234,7 +262,7 @@ function MonteCarloSection({
                       stroke="#f59e0b"
                       strokeWidth={2.5}
                       label={{
-                        value: `FI: ${result.medianFireAge}`,
+                        value: t("fire_planner.sim.ref_fi_median", { age: result.medianFireAge }),
                         position: "insideTopLeft",
                         fontSize: 11,
                         fontWeight: 700,
@@ -242,22 +270,24 @@ function MonteCarloSection({
                       }}
                     />
                   )}
-                  <Line dataKey="p90" name="P90" stroke="#22c55e" dot={false} strokeWidth={1.5} />
-                  <Line dataKey="p75" name="P75" stroke="#86efac" dot={false} strokeWidth={1} />
+                  <Line dataKey="p90" name={t("fire_planner.sim.legend_p90")} stroke="#22c55e" dot={false} strokeWidth={1.5} />
+                  <Line dataKey="p75" name={t("fire_planner.sim.legend_p75")} stroke="#86efac" dot={false} strokeWidth={1} />
                   <Line
                     dataKey="p50"
-                    name="P50 (Median)"
+                    name={t("fire_planner.sim.legend_p50_median")}
                     stroke="#3b82f6"
                     dot={false}
                     strokeWidth={2}
                   />
-                  <Line dataKey="p25" name="P25" stroke="#fca5a5" dot={false} strokeWidth={1} />
-                  <Line dataKey="p10" name="P10" stroke="#ef4444" dot={false} strokeWidth={1.5} />
+                  <Line dataKey="p25" name={t("fire_planner.sim.legend_p25")} stroke="#fca5a5" dot={false} strokeWidth={1} />
+                  <Line dataKey="p10" name={t("fire_planner.sim.legend_p10")} stroke="#ef4444" dot={false} strokeWidth={1.5} />
                 </LineChart>
               </ResponsiveContainer>
               <p className="text-muted-foreground mt-1 text-center text-xs">
-                Portfolio value from age {settings.currentAge} to {settings.planningHorizonAge}{" "}
-                across 100,000 simulations
+                {t("fire_planner.sim.chart_caption", {
+                  from: settings.currentAge,
+                  to: settings.planningHorizonAge,
+                })}
               </p>
             </div>
           </div>
@@ -265,7 +295,7 @@ function MonteCarloSection({
 
         {!running && !result && (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            Click "Run Simulation" to model 10,000 possible retirement paths.
+            {t("fire_planner.sim.empty_run_hint")}
           </p>
         )}
 
@@ -278,20 +308,18 @@ function MonteCarloSection({
 
         {!comparing && compResult && (
           <div className="border-t pt-4">
-            <p className="mb-2 text-xs font-semibold">
-              Strategy Comparison (5,000 simulations each)
-            </p>
+            <p className="mb-2 text-xs font-semibold">{t("fire_planner.sim.strat_comparison_title")}</p>
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground border-b">
-                  <th className="pb-2 text-left">Metric</th>
-                  <th className="pb-2 text-right">Constant Dollar</th>
-                  <th className="pb-2 text-right">Constant %</th>
+                  <th className="pb-2 text-left">{t("fire_planner.sim.th_metric")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.sim.th_constant_dollar")}</th>
+                  <th className="pb-2 text-right">{t("fire_planner.sim.th_constant_pct")}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b">
-                  <td className="py-1.5">Success Rate</td>
+                  <td className="py-1.5">{t("fire_planner.sim.metric_success_rate")}</td>
                   <td className="py-1.5 text-right">
                     {(compResult.constantDollar.successRate * 100).toFixed(0)}%
                   </td>
@@ -300,14 +328,14 @@ function MonteCarloSection({
                   </td>
                 </tr>
                 <tr className="border-b">
-                  <td className="py-1.5">Median FIRE Age</td>
+                  <td className="py-1.5">{t("fire_planner.sim.metric_median_fire_age")}</td>
                   <td className="py-1.5 text-right">{compResult.constantDollar.medianFireAge}</td>
                   <td className="py-1.5 text-right">
                     {compResult.constantPercentage.medianFireAge}
                   </td>
                 </tr>
                 <tr className="border-b">
-                  <td className="py-1.5">Median portfolio at horizon</td>
+                  <td className="py-1.5">{t("fire_planner.sim.metric_median_portfolio_horizon")}</td>
                   <td className="py-1.5 text-right">
                     {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p50, settings.currency)}
                   </td>
@@ -319,7 +347,7 @@ function MonteCarloSection({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-1.5">P10 portfolio at horizon</td>
+                  <td className="py-1.5">{t("fire_planner.sim.metric_p10_horizon")}</td>
                   <td className="py-1.5 text-right">
                     {fmt(compResult.constantDollar.finalPortfolioAtHorizon.p10, settings.currency)}
                   </td>
@@ -332,10 +360,7 @@ function MonteCarloSection({
                 </tr>
               </tbody>
             </table>
-            <p className="text-muted-foreground mt-2 text-xs">
-              Constant %: the portfolio mathematically never depletes (high success rate expected),
-              but annual spending varies with market performance.
-            </p>
+            <p className="text-muted-foreground mt-2 text-xs">{t("fire_planner.sim.constant_pct_note")}</p>
           </div>
         )}
       </CardContent>
@@ -346,6 +371,7 @@ function MonteCarloSection({
 // ─── Scenario Analysis Section ─────────────────────────────────────────────────
 
 function ScenarioSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
+  const { t } = useTranslation("common");
   const scenarios = useMemo(
     () => runScenarioAnalysis(settings, totalValue),
     [settings, totalValue],
@@ -369,8 +395,8 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Scenario Analysis</CardTitle>
-        <p className="text-muted-foreground text-xs">Same settings, three return assumptions</p>
+        <CardTitle className="text-sm">{t("fire_planner.sim.scenario_title")}</CardTitle>
+        <p className="text-muted-foreground text-xs">{t("fire_planner.sim.scenario_subtitle")}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <ResponsiveContainer width="100%" height={260}>
@@ -380,7 +406,7 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
             <YAxis tickFormatter={fmtCompact} />
             <Tooltip
               formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
-              labelFormatter={(age) => `Age ${age}`}
+              labelFormatter={(age) => t("fire_planner.sim.tooltip_age", { age })}
             />
             <Legend />
             {scenarios.map((s, i) =>
@@ -405,6 +431,7 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
               <Line
                 key={s.label}
                 dataKey={s.label}
+                name={translateSimScenarioLabel(s.label, t)}
                 stroke={COLORS[i]}
                 dot={false}
                 strokeWidth={2}
@@ -416,17 +443,17 @@ function ScenarioSection({ settings, totalValue }: { settings: FireSettings; tot
         <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Scenario</th>
-              <th className="pb-2 text-right">Return</th>
-              <th className="pb-2 text-right">FIRE Age</th>
-              <th className="pb-2 text-right">Portfolio at Horizon</th>
+              <th className="pb-2 text-left">{t("fire_planner.sim.th_scenario")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_return")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_fire_age")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_portfolio_horizon")}</th>
             </tr>
           </thead>
           <tbody>
             {scenarios.map((s, i) => (
               <tr key={s.label} className="border-b last:border-0">
                 <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
-                  {s.label}
+                  {translateSimScenarioLabel(s.label, t)}
                 </td>
                 <td className="py-1.5 text-right">{(s.annualReturn * 100).toFixed(1)}%</td>
                 <td
@@ -458,6 +485,7 @@ function IncomeProjectionSection({
   settings: FireSettings;
   actualFireAge: number;
 }) {
+  const { t } = useTranslation("common");
   const streams = settings.additionalIncomeStreams;
   if (streams.length === 0) return null;
 
@@ -509,12 +537,8 @@ function IncomeProjectionSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Income Streams Projection</CardTitle>
-        <p className="text-muted-foreground text-xs">
-          All amounts in today's euros (real terms). Inflation-indexed streams appear flat;
-          non-indexed streams lose purchasing power over time. The gap between total income and the
-          expense line is what the portfolio must cover each year.
-        </p>
+        <CardTitle className="text-sm">{t("fire_planner.sim.income_proj_title")}</CardTitle>
+        <p className="text-muted-foreground text-xs">{t("fire_planner.sim.income_proj_desc")}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <ResponsiveContainer width="100%" height={280}>
@@ -525,15 +549,15 @@ function IncomeProjectionSection({
             <Tooltip
               formatter={(value: number | undefined, name: string | undefined) => {
                 const stream = streams.find((s) => s.id === name);
-                const label = stream ? stream.label || "Stream" : (name ?? "");
+                const label = stream ? stream.label || t("fire_planner.sim.stream_fallback") : (name ?? "");
                 return [fmt(value ?? 0, settings.currency), label];
               }}
-              labelFormatter={(age) => `Age ${age} (today's €)`}
+              labelFormatter={(age) => t("fire_planner.sim.tooltip_age_real", { age })}
             />
             <Legend
               formatter={(value) => {
                 const stream = streams.find((s) => s.id === value);
-                return stream ? stream.label || "Stream" : value;
+                return stream ? stream.label || t("fire_planner.sim.stream_fallback") : value;
               }}
             />
             {streams.map((s, i) => (
@@ -551,7 +575,7 @@ function IncomeProjectionSection({
             ))}
             <Line
               dataKey="expenses"
-              name="FIRE Expenses"
+              name={t("fire_planner.sim.line_fire_expenses")}
               stroke="#ef4444"
               dot={false}
               strokeWidth={2}
@@ -562,7 +586,7 @@ function IncomeProjectionSection({
               x={fireAge}
               stroke="#94a3b8"
               strokeDasharray="4 2"
-              label={{ value: "FIRE", position: "top", fontSize: 10 }}
+              label={{ value: t("fire_planner.sim.ref_fire"), position: "top", fontSize: 10 }}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -570,15 +594,15 @@ function IncomeProjectionSection({
         <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Age</th>
+              <th className="pb-2 text-left">{t("fire_planner.sim.th_age")}</th>
               {streams.map((s) => (
                 <th key={s.id} className="pb-2 text-right">
-                  {s.label || "Stream"}
+                  {s.label || t("fire_planner.sim.stream_fallback")}
                 </th>
               ))}
-              <th className="pb-2 text-right">Total income/yr</th>
-              <th className="pb-2 text-right">Expenses/yr</th>
-              <th className="pb-2 text-right">Coverage</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_total_income_yr")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_expenses_yr")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_coverage")}</th>
             </tr>
           </thead>
           <tbody>
@@ -600,7 +624,9 @@ function IncomeProjectionSection({
                   <td className="py-1.5">
                     {age}
                     {isFireRow && (
-                      <span className="text-muted-foreground ml-1 font-normal">(FIRE)</span>
+                      <span className="text-muted-foreground ml-1 font-normal">
+                        {t("fire_planner.sim.fire_row_suffix")}
+                      </span>
                     )}
                   </td>
                   {streams.map((s) => {
@@ -652,6 +678,7 @@ function SensitivitySection({
   settings: FireSettings;
   totalValue: number;
 }) {
+  const { t } = useTranslation("common");
   const sensitivity = useMemo(
     () => runSensitivityAnalysis(settings, totalValue),
     [settings, totalValue],
@@ -677,20 +704,22 @@ function SensitivitySection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Sensitivity Analysis</CardTitle>
+        <CardTitle className="text-sm">{t("fire_planner.sim.sens_title")}</CardTitle>
         <p className="text-muted-foreground text-xs">
-          FIRE age by monthly contribution × expected return.{" "}
-          <span className="text-blue-600">Blue = your settings.</span>
+          <Trans
+            i18nKey="fire_planner.sim.sens_subtitle"
+            components={{ 0: <span className="text-blue-600" /> }}
+          />
         </p>
       </CardHeader>
       <CardContent className="space-y-6 overflow-x-auto">
         <div>
-          <p className="mb-2 text-xs font-semibold">FIRE Age (monthly contribution × return)</p>
+          <p className="mb-2 text-xs font-semibold">{t("fire_planner.sim.sens_table_contrib_title")}</p>
           <table className="text-xs">
             <thead>
               <tr>
                 <th className="text-muted-foreground pr-2 text-left font-normal">
-                  Monthly ↓ / Return →
+                  {t("fire_planner.sim.sens_monthly_return_axes")}
                 </th>
                 {contribution.returnColumns.map((r) => (
                   <th
@@ -718,7 +747,7 @@ function SensitivitySection({
                         key={r}
                         className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
                       >
-                        {age ?? `>${settings.planningHorizonAge}`}
+                        {age ?? t("fire_planner.sim.sens_beyond_horizon", { age: settings.planningHorizonAge })}
                       </td>
                     );
                   })}
@@ -729,12 +758,12 @@ function SensitivitySection({
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-semibold">FIRE Age (SWR × return)</p>
+          <p className="mb-2 text-xs font-semibold">{t("fire_planner.sim.sens_table_swr_title")}</p>
           <table className="text-xs">
             <thead>
               <tr>
                 <th className="text-muted-foreground pr-2 text-left font-normal">
-                  SWR ↓ / Return →
+                  {t("fire_planner.sim.sens_swr_return_axes")}
                 </th>
                 {swr.returnColumns.map((r) => (
                   <th
@@ -764,7 +793,7 @@ function SensitivitySection({
                           key={r}
                           className={`px-2 py-1 text-center ${cellBg(age)} ${highlight ? "ring-2 ring-blue-500" : ""}`}
                         >
-                          {age ?? `>${settings.planningHorizonAge}`}
+                          {age ?? t("fire_planner.sim.sens_beyond_horizon", { age: settings.planningHorizonAge })}
                         </td>
                       );
                     })}
@@ -782,6 +811,7 @@ function SensitivitySection({
 // ─── Sequence of Returns Risk Section ─────────────────────────────────────────
 
 function SorrSection({ settings, totalValue }: { settings: FireSettings; totalValue: number }) {
+  const { t } = useTranslation("common");
   const proj = useMemo(() => projectFireDate(settings, totalValue), [settings, totalValue]);
   const fireReached = proj.fundedAtRetirement;
   const portfolioAtFire = proj.portfolioAtFire > 0 ? proj.portfolioAtFire : totalValue;
@@ -822,46 +852,49 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Sequence of Returns Risk</CardTitle>
+        <CardTitle className="text-sm">{t("fire_planner.sim.sorr_title")}</CardTitle>
         <p className="text-muted-foreground text-xs">
-          A market crash in the first years of FIRE is more dangerous than the same crash later.
-          Starting portfolio: {fmt(portfolioAtFire, settings.currency)}
-          {!fireReached && " (current portfolio — FIRE not yet reached in projection)"}.
+          {t("fire_planner.sim.sorr_subtitle", {
+            amount: fmt(portfolioAtFire, settings.currency),
+            suffix: !fireReached ? t("fire_planner.sim.sorr_subtitle_suffix_not_fire") : "",
+          })}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {!fireReached && (
           <div className="rounded bg-yellow-50 p-3 text-xs dark:bg-yellow-950/20">
-            FIRE has not been reached within your planning horizon. Results below show crash
-            scenarios starting from your current portfolio — they are illustrative only.
+            {t("fire_planner.sim.sorr_banner_underfunded")}
           </div>
         )}
         {incomeRatio > 0.3 && (
           <div className="rounded bg-green-50 p-3 text-xs dark:bg-green-950/20">
-            Your additional income ({fmt(annualIncomeAtFire / 12, settings.currency)}/mo) covers{" "}
-            {(incomeRatio * 100).toFixed(0)}% of your FIRE expenses, significantly reducing
-            sequence-of-returns risk.
+            {t("fire_planner.sim.sorr_banner_income", {
+              amount: fmt(annualIncomeAtFire / 12, settings.currency),
+              pct: (incomeRatio * 100).toFixed(0),
+            })}
           </div>
         )}
 
         <table className="w-full text-xs">
           <thead>
             <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Scenario</th>
-              <th className="pb-2 text-right">Final Value</th>
-              <th className="pb-2 text-center">Survived to age {settings.planningHorizonAge}?</th>
+              <th className="pb-2 text-left">{t("fire_planner.sim.th_sorr_scenario")}</th>
+              <th className="pb-2 text-right">{t("fire_planner.sim.th_final_value")}</th>
+              <th className="pb-2 text-center">
+                {t("fire_planner.sim.th_survived", { age: settings.planningHorizonAge })}
+              </th>
             </tr>
           </thead>
           <tbody>
             {scenarios.map((s, i) => (
               <tr key={s.label} className="border-b last:border-0">
                 <td className="py-1.5 font-medium" style={{ color: COLORS[i] }}>
-                  {s.label}
+                  {translateSimScenarioLabel(s.label, t)}
                 </td>
                 <td className="py-1.5 text-right">{fmt(s.finalValue, settings.currency)}</td>
                 <td className="py-1.5 text-center">
                   <Badge variant={s.survived ? "default" : "destructive"} className="text-xs">
-                    {s.survived ? "Yes" : "No"}
+                    {s.survived ? t("fire_planner.sim.survived_yes") : t("fire_planner.sim.survived_no")}
                   </Badge>
                 </td>
               </tr>
@@ -872,21 +905,25 @@ function SorrSection({ settings, totalValue }: { settings: FireSettings; totalVa
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="age" label={{ value: "Age", position: "insideBottom", offset: -2 }} />
+            <XAxis
+              dataKey="age"
+              label={{ value: t("fire_planner.sim.chart_age"), position: "insideBottom", offset: -2 }}
+            />
             <YAxis tickFormatter={fmtCompact} />
             <Tooltip
               formatter={(value: number | undefined) => fmt(value ?? 0, settings.currency)}
-              labelFormatter={(age) => `Age ${age}`}
+              labelFormatter={(age) => t("fire_planner.sim.tooltip_age", { age })}
             />
             <Legend />
             {scenarios.map((s, i) => (
               <Line
                 key={s.label}
                 dataKey={s.label}
+                name={translateSimScenarioLabel(s.label, t)}
                 stroke={COLORS[i]}
                 dot={false}
-                strokeWidth={s.label === "Base (constant)" ? 2 : 1.5}
-                strokeDasharray={s.label === "Base (constant)" ? undefined : "4 2"}
+                strokeWidth={s.label === SORR_BASE_LABEL ? 2 : 1.5}
+                strokeDasharray={s.label === SORR_BASE_LABEL ? undefined : "4 2"}
               />
             ))}
           </LineChart>

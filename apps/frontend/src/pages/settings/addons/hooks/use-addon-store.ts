@@ -13,8 +13,10 @@ import type { AddonStoreListing } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export function useAddonStore() {
+  const { t } = useTranslation();
   const [isInstalling, setIsInstalling] = useState<string | null>(null);
   const [isSubmittingRating, setIsSubmittingRating] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -38,8 +40,11 @@ export function useAddonStore() {
     if (storeError) {
       logger.error(`Failed to fetch store listings: ${String(storeError)}`);
       toast({
-        title: "Failed to load addon store",
-        description: storeError instanceof Error ? storeError.message : "Unknown error occurred",
+        title: t("settings.addons.hooks.store_load_failed_title"),
+        description:
+          storeError instanceof Error
+            ? storeError.message
+            : t("settings.addons.hooks.unknown_error"),
         variant: "destructive",
       });
     }
@@ -56,8 +61,8 @@ export function useAddonStore() {
     ) => {
       if (!onShowPermissionDialog) {
         toast({
-          title: "Permission handler not provided",
-          description: "Please use the addon actions hook for installation.",
+          title: t("settings.addons.hooks.permission_handler_missing_title"),
+          description: t("settings.addons.hooks.permission_handler_missing_description"),
           variant: "destructive",
         });
         return;
@@ -85,8 +90,11 @@ export function useAddonStore() {
           logger.error(`Failed to clean up staging after error: ${String(cleanupError)}`);
         }
         toast({
-          title: "Installation failed",
-          description: error instanceof Error ? error.message : "Failed to download the addon",
+          title: t("settings.addons.hooks.installation_failed_title"),
+          description:
+            error instanceof Error
+              ? error.message
+              : t("settings.addons.hooks.installation_failed_description"),
           variant: "destructive",
         });
         throw error;
@@ -110,8 +118,11 @@ export function useAddonStore() {
     } catch (error) {
       logger.error(`Failed to clear staging directory: ${String(error)}`);
       toast({
-        title: "Failed to clear staging",
-        description: error instanceof Error ? error.message : "Failed to clear staging directory",
+        title: t("settings.addons.hooks.clear_staging_failed_title"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("settings.addons.hooks.clear_staging_failed_description"),
         variant: "destructive",
       });
     }
@@ -124,8 +135,8 @@ export function useAddonStore() {
         await submitAddonRating(addonId, rating, review);
 
         toast({
-          title: "Rating submitted",
-          description: "Thank you for your feedback!",
+          title: t("settings.addons.hooks.rating_submitted_title"),
+          description: t("settings.addons.hooks.rating_submitted_description"),
         });
 
         // Invalidate store listings to refresh ratings data
@@ -133,8 +144,11 @@ export function useAddonStore() {
       } catch (error) {
         logger.error(`Failed to submit rating: ${String(error)}`);
         toast({
-          title: "Rating submission failed",
-          description: error instanceof Error ? error.message : "Failed to submit rating",
+          title: t("settings.addons.hooks.rating_submit_failed_title"),
+          description:
+            error instanceof Error
+              ? error.message
+              : t("settings.addons.hooks.rating_submit_failed_description"),
           variant: "destructive",
         });
         throw error;
@@ -152,8 +166,11 @@ export function useAddonStore() {
       } catch (error) {
         logger.error(`Failed to fetch ratings: ${String(error)}`);
         toast({
-          title: "Failed to load ratings",
-          description: error instanceof Error ? error.message : "Failed to fetch addon ratings",
+          title: t("settings.addons.hooks.ratings_load_failed_title"),
+          description:
+            error instanceof Error
+              ? error.message
+              : t("settings.addons.hooks.ratings_load_failed_description"),
           variant: "destructive",
         });
         throw error;

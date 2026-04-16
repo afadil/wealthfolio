@@ -26,24 +26,31 @@ export interface DataTableFacetedFilterProps<TData, TValue> {
     value: string;
     icon?: React.ComponentType<{ className?: string }>;
   }[];
+  emptyMessage?: string;
+  clearFiltersLabel?: string;
+  manySelectedLabel?: (count: number) => string;
 }
 
 export function DataTableFacetedFilter<TData, TValue>({
   column,
   title,
   options,
+  emptyMessage = "No results found.",
+  clearFiltersLabel = "Clear filters",
+  manySelectedLabel,
 }: DataTableFacetedFilterProps<TData, TValue>) {
   const facets = column?.getFacetedUniqueValues();
   const selectedValues = new Set(column?.getFilterValue() as string[]);
+  const [open, setOpen] = React.useState(false);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           size="sm"
           className={cn(
-            'hover:bg-muted/80" bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium',
+            "hover:bg-muted/80 bg-secondary/30 h-8 gap-1.5 rounded-md border-[1.5px] border-none px-3 py-1 text-sm font-medium",
             selectedValues?.size > 0 ? "bg-muted/40" : "shadow-inner-xs bg-muted/90",
           )}
         >
@@ -58,7 +65,9 @@ export function DataTableFacetedFilter<TData, TValue>({
               <div className="hidden space-x-1 lg:flex">
                 {selectedValues.size > 2 ? (
                   <Badge variant="secondary" className="text-foreground rounded-sm px-1 font-normal">
-                    {selectedValues.size} selected
+                    {manySelectedLabel
+                      ? manySelectedLabel(selectedValues.size)
+                      : `${selectedValues.size} selected`}
                   </Badge>
                 ) : (
                   options
@@ -82,7 +91,7 @@ export function DataTableFacetedFilter<TData, TValue>({
         <Command>
           <CommandInput placeholder={title} />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.has(option.value);
@@ -97,6 +106,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                       }
                       const filterValues = Array.from(selectedValues);
                       column?.setFilterValue(filterValues.length ? filterValues : undefined);
+                      queueMicrotask(() => setOpen(true));
                     }}
                   >
                     <div
@@ -123,10 +133,13 @@ export function DataTableFacetedFilter<TData, TValue>({
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem
-                    onSelect={() => column?.setFilterValue(undefined)}
+                    onSelect={() => {
+                      column?.setFilterValue(undefined);
+                      queueMicrotask(() => setOpen(false));
+                    }}
                     className="text-destructive hover:bg-destructive/10 justify-center text-center text-sm"
                   >
-                    Clear filters
+                    {clearFiltersLabel}
                   </CommandItem>
                 </CommandGroup>
               </>

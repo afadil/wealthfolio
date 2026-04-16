@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::{
     api::shared::{normalize_file_path, process_portfolio_job, PortfolioJobConfig},
-    error::ApiResult,
+    error::{ApiError, ApiResult},
     main_lib::AppState,
 };
 use anyhow::Context;
@@ -370,6 +370,27 @@ async fn restore_database_route(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TranslateBody {
+    text: String,
+    source_lang: String,
+    target_lang: String,
+}
+
+async fn translate_text_route(Json(body): Json<TranslateBody>) -> ApiResult<Json<String>> {
+    let client = reqwest::Client::new();
+    let out = wealthfolio_translation::translate_mymemory(
+        &client,
+        &body.text,
+        &body.source_lang,
+        &body.target_lang,
+    )
+    .await
+    .map_err(ApiError::BadRequest)?;
+    Ok(Json(out))
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/settings", get(get_settings).put(update_settings))
@@ -385,4 +406,5 @@ pub fn router() -> Router<Arc<AppState>> {
             post(backup_database_to_path_route),
         )
         .route("/utilities/database/restore", post(restore_database_route))
+        .route("/utilities/translate", post(translate_text_route))
 }

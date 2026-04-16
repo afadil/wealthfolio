@@ -1,4 +1,5 @@
 import { logger, deleteQuote, updateQuote } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { Quote } from "@/lib/types";
@@ -44,7 +45,7 @@ export const useQuoteMutations = (assetId: string) => {
   const deleteQuoteMutation = useMutation({
     mutationFn: deleteQuote,
     onSuccess: () => {
-      handleSuccess("Quote deleted successfully.");
+      handleSuccess(i18n.t("asset.quote.toast.delete_success"));
     },
     onError: (error) => {
       logger.error(`Error deleting quote: ${error}`);

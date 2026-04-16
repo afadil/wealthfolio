@@ -15,9 +15,11 @@ import type { FireSettings } from "@/pages/fire-planner/types";
 import type { GoalAllocation } from "@/lib/types";
 import { Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 
 export default function FirePlannerSettingsPage() {
+  const { t } = useTranslation();
   const { settings, timezone, isLoading, saveSettings, isSaving } = useFireSettings();
   const portfolioData = usePortfolioData(settings);
   const country = timezoneToCountry(timezone);
@@ -70,9 +72,9 @@ export default function FirePlannerSettingsPage() {
       }
     } catch (err) {
       toast({
-        title: "Goal sync failed",
+        title: t("settings.fire_planner.goal_sync_failed_title"),
         description:
-          err instanceof Error ? err.message : "Could not create or update the FIRE goal.",
+          err instanceof Error ? err.message : t("settings.fire_planner.goal_sync_failed_description"),
         variant: "destructive",
       });
     }
@@ -93,13 +95,13 @@ export default function FirePlannerSettingsPage() {
   return (
     <div className="space-y-6">
       <SettingsHeader
-        heading="FIRE Planner"
-        text="Configure your Financial Independence · Retire Early settings."
+        heading={t("settings.fire_planner.heading")}
+        text={t("settings.fire_planner.description")}
       />
       <Tabs defaultValue="settings">
         <TabsList>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="guide">Guide</TabsTrigger>
+          <TabsTrigger value="settings">{t("settings.fire_planner.tab_settings")}</TabsTrigger>
+          <TabsTrigger value="guide">{t("settings.fire_planner.tab_guide")}</TabsTrigger>
         </TabsList>
         <TabsContent value="settings" className="mt-6">
           <FireSettingsForm

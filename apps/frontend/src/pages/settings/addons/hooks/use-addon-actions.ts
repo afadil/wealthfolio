@@ -16,6 +16,7 @@ import type { InstalledAddon, Permission, ExtractedAddon } from "@/adapters";
 import { reloadAllAddons } from "@/addons/addons-core";
 import type { RiskLevel, AddonManifest } from "@wealthfolio/addon-sdk";
 import { QueryKeys } from "@/lib/query-keys";
+import { useTranslation } from "react-i18next";
 
 interface PermissionDialogState {
   open: boolean;
@@ -35,6 +36,7 @@ interface ViewPermissionDialogState {
 }
 
 export function useAddonActions() {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [togglingAddonId, setTogglingAddonId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -125,8 +127,8 @@ export function useAddonActions() {
       const isZip = file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip";
       if (!isZip) {
         toast({
-          title: "Invalid file type",
-          description: "Please select a .zip addon package.",
+          title: t("settings.addons.hooks.invalid_file_type_title"),
+          description: t("settings.addons.hooks.invalid_file_type_description"),
           variant: "destructive",
         });
         return;
@@ -138,8 +140,9 @@ export function useAddonActions() {
     } catch (error) {
       envLogger.error("Error loading addon: " + (error as Error).message);
       toast({
-        title: "Error loading addon",
-        description: error instanceof Error ? error.message : "Failed to load addon",
+        title: t("settings.addons.hooks.load_addon_error_title"),
+        description:
+          error instanceof Error ? error.message : t("settings.addons.hooks.load_addon_error_description"),
         variant: "destructive",
       });
     } finally {
@@ -172,8 +175,8 @@ export function useAddonActions() {
       console.error("Error analyzing addon permissions:", error);
       // If permission analysis fails, show warning and allow user to proceed
       toast({
-        title: "Permission analysis failed",
-        description: "Could not analyze addon permissions. Install at your own risk.",
+        title: t("settings.addons.hooks.permission_analysis_failed_title"),
+        description: t("settings.addons.hooks.permission_analysis_failed_description"),
         variant: "destructive",
       });
 
@@ -204,8 +207,10 @@ export function useAddonActions() {
           queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
           await reloadAllAddons();
           toast({
-            title: "Addon installed successfully",
-            description: `${extractedAddon.metadata.name} has been installed and is now active.`,
+            title: t("settings.addons.hooks.addon_installed_title"),
+            description: t("settings.addons.hooks.addon_installed_description", {
+              name: extractedAddon.metadata.name,
+            }),
           });
         } catch (error) {
           // Clear staging for this specific addon on installation failure
@@ -241,8 +246,8 @@ export function useAddonActions() {
       await reloadAllAddons();
 
       toast({
-        title: "Addon installed successfully",
-        description: `${metadata.name} has been installed and is now active.`,
+        title: t("settings.addons.hooks.addon_installed_title"),
+        description: t("settings.addons.hooks.addon_installed_description", { name: metadata.name }),
       });
     } catch (error) {
       console.error("Error installing ZIP addon:", error);
@@ -262,8 +267,17 @@ export function useAddonActions() {
       const addon = installedAddons.find((a) => a.metadata.id === addonId);
       if (addon) {
         toast({
-          title: `Addon ${newEnabled ? "enabled" : "disabled"}`,
-          description: `${addon.metadata.name} has been ${newEnabled ? "enabled" : "disabled"}.`,
+          title: t(
+            newEnabled
+              ? "settings.addons.hooks.addon_enabled_title"
+              : "settings.addons.hooks.addon_disabled_title",
+          ),
+          description: t(
+            newEnabled
+              ? "settings.addons.hooks.addon_enabled_description"
+              : "settings.addons.hooks.addon_disabled_description",
+            { name: addon.metadata.name },
+          ),
         });
       }
 
@@ -272,8 +286,9 @@ export function useAddonActions() {
     } catch (error) {
       console.error("Error toggling addon:", error);
       toast({
-        title: "Error toggling addon",
-        description: error instanceof Error ? error.message : "Failed to toggle addon",
+        title: t("settings.addons.hooks.toggle_addon_error_title"),
+        description:
+          error instanceof Error ? error.message : t("settings.addons.hooks.toggle_addon_error_description"),
         variant: "destructive",
       });
     } finally {
@@ -292,8 +307,10 @@ export function useAddonActions() {
       queryClient.invalidateQueries({ queryKey: [QueryKeys.INSTALLED_ADDONS] });
 
       toast({
-        title: "Addon uninstalled",
-        description: `${addon.metadata.name} has been completely removed.`,
+        title: t("settings.addons.hooks.addon_uninstalled_title"),
+        description: t("settings.addons.hooks.addon_uninstalled_description", {
+          name: addon.metadata.name,
+        }),
       });
 
       // Reload all addons to remove the uninstalled addon from runtime
@@ -301,8 +318,9 @@ export function useAddonActions() {
     } catch (error) {
       console.error("Error uninstalling addon:", error);
       toast({
-        title: "Error uninstalling addon",
-        description: error instanceof Error ? error.message : "Failed to uninstall addon",
+        title: t("settings.addons.hooks.uninstall_addon_error_title"),
+        description:
+          error instanceof Error ? error.message : t("settings.addons.hooks.uninstall_addon_error_description"),
         variant: "destructive",
       });
     }
@@ -325,8 +343,8 @@ export function useAddonActions() {
     } catch (error) {
       console.error("Error loading addon permissions:", error);
       toast({
-        title: "Error loading permissions",
-        description: "Could not load addon permissions.",
+        title: t("settings.addons.hooks.load_permissions_error_title"),
+        description: t("settings.addons.hooks.load_permissions_error_description"),
         variant: "destructive",
       });
     }

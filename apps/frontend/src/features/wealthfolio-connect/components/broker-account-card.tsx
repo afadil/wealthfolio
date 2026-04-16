@@ -1,6 +1,8 @@
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { formatDate } from "@/lib/utils";
 import type { BrokerAccount } from "../types";
 
@@ -34,12 +36,13 @@ function getLastSyncDate(account: BrokerAccount): string | null {
 /**
  * Format the last sync date for display
  */
-function formatLastSyncDate(dateStr: string | null): string {
-  if (!dateStr) return "No data yet";
-  return `Data as of ${formatDate(dateStr)}`;
+function formatLastSyncDate(dateStr: string | null, t: TFunction<"common">): string {
+  if (!dateStr) return t("connect.connected_view.no_data_yet");
+  return t("connect.connected_view.data_as_of", { date: formatDate(dateStr) });
 }
 
 export function BrokerAccountCard({ account }: BrokerAccountCardProps) {
+  const { t } = useTranslation("common");
   const lastSyncDate = getLastSyncDate(account);
   const isShared = account.owner && !account.owner.is_own_account;
   const ownerName = account.owner?.full_name;
@@ -66,16 +69,16 @@ export function BrokerAccountCard({ account }: BrokerAccountCardProps) {
 
           <div>
             <div className="flex items-center gap-2">
-              <p className="font-medium">{account.name || "Account"}</p>
+              <p className="font-medium">{account.name || t("connect.connected_view.account_fallback")}</p>
               {account.is_paper && (
                 <Badge variant="outline" className="text-xs">
-                  Paper
+                  {t("connect.connected_view.paper")}
                 </Badge>
               )}
               {isShared && ownerName && (
                 <span className="text-muted-foreground flex items-center gap-1 text-sm">
                   <Icons.Users className="h-3.5 w-3.5" />
-                  Shared by {ownerName}
+                  {t("connect.connected_view.shared")} {ownerName}
                 </span>
               )}
             </div>
@@ -93,7 +96,7 @@ export function BrokerAccountCard({ account }: BrokerAccountCardProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-muted-foreground text-sm">{formatLastSyncDate(lastSyncDate)}</span>
+          <span className="text-muted-foreground text-sm">{formatLastSyncDate(lastSyncDate, t)}</span>
 
           {/* Sync enabled indicator */}
           {account.sync_enabled ? (

@@ -2,6 +2,7 @@ import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslation } from "react-i18next";
 import type { Account, Platform } from "@/lib/types";
 import type { BrokerSyncState, SyncStatus } from "../types";
 
@@ -14,35 +15,39 @@ interface BrokerSyncStateCardProps {
 const statusConfig: Record<
   SyncStatus,
   {
-    label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
     icon: React.ReactNode;
   }
 > = {
   IDLE: {
-    label: "Up to Date",
     variant: "default",
     icon: <Icons.CheckCircle className="h-4 w-4 text-green-500" />,
   },
   RUNNING: {
-    label: "Syncing",
     variant: "outline",
     icon: <Icons.Spinner className="h-4 w-4 animate-spin text-blue-500" />,
   },
   NEEDS_REVIEW: {
-    label: "Needs Review",
     variant: "destructive",
     icon: <Icons.AlertTriangle className="h-4 w-4 text-yellow-500" />,
   },
   FAILED: {
-    label: "Failed",
     variant: "destructive",
     icon: <Icons.AlertCircle className="h-4 w-4 text-red-500" />,
   },
 };
 
 export function BrokerSyncStateCard({ syncState, account, platform }: BrokerSyncStateCardProps) {
+  const { t } = useTranslation("common");
   const config = statusConfig[syncState.syncStatus];
+  const statusLabel =
+    syncState.syncStatus === "IDLE"
+      ? t("connect.page.device_sync_uptodate")
+      : syncState.syncStatus === "RUNNING"
+        ? t("connect.page.syncing")
+        : syncState.syncStatus === "NEEDS_REVIEW"
+          ? t("connect.import_runs.status.NEEDS_REVIEW")
+          : t("connect.import_runs.status.FAILED");
   const accountName = account?.name || syncState.accountId;
 
   return (
@@ -54,7 +59,7 @@ export function BrokerSyncStateCard({ syncState, account, platform }: BrokerSync
             {platform?.url ? (
               <img
                 src={`https://logo.clearbit.com/${new URL(platform.url).hostname}`}
-                alt={platform.name || "Platform"}
+                alt={platform.name || t("connect.connected_view.broker_logo_alt")}
                 className="h-6 w-6"
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
@@ -72,14 +77,16 @@ export function BrokerSyncStateCard({ syncState, account, platform }: BrokerSync
             </div>
             <p className="text-muted-foreground text-sm">
               {syncState.lastSuccessfulAt
-                ? `Last synced ${formatDistanceToNow(new Date(syncState.lastSuccessfulAt), { addSuffix: true })}`
-                : "Never synced"}
+                ? t("connect.sync.last_synced", {
+                    when: formatDistanceToNow(new Date(syncState.lastSuccessfulAt), { addSuffix: true }),
+                  })
+                : t("connect.sync.never_synced")}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant={config.variant}>{config.label}</Badge>
+          <Badge variant={config.variant}>{statusLabel}</Badge>
         </div>
       </CardContent>
 

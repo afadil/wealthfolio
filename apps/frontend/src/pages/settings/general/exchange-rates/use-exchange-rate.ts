@@ -5,6 +5,7 @@ import {
   getExchangeRates,
   updateExchangeRate as updateExchangeRateApi,
 } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
 import { ExchangeRate } from "@/lib/types";
@@ -48,8 +49,10 @@ export function useExchangeRates() {
     onError: (error) => {
       logger.error(`Error updating exchange rate: ${error}`);
       toast({
-        title: "Uh oh! Something went wrong.",
-        description: `There was a problem updating the exchange rate: ${error?.message}`,
+        title: i18n.t("settings.exchange_rates.toast_update_title"),
+        description: i18n.t("settings.exchange_rates.toast_update_description", {
+          message: error?.message ?? "",
+        }),
         variant: "destructive",
       });
     },
@@ -60,8 +63,10 @@ export function useExchangeRates() {
     onError: (error) => {
       logger.error(`Error adding exchange rate: ${error}`);
       toast({
-        title: "Error adding exchange rate",
-        description: `There was a problem adding the exchange rate: ${error?.message}`,
+        title: i18n.t("settings.exchange_rates.toast_add_title"),
+        description: i18n.t("settings.exchange_rates.toast_add_description", {
+          message: error?.message ?? "",
+        }),
         variant: "destructive",
       });
     },
@@ -72,8 +77,10 @@ export function useExchangeRates() {
     onError: (error) => {
       logger.error(`Error deleting exchange rate: ${error}`);
       toast({
-        title: "Error deleting exchange rate",
-        description: `There was a problem deleting the exchange rate: ${error?.message}`,
+        title: i18n.t("settings.exchange_rates.toast_delete_title"),
+        description: i18n.t("settings.exchange_rates.toast_delete_description", {
+          message: error?.message ?? "",
+        }),
         variant: "destructive",
       });
     },

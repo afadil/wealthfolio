@@ -87,7 +87,8 @@ impl HealthCategory {
         }
     }
 
-    /// Returns a human-friendly label for this category.
+    /// English display string (e.g. logs). The desktop/web UI localizes by
+    /// [`HealthCategory::as_str`] / API enum (see `health.page.category.*` in the frontend).
     pub fn label(&self) -> &'static str {
         match self {
             HealthCategory::PriceStaleness => "Price Updates",
@@ -114,12 +115,16 @@ impl std::fmt::Display for HealthCategory {
 ///
 /// Fix actions are safe, automated operations like refreshing stale data.
 /// The backend handles executing these actions when triggered by the user.
+///
+/// **Localization:** the web/desktop app resolves button copy from the `id` field
+/// (`health.action.*` keys). The `label` field is an English fallback for serialization
+/// and debugging; do not rely on it for UI strings in localized clients.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FixAction {
     /// Unique identifier for the action type (e.g., "sync_prices", "fetch_fx")
     pub id: String,
-    /// Human-readable button label (e.g., "Sync Prices")
+    /// English fallback label (e.g. "Sync Prices"); UI should use `id` for i18n.
     pub label: String,
     /// JSON payload containing data needed to execute the action
     pub payload: Value,
@@ -180,6 +185,10 @@ impl FixAction {
 ///
 /// Navigate actions guide users to the appropriate page where they
 /// can manually resolve an issue (e.g., assigning classifications).
+///
+/// **Localization:** the web/desktop app resolves button copy from the `route` field
+/// (`health.nav.*` keys). The `label` field is an English fallback for serialization
+/// and debugging.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NavigateAction {
@@ -188,7 +197,7 @@ pub struct NavigateAction {
     /// Optional query parameters for the route
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<Value>,
-    /// Human-readable button label (e.g., "View Holdings")
+    /// English fallback label (e.g. "View Holdings"); UI should use `route` for i18n.
     pub label: String,
 }
 

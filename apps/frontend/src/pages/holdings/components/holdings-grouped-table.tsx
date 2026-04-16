@@ -15,6 +15,7 @@ import { cn, safeDivide } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface HoldingsGroupedTableProps {
   holdings: Holding[];
@@ -50,6 +51,7 @@ export function HoldingsGroupedTable({
   showConvertedValues,
   isLoading,
 }: HoldingsGroupedTableProps) {
+  const { t } = useTranslation("common");
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -76,7 +78,7 @@ export function HoldingsGroupedTable({
 
     holdings.forEach((holding) => {
       const accountType = accountTypeMap.get(holding.accountId);
-      const groupName = getGroupName(accountType);
+      const groupName = getGroupName(accountType, t);
       const isLiability = holding.assetKind === AssetKind.LIABILITY;
 
       const holdingWithMeta: HoldingWithMeta = {
@@ -109,7 +111,7 @@ export function HoldingsGroupedTable({
     }));
 
     return groupArray.sort((a, b) => a.order - b.order);
-  }, [holdings, accountTypeMap, linkedLiabilities]);
+  }, [holdings, accountTypeMap, linkedLiabilities, t]);
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -291,15 +293,18 @@ function HoldingRow({
   );
 }
 
-function getGroupName(accountType: string | undefined): string {
+function getGroupName(
+  accountType: string | undefined,
+  t: (key: string, options?: { defaultValue?: string }) => string,
+): string {
   switch (accountType) {
     case AccountType.SECURITIES:
     case AccountType.CRYPTOCURRENCY:
-      return "Investments";
+      return t("holdings.page.tab_investments");
     case AccountType.CASH:
-      return "Cash";
+      return t("taxonomy.system.asset_classes.category.CASH.name", { defaultValue: "Cash" });
     default:
-      return "Investments";
+      return t("holdings.page.tab_investments");
   }
 }
 

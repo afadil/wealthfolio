@@ -1,6 +1,7 @@
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { ActivityType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface ActivityTypeBadgeProps {
   type: ActivityType;
@@ -30,11 +31,12 @@ function getActivityBadgeVariant(type: ActivityType) {
 }
 
 export function ActivityTypeBadge({ type, className }: ActivityTypeBadgeProps) {
+  const { t } = useTranslation("common");
   const variant = getActivityBadgeVariant(type);
 
   return (
     <Badge variant={variant} className={cn("rounded-sm", className)}>
-      {ActivityTypeNames[type]}
+      {t(`activity.types.${type}`)}
     </Badge>
   );
 }

@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
 
 interface RefreshQuotesConfirmDialogProps {
   open: boolean;
@@ -23,25 +24,28 @@ export function RefreshQuotesConfirmDialog({
   onConfirm,
   assetName,
 }: RefreshQuotesConfirmDialogProps) {
+  const { t } = useTranslation("common");
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Refresh history</AlertDialogTitle>
+          <AlertDialogTitle>{t("asset.refresh_history.title")}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will delete and replace all provider quotes with fresh data
-            {assetName ? ` for ${assetName}` : ""}. Manual quotes will be preserved. Continue?
+            {assetName
+              ? t("asset.refresh_history.body_named", { name: assetName })
+              : t("asset.refresh_history.body")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t("asset.refresh_history.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               onConfirm();
               onOpenChange(false);
             }}
           >
-            Refresh
+            {t("asset.refresh_history.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

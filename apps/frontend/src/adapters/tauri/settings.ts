@@ -103,3 +103,17 @@ export const installUpdate = async (): Promise<void> => {
 export const getPlatform = async (): Promise<PlatformInfo> => {
   return invoke<PlatformInfo>("get_platform");
 };
+
+/** Keeps native menus/dialogs in sync with the web UI language (desktop only). */
+export async function syncShellLocale(locale: string): Promise<void> {
+  try {
+    // Normalize i18n locales like "de-DE" / "en-US" to shell-supported codes.
+    const normalized = (locale ?? "en").toLowerCase().split("-")[0];
+    const shellLocale = normalized === "de" ? "de" : "en";
+    logger.debug(`[i18n] syncShellLocale request: ${locale} -> ${shellLocale}`);
+    await invoke<void>("set_shell_locale", { locale: shellLocale });
+    logger.debug(`[i18n] syncShellLocale success: ${shellLocale}`);
+  } catch {
+    logger.warn("[i18n] syncShellLocale failed");
+  }
+}

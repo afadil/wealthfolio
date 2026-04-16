@@ -1,0 +1,147 @@
+/**
+ * Replace ASCII German digraphs (ae/oe/ue) in de/common.json with ä/ö/ü.
+ * Run: node apps/frontend/scripts/fix-de-umlauts.mjs
+ *
+ * Für neue deutsche Übersetzungen: echte Umlaute (ä ö ü) und ß verwenden —
+ * keine Ersatzschreibungen (ae/oe/ue/ss statt ß), damit die Datei konsistent bleibt.
+ *
+ * Safe: no blind global "ue"→"ü" (would break "aktuell", "manuell", etc.).
+ */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const p = path.join(__dirname, "../src/i18n/locales/de/common.json");
+let s = fs.readFileSync(p, "utf8");
+
+/** @type {[string, string][]} Order: longer phrases first. */
+const pairs = [
+  ["vertrauenswuerdigen", "vertrauenswürdigen"],
+  ["vertrauenswuerdige", "vertrauenswürdige"],
+  ["Einkommensuebersicht", "Einkommensübersicht"],
+  ["vollstaendig", "vollständig"],
+  ["kuerzlich", "kürzlich"],
+  ["laeuft", "läuft"],
+  ["Haeufig", "Häufig"],
+  ["Bestaende", "Bestände"],
+  ["bestaende", "bestände"],
+  ["Portfolio-Aufschluesselungen", "Portfolio-Aufschlüsselungen"],
+  ["Ende-zu-Ende-Verschluesselung", "Ende-zu-Ende-Verschlüsselung"],
+  ["Waehrungsumrechnung", "Währungsumrechnung"],
+  ["Kursaktualitaet", "Kursaktualität"],
+  ["Aktivitaetstyp", "Aktivitätstyp"],
+  ["Datenqualitaet", "Datenqualität"],
+  ["Split-Verhaeltnis", "Split-Verhältnis"],
+  ["API-Schluessel", "API-Schlüssel"],
+  ["hinzuzufuegen", "hinzuzufügen"],
+  ["hinzugefuegt", "hinzugefügt"],
+  ["Hinzufuegen", "Hinzufügen"],
+  ["hinzufuegen", "hinzufügen"],
+  ["Aufschluesselungen", "Aufschlüsselungen"],
+  ["aufschluesselungen", "aufschlüsselungen"],
+  ["Aufschluesselung", "Aufschlüsselung"],
+  ["aufschluesselung", "aufschlüsselung"],
+  ["Mehrwaehrungs", "Mehrwährungs"],
+  ["Basiswaehrung", "Basiswährung"],
+  ["Kurswaehrung", "Kurswährung"],
+  ["Verfuegbar", "Verfügbar"],
+  ["verfuegbar", "verfügbar"],
+  ["verfuegbare", "verfügbare"],
+  ["verfuegbaren", "verfügbaren"],
+  ["rueckgaengig", "rückgängig"],
+  ["Rueckgaengig", "Rückgängig"],
+  ["Zuruecksetzen", "Zurücksetzen"],
+  ["zuruecksetzen", "zurücksetzen"],
+  ["uebersprungen", "übersprungen"],
+  ["Uebersprungen", "Übersprungen"],
+  ["voruebergehend", "vorübergehend"],
+  ["Voruebergehend", "Vorübergehend"],
+  ["unveraendert", "unverändert"],
+  ["Unveraendert", "Unverändert"],
+  ["Aenderungen", "Änderungen"],
+  ["aenderungen", "änderungen"],
+  ["Aenderung", "Änderung"],
+  ["aendern", "ändern"],
+  ["geaendert", "geändert"],
+  ["Aktivitaeten", "Aktivitäten"],
+  ["aktivitaeten", "aktivitäten"],
+  ["Aktivitaet", "Aktivität"],
+  ["aktivitaet", "aktivität"],
+  ["Waehrungen", "Währungen"],
+  ["waehrungen", "währungen"],
+  ["Waehrung", "Währung"],
+  ["waehrung", "währung"],
+  ["Diese Waehrung", "Diese Währung"],
+  ["Gebuehr", "Gebühr"],
+  ["gebuehr", "gebühr"],
+  ["Verhaeltnis", "Verhältnis"],
+  ["verhaeltnis", "verhältnis"],
+  ["Boerse", "Börse"],
+  ["boerse", "börse"],
+  ["Faehigkeiten", "Fähigkeiten"],
+  ["faehigkeiten", "fähigkeiten"],
+  ["ausgewaehlt", "ausgewählt"],
+  ["auswaehlen", "auswählen"],
+  ["waehlen", "wählen"],
+  ["Waehlen", "Wählen"],
+  ["Pruefungen", "Prüfungen"],
+  ["pruefungen", "prüfungen"],
+  ["Pruefung", "Prüfung"],
+  ["pruefung", "prüfung"],
+  ["Pruefe", "Prüfe"],
+  ["pruefe", "prüfe"],
+  ["Pruefen", "Prüfen"],
+  ["pruefen", "prüfen"],
+  ["Prueft", "Prüft"],
+  ["prueft", "prüft"],
+  ["spaeter", "später"],
+  ["Spaeter", "Später"],
+  ["Geraete", "Geräte"],
+  ["geraete", "geräte"],
+  ["Geraet", "Gerät"],
+  ["geraet", "gerät"],
+  ["geloescht", "gelöscht"],
+  ["loeschen", "löschen"],
+  ["Loeschen", "Löschen"],
+  ["loesen", "lösen"],
+  ["moeglich", "möglich"],
+  ["koennen", "können"],
+  ["Koennen", "Können"],
+  ["muessen", "müssen"],
+  ["Muessen", "Müssen"],
+  ["duerfen", "dürfen"],
+  ["fuehren", "führen"],
+  ["fuehrt", "führt"],
+  ["verfaelschen", "verfälschen"],
+  ["zugehoerigen", "zugehörigen"],
+  ["zugehoerig", "zugehörig"],
+  ["Eintraege", "Einträge"],
+  ["eintraege", "einträge"],
+  ["abschliessen", "abschließen"],
+  ["Laender", "Länder"],
+  ["laender", "länder"],
+  ["oeffnen", "öffnen"],
+  ["Oeffnen", "Öffnen"],
+  ["gueltig", "gültig"],
+  ["ungueltig", "ungültig"],
+  ["Ungueltig", "Ungültig"],
+  ["Verschluesselung", "Verschlüsselung"],
+  ["verschluesselung", "verschlüsselung"],
+  ["noetig", "nötig"],
+  ["Noetig", "Nötig"],
+  ["ueber", "über"],
+  ["Ueber", "Über"],
+  ["Schluessel", "Schlüssel"],
+  ["schluessel", "schlüssel"],
+  ["fuer", "für"],
+  ["Fuer", "Für"],
+];
+
+for (const [from, to] of pairs) {
+  if (from === to) continue;
+  s = s.split(from).join(to);
+}
+
+fs.writeFileSync(p, s);
+console.log("Updated:", p);

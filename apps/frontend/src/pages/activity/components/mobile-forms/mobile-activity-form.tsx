@@ -1,4 +1,5 @@
 import { logger } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Form } from "@wealthfolio/ui/components/ui/form";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -16,12 +17,13 @@ import { buildOccSymbol, parseOccSymbol } from "@/lib/occ-symbol";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails, SymbolInput } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import type { AccountSelectOption } from "../forms/fields";
-import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
+import { createNewActivitySchema, type NewActivityFormValues } from "../forms/schemas";
 import { MobileActivitySteps } from "./mobile-activity-steps";
 
 interface MobileActivityFormProps {
@@ -66,23 +68,23 @@ export function validateTransferFields(
   const isSecurities = mode === "securities";
 
   if (isCash && (!input.amount || input.amount <= 0)) {
-    return { field: "amount", message: "Please enter an amount." };
+    return { field: "amount", message: i18n.t("activity.validation.transfer_amount") };
   }
 
   if (isSecurities) {
     if (!input.assetId?.trim()) {
-      return { field: "assetId", message: "Please select a symbol." };
+      return { field: "assetId", message: i18n.t("activity.validation.transfer_symbol") };
     }
     if (!input.quantity || input.quantity <= 0) {
-      return { field: "quantity", message: "Please enter a quantity." };
+      return { field: "quantity", message: i18n.t("activity.validation.transfer_quantity") };
     }
     if (isExternal && direction === "in" && (!input.unitPrice || input.unitPrice <= 0)) {
-      return { field: "unitPrice", message: "Please enter a cost basis." };
+      return { field: "unitPrice", message: i18n.t("activity.validation.transfer_cost_basis") };
     }
   }
 
   if (!isExternal && !input.toAccountId) {
-    return { field: "toAccountId", message: "Please select a destination account." };
+    return { field: "toAccountId", message: i18n.t("activity.validation.transfer_destination") };
   }
 
   return null;
@@ -100,20 +102,20 @@ function validateTradeFields(data: Record<string, unknown>): TransferValidationE
 
   if (assetType === "option") {
     if (!(data.underlyingSymbol as string)?.trim()) {
-      return { field: "underlyingSymbol", message: "Underlying symbol is required." };
+      return { field: "underlyingSymbol", message: i18n.t("activity.validation.option_underlying") };
     }
     if (!data.strikePrice || Number(data.strikePrice) <= 0) {
-      return { field: "strikePrice", message: "Strike price is required." };
+      return { field: "strikePrice", message: i18n.t("activity.validation.option_strike") };
     }
     if (!(data.expirationDate as string)?.trim()) {
-      return { field: "expirationDate", message: "Expiration date is required." };
+      return { field: "expirationDate", message: i18n.t("activity.validation.option_expiration") };
     }
     if (!data.optionType) {
-      return { field: "optionType", message: "Option type is required." };
+      return { field: "optionType", message: i18n.t("activity.validation.option_type") };
     }
   } else {
     if (!(data.assetId as string)?.trim()) {
-      return { field: "assetId", message: "Please select a security." };
+      return { field: "assetId", message: i18n.t("activity.validation.select_security") };
     }
   }
 
@@ -128,10 +130,12 @@ function extractErrorMessage(error: unknown): string {
     if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
     if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
   }
-  return "Failed to save activity. Please check your inputs and try again.";
+  return i18n.t("activity.toast.save_failed_fallback");
 }
 
 export function MobileActivityForm({ accounts, activity, open, onClose }: MobileActivityFormProps) {
+  const { t, i18n } = useTranslation();
+  const newActivitySchema = useMemo(() => createNewActivitySchema(), [i18n.language]);
   const [currentStep, setCurrentStep] = useState(activity?.id ? 2 : 1);
   const { addActivityMutation, updateActivityMutation, saveActivitiesMutation } =
     useActivityMutations(onClose);
@@ -409,7 +413,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       form.reset(defaultValues);
       setCurrentStep(1);
     } catch (error) {
-      toast.error("Failed to save activity", { description: extractErrorMessage(error) });
+      toast.error(i18n.t("activity.toast.save_failed_title"), {
+        description: extractErrorMessage(error),
+      });
       logger.error(
         `Mobile Activity Form Submit Error: ${JSON.stringify({ error, formValues: form.getValues() })}`,
       );
@@ -464,7 +470,11 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
       <SheetContent side="bottom" className="rounded-t-4xl mx-1 flex h-[90vh] flex-col p-0">
         <SheetHeader className="border-b px-6 py-4">
           <div className="flex flex-col items-center space-y-2">
-            <SheetTitle>{activity?.id ? "Update Activity" : "Add Activity"}</SheetTitle>
+            <SheetTitle>
+              {activity?.id
+                ? t("activity.manager.heading_update")
+                : t("activity.manager.heading_add")}
+            </SheetTitle>
             {!activity?.id && (
               <div className="flex gap-1.5">
                 {[1, 2].map((step) => (
@@ -481,7 +491,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 ))}
               </div>
             )}
-            {activity?.id && <SheetDescription>Update transaction details</SheetDescription>}
+            {activity?.id && (
+              <SheetDescription>{t("activity.mobile.update_details")}</SheetDescription>
+            )}
           </div>
         </SheetHeader>
 
@@ -510,7 +522,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 className="flex-1"
               >
                 <Icons.ArrowLeft className="mr-2 h-4 w-4" />
-                Back
+                {t("activity.mobile.back")}
               </Button>
             )}
 
@@ -522,7 +534,7 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 className="flex-1 font-medium"
                 disabled={!form.watch("activityType") && currentStep === 1}
               >
-                Next
+                {t("activity.mobile.next")}
                 <Icons.ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
@@ -538,7 +550,9 @@ export function MobileActivityForm({ accounts, activity, open, onClose }: Mobile
                 ) : (
                   <Icons.Check className="mr-2 h-4 w-4" />
                 )}
-                {activity?.id ? "Update" : "Add"} Activity
+                {activity?.id
+                  ? t("activity.mobile.submit_update")
+                  : t("activity.mobile.submit_add")}
               </Button>
             )}
           </div>

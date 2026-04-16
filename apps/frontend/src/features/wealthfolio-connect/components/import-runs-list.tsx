@@ -8,6 +8,7 @@ import {
 } from "@wealthfolio/ui/components/ui/collapsible";
 import { format } from "date-fns";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { ImportRun, ImportRunStatus } from "../types";
 
@@ -16,23 +17,25 @@ interface ImportRunsListProps {
   isLoading?: boolean;
 }
 
-const statusConfig: Record<
+const statusVariant: Record<
   ImportRunStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+  "default" | "secondary" | "destructive" | "outline"
 > = {
-  RUNNING: { label: "Running", variant: "outline" },
-  APPLIED: { label: "Applied", variant: "default" },
-  NEEDS_REVIEW: { label: "Needs Review", variant: "destructive" },
-  FAILED: { label: "Failed", variant: "destructive" },
-  CANCELLED: { label: "Cancelled", variant: "secondary" },
+  RUNNING: "outline",
+  APPLIED: "default",
+  NEEDS_REVIEW: "destructive",
+  FAILED: "destructive",
+  CANCELLED: "secondary",
 };
 
 export function ImportRunsList({ runs, isLoading }: ImportRunsListProps) {
+  const { t } = useTranslation("common");
+
   if (isLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium">Recent Sync Runs</CardTitle>
+          <CardTitle className="text-base font-medium">{t("connect.import_runs.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
@@ -47,10 +50,10 @@ export function ImportRunsList({ runs, isLoading }: ImportRunsListProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium">Recent Sync Runs</CardTitle>
+          <CardTitle className="text-base font-medium">{t("connect.import_runs.title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm">No sync runs yet.</p>
+          <p className="text-muted-foreground text-sm">{t("connect.import_runs.empty")}</p>
         </CardContent>
       </Card>
     );
@@ -59,7 +62,7 @@ export function ImportRunsList({ runs, isLoading }: ImportRunsListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium">Recent Sync Runs</CardTitle>
+        <CardTitle className="text-base font-medium">{t("connect.import_runs.title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {runs.map((run) => (
@@ -71,8 +74,10 @@ export function ImportRunsList({ runs, isLoading }: ImportRunsListProps) {
 }
 
 function ImportRunItem({ run }: { run: ImportRun }) {
+  const { t } = useTranslation("common");
   const [isOpen, setIsOpen] = useState(false);
-  const config = statusConfig[run.status];
+  const variant = statusVariant[run.status];
+  const statusLabel = t(`connect.import_runs.status.${run.status}`);
   const hasWarnings = run.warnings && run.warnings.length > 0;
 
   return (
@@ -94,10 +99,10 @@ function ImportRunItem({ run }: { run: ImportRun }) {
             <div className="flex items-center gap-2">
               {hasWarnings && (
                 <span className="text-xs text-yellow-600 dark:text-yellow-400">
-                  {run.warnings?.length} warnings
+                  {t("connect.import_runs.warnings_count", { count: run.warnings?.length ?? 0 })}
                 </span>
               )}
-              <Badge variant={config.variant}>{config.label}</Badge>
+              <Badge variant={variant}>{statusLabel}</Badge>
               <Icons.ChevronDown
                 className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
               />
@@ -112,19 +117,27 @@ function ImportRunItem({ run }: { run: ImportRun }) {
               <div className="mb-3 grid grid-cols-4 gap-2 text-center">
                 <div>
                   <p className="text-lg font-semibold">{run.summary.fetched}</p>
-                  <p className="text-muted-foreground text-xs">Fetched</p>
+                  <p className="text-muted-foreground text-xs">
+                    {t("connect.import_runs.stat_fetched")}
+                  </p>
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-green-600">{run.summary.inserted}</p>
-                  <p className="text-muted-foreground text-xs">Inserted</p>
+                  <p className="text-muted-foreground text-xs">
+                    {t("connect.import_runs.stat_inserted")}
+                  </p>
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-blue-600">{run.summary.updated}</p>
-                  <p className="text-muted-foreground text-xs">Updated</p>
+                  <p className="text-muted-foreground text-xs">
+                    {t("connect.import_runs.stat_updated")}
+                  </p>
                 </div>
                 <div>
                   <p className="text-lg font-semibold text-gray-500">{run.summary.skipped}</p>
-                  <p className="text-muted-foreground text-xs">Skipped</p>
+                  <p className="text-muted-foreground text-xs">
+                    {t("connect.import_runs.stat_skipped")}
+                  </p>
                 </div>
               </div>
             )}
@@ -133,7 +146,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
             {hasWarnings && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-                  Warnings:
+                  {t("connect.import_runs.warnings_heading")}
                 </p>
                 <ul className="space-y-1">
                   {run.warnings?.slice(0, 5).map((warning, idx) => (
@@ -143,7 +156,10 @@ function ImportRunItem({ run }: { run: ImportRun }) {
                   ))}
                   {(run.warnings?.length ?? 0) > 5 && (
                     <li className="text-muted-foreground text-sm">
-                      • ... and {(run.warnings?.length ?? 0) - 5} more
+                      •{" "}
+                      {t("connect.import_runs.more_warnings", {
+                        count: (run.warnings?.length ?? 0) - 5,
+                      })}
                     </li>
                   )}
                 </ul>
@@ -151,7 +167,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
                   to={`/activities?account=${run.accountId}`}
                   className="text-primary mt-2 inline-flex items-center gap-1 text-sm hover:underline"
                 >
-                  Review activities
+                  {t("connect.import_runs.review_activities")}
                   <Icons.ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
@@ -166,10 +182,10 @@ function ImportRunItem({ run }: { run: ImportRun }) {
 
             {/* Timing info */}
             <p className="text-muted-foreground mt-2 text-xs">
-              Duration:{" "}
+              {t("connect.import_runs.duration")}{" "}
               {run.finishedAt
                 ? `${Math.round((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000)}s`
-                : "In progress..."}
+                : t("connect.import_runs.in_progress")}
             </p>
           </div>
         </CollapsibleContent>

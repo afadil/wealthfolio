@@ -212,7 +212,8 @@ export function getColumnVariant(variant?: CellOpts["variant"]): {
     case "long-text":
       return { label: "Long text", icon: Icons.CaseSensitive };
     case "number":
-      return { label: "Number", icon: Icons.Hash };
+      // Use a neutral value icon — Lucide "Hash" renders like "#" and reads as markdown/heading in DE.
+      return { label: "Number", icon: Icons.CircleGauge };
     case "url":
       return { label: "URL", icon: Icons.Link };
     case "checkbox":

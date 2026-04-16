@@ -1,4 +1,5 @@
 import { createActivity, deleteActivity, logger, saveActivities, updateActivity } from "@/adapters";
+import i18n from "@/i18n/i18n";
 import { generateId } from "@/lib/id";
 import {
   ActivityBulkMutationRequest,
@@ -70,6 +71,13 @@ export function useActivityMutations(
     return str === "" ? undefined : str;
   };
 
+  const mutationFailedTitleKey: Record<string, string> = {
+    adding: "activity.toast.mutation_failed_adding",
+    updating: "activity.toast.mutation_failed_updating",
+    deleting: "activity.toast.mutation_failed_deleting",
+    duplicating: "activity.toast.mutation_failed_duplicating",
+  };
+
   const createMutationOptions = (action: string) => ({
     onSuccess: (activity: { accountId?: string | null }) => {
       queryClient.invalidateQueries();
@@ -77,7 +85,8 @@ export function useActivityMutations(
     },
     onError: (error: string) => {
       logger.error(`Error ${action} activity: ${String(error)}`);
-      toast.error(`Failed ${action} activity`, {
+      const titleKey = mutationFailedTitleKey[action] ?? "activity.toast.save_failed_title";
+      toast.error(i18n.t(titleKey), {
         description: String(error),
       });
     },
@@ -307,7 +316,7 @@ export function useActivityMutations(
       // Show errors from partial failures
       if (result.errors?.length > 0) {
         const messages = result.errors.map((e) => e.message).join("; ");
-        toast.error("Some activities failed to save", { description: messages });
+        toast.error(i18n.t("activity.toast.bulk_partial_failed"), { description: messages });
         logger.error(`Bulk save partial failure: ${JSON.stringify(result.errors)}`);
       }
 
@@ -318,7 +327,7 @@ export function useActivityMutations(
     },
     onError: (error: string) => {
       logger.error(`Error saving activities: ${String(error)}`);
-      toast.error("Failed to save activities", {
+      toast.error(i18n.t("activity.toast.bulk_save_failed"), {
         description: String(error),
       });
     },

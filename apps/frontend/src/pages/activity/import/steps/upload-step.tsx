@@ -36,6 +36,8 @@ import { SearchableSelect } from "@wealthfolio/ui";
 import { DATE_FORMAT_OPTIONS, isPresetFormat } from "../utils/date-format-options";
 import { computeFieldMappings } from "../hooks/use-import-mapping";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { CSVFileViewer, type CSVLine } from "../components/csv-file-viewer";
 import { FileDropzone } from "../components/file-dropzone";
 import { HelpTooltip } from "../components/help-tooltip";
@@ -68,6 +70,7 @@ interface CsvPreviewTableProps {
 }
 
 function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) {
+  const { t } = useTranslation();
   const displayRows = rows.slice(0, maxRows);
   const hasMoreRows = rows.length > maxRows;
 
@@ -84,7 +87,11 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
                 key={idx}
                 className="border-r px-2 py-1.5 text-left font-mono text-xs font-semibold last:border-r-0"
               >
-                {header || <span className="text-muted-foreground italic">empty</span>}
+                {header || (
+                  <span className="text-muted-foreground italic">
+                    {t("activity.import.preview.empty_header")}
+                  </span>
+                )}
               </th>
             ))}
           </tr>
@@ -123,7 +130,7 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
       </table>
       {hasMoreRows && (
         <div className="text-muted-foreground border-t px-3 py-2 text-center text-xs">
-          Showing first {maxRows} of {rows.length} rows
+          {t("activity.import.preview.rows_truncated", { max: maxRows, total: rows.length })}
         </div>
       )}
     </>
@@ -143,6 +150,7 @@ function CsvPreviewTabs({
   headers: string[];
   rows: string[][];
 }) {
+  const { t } = useTranslation();
   const [csvLines, setCsvLines] = useState<CSVLine[] | null>(null);
 
   const handleTabChange = useCallback(
@@ -163,17 +171,19 @@ function CsvPreviewTabs({
         <CardHeader className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-sm font-medium">CSV Preview</CardTitle>
+              <CardTitle className="text-sm font-medium">{t("activity.import.preview.title")}</CardTitle>
               <span className="text-muted-foreground text-xs">
-                {rows.length} row{rows.length !== 1 ? "s" : ""}
+                {rows.length === 1
+                  ? t("activity.import.preview.row_count", { count: rows.length })
+                  : t("activity.import.preview.row_count_plural", { count: rows.length })}
               </span>
             </div>
             <TabsList className="bg-secondary flex space-x-1 rounded-full p-1">
               <TabsTrigger className="h-8 rounded-full px-2 text-sm" value="parsed">
-                Parsed
+                {t("activity.import.preview.tab_parsed")}
               </TabsTrigger>
               <TabsTrigger className="h-8 rounded-full px-2 text-sm" value="raw">
-                Raw File
+                {t("activity.import.preview.tab_raw")}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -202,11 +212,6 @@ const dateFormatSelectOptions = DATE_FORMAT_OPTIONS.map((o) => ({
   label: o.label,
 }));
 
-const DATE_FORMAT_SELECT_OPTIONS = [
-  ...dateFormatSelectOptions,
-  { value: "__custom__", label: "Custom…" },
-];
-
 function DateFormatPicker({
   value,
   onChange,
@@ -214,6 +219,15 @@ function DateFormatPicker({
   value: string;
   onChange: (config: Partial<ParseConfig>) => void;
 }) {
+  const { t } = useTranslation();
+  const dateFormatOptions = useMemo(
+    () => [
+      ...dateFormatSelectOptions,
+      { value: "__custom__", label: t("activity.import.parse.custom_format") },
+    ],
+    [t],
+  );
+
   const isCustom = value !== "__custom__" && !isPresetFormat(value) && value !== "";
   const [showCustom, setShowCustom] = useState(isCustom);
   const [customValue, setCustomValue] = useState(isCustom ? value : "");
@@ -222,9 +236,9 @@ function DateFormatPicker({
 
   return (
     <div className="space-y-1.5">
-      <Label className="text-muted-foreground text-xs">Date format</Label>
+      <Label className="text-muted-foreground text-xs">{t("activity.import.parse.date_format")}</Label>
       <SearchableSelect
-        options={DATE_FORMAT_SELECT_OPTIONS}
+        options={dateFormatOptions}
         value={selectValue}
         onValueChange={(v) => {
           if (v === "__custom__") {
@@ -237,13 +251,13 @@ function DateFormatPicker({
             onChange({ dateFormat: v });
           }
         }}
-        placeholder="Select date format"
-        searchPlaceholder="Search formats…"
-        emptyMessage="No matching format."
+        placeholder={t("activity.import.parse.placeholder_date_format")}
+        searchPlaceholder={t("activity.import.parse.search_formats")}
+        emptyMessage={t("activity.import.parse.no_format_match")}
       />
       {showCustom && (
         <Input
-          placeholder="e.g. dd/MM/yyyy HH:mm:ss"
+          placeholder={t("activity.import.parse.custom_hint")}
           value={customValue}
           onChange={(e) => {
             const v = e.target.value;
@@ -260,24 +274,24 @@ function DateFormatPicker({
 }
 
 // Format config value for display
-function formatConfigValue(key: string, value: string | number | boolean): string {
+function formatConfigValue(t: TFunction, key: string, value: string | number | boolean): string {
   if (key === "delimiter") {
     const delimiterLabels: Record<string, string> = {
-      auto: "Auto",
-      ",": "Comma",
-      ";": "Semicolon",
-      "\t": "Tab",
+      auto: t("activity.import.parse.fmt_auto"),
+      ",": t("activity.import.parse.delim_comma"),
+      ";": t("activity.import.parse.delim_semicolon"),
+      "\t": t("activity.import.parse.delim_tab"),
     };
     return delimiterLabels[value as string] || String(value);
   }
   if (key === "dateFormat") {
-    return value === "auto" ? "Auto" : String(value);
+    return value === "auto" ? t("activity.import.parse.fmt_auto") : String(value);
   }
   if (key === "decimalSeparator") {
     const decimalLabels: Record<string, string> = {
-      auto: "Auto",
-      ".": "Period",
-      ",": "Comma",
+      auto: t("activity.import.parse.fmt_auto"),
+      ".": t("activity.import.parse.dec_period"),
+      ",": t("activity.import.parse.dec_comma"),
     };
     return decimalLabels[value as string] || String(value);
   }
@@ -285,29 +299,41 @@ function formatConfigValue(key: string, value: string | number | boolean): strin
 }
 
 // Build compact summary of parse settings
-function buildConfigSummary(config: ParseConfig): string {
+function buildConfigSummary(config: ParseConfig, t: TFunction): string {
   const parts: string[] = [];
 
   if (config.delimiter && config.delimiter !== "auto") {
-    parts.push(`Delimiter: ${formatConfigValue("delimiter", config.delimiter)}`);
+    parts.push(
+      t("activity.import.parse.summary_delimiter", {
+        value: formatConfigValue(t, "delimiter", config.delimiter),
+      }),
+    );
   }
   if (config.dateFormat && config.dateFormat !== "auto") {
-    parts.push(`Date: ${config.dateFormat}`);
+    parts.push(
+      t("activity.import.parse.summary_date", {
+        value: formatConfigValue(t, "dateFormat", config.dateFormat),
+      }),
+    );
   }
   if (config.decimalSeparator && config.decimalSeparator !== "auto") {
-    parts.push(`Decimal: ${formatConfigValue("decimalSeparator", config.decimalSeparator)}`);
+    parts.push(
+      t("activity.import.parse.summary_decimal", {
+        value: formatConfigValue(t, "decimalSeparator", config.decimalSeparator),
+      }),
+    );
   }
   if (config.skipTopRows > 0) {
-    parts.push(`Skip top: ${config.skipTopRows}`);
+    parts.push(t("activity.import.parse.summary_skip_top", { count: config.skipTopRows }));
   }
   if (config.skipBottomRows > 0) {
-    parts.push(`Skip bottom: ${config.skipBottomRows}`);
+    parts.push(t("activity.import.parse.summary_skip_bottom", { count: config.skipBottomRows }));
   }
   if (!config.hasHeaderRow) {
-    parts.push("No header");
+    parts.push(t("activity.import.parse.summary_no_header"));
   }
 
-  return parts.length > 0 ? parts.join(" · ") : "Auto-detect";
+  return parts.length > 0 ? parts.join(" · ") : t("activity.import.parse.summary_auto");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -333,13 +359,14 @@ function TemplateSelector({
   onConfigChange,
   hasConfigErrors = false,
 }: TemplateSelectorProps) {
+  const { t } = useTranslation();
   const [settingsOpen, setSettingsOpen] = useState(hasConfigErrors);
 
   useEffect(() => {
     if (hasConfigErrors) setSettingsOpen(true);
   }, [hasConfigErrors]);
 
-  const configSummary = buildConfigSummary(config);
+  const configSummary = buildConfigSummary(config, t);
 
   return (
     <div className="bg-muted/20 rounded-lg border">
@@ -364,10 +391,12 @@ function TemplateSelector({
           >
             <div className="flex items-center gap-2">
               <Icons.Settings2 className="text-muted-foreground h-3.5 w-3.5" />
-              <span className="text-muted-foreground text-xs font-medium">Parse Settings</span>
+              <span className="text-muted-foreground text-xs font-medium">
+                {t("activity.import.parse.settings_title")}
+              </span>
               {hasConfigErrors && (
                 <span className="bg-destructive/10 text-destructive rounded-full px-2 py-px text-[10px]">
-                  Adjust settings to fix errors
+                  {t("activity.import.parse.adjust_errors")}
                 </span>
               )}
               {!settingsOpen && !hasConfigErrors && (
@@ -393,13 +422,13 @@ function TemplateSelector({
                   onCheckedChange={(checked) => onConfigChange({ hasHeaderRow: checked === true })}
                 />
                 <Label htmlFor="hasHeaderRow" className="cursor-pointer text-sm">
-                  First row is header
+                  {t("activity.import.parse.first_row_header")}
                 </Label>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="skipTopRows" className="text-muted-foreground text-xs">
-                  Skip top rows
+                  {t("activity.import.parse.skip_top")}
                 </Label>
                 <Input
                   id="skipTopRows"
@@ -415,7 +444,7 @@ function TemplateSelector({
 
               <div className="space-y-1.5">
                 <Label htmlFor="skipBottomRows" className="text-muted-foreground text-xs">
-                  Skip bottom rows
+                  {t("activity.import.parse.skip_bottom")}
                 </Label>
                 <Input
                   id="skipBottomRows"
@@ -431,20 +460,20 @@ function TemplateSelector({
 
               <div className="space-y-1.5">
                 <Label htmlFor="delimiter" className="text-muted-foreground text-xs">
-                  Delimiter
+                  {t("activity.import.parse.delimiter")}
                 </Label>
                 <Select
                   value={config.delimiter}
                   onValueChange={(value) => onConfigChange({ delimiter: value })}
                 >
                   <SelectTrigger id="delimiter" className="h-8 text-sm">
-                    <SelectValue placeholder="Select delimiter" />
+                    <SelectValue placeholder={t("activity.import.parse.placeholder_delimiter")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value=",">Comma (,)</SelectItem>
-                    <SelectItem value=";">Semicolon (;)</SelectItem>
-                    <SelectItem value="\t">Tab</SelectItem>
+                    <SelectItem value="auto">{t("activity.import.parse.auto_detect")}</SelectItem>
+                    <SelectItem value=",">{t("activity.import.parse.delim_comma")}</SelectItem>
+                    <SelectItem value=";">{t("activity.import.parse.delim_semicolon")}</SelectItem>
+                    <SelectItem value="\t">{t("activity.import.parse.delim_tab")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -453,19 +482,19 @@ function TemplateSelector({
 
               <div className="space-y-1.5">
                 <Label htmlFor="decimalSeparator" className="text-muted-foreground text-xs">
-                  Decimal separator
+                  {t("activity.import.parse.decimal_separator")}
                 </Label>
                 <Select
                   value={config.decimalSeparator}
                   onValueChange={(value) => onConfigChange({ decimalSeparator: value })}
                 >
                   <SelectTrigger id="decimalSeparator" className="h-8 text-sm">
-                    <SelectValue placeholder="Select separator" />
+                    <SelectValue placeholder={t("activity.import.parse.placeholder_decimal")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value=".">Period (.)</SelectItem>
-                    <SelectItem value=",">Comma (,)</SelectItem>
+                    <SelectItem value="auto">{t("activity.import.parse.auto_detect")}</SelectItem>
+                    <SelectItem value=".">{t("activity.import.parse.dec_period")}</SelectItem>
+                    <SelectItem value=",">{t("activity.import.parse.dec_comma")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -482,6 +511,7 @@ function TemplateSelector({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function UploadStep() {
+  const { t } = useTranslation();
   const { state, dispatch } = useImportContext();
   const [parseError, setParseError] = useState<string | null>(null);
   const { accounts } = useAccounts();
@@ -539,7 +569,9 @@ export function UploadStep() {
           dispatch(setParseConfig(result.detectedConfig));
           headers = result.headers;
         } catch (err) {
-          setParseError(err instanceof Error ? err.message : "Failed to re-parse CSV");
+          setParseError(
+            err instanceof Error ? err.message : t("activity.import.error.reparse_failed"),
+          );
         }
       }
 
@@ -568,6 +600,7 @@ export function UploadStep() {
       state.file,
       state.parseConfig,
       state.headers,
+      t,
     ],
   );
 
@@ -605,10 +638,12 @@ export function UploadStep() {
           dispatch(setParseConfig(result.detectedConfig));
         })
         .catch((error) => {
-          setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+          setParseError(
+            error instanceof Error ? error.message : t("activity.import.error.parse_failed"),
+          );
         });
     }
-  }, [applyTemplate, baselineParseConfig, dispatch, importType, state.accountId, state.file]);
+  }, [applyTemplate, baselineParseConfig, dispatch, importType, state.accountId, state.file, t]);
 
   // Auto-suggest linked template when account changes.
   // Two-phase approach: fetch the linked template ID, then apply once templates are loaded.
@@ -635,7 +670,9 @@ export function UploadStep() {
               dispatch(setParseConfig(result.detectedConfig));
             })
             .catch((error) => {
-              setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+              setParseError(
+                error instanceof Error ? error.message : t("activity.import.error.parse_failed"),
+              );
             });
         }
       }
@@ -704,10 +741,12 @@ export function UploadStep() {
           dispatch(setParsedData(result.headers, result.rows));
         })
         .catch((error) => {
-          setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+          setParseError(
+            error instanceof Error ? error.message : t("activity.import.error.parse_failed"),
+          );
         });
     }
-  }, [dispatch, selectedAccount, state.parseConfig.defaultCurrency]);
+  }, [dispatch, selectedAccount, state.parseConfig.defaultCurrency, t]);
 
   const handleAccountSelect = useCallback(
     (account: Account) => {
@@ -724,7 +763,9 @@ export function UploadStep() {
       dispatch(setParseConfig(result.detectedConfig));
     },
     onError: (error) => {
-      setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+      setParseError(
+        error instanceof Error ? error.message : t("activity.import.error.parse_failed"),
+      );
     },
   });
 
@@ -752,11 +793,13 @@ export function UploadStep() {
             dispatch(setParsedData(result.headers, result.rows));
           })
           .catch((error) => {
-            setParseError(error instanceof Error ? error.message : "Failed to parse CSV file");
+            setParseError(
+              error instanceof Error ? error.message : t("activity.import.error.parse_failed"),
+            );
           });
       }
     },
-    [dispatch, state.file, state.parseConfig],
+    [dispatch, state.file, state.parseConfig, t],
   );
 
   const hasParseErrors = parseError !== null;
@@ -769,8 +812,8 @@ export function UploadStep() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground font-mono text-[10px] tabular-nums">01</span>
-            <h2 className="text-sm font-semibold">Select Account</h2>
-            <HelpTooltip content="Choose the default account for imported activities. If your CSV includes an Account column with valid account ids, those will take priority for each row." />
+            <h2 className="text-sm font-semibold">{t("activity.import.upload.select_account")}</h2>
+            <HelpTooltip content={t("activity.import.upload.tooltip_account")} />
           </div>
           <div className="h-[116px]">
             {isMobile ? (
@@ -800,7 +843,9 @@ export function UploadStep() {
                 ) : (
                   <>
                     <Icons.Briefcase className="text-muted-foreground h-8 w-8" />
-                    <p className="text-muted-foreground text-center text-sm">No account selected</p>
+                    <p className="text-muted-foreground text-center text-sm">
+                      {t("activity.import.upload.no_account")}
+                    </p>
                     <AccountSelectorMobile
                       setSelectedAccount={handleAccountSelect}
                       includePortfolio={false}
@@ -822,8 +867,8 @@ export function UploadStep() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground font-mono text-[10px] tabular-nums">02</span>
-            <h2 className="text-sm font-semibold">Upload CSV File</h2>
-            <HelpTooltip content="After uploading, double-check the Parse Settings below — make sure the delimiter, date format, and rows to skip match your file." />
+            <h2 className="text-sm font-semibold">{t("activity.import.upload.upload_csv")}</h2>
+            <HelpTooltip content={t("activity.import.upload.tooltip_file")} />
           </div>
           <div className="h-[116px]">
             <FileDropzone
@@ -842,9 +887,9 @@ export function UploadStep() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1.5">
           <span className="text-muted-foreground font-mono text-[10px] tabular-nums">03</span>
-          <h2 className="text-sm font-semibold">Select Format</h2>
+          <h2 className="text-sm font-semibold">{t("activity.import.upload.select_format")}</h2>
           <span className="text-muted-foreground rounded border px-1.5 py-px text-[10px] leading-none">
-            optional
+            {t("activity.import.upload.optional")}
           </span>
         </div>
         <TemplateSelector

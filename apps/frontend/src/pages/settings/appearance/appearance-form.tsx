@@ -1,4 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { TFunction } from "i18next";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -16,21 +18,26 @@ import {
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { useTranslation } from "react-i18next";
 
-const appearanceFormSchema = z.object({
-  theme: z.enum(["light", "dark", "system"], {
-    required_error: "Please select a theme.",
-  }),
-  font: z.enum(["font-mono", "font-sans", "font-serif"], {
-    invalid_type_error: "Select a font",
-    required_error: "Please select a font.",
-  }),
-  menuBarVisible: z.boolean(),
-});
+function createAppearanceFormSchema(t: TFunction) {
+  return z.object({
+    theme: z.enum(["light", "dark", "system"], {
+      required_error: t("settings.appearance.validation.theme_required"),
+    }),
+    font: z.enum(["font-mono", "font-sans", "font-serif"], {
+      invalid_type_error: t("settings.appearance.validation.font_invalid"),
+      required_error: t("settings.appearance.validation.font_required"),
+    }),
+    menuBarVisible: z.boolean(),
+  });
+}
 
-type AppearanceFormValues = z.infer<typeof appearanceFormSchema>;
+type AppearanceFormValues = z.infer<ReturnType<typeof createAppearanceFormSchema>>;
 
 export function AppearanceForm() {
+  const { t } = useTranslation("common");
+  const appearanceFormSchema = useMemo(() => createAppearanceFormSchema(t), [t]);
   const { settings, updateSettings } = useSettingsContext();
   const { isMobile } = usePlatform();
   const defaultValues: Partial<AppearanceFormValues> = {
@@ -58,10 +65,8 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="space-y-1">
-                <FormLabel className="text-base font-medium">Font Family</FormLabel>
-                <FormDescription className="text-sm">
-                  Choose the font family used throughout the interface.
-                </FormDescription>
+                <FormLabel className="text-base font-medium">{t("settings.appearance.font_label")}</FormLabel>
+                <FormDescription className="text-sm">{t("settings.appearance.font_hint")}</FormDescription>
               </div>
               <FormControl>
                 <FontSelector
@@ -82,10 +87,8 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="space-y-1">
-                <FormLabel className="text-base font-medium">Theme</FormLabel>
-                <FormDescription className="text-sm">
-                  Select your preferred theme for the application.
-                </FormDescription>
+                <FormLabel className="text-base font-medium">{t("settings.appearance.theme_label")}</FormLabel>
+                <FormDescription className="text-sm">{t("settings.appearance.theme_hint")}</FormDescription>
               </div>
               <FormMessage />
               <FormControl>
@@ -109,8 +112,8 @@ export function AppearanceForm() {
             render={({ field }) => (
               <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                 <div className="space-y-0.5">
-                  <FormLabel>Show menu bar</FormLabel>
-                  <FormDescription>Toggle to display the application menu bar.</FormDescription>
+                  <FormLabel>{t("settings.appearance.menu_bar_label")}</FormLabel>
+                  <FormDescription>{t("settings.appearance.menu_bar_hint")}</FormDescription>
                 </div>
                 <FormControl>
                   <Switch

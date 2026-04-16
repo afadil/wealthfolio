@@ -22,6 +22,7 @@ pub mod platform;
 pub mod portfolio;
 pub mod providers_settings;
 pub mod secrets;
+pub mod shell_locale;
 pub mod settings;
 #[cfg(feature = "device-sync")]
 pub mod sync_crypto;

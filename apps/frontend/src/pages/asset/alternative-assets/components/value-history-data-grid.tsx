@@ -1,5 +1,7 @@
 import { Button, DataGrid, Icons, useDataGrid } from "@wealthfolio/ui";
+import { useDataGridColumnHeaderMenuLabels } from "@/hooks/use-data-grid-column-header-labels";
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createColumnHelper } from "@tanstack/react-table";
 import type { Quote } from "@/lib/types";
 import { ValueHistoryToolbar } from "./value-history-toolbar";
@@ -106,6 +108,8 @@ export function ValueHistoryDataGrid({
   onSaveQuote,
   onDeleteQuote,
 }: ValueHistoryDataGridProps) {
+  const { t } = useTranslation("common");
+  const columnHeaderMenuLabels = useDataGridColumnHeaderMenuLabels();
   // Convert quotes to local entries
   const initialEntries = useMemo(
     () => data.map(toValueHistoryEntry).sort((a, b) => b.date.getTime() - a.date.getTime()),
@@ -152,17 +156,19 @@ export function ValueHistoryDataGrid({
   const columns = useMemo(
     () => [
       columnHelper.accessor("date", {
-        header: "Date",
+        header: t("holdings.value_history.col_date"),
         size: 140,
         meta: { cell: { variant: "date-input" } },
       }),
       columnHelper.accessor("value", {
-        header: isLiability ? "Balance" : "Value",
+        header: isLiability
+          ? t("holdings.value_history.col_balance")
+          : t("holdings.value_history.col_value"),
         size: 180,
         meta: { cell: { variant: "number", min: 0 } },
       }),
       columnHelper.accessor("notes", {
-        header: "Notes",
+        header: t("holdings.value_history.col_notes"),
         size: 300,
         meta: { cell: { variant: "long-text" } },
       }),
@@ -188,7 +194,7 @@ export function ValueHistoryDataGrid({
         ),
       }),
     ],
-    [columnHelper, isLiability, handleDeleteRow],
+    [columnHelper, isLiability, handleDeleteRow, t],
   );
 
   // Handle data changes from the grid
@@ -296,6 +302,8 @@ export function ValueHistoryDataGrid({
     enableSorting: true,
     enableSearch: true,
     enablePaste: true,
+    columnHeaderMenuLabels,
+    addRowLabel: t("activity.data_grid.add_row"),
     onDataChange,
     onRowAdd,
     onRowsAdd,

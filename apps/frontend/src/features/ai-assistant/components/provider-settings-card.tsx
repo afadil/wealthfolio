@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { ExternalLink } from "@/components/external-link";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -48,29 +49,19 @@ interface ProviderSettingsCardProps {
   onRefreshModels?: () => void;
 }
 
-// Novice-friendly tool mapping for data access settings
-const DATA_ACCESS_OPTIONS = [
-  { toolId: "get_accounts", label: "Accounts", description: "Account names, types, and balances" },
-  { toolId: "get_holdings", label: "Holdings", description: "Current positions and their values" },
-  {
-    toolId: "search_activities",
-    label: "Transactions",
-    description: "Past transactions and activities",
-  },
-  {
-    toolId: "get_performance",
-    label: "Performance",
-    description: "Returns and performance metrics",
-  },
-  { toolId: "get_income", label: "Income", description: "Income summary and breakdown" },
-  { toolId: "get_goals", label: "Goals", description: "Investment goals and progress" },
-  {
-    toolId: "get_asset_allocation",
-    label: "Allocation",
-    description: "Portfolio allocation breakdown",
-  },
-  { toolId: "get_valuation_history", label: "History", description: "Portfolio value over time" },
-];
+/** Backend sends this literal in `crates/ai/src/ai_providers.json` for custom URL fields. */
+const CUSTOM_URL_PLACEHOLDER_DEFAULT = "Leave empty to use default";
+
+const DATA_ACCESS_TOOL_IDS = [
+  "get_accounts",
+  "get_holdings",
+  "search_activities",
+  "get_performance",
+  "get_income",
+  "get_goals",
+  "get_asset_allocation",
+  "get_valuation_history",
+] as const;
 
 export function ProviderSettingsCard({
   provider,
@@ -93,6 +84,7 @@ export function ProviderSettingsCard({
   fetchModelsError: externalFetchModelsError,
   onRefreshModels,
 }: ProviderSettingsCardProps) {
+  const { t } = useTranslation();
   // Suppress unused variable warnings for deprecated/unused props
   void _onSelectModel;
   void _onSetDefault;
@@ -114,6 +106,16 @@ export function ProviderSettingsCard({
   const fetchedModels = externalFetchedModels ?? [];
   const isFetchingModels = externalIsFetchingModels ?? false;
   const fetchError = externalFetchModelsError ?? null;
+
+  const dataAccessOptions = useMemo(
+    () =>
+      DATA_ACCESS_TOOL_IDS.map((toolId) => ({
+        toolId,
+        label: t(`settings.ai_providers.data_access.${toolId}.label`),
+        description: t(`settings.ai_providers.data_access.${toolId}.description`),
+      })),
+    [t],
+  );
 
   // Check if provider supports custom base URL
   const supportsCustomUrl = provider.connectionFields?.some(
@@ -240,7 +242,7 @@ export function ProviderSettingsCard({
     if (!onToolsAllowlistChange) return;
 
     const currentAllowlist = provider.toolsAllowlist;
-    const allToolIds = DATA_ACCESS_OPTIONS.map((opt) => opt.toolId);
+    const allToolIds = dataAccessOptions.map((opt) => opt.toolId);
 
     if (currentAllowlist === null || currentAllowlist === undefined) {
       // Currently all tools enabled (null = all). If disabling one, create allowlist with all except this one.
@@ -288,7 +290,7 @@ export function ProviderSettingsCard({
               <span className="font-medium">{provider.name}</span>
               {provider.isDefault && (
                 <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
-                  Default
+                  {t("settings.ai_providers.badge_default")}
                 </Badge>
               )}
               {provider.enabled && !provider.hasApiKey && provider.type === "api" && (
@@ -297,7 +299,7 @@ export function ProviderSettingsCard({
                   className="border-warning/20 bg-warning/10 text-warning shrink-0 text-xs"
                 >
                   <Icons.AlertTriangle className="mr-1 h-3 w-3" />
-                  API Key Required
+                  {t("settings.ai_providers.badge_api_key_required")}
                 </Badge>
               )}
             </div>
@@ -334,14 +336,14 @@ export function ProviderSettingsCard({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label htmlFor={`apikey-${provider.id}`} className="text-sm font-medium">
-                        API Key
+                        {t("settings.ai_providers.label_api_key")}
                       </Label>
                       {provider.documentationUrl && (
                         <ExternalLink
                           href={provider.documentationUrl}
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                         >
-                          Get API key
+                          {t("settings.ai_providers.link_get_api_key")}
                           <Icons.ExternalLink className="h-3 w-3" />
                         </ExternalLink>
                       )}
@@ -359,7 +361,9 @@ export function ProviderSettingsCard({
                                 : ""
                           }
                           onChange={(e) => setApiKeyValue(e.target.value)}
-                          placeholder={provider.hasApiKey ? "" : "Enter API key"}
+                          placeholder={
+                            provider.hasApiKey ? "" : t("settings.ai_providers.placeholder_api_key")
+                          }
                           className="bg-background pr-9 font-mono text-sm"
                           readOnly={!hasLoadedKey && provider.hasApiKey}
                         />
@@ -370,7 +374,11 @@ export function ProviderSettingsCard({
                           className="absolute right-0 top-0 h-full w-9 hover:bg-transparent"
                           onClick={handleRevealApiKey}
                           disabled={isLoadingKey}
-                          aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                          aria-label={
+                            showApiKey
+                              ? t("settings.ai_providers.aria_hide_api_key")
+                              : t("settings.ai_providers.aria_show_api_key")
+                          }
                         >
                           {isLoadingKey ? (
                             <Icons.Spinner className="h-4 w-4 animate-spin" />
@@ -387,7 +395,7 @@ export function ProviderSettingsCard({
                         className="shrink-0"
                         disabled={!hasLoadedKey && provider.hasApiKey}
                       >
-                        Save
+                        {t("settings.shared.save")}
                       </Button>
                     </div>
                   </div>
@@ -400,7 +408,9 @@ export function ProviderSettingsCard({
                   <div className="space-y-3">
                     {/* Header with Add button */}
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Models</Label>
+                      <Label className="text-sm font-medium">
+                        {t("settings.ai_providers.models_section")}
+                      </Label>
                       <div className="flex items-center gap-2">
                         {provider.supportsModelListing && onRefreshModels && (
                           <Button
@@ -423,25 +433,28 @@ export function ProviderSettingsCard({
                           <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="h-7 gap-1 text-xs">
                               <Icons.Plus className="h-3 w-3" />
-                              Add
+                              {t("settings.ai_providers.add")}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-80 p-0" align="end">
                             <Command>
-                              <CommandInput placeholder="Search models..." className="h-9" />
+                              <CommandInput
+                                placeholder={t("settings.ai_providers.search_models")}
+                                className="h-9"
+                              />
                               <CommandList>
                                 <CommandEmpty>
                                   {isFetchingModels ? (
                                     <div className="flex items-center justify-center gap-2 py-2">
                                       <Icons.Spinner className="h-4 w-4 animate-spin" />
-                                      <span>Loading...</span>
+                                      <span>{t("settings.ai_providers.loading")}</span>
                                     </div>
                                   ) : (
-                                    "No models found."
+                                    t("settings.ai_providers.no_models_found")
                                   )}
                                 </CommandEmpty>
                                 {/* Recommended models */}
-                                <CommandGroup heading="Recommended">
+                                <CommandGroup heading={t("settings.ai_providers.group_recommended")}>
                                   {allModels
                                     .filter((m) => "isCatalog" in m && m.isCatalog)
                                     .map((model) => {
@@ -484,7 +497,9 @@ export function ProviderSettingsCard({
                                 {/* Other available models */}
                                 {allModels.filter((m) => !("isCatalog" in m && m.isCatalog))
                                   .length > 0 && (
-                                  <CommandGroup heading="Other Available">
+                                  <CommandGroup
+                                    heading={t("settings.ai_providers.group_other_available")}
+                                  >
                                     {allModels
                                       .filter((m) => !("isCatalog" in m && m.isCatalog))
                                       .map((model) => {
@@ -520,7 +535,7 @@ export function ProviderSettingsCard({
                     <div className="bg-background rounded-md border">
                       {enabledModels.length === 0 ? (
                         <div className="text-muted-foreground flex items-center justify-center py-6 text-sm">
-                          No models selected. Click &quot;Add&quot; to add models.
+                          {t("settings.ai_providers.no_models_selected_hint")}
                         </div>
                       ) : (
                         <div className="divide-y">
@@ -554,17 +569,17 @@ export function ProviderSettingsCard({
                                   {/* Capability badges */}
                                   {capabilities?.tools && (
                                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                      Tools
+                                      {t("settings.ai_providers.cap_badge_tools")}
                                     </Badge>
                                   )}
                                   {capabilities?.vision && (
                                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                      Vision
+                                      {t("settings.ai_providers.cap_badge_vision")}
                                     </Badge>
                                   )}
                                   {capabilities?.thinking && (
                                     <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                      Thinking
+                                      {t("settings.ai_providers.cap_badge_thinking")}
                                     </Badge>
                                   )}
                                   {needsConfig && (
@@ -573,7 +588,7 @@ export function ProviderSettingsCard({
                                       className="border-warning/50 text-warning h-5 px-1.5 text-[10px]"
                                     >
                                       <Icons.AlertTriangle className="mr-1 h-3 w-3" />
-                                      Config
+                                      {t("settings.ai_providers.badge_config")}
                                     </Badge>
                                   )}
                                   {/* Remove button */}
@@ -615,7 +630,7 @@ export function ProviderSettingsCard({
                               <p className="text-sm font-medium">{model.name ?? model.id}</p>
                               {isRecommended && (
                                 <Badge variant="secondary" className="text-xs">
-                                  Recommended
+                                  {t("settings.ai_providers.recommended")}
                                 </Badge>
                               )}
                             </div>
@@ -628,7 +643,7 @@ export function ProviderSettingsCard({
                                   }
                                   disabled={isRecommended}
                                 />
-                                Tools
+                                {t("settings.ai_providers.cap_checkbox_tools")}
                               </label>
                               <label className="flex items-center gap-2 text-sm">
                                 <Checkbox
@@ -638,7 +653,7 @@ export function ProviderSettingsCard({
                                   }
                                   disabled={isRecommended}
                                 />
-                                Vision
+                                {t("settings.ai_providers.cap_checkbox_vision")}
                               </label>
                               <label className="flex items-center gap-2 text-sm">
                                 <Checkbox
@@ -648,12 +663,12 @@ export function ProviderSettingsCard({
                                   }
                                   disabled={isRecommended}
                                 />
-                                Thinking
+                                {t("settings.ai_providers.cap_checkbox_thinking")}
                               </label>
                             </div>
                             {isRecommended && (
                               <p className="text-muted-foreground mt-2 text-xs">
-                                Capabilities are preset for recommended models.
+                                {t("settings.ai_providers.capabilities_preset_hint")}
                               </p>
                             )}
                           </div>
@@ -679,7 +694,7 @@ export function ProviderSettingsCard({
                           href={customUrlField.helpUrl}
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                         >
-                          Learn more
+                          {t("settings.ai_providers.learn_more")}
                           <Icons.ExternalLink className="h-3 w-3" />
                         </ExternalLink>
                       )}
@@ -690,7 +705,11 @@ export function ProviderSettingsCard({
                         type="url"
                         value={customUrlValue}
                         onChange={(e) => setCustomUrlValue(e.target.value)}
-                        placeholder={customUrlField.placeholder}
+                        placeholder={
+                          customUrlField.placeholder === CUSTOM_URL_PLACEHOLDER_DEFAULT
+                            ? t("settings.ai_providers.placeholder_custom_url_default")
+                            : customUrlField.placeholder
+                        }
                         className="bg-background flex-1 font-mono text-sm"
                       />
                       <Button
@@ -698,7 +717,7 @@ export function ProviderSettingsCard({
                         size="default"
                         className="shrink-0"
                       >
-                        Save
+                        {t("settings.shared.save")}
                       </Button>
                     </div>
                   </div>
@@ -709,13 +728,15 @@ export function ProviderSettingsCard({
               {onToolsAllowlistChange && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Data Access</Label>
+                    <Label className="text-sm font-medium">
+                      {t("settings.ai_providers.label_data_access")}
+                    </Label>
                     <span className="text-muted-foreground text-xs">
-                      What data the AI can access
+                      {t("settings.ai_providers.data_access_subtitle")}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {DATA_ACCESS_OPTIONS.map((option) => {
+                    {dataAccessOptions.map((option) => {
                       const isEnabled = isToolEnabled(option.toolId);
                       return (
                         <button

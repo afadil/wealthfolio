@@ -6,6 +6,7 @@ import type {
   UseFormGetValues,
   UseFormReturn,
 } from "react-hook-form";
+import i18n from "@/i18n/i18n";
 import { toast } from "sonner";
 
 interface ValidationIssue {
@@ -13,36 +14,11 @@ interface ValidationIssue {
   message: string;
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  accountId: "Account",
-  fromAccountId: "From Account",
-  toAccountId: "To Account",
-  isExternal: "External Transfer",
-  direction: "Transfer Direction",
-  transferMode: "Transfer Mode",
-  activityType: "Activity Type",
-  assetId: "Symbol",
-  symbol: "Symbol",
-  activityDate: "Date",
-  quantity: "Quantity",
-  splitRatio: "Split Ratio",
-  unitPrice: "Price",
-  amount: "Amount",
-  fee: "Fee",
-  currency: "Currency",
-  fxRate: "FX Rate",
-  comment: "Notes",
-  subtype: "Subtype",
-  exchangeMic: "Exchange",
-  symbolQuoteCcy: "Quote Currency",
-  symbolInstrumentType: "Instrument Type",
-  quoteMode: "Quote Mode",
-};
-
 function formatFieldName(fieldPath: string): string {
   const leaf = fieldPath.split(".").at(-1) ?? fieldPath;
   const cleaned = leaf.replace(/\[\d+\]/g, "");
-  return FIELD_LABELS[cleaned] ?? cleaned;
+  const key = `activity.form.fields.${cleaned}`;
+  return i18n.exists(key) ? i18n.t(key) : cleaned;
 }
 
 function collectIssues(errors: FieldErrors<FieldValues>): ValidationIssue[] {
@@ -93,9 +69,12 @@ export function showValidationToast<T extends FieldValues>(
     const fieldName = formatFieldName(issue.fieldPath);
     return `${fieldName}: ${issue.message}`;
   });
-  const suffix = issues.length > 3 ? ` (+${issues.length - 3} more)` : "";
+  const suffix =
+    issues.length > 3
+      ? ` ${i18n.t("activity.validation.more_suffix", { count: issues.length - 3 })}`
+      : "";
 
-  toast.error("Please fix form errors", {
+  toast.error(i18n.t("activity.validation.title"), {
     id: "activity-form-validation",
     description: `${lines.join(" • ")}${suffix}`,
   });
@@ -119,7 +98,7 @@ export function createValidatedSubmit<T extends FieldValues>(
       await handler(event);
     } catch (err) {
       console.error("[ActivityForm] Unhandled submit error:", err);
-      toast.error("An unexpected error occurred", {
+      toast.error(i18n.t("toast.common.unexpected_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }

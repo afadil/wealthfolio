@@ -19,11 +19,13 @@ import {
 } from "@wealthfolio/ui";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SettingsHeader } from "../settings-header";
 import { useAddonActions } from "./hooks/use-addon-actions";
 import { useAddonUpdates } from "./hooks/use-addon-updates";
 
 export default function AddonSettingsPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"installed" | "store">("installed");
   const [ratingDialog, setRatingDialog] = useState<{
     open: boolean;
@@ -87,8 +89,8 @@ export default function AddonSettingsPage() {
   const handleRatingSubmitted = () => {
     // Could refresh addon data here if needed in the future
     toast({
-      title: "Thank you!",
-      description: "Your rating has been submitted successfully.",
+      title: t("settings.addons.page.rating_thanks_title"),
+      description: t("settings.addons.page.rating_thanks_description"),
     });
   };
 
@@ -98,8 +100,8 @@ export default function AddonSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <SettingsHeader
-          heading="Addon Manager"
-          text="Install and manage add-ons to extend Wealthfolio's functionality."
+          heading={t("settings.addons.page.heading")}
+          text={t("settings.addons.page.description")}
         />
 
         <div className="flex items-center gap-3">
@@ -112,19 +114,19 @@ export default function AddonSettingsPage() {
             <PopoverContent className="w-80">
               <div className="space-y-3">
                 <div className="space-y-2">
-                  <h4 className="font-medium">🔌 Add-ons & Extensions</h4>
+                  <h4 className="font-medium">{t("settings.addons.page.extensions_title")}</h4>
                   <p className="text-muted-foreground text-sm">
-                    Add-ons let you extend Wealthfolio with new features, custom analytics, and
-                    additional functionality to enhance your financial management experience.
+                    {t("settings.addons.page.extensions_description")}
                   </p>
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex items-start gap-2">
                     <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     <p className="text-muted-foreground text-xs">
-                      <span className="font-medium text-amber-600">Security Notice:</span> Only
-                      install add-ons from trusted sources. Add-ons have access to your application
-                      data.
+                      <span className="font-medium text-amber-600">
+                        {t("settings.addons.page.security_notice_title")}
+                      </span>{" "}
+                      {t("settings.addons.page.security_notice_description")}
                     </p>
                   </div>
                 </div>
@@ -144,7 +146,7 @@ export default function AddonSettingsPage() {
             className="flex items-center justify-center gap-1.5 sm:gap-2"
           >
             <Icons.Package className="h-4 w-4 flex-shrink-0" />
-            <span className="truncate">Installed</span>
+            <span className="truncate">{t("settings.addons.page.tab_installed")}</span>
             {installedAddons.length > 0 && (
               <Badge variant="secondary" className="ml-0.5 flex-shrink-0 sm:ml-1">
                 {installedAddons.length}
@@ -153,7 +155,7 @@ export default function AddonSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="store" className="flex items-center justify-center gap-1.5 sm:gap-2">
             <Icons.Store className="h-4 w-4 flex-shrink-0" />
-            <span className="truncate">Available</span>
+            <span className="truncate">{t("settings.addons.page.tab_available")}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -161,19 +163,22 @@ export default function AddonSettingsPage() {
           <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <h3 className="text-base font-medium sm:text-lg">Installed Add-ons</h3>
+                <h3 className="text-base font-medium sm:text-lg">
+                  {t("settings.addons.page.installed_title")}
+                </h3>
                 <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm">
                   <span>
-                    {installedAddons.length} add-on{installedAddons.length !== 1 ? "s" : ""}{" "}
-                    installed
+                    {t("settings.addons.page.installed_count", { count: installedAddons.length })}
                   </span>
                   {hasUpdates() && (
                     <Badge
                       variant={getCriticalUpdateCount() > 0 ? "destructive" : "default"}
                       className="text-xs"
                     >
-                      {getUpdateCount()} update{getUpdateCount() !== 1 ? "s" : ""} available
-                      {getCriticalUpdateCount() > 0 && ` (${getCriticalUpdateCount()} critical)`}
+                      {t("settings.addons.page.updates_available", {
+                        count: getUpdateCount(),
+                        critical: getCriticalUpdateCount(),
+                      })}
                     </Badge>
                   )}
                 </div>
@@ -191,7 +196,7 @@ export default function AddonSettingsPage() {
                         onClick={handleCheckUpdates}
                         disabled={isCheckingUpdates || installedAddons.length === 0}
                         className="hover:bg-muted/50 relative"
-                        title="Check for Updates"
+                        title={t("settings.addons.page.check_updates")}
                       >
                         {isCheckingUpdates ? (
                           <Icons.Loader className="h-4 w-4 animate-spin" />
@@ -208,10 +213,10 @@ export default function AddonSettingsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Icons.Refresh className="h-4 w-4" />
-                        <span className="font-medium">Check for Updates</span>
+                        <span className="font-medium">{t("settings.addons.page.check_updates")}</span>
                       </div>
                       <p className="text-muted-foreground text-sm">
-                        Check all installed add-ons for available updates from their sources.
+                        {t("settings.addons.page.check_updates_description")}
                       </p>
                       {hasUpdates() && (
                         <div className="border-t pt-2">
@@ -219,7 +224,9 @@ export default function AddonSettingsPage() {
                             variant={getCriticalUpdateCount() > 0 ? "destructive" : "default"}
                             className="text-xs"
                           >
-                            {getUpdateCount()} update{getUpdateCount() !== 1 ? "s" : ""} available
+                            {t("settings.addons.page.updates_available_short", {
+                              count: getUpdateCount(),
+                            })}
                           </Badge>
                         </div>
                       )}
@@ -237,7 +244,7 @@ export default function AddonSettingsPage() {
                         onClick={handleLoadAddon}
                         disabled={isLoading}
                         className="hover:bg-muted/50"
-                        title="Install from File"
+                        title={t("settings.addons.page.install_from_file")}
                       >
                         {isLoading ? (
                           <Icons.Loader className="h-4 w-4 animate-spin" />
@@ -251,11 +258,12 @@ export default function AddonSettingsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Icons.Plus className="h-4 w-4" />
-                        <span className="font-medium">Install from File</span>
+                        <span className="font-medium">
+                          {t("settings.addons.page.install_from_file")}
+                        </span>
                       </div>
                       <p className="text-muted-foreground text-sm">
-                        Install an add-on from a local ZIP file. Only install add-ons from trusted
-                        sources.
+                        {t("settings.addons.page.install_from_file_description")}
                       </p>
                     </div>
                   </PopoverContent>
@@ -268,8 +276,8 @@ export default function AddonSettingsPage() {
                   className="flex items-center gap-1.5"
                 >
                   <Icons.Store className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden sm:inline">Browse Add-ons</span>
-                  <span className="sm:hidden">Browse</span>
+                  <span className="hidden sm:inline">{t("settings.addons.page.browse_addons")}</span>
+                  <span className="sm:hidden">{t("settings.addons.page.browse")}</span>
                 </Button>
               </div>
             </div>
@@ -278,21 +286,20 @@ export default function AddonSettingsPage() {
               <div className="flex items-center justify-center py-12">
                 <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
                 <span className="text-muted-foreground ml-2 text-sm sm:text-base">
-                  Loading add-ons...
+                  {t("settings.addons.page.loading")}
                 </span>
               </div>
             ) : installedAddons.length === 0 ? (
               <EmptyPlaceholder>
                 <EmptyPlaceholder.Icon name="Package" />
-                <EmptyPlaceholder.Title>No add-ons installed</EmptyPlaceholder.Title>
+                <EmptyPlaceholder.Title>{t("settings.addons.page.empty_title")}</EmptyPlaceholder.Title>
                 <EmptyPlaceholder.Description>
-                  Get started by installing your first add-on to extend Wealthfolio&apos;s
-                  functionality.
+                  {t("settings.addons.page.empty_description")}
                 </EmptyPlaceholder.Description>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
                   <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
                     <Icons.Store className="mr-2 h-4 w-4" />
-                    Browse Add-ons
+                    {t("settings.addons.page.browse_addons")}
                   </Button>
                   <Button
                     variant="outline"
@@ -301,7 +308,7 @@ export default function AddonSettingsPage() {
                     className="w-full sm:w-auto"
                   >
                     <Icons.Plus className="mr-2 h-4 w-4" />
-                    Install from File
+                    {t("settings.addons.page.install_from_file")}
                   </Button>
                 </div>
               </EmptyPlaceholder>
@@ -344,7 +351,7 @@ export default function AddonSettingsPage() {
                               className="bg-warning/10 text-warning border-warning/20 shrink-0 text-xs"
                             >
                               <Icons.AlertCircle className="mr-1 h-3 w-3" />
-                              Disabled
+                              {t("settings.shared.disabled")}
                             </Badge>
                           )}
                         </div>
@@ -372,7 +379,9 @@ export default function AddonSettingsPage() {
                             }`}
                           >
                             <Icons.Users className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">By {addon.metadata.author}</span>
+                            <span className="truncate">
+                              {t("settings.addons.page.by_author", { author: addon.metadata.author })}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -388,7 +397,7 @@ export default function AddonSettingsPage() {
                             className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
                           >
                             <Icons.Eye className="h-4 w-4" />
-                            <span className="sr-only">View permissions</span>
+                            <span className="sr-only">{t("settings.addons.page.view_permissions")}</span>
                           </Button>
 
                           {/* Rating button */}
@@ -399,21 +408,20 @@ export default function AddonSettingsPage() {
                             className="text-muted-foreground hover:bg-accent hover:text-foreground h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
                           >
                             <Icons.Star className="h-4 w-4" />
-                            <span className="sr-only">Rate addon</span>
+                            <span className="sr-only">{t("settings.addons.page.rate_addon")}</span>
                           </Button>
 
                           {/* Delete button with confirmation */}
                           <DeleteConfirm
-                            deleteConfirmTitle="Remove Addon"
+                            deleteConfirmTitle={t("settings.addons.page.remove_addon_title")}
                             deleteConfirmMessage={
                               <div className="space-y-2">
                                 <p>
-                                  Are you sure you want to remove{" "}
+                                  {t("settings.addons.page.remove_addon_confirm_prefix")}{" "}
                                   <strong>{addon.metadata.name}</strong>?
                                 </p>
                                 <p className="text-muted-foreground text-sm">
-                                  This action cannot be undone. The addon will be completely removed
-                                  from your system.
+                                  {t("settings.addons.page.remove_addon_warning")}
                                 </p>
                               </div>
                             }
@@ -426,7 +434,7 @@ export default function AddonSettingsPage() {
                                 className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-9 w-9 p-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
                               >
                                 <Icons.Trash className="h-4 w-4" />
-                                <span className="sr-only">Remove addon</span>
+                                <span className="sr-only">{t("settings.addons.page.remove_addon")}</span>
                               </Button>
                             }
                           />
@@ -490,8 +498,8 @@ export default function AddonSettingsPage() {
         onDeny={() => {
           setPermissionDialog({ open: false });
           toast({
-            title: "Installation cancelled",
-            description: "Addon installation was cancelled by user.",
+            title: t("settings.addons.page.installation_cancelled_title"),
+            description: t("settings.addons.page.installation_cancelled_description"),
           });
         }}
       />

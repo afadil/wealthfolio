@@ -1,3 +1,4 @@
+import i18n from "@/i18n/i18n";
 import { useSettings } from "@/hooks/use-settings";
 import { ActivityType, QuoteMode } from "@/lib/constants";
 import { formatAmount } from "@/lib/utils";
@@ -11,6 +12,7 @@ import { Label } from "@wealthfolio/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { useMemo } from "react";
 import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
   AccountSelect,
@@ -36,164 +38,152 @@ const assetMetadataSchema = z
   })
   .optional();
 
-// Zod schema for TransferForm validation
-export const transferFormSchema = z
-  .object({
-    isExternal: z.boolean().default(false),
-    direction: z.enum(["in", "out"]).default("in"),
-    accountId: z.string().optional(), // For external transfers (single account)
-    fromAccountId: z.string().optional(), // For internal transfers
-    toAccountId: z.string().optional(), // For internal transfers
-    activityDate: z.date({ required_error: "Please select a date." }),
-    transferMode: z.enum(["cash", "securities"]).default("cash"),
-    amount: z.coerce
-      .number({
-        invalid_type_error: "Amount must be a number.",
-      })
-      .positive({ message: "Amount must be greater than 0." })
-      .optional()
-      .nullable(),
-    // Fields for security transfers
-    assetId: z.string().optional().nullable(),
-    quantity: z.coerce
-      .number({
-        invalid_type_error: "Quantity must be a number.",
-      })
-      .positive({ message: "Quantity must be greater than 0." })
-      .optional()
-      .nullable(),
-    unitPrice: z.coerce
-      .number({
-        invalid_type_error: "Cost basis must be a number.",
-      })
-      .positive({ message: "Cost basis must be greater than 0." })
-      .optional()
-      .nullable(),
-    comment: z.string().optional().nullable(),
-    // Advanced options
-    currency: z.string().min(1, { message: "Currency is required." }),
-    fxRate: z.coerce
-      .number({
-        invalid_type_error: "FX Rate must be a number.",
-      })
-      .positive({ message: "FX Rate must be positive." })
-      .optional(),
-    subtype: z.string().optional().nullable(),
-    // Internal field for manual quote mode
-    quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
-    exchangeMic: z.string().nullable().optional(),
-    symbolQuoteCcy: z.string().nullable().optional(),
-    symbolInstrumentType: z.string().nullable().optional(),
-    // Asset metadata for custom assets (name, etc.)
-    assetMetadata: assetMetadataSchema,
-  })
-  // External transfer requires accountId
-  .refine(
-    (data) => {
-      if (data.isExternal) {
-        return data.accountId != null && data.accountId.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please select an account.",
-      path: ["accountId"],
-    },
-  )
-  // Internal transfer requires fromAccountId
-  .refine(
-    (data) => {
-      if (!data.isExternal) {
-        return data.fromAccountId != null && data.fromAccountId.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please select a source account.",
-      path: ["fromAccountId"],
-    },
-  )
-  // Internal transfer requires toAccountId
-  .refine(
-    (data) => {
-      if (!data.isExternal) {
-        return data.toAccountId != null && data.toAccountId.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please select a destination account.",
-      path: ["toAccountId"],
-    },
-  )
-  // Internal transfer: accounts must be different
-  .refine(
-    (data) => {
-      if (!data.isExternal) {
-        return data.fromAccountId !== data.toAccountId;
-      }
-      return true;
-    },
-    {
-      message: "Source and destination accounts must be different.",
-      path: ["toAccountId"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Cash mode requires amount
-      if (data.transferMode === "cash") {
-        return data.amount != null && data.amount > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please enter an amount.",
-      path: ["amount"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Securities mode requires assetId
-      if (data.transferMode === "securities") {
-        return data.assetId != null && data.assetId.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please select a symbol.",
-      path: ["assetId"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Securities mode requires quantity
-      if (data.transferMode === "securities") {
-        return data.quantity != null && data.quantity > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please enter a quantity.",
-      path: ["quantity"],
-    },
-  )
-  .refine(
-    (data) => {
-      // Cost basis required only for external transfer in with securities
-      // Backend calculates cost basis for transfer out from existing holdings
-      if (data.transferMode === "securities" && data.isExternal && data.direction === "in") {
-        return data.unitPrice != null && data.unitPrice > 0;
-      }
-      return true;
-    },
-    {
-      message: "Please enter a cost basis.",
-      path: ["unitPrice"],
-    },
-  );
+export function createTransferFormSchema() {
+  return z
+    .object({
+      isExternal: z.boolean().default(false),
+      direction: z.enum(["in", "out"]).default("in"),
+      accountId: z.string().optional(),
+      fromAccountId: z.string().optional(),
+      toAccountId: z.string().optional(),
+      activityDate: z.date({ required_error: i18n.t("activity.validation.select_date") }),
+      transferMode: z.enum(["cash", "securities"]).default("cash"),
+      amount: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.amount_invalid_type"),
+        })
+        .positive({ message: i18n.t("activity.validation.amount_greater_than_zero") })
+        .optional()
+        .nullable(),
+      assetId: z.string().optional().nullable(),
+      quantity: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.quantity_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.quantity_greater_than_zero") })
+        .optional()
+        .nullable(),
+      unitPrice: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.cost_basis_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.cost_basis_greater_than_zero") })
+        .optional()
+        .nullable(),
+      comment: z.string().optional().nullable(),
+      currency: z.string().min(1, { message: i18n.t("activity.validation.currency_required") }),
+      fxRate: z.coerce
+        .number({
+          invalid_type_error: i18n.t("activity.validation.fx_rate_must_be_number"),
+        })
+        .positive({ message: i18n.t("activity.validation.fx_rate_positive_short") })
+        .optional(),
+      subtype: z.string().optional().nullable(),
+      quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]).default(QuoteMode.MARKET),
+      exchangeMic: z.string().nullable().optional(),
+      symbolQuoteCcy: z.string().nullable().optional(),
+      symbolInstrumentType: z.string().nullable().optional(),
+      assetMetadata: assetMetadataSchema,
+    })
+    .refine(
+      (data) => {
+        if (data.isExternal) {
+          return data.accountId != null && data.accountId.length > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.account_required"),
+        path: ["accountId"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (!data.isExternal) {
+          return data.fromAccountId != null && data.fromAccountId.length > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.select_source_account"),
+        path: ["fromAccountId"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (!data.isExternal) {
+          return data.toAccountId != null && data.toAccountId.length > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.transfer_destination"),
+        path: ["toAccountId"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (!data.isExternal) {
+          return data.fromAccountId !== data.toAccountId;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.source_dest_accounts_different"),
+        path: ["toAccountId"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.transferMode === "cash") {
+          return data.amount != null && data.amount > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.transfer_amount"),
+        path: ["amount"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.transferMode === "securities") {
+          return data.assetId != null && data.assetId.length > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.transfer_symbol"),
+        path: ["assetId"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.transferMode === "securities") {
+          return data.quantity != null && data.quantity > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.transfer_quantity"),
+        path: ["quantity"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.transferMode === "securities" && data.isExternal && data.direction === "in") {
+          return data.unitPrice != null && data.unitPrice > 0;
+        }
+        return true;
+      },
+      {
+        message: i18n.t("activity.validation.transfer_cost_basis"),
+        path: ["unitPrice"],
+      },
+    );
+}
 
-export type TransferFormValues = z.infer<typeof transferFormSchema>;
+export type TransferFormValues = z.infer<ReturnType<typeof createTransferFormSchema>>;
 
 interface TransferFormProps {
   accounts: AccountSelectOption[];
@@ -219,6 +209,8 @@ export function TransferForm({
   isEditing = false,
   assetCurrency,
 }: TransferFormProps) {
+  const { t, i18n } = useTranslation();
+  const transferFormSchema = useMemo(() => createTransferFormSchema(), [i18n.language]);
   const { data: settings } = useSettings();
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
@@ -287,8 +279,8 @@ export function TransferForm({
 
   // Toggle items for transfer mode
   const transferModeItems = [
-    { value: "cash" as const, label: "Cash" },
-    { value: "securities" as const, label: "Securities" },
+    { value: "cash" as const, label: t("activity.form.transfer.mode_cash") },
+    { value: "securities" as const, label: t("activity.form.transfer.mode_securities") },
   ];
 
   // Handle transfer mode change
@@ -331,13 +323,13 @@ export function TransferForm({
 
   // Generate dynamic submit button text
   const getSubmitButtonText = () => {
-    if (isEditing) return "Update";
+    if (isEditing) return t("activity.form.update");
 
     const actionPrefix = isExternal
       ? direction === "in"
-        ? "Transfer In"
-        : "Transfer Out"
-      : "Transfer";
+        ? t("activity.form.transfer.action_in")
+        : t("activity.form.transfer.action_out")
+      : t("activity.form.transfer.action");
 
     if (isCashMode && amount && amount > 0) {
       const displayCurrency = initialCurrency || accountCurrency || baseCurrency;
@@ -348,7 +340,11 @@ export function TransferForm({
       return `${actionPrefix} ${quantity} ${assetId}`;
     }
 
-    return isExternal ? `Add ${actionPrefix}` : "Add Transfer";
+    return isExternal
+      ? direction === "in"
+        ? t("activity.form.transfer.add_in")
+        : t("activity.form.transfer.add_out")
+      : t("activity.form.transfer.add");
   };
 
   // Filter destination accounts to exclude source account (for internal transfers)
@@ -387,7 +383,7 @@ export function TransferForm({
                   onCheckedChange={handleExternalChange}
                 />
                 <Label htmlFor="isExternal" className="cursor-pointer text-sm font-normal">
-                  External transfer
+                  {t("activity.form.transfer.external_label")}
                 </Label>
               </div>
 
@@ -403,13 +399,13 @@ export function TransferForm({
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="in" id="direction-in" />
                       <Label htmlFor="direction-in" className="cursor-pointer text-sm font-normal">
-                        In
+                        {t("activity.form.transfer.direction_in")}
                       </Label>
                     </div>
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="out" id="direction-out" />
                       <Label htmlFor="direction-out" className="cursor-pointer text-sm font-normal">
-                        Out
+                        {t("activity.form.transfer.direction_out")}
                       </Label>
                     </div>
                   </RadioGroup>
@@ -423,8 +419,12 @@ export function TransferForm({
                 name="accountId"
                 accounts={accounts}
                 currencyName="currency"
-                label={direction === "in" ? "To Account" : "From Account"}
-                placeholder="Select account..."
+                label={
+                  direction === "in"
+                    ? t("activity.form.transfer.label_to_in")
+                    : t("activity.form.transfer.label_from_out")
+                }
+                placeholder={t("activity.form.transfer.placeholder_account")}
               />
             ) : (
               <>
@@ -433,22 +433,22 @@ export function TransferForm({
                   name="fromAccountId"
                   accounts={accounts}
                   currencyName="currency"
-                  label="From Account"
-                  placeholder="Select source account..."
+                  label={t("activity.form.fields.fromAccountId")}
+                  placeholder={t("activity.form.transfer.placeholder_source")}
                 />
 
                 {/* To Account Selection */}
                 <AccountSelect
                   name="toAccountId"
                   accounts={toAccountOptions}
-                  label="To Account"
-                  placeholder="Select destination account..."
+                  label={t("activity.form.fields.toAccountId")}
+                  placeholder={t("activity.form.transfer.placeholder_destination")}
                 />
               </>
             )}
 
             {/* Date Picker */}
-            <DatePicker name="activityDate" label="Date" />
+            <DatePicker name="activityDate" label={t("activity.form.fields.activityDate")} />
 
             {/* Securities mode: Symbol and Quantity at top */}
             {!isCashMode && (
@@ -468,12 +468,12 @@ export function TransferForm({
                 <input type="hidden" {...form.register("assetMetadata.kind")} />
                 <input type="hidden" {...form.register("symbolQuoteCcy")} />
                 <input type="hidden" {...form.register("symbolInstrumentType")} />
-                <QuantityInput name="quantity" label="Quantity" />
+                <QuantityInput name="quantity" label={t("activity.form.fields.quantity")} />
                 {/* Cost basis only needed for external transfer in - backend calculates for transfer out */}
                 {isExternal && direction === "in" && (
                   <AmountInput
                     name="unitPrice"
-                    label="Cost Basis"
+                    label={t("activity.form.fields.costBasis")}
                     maxDecimalPlaces={4}
                     currency={currency}
                   />
@@ -482,7 +482,9 @@ export function TransferForm({
             )}
 
             {/* Cash mode: Amount */}
-            {isCashMode && <AmountInput name="amount" label="Amount" currency={currency} />}
+            {isCashMode && (
+              <AmountInput name="amount" label={t("activity.form.fields.amount")} currency={currency} />
+            )}
 
             {/* Advanced Options */}
             <AdvancedOptionsSection
@@ -496,7 +498,7 @@ export function TransferForm({
             />
 
             {/* Notes */}
-            <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />
+            <NotesInput name="comment" />
           </CardContent>
         </Card>
 
@@ -504,7 +506,7 @@ export function TransferForm({
         <div className="flex justify-end gap-2">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              {t("activity.form.cancel")}
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>

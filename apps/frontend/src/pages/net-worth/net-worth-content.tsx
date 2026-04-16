@@ -25,7 +25,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@wealthfolio/ui/components/ui/tooltip";
+import { buildIntervalButtonLabels, buildIntervalLabels } from "@/lib/interval-labels";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { NetWorthChart } from "./net-worth-chart";
 
@@ -88,6 +90,7 @@ interface BalanceSheetProps {
 }
 
 function BalanceSheet({ data, currency }: BalanceSheetProps) {
+  const { t } = useTranslation("common");
   const [assetsOpen, setAssetsOpen] = useState(true);
   const [liabilitiesOpen, setLiabilitiesOpen] = useState(true);
 
@@ -104,7 +107,7 @@ function BalanceSheet({ data, currency }: BalanceSheetProps) {
             <Icons.ChevronRight
               className={`text-muted-foreground h-4 w-4 transition-transform ${assetsOpen ? "rotate-90" : ""}`}
             />
-            <span className="text-sm font-semibold">Assets</span>
+            <span className="text-sm font-semibold">{t("net_worth.balance_sheet.assets")}</span>
           </div>
           <span className="text-success text-sm font-semibold">
             <PrivacyAmount value={data.assets.total} currency={currency} />
@@ -144,7 +147,7 @@ function BalanceSheet({ data, currency }: BalanceSheetProps) {
               <Icons.ChevronRight
                 className={`text-muted-foreground h-4 w-4 transition-transform ${liabilitiesOpen ? "rotate-90" : ""}`}
               />
-              <span className="text-sm font-semibold">Liabilities</span>
+              <span className="text-sm font-semibold">{t("net_worth.balance_sheet.liabilities")}</span>
             </div>
             <span className="text-destructive text-sm font-semibold">
               -<PrivacyAmount value={data.liabilities.total} currency={currency} />
@@ -175,7 +178,7 @@ function BalanceSheet({ data, currency }: BalanceSheetProps) {
 
       {/* Net Worth Summary */}
       <div className="bg-muted/30 flex items-center justify-between border-t px-4 py-3 md:px-5">
-        <span className="text-sm font-bold">Net Worth</span>
+        <span className="text-sm font-bold">{t("net_worth.balance_sheet.net_worth")}</span>
         <span className="text-sm font-bold">
           <PrivacyAmount value={data.netWorth} currency={currency} />
         </span>
@@ -200,6 +203,7 @@ interface CompositionWidgetProps {
 }
 
 function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
+  const { t } = useTranslation("common");
   const items = useMemo((): CompositionItem[] => {
     if (!data || data.assets.total === 0) return [];
 
@@ -217,7 +221,7 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
   if (isLoading) {
     return (
       <div className="w-full">
-        <h2 className="text-md pb-2 font-semibold tracking-tight">Composition</h2>
+        <h2 className="text-md pb-2 font-semibold tracking-tight">{t("net_worth.composition.title")}</h2>
         <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
           <Skeleton className="mb-4 h-2.5 w-full rounded-full" />
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -237,7 +241,7 @@ function CompositionWidget({ data, isLoading }: CompositionWidgetProps) {
 
   return (
     <div className="w-full">
-      <h2 className="text-md pb-2 font-semibold tracking-tight">Composition</h2>
+      <h2 className="text-md pb-2 font-semibold tracking-tight">{t("net_worth.composition.title")}</h2>
       <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
         {/* Stacked horizontal bar */}
         <div className="mb-4 flex h-2.5 w-full overflow-hidden rounded-full">
@@ -295,6 +299,9 @@ interface NetWorthContentProps {
 }
 
 export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentProps) {
+  const { t } = useTranslation("common");
+  const intervalLabels = useMemo(() => buildIntervalLabels(t), [t]);
+  const intervalButtonLabels = useMemo(() => buildIntervalButtonLabels(t), [t]);
   const { settings } = useSettingsContext();
   const { data: netWorthData, isLoading, isError, error } = useNetWorth();
 
@@ -305,8 +312,9 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
   const [dateRange, setDateRange] = useState<DateRange | undefined>(
     () => getInitialIntervalData(intervalCode).range,
   );
-  const [selectedIntervalDescription, setSelectedIntervalDescription] = useState<string>(
-    () => getInitialIntervalData(intervalCode).description,
+  const selectedIntervalDescription = useMemo(
+    () => getInitialIntervalData(intervalCode, intervalLabels).description,
+    [intervalCode, intervalLabels],
   );
 
   // Compute ISO date strings for the history query
@@ -327,12 +335,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
   });
 
   // Interval selector callback
-  const handleIntervalSelect = (
-    _code: TimePeriod,
-    description: string,
-    range: DateRange | undefined,
-  ) => {
-    setSelectedIntervalDescription(description);
+  const handleIntervalSelect = (_code: TimePeriod, _description: string, range: DateRange | undefined) => {
     setDateRange(range);
   };
 
@@ -397,7 +400,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
           <div className="bg-destructive/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
             <Icons.AlertTriangle className="text-destructive h-6 w-6" />
           </div>
-          <p className="text-destructive text-lg font-medium">Failed to load net worth</p>
+          <p className="text-destructive text-lg font-medium">{t("net_worth.error.load_failed")}</p>
           <p className="text-muted-foreground mt-2 text-sm">{error?.message}</p>
         </div>
       </div>
@@ -426,7 +429,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="max-w-[280px]">
-                      <p className="mb-2 text-xs font-medium">Stale valuations (90+ days):</p>
+                      <p className="mb-2 text-xs font-medium">{t("net_worth.stale.tooltip_title")}</p>
                       <ul className="space-y-1 text-xs">
                         {netWorthData?.staleAssets.map((asset) => (
                           <li
@@ -435,7 +438,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                           >
                             <span className="truncate">{asset.name ?? asset.assetId}</span>
                             <span className="text-muted-foreground shrink-0">
-                              {asset.daysStale}d ago
+                              {t("net_worth.stale.days_ago", { days: asset.daysStale })}
                             </span>
                           </li>
                         ))}
@@ -499,7 +502,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
           ) : (
             <div className="flex h-full flex-col items-center justify-center">
               <Icons.TrendingUp className="text-muted-foreground/30 mb-3 h-12 w-12" />
-              <p className="text-muted-foreground text-sm">No history data available</p>
+              <p className="text-muted-foreground text-sm">{t("net_worth.chart.no_history")}</p>
             </div>
           )}
           {historyData && historyData.length > 0 && (
@@ -510,6 +513,8 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                 isLoading={isHistoryLoading}
                 storageKey={INTERVAL_STORAGE_KEY}
                 defaultValue={DEFAULT_INTERVAL}
+                intervalLabels={intervalLabels}
+                intervalButtonLabels={intervalButtonLabels}
               />
             </div>
           )}
@@ -521,7 +526,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
             {/* Left column: Breakdown */}
             <div className="lg:col-span-2">
               <div className="mb-4 mt-8 w-full lg:mt-0">
-                <h2 className="text-md pb-2 font-semibold tracking-tight">Breakdown</h2>
+                <h2 className="text-md pb-2 font-semibold tracking-tight">{t("net_worth.breakdown.title")}</h2>
 
                 {isLoading ? (
                   <div className="border-border bg-card shadow-xs rounded-lg border p-4 md:p-5">
@@ -541,12 +546,12 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                     className="rounded-lg border border-orange-200/50 p-6 text-center md:p-8 dark:border-orange-800/50"
                     style={{ backgroundColor: THEME_COLOR_LIGHT }}
                   >
-                    <p className="text-sm">No assets found.</p>
+                    <p className="text-sm">{t("net_worth.empty.no_assets")}</p>
                     <Link
                       to="/holdings"
                       className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
                     >
-                      Add your first asset
+                      {t("net_worth.empty.add_first_asset")}
                       <Icons.ChevronRight className="h-3 w-3" />
                     </Link>
                   </div>
@@ -567,11 +572,9 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                       <Icons.AlertCircle className="text-warning h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">Update your valuations</p>
+                      <p className="text-sm font-medium">{t("net_worth.stale.update_title")}</p>
                       <p className="text-muted-foreground mt-1 text-xs">
-                        {netWorthData?.staleAssets.length} asset
-                        {netWorthData?.staleAssets.length !== 1 ? "s have" : " has"} not been
-                        updated in over 90 days.
+                        {t("net_worth.stale.banner", { count: netWorthData?.staleAssets.length ?? 0 })}
                       </p>
                       <div className="mt-3 space-y-1.5">
                         {netWorthData?.staleAssets.map((asset) => (
@@ -584,7 +587,7 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                               {asset.name ?? asset.assetId}
                             </span>
                             <span className="text-muted-foreground ml-2 shrink-0 text-xs">
-                              {asset.daysStale}d ago
+                              {t("net_worth.stale.days_ago", { days: asset.daysStale })}
                             </span>
                           </Link>
                         ))}
@@ -599,35 +602,35 @@ export function NetWorthContent({ onAddAsset, onAddLiability }: NetWorthContentP
                 className="rounded-lg border border-orange-200/50 p-4 md:p-5 dark:border-orange-800/50"
                 style={{ backgroundColor: THEME_COLOR_LIGHT }}
               >
-                <p className="text-sm font-medium">Manage your assets</p>
+                <p className="text-sm font-medium">{t("net_worth.quick_links.title")}</p>
                 <div className="mt-3 space-y-2">
                   <Link
                     to="/holdings"
                     className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                   >
                     <Icons.ChevronRight className="h-4 w-4" />
-                    View all holdings
+                    {t("net_worth.quick_links.view_all_holdings")}
                   </Link>
                   <Link
                     to="/settings/accounts"
                     className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                   >
                     <Icons.ChevronRight className="h-4 w-4" />
-                    Manage accounts
+                    {t("net_worth.quick_links.manage_accounts")}
                   </Link>
                   <button
                     onClick={onAddAsset}
                     className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                   >
                     <Icons.Plus className="h-4 w-4" />
-                    Add asset
+                    {t("net_worth.quick_links.add_asset")}
                   </button>
                   <button
                     onClick={onAddLiability}
                     className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-sm transition-colors"
                   >
                     <Icons.Plus className="h-4 w-4" />
-                    Add liability
+                    {t("net_worth.quick_links.add_liability")}
                   </button>
                 </div>
               </div>
