@@ -210,6 +210,34 @@ describe("Activity Utilities", () => {
 
       expect(calculateActivityValue(transferOut)).toBe(1010);
     });
+
+    it("should calculate securities transfer value from qty × unitPrice, not amount", () => {
+      // Simulates a real DB row where `amount` is stale/corrupted but
+      // quantity and unitPrice are correct. For securities transfers the
+      // activity value must derive from qty × unitPrice, NOT the amount field.
+      const transferIn = createActivity({
+        activityType: ActivityType.TRANSFER_IN,
+        assetSymbol: "FWIA",
+        quantity: "2078",
+        unitPrice: "7.29",
+        amount: "31478832.36", // bogus value that must be ignored
+        fee: "0",
+      });
+
+      expect(calculateActivityValue(transferIn)).toBeCloseTo(15148.62, 2);
+
+      const transferOut = createActivity({
+        activityType: ActivityType.TRANSFER_OUT,
+        assetSymbol: "AAPL",
+        quantity: "10",
+        unitPrice: "150",
+        amount: "999999", // bogus
+        fee: "5",
+      });
+
+      // Transfer out of securities: qty × price + fee (mirrors SELL-like handling for value display)
+      expect(calculateActivityValue(transferOut)).toBe(1500);
+    });
   });
 
   describe("formatSplitRatio", () => {

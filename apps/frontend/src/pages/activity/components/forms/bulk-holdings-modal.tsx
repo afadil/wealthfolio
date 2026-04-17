@@ -145,7 +145,11 @@ export const BulkHoldingsModal = ({
         },
         quantity: Number(holding.sharesOwned),
         unitPrice: Number(holding.averageCost),
-        amount: Number(holding.sharesOwned) * Number(holding.averageCost),
+        // Securities transfers derive value from qty × unitPrice at display time.
+        // Sending a precomputed amount here is redundant and has produced corrupted
+        // rows in the wild (e.g. amount = qty² × unitPrice); leave it null so the
+        // backend stores NULL and readers fall back to qty × unitPrice.
+        amount: null,
         currency,
         fee: 0,
         comment: data.comment?.trim() || undefined,

@@ -91,6 +91,18 @@ export const isCashTransfer = (activityType: string, assetSymbol: string): boole
   return false;
 };
 
+/**
+ * Securities transfer: TRANSFER_IN/OUT whose symbol is NOT a cash symbol.
+ * These move assets (shares/units), so their value derives from quantity × unitPrice,
+ * unlike cash transfers which carry a plain amount.
+ */
+export const isSecuritiesTransfer = (activityType: string, assetSymbol: string): boolean => {
+  if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
+    return false;
+  }
+  return !isCashTransfer(activityType, assetSymbol);
+};
+
 const isCanonicalCashIdentifier = (identifier: string): boolean => {
   const upper = identifier.toUpperCase();
   if (upper === "CASH") {
@@ -235,9 +247,9 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     return roundCurrency(getFee(activity));
   }
 
-  // Handle cash activities
+  // Handle cash activities (but NOT securities transfers, which need qty × price)
   if (
-    isCashActivity(activityType) ||
+    (isCashActivity(activityType) && !isSecuritiesTransfer(activityType, assetSymbol)) ||
     isCashTransfer(activityType, assetSymbol) ||
     isIncomeActivity(activityType)
   ) {

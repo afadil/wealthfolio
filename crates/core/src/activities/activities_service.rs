@@ -7,10 +7,10 @@ use std::sync::Arc;
 
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
-    classify_import_activity, is_garbage_symbol, requires_symbol, ImportSymbolDisposition,
-    ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND, ACTIVITY_SUBTYPE_DRIP, ACTIVITY_SUBTYPE_STAKING_REWARD,
-    ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
-    PRICE_BEARING_ACTIVITY_TYPES,
+    classify_import_activity, is_cash_symbol, is_garbage_symbol, requires_symbol,
+    ImportSymbolDisposition, ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND, ACTIVITY_SUBTYPE_DRIP,
+    ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN,
+    ACTIVITY_TYPE_TRANSFER_OUT, PRICE_BEARING_ACTIVITY_TYPES,
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
@@ -58,6 +58,20 @@ fn yahoo_suffix_for_mic(mic: &str) -> Option<&'static str> {
         }
     }
     None
+}
+
+/// A TRANSFER_IN/TRANSFER_OUT that moves a security (not cash). The monetary
+/// value of such an activity is always `quantity × unit_price`; the DB column
+/// `amount` must remain NULL so there is a single source of truth and we cannot
+/// drift into storing e.g. `qty² × unit_price`.
+fn is_securities_transfer(activity_type: &str, resolved_asset_id: Option<&str>) -> bool {
+    if activity_type != ACTIVITY_TYPE_TRANSFER_IN && activity_type != ACTIVITY_TYPE_TRANSFER_OUT {
+        return false;
+    }
+    match resolved_asset_id {
+        None => false,
+        Some(id) => !is_cash_symbol(id),
+    }
 }
 
 fn normalize_isin_key(isin: Option<&str>) -> Option<String> {
@@ -1471,6 +1485,14 @@ impl ActivityService {
         activity.amount = activity.amount.map(|v| v.abs());
         activity.fee = activity.fee.map(|v| v.abs());
 
+        // Securities transfers derive monetary value from quantity × unit_price at
+        // read time. Any inbound `amount` is redundant and has historically been
+        // a source of corruption (e.g. amount = qty² × unit_price stored on the
+        // row). Force it to None so the DB holds a single source of truth.
+        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+            activity.amount = None;
+        }
+
         // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
         if get_normalization_rule(&activity.currency).is_some() {
             if let Some(unit_price) = activity.unit_price {
@@ -1851,6 +1873,12 @@ impl ActivityService {
         activity.unit_price = activity.unit_price.map(|v| v.map(|d| d.abs()));
         activity.amount = activity.amount.map(|v| v.map(|d| d.abs()));
         activity.fee = activity.fee.map(|v| v.map(|d| d.abs()));
+
+        // Securities transfers derive value from quantity × unit_price; always
+        // clear `amount` on update so a caller cannot re-introduce a stale value.
+        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+            activity.amount = Some(None);
+        }
 
         // Normalize minor currency units
         if get_normalization_rule(&activity.currency).is_some() {
@@ -4112,6 +4140,12 @@ impl ActivityService {
             activity.amount = activity.amount.map(|v| v.abs());
             activity.fee = activity.fee.map(|v| v.abs());
 
+            // Securities transfers derive monetary value from quantity × unit_price;
+            // never persist an inbound `amount` for them (see prepare_new_activity).
+            if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+                activity.amount = None;
+            }
+
             // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
             if get_normalization_rule(&activity.currency).is_some() {
                 if let Some(unit_price) = activity.unit_price {
@@ -4251,5 +4285,34 @@ impl ActivityService {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod securities_transfer_tests {
+    use super::is_securities_transfer;
+
+    #[test]
+    fn transfer_with_security_asset_is_securities() {
+        assert!(is_securities_transfer("TRANSFER_IN", Some("AAPL")));
+        assert!(is_securities_transfer("TRANSFER_OUT", Some("FWIA")));
+    }
+
+    #[test]
+    fn transfer_with_cash_asset_is_not_securities() {
+        assert!(!is_securities_transfer("TRANSFER_IN", Some("CASH:USD")));
+        assert!(!is_securities_transfer("TRANSFER_OUT", Some("$CASH-EUR")));
+        assert!(!is_securities_transfer("TRANSFER_IN", Some("CASH-GBP")));
+    }
+
+    #[test]
+    fn transfer_without_resolved_asset_is_not_securities() {
+        assert!(!is_securities_transfer("TRANSFER_IN", None));
+    }
+
+    #[test]
+    fn non_transfer_types_are_not_securities_transfers() {
+        assert!(!is_securities_transfer("BUY", Some("AAPL")));
+        assert!(!is_securities_transfer("DEPOSIT", Some("CASH:USD")));
     }
 }

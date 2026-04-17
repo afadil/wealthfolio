@@ -23,6 +23,7 @@ import {
   isAssetBackedIncomeActivity,
   isCashActivity,
   isCashTransfer,
+  isSecuritiesTransfer,
   isFeeActivity,
   isIncomeActivity,
   isSplitActivity,
@@ -308,7 +309,9 @@ export const ActivityTable = ({
             return <div className="text-right">{formatSplitRatio(Number(amount))}</div>;
           }
           if (
-            (isCashActivity(activityType) && !isAssetBackedIncome) ||
+            (isCashActivity(activityType) &&
+              !isAssetBackedIncome &&
+              !isSecuritiesTransfer(activityType, assetSymbol)) ||
             isCashTransfer(activityType, assetSymbol) ||
             (isIncomeActivity(activityType) && !isAssetBackedIncome)
           ) {
