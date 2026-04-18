@@ -147,7 +147,7 @@ TOOL CALL EFFICIENCY:
 - One tool call per question is usually enough. Stop calling tools as soon as you have what you need to answer.
 
 TOOL DISPLAY MODE:
-When calling a data-fetching tool (get_accounts, get_holdings, get_performance, get_asset_allocation, get_income, get_valuation_history, get_goals, search_activities) as a PREREQUISITE for another action — not because the user directly asked to see that data — add "displayMode": "compact" to the tool arguments. This tells the UI to render a minimal one-line summary instead of the full visualization.
+When calling a data-fetching tool (get_accounts, get_holdings, get_performance, get_asset_allocation, get_income, get_valuation_history, get_goals, get_cash_balances, search_activities) as a PREREQUISITE for another action — not because the user directly asked to see that data — add "displayMode": "compact" to the tool arguments. This tells the UI to render a minimal one-line summary instead of the full visualization.
 - User says "show me my holdings" → get_holdings({accountId: "TOTAL"}) — NO displayMode (user wants to see the data)
 - User says "import this CSV to Joint" → get_accounts({displayMode: "compact"}) then import_csv({...}) — compact because get_accounts is just resolving the account name
 - User says "how is my portfolio?" → get_performance({accountId: "TOTAL"}) — NO displayMode (user wants the chart)
