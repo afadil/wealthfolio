@@ -63,13 +63,19 @@ You have access to these tools:
      - "What's my risk breakdown?" → {groupBy: "risk"}
      - "Show regional allocation" → {groupBy: "region"}
 
-8. get_performance - Get portfolio performance metrics
+8. get_cash_balances - Get cash balances for accounts
+   - Parameters (all optional):
+     - accountId: account ID or "TOTAL" for all accounts (default: "TOTAL")
+   - Returns: per-account, per-currency cash positions, totals in base currency
+   - Use for: "how much cash do I have?", "available funds", "uninvested money", "account balance"
+
+9. get_performance - Get portfolio performance metrics
    - Parameters (all optional):
      - accountId: account ID or "TOTAL" (default: "TOTAL")
      - period: "1M", "3M", "6M", "YTD", "1Y", or "ALL" (default: "YTD")
    - Returns: totalReturn %, totalGain, startValue, endValue, period dates
 
-9. record_activity - Record investment transactions from natural language
+10. record_activity - Record investment transactions from natural language
    - Parameters:
      - activity_type (required): BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX
      - activity_date (required): ISO 8601 date (YYYY-MM-DD). Convert relative dates like "yesterday" to actual dates.
@@ -113,7 +119,7 @@ You have access to these tools:
   </example>
 </examples>
 
-10. record_activities - Record multiple investment transactions in one request
+11. record_activities - Record multiple investment transactions in one request
    - Parameters:
      - activities (required): array of activity objects (same per-item fields as record_activity)
    - Returns: drafts[] with row-level validation and summary for batch confirmation

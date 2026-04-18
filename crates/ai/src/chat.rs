@@ -769,6 +769,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             if is_allowed("get_accounts") {
                 allowed_tools.push(Box::new(tool_set.accounts));
             }
+            if is_allowed("get_cash_balances") {
+                allowed_tools.push(Box::new(tool_set.cash_balances));
+            }
             if is_allowed("search_activities") {
                 allowed_tools.push(Box::new(tool_set.activities));
             }
