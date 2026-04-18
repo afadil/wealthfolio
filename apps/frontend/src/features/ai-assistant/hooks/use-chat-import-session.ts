@@ -611,21 +611,32 @@ export function useChatImportSession({
               .filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i)
           : [];
 
-        const [validated, preview] = await Promise.all([
-          activitiesToValidate.length > 0
-            ? checkActivitiesImport({ activities: activitiesToValidate })
-            : Promise.resolve([] as ActivityImport[]),
-          candidates.length > 0
-            ? previewImportAssets({ candidates })
-            : Promise.resolve([] as ImportAssetPreviewItem[]),
-        ]);
+        // Backend validation + asset preview are best-effort. If they fail
+        // (e.g., "Record not found" for a new symbol), proceed with local-only
+        // validation. The user can still review, edit, and import.
+        let validated: ActivityImport[] = [];
+        let preview: ImportAssetPreviewItem[] = [];
+        try {
+          [validated, preview] = await Promise.all([
+            activitiesToValidate.length > 0
+              ? checkActivitiesImport({ activities: activitiesToValidate })
+              : Promise.resolve([] as ActivityImport[]),
+            candidates.length > 0
+              ? previewImportAssets({ candidates })
+              : Promise.resolve([] as ImportAssetPreviewItem[]),
+          ]);
+        } catch (err) {
+          logger.warn(
+            "[ChatImport] Backend validation failed (proceeding with local validation):",
+            err instanceof Error ? err.message : String(err),
+          );
+        }
         if (cancelled) return;
 
         let nextDrafts = drafts;
         if (validated.length > 0) {
           nextDrafts = applyBackendValidation(nextDrafts, validated);
         }
-        // Auto-apply preview resolutions so the grid reflects the backend's picks.
         for (const item of preview) {
           if (!item.draft) continue;
           if (item.status === "EXISTING_ASSET") {
