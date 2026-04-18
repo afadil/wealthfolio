@@ -202,6 +202,14 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Session tracking — module-level Set resets on page reload but persists
+// across thread switches within the same page session. Used to distinguish
+// "tool call that just completed (initialize)" from "reloaded from DB (stale)".
+// ─────────────────────────────────────────────────────────────────────────────
+
+const liveToolCalls = new Set<string>();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -234,16 +242,17 @@ function ImportCsvToolUIContentImpl({
     return normalized;
   }, [result, status?.type, csvContent]);
 
-  // Decide whether to initialize the full interactive session based on
-  // DATA PRESENCE, not timing. This avoids the race where fast local
-  // models (Ollama) complete before the component mounts, making the
-  // old "was status running at mount?" heuristic unreliable.
-  //
-  // - submitted → show success card (no session needed)
-  // - csvContent present → parse + show interactive grid
-  // - csvContent empty → was confirmed (stripped) or truly stale → static card
+  // Track which tool calls went through "running" status in this page
+  // session. On page reload the Set resets — we won't find the toolCallId,
+  // so we show the stale card. During a live session, we add the ID when
+  // status is "running" and it persists across thread switches.
+  if (toolCallId && status?.type === "running") {
+    liveToolCalls.add(toolCallId);
+  }
   const hasCsvContent = !!mapping?.csvContent;
-  const shouldInitSession = hasCsvContent || mapping?.submitted;
+  const isSubmitted = mapping?.submitted ?? false;
+  const isLive = !!toolCallId && liveToolCalls.has(toolCallId);
+  const shouldInitSession = (isLive && hasCsvContent) || isSubmitted;
 
   const session = useChatImportSession({
     mapping: shouldInitSession ? mapping : null,
@@ -256,13 +265,6 @@ function ImportCsvToolUIContentImpl({
   if (!result || (!mapping && status?.type === "running")) {
     return <LoadingCard />;
   }
-  // Debug: log when we have result but session is stuck initializing
-  if (mapping && hasCsvContent && session.status === "initializing") {
-    logger.info(
-      `[ImportCsvToolUI] Session initializing: csvContent=${csvContent?.length ?? 0} chars, ` +
-        `status=${status?.type}, mapping keys=${Object.keys(mapping.appliedMapping?.fieldMappings ?? {}).length}`,
-    );
-  }
   if (status?.type === "incomplete") {
     return <ErrorCard message="The CSV import request was interrupted." />;
   }
@@ -271,11 +273,11 @@ function ImportCsvToolUIContentImpl({
       <ErrorCard message={normalizeError || "No import mapping was returned by the AI tool."} />
     );
   }
-  if (mapping.submitted || session.submitted) {
+  if (isSubmitted || session.submitted) {
     return <SuccessCard count={session.importedCount || mapping.importedCount || 0} />;
   }
-  // No CSV content → either confirmed+stripped or loaded from old thread
-  if (!hasCsvContent) {
+  // Not a live tool call from this page session → stale card
+  if (!isLive) {
     return <StaleImportCard mapping={mapping} />;
   }
   if (session.status === "initializing") {
