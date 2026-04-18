@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef } from "react";
+import { memo, useMemo, useState } from "react";
 
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
@@ -204,13 +204,11 @@ function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToo
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
 
-  // Track whether this component ever saw the tool in "running" state.
-  // If it didn't, the tool result was loaded from a saved thread — we
-  // should show a lightweight static card instead of re-initializing the
-  // full import session (re-parsing CSV, calling backend validation, etc).
-  const wasRunningRef = useRef(status?.type === "running");
-  if (status?.type === "running") wasRunningRef.current = true;
-  const isLiveToolCall = wasRunningRef.current;
+  // Capture whether this component mounted during a live tool call (status
+  // was "running" at mount time). Lazy initializer runs once — survives
+  // re-renders but resets on remount, which is correct (remount = new
+  // component instance for a different tool call via key={toolCallId}).
+  const [isLiveToolCall] = useState(() => status?.type === "running");
 
   const { mapping, errorMessage: normalizeError } = useMemo(() => {
     const normalized = normalizeMappingResult(result as RawResult);
