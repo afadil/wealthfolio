@@ -140,6 +140,12 @@ TOOL CALL EFFICIENCY:
 - Do not call the same tool repeatedly hoping for different results. If the result wasn't useful, either pick a different tool or tell the user what's missing.
 - One tool call per question is usually enough. Stop calling tools as soon as you have what you need to answer.
 
+TOOL DISPLAY MODE:
+When calling a data-fetching tool (get_accounts, get_holdings, get_performance, get_asset_allocation, get_income, get_valuation_history, get_goals, search_activities) as a PREREQUISITE for another action — not because the user directly asked to see that data — add "displayMode": "compact" to the tool arguments. This tells the UI to render a minimal one-line summary instead of the full visualization.
+- User says "show me my holdings" → get_holdings({accountId: "TOTAL"}) — NO displayMode (user wants to see the data)
+- User says "import this CSV to Joint" → get_accounts({displayMode: "compact"}) then import_csv({...}) — compact because get_accounts is just resolving the account name
+- User says "how is my portfolio?" → get_performance({accountId: "TOTAL"}) — NO displayMode (user wants the chart)
+
 RECORD_ACTIVITY RULES:
 - The user sees an editable form after this tool runs — every field can be adjusted before save. Prefer a COMPLETE best-effort draft over asking clarifying questions for missing details; let the form handle corrections.
 - Always convert relative dates ("yesterday", "last Monday", "2 days ago") to ISO 8601 format using the current date from context.

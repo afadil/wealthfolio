@@ -18,6 +18,7 @@ import {
 import { memo, useMemo } from "react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Bar, BarChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis } from "recharts";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
@@ -25,6 +26,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis } fr
 
 interface GetIncomeArgs {
   period?: string;
+  displayMode?: "compact" | "full";
 }
 
 interface TopAssetDto {
@@ -197,7 +199,7 @@ type IncomeContentProps = ToolCallMessagePartProps<GetIncomeArgs, GetIncomeOutpu
 
 const IncomeContent = memo(IncomeContentImpl);
 
-function IncomeContentImpl({ result, status }: IncomeContentProps) {
+function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const parsed = normalizeResult(result);
 
@@ -258,6 +260,11 @@ function IncomeContentImpl({ result, status }: IncomeContentProps) {
   const isLoading = status?.type === "running";
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return <CompactToolCard label="Fetched income summary" />;
+  }
 
   const formatValue = (value: number) => {
     if (isBalanceHidden) return "******";

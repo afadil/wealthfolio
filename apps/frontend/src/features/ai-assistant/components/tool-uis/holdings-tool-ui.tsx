@@ -23,6 +23,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { ResponsiveContainer, Treemap, Tooltip as ChartTooltip } from "recharts";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AnimatedToggleGroup } from "@wealthfolio/ui";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
@@ -34,6 +35,7 @@ type ReturnType = "daily" | "total";
 interface GetHoldingsArgs {
   accountId?: string;
   viewMode?: ViewMode;
+  displayMode?: "compact" | "full";
 }
 
 interface HoldingDto {
@@ -396,6 +398,15 @@ function HoldingsContentImpl({ args, result, status }: HoldingsContentProps) {
 
   const accountLabel = parsed?.accountScope ?? args?.accountId ?? "TOTAL";
   const isLoading = status?.type === "running";
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return (
+      <CompactToolCard
+        label={`Fetched ${parsed.holdings.length} holding${parsed.holdings.length !== 1 ? "s" : ""}`}
+      />
+    );
+  }
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const holdingsCount = sortedHoldings.length;

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
@@ -15,6 +16,7 @@ interface GetPerformanceArgs {
   accountId?: string;
   startDate?: string;
   endDate?: string;
+  displayMode?: "compact" | "full";
 }
 
 interface PerformanceResult {
@@ -205,6 +207,11 @@ function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolU
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
   const isComplete = status?.type === "complete";
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return <CompactToolCard label="Fetched performance metrics" />;
+  }
 
   // Format values
   const { formatCurrency, formatPercent, formatPercentSigned } = useMemo(() => {

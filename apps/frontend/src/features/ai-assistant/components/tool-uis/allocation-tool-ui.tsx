@@ -16,6 +16,7 @@ import {
 import { memo, useMemo } from "react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
@@ -26,6 +27,7 @@ interface GetAssetAllocationArgs {
   groupBy?: string;
   taxonomyId?: string;
   categoryId?: string;
+  displayMode?: "compact" | "full";
 }
 
 interface AllocationDto {
@@ -207,6 +209,11 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const categoryCount = sortedCategories.length;
   const holdingsCount = sortedHoldings.length;
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return <CompactToolCard label="Fetched asset allocation" />;
+  }
 
   // Format value with privacy
   const formatValue = (value: number) => {
