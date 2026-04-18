@@ -14,8 +14,8 @@ import {
 } from "../context";
 import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
 import { ImportAlert } from "../components/import-alert";
-import type { ActivityImport } from "@/lib/types";
 import { createAsset } from "@/adapters";
+import { draftToActivityImport } from "../utils/draft-utils";
 import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,38 +106,6 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
   }
 
   return summary;
-}
-
-/**
- * Convert DraftActivity to ActivityImport for the backend
- */
-function draftToActivityImport(draft: DraftActivity): ActivityImport {
-  return {
-    id: undefined,
-    accountId: draft.accountId,
-    assetId: draft.assetId,
-    currency: draft.currency ?? "",
-    activityType: draft.activityType as ActivityImport["activityType"],
-    date: draft.activityDate,
-    symbol: draft.symbol ?? "",
-    symbolName: draft.symbolName,
-    amount: draft.amount,
-    quantity: draft.quantity,
-    unitPrice: draft.unitPrice,
-    fee: draft.fee,
-    fxRate: draft.fxRate,
-    subtype: draft.subtype,
-    exchangeMic: draft.exchangeMic,
-    quoteCcy: draft.quoteCcy,
-    instrumentType: draft.instrumentType,
-    quoteMode: draft.quoteMode as ActivityImport["quoteMode"],
-    errors: draft.errors,
-    isValid: draft.status === "valid" || draft.status === "warning",
-    lineNumber: draft.rowIndex + 1,
-    isDraft: false,
-    comment: draft.comment,
-    forceImport: draft.forceImport ?? false,
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

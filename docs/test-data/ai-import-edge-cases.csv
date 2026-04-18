@@ -1,0 +1,23 @@
+Statement for account: Test Brokerage 123
+Period: 2024-01-01 to 2024-04-15
+Generated: 2024-04-16
+Date,Trade Date,Settlement Date,Side,Symbol,Company,Quantity,Per Share Cost,Settle Amount Net,Fee,Currency,Notes
+"",2024-01-15,2024-01-17,Bought,AAPL,Apple Inc.,"50","$172.50","$8,637.50","$0.99",USD,Opening position
+"",01/16/2024,01/18/2024,Buy,NET,Cloudflare,"100","$89.20","8,920.99","0.99",USD,
+"",2024-02-01,2024-02-03,DIV,MSFT,Microsoft Corp,"","","$58.00","",USD,Quarterly dividend
+"",2024-02-12,2024-02-14,Bought,Tesla,Tesla Inc.,"10","$190.00","1,901.50","1.50",USD,
+"",2024-02-20,2024-02-22,Sell,AAPL,Apple Inc.,"25","$185.00","4,623.75","1.25",USD,Partial close
+"",2024-02-20,2024-02-22,SOLD,AAPL,Apple Inc.,"25","$185.00","$4,623.75","$1.25",USD,Accidental duplicate row
+"",2024-03-01,2024-03-03,Interest Earned,,,,,"$12.50","",USD,Cash account interest
+"",2024-03-05,2024-03-07,Cash Deposit,,,,,"5,000.00","",USD,Wire transfer in
+"",2024-03-10,2024-03-12,DRIP,MSFT,Microsoft Corp,"0.5","$405.20","$202.60","",USD,Dividend reinvestment
+"",2024-03-15,2024-03-17,Buy,GOOGL,Alphabet Class A,"5","$140.00","$700.25","0.25",USD,
+"",2024-03-20,2024-03-22,,AMZN,Amazon.com,"","$180.00","","",USD,Missing activity type
+"",2024-03-25,2024-03-27,Stock Split,NVDA,NVIDIA Corp,"","","10:1","",USD,10-for-1 forward split
+"",2024-04-01,2024-04-03,Forex,EURUSD,,"10000","1.0850","","0.00",USD,FX conversion
+"",2024-04-05,2024-04-07,Withdrawal,,,,,"-2500.00","",USD,ATM withdrawal
+"",2024-04-10,2024-04-12,Buy,MyAntiqueWatch,,"1","$4,200.00","$4,200.00","",USD,Custom asset — needs manual resolution
+"",not-a-date,2024-04-14,Buy,AAPL,Apple Inc.,"10","$175.00","$1,750.00","",USD,Row with invalid date
+"",2024-04-14,2024-04-16,Bought,AAPL,Apple Inc.,"abc","$175.00","","",USD,Row with non-numeric quantity
+Total: $21,369.09,,,,,,,,,,,
+*** End of statement ***,,,,,,,,,,,

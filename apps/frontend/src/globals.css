@@ -41,6 +41,23 @@
   }
 }
 
+/* Force visible scrollbars inside the chat import grid so users know
+   they can scroll horizontally to see more columns. */
+.chat-import-grid [data-slot="grid"] {
+  scrollbar-width: thin;
+}
+.chat-import-grid [data-slot="grid"]::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.chat-import-grid [data-slot="grid"]::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 4px;
+}
+.chat-import-grid [data-slot="grid"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 @theme {
   /* Font families */
   --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
