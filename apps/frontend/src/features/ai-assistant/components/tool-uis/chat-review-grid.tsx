@@ -116,11 +116,7 @@ export const ChatReviewGrid = memo(function ChatReviewGrid({
   return (
     <div className="space-y-2">
       <FilterPills filter={filter} onFilterChange={onFilterChange} stats={stats} />
-      {/* overflow-hidden prevents the toolbar / grid from pushing outside the
-          chat card boundary. The DataGrid handles its own internal scroll. */}
-      {/* flex col provides the flex context ImportReviewGrid expects (it uses
-          flex-1 min-h-0 internally). overflow-hidden clips the toolbar. */}
-      <div className="chat-import-grid flex min-w-0 flex-col overflow-hidden">
+      <div className="[&_*]:scrollbar-thin flex min-w-0 flex-col overflow-hidden">
         <ImportReviewGrid
           drafts={filteredDrafts}
           selectedRows={selectedRows}
