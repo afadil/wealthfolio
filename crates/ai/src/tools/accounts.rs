@@ -140,7 +140,7 @@ mod tests {
         let env = Arc::new(MockEnvironment::new());
         let tool = GetAccountsTool::new(env);
 
-        let result = tool.call(GetAccountsArgs {}).await;
+        let result = tool.call(GetAccountsArgs::default()).await;
         assert!(result.is_ok());
 
         let output = result.unwrap();

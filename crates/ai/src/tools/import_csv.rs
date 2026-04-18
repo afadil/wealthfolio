@@ -58,18 +58,19 @@ pub struct ImportCsvArgs {
     pub account_id: Option<String>,
 
     /// Maps field names to CSV header names.
-    #[serde(deserialize_with = "deserialize_nullable_string_map")]
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub field_mappings: Option<HashMap<String, String>>,
 
     /// Maps canonical activity types to CSV values.
+    #[serde(default)]
     pub activity_mappings: Option<HashMap<String, Vec<String>>>,
 
     /// Maps CSV symbol *values* to canonical tickers.
-    #[serde(deserialize_with = "deserialize_nullable_string_map")]
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub symbol_mappings: Option<HashMap<String, String>>,
 
     /// Maps CSV account values to app account IDs.
-    #[serde(deserialize_with = "deserialize_nullable_string_map")]
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub account_mappings: Option<HashMap<String, String>>,
 
     /// CSV delimiter: ",", ";", "\t", or "auto"
