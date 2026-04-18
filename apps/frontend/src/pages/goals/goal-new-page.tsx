@@ -72,7 +72,7 @@ const GOAL_TEMPLATES: {
 ];
 
 function hasRetirementGoal(goals: Goal[]): boolean {
-  return goals.some((g) => g.goalType === "retirement" && !g.isArchived);
+  return goals.some((g) => g.goalType === "retirement" && g.statusLifecycle !== "archived");
 }
 
 export default function GoalNewPage() {
@@ -104,7 +104,6 @@ export default function GoalNewPage() {
         title: template.title,
         description: template.description,
         targetAmount: template.defaultTarget,
-        isAchieved: false,
         coverImageKey: selectedType,
       },
       {

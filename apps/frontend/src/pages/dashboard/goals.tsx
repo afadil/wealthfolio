@@ -46,7 +46,7 @@ export function SavingGoals() {
   }
 
   const activeGoals = (goals ?? [])
-    .filter((g) => !g.isArchived && g.statusLifecycle !== "archived")
+    .filter((g) => g.statusLifecycle === "active")
     .sort(
       (a, b) => b.priority - a.priority || (a.targetDate ?? "").localeCompare(b.targetDate ?? ""),
     );

@@ -25,7 +25,7 @@ async fn build_valuation_map(
 ) -> Result<std::collections::HashMap<String, f64>, String> {
     let accounts = state
         .account_service()
-        .get_active_accounts()
+        .get_active_non_archived_accounts()
         .map_err(|e| e.to_string())?;
     let account_ids: Vec<String> = accounts.into_iter().map(|a| a.id).collect();
     let valuations = state

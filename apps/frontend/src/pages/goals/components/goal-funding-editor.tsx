@@ -56,46 +56,30 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     [accounts],
   );
 
-  const [selectedAccounts, setSelectedAccounts] = useState<Map<string, number | null>>(new Map());
-  const [countablePercents, setCountablePercents] = useState<Map<string, number>>(new Map());
+  const [sharePercents, setSharePercents] = useState<Map<string, number>>(new Map());
   const [taxBuckets, setTaxBuckets] = useState<Map<string, string>>(new Map());
   const [dirty, setDirty] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    const map = new Map<string, number | null>();
-    const cpMap = new Map<string, number>();
+    const spMap = new Map<string, number>();
     const tbMap = new Map<string, string>();
     for (const rule of fundingRules) {
-      map.set(rule.accountId, rule.reservationPercent ?? null);
-      if (rule.countablePercent != null) cpMap.set(rule.accountId, rule.countablePercent);
+      spMap.set(rule.accountId, rule.sharePercent);
       if (rule.taxBucket) tbMap.set(rule.accountId, rule.taxBucket);
     }
-    setSelectedAccounts(map);
-    setCountablePercents(cpMap);
+    setSharePercents(spMap);
     setTaxBuckets(tbMap);
     setDirty(false);
   }, [fundingRules]);
 
-  const addAccount = useCallback(
-    (accountId: string) => {
-      setSelectedAccounts((prev) => {
-        const next = new Map(prev);
-        next.set(accountId, isRetirement ? null : 100);
-        return next;
-      });
-      setDirty(true);
-    },
-    [isRetirement],
-  );
+  const addAccount = useCallback((accountId: string) => {
+    setSharePercents((prev) => new Map(prev).set(accountId, 100));
+    setDirty(true);
+  }, []);
 
   const removeAccount = useCallback((accountId: string) => {
-    setSelectedAccounts((prev) => {
-      const next = new Map(prev);
-      next.delete(accountId);
-      return next;
-    });
-    setCountablePercents((prev) => {
+    setSharePercents((prev) => {
       const next = new Map(prev);
       next.delete(accountId);
       return next;
@@ -108,13 +92,8 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     setDirty(true);
   }, []);
 
-  const updatePercent = useCallback((accountId: string, value: number) => {
-    setSelectedAccounts((prev) => new Map(prev).set(accountId, value));
-    setDirty(true);
-  }, []);
-
-  const updateCountablePercent = useCallback((accountId: string, value: number) => {
-    setCountablePercents((prev) => new Map(prev).set(accountId, Math.max(0, Math.min(100, value))));
+  const updateSharePercent = useCallback((accountId: string, value: number) => {
+    setSharePercents((prev) => new Map(prev).set(accountId, Math.max(0, Math.min(100, value))));
     setDirty(true);
   }, []);
 
@@ -132,38 +111,26 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
 
   const handleSave = useCallback(() => {
     const rules: GoalFundingRuleInput[] = [];
-    for (const [accountId, percent] of selectedAccounts) {
-      if (isRetirement) {
-        rules.push({
-          accountId,
-          fundingRole: "residual_eligible",
-          countablePercent: countablePercents.get(accountId) ?? 100,
-          taxBucket: taxBuckets.get(accountId),
-        });
-      } else {
-        rules.push({
-          accountId,
-          fundingRole: "explicit_reservation",
-          reservationPercent: percent ?? 0,
-        });
-      }
+    for (const [accountId, percent] of sharePercents) {
+      rules.push({
+        accountId,
+        sharePercent: percent,
+        taxBucket: isRetirement ? taxBuckets.get(accountId) : undefined,
+      });
     }
     saveFundingMutation.mutate(rules);
     setDirty(false);
     setIsEditing(false);
-  }, [selectedAccounts, countablePercents, taxBuckets, isRetirement, saveFundingMutation]);
+  }, [sharePercents, taxBuckets, isRetirement, saveFundingMutation]);
 
   const handleCancel = useCallback(() => {
-    const map = new Map<string, number | null>();
-    const cpMap = new Map<string, number>();
+    const spMap = new Map<string, number>();
     const tbMap = new Map<string, string>();
     for (const rule of fundingRules) {
-      map.set(rule.accountId, rule.reservationPercent ?? null);
-      if (rule.countablePercent != null) cpMap.set(rule.accountId, rule.countablePercent);
+      spMap.set(rule.accountId, rule.sharePercent);
       if (rule.taxBucket) tbMap.set(rule.accountId, rule.taxBucket);
     }
-    setSelectedAccounts(map);
-    setCountablePercents(cpMap);
+    setSharePercents(spMap);
     setTaxBuckets(tbMap);
     setDirty(false);
     setIsEditing(false);
@@ -172,21 +139,19 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
   const dcLinkedSet = useMemo(() => new Set(dcLinkedAccountIds), [dcLinkedAccountIds]);
 
   const includedAccounts = useMemo(
-    () => activeAccounts.filter((a) => selectedAccounts.has(a.id)),
-    [activeAccounts, selectedAccounts],
+    () => activeAccounts.filter((a) => sharePercents.has(a.id)),
+    [activeAccounts, sharePercents],
   );
 
   const availableAccounts = useMemo(
-    () => activeAccounts.filter((a) => !selectedAccounts.has(a.id) && !dcLinkedSet.has(a.id)),
-    [activeAccounts, selectedAccounts, dcLinkedSet],
+    () => activeAccounts.filter((a) => !sharePercents.has(a.id) && !dcLinkedSet.has(a.id)),
+    [activeAccounts, sharePercents, dcLinkedSet],
   );
 
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">
-          {isRetirement ? "Eligible Accounts" : "Account Funding"}
-        </CardTitle>
+        <CardTitle className="text-sm">Account Shares</CardTitle>
         {isEditing ? (
           <div className="flex gap-1.5">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancel}>
@@ -217,24 +182,28 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
         {isEditing ? (
           /* ── Edit mode ── */
           <div className="space-y-3">
-            {/* Selected accounts */}
+            {!isRetirement && (
+              <p className="text-muted-foreground text-[10px]">
+                This share stays reserved while the goal is active. It is released when the goal is
+                achieved or archived.
+              </p>
+            )}
+
             {includedAccounts.length > 0 && (
               <div className="space-y-1">
                 {includedAccounts.map((a) => {
                   const isDcLinked = dcLinkedSet.has(a.id);
                   const tb = taxBuckets.get(a.id);
-                  const cp = countablePercents.get(a.id) ?? 100;
-                  const percent = selectedAccounts.get(a.id);
+                  const percent = sharePercents.get(a.id) ?? 100;
 
                   return (
                     <div
                       key={a.id}
                       className="bg-muted/30 flex items-center gap-2 rounded-lg px-2.5 py-2"
                     >
-                      {/* Name */}
                       <span className="min-w-0 flex-1 truncate text-xs font-medium">{a.name}</span>
 
-                      {/* Tax bucket pill (retirement only, click to cycle) */}
+                      {/* Tax bucket pill (retirement only) */}
                       {isRetirement && !isDcLinked && (
                         <button
                           onClick={() => cycleTaxBucket(a.id)}
@@ -247,30 +216,15 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                         </button>
                       )}
 
-                      {/* Countable % (retirement, only if not 100%) */}
-                      {isRetirement && !isDcLinked && (
+                      {/* Share % input */}
+                      {!isDcLinked && (
                         <div className="flex w-14 shrink-0 items-center gap-0.5">
                           <Input
                             type="number"
                             min={0}
                             max={100}
-                            value={cp}
-                            onChange={(e) => updateCountablePercent(a.id, Number(e.target.value))}
-                            className="h-6 w-10 px-1 text-center text-[11px]"
-                          />
-                          <span className="text-muted-foreground text-[10px]">%</span>
-                        </div>
-                      )}
-
-                      {/* Reservation % (save-up goals) */}
-                      {!isRetirement && (
-                        <div className="flex w-14 shrink-0 items-center gap-0.5">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={percent ?? 0}
-                            onChange={(e) => updatePercent(a.id, Number(e.target.value))}
+                            value={percent}
+                            onChange={(e) => updateSharePercent(a.id, Number(e.target.value))}
                             className="h-6 w-10 px-1 text-center text-[11px]"
                           />
                           <span className="text-muted-foreground text-[10px]">%</span>
@@ -346,8 +300,7 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
             ) : (
               <div className="divide-border divide-y">
                 {includedAccounts.map((a, i) => {
-                  const percent = selectedAccounts.get(a.id);
-                  const cp = countablePercents.get(a.id) ?? 100;
+                  const percent = sharePercents.get(a.id) ?? 0;
                   const tb = taxBuckets.get(a.id);
                   const tbLabel = tb ? TAX_BUCKET_LABELS[tb] : null;
                   return (
@@ -364,12 +317,7 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                           {tbLabel}
                         </span>
                       )}
-                      {!isRetirement && percent != null && (
-                        <span className="text-sm font-semibold tabular-nums">{percent}%</span>
-                      )}
-                      {isRetirement && cp !== 100 && (
-                        <span className="text-muted-foreground text-xs tabular-nums">{cp}%</span>
-                      )}
+                      <span className="text-sm font-semibold tabular-nums">{percent}%</span>
                     </div>
                   );
                 })}

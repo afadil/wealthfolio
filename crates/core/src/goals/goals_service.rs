@@ -1,3 +1,4 @@
+use crate::accounts::{Account, AccountServiceTrait};
 use crate::errors::Result;
 use crate::goals::goals_model::{
     AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
@@ -15,12 +16,14 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+const RETIREMENT_ELIGIBLE_ACCOUNT_TYPES: &[&str] = &["SECURITIES", "CASH", "CRYPTOCURRENCY"];
+const GOAL_LIFECYCLE_ACTIVE: &str = "active";
+const GOAL_LIFECYCLE_ACHIEVED: &str = "achieved";
+const GOAL_LIFECYCLE_ARCHIVED: &str = "archived";
+
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
-/// Extract DC-linked account IDs from a `RetirementPlan`.
-fn extract_plan_dc_linked_account_ids(
-    plan: &crate::planning::retirement::RetirementPlan,
-) -> HashSet<String> {
+fn extract_plan_dc_linked_account_ids(plan: &RetirementPlan) -> HashSet<String> {
     plan.income_streams
         .iter()
         .filter(|s| s.stream_type == crate::planning::retirement::StreamKind::DefinedContribution)
@@ -28,152 +31,96 @@ fn extract_plan_dc_linked_account_ids(
         .collect()
 }
 
-/// Compute the residual portfolio value for a retirement goal.
-///
-/// For each eligible account, subtracts explicit reservations from other goals,
-/// and excludes accounts linked to DC income streams (tracked separately by FIRE engine).
-fn build_account_reservations(all_active_rules: &[GoalFundingRule]) -> HashMap<&str, f64> {
-    let mut account_reservations: HashMap<&str, f64> = HashMap::new();
-    for r in all_active_rules {
-        if r.funding_role == "explicit_reservation" {
-            if let Some(pct) = r.reservation_percent {
-                *account_reservations.entry(&r.account_id).or_default() += pct;
-            }
-        }
-    }
-    account_reservations
-}
-
-fn residual_value_for(
-    account_id: &str,
-    value: f64,
-    account_reservations: &HashMap<&str, f64>,
-    dc_linked_accounts: &HashSet<String>,
-) -> f64 {
-    if dc_linked_accounts.contains(account_id) {
-        return 0.0;
-    }
-    let reserved = account_reservations.get(account_id).copied().unwrap_or(0.0);
-    value * (1.0 - reserved / 100.0).max(0.0)
-}
-
-fn compute_residual_portfolio_value(
+fn compute_goal_value_from_shares(
     funding_rules: &[GoalFundingRule],
-    all_active_rules: &[GoalFundingRule],
     valuations: &AccountValuationMap,
-    dc_linked_accounts: &HashSet<String>,
 ) -> f64 {
-    let account_reservations = build_account_reservations(all_active_rules);
-
-    if funding_rules.is_empty() {
-        // No funding rules — fall back to all accounts (residual of each)
-        valuations
-            .iter()
-            .map(|(id, &v)| residual_value_for(id, v, &account_reservations, dc_linked_accounts))
-            .sum()
-    } else {
-        funding_rules
-            .iter()
-            .filter(|r| r.funding_role == "residual_eligible")
-            .filter_map(|r| {
-                valuations.get(&r.account_id).map(|&v| {
-                    let countable = r.countable_percent.unwrap_or(100.0) / 100.0;
-                    residual_value_for(&r.account_id, v, &account_reservations, dc_linked_accounts)
-                        * countable
-                })
-            })
-            .sum()
-    }
-}
-
-/// Compute blended effective tax rate from the same residual/countable balances
-/// that feed the retirement engine.
-fn compute_effective_tax_rate(
-    funding_rules: &[GoalFundingRule],
-    all_active_rules: &[GoalFundingRule],
-    valuations: &AccountValuationMap,
-    dc_linked_accounts: &HashSet<String>,
-    tax: &Option<TaxProfile>,
-) -> Option<f64> {
-    let profile = match tax {
-        Some(p) => p,
-        None => return None,
-    };
-    let account_reservations = build_account_reservations(all_active_rules);
-    let mut total_value = 0.0;
-    let mut weighted_rate = 0.0;
-    for rule in funding_rules
+    funding_rules
         .iter()
-        .filter(|r| r.funding_role == "residual_eligible")
-    {
-        if let Some(&val) = valuations.get(&rule.account_id) {
-            let countable = rule.countable_percent.unwrap_or(100.0) / 100.0;
-            let v = residual_value_for(
-                &rule.account_id,
-                val,
-                &account_reservations,
-                dc_linked_accounts,
-            ) * countable;
-            if v <= 0.0 {
-                continue;
-            }
-            let rate = match rule.tax_bucket.as_deref() {
-                Some("tax_deferred") | Some("tax-deferred") => profile.tax_deferred_withdrawal_rate,
-                Some("tax_free") | Some("tax-free") => profile.tax_free_withdrawal_rate,
-                Some("taxable") | Some("unknown") | None => profile.taxable_withdrawal_rate,
-                _ => profile.taxable_withdrawal_rate,
-            };
-            weighted_rate += v * rate;
-            total_value += v;
-        }
+        .filter_map(|r| {
+            valuations
+                .get(&r.account_id)
+                .map(|&v| v * r.share_percent / 100.0)
+        })
+        .sum()
+}
+
+fn build_account_share_totals(rules: &[GoalFundingRule]) -> HashMap<String, f64> {
+    let mut totals = HashMap::new();
+    for rule in rules {
+        *totals.entry(rule.account_id.clone()).or_default() += rule.share_percent;
     }
-    if total_value > 0.0 {
-        Some(weighted_rate / total_value)
+    totals
+}
+
+fn build_retirement_seed_rules(
+    eligible_accounts: &[Account],
+    participating_rules: &[GoalFundingRule],
+) -> Vec<GoalFundingRuleInput> {
+    let existing_share_totals = build_account_share_totals(participating_rules);
+
+    eligible_accounts
+        .iter()
+        .filter(|a| RETIREMENT_ELIGIBLE_ACCOUNT_TYPES.contains(&a.account_type.as_str()))
+        .filter_map(|a| {
+            let remaining_share = (100.0
+                - existing_share_totals.get(&a.id).copied().unwrap_or(0.0))
+            .clamp(0.0, 100.0);
+            (remaining_share > 0.0).then(|| GoalFundingRuleInput {
+                account_id: a.id.clone(),
+                share_percent: remaining_share,
+                tax_bucket: None,
+            })
+        })
+        .collect()
+}
+
+fn compute_summary_current_value(
+    goal: &Goal,
+    funding_rules: &[GoalFundingRule],
+    valuations: &AccountValuationMap,
+) -> f64 {
+    if matches!(
+        goal.status_lifecycle.as_str(),
+        GOAL_LIFECYCLE_ACHIEVED | GOAL_LIFECYCLE_ARCHIVED
+    ) {
+        goal.current_value_cached
+            .unwrap_or_else(|| compute_goal_value_from_shares(funding_rules, valuations))
     } else {
-        None
+        compute_goal_value_from_shares(funding_rules, valuations)
+    }
+}
+
+fn validate_goal_lifecycle(status_lifecycle: &str) -> Result<()> {
+    if matches!(
+        status_lifecycle,
+        GOAL_LIFECYCLE_ACTIVE | GOAL_LIFECYCLE_ACHIEVED | GOAL_LIFECYCLE_ARCHIVED
+    ) {
+        Ok(())
+    } else {
+        Err(crate::errors::ValidationError::InvalidInput(format!(
+            "Unsupported goal lifecycle '{}'",
+            status_lifecycle
+        ))
+        .into())
     }
 }
 
 fn compute_tax_bucket_balances(
     funding_rules: &[GoalFundingRule],
-    all_active_rules: &[GoalFundingRule],
     valuations: &AccountValuationMap,
-    dc_linked_accounts: &HashSet<String>,
 ) -> TaxBucketBalances {
-    let account_reservations = build_account_reservations(all_active_rules);
-
-    if funding_rules.is_empty() {
-        let taxable = valuations
-            .iter()
-            .map(|(id, &v)| residual_value_for(id, v, &account_reservations, dc_linked_accounts))
-            .sum();
-        return TaxBucketBalances {
-            taxable,
-            tax_deferred: 0.0,
-            tax_free: 0.0,
-        };
-    }
-
     let mut balances = TaxBucketBalances::default();
-    for rule in funding_rules
-        .iter()
-        .filter(|r| r.funding_role == "residual_eligible")
-    {
+    for rule in funding_rules {
         if let Some(&value) = valuations.get(&rule.account_id) {
-            let countable = rule.countable_percent.unwrap_or(100.0) / 100.0;
-            let usable = residual_value_for(
-                &rule.account_id,
-                value,
-                &account_reservations,
-                dc_linked_accounts,
-            ) * countable;
-            if usable <= 0.0 {
+            let share_value = value * rule.share_percent / 100.0;
+            if share_value <= 0.0 {
                 continue;
             }
             match rule.tax_bucket.as_deref() {
-                Some("tax_deferred") | Some("tax-deferred") => balances.tax_deferred += usable,
-                Some("tax_free") | Some("tax-free") => balances.tax_free += usable,
-                _ => balances.taxable += usable,
+                Some("tax_deferred") | Some("tax-deferred") => balances.tax_deferred += share_value,
+                Some("tax_free") | Some("tax-free") => balances.tax_free += share_value,
+                _ => balances.taxable += share_value,
             }
         }
     }
@@ -233,16 +180,37 @@ pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
             .into());
         }
     }
+    // Reject duplicate linkedAccountId values across DC streams
+    let dc_linked_ids: Vec<&str> = plan
+        .income_streams
+        .iter()
+        .filter(|s| s.stream_type == crate::planning::retirement::StreamKind::DefinedContribution)
+        .filter_map(|s| s.linked_account_id.as_deref())
+        .collect();
+    let mut seen = HashSet::new();
+    for id in &dc_linked_ids {
+        if !seen.insert(*id) {
+            return Err(crate::errors::ValidationError::InvalidInput(format!(
+                "Duplicate linked account '{}' across DC income streams",
+                id
+            ))
+            .into());
+        }
+    }
     Ok(())
 }
 
 pub struct GoalService<T: GoalRepositoryTrait> {
     goal_repo: Arc<T>,
+    account_service: Arc<dyn AccountServiceTrait>,
 }
 
 impl<T: GoalRepositoryTrait> GoalService<T> {
-    pub fn new(goal_repo: Arc<T>) -> Self {
-        GoalService { goal_repo }
+    pub fn new(goal_repo: Arc<T>, account_service: Arc<dyn AccountServiceTrait>) -> Self {
+        GoalService {
+            goal_repo,
+            account_service,
+        }
     }
 
     fn prepare_retirement_input(
@@ -266,25 +234,14 @@ impl<T: GoalRepositoryTrait> GoalService<T> {
             ))
         })?;
         let funding_rules = self.goal_repo.load_funding_rules(goal_id)?;
-        let all_rules = self.goal_repo.load_all_active_funding_rules()?;
         let planner_mode =
             RetirementTimingMode::from_str(stored_plan.planner_mode.as_deref().unwrap_or("fire"));
 
         let mut retirement_plan: RetirementPlan = serde_json::from_str(&stored_plan.settings_json)?;
         validate_retirement_plan(&retirement_plan)?;
 
-        let dc_linked = extract_plan_dc_linked_account_ids(&retirement_plan);
-        let current_portfolio =
-            compute_residual_portfolio_value(&funding_rules, &all_rules, valuation_map, &dc_linked);
-        let bucket_balances =
-            compute_tax_bucket_balances(&funding_rules, &all_rules, valuation_map, &dc_linked);
-        let blended_rate = compute_effective_tax_rate(
-            &funding_rules,
-            &all_rules,
-            valuation_map,
-            &dc_linked,
-            &retirement_plan.tax,
-        );
+        let current_portfolio = compute_goal_value_from_shares(&funding_rules, valuation_map);
+        let bucket_balances = compute_tax_bucket_balances(&funding_rules, valuation_map);
 
         let tax = retirement_plan.tax.get_or_insert(TaxProfile {
             taxable_withdrawal_rate: 0.0,
@@ -296,10 +253,6 @@ impl<T: GoalRepositoryTrait> GoalService<T> {
             withdrawal_buckets: TaxBucketBalances::default(),
         });
         tax.withdrawal_buckets = bucket_balances;
-
-        if let Some(blended_rate) = blended_rate {
-            tax.taxable_withdrawal_rate = blended_rate;
-        }
 
         Ok(PreparedRetirementSimulationInput {
             plan: retirement_plan,
@@ -320,12 +273,16 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
     }
 
     async fn create_goal(&self, new_goal: NewGoal) -> Result<Goal> {
-        // Enforce: only one non-archived retirement goal
-        if new_goal.goal_type == "retirement" {
+        let is_retirement = new_goal.goal_type == "retirement";
+        if let Some(status_lifecycle) = new_goal.status_lifecycle.as_deref() {
+            validate_goal_lifecycle(status_lifecycle)?;
+        }
+
+        if is_retirement {
             let goals = self.goal_repo.load_goals()?;
-            let existing = goals
-                .iter()
-                .any(|g| g.goal_type == "retirement" && !g.is_archived);
+            let existing = goals.iter().any(|g| {
+                g.goal_type == "retirement" && g.status_lifecycle != GOAL_LIFECYCLE_ARCHIVED
+            });
             if existing {
                 return Err(crate::errors::ValidationError::InvalidInput(
                     "Only one active retirement goal is allowed".to_string(),
@@ -333,10 +290,28 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                 .into());
             }
         }
-        self.goal_repo.insert_new_goal(new_goal).await
+
+        if is_retirement {
+            let eligible = self.account_service.get_active_non_archived_accounts()?;
+            let participating_rules = self.goal_repo.load_participating_funding_rules()?;
+            let seed_rules = build_retirement_seed_rules(&eligible, &participating_rules);
+            self.goal_repo
+                .insert_goal_with_funding(new_goal, seed_rules)
+                .await
+        } else {
+            self.goal_repo.insert_new_goal(new_goal).await
+        }
     }
 
     async fn update_goal(&self, updated_goal_data: Goal) -> Result<Goal> {
+        let existing = self.goal_repo.load_goal(&updated_goal_data.id)?;
+        if existing.goal_type != updated_goal_data.goal_type {
+            return Err(crate::errors::ValidationError::InvalidInput(
+                "Goal type cannot be changed after creation".to_string(),
+            )
+            .into());
+        }
+        validate_goal_lifecycle(&updated_goal_data.status_lifecycle)?;
         self.goal_repo.update_goal(updated_goal_data).await
     }
 
@@ -356,45 +331,40 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let goal = self.goal_repo.load_goal(goal_id)?;
         let is_retirement = goal.goal_type == "retirement";
 
-        // Validate funding_role matches goal type
+        // Reject duplicate accountId entries
+        let mut seen_accounts = HashSet::new();
         for rule in &rules {
-            if is_retirement && rule.funding_role != "residual_eligible" {
-                return Err(crate::errors::ValidationError::InvalidInput(
-                    "Retirement goals only accept 'residual_eligible' funding rules".to_string(),
-                )
+            if !seen_accounts.insert(&rule.account_id) {
+                return Err(crate::errors::ValidationError::InvalidInput(format!(
+                    "Duplicate account '{}' in funding rules",
+                    rule.account_id
+                ))
                 .into());
-            }
-            if !is_retirement && rule.funding_role != "explicit_reservation" {
-                return Err(crate::errors::ValidationError::InvalidInput(
-                    "Non-retirement goals only accept 'explicit_reservation' funding rules"
-                        .to_string(),
-                )
-                .into());
-            }
-            if rule.funding_role == "residual_eligible" && rule.reservation_percent.is_some() {
-                return Err(crate::errors::ValidationError::InvalidInput(
-                    "Residual-eligible rules must not have reservation_percent".to_string(),
-                )
-                .into());
-            }
-            if rule.funding_role == "explicit_reservation" {
-                match rule.reservation_percent {
-                    Some(p) if !(0.0..=100.0).contains(&p) => {
-                        return Err(crate::errors::ValidationError::InvalidInput(
-                            "reservation_percent must be between 0 and 100".to_string(),
-                        )
-                        .into());
-                    }
-                    None => {
-                        return Err(crate::errors::ValidationError::InvalidInput(
-                            "explicit_reservation rules require reservation_percent".to_string(),
-                        )
-                        .into());
-                    }
-                    _ => {}
-                }
             }
         }
+
+        // Validate share_percent range
+        for rule in &rules {
+            if !(0.0..=100.0).contains(&rule.share_percent) {
+                return Err(crate::errors::ValidationError::InvalidInput(
+                    "share_percent must be between 0 and 100".to_string(),
+                )
+                .into());
+            }
+        }
+
+        // Clear tax_bucket for non-retirement goals
+        let rules: Vec<GoalFundingRuleInput> = if is_retirement {
+            rules
+        } else {
+            rules
+                .into_iter()
+                .map(|mut r| {
+                    r.tax_bucket = None;
+                    r
+                })
+                .collect()
+        };
 
         // Validate DC-linked accounts not in rules
         if is_retirement {
@@ -419,31 +389,23 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             }
         }
 
-        // Validate per-account reservation sum <= 100%
-        if !is_retirement {
-            let all_rules = self.goal_repo.load_all_active_funding_rules()?;
-            // Sum existing reservations by account, excluding this goal's current rules
-            let mut account_totals: HashMap<String, f64> = HashMap::new();
-            for r in &all_rules {
-                if r.goal_id != goal_id && r.funding_role == "explicit_reservation" {
-                    if let Some(pct) = r.reservation_percent {
-                        *account_totals.entry(r.account_id.clone()).or_default() += pct;
-                    }
-                }
+        // Validate per-account share sum <= 100% across all participating goals
+        let participating_rules = self.goal_repo.load_participating_funding_rules()?;
+        let mut account_totals: HashMap<String, f64> = HashMap::new();
+        for r in &participating_rules {
+            if r.goal_id != goal_id {
+                *account_totals.entry(r.account_id.clone()).or_default() += r.share_percent;
             }
-            // Add new rules
-            for rule in &rules {
-                if let Some(pct) = rule.reservation_percent {
-                    let total = account_totals.entry(rule.account_id.clone()).or_default();
-                    *total += pct;
-                    if *total > 100.0 {
-                        return Err(crate::errors::ValidationError::InvalidInput(format!(
-                            "Total reservation for account '{}' would exceed 100%",
-                            rule.account_id
-                        ))
-                        .into());
-                    }
-                }
+        }
+        for rule in &rules {
+            let total = account_totals.entry(rule.account_id.clone()).or_default();
+            *total += rule.share_percent;
+            if *total > 100.0 {
+                return Err(crate::errors::ValidationError::InvalidInput(format!(
+                    "Total shares for account '{}' would exceed 100%",
+                    rule.account_id
+                ))
+                .into());
             }
         }
 
@@ -473,7 +435,6 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             )
             .into());
         }
-        // Parse and validate retirement plan JSON before persisting
         if plan.plan_kind == "retirement" {
             let retirement_plan: RetirementPlan = serde_json::from_str(&plan.settings_json)
                 .map_err(|e| {
@@ -483,6 +444,21 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                     ))
                 })?;
             validate_retirement_plan(&retirement_plan)?;
+
+            // Reject linking a DC stream to an account that has participating shares
+            let dc_linked = extract_plan_dc_linked_account_ids(&retirement_plan);
+            if !dc_linked.is_empty() {
+                let participating = self.goal_repo.load_participating_funding_rules()?;
+                for account_id in &dc_linked {
+                    if participating.iter().any(|r| r.account_id == *account_id) {
+                        return Err(crate::errors::ValidationError::InvalidInput(format!(
+                            "Account '{}' has participating goal shares and cannot be linked as DC",
+                            account_id
+                        ))
+                        .into());
+                    }
+                }
+            }
         }
         self.goal_repo.save_goal_plan(plan).await
     }
@@ -500,32 +476,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let rules = self.goal_repo.load_funding_rules(goal_id)?;
         let is_retirement = goal.goal_type == "retirement";
 
-        let current_value = if is_retirement {
-            match self.prepare_retirement_input(goal_id, valuations) {
-                Ok(prepared) => prepared.current_portfolio,
-                Err(_) => {
-                    let all_rules = self.goal_repo.load_all_active_funding_rules()?;
-                    let dc_linked = self
-                        .goal_repo
-                        .load_goal_plan(goal_id)?
-                        .and_then(|p| serde_json::from_str::<RetirementPlan>(&p.settings_json).ok())
-                        .map(|rp| extract_plan_dc_linked_account_ids(&rp))
-                        .unwrap_or_default();
-                    compute_residual_portfolio_value(&rules, &all_rules, valuations, &dc_linked)
-                }
-            }
-        } else {
-            // Save-up: explicit reservation
-            let mut total = 0.0;
-            for rule in &rules {
-                if let Some(pct) = rule.reservation_percent {
-                    if let Some(&v) = valuations.get(&rule.account_id) {
-                        total += v * pct / 100.0;
-                    }
-                }
-            }
-            total
-        };
+        let current_value = compute_summary_current_value(&goal, &rules, valuations);
 
         // Determine target
         let target = if is_retirement {
@@ -544,7 +495,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             _ => None,
         };
 
-        let health = if goal.status_lifecycle == "achieved" {
+        let health = if goal.status_lifecycle == GOAL_LIFECYCLE_ACHIEVED {
             "on_track".to_string()
         } else {
             match (goal.projected_value_at_target_date, target) {
@@ -610,15 +561,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let plan = self.goal_repo.load_goal_plan(goal_id)?;
         let funding_rules = self.goal_repo.load_funding_rules(goal_id)?;
 
-        // Compute current value from explicit reservations (same as refresh_goal_summary)
-        let mut current_value = 0.0;
-        for rule in &funding_rules {
-            if let Some(pct) = rule.reservation_percent {
-                if let Some(&v) = valuation_map.get(&rule.account_id) {
-                    current_value += v * pct / 100.0;
-                }
-            }
-        }
+        let current_value = compute_summary_current_value(&goal, &funding_rules, valuation_map);
 
         // Parse settings from plan if it exists
         let (monthly_contribution, expected_return) = if let Some(p) = &plan {
@@ -653,29 +596,59 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
 mod tests {
     use super::*;
     use crate::goals::goals_model::GoalFundingRule;
+    use chrono::NaiveDateTime;
 
-    fn rule(account_id: &str, countable: Option<f64>) -> GoalFundingRule {
-        GoalFundingRule {
-            id: format!("r-{}", account_id),
-            goal_id: "goal-1".into(),
-            account_id: account_id.into(),
-            funding_role: "residual_eligible".into(),
-            reservation_percent: None,
-            countable_percent: countable,
-            tax_bucket: None,
-            created_at: String::new(),
-            updated_at: String::new(),
+    fn test_account(id: &str, account_type: &str) -> Account {
+        Account {
+            id: id.into(),
+            name: format!("Account {id}"),
+            account_type: account_type.into(),
+            group: None,
+            currency: "USD".into(),
+            is_default: false,
+            is_active: true,
+            created_at: NaiveDateTime::default(),
+            updated_at: NaiveDateTime::default(),
+            platform_id: None,
+            account_number: None,
+            meta: None,
+            provider: None,
+            provider_account_id: None,
+            is_archived: false,
+            tracking_mode: crate::accounts::TrackingMode::NotSet,
         }
     }
 
-    fn reservation_rule(goal_id: &str, account_id: &str, pct: f64) -> GoalFundingRule {
+    fn test_goal(status_lifecycle: &str, current_value_cached: Option<f64>) -> Goal {
+        Goal {
+            id: "goal-1".into(),
+            goal_type: "custom_save_up".into(),
+            title: "Goal".into(),
+            description: None,
+            target_amount: Some(100_000.0),
+            status_lifecycle: status_lifecycle.into(),
+            status_health: "not_applicable".into(),
+            priority: 0,
+            cover_image_key: None,
+            currency: Some("USD".into()),
+            start_date: None,
+            target_date: None,
+            current_value_cached,
+            progress_cached: None,
+            projected_completion_date: None,
+            projected_value_at_target_date: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+            target_amount_cached: None,
+        }
+    }
+
+    fn share_rule(goal_id: &str, account_id: &str, pct: f64) -> GoalFundingRule {
         GoalFundingRule {
             id: format!("r-{}-{}", goal_id, account_id),
             goal_id: goal_id.into(),
             account_id: account_id.into(),
-            funding_role: "explicit_reservation".into(),
-            reservation_percent: Some(pct),
-            countable_percent: None,
+            share_percent: pct,
             tax_bucket: None,
             created_at: String::new(),
             updated_at: String::new(),
@@ -683,165 +656,129 @@ mod tests {
     }
 
     #[test]
-    fn residual_excludes_dc_linked() {
-        let rules = vec![rule("acct-1", None), rule("acct-2", None)];
-        let all_rules = rules.clone();
+    fn share_value_basic() {
+        let rules = vec![share_rule("g1", "acct-1", 70.0)];
         let mut vals = HashMap::new();
         vals.insert("acct-1".into(), 100_000.0);
-        vals.insert("acct-2".into(), 50_000.0);
-        let dc_linked: HashSet<String> = ["acct-2".into()].into();
-
-        let residual = compute_residual_portfolio_value(&rules, &all_rules, &vals, &dc_linked);
-        assert!(
-            (residual - 100_000.0).abs() < 0.01,
-            "DC-linked acct-2 excluded: {}",
-            residual
-        );
+        let v = compute_goal_value_from_shares(&rules, &vals);
+        assert!((v - 70_000.0).abs() < 0.01, "70% of 100k = {}", v);
     }
 
     #[test]
-    fn residual_applies_reservations() {
-        let rules = vec![rule("acct-1", None)];
-        // Another goal reserves 30% of acct-1
-        let all_rules = vec![
-            rule("acct-1", None),
-            reservation_rule("goal-2", "acct-1", 30.0),
+    fn share_value_multiple_accounts() {
+        let rules = vec![
+            share_rule("g1", "acct-1", 70.0),
+            share_rule("g1", "acct-2", 30.0),
         ];
         let mut vals = HashMap::new();
         vals.insert("acct-1".into(), 100_000.0);
-        let dc_linked = HashSet::new();
-
-        let residual = compute_residual_portfolio_value(&rules, &all_rules, &vals, &dc_linked);
-        // 100k * (1 - 0.30) * 1.0 countable = 70k
-        assert!(
-            (residual - 70_000.0).abs() < 0.01,
-            "30% reserved: {}",
-            residual
-        );
+        vals.insert("acct-2".into(), 200_000.0);
+        let v = compute_goal_value_from_shares(&rules, &vals);
+        // 100k*0.70 + 200k*0.30 = 70k + 60k = 130k
+        assert!((v - 130_000.0).abs() < 0.01, "multi-account: {}", v);
     }
 
     #[test]
-    fn residual_empty_rules_falls_back_to_all() {
+    fn share_value_empty_rules_is_zero() {
         let rules: Vec<GoalFundingRule> = vec![];
-        let all_rules = vec![reservation_rule("goal-2", "acct-1", 20.0)];
         let mut vals = HashMap::new();
         vals.insert("acct-1".into(), 100_000.0);
-        vals.insert("acct-2".into(), 50_000.0);
-        let dc_linked = HashSet::new();
-
-        let residual = compute_residual_portfolio_value(&rules, &all_rules, &vals, &dc_linked);
-        // acct-1: 100k * 0.80 = 80k, acct-2: 50k * 1.0 = 50k → 130k
-        assert!(
-            (residual - 130_000.0).abs() < 0.01,
-            "fallback all accounts: {}",
-            residual
-        );
+        let v = compute_goal_value_from_shares(&rules, &vals);
+        assert!((v).abs() < 0.01, "empty rules: {}", v);
     }
 
     #[test]
-    fn residual_applies_countable_percent() {
-        let rules = vec![rule("acct-1", Some(50.0))];
-        let all_rules = rules.clone();
-        let mut vals = HashMap::new();
-        vals.insert("acct-1".into(), 100_000.0);
-        let dc_linked = HashSet::new();
-
-        let residual = compute_residual_portfolio_value(&rules, &all_rules, &vals, &dc_linked);
-        // 100k * 1.0 (no reservation) * 0.50 countable = 50k
-        assert!(
-            (residual - 50_000.0).abs() < 0.01,
-            "50% countable: {}",
-            residual
-        );
+    fn share_value_missing_account_ignored() {
+        let rules = vec![share_rule("g1", "missing", 100.0)];
+        let vals = HashMap::new();
+        let v = compute_goal_value_from_shares(&rules, &vals);
+        assert!((v).abs() < 0.01, "missing account: {}", v);
     }
 
     #[test]
-    fn residual_countable_and_reservation_combined() {
-        let rules = vec![rule("acct-1", Some(80.0))];
-        let all_rules = vec![
-            rule("acct-1", Some(80.0)),
-            reservation_rule("goal-2", "acct-1", 25.0),
-        ];
-        let mut vals = HashMap::new();
-        vals.insert("acct-1".into(), 100_000.0);
-        let dc_linked = HashSet::new();
-
-        let residual = compute_residual_portfolio_value(&rules, &all_rules, &vals, &dc_linked);
-        // 100k * (1 - 0.25) * 0.80 = 100k * 0.75 * 0.80 = 60k
-        assert!(
-            (residual - 60_000.0).abs() < 0.01,
-            "reservation + countable: {}",
-            residual
-        );
-    }
-
-    #[test]
-    fn blended_tax_rate_uses_residual_countable_values() {
+    fn tax_bucket_balances_from_shares() {
         let rules = vec![
             GoalFundingRule {
                 tax_bucket: Some("tax_deferred".into()),
-                ..rule("acct-1", Some(50.0))
+                ..share_rule("g1", "acct-1", 100.0)
             },
             GoalFundingRule {
                 tax_bucket: Some("tax_free".into()),
-                ..rule("acct-2", None)
-            },
-        ];
-        let all_rules = vec![
-            rules[0].clone(),
-            rules[1].clone(),
-            reservation_rule("goal-2", "acct-2", 50.0),
-        ];
-        let mut vals = HashMap::new();
-        vals.insert("acct-1".into(), 100_000.0);
-        vals.insert("acct-2".into(), 100_000.0);
-        let tax = Some(TaxProfile {
-            taxable_withdrawal_rate: 0.10,
-            tax_deferred_withdrawal_rate: 0.30,
-            tax_free_withdrawal_rate: 0.0,
-            early_withdrawal_penalty_rate: None,
-            early_withdrawal_penalty_age: None,
-            country_code: None,
-            withdrawal_buckets: TaxBucketBalances::default(),
-        });
-
-        let blended =
-            compute_effective_tax_rate(&rules, &all_rules, &vals, &HashSet::new(), &tax).unwrap();
-
-        // acct-1 contributes 100k * 50% = 50k at 30%
-        // acct-2 contributes 100k * 50% reserved = 50k at 0%
-        // blended = (50k*0.30 + 50k*0.0) / 100k = 0.15
-        assert!((blended - 0.15).abs() < 0.0001, "blended = {}", blended);
-    }
-
-    #[test]
-    fn blended_tax_rate_excludes_dc_linked_accounts() {
-        let rules = vec![
-            GoalFundingRule {
-                tax_bucket: Some("tax_deferred".into()),
-                ..rule("acct-1", None)
+                ..share_rule("g1", "acct-2", 50.0)
             },
             GoalFundingRule {
                 tax_bucket: Some("taxable".into()),
-                ..rule("acct-2", None)
+                ..share_rule("g1", "acct-3", 100.0)
             },
         ];
         let mut vals = HashMap::new();
         vals.insert("acct-1".into(), 100_000.0);
-        vals.insert("acct-2".into(), 100_000.0);
-        let dc_linked: HashSet<String> = ["acct-2".into()].into();
-        let tax = Some(TaxProfile {
-            taxable_withdrawal_rate: 0.05,
-            tax_deferred_withdrawal_rate: 0.25,
-            tax_free_withdrawal_rate: 0.0,
-            early_withdrawal_penalty_rate: None,
-            early_withdrawal_penalty_age: None,
-            country_code: None,
-            withdrawal_buckets: TaxBucketBalances::default(),
-        });
+        vals.insert("acct-2".into(), 80_000.0);
+        vals.insert("acct-3".into(), 60_000.0);
 
-        let blended = compute_effective_tax_rate(&rules, &rules, &vals, &dc_linked, &tax).unwrap();
+        let b = compute_tax_bucket_balances(&rules, &vals);
+        assert!((b.tax_deferred - 100_000.0).abs() < 0.01);
+        assert!((b.tax_free - 40_000.0).abs() < 0.01);
+        assert!((b.taxable - 60_000.0).abs() < 0.01);
+    }
 
-        assert!((blended - 0.25).abs() < 0.0001, "blended = {}", blended);
+    #[test]
+    fn tax_bucket_defaults_to_taxable() {
+        let rules = vec![share_rule("g1", "acct-1", 100.0)];
+        let mut vals = HashMap::new();
+        vals.insert("acct-1".into(), 50_000.0);
+
+        let b = compute_tax_bucket_balances(&rules, &vals);
+        assert!((b.taxable - 50_000.0).abs() < 0.01);
+        assert!((b.tax_deferred).abs() < 0.01);
+        assert!((b.tax_free).abs() < 0.01);
+    }
+
+    #[test]
+    fn retirement_seed_rules_use_remaining_capacity() {
+        let eligible_accounts = vec![
+            test_account("acct-1", "SECURITIES"),
+            test_account("acct-2", "CASH"),
+            test_account("acct-3", "CRYPTOCURRENCY"),
+            test_account("acct-4", "OTHER"),
+        ];
+        let participating_rules = vec![
+            share_rule("goal-a", "acct-1", 30.0),
+            share_rule("goal-b", "acct-2", 100.0),
+            share_rule("goal-c", "acct-3", 80.0),
+        ];
+
+        let seed_rules = build_retirement_seed_rules(&eligible_accounts, &participating_rules);
+        let shares_by_account: HashMap<String, f64> = seed_rules
+            .into_iter()
+            .map(|rule| (rule.account_id, rule.share_percent))
+            .collect();
+
+        assert_eq!(shares_by_account.get("acct-1"), Some(&70.0));
+        assert_eq!(shares_by_account.get("acct-3"), Some(&20.0));
+        assert!(!shares_by_account.contains_key("acct-2"));
+        assert!(!shares_by_account.contains_key("acct-4"));
+    }
+
+    #[test]
+    fn achieved_summary_value_uses_cached_value() {
+        let goal = test_goal("achieved", Some(42_000.0));
+        let rules = vec![share_rule("goal-1", "acct-1", 100.0)];
+        let mut vals = HashMap::new();
+        vals.insert("acct-1".into(), 80_000.0);
+
+        let current_value = compute_summary_current_value(&goal, &rules, &vals);
+        assert!((current_value - 42_000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn active_summary_value_uses_live_share_value() {
+        let goal = test_goal("active", Some(42_000.0));
+        let rules = vec![share_rule("goal-1", "acct-1", 100.0)];
+        let mut vals = HashMap::new();
+        vals.insert("acct-1".into(), 80_000.0);
+
+        let current_value = compute_summary_current_value(&goal, &rules, &vals);
+        assert!((current_value - 80_000.0).abs() < 0.01);
     }
 }

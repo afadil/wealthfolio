@@ -14,11 +14,9 @@ export function usePortfolioData(accountIds?: string[]) {
   const accounts = accountsQuery.data ?? [];
   const allActiveAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
 
-  const explicitIds = accountIds;
-
   const activeAccountIds = (
-    explicitIds && explicitIds.length > 0
-      ? allActiveAccounts.filter((a) => explicitIds.includes(a.id))
+    accountIds !== undefined
+      ? allActiveAccounts.filter((a) => accountIds.includes(a.id))
       : allActiveAccounts.filter((a) => INVESTMENT_TYPES.has(a.accountType))
   ).map((a) => a.id);
 

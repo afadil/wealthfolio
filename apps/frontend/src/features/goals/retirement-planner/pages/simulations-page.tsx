@@ -526,7 +526,7 @@ function ScenarioSection({
   );
 }
 
-// ─── Income Streams Projection Section ────────────────────────────────────────
+// ─── Retirement Income Projection Section ─────────────────────────────────────
 
 const STREAM_COLORS = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899", "#14b8a6"];
 
@@ -597,11 +597,11 @@ function IncomeProjectionSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Income Streams Projection</CardTitle>
+        <CardTitle className="text-sm">Retirement Income Projection</CardTitle>
         <p className="text-muted-foreground text-xs">
-          All amounts in today's euros (real terms). Inflation-indexed streams appear flat;
-          non-indexed streams lose purchasing power over time. The gap between total income and the
-          expense line is what the portfolio must cover each year.
+          All amounts are shown in today's money. Inflation-indexed income appears flat; non-indexed
+          income loses purchasing power over time. The gap between retirement income and planned
+          spending is what the portfolio must cover each year.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -616,7 +616,7 @@ function IncomeProjectionSection({
                 const label = stream ? stream.label || "Stream" : (name ?? "");
                 return [fmt(value ?? 0, plan.currency), label];
               }}
-              labelFormatter={(age) => `Age ${age} (today's €)`}
+              labelFormatter={(age) => `Age ${age} (today's money)`}
             />
             <Legend
               formatter={(value) => {
@@ -639,7 +639,7 @@ function IncomeProjectionSection({
             ))}
             <Line
               dataKey="expenses"
-              name="FIRE Expenses"
+              name="Planned retirement spending"
               stroke="#ef4444"
               dot={false}
               strokeWidth={2}
@@ -664,8 +664,8 @@ function IncomeProjectionSection({
                   {s.label || "Stream"}
                 </th>
               ))}
-              <th className="pb-2 text-right">Total income/yr</th>
-              <th className="pb-2 text-right">Expenses/yr</th>
+              <th className="pb-2 text-right">Retirement income/yr</th>
+              <th className="pb-2 text-right">Planned spending/yr</th>
               <th className="pb-2 text-right">Coverage</th>
             </tr>
           </thead>
@@ -996,8 +996,8 @@ function SorrSection({
         )}
         {fireReached && incomeRatio > 0.3 && (
           <div className="rounded bg-green-50 p-3 text-xs dark:bg-green-950/20">
-            Your additional income ({fmt(annualIncomeAtFire / 12, plan.currency)}/mo) covers{" "}
-            {(incomeRatio * 100).toFixed(0)}% of your FIRE expenses, significantly reducing
+            Your retirement income ({fmt(annualIncomeAtFire / 12, plan.currency)}/mo) covers{" "}
+            {(incomeRatio * 100).toFixed(0)}% of planned retirement spending, significantly reducing
             sequence-of-returns risk.
           </div>
         )}

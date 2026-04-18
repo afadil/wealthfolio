@@ -13,10 +13,8 @@ pub struct Goal {
     pub title: String,
     pub description: Option<String>,
     pub target_amount: Option<f64>,
-    pub is_achieved: bool,
     pub status_lifecycle: String,
     pub status_health: String,
-    pub is_archived: bool,
     pub priority: i32,
     pub cover_image_key: Option<String>,
     pub currency: Option<String>,
@@ -40,10 +38,8 @@ pub struct NewGoal {
     pub title: String,
     pub description: Option<String>,
     pub target_amount: Option<f64>,
-    pub is_achieved: bool,
     pub status_lifecycle: Option<String>,
     pub status_health: Option<String>,
-    pub is_archived: Option<bool>,
     pub priority: Option<i32>,
     pub cover_image_key: Option<String>,
     pub currency: Option<String>,
@@ -60,10 +56,8 @@ pub struct GoalFundingRule {
     pub id: String,
     pub goal_id: String,
     pub account_id: String,
-    pub funding_role: String,
-    pub reservation_percent: Option<f64>,
-    pub countable_percent: Option<f64>,
-    pub tax_bucket: Option<String>, // "taxable", "tax_deferred", "tax_free", "unknown"
+    pub share_percent: f64,
+    pub tax_bucket: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -73,9 +67,7 @@ pub struct GoalFundingRule {
 #[serde(rename_all = "camelCase")]
 pub struct GoalFundingRuleInput {
     pub account_id: String,
-    pub funding_role: String,
-    pub reservation_percent: Option<f64>,
-    pub countable_percent: Option<f64>,
+    pub share_percent: f64,
     pub tax_bucket: Option<String>,
 }
 

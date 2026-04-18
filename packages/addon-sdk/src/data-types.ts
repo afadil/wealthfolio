@@ -641,7 +641,7 @@ export interface Goal {
   title: string;
   description?: string;
   targetAmount: number;
-  isAchieved?: boolean;
+  statusLifecycle?: 'active' | 'achieved' | 'archived';
   allocations?: GoalAllocation[];
 }
 
@@ -649,7 +649,8 @@ export interface GoalAllocation {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  sharePercent: number;
+  taxBucket?: string;
 }
 
 export interface GoalProgress {

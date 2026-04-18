@@ -2668,21 +2668,21 @@ mod tests {
         let payload = normalize_outbox_payload(serde_json::json!({
             "id": "goal-outbox-camel",
             "targetAmount": 5000.0,
-            "isAchieved": false
+            "statusLifecycle": "active"
         }))
         .expect("normalize payload");
         assert!(payload.get("target_amount").is_some());
-        assert!(payload.get("is_achieved").is_some());
+        assert!(payload.get("status_lifecycle").is_some());
         assert!(payload.get("targetAmount").is_none());
-        assert!(payload.get("isAchieved").is_none());
+        assert!(payload.get("statusLifecycle").is_none());
     }
 
     #[test]
     fn normalize_outbox_payload_rejects_conflicting_aliases() {
         let result = normalize_outbox_payload(serde_json::json!({
             "id": "goal-outbox-conflict",
-            "isAchieved": false,
-            "is_achieved": true
+            "statusLifecycle": "active",
+            "status_lifecycle": "archived"
         }));
         assert!(
             result.is_err(),
@@ -2871,7 +2871,7 @@ mod tests {
                     "title": "Emergency Fund",
                     "description": "6 months expenses",
                     "targetAmount": 50000.0,
-                    "isAchieved": true
+                    "statusLifecycle": "achieved"
                 }),
             )
             .await
@@ -2879,13 +2879,13 @@ mod tests {
         assert!(applied, "expected goal create to apply");
 
         let mut conn = get_connection(&pool).expect("conn");
-        let (target_amount_value, is_achieved_value): (f64, bool) = goals::table
+        let (target_amount_value, status_lifecycle_value): (f64, String) = goals::table
             .filter(goals::id.eq("goal-camel-case"))
-            .select((goals::target_amount, goals::is_achieved))
+            .select((goals::target_amount, goals::status_lifecycle))
             .first(&mut conn)
             .expect("goal row");
         assert_eq!(target_amount_value, 50000.0);
-        assert!(is_achieved_value);
+        assert_eq!(status_lifecycle_value, "achieved");
     }
 
     #[tokio::test]
@@ -3332,8 +3332,8 @@ mod tests {
                     "title": "Conflicting Goal",
                     "description": serde_json::Value::Null,
                     "targetAmount": 10.0,
-                    "isAchieved": false,
-                    "is_achieved": true
+                    "statusLifecycle": "active",
+                    "status_lifecycle": "archived"
                 }),
             )
             .await;

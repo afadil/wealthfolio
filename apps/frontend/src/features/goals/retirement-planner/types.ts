@@ -39,6 +39,9 @@ export interface YearlySnapshot {
   pensionAssets: number;
   annualTaxes?: number;
   grossWithdrawal?: number;
+  plannedExpenses?: number;
+  fundedExpenses?: number;
+  annualShortfall?: number;
 }
 
 export interface MonteCarloResult {

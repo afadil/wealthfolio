@@ -174,7 +174,7 @@ function ExpenseBucketRow({
         </div>
       </div>
       <NumberField
-        label="Monthly amount"
+        label="Monthly spending"
         value={bucket.monthlyAmount}
         onChange={(v) => onChange({ monthlyAmount: v })}
         min={0}
@@ -439,7 +439,7 @@ export default function SettingsPage({
   return (
     <div className="space-y-6 pb-8">
       {/* ── Section 1: Core ── */}
-      <SettingsSection title="Core" defaultOpen={true}>
+      <SettingsSection title="Retirement Timeline" defaultOpen={true}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <NumberField
             label="Current age"
@@ -448,26 +448,26 @@ export default function SettingsPage({
             min={1}
           />
           <NumberField
-            label="Target retirement age"
+            label="Desired retirement age"
             value={draft.personal.targetRetirementAge}
             onChange={(v) => updatePersonal("targetRetirementAge", v)}
             min={1}
           />
           <NumberField
-            label="Planning horizon age (life expectancy)"
+            label="Plan through age"
             value={draft.personal.planningHorizonAge}
             onChange={(v) => updatePersonal("planningHorizonAge", v)}
             min={draft.personal.targetRetirementAge + 1}
           />
           <NumberField
-            label={`Monthly contribution (${draft.currency})`}
+            label={`Monthly contribution until retirement (${draft.currency})`}
             value={draft.investment.monthlyContribution}
             onChange={(v) => updateInvestment("monthlyContribution", v)}
             min={0}
           />
         </div>
         <SliderField
-          label="Annual withdrawal rate"
+          label="Target withdrawal rate for sizing"
           value={draft.withdrawal.safeWithdrawalRate}
           min={0.025}
           max={0.06}
@@ -477,23 +477,26 @@ export default function SettingsPage({
         />
       </SettingsSection>
 
-      {/* ── Section 2: Expenses ── */}
-      <SettingsSection title="Expenses" defaultOpen={true}>
+      {/* ── Section 2: Retirement Spending ── */}
+      <SettingsSection title="Retirement Spending" defaultOpen={true}>
+        <p className="text-muted-foreground text-xs">
+          Monthly spending you expect during retirement, entered in today's money.
+        </p>
         <ExpenseBucketRow
-          label="Living"
+          label="Living spending"
           bucket={draft.expenses.living}
           onChange={(patch) => updateExpenseBucket("living", patch)}
           generalInflation={draft.investment.inflationRate}
         />
         <ExpenseBucketRow
-          label="Healthcare"
+          label="Healthcare spending"
           bucket={draft.expenses.healthcare}
           onChange={(patch) => updateExpenseBucket("healthcare", patch)}
           generalInflation={draft.investment.inflationRate}
         />
         {draft.expenses.housing && (
           <ExpenseBucketRow
-            label="Housing"
+            label="Housing spending"
             bucket={draft.expenses.housing}
             onChange={(patch) => updateExpenseBucket("housing", patch)}
             generalInflation={draft.investment.inflationRate}
@@ -503,7 +506,7 @@ export default function SettingsPage({
         )}
         {draft.expenses.discretionary && (
           <ExpenseBucketRow
-            label="Discretionary"
+            label="Discretionary spending"
             bucket={draft.expenses.discretionary}
             onChange={(patch) => updateExpenseBucket("discretionary", patch)}
             generalInflation={draft.investment.inflationRate}
@@ -514,29 +517,30 @@ export default function SettingsPage({
         <div className="flex gap-2">
           {!draft.expenses.housing && (
             <Button variant="outline" size="sm" onClick={() => addOptionalBucket("housing")}>
-              + Housing
+              + Housing spending
             </Button>
           )}
           {!draft.expenses.discretionary && (
             <Button variant="outline" size="sm" onClick={() => addOptionalBucket("discretionary")}>
-              + Discretionary
+              + Discretionary spending
             </Button>
           )}
         </div>
       </SettingsSection>
 
-      {/* ── Section 3: Income Streams ── */}
-      <SettingsSection title="Income Streams" defaultOpen={true}>
+      {/* ── Section 3: Retirement Income ── */}
+      <SettingsSection title="Retirement Income" defaultOpen={true}>
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground text-xs">
-            Pension, rental income, part-time work, etc. Enter amounts as net (after tax).
+            Pension, rental income, part-time work, or annuities expected during retirement. Enter
+            amounts as net monthly income in today's money.
           </p>
           <Button variant="outline" size="sm" onClick={addStream}>
-            + Add
+            + Add income
           </Button>
         </div>
         {draft.incomeStreams.length === 0 && (
-          <p className="text-muted-foreground text-xs">No income streams added.</p>
+          <p className="text-muted-foreground text-xs">No retirement income added.</p>
         )}
         {draft.incomeStreams.map((stream) => {
           const isDc = stream.streamType === "dc";
@@ -592,7 +596,7 @@ export default function SettingsPage({
                   </div>
                 ) : (
                   <div>
-                    <Label className="text-xs">Monthly amount ({draft.currency})</Label>
+                    <Label className="text-xs">Monthly income ({draft.currency})</Label>
                     <Input
                       type="number"
                       value={stream.monthlyAmount ?? 0}
@@ -828,8 +832,8 @@ export default function SettingsPage({
         })}
       </SettingsSection>
 
-      {/* ── Section 4: Investment Assumptions ── */}
-      <SettingsSection title="Investment Assumptions" defaultOpen={true}>
+      {/* ── Section 4: Portfolio Assumptions ── */}
+      <SettingsSection title="Portfolio Assumptions" defaultOpen={true}>
         <SliderField
           label="Expected annual portfolio return"
           value={draft.investment.expectedAnnualReturn}
@@ -1009,8 +1013,8 @@ export default function SettingsPage({
         </div>
       </SettingsSection>
 
-      {/* ── Section 5: Withdrawal Policy ── */}
-      <SettingsSection title="Withdrawal Policy" defaultOpen={true}>
+      {/* ── Section 5: Withdrawal Rule ── */}
+      <SettingsSection title="Retirement Withdrawal Rule" defaultOpen={true}>
         <div className="space-y-2">
           <Label className="text-xs">Strategy</Label>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
@@ -1077,14 +1081,15 @@ export default function SettingsPage({
         </div>
       </SettingsSection>
 
-      {/* ── Section 6: Tax Profile ── */}
-      <SettingsSection title="Tax Profile" defaultOpen={false}>
+      {/* ── Section 6: Withdrawal Taxes ── */}
+      <SettingsSection title="Withdrawal Taxes" defaultOpen={false}>
         <p className="text-muted-foreground mb-3 text-xs">
-          Simple effective tax rates applied to retirement withdrawals.
+          Simple effective tax rates applied when retirement spending is funded from each account
+          bucket. Set all rates to 0% to ignore tax drag.
         </p>
         <div className="grid grid-cols-2 gap-4">
           <SliderField
-            label="Taxable withdrawal rate"
+            label="Taxable account rate"
             value={(draft.tax?.taxableWithdrawalRate ?? 0) * 100}
             min={0}
             max={50}
@@ -1093,7 +1098,7 @@ export default function SettingsPage({
             onChange={(v) => updateTax("taxableWithdrawalRate", v / 100)}
           />
           <SliderField
-            label="Tax-deferred rate"
+            label="Tax-deferred account rate"
             value={(draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100}
             min={0}
             max={50}
@@ -1102,7 +1107,7 @@ export default function SettingsPage({
             onChange={(v) => updateTax("taxDeferredWithdrawalRate", v / 100)}
           />
           <SliderField
-            label="Tax-free rate"
+            label="Tax-free account rate"
             value={(draft.tax?.taxFreeWithdrawalRate ?? 0) * 100}
             min={0}
             max={50}

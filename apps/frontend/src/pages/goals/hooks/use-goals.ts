@@ -25,19 +25,15 @@ export function useGoals() {
     }
   }, [query.data, queryClient]);
 
-  const nonArchived = query.data?.filter(
-    (g) => !g.isArchived && g.statusLifecycle !== "archived" && g.statusLifecycle !== "achieved",
-  );
+  const nonArchived = query.data?.filter((g) => g.statusLifecycle === "active");
   const atRisk =
     nonArchived?.filter((g) => g.statusHealth === "at_risk" || g.statusHealth === "off_track") ??
     [];
   const active =
     nonArchived?.filter((g) => g.statusHealth !== "at_risk" && g.statusHealth !== "off_track") ??
     [];
-  const achieved =
-    query.data?.filter((g) => g.statusLifecycle === "achieved" && !g.isArchived) ?? [];
-  const archived =
-    query.data?.filter((g) => g.isArchived || g.statusLifecycle === "archived") ?? [];
+  const achieved = query.data?.filter((g) => g.statusLifecycle === "achieved") ?? [];
+  const archived = query.data?.filter((g) => g.statusLifecycle === "archived") ?? [];
 
   return {
     goals: query.data ?? [],

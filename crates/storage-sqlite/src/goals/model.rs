@@ -25,11 +25,9 @@ pub struct GoalDB {
     pub title: String,
     pub description: Option<String>,
     pub target_amount: f64,
-    pub is_achieved: bool,
     pub goal_type: String,
     pub status_lifecycle: String,
     pub status_health: String,
-    pub is_archived: bool,
     pub priority: i32,
     pub cover_image_key: Option<String>,
     pub currency: Option<String>,
@@ -54,10 +52,8 @@ pub struct NewGoalDB {
     pub title: String,
     pub description: Option<String>,
     pub target_amount: f64,
-    pub is_achieved: bool,
     pub status_lifecycle: String,
     pub status_health: String,
-    pub is_archived: bool,
     pub priority: i32,
     pub cover_image_key: Option<String>,
     pub currency: Option<String>,
@@ -88,15 +84,12 @@ pub struct NewGoalDB {
 #[serde(rename_all = "camelCase")]
 pub struct GoalsAllocationDB {
     pub id: String,
-    pub percent_allocation: i32,
     pub goal_id: String,
     pub account_id: String,
-    pub funding_role: String,
-    pub reservation_percent: Option<f64>,
+    pub share_percent: f64,
+    pub tax_bucket: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    pub countable_percent: Option<f64>,
-    pub tax_bucket: Option<String>,
 }
 
 /// Database model for goal plans
@@ -142,10 +135,8 @@ impl From<GoalDB> for wealthfolio_core::goals::Goal {
             title: db.title,
             description: db.description,
             target_amount: target,
-            is_achieved: db.is_achieved,
             status_lifecycle: db.status_lifecycle,
             status_health: db.status_health,
-            is_archived: db.is_archived,
             priority: db.priority,
             cover_image_key: db.cover_image_key,
             currency: db.currency,
@@ -168,9 +159,7 @@ impl From<GoalsAllocationDB> for wealthfolio_core::goals::GoalFundingRule {
             id: db.id,
             goal_id: db.goal_id,
             account_id: db.account_id,
-            funding_role: db.funding_role,
-            reservation_percent: db.reservation_percent,
-            countable_percent: db.countable_percent,
+            share_percent: db.share_percent,
             tax_bucket: db.tax_bucket,
             created_at: db.created_at,
             updated_at: db.updated_at,
@@ -202,14 +191,12 @@ impl From<wealthfolio_core::goals::NewGoal> for NewGoalDB {
             title: domain.title,
             description: domain.description,
             target_amount: domain.target_amount.unwrap_or(0.0),
-            is_achieved: domain.is_achieved,
             status_lifecycle: domain
                 .status_lifecycle
                 .unwrap_or_else(|| "active".to_string()),
             status_health: domain
                 .status_health
                 .unwrap_or_else(|| "not_applicable".to_string()),
-            is_archived: domain.is_archived.unwrap_or(false),
             priority: domain.priority.unwrap_or(0),
             cover_image_key: domain.cover_image_key,
             currency: domain.currency,

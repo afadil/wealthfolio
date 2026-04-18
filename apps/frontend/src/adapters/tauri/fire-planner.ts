@@ -7,7 +7,7 @@ import type {
   SorrScenario,
   SensitivityResult,
   StrategyComparisonResult,
-} from "@/pages/fire-planner/types";
+} from "@/features/goals/retirement-planner/types";
 import type { PlannerMode } from "@/lib/types";
 
 export type { SensitivityResult, StrategyComparisonResult };

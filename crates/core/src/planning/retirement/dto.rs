@@ -4,7 +4,9 @@ use super::engine::{
     compute_required_capital, project_retirement, project_retirement_with_mode,
     resolve_plan_dc_payouts,
 };
-use super::model::{RetirementPlan, RetirementStartReason, RetirementTimingMode};
+use super::model::{
+    RetirementPlan, RetirementStartReason, RetirementTimingMode, TaxBucketBalances,
+};
 use super::withdrawal::compute_gross_withdrawal;
 
 // ─── Output types ────────────────────────────────────────────────────────────
@@ -25,6 +27,12 @@ pub struct YearlySnapshot {
     pub annual_taxes: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gross_withdrawal: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planned_expenses: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funded_expenses: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annual_shortfall: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -189,6 +197,7 @@ pub struct RetirementOverview {
     pub coast_amount_today: f64,
     pub coast_reached: bool,
     pub progress: f64, // 0.0 to 1.0
+    pub tax_bucket_balances: TaxBucketBalances,
     pub budget_breakdown: BudgetBreakdown,
     pub trajectory: Vec<RetirementTrajectoryPoint>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -209,6 +218,12 @@ pub struct RetirementTrajectoryPoint {
     pub portfolio_end: f64,
     pub required_capital: f64,
     pub pension_assets: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub planned_expenses: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funded_expenses: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annual_shortfall: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -373,11 +388,14 @@ fn build_trajectory(
                 portfolio_start: snap.portfolio_value,
                 annual_contribution: snap.annual_contribution,
                 annual_income: snap.annual_income,
-                annual_expenses: snap.annual_withdrawal,
+                annual_expenses: snap.planned_expenses.unwrap_or(snap.annual_withdrawal),
                 net_withdrawal_from_portfolio: snap.net_withdrawal_from_portfolio,
                 portfolio_end,
                 required_capital: required_capitals[idx],
                 pension_assets: snap.pension_assets,
+                planned_expenses: snap.planned_expenses,
+                funded_expenses: snap.funded_expenses,
+                annual_shortfall: snap.annual_shortfall,
             }
         })
         .collect()
@@ -535,6 +553,11 @@ pub fn compute_retirement_overview_with_mode(
 
     let fire_age_for_budget = retirement_start_age.unwrap_or(plan.personal.target_retirement_age);
     let budget = compute_budget_breakdown(plan, fire_age_for_budget);
+    let tax_bucket_balances = plan
+        .tax
+        .as_ref()
+        .map(|tax| tax.withdrawal_buckets)
+        .unwrap_or_default();
 
     let trajectory = build_trajectory(&projection.year_by_year, plan, net_target_today);
 
@@ -561,6 +584,7 @@ pub fn compute_retirement_overview_with_mode(
         coast_amount_today: coast,
         coast_reached: current_portfolio >= coast,
         progress,
+        tax_bucket_balances,
         budget_breakdown: budget,
         trajectory,
         withdrawal_policy: Some(match plan.withdrawal.strategy {
@@ -730,5 +754,22 @@ mod tests {
                 overview.trajectory[idx].required_capital,
             );
         }
+    }
+
+    #[test]
+    fn trajectory_uses_planned_expenses_when_available() {
+        let mut plan = base_plan();
+        plan.personal.target_retirement_age = 36;
+        let overview = compute_retirement_overview(&plan, 1_000_000.0, "traditional");
+        let fire_point = overview
+            .trajectory
+            .iter()
+            .find(|point| point.phase == "fire")
+            .expect("retirement point should exist");
+
+        assert_eq!(
+            fire_point.planned_expenses,
+            Some(fire_point.annual_expenses)
+        );
     }
 }

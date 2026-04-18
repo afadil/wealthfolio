@@ -1,4 +1,12 @@
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   Page,
   PageContent,
@@ -11,9 +19,9 @@ import {
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { DeleteConfirm } from "@wealthfolio/ui/components/common";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import {
   useGoalDetail,
   useGoalPlanMutations,
@@ -22,13 +30,16 @@ import {
 } from "./hooks/use-goal-detail";
 import { useGoalMutations } from "./hooks/use-goals";
 import type { RetirementOverview } from "@/lib/types";
-import type { RetirementPlan } from "@/pages/fire-planner/types";
-import { parseSettingsJson, DEFAULT_RETIREMENT_PLAN } from "@/pages/fire-planner/lib/plan-adapter";
-import { usePortfolioData } from "@/pages/fire-planner/hooks/use-portfolio";
-import DashboardPage from "@/pages/fire-planner/pages/dashboard-page";
-import SimulationsPage from "@/pages/fire-planner/pages/simulations-page";
-import AllocationPage from "@/pages/fire-planner/pages/allocation-page";
-import SettingsPage from "@/pages/fire-planner/pages/settings-page";
+import type { RetirementPlan } from "@/features/goals/retirement-planner/types";
+import {
+  parseSettingsJson,
+  DEFAULT_RETIREMENT_PLAN,
+} from "@/features/goals/retirement-planner/lib/plan-adapter";
+import { usePortfolioData } from "@/features/goals/retirement-planner/hooks/use-portfolio";
+import DashboardPage from "@/features/goals/retirement-planner/pages/dashboard-page";
+import SimulationsPage from "@/features/goals/retirement-planner/pages/simulations-page";
+import AllocationPage from "@/features/goals/retirement-planner/pages/allocation-page";
+import SettingsPage from "@/features/goals/retirement-planner/pages/settings-page";
 import SaveUpDetailPage from "./components/save-up-detail";
 import { GoalFundingEditor } from "./components/goal-funding-editor";
 import { GoalEditDialog } from "./components/goal-edit-dialog";
@@ -64,11 +75,7 @@ export default function GoalDetailPage() {
   // Fetch backend-computed save-up overview when this is a save-up goal
   const { data: saveUpOverview } = useSaveUpOverview(isSaveUp ? goalId : undefined);
 
-  // Derive eligible account IDs from funding rules (replaces includedAccountIds in settings)
-  const eligibleAccountIds = useMemo(
-    () => fundingRules.filter((r) => r.fundingRole === "residual_eligible").map((r) => r.accountId),
-    [fundingRules],
-  );
+  const eligibleAccountIds = useMemo(() => fundingRules.map((r) => r.accountId), [fundingRules]);
 
   // Parse retirement plan from settings JSON
   const retirementPlan: RetirementPlan = useMemo(() => {
@@ -86,9 +93,7 @@ export default function GoalDetailPage() {
   }, [retirementPlan]);
 
   // Feed portfolio data from funding-rule-derived accounts
-  const portfolioData = usePortfolioData(
-    isRetirement ? (eligibleAccountIds.length > 0 ? eligibleAccountIds : undefined) : undefined,
-  );
+  const portfolioData = usePortfolioData(isRetirement ? eligibleAccountIds : undefined);
 
   // Default tab: plan if setup, overview otherwise
   const [activeTab, setActiveTab] = useState(isSetup ? "plan" : "overview");
@@ -131,6 +136,8 @@ export default function GoalDetailPage() {
   );
 
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [actionPaletteOpen, setActionPaletteOpen] = useState(false);
 
   const handleDelete = () => {
     if (!goalId) return;
@@ -165,6 +172,23 @@ export default function GoalDetailPage() {
   }
 
   const typeLabel = GOAL_TYPE_LABELS[goal.goalType] ?? "Goal";
+  const actionGroups = [
+    {
+      items: [
+        {
+          icon: Icons.Settings2,
+          label: "Edit goal",
+          onClick: () => setEditOpen(true),
+        },
+        {
+          icon: Icons.Trash,
+          label: "Delete goal",
+          onClick: () => setDeleteOpen(true),
+          variant: "destructive",
+        },
+      ],
+    },
+  ] satisfies ActionPaletteGroup[];
 
   return (
     <Page>
@@ -175,25 +199,44 @@ export default function GoalDetailPage() {
         actions={
           <div className="flex items-center gap-2">
             {goal.statusLifecycle === "achieved" && <Badge variant="default">Achieved</Badge>}
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Icons.Settings2 className="mr-1 h-4 w-4" />
-              Edit
-            </Button>
-            <DeleteConfirm
-              deleteConfirmTitle="Delete goal"
-              deleteConfirmMessage={`Are you sure you want to delete "${goal.title}"? This action cannot be undone.`}
-              handleDeleteConfirm={handleDelete}
-              isPending={deleteMutation.isPending}
-              button={
-                <Button variant="destructive" size="sm">
-                  <Icons.Trash className="h-4 w-4" />
-                </Button>
-              }
+            <ActionPalette
+              open={actionPaletteOpen}
+              onOpenChange={setActionPaletteOpen}
+              title={goal.title}
+              groups={actionGroups}
             />
           </div>
         }
       />
       {goal && <GoalEditDialog goal={goal} open={editOpen} onClose={() => setEditOpen(false)} />}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete goal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{goal.title}&quot;? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PageContent>
         {isRetirement ? (
           plan ? (

@@ -47,8 +47,8 @@ export function useGoalDetail(goalId: string | undefined) {
     goal: goal.data,
     plan: plan.data,
     fundingRules,
-    isLoading: goal.isLoading || plan.isLoading,
-    error: goal.error || plan.error,
+    isLoading: goal.isLoading || plan.isLoading || funding.isLoading,
+    error: goal.error || plan.error || funding.error,
   };
 }
 

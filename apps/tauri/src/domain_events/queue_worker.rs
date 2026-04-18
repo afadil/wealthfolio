@@ -465,7 +465,7 @@ async fn refresh_all_goal_summaries(context: &Arc<ServiceContext>) {
 
     let active_goals: Vec<_> = goals
         .iter()
-        .filter(|g| !g.is_archived && g.status_lifecycle != "archived")
+        .filter(|g| g.status_lifecycle == "active")
         .collect();
 
     if active_goals.is_empty() {
@@ -473,7 +473,7 @@ async fn refresh_all_goal_summaries(context: &Arc<ServiceContext>) {
     }
 
     // Fetch valuations once for all accounts
-    let accounts = match context.account_service().get_active_accounts() {
+    let accounts = match context.account_service().get_active_non_archived_accounts() {
         Ok(a) => a,
         Err(e) => {
             warn!("Failed to load accounts for goal summary refresh: {}", e);
@@ -512,7 +512,10 @@ async fn refresh_all_goal_summaries(context: &Arc<ServiceContext>) {
 
     debug!(
         "Refreshed summaries for {} active goal(s)",
-        goals.iter().filter(|g| !g.is_archived).count()
+        goals
+            .iter()
+            .filter(|g| g.status_lifecycle == "active")
+            .count()
     );
 }
 

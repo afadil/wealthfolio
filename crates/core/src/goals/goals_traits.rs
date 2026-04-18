@@ -15,12 +15,17 @@ pub trait GoalRepositoryTrait: Send + Sync {
     fn load_goals(&self) -> Result<Vec<Goal>>;
     fn load_goal(&self, goal_id: &str) -> Result<Goal>;
     async fn insert_new_goal(&self, new_goal: NewGoal) -> Result<Goal>;
+    async fn insert_goal_with_funding(
+        &self,
+        new_goal: NewGoal,
+        funding_rules: Vec<GoalFundingRuleInput>,
+    ) -> Result<Goal>;
     async fn update_goal(&self, goal_update: Goal) -> Result<Goal>;
     async fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize>;
 
     // Funding rules
     fn load_funding_rules(&self, goal_id: &str) -> Result<Vec<GoalFundingRule>>;
-    fn load_all_active_funding_rules(&self) -> Result<Vec<GoalFundingRule>>;
+    fn load_participating_funding_rules(&self) -> Result<Vec<GoalFundingRule>>;
     async fn save_goal_funding(
         &self,
         goal_id: &str,

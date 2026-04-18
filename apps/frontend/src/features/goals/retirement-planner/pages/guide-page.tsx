@@ -70,20 +70,19 @@ export default function GuidePage({ country }: { country?: string }) {
             FIRE, then lets it grow contribution-free until payout age.
           </Step>
           <Step n={5} title="Read the Dashboard, then explore Simulations">
-            The Dashboard shows your FIRE target, progress, budget breakdown by source, and a
-            year-by-year table. Simulations runs Monte Carlo (100,000 paths), scenario analysis,
-            sensitivity heatmaps, and sequence-of-returns crash tests.
+            The Dashboard shows your retire-today target, projected FI age, retirement spending
+            coverage, and a year-by-year table. Simulations runs Monte Carlo (100,000 paths),
+            scenario analysis, sensitivity heatmaps, and sequence-of-returns crash tests.
           </Step>
         </div>
       </Section>
 
       <Section title="Understanding the Dashboard">
         <div className="space-y-4">
-          <Term t="FIRE Target (net)">
-            The portfolio you need to accumulate, after subtracting income available from day one of
-            FIRE. A €1,200/mo stream that starts at your FIRE age reduces your target by €1,200 × 12
-            / withdrawal rate. Deferred streams (e.g. state pension at 67) do NOT reduce this number
-            — your portfolio must bridge the gap on its own until those streams start.
+          <Term t="Retire-today target">
+            The portfolio needed if retirement started today, after subtracting income streams
+            active today. Deferred streams, such as a pension starting at 67, do not reduce this
+            number because your portfolio must bridge the gap until those streams start.
           </Term>
           <Term t="Gross vs net target">
             The gross target (annual expenses / withdrawal rate) ignores income streams. The net
@@ -97,15 +96,16 @@ export default function GuidePage({ country }: { country?: string }) {
             FIRE target by your target age on investment returns alone. Once you pass Coast FIRE,
             every additional contribution accelerates retirement rather than enabling it.
           </Term>
-          <Term t="Monthly Budget at FIRE">
-            Your total monthly spend broken down by funding source. Income streams active from FIRE
-            age appear as coloured segments; the remainder is what the portfolio must cover. Each
-            deferred stream shows how the mix shifts at the age it starts.
+          <Term t="Retirement spending coverage">
+            Your planned monthly retirement spending broken down by funding source. Income streams
+            active at the selected retirement age appear as coloured segments; the remainder is what
+            the portfolio must cover. Deferred streams show how the mix shifts at the age they
+            start.
           </Term>
           <Term t="Year-by-Year table">
             The accumulation phase shows annual contributions and portfolio growth. The FIRE phase
-            shows annual expenses, income from each stream, and the net withdrawal from the
-            portfolio. The highlighted row marks when FIRE is reached; blue rows mark when a new
+            shows planned spending, retirement income from each stream, and the portfolio
+            withdrawal. The highlighted row marks when FIRE is reached; blue rows mark when a new
             income stream activates.
           </Term>
         </div>
@@ -131,11 +131,11 @@ export default function GuidePage({ country }: { country?: string }) {
             how sensitive your FIRE date is to return differences. Income streams are fully
             reflected — the lines diverge in the FIRE phase where withdrawals differ.
           </Term>
-          <Term t="Income Streams Projection">
-            Stacked area chart of each income stream over time versus your inflation-adjusted
-            expense line. The gap between the stack and the line is the portfolio withdrawal needed
-            each year. The coverage table shows what fraction of expenses are self-funded at each
-            key age.
+          <Term t="Retirement income projection">
+            Stacked area chart of each retirement income stream over time versus your planned
+            spending line. The gap between the stack and the line is the portfolio withdrawal needed
+            each year. The coverage table shows what fraction of spending is covered by income at
+            each key age.
           </Term>
           <Term t="Sequence of Returns Risk (SORR)">
             Five crash scenarios starting from your FIRE date. A crash in year 1 is far more
@@ -153,11 +153,11 @@ export default function GuidePage({ country }: { country?: string }) {
 
       <Section title="Key concepts">
         <div className="space-y-4">
-          <Term t="Annual withdrawal rate">
-            The percentage of your portfolio you withdraw each year in retirement. The classic 4%
-            rule (Trinity Study) means a €1M portfolio supports €40k/year. This planner defaults to
-            3.5% — more conservative and appropriate for early retirees with longer horizons. A
-            lower rate means a larger required portfolio but more safety margin.
+          <Term t="Target withdrawal rate">
+            The rate used to size the portfolio needed for retirement. The classic 4% rule means a
+            $1M portfolio supports about $40k/year. This planner defaults to 3.5% - more
+            conservative and appropriate for early retirees with longer horizons. A lower rate means
+            a larger required portfolio but more safety margin.
           </Term>
           <Term t="How the withdrawal rate is used">
             Its role depends on which withdrawal strategy you choose:
@@ -226,10 +226,10 @@ export default function GuidePage({ country }: { country?: string }) {
             </Term>
             <Term t="Pensione INPS (state pension — previdenza obbligatoria)">
               Add it as a plain income stream (no accumulation fund). Enter your estimated monthly
-              net pension in <strong>today's euros</strong> (real value) and set the payout start
+              net pension in <strong>today's money</strong> (real value) and set the payout start
               age (typically 67 for the contributivo system). Enable "Inflation-adjusted" since INPS
               is indexed to the cost of living. Use the INPS simulator (inps.it) to estimate your
-              amount — the simulator gives a future nominal value, so convert it to today's euros by
+              amount — the simulator gives a future nominal value, so convert it to today's money by
               dividing by (1 + inflation)^years. Example: simulator says €1,500 at age 67 in 35
               years at 2% inflation → enter €1,500 / 1.02³⁵ ≈ €750.
             </Term>

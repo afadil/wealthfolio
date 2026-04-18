@@ -108,7 +108,7 @@ async fn delete_goal_plan(
 
 /// Build account_id → base-currency value map from latest valuations.
 async fn build_valuation_map(state: &AppState) -> ApiResult<HashMap<String, f64>> {
-    let accounts = state.account_service.get_active_accounts()?;
+    let accounts = state.account_service.get_active_non_archived_accounts()?;
     let account_ids: Vec<String> = accounts.into_iter().map(|a| a.id).collect();
     let valuations = state
         .valuation_service

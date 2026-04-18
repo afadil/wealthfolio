@@ -544,6 +544,7 @@ pub fn project_retirement_with_mode(
                 age,
             );
 
+            let shortfall = (total_expenses - outcome.spending_funded - income).max(0.0);
             year_by_year.push(YearlySnapshot {
                 age,
                 year,
@@ -556,6 +557,9 @@ pub fn project_retirement_with_mode(
                 pension_assets,
                 annual_taxes: Some(outcome.tax_amount),
                 gross_withdrawal: Some(outcome.gross_withdrawal),
+                planned_expenses: Some(total_expenses),
+                funded_expenses: Some(outcome.spending_funded + income),
+                annual_shortfall: Some(shortfall),
             });
 
             buckets = outcome.remaining_buckets;
@@ -575,6 +579,9 @@ pub fn project_retirement_with_mode(
                 pension_assets,
                 annual_taxes: None,
                 gross_withdrawal: None,
+                planned_expenses: None,
+                funded_expenses: None,
+                annual_shortfall: None,
             });
 
             let grown_buckets = apply_growth(buckets, r);

@@ -114,7 +114,7 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
                     current_amount,
                     progress_percent,
                     deadline: g.target_date,
-                    is_achieved: g.is_achieved,
+                    is_achieved: g.status_lifecycle == "achieved",
                 }
             })
             .collect();

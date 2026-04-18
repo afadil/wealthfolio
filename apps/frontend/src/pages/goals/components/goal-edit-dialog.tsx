@@ -1,5 +1,7 @@
-import type { Goal, GoalType } from "@/lib/types";
-import { Button, Input, Label, MoneyInput } from "@wealthfolio/ui";
+import type { Goal } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { Button, Input, Label } from "@wealthfolio/ui";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -8,31 +10,39 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@wealthfolio/ui/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@wealthfolio/ui/components/ui/select";
-import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
+import { useEffect, useState } from "react";
 import { useGoalMutations } from "../hooks/use-goals";
-import { useState } from "react";
 
-const GOAL_TYPES: { value: GoalType; label: string }[] = [
-  { value: "retirement", label: "Retirement" },
-  { value: "education", label: "Education" },
-  { value: "home", label: "Home Purchase" },
-  { value: "car", label: "Car Purchase" },
-  { value: "wedding", label: "Wedding" },
-  { value: "custom_save_up", label: "Savings Goal" },
-];
+const GOAL_TYPE_LABELS: Record<Goal["goalType"], string> = {
+  retirement: "Retirement",
+  education: "Education",
+  home: "Home Purchase",
+  car: "Car Purchase",
+  wedding: "Wedding",
+  custom_save_up: "Savings Goal",
+};
 
-const LIFECYCLE_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "paused", label: "Paused" },
-  { value: "achieved", label: "Achieved" },
-  { value: "archived", label: "Archived" },
+const LIFECYCLE_OPTIONS: {
+  value: Goal["statusLifecycle"];
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "active",
+    label: "Active",
+    description: "Show in active planning and progress.",
+  },
+  {
+    value: "achieved",
+    label: "Achieved",
+    description: "Mark complete and release its account shares.",
+  },
+  {
+    value: "archived",
+    label: "Archived",
+    description: "Hide from active goals without deleting history.",
+  },
 ];
 
 interface Props {
@@ -45,127 +55,129 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
   const { updateMutation } = useGoalMutations();
   const [title, setTitle] = useState(goal.title);
   const [description, setDescription] = useState(goal.description ?? "");
-  const [goalType, setGoalType] = useState(goal.goalType);
-  const [targetAmount, setTargetAmount] = useState(goal.targetAmount ?? 0);
-  const [targetDate, setTargetDate] = useState(goal.targetDate ?? "");
-  const [currency, setCurrency] = useState(goal.currency ?? "USD");
-  const [lifecycle, setLifecycle] = useState<string>(goal.statusLifecycle);
-  const [isArchived, setIsArchived] = useState(goal.isArchived);
+  const [lifecycle, setLifecycle] = useState<Goal["statusLifecycle"]>(goal.statusLifecycle);
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (!open) return;
+    setTitle(goal.title);
+    setDescription(goal.description ?? "");
+    setLifecycle(goal.statusLifecycle);
+  }, [goal, open]);
+
+  const isRetirement = goal.goalType === "retirement";
+  const trimmedTitle = title.trim();
+  const trimmedDescription = description.trim();
+
+  const handleSave = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!trimmedTitle) return;
+
     updateMutation.mutate(
       {
         ...goal,
-        title,
-        description: description || undefined,
-        goalType: goalType as GoalType,
-        targetAmount: targetAmount || undefined,
-        targetDate: targetDate || undefined,
-        currency: currency || undefined,
-        statusLifecycle: lifecycle as Goal["statusLifecycle"],
-        isArchived,
+        title: trimmedTitle,
+        description: trimmedDescription || undefined,
+        statusLifecycle: lifecycle,
       },
       { onSuccess: () => onClose() },
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Edit Goal</DialogTitle>
-          <DialogDescription>Update your goal details.</DialogDescription>
-        </DialogHeader>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-xl">
+        <form onSubmit={handleSave} className="space-y-6">
+          <DialogHeader>
+            <DialogTitle>Edit goal</DialogTitle>
+            <DialogDescription>
+              Update the goal name, notes, and lifecycle.{" "}
+              {isRetirement
+                ? "Retirement assumptions, spending, taxes, and account shares stay in the planner."
+                : "Target amount, target date, and funding stay in the goal plan."}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          <div className="space-y-1.5">
-            <Label>Title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Goal Type</Label>
-              <Select value={goalType} onValueChange={(v) => setGoalType(v as GoalType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GOAL_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="space-y-5">
+            <div className="bg-muted/30 rounded-xl border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Goal type</p>
+                  <p className="text-muted-foreground text-xs">
+                    Fixed after creation so the planner logic stays consistent.
+                  </p>
+                </div>
+                <Badge variant="secondary">{GOAL_TYPE_LABELS[goal.goalType]}</Badge>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={lifecycle} onValueChange={setLifecycle}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LIFECYCLE_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Target Amount</Label>
-              <MoneyInput
-                value={targetAmount}
-                onChange={(e) => setTargetAmount(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Target Date</Label>
+            <div className="space-y-2">
+              <Label htmlFor="goal-title">Title</Label>
               <Input
-                type="date"
-                value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
+                id="goal-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Goal name"
+                autoFocus
+              />
+              {!trimmedTitle && <p className="text-destructive text-xs">Title is required.</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="goal-description">Notes</Label>
+              <Textarea
+                id="goal-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Optional context for this goal"
+                rows={3}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Lifecycle</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {LIFECYCLE_OPTIONS.map((option) => {
+                  const selected = lifecycle === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setLifecycle(option.value)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        "focus-visible:ring-ring focus:outline-none focus-visible:ring-2",
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "border-border/70 bg-card hover:bg-accent",
+                      )}
+                    >
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      <span className="text-muted-foreground mt-1 block text-xs leading-relaxed">
+                        {option.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Currency</Label>
-              <Input value={currency} onChange={(e) => setCurrency(e.target.value)} />
-            </div>
-
-            <div className="flex items-center gap-3 pt-6">
-              <Switch checked={isArchived} onCheckedChange={setIsArchived} />
-              <Label>Archived</Label>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending}>
-            {updateMutation.isPending ? "Saving..." : "Save Changes"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending || !trimmedTitle}>
+              {updateMutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

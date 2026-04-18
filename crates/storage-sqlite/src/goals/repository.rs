@@ -69,6 +69,49 @@ impl GoalRepositoryTrait for GoalRepository {
             .await
     }
 
+    async fn insert_goal_with_funding(
+        &self,
+        new_goal: NewGoal,
+        funding_rules: Vec<GoalFundingRuleInput>,
+    ) -> Result<Goal> {
+        self.writer
+            .exec_tx(move |tx| -> Result<Goal> {
+                let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+                let mut new_goal_db: NewGoalDB = new_goal.into();
+                new_goal_db.id = Some(Uuid::new_v4().to_string());
+
+                let result_db = diesel::insert_into(goals::table)
+                    .values(&new_goal_db)
+                    .returning(GoalDB::as_returning())
+                    .get_result(tx.conn())
+                    .map_err(StorageError::from)?;
+                let payload_db = result_db.clone();
+                let goal = Goal::from(result_db);
+                tx.insert(&payload_db)?;
+
+                for rule in funding_rules {
+                    let db = GoalsAllocationDB {
+                        id: Uuid::new_v4().to_string(),
+                        goal_id: goal.id.clone(),
+                        account_id: rule.account_id,
+                        share_percent: rule.share_percent,
+                        tax_bucket: rule.tax_bucket,
+                        created_at: now.clone(),
+                        updated_at: now.clone(),
+                    };
+                    diesel::insert_into(goals_allocation::table)
+                        .values(&db)
+                        .execute(tx.conn())
+                        .map_err(StorageError::from)?;
+                    tx.insert(&db)?;
+                }
+
+                Ok(goal)
+            })
+            .await
+    }
+
     async fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
         let goal_id_owned = goal_update.id.clone();
         let goal_db = GoalDB {
@@ -77,10 +120,8 @@ impl GoalRepositoryTrait for GoalRepository {
             title: goal_update.title,
             description: goal_update.description,
             target_amount: goal_update.target_amount.unwrap_or(0.0),
-            is_achieved: goal_update.is_achieved,
             status_lifecycle: goal_update.status_lifecycle,
             status_health: goal_update.status_health,
-            is_archived: goal_update.is_archived,
             priority: goal_update.priority,
             cover_image_key: goal_update.cover_image_key,
             currency: goal_update.currency,
@@ -142,17 +183,11 @@ impl GoalRepositoryTrait for GoalRepository {
         Ok(rules.into_iter().map(GoalFundingRule::from).collect())
     }
 
-    fn load_all_active_funding_rules(&self) -> Result<Vec<GoalFundingRule>> {
+    fn load_participating_funding_rules(&self) -> Result<Vec<GoalFundingRule>> {
         let mut conn = get_connection(&self.pool)?;
         let rules = goals_allocation::table
             .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
-            .filter(goals::is_archived.eq(false))
-            .filter(
-                goals::status_lifecycle
-                    .eq("active")
-                    .or(goals::status_lifecycle.eq("achieved"))
-                    .or(goals::status_lifecycle.eq("paused")),
-            )
+            .filter(goals::status_lifecycle.eq("active"))
             .select(GoalsAllocationDB::as_select())
             .load::<GoalsAllocationDB>(&mut conn)
             .map_err(StorageError::from)?;
@@ -193,15 +228,12 @@ impl GoalRepositoryTrait for GoalRepository {
                 for rule in rules {
                     let db = GoalsAllocationDB {
                         id: Uuid::new_v4().to_string(),
-                        percent_allocation: rule.reservation_percent.unwrap_or(0.0) as i32,
                         goal_id: goal_id_owned.clone(),
                         account_id: rule.account_id,
-                        funding_role: rule.funding_role,
-                        reservation_percent: rule.reservation_percent,
+                        share_percent: rule.share_percent,
+                        tax_bucket: rule.tax_bucket.clone(),
                         created_at: now.clone(),
                         updated_at: now.clone(),
-                        countable_percent: rule.countable_percent,
-                        tax_bucket: rule.tax_bucket.clone(),
                     };
                     diesel::insert_into(goals_allocation::table)
                         .values(&db)

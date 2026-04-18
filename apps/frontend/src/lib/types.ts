@@ -714,7 +714,7 @@ export interface SettingsContextType {
 }
 
 export type GoalType = "retirement" | "education" | "wedding" | "home" | "car" | "custom_save_up";
-export type GoalLifecycle = "draft" | "active" | "achieved" | "archived" | "paused";
+export type GoalLifecycle = "active" | "achieved" | "archived";
 export type GoalHealth = "on_track" | "at_risk" | "off_track" | "not_applicable";
 export type PlanKind = "retirement" | "save_up";
 export type PlannerMode = "fire" | "traditional";
@@ -725,10 +725,8 @@ export interface Goal {
   title: string;
   description?: string;
   targetAmount?: number;
-  isAchieved: boolean;
   statusLifecycle: GoalLifecycle;
   statusHealth: GoalHealth;
-  isArchived: boolean;
   priority: number;
   coverImageKey?: string;
   currency?: string;
@@ -749,10 +747,8 @@ export interface NewGoal {
   title: string;
   description?: string;
   targetAmount?: number;
-  isAchieved: boolean;
   statusLifecycle?: GoalLifecycle;
   statusHealth?: GoalHealth;
-  isArchived?: boolean;
   priority?: number;
   coverImageKey?: string;
   currency?: string;
@@ -760,15 +756,11 @@ export interface NewGoal {
   targetDate?: string;
 }
 
-export type FundingRole = "explicit_reservation" | "residual_eligible";
-
 export interface GoalFundingRule {
   id: string;
   goalId: string;
   accountId: string;
-  fundingRole: FundingRole;
-  reservationPercent?: number;
-  countablePercent?: number;
+  sharePercent: number;
   taxBucket?: string;
   createdAt: string;
   updatedAt: string;
@@ -776,14 +768,9 @@ export interface GoalFundingRule {
 
 export interface GoalFundingRuleInput {
   accountId: string;
-  fundingRole: FundingRole;
-  reservationPercent?: number;
-  countablePercent?: number;
+  sharePercent: number;
   taxBucket?: string;
 }
-
-/** @deprecated Use GoalFundingRule */
-export type GoalAllocation = GoalFundingRule;
 
 export interface GoalPlan {
   goalId: string;
@@ -1998,6 +1985,12 @@ export interface CheckHoldingsImportResult {
 
 // ─── Planning DTOs (backend-computed overviews) ──────────────────
 
+export interface TaxBucketBalances {
+  taxable: number;
+  taxDeferred: number;
+  taxFree: number;
+}
+
 export interface RetirementOverview {
   analysisMode: string;
   status: string;
@@ -2021,6 +2014,7 @@ export interface RetirementOverview {
   coastAmountToday: number;
   coastReached: boolean;
   progress: number;
+  taxBucketBalances: TaxBucketBalances;
   budgetBreakdown: BudgetBreakdown;
   trajectory: RetirementTrajectoryPoint[];
   withdrawalPolicy?: string;
@@ -2038,6 +2032,9 @@ export interface RetirementTrajectoryPoint {
   portfolioEnd: number;
   requiredCapital: number;
   pensionAssets: number;
+  plannedExpenses?: number;
+  fundedExpenses?: number;
+  annualShortfall?: number;
 }
 
 export interface BudgetBreakdown {

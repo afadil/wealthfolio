@@ -216,11 +216,9 @@ diesel::table! {
         title -> Text,
         description -> Nullable<Text>,
         target_amount -> Double,
-        is_achieved -> Bool,
         goal_type -> Text,
         status_lifecycle -> Text,
         status_health -> Text,
-        is_archived -> Bool,
         priority -> Integer,
         cover_image_key -> Nullable<Text>,
         currency -> Nullable<Text>,
@@ -252,15 +250,12 @@ diesel::table! {
 diesel::table! {
     goals_allocation (id) {
         id -> Text,
-        percent_allocation -> Integer,
         goal_id -> Text,
         account_id -> Text,
-        funding_role -> Text,
-        reservation_percent -> Nullable<Double>,
+        share_percent -> Double,
+        tax_bucket -> Nullable<Text>,
         created_at -> Text,
         updated_at -> Text,
-        countable_percent -> Nullable<Double>,
-        tax_bucket -> Nullable<Text>,
     }
 }
 

@@ -164,7 +164,7 @@ pub async fn refresh_all_goal_summaries(
 
     let mut results = Vec::new();
     for goal in &goals {
-        if goal.is_archived {
+        if goal.status_lifecycle != "active" {
             continue;
         }
         match state
@@ -226,7 +226,7 @@ async fn build_valuation_map(
 ) -> Result<std::collections::HashMap<String, f64>, String> {
     let accounts = state
         .account_service()
-        .get_active_accounts()
+        .get_active_non_archived_accounts()
         .map_err(|e| e.to_string())?;
     let account_ids: Vec<String> = accounts.into_iter().map(|a| a.id).collect();
     let valuations = state

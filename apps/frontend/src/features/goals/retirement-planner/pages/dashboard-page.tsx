@@ -14,7 +14,7 @@ import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useMemo, useState, useCallback } from "react";
 import { GoalFundingEditor } from "@/pages/goals/components/goal-funding-editor";
-import { Input, Label } from "@wealthfolio/ui";
+import { Input } from "@wealthfolio/ui";
 import type {
   RetirementPlan,
   WithdrawalConfig,
@@ -59,7 +59,7 @@ function modeLabel(mode: PlannerMode) {
     estAge: mode === "fire" ? "Projected FI Age" : "Retirement Age",
     progress: mode === "fire" ? "FIRE Progress" : "Retirement Progress",
     coast: mode === "fire" ? "Coast FIRE" : "Coast Amount",
-    budgetAt: mode === "fire" ? "Monthly Budget at FIRE" : "Monthly Budget at Retirement",
+    budgetAt: "Retirement spending coverage",
     prefix: mode === "fire" ? "FIRE" : "Retirement",
   };
 }
@@ -116,16 +116,21 @@ function RadialProgress({ value, size = 80 }: { value: number; size?: number }) 
 
 // ─── Chart types & helpers ───────────────────────────────────────
 
+type ChartValueMode = "real" | "nominal";
+
 interface ChartPoint {
   label: string; // category axis for reliable ReferenceLine
   age: number;
-  portfolio: number;
+  portfolio: number; // start-of-age value used for visual comparison to required capital
+  portfolioStart: number;
+  portfolioEnd: number;
   target: number | undefined;
   withdrawal: number; // annual withdrawal (0 during accumulation)
   phase: string;
   annualContribution: number;
   annualIncome: number;
   annualExpenses: number;
+  netChange: number;
 }
 
 const CHART_COLORS = {
@@ -136,20 +141,23 @@ function RetirementChartTooltip({
   active,
   payload,
   currency,
+  valueMode,
 }: {
   active?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any[];
   currency: string;
+  valueMode: ChartValueMode;
 }) {
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload as ChartPoint | undefined;
   if (!point) return null;
+  const valueLabel = valueMode === "real" ? "today's money" : "nominal money";
 
   return (
     <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2.5 shadow-md">
       <p className="text-muted-foreground text-xs font-medium">
-        Age {point.age} · {point.phase === "fire" ? "Retirement" : "Accumulation"}
+        Age {point.age} · {point.phase === "fire" ? "Retirement" : "Accumulation"} · {valueLabel}
       </p>
       <div className="flex items-center justify-between space-x-4">
         <div className="flex items-center space-x-1.5">
@@ -157,17 +165,23 @@ function RetirementChartTooltip({
             className="block h-2 w-2 rounded-full"
             style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
           />
-          <span className="text-muted-foreground text-xs">Portfolio:</span>
+          <span className="text-muted-foreground text-xs">Start portfolio:</span>
         </div>
         <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.portfolio, currency)}
+          {fmtCompact(point.portfolioStart, currency)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between space-x-4">
+        <span className="text-muted-foreground text-xs">End portfolio:</span>
+        <span className="text-xs font-semibold tabular-nums">
+          {fmtCompact(point.portfolioEnd, currency)}
         </span>
       </div>
       {point.target != null && (
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-1.5">
             <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
-            <span className="text-muted-foreground text-xs">Target:</span>
+            <span className="text-muted-foreground text-xs">Required path:</span>
           </div>
           <span className="text-xs font-semibold tabular-nums">
             {fmtCompact(point.target, currency)}
@@ -191,7 +205,7 @@ function RetirementChartTooltip({
         </div>
       )}
       <div className="flex items-center justify-between space-x-4">
-        <span className="text-muted-foreground text-xs">Expenses/yr:</span>
+        <span className="text-muted-foreground text-xs">Planned spending/yr:</span>
         <span className="text-xs font-semibold tabular-nums">
           {fmtCompact(point.annualExpenses, currency)}
         </span>
@@ -200,13 +214,24 @@ function RetirementChartTooltip({
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-1.5">
             <span className="text-destructive block h-2 w-2 rounded-full" />
-            <span className="text-muted-foreground text-xs">Withdrawal/yr:</span>
+            <span className="text-muted-foreground text-xs">Portfolio withdrawal/yr:</span>
           </div>
           <span className="text-destructive text-xs font-semibold tabular-nums">
             -{fmtCompact(point.withdrawal, currency)}
           </span>
         </div>
       )}
+      <div className="flex items-center justify-between space-x-4 border-t pt-1">
+        <span className="text-muted-foreground text-xs">Net portfolio change:</span>
+        <span
+          className={`text-xs font-semibold tabular-nums ${
+            point.netChange >= 0 ? "text-green-600" : "text-red-500"
+          }`}
+        >
+          {point.netChange >= 0 ? "+" : "-"}
+          {fmtCompact(Math.abs(point.netChange), currency)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -216,11 +241,13 @@ function RetirementChart({
   currency,
   retirementAge,
   projectedFireAge,
+  valueMode,
 }: {
   data: ChartPoint[];
   currency: string;
   retirementAge: number;
   projectedFireAge?: number | null;
+  valueMode: ChartValueMode;
 }) {
   if (data.length < 2) return null;
 
@@ -249,7 +276,9 @@ function RetirementChart({
             tickLine={false}
           />
           <YAxis hide domain={[0, "auto"]} />
-          <RTooltip content={<RetirementChartTooltip currency={currency} />} />
+          <RTooltip
+            content={<RetirementChartTooltip currency={currency} valueMode={valueMode} />}
+          />
 
           {/* Projected FI age vertical line — render FIRST so retirement line draws on top */}
           {showProjectedFiLine && (
@@ -288,7 +317,7 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="target"
-            name="What you'll need"
+            name="Required capital path"
             stroke="#888"
             strokeWidth={1.5}
             strokeDasharray="6 4"
@@ -301,7 +330,7 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="portfolio"
-            name="What you'll have"
+            name="Projected portfolio"
             stroke={CHART_COLORS.portfolio.stroke}
             strokeWidth={1.5}
             fill="url(#retirementPortfolio)"
@@ -320,7 +349,27 @@ function RetirementChart({
 // ─── Sidebar Configurator ─────────────────────────────────────────────────────
 
 /** Read-only label:value row */
-function ConfigRow({ label, children }: { label: string; children: React.ReactNode }) {
+function InfoLabel({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span>{label}</span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+            aria-label={`More info about ${label}`}
+          >
+            <Icons.Info className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-xs">{children}</TooltipContent>
+      </Tooltip>
+    </span>
+  );
+}
+
+function ConfigRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 py-1.5 first:pt-0 last:pb-0">
       <span className="text-muted-foreground text-xs">{label}</span>
@@ -338,7 +387,7 @@ function InlineField({
   min,
   suffix,
 }: {
-  label: string;
+  label: React.ReactNode;
   value: number;
   onChange: (v: number) => void;
   step?: number;
@@ -347,7 +396,7 @@ function InlineField({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <Label className="text-muted-foreground min-w-0 shrink text-xs font-normal">{label}</Label>
+      <div className="text-muted-foreground min-w-0 shrink text-xs font-normal">{label}</div>
       <div className="flex items-center gap-1">
         <Input
           type="number"
@@ -365,6 +414,10 @@ function InlineField({
 
 function fmtPct(v: number) {
   return (v * 100).toFixed(1) + "%";
+}
+
+function pctOfTotal(value: number, total: number) {
+  return total > 0 ? ((value / total) * 100).toFixed(0) + "%" : "0%";
 }
 
 /** A single sidebar card: title + edit button → read rows or edit fields */
@@ -401,10 +454,20 @@ function SidebarCard({
             </Button>
           </div>
         ) : (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onEdit}>
-            <Icons.Pencil className="mr-1.5 h-3 w-3" />
-            Edit
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={onEdit}
+                aria-label={`Edit ${title}`}
+              >
+                <Icons.Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="text-xs">Edit {title.toLowerCase()}</TooltipContent>
+          </Tooltip>
         )}
       </CardHeader>
       <CardContent>
@@ -523,6 +586,14 @@ function SidebarConfigurator({
 
   const budget = retirementOverview?.budgetBreakdown;
   const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
+  const taxBucketBalances = retirementOverview?.taxBucketBalances;
+  const taxBucketTotal = taxBucketBalances
+    ? taxBucketBalances.taxable + taxBucketBalances.taxDeferred + taxBucketBalances.taxFree
+    : 0;
+  const allTaxRatesZero =
+    (draft.tax?.taxableWithdrawalRate ?? 0) === 0 &&
+    (draft.tax?.taxDeferredWithdrawalRate ?? 0) === 0 &&
+    (draft.tax?.taxFreeWithdrawalRate ?? 0) === 0;
 
   const strategyLabels: Record<string, string> = {
     "constant-dollar": "Constant Dollar",
@@ -534,7 +605,7 @@ function SidebarConfigurator({
     <div className="space-y-4">
       {/* ── Plan ── */}
       <SidebarCard
-        title="Plan Details"
+        title="Retirement Timeline"
         editing={editingSection === "plan"}
         onEdit={() => setEditingSection("plan")}
         onSave={saveDraft}
@@ -543,12 +614,14 @@ function SidebarConfigurator({
         readContent={
           <div className="divide-border divide-y">
             <ConfigRow label="Current age">{draft.personal.currentAge}</ConfigRow>
-            <ConfigRow label="Retirement age">{draft.personal.targetRetirementAge}</ConfigRow>
-            <ConfigRow label="Planning horizon">{draft.personal.planningHorizonAge}</ConfigRow>
-            <ConfigRow label="Monthly contribution">
+            <ConfigRow label="Desired retirement age">
+              {draft.personal.targetRetirementAge}
+            </ConfigRow>
+            <ConfigRow label="Plan through age">{draft.personal.planningHorizonAge}</ConfigRow>
+            <ConfigRow label="Monthly contribution until retirement">
               {fmt(draft.investment.monthlyContribution, currency)}
             </ConfigRow>
-            <ConfigRow label="Withdrawal rate">
+            <ConfigRow label="Target withdrawal rate for sizing">
               {fmtPct(draft.withdrawal.safeWithdrawalRate)}
             </ConfigRow>
           </div>
@@ -562,26 +635,26 @@ function SidebarConfigurator({
               min={1}
             />
             <InlineField
-              label="Retirement age"
+              label="Desired retirement age"
               value={draft.personal.targetRetirementAge}
               onChange={(v) => setPersonal("targetRetirementAge", v)}
               min={draft.personal.currentAge + 1}
             />
             <InlineField
-              label="Planning horizon"
+              label="Plan through age"
               value={draft.personal.planningHorizonAge}
               onChange={(v) => setPersonal("planningHorizonAge", v)}
               min={draft.personal.targetRetirementAge + 1}
             />
             <InlineField
-              label="Monthly contribution"
+              label="Monthly contribution until retirement"
               value={draft.investment.monthlyContribution}
               onChange={(v) => setInvestment("monthlyContribution", v)}
               step={100}
               min={0}
             />
             <InlineField
-              label="Withdrawal rate"
+              label="Target withdrawal rate for sizing"
               value={+(draft.withdrawal.safeWithdrawalRate * 100).toFixed(2)}
               onChange={(v) => setWithdrawal("safeWithdrawalRate", v / 100)}
               step={0.1}
@@ -593,7 +666,7 @@ function SidebarConfigurator({
 
       {/* ── Expenses ── */}
       <SidebarCard
-        title="Expenses"
+        title="Retirement Spending"
         editing={editingSection === "expenses"}
         onEdit={() => setEditingSection("expenses")}
         onSave={saveDraft}
@@ -601,21 +674,21 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           <div className="divide-border divide-y">
-            <ConfigRow label="Living">
+            <ConfigRow label="Living spending">
               {fmt(draft.expenses.living.monthlyAmount, currency)}/mo
             </ConfigRow>
             {draft.expenses.healthcare.monthlyAmount > 0 && (
-              <ConfigRow label="Healthcare">
+              <ConfigRow label="Healthcare spending">
                 {fmt(draft.expenses.healthcare.monthlyAmount, currency)}/mo
               </ConfigRow>
             )}
             {draft.expenses.housing && (
-              <ConfigRow label="Housing">
+              <ConfigRow label="Housing spending">
                 {fmt(draft.expenses.housing.monthlyAmount, currency)}/mo
               </ConfigRow>
             )}
             {draft.expenses.discretionary && (
-              <ConfigRow label="Discretionary">
+              <ConfigRow label="Discretionary spending">
                 {fmt(draft.expenses.discretionary.monthlyAmount, currency)}/mo
               </ConfigRow>
             )}
@@ -624,14 +697,14 @@ function SidebarConfigurator({
         editContent={
           <>
             <InlineField
-              label="Living"
+              label="Living spending"
               value={draft.expenses.living.monthlyAmount}
               onChange={(v) => setExpense("living", { monthlyAmount: v })}
               step={100}
               suffix="/mo"
             />
             <InlineField
-              label="Healthcare"
+              label="Healthcare spending"
               value={draft.expenses.healthcare.monthlyAmount}
               onChange={(v) => setExpense("healthcare", { monthlyAmount: v })}
               step={50}
@@ -641,7 +714,7 @@ function SidebarConfigurator({
               <div className="flex items-center gap-1">
                 <div className="flex-1">
                   <InlineField
-                    label="Housing"
+                    label="Housing spending"
                     value={draft.expenses.housing.monthlyAmount}
                     onChange={(v) => setExpense("housing", { monthlyAmount: v })}
                     step={100}
@@ -662,7 +735,7 @@ function SidebarConfigurator({
               <div className="flex items-center gap-1">
                 <div className="flex-1">
                   <InlineField
-                    label="Discretionary"
+                    label="Discretionary spending"
                     value={draft.expenses.discretionary.monthlyAmount}
                     onChange={(v) => setExpense("discretionary", { monthlyAmount: v })}
                     step={50}
@@ -690,7 +763,7 @@ function SidebarConfigurator({
                     }))
                   }
                 >
-                  + Housing
+                  + Housing spending
                 </button>
               )}
               {!draft.expenses.discretionary && (
@@ -703,7 +776,7 @@ function SidebarConfigurator({
                     }))
                   }
                 >
-                  + Discretionary
+                  + Discretionary spending
                 </button>
               )}
             </div>
@@ -713,7 +786,7 @@ function SidebarConfigurator({
 
       {/* ── Income Streams ── */}
       <SidebarCard
-        title="Income Streams"
+        title="Retirement Income"
         editing={editingSection === "income"}
         onEdit={() => setEditingSection("income")}
         onSave={saveDraft}
@@ -729,7 +802,7 @@ function SidebarConfigurator({
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">No income streams configured</p>
+            <p className="text-muted-foreground text-xs">No retirement income configured</p>
           )
         }
         editContent={
@@ -753,7 +826,7 @@ function SidebarConfigurator({
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                   {s.streamType !== "dc" && (
                     <InlineField
-                      label="Amount"
+                      label="Monthly income"
                       value={s.monthlyAmount ?? 0}
                       onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
                       suffix="/mo"
@@ -772,7 +845,7 @@ function SidebarConfigurator({
               className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-[11px] transition-colors"
               onClick={addStream}
             >
-              <Icons.Plus className="h-3 w-3" /> Add stream
+              <Icons.Plus className="h-3 w-3" /> Add retirement income
             </button>
           </>
         }
@@ -780,7 +853,7 @@ function SidebarConfigurator({
 
       {/* ── Investment ── */}
       <SidebarCard
-        title="Investment Assumptions"
+        title="Portfolio Assumptions"
         editing={editingSection === "investment"}
         onEdit={() => setEditingSection("investment")}
         onSave={saveDraft}
@@ -788,15 +861,15 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           <div className="divide-border divide-y">
-            <ConfigRow label="Expected return">
+            <ConfigRow label="Expected annual return">
               {fmtPct(draft.investment.expectedAnnualReturn)}
             </ConfigRow>
-            <ConfigRow label="Volatility">
+            <ConfigRow label="Annual volatility">
               {fmtPct(draft.investment.expectedReturnStdDev)}
             </ConfigRow>
             <ConfigRow label="Inflation">{fmtPct(draft.investment.inflationRate)}</ConfigRow>
             {draft.investment.contributionGrowthRate > 0 && (
-              <ConfigRow label="Contribution growth">
+              <ConfigRow label="Contribution growth per year">
                 {fmtPct(draft.investment.contributionGrowthRate)}
               </ConfigRow>
             )}
@@ -805,14 +878,14 @@ function SidebarConfigurator({
         editContent={
           <>
             <InlineField
-              label="Expected return"
+              label="Expected annual return"
               value={+(draft.investment.expectedAnnualReturn * 100).toFixed(2)}
               onChange={(v) => setInvestment("expectedAnnualReturn", v / 100)}
               step={0.1}
               suffix="%"
             />
             <InlineField
-              label="Volatility"
+              label="Annual volatility"
               value={+(draft.investment.expectedReturnStdDev * 100).toFixed(2)}
               onChange={(v) => setInvestment("expectedReturnStdDev", v / 100)}
               step={0.1}
@@ -826,7 +899,7 @@ function SidebarConfigurator({
               suffix="%"
             />
             <InlineField
-              label="Contribution growth"
+              label="Contribution growth per year"
               value={+(draft.investment.contributionGrowthRate * 100).toFixed(2)}
               onChange={(v) => setInvestment("contributionGrowthRate", v / 100)}
               step={0.1}
@@ -838,14 +911,14 @@ function SidebarConfigurator({
 
       {/* ── Withdrawal ── */}
       <SidebarCard
-        title="Withdrawal Policy"
+        title="Retirement Withdrawal Rule"
         editing={editingSection === "withdrawal"}
         onEdit={() => setEditingSection("withdrawal")}
         onSave={saveDraft}
         onCancel={cancelEdit}
         dirty={dirty}
         readContent={
-          <ConfigRow label="Strategy">
+          <ConfigRow label="Withdrawal strategy">
             {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
           </ConfigRow>
         }
@@ -902,44 +975,163 @@ function SidebarConfigurator({
 
       {/* ── Tax ── */}
       <SidebarCard
-        title="Tax Profile"
+        title="Withdrawal Taxes"
         editing={editingSection === "tax"}
         onEdit={() => setEditingSection("tax")}
         onSave={saveDraft}
         onCancel={cancelEdit}
         dirty={dirty}
         readContent={
-          <div className="divide-border divide-y">
-            <ConfigRow label="Taxable">{fmtPct(draft.tax?.taxableWithdrawalRate ?? 0)}</ConfigRow>
-            <ConfigRow label="Tax-deferred">
-              {fmtPct(draft.tax?.taxDeferredWithdrawalRate ?? 0)}
-            </ConfigRow>
-            <ConfigRow label="Tax-free">{fmtPct(draft.tax?.taxFreeWithdrawalRate ?? 0)}</ConfigRow>
-            {effectiveTaxRate > 0 && (
-              <ConfigRow label="Effective blended">
-                {(effectiveTaxRate * 100).toFixed(1)}%
+          <div className="space-y-3">
+            <div className="divide-border divide-y">
+              <ConfigRow
+                label={
+                  <InfoLabel label="Taxable account rate">
+                    Effective tax rate applied when the planner withdraws from regular taxable or
+                    non-registered accounts. Higher rates increase gross withdrawals and can delay
+                    FI.
+                  </InfoLabel>
+                }
+              >
+                {fmtPct(draft.tax?.taxableWithdrawalRate ?? 0)}
               </ConfigRow>
+              <ConfigRow
+                label={
+                  <InfoLabel label="Tax-deferred account rate">
+                    Effective tax rate applied to RRSP, IRA, pension, or similar tax-deferred
+                    withdrawals. The planner grosses up withdrawals so spending is funded after
+                    taxes.
+                  </InfoLabel>
+                }
+              >
+                {fmtPct(draft.tax?.taxDeferredWithdrawalRate ?? 0)}
+              </ConfigRow>
+              <ConfigRow
+                label={
+                  <InfoLabel label="Tax-free account rate">
+                    Effective tax rate applied to TFSA, Roth, or similar tax-free withdrawals. This
+                    is usually 0%.
+                  </InfoLabel>
+                }
+              >
+                {fmtPct(draft.tax?.taxFreeWithdrawalRate ?? 0)}
+              </ConfigRow>
+              {effectiveTaxRate > 0 && (
+                <ConfigRow
+                  label={
+                    <InfoLabel label="Blended tax drag">
+                      The effective tax rate for the retirement withdrawal mix at the selected FI
+                      age, based on account buckets and withdrawal order.
+                    </InfoLabel>
+                  }
+                >
+                  {(effectiveTaxRate * 100).toFixed(1)}%
+                </ConfigRow>
+              )}
+            </div>
+
+            {taxBucketBalances && taxBucketTotal > 0 && (
+              <div className="border-t pt-3">
+                <p className="text-muted-foreground mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                  Account buckets
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-foreground rounded-full transition-colors"
+                        aria-label="More info about account tax buckets"
+                      >
+                        <Icons.Info className="h-3 w-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      Value-weighted account shares used by the withdrawal engine. These come from
+                      the Account Shares section, not from the tax rate fields above.
+                    </TooltipContent>
+                  </Tooltip>
+                </p>
+                <div className="divide-border divide-y">
+                  <ConfigRow
+                    label={
+                      <InfoLabel label="Taxable bucket">
+                        Portion of the retirement portfolio assigned to taxable or non-registered
+                        accounts.
+                      </InfoLabel>
+                    }
+                  >
+                    {fmt(taxBucketBalances.taxable, currency)}{" "}
+                    <span className="text-muted-foreground ml-1 font-normal">
+                      {pctOfTotal(taxBucketBalances.taxable, taxBucketTotal)}
+                    </span>
+                  </ConfigRow>
+                  <ConfigRow
+                    label={
+                      <InfoLabel label="Tax-deferred bucket">
+                        Portion assigned to tax-deferred accounts such as RRSP, IRA, or pension-like
+                        accounts.
+                      </InfoLabel>
+                    }
+                  >
+                    {fmt(taxBucketBalances.taxDeferred, currency)}{" "}
+                    <span className="text-muted-foreground ml-1 font-normal">
+                      {pctOfTotal(taxBucketBalances.taxDeferred, taxBucketTotal)}
+                    </span>
+                  </ConfigRow>
+                  <ConfigRow
+                    label={
+                      <InfoLabel label="Tax-free bucket">
+                        Portion assigned to tax-free accounts such as TFSA or Roth-style accounts.
+                      </InfoLabel>
+                    }
+                  >
+                    {fmt(taxBucketBalances.taxFree, currency)}{" "}
+                    <span className="text-muted-foreground ml-1 font-normal">
+                      {pctOfTotal(taxBucketBalances.taxFree, taxBucketTotal)}
+                    </span>
+                  </ConfigRow>
+                </div>
+              </div>
+            )}
+
+            {allTaxRatesZero && taxBucketTotal > 0 && (
+              <p className="text-muted-foreground text-[10px]">
+                Account bucket tags are applied, but 0% withdrawal rates mean no tax drag is
+                modeled.
+              </p>
             )}
           </div>
         }
         editContent={
           <>
             <InlineField
-              label="Taxable rate"
+              label={
+                <InfoLabel label="Taxable account rate">
+                  Effective tax rate applied when withdrawing from taxable or non-registered
+                  accounts.
+                </InfoLabel>
+              }
               value={+((draft.tax?.taxableWithdrawalRate ?? 0) * 100).toFixed(1)}
               onChange={(v) => setTax("taxableWithdrawalRate", v / 100)}
               step={0.5}
               suffix="%"
             />
             <InlineField
-              label="Tax-deferred rate"
+              label={
+                <InfoLabel label="Tax-deferred account rate">
+                  Effective tax rate applied to RRSP, IRA, pension, or similar withdrawals.
+                </InfoLabel>
+              }
               value={+((draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100).toFixed(1)}
               onChange={(v) => setTax("taxDeferredWithdrawalRate", v / 100)}
               step={0.5}
               suffix="%"
             />
             <InlineField
-              label="Tax-free rate"
+              label={
+                <InfoLabel label="Tax-free account rate">
+                  Effective tax rate applied to TFSA, Roth, or similar withdrawals. Usually 0%.
+                </InfoLabel>
+              }
               value={+((draft.tax?.taxFreeWithdrawalRate ?? 0) * 100).toFixed(1)}
               onChange={(v) => setTax("taxFreeWithdrawalRate", v / 100)}
               step={0.5}
@@ -1008,21 +1200,39 @@ export default function DashboardPage({
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
   );
 
+  const [chartValueMode, setChartValueMode] = useState<ChartValueMode>("real");
+
   // Chart data from backend trajectory
   const chartData: ChartPoint[] = useMemo(() => {
     if (!retirementOverview?.trajectory?.length) return [];
+    const inflationBase = Math.max(1 + plan.investment.inflationRate, 0.01);
+    const scaleForAge = (value: number, age: number) => {
+      if (chartValueMode === "nominal") return value;
+      const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+      return value / Math.pow(inflationBase, yearsFromNow);
+    };
     return retirementOverview.trajectory.map((pt) => ({
       label: `Age ${pt.age}`,
       age: pt.age,
-      portfolio: Math.max(0, pt.portfolioEnd),
-      target: pt.requiredCapital,
-      withdrawal: pt.netWithdrawalFromPortfolio,
+      portfolio: scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
+      portfolioStart: scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
+      portfolioEnd: scaleForAge(Math.max(0, pt.portfolioEnd), pt.age),
+      target: scaleForAge(pt.requiredCapital, pt.age),
+      withdrawal: scaleForAge(pt.netWithdrawalFromPortfolio, pt.age),
       phase: pt.phase,
-      annualContribution: pt.annualContribution,
-      annualIncome: pt.annualIncome,
-      annualExpenses: pt.annualExpenses,
+      annualContribution: scaleForAge(pt.annualContribution, pt.age),
+      annualIncome: scaleForAge(pt.annualIncome, pt.age),
+      annualExpenses: scaleForAge(pt.plannedExpenses ?? pt.annualExpenses, pt.age),
+      netChange:
+        scaleForAge(Math.max(0, pt.portfolioEnd), pt.age) -
+        scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
     }));
-  }, [retirementOverview?.trajectory]);
+  }, [
+    chartValueMode,
+    plan.investment.inflationRate,
+    plan.personal.currentAge,
+    retirementOverview?.trajectory,
+  ]);
 
   // Year-by-year table: all years from backend trajectory
   const allSnapshots: RetirementTrajectoryPoint[] = useMemo(() => {
@@ -1034,6 +1244,24 @@ export default function DashboardPage({
   const [tablePage, setTablePage] = useState(0);
   const totalPages = Math.ceil(allSnapshots.length / PAGE_SIZE);
   const pagedSnapshots = allSnapshots.slice(tablePage * PAGE_SIZE, (tablePage + 1) * PAGE_SIZE);
+
+  const isFinanciallyIndependent = portfolioNow >= netFireTarget && netFireTarget > 0;
+  const yearsFromDesired =
+    effectiveFiAge != null ? effectiveFiAge - plan.personal.targetRetirementAge : null;
+  const heroHealth =
+    isFinanciallyIndependent ||
+    (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge)
+      ? "on_track"
+      : effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge + 3
+        ? "at_risk"
+        : "off_track";
+  const heroGuidance = isFinanciallyIndependent
+    ? "You have reached financial independence with the current assumptions."
+    : yearsFromDesired != null && yearsFromDesired > 0
+      ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
+      : effectiveFiAge == null && netFireTarget > 0
+        ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
+        : null;
 
   if (isLoading || !retirementOverview) {
     return (
@@ -1055,27 +1283,6 @@ export default function DashboardPage({
 
   return (
     <div className="space-y-6">
-      {/* Status banner */}
-      {portfolioNow >= netFireTarget && netFireTarget > 0 ? (
-        <div className="rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-700 dark:bg-green-950/30 dark:text-green-300">
-          <strong>Congratulations!</strong> You've reached financial independence!
-        </div>
-      ) : effectiveFiAge != null && effectiveFiAge > plan.personal.targetRetirementAge ? (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-          <strong>
-            Projected FI is {effectiveFiAge - plan.personal.targetRetirementAge} year
-            {effectiveFiAge - plan.personal.targetRetirementAge !== 1 ? "s" : ""} after your desired
-            age.
-          </strong>{" "}
-          Consider: increase contributions, extend target age, or reduce expenses.
-        </div>
-      ) : effectiveFiAge == null && netFireTarget > 0 ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300">
-          <strong>{L.target} not reachable</strong> by planning horizon age{" "}
-          {plan.personal.planningHorizonAge}.
-        </div>
-      ) : null}
-
       {/* Two-column layout: main + sidebar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Main column ── */}
@@ -1091,7 +1298,7 @@ export default function DashboardPage({
                     <p className="text-3xl font-bold tabular-nums">
                       {effectiveFiAge != null
                         ? `Age ${effectiveFiAge}`
-                        : portfolioNow >= netFireTarget && netFireTarget > 0
+                        : isFinanciallyIndependent
                           ? "FI Reached"
                           : "Not reachable"}
                     </p>
@@ -1102,7 +1309,7 @@ export default function DashboardPage({
                       )}
                     </p>
                     <p className="text-sm font-medium">
-                      {portfolioNow >= netFireTarget && netFireTarget > 0 ? (
+                      {isFinanciallyIndependent ? (
                         <span className="text-green-600">Financially independent</span>
                       ) : effectiveFiAge != null ? (
                         effectiveFiAge < plan.personal.targetRetirementAge ? (
@@ -1130,28 +1337,19 @@ export default function DashboardPage({
                     </p>
                   </div>
                 </div>
-                {(() => {
-                  const health =
-                    effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge
-                      ? "on_track"
-                      : effectiveFiAge != null &&
-                          effectiveFiAge <= plan.personal.targetRetirementAge + 3
-                        ? "at_risk"
-                        : "off_track";
-                  return health === "on_track" ? (
-                    <Badge variant="default" className="bg-green-600 text-[10px]">
-                      On Track
-                    </Badge>
-                  ) : health === "at_risk" ? (
-                    <Badge variant="secondary" className="text-[10px] text-amber-600">
-                      At Risk
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="text-[10px]">
-                      Off Track
-                    </Badge>
-                  );
-                })()}
+                {heroHealth === "on_track" ? (
+                  <Badge variant="default" className="bg-green-600 text-[10px]">
+                    On Track
+                  </Badge>
+                ) : heroHealth === "at_risk" ? (
+                  <Badge variant="secondary" className="text-[10px] text-amber-600">
+                    At Risk
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-[10px]">
+                    Off Track
+                  </Badge>
+                )}
               </div>
 
               {/* Progress bar */}
@@ -1162,22 +1360,23 @@ export default function DashboardPage({
                 />
                 <div className="mt-1.5 flex justify-between text-xs">
                   <span>
-                    Portfolio <span className="font-semibold">{fmt(portfolioNow, currency)}</span>
+                    Included portfolio{" "}
+                    <span className="font-semibold">{fmt(portfolioNow, currency)}</span>
                   </span>
                   <span>
                     <Tooltip>
                       <TooltipTrigger className="cursor-help underline decoration-dotted">
-                        {L.target}
+                        Retire-today target
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
                         <p>
-                          <strong>Net target</strong> — portfolio needed after subtracting income
-                          streams active at retirement.
+                          <strong>Retire-today target</strong> - capital needed if the retirement
+                          phase started now, after subtracting income streams active now.
                         </p>
                         {netFireTarget < fireTarget && (
                           <p className="mt-1">
-                            Gross target is {fmt(fireTarget, currency)}. Income offsets{" "}
-                            {fmt(fireTarget - netFireTarget, currency)}.
+                            Unadjusted target is {fmt(fireTarget, currency)}. Schedule and income
+                            adjustments reduce it by {fmt(fireTarget - netFireTarget, currency)}.
                           </p>
                         )}
                       </TooltipContent>
@@ -1190,8 +1389,11 @@ export default function DashboardPage({
               {/* Key metrics grid — context-aware */}
               {(() => {
                 const onTrack =
-                  effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge;
+                  isFinanciallyIndependent ||
+                  (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge);
                 const currentGap = netFireTarget - portfolioNow;
+                const goalShortfall = retirementOverview.shortfallAtGoalAge;
+                const goalSurplus = retirementOverview.surplusAtGoalAge;
                 return (
                   <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 border-t pt-5 sm:grid-cols-3">
                     {plannerMode === "fire" && (
@@ -1214,7 +1416,7 @@ export default function DashboardPage({
                     {onTrack ? (
                       <>
                         <div>
-                          <p className="text-muted-foreground text-xs">Current gap</p>
+                          <p className="text-muted-foreground text-xs">Retire-today gap</p>
                           <p className="mt-0.5 text-base font-semibold tabular-nums">
                             {currentGap > 0 ? (
                               fmt(currentGap, currency)
@@ -1226,7 +1428,7 @@ export default function DashboardPage({
                         <div>
                           <p className="text-muted-foreground text-xs">Projected FI</p>
                           <p className="mt-0.5 text-base font-semibold tabular-nums text-green-600">
-                            Age {effectiveFiAge}
+                            {effectiveFiAge != null ? `Age ${effectiveFiAge}` : "Reached"}
                           </p>
                         </div>
                       </>
@@ -1234,11 +1436,13 @@ export default function DashboardPage({
                       <>
                         <div>
                           <p className="text-muted-foreground text-xs">
-                            {currentGap > 0 ? "Shortfall" : "Surplus"}
+                            {goalShortfall > 0
+                              ? `Shortfall at age ${plan.personal.targetRetirementAge}`
+                              : `Surplus at age ${plan.personal.targetRetirementAge}`}
                           </p>
                           <p className="mt-0.5 text-base font-semibold tabular-nums">
-                            <span className={currentGap <= 0 ? "text-green-600" : "text-red-500"}>
-                              {fmt(Math.abs(currentGap), currency)}
+                            <span className={goalShortfall > 0 ? "text-red-500" : "text-green-600"}>
+                              {fmt(goalShortfall > 0 ? goalShortfall : goalSurplus, currency)}
                             </span>
                           </p>
                         </div>
@@ -1258,6 +1462,19 @@ export default function DashboardPage({
                   </div>
                 );
               })()}
+              {heroGuidance && (
+                <p
+                  className={`mt-4 border-t pt-4 text-xs ${
+                    heroHealth === "on_track"
+                      ? "text-green-700 dark:text-green-300"
+                      : heroHealth === "at_risk"
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-red-600 dark:text-red-300"
+                  }`}
+                >
+                  {heroGuidance}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -1265,19 +1482,43 @@ export default function DashboardPage({
           {chartData.length > 2 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Projected Retirement Savings</CardTitle>
-                <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
-                    />
-                    What you'll have
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="inline-block h-0 w-3 border-b border-dashed border-[#888]" />
-                    What you'll need
-                  </span>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-sm">Retirement Portfolio Projection</CardTitle>
+                    <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2 w-2 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
+                        />
+                        Projected portfolio
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block h-0 w-3 border-b border-dashed border-[#888]" />
+                        Required capital path
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 flex rounded-md border p-0.5">
+                    <Button
+                      type="button"
+                      variant={chartValueMode === "real" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setChartValueMode("real")}
+                    >
+                      Today's value
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={chartValueMode === "nominal" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setChartValueMode("nominal")}
+                    >
+                      Nominal
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1286,23 +1527,30 @@ export default function DashboardPage({
                   currency={currency}
                   retirementAge={plan.personal.targetRetirementAge}
                   projectedFireAge={effectiveFiAge}
+                  valueMode={chartValueMode}
                 />
+                <p className="text-muted-foreground mt-2 text-xs">
+                  The portfolio line uses start-of-age balances to match the FI decision. In
+                  constant-dollar mode, withdrawals fund expenses after income streams; the
+                  portfolio can still grow when returns exceed withdrawals.
+                </p>
               </CardContent>
             </Card>
           )}
 
-          {/* Monthly Budget at Retirement */}
+          {/* Retirement spending coverage */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">{L.budgetAt}</CardTitle>
               <p className="text-muted-foreground text-xs">
-                How your {fmt(totalBudget, currency)}/mo is funded at each phase
+                How your planned {fmt(totalBudget, currency)}/mo retirement spending is covered at
+                the selected retirement age.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <p className="mb-2 text-xs font-medium">
-                  At age {fireAgeForBudget} — {fmt(totalBudget, currency)}/mo
+                  At age {fireAgeForBudget} - {fmt(totalBudget, currency)}/mo planned spending
                 </p>
                 <div className="mb-3 flex h-5 w-full overflow-hidden rounded-full">
                   {budgetStreams.map((s, i) => {
@@ -1331,14 +1579,14 @@ export default function DashboardPage({
                 <div className="space-y-1">
                   {/* Expense buckets breakdown */}
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Living expenses</span>
+                    <span className="text-muted-foreground">Living spending</span>
                     <span className="text-muted-foreground">
                       {fmt(budget?.monthlyLivingExpenses ?? 0, currency)}/mo
                     </span>
                   </div>
                   {healthcareMonthly > 0 && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Healthcare</span>
+                      <span className="text-muted-foreground">Healthcare spending</span>
                       <span className="text-muted-foreground">
                         {fmt(healthcareMonthly, currency)}/mo
                       </span>
@@ -1346,7 +1594,7 @@ export default function DashboardPage({
                   )}
                   {housingMonthly > 0 && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Housing</span>
+                      <span className="text-muted-foreground">Housing spending</span>
                       <span className="text-muted-foreground">
                         {fmt(housingMonthly, currency)}/mo
                       </span>
@@ -1354,7 +1602,7 @@ export default function DashboardPage({
                   )}
                   {discretionaryMonthly > 0 && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Discretionary</span>
+                      <span className="text-muted-foreground">Discretionary spending</span>
                       <span className="text-muted-foreground">
                         {fmt(discretionaryMonthly, currency)}/mo
                       </span>
@@ -1409,8 +1657,8 @@ export default function DashboardPage({
 
               {budgetStreams.length === 0 && (
                 <p className="text-muted-foreground text-xs">
-                  No income streams configured. Add pension, part-time work, or annuity streams in
-                  Settings to see how they reduce your portfolio withdrawal.
+                  No retirement income configured. Add pension, part-time work, or annuity streams
+                  in the Plan tab to see how they reduce your portfolio withdrawal.
                 </p>
               )}
             </CardContent>
@@ -1462,12 +1710,12 @@ export default function DashboardPage({
                       <th className="pb-2 text-left">Age</th>
                       <th className="pb-2 text-left">Year</th>
                       <th className="pb-2 text-left">Phase</th>
-                      <th className="pb-2 text-right">Portfolio</th>
+                      <th className="pb-2 text-right">End Portfolio</th>
                       {hasPensionFunds && <th className="pb-2 text-right">Pension Fund</th>}
                       <th className="pb-2 text-right">Contribution/yr</th>
-                      <th className="pb-2 text-right">Income/yr</th>
-                      <th className="pb-2 text-right">Expenses/yr</th>
-                      <th className="pb-2 text-right">Net Withdrawal/yr</th>
+                      <th className="pb-2 text-right">Retirement income/yr</th>
+                      <th className="pb-2 text-right">Planned spending/yr</th>
+                      <th className="pb-2 text-right">Portfolio withdrawal/yr</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1508,7 +1756,9 @@ export default function DashboardPage({
                             {snap.annualIncome > 0 ? fmt(snap.annualIncome, currency) : "—"}
                           </td>
                           <td className="py-1.5 text-right">
-                            {snap.annualExpenses > 0 ? fmt(snap.annualExpenses, currency) : "—"}
+                            {(snap.plannedExpenses ?? snap.annualExpenses) > 0
+                              ? fmt(snap.plannedExpenses ?? snap.annualExpenses, currency)
+                              : "—"}
                           </td>
                           <td className="py-1.5 text-right">
                             {snap.netWithdrawalFromPortfolio > 0

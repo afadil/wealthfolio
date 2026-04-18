@@ -184,7 +184,7 @@ pub async fn initialize_context(
         )
         .with_event_sink(domain_event_sink.clone()),
     );
-    let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
+    let goal_service = Arc::new(GoalService::new(goal_repo.clone(), account_service.clone()));
     let limits_service = Arc::new(ContributionLimitService::new_with_timezone(
         fx_service.clone(),
         limit_repository.clone(),
