@@ -17,7 +17,6 @@ import {
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
-import { logger } from "@/adapters";
 import { Link } from "react-router-dom";
 import { useSettingsContext } from "@/lib/settings-provider";
 
@@ -231,16 +230,10 @@ function ImportCsvToolUIContentImpl({
   // (the tool no longer echoes it back to avoid double-storing in the DB).
   const csvContent = (args as Record<string, unknown>)?.csvContent as string | undefined;
 
-  const { mapping, errorMessage: normalizeError } = useMemo(() => {
-    const normalized = normalizeMappingResult(result as RawResult, csvContent ?? "");
-    if (!normalized.mapping && result && status?.type !== "running") {
-      logger.warn(
-        "[ImportCsvToolUI] Failed to normalize result:",
-        JSON.stringify(result).slice(0, 500),
-      );
-    }
-    return normalized;
-  }, [result, status?.type, csvContent]);
+  const { mapping, errorMessage: normalizeError } = useMemo(
+    () => normalizeMappingResult(result as RawResult, csvContent ?? ""),
+    [result, csvContent],
+  );
 
   // Track which tool calls went through "running" status in this page
   // session. On page reload the Set resets — we won't find the toolCallId,
@@ -368,8 +361,6 @@ export const ImportCsvToolUI = makeAssistantToolUI<ImportCsvArgs, unknown>({
   toolName: "import_csv",
   render: (props) => {
     // Key on toolCallId so React unmounts/remounts when switching threads.
-    // Without this, refs (wasRunningRef, initializedRef) carry stale state
-    // from the previous thread's tool call.
     return <ImportCsvToolUIContent key={props.toolCallId} {...props} />;
   },
 });

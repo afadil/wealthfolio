@@ -534,21 +534,11 @@ export function useChatImportSession({
         // AI's field mappings don't match the parsed headers AND skipTopRows
         // is set, retry with skipTopRows: 0.
         if (hits < 2 && (baseParseConfig.skipTopRows ?? 0) > 0) {
-          logger.info(
-            `[ChatImport] Field-mapping mismatch with skipTopRows=${baseParseConfig.skipTopRows}. ` +
-              `Retrying with skipTopRows=0`,
-          );
           parseConfig = { ...baseParseConfig, skipTopRows: 0 };
           parsed = await parseCsv(csvStringAsFile(mapping.csvContent), parseConfig);
           if (cancelled) return;
           hits = countFieldMappingHits(aiFieldMappings, parsed.headers);
         }
-
-        logger.info(
-          `[ChatImport] parse_csv: ${parsed.headers.length} headers, ${parsed.rows.length} rows, ` +
-            `hits=${hits}/${CORE_FIELDS.length}, ` +
-            `headers=${JSON.stringify(parsed.headers.slice(0, 6))}`,
-        );
 
         const effectiveFieldMappings: Record<string, string | string[]> =
           hits >= 2
