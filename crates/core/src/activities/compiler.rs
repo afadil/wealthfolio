@@ -93,7 +93,13 @@ impl DefaultActivityCompiler {
         dividend_leg.subtype = None; // Clear subtype for calculator
         dividend_leg.quantity = None;
         dividend_leg.unit_price = None;
-        // amount stays as-is for income tracking
+        // if amount is missing, derive from qty * unit_price
+        // if provided, amount stays as-is for income tracking
+        if dividend_leg.amount.is_none() {
+            let qty = activity.quantity.unwrap_or(Decimal::ZERO);
+            let price = activity.unit_price.unwrap_or(Decimal::ZERO);
+            dividend_leg.amount = Some(qty * price);
+        }
 
         // Leg 2: BUY (share acquisition)
         let mut buy_leg = activity.clone();
@@ -328,6 +334,24 @@ mod tests {
             assert_eq!(leg.asset_id, Some("MSFT".to_string()));
             assert_eq!(leg.currency, "EUR");
         }
+    }
+
+    #[test]
+    fn test_compile_drip_derives_amount_when_missing() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
+        activity.quantity = Some(dec!(5));
+        activity.unit_price = Some(dec!(20));
+        activity.amount = None; // not provided in CSV
+
+        let result = compiler.compile(&activity).unwrap();
+
+        // Dividend leg  amount = qty * price so that it offsets the BUY
+        assert_eq!(result[0].amount, Some(dec!(100)));
+        // BUY leg still has no amount (computed by calculator)
+        assert!(result[1].amount.is_none());
     }
 
     #[test]
