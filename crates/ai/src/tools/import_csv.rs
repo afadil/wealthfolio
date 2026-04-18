@@ -582,6 +582,15 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             args.delimiter
         );
 
+        // Reject empty CSV early with a clear message the LLM can relay.
+        if args.csv_content.trim().is_empty() {
+            return Err(AiError::ToolExecutionFailed(
+                "No CSV content provided. The user needs to attach the CSV file again — \
+                 file content from previous messages is not available in follow-up turns."
+                    .to_string(),
+            ));
+        }
+
         // Get available accounts
         let accounts = self
             .env
