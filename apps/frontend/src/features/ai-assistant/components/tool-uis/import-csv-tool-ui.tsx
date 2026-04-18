@@ -46,6 +46,17 @@ interface NormalizeResult {
   errorMessage: string | null;
 }
 
+/** Strip rig's error chain prefix ("Toolset error: ToolCallError: ...") to
+ *  surface just the actionable message. */
+function cleanErrorMessage(raw: string): string {
+  return raw
+    .replace(/^Toolset error:\s*/i, "")
+    .replace(/ToolCallError:\s*/g, "")
+    .replace(/^Tool execution failed:\s*/i, "")
+    .replace(/^JsonError:\s*/i, "")
+    .trim();
+}
+
 function normalizeMappingResult(raw: RawResult, csvContent: string): NormalizeResult {
   if (!raw) return { mapping: null, errorMessage: null };
 
@@ -54,18 +65,18 @@ function normalizeMappingResult(raw: RawResult, csvContent: string): NormalizeRe
     try {
       return normalizeMappingResult(JSON.parse(raw), csvContent);
     } catch {
-      return { mapping: null, errorMessage: raw };
+      return { mapping: null, errorMessage: cleanErrorMessage(raw) };
     }
   }
   if (typeof raw !== "object") {
-    return { mapping: null, errorMessage: String(raw) };
+    return { mapping: null, errorMessage: cleanErrorMessage(String(raw)) };
   }
 
   const obj = raw as Record<string, unknown>;
 
   // Check for error envelope: { error: "..." }
   if ("error" in obj && typeof obj.error === "string") {
-    return { mapping: null, errorMessage: obj.error };
+    return { mapping: null, errorMessage: cleanErrorMessage(obj.error) };
   }
 
   // Unwrap { data: ... } envelope if present.
@@ -244,6 +255,13 @@ function ImportCsvToolUIContentImpl({
 
   if (!result || (!mapping && status?.type === "running")) {
     return <LoadingCard />;
+  }
+  // Debug: log when we have result but session is stuck initializing
+  if (mapping && hasCsvContent && session.status === "initializing") {
+    logger.info(
+      `[ImportCsvToolUI] Session initializing: csvContent=${csvContent?.length ?? 0} chars, ` +
+        `status=${status?.type}, mapping keys=${Object.keys(mapping.appliedMapping?.fieldMappings ?? {}).length}`,
+    );
   }
   if (status?.type === "incomplete") {
     return <ErrorCard message="The CSV import request was interrupted." />;
