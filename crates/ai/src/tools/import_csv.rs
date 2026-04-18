@@ -567,7 +567,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                         "description": "Default currency when rows don't specify one (e.g., \"EUR\" for European broker statements)."
                     }
                 },
-                "required": ["csvContent", "accountId", "fieldMappings", "activityMappings", "symbolMappings", "accountMappings", "delimiter", "skipTopRows", "skipBottomRows", "dateFormat", "decimalSeparator", "thousandsSeparator", "defaultCurrency"],
+                "required": ["csvContent"],
                 "additionalProperties": false
             }),
         }
