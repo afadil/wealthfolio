@@ -637,6 +637,17 @@ export function useChatImportSession({
           type: "INIT_OK",
           payload: { drafts: nextDrafts, assetPreviewItems: preview, accountId },
         });
+
+        // Strip csvContent from the persisted tool result — it's large and
+        // no longer needed (drafts are built, CSV is parsed). On reload the
+        // stale card shows a lightweight summary without it.
+        if (threadId && toolCallId) {
+          updateToolResult({
+            threadId,
+            toolCallId,
+            resultPatch: { csvContent: "" },
+          }).catch(() => {});
+        }
       } catch (err) {
         if (cancelled) return;
         dispatch({
@@ -859,6 +870,7 @@ export function useChatImportSession({
               importedCount,
               importRunId: result.importRunId,
               submittedAt: new Date().toISOString(),
+              csvContent: "",
             },
           });
         } catch (err) {
