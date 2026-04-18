@@ -16,8 +16,9 @@ use rig::{
     client::{CompletionClient, Nothing},
     completion::{CompletionModel, Message},
     message::{
-        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageMediaType,
-        Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent,
+        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageDetail,
+        ImageMediaType, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent,
+        UserContent,
     },
     providers::{
         anthropic, gemini, groq,
@@ -525,7 +526,7 @@ fn build_user_prompt(user_message: &str, attachments: &[MessageAttachment]) -> M
                 parts.push(UserContent::Image(Image {
                     data: DocumentSourceKind::Base64(att.data.clone()),
                     media_type,
-                    detail: None,
+                    detail: Some(ImageDetail::Auto),
                     additional_params: None,
                 }));
             }
