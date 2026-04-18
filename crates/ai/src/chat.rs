@@ -281,7 +281,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();
         for att in &attachments {
-            persist_text.push_str(&format!("\n[Attached: {}]", att.name));
+            persist_text.push_str(&format!("\n\u{1F4CE} {}", att.name));
         }
         let user_message = ChatMessage::user(&thread_id, &persist_text);
         repo.create_message(user_message).await?;
