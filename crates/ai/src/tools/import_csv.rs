@@ -492,6 +492,9 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                 The tool returns a mapping (column→field, value normalization, symbol translations, parse config); \
                 the app then parses/validates the file and shows the user an inline review grid in the chat. \
                 You do NOT need to parse or validate the data yourself. \
+                \n\nIMPORTANT: csvContent must contain the COMPLETE CSV text every time this tool is called. \
+                CSV data from previous tool calls is NOT retained. If the user wants to re-import or change \
+                settings, ask them to re-attach the CSV file — do not call this tool with empty or partial content. \
                 \n\nWhen CSV symbol values look like company NAMES rather than tickers, populate `symbolMappings` with \
                 name→ticker pairs using your knowledge of public companies. Examples: {\"Cloudflare\": \"NET\", \
                 \"Apple Inc\": \"AAPL\", \"Tesla Inc.\": \"TSLA\"}. For values you are unsure about, leave them \
