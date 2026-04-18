@@ -639,10 +639,14 @@ export function useChatImportSession({
         });
       } catch (err) {
         if (cancelled) return;
-        dispatch({
-          type: "INIT_ERROR",
-          payload: err instanceof Error ? err.message : "Failed to prepare CSV import.",
-        });
+        const message =
+          err instanceof Error
+            ? err.message
+            : typeof err === "string"
+              ? err
+              : "Failed to prepare CSV import.";
+        logger.error("[ChatImport] Init failed:", message);
+        dispatch({ type: "INIT_ERROR", payload: message });
       }
     })();
 
