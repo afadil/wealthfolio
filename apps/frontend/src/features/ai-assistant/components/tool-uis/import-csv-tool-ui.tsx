@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
@@ -204,12 +204,6 @@ function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToo
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
 
-  // Capture whether this component mounted during a live tool call (status
-  // was "running" at mount time). Lazy initializer runs once — survives
-  // re-renders but resets on remount, which is correct (remount = new
-  // component instance for a different tool call via key={toolCallId}).
-  const [isLiveToolCall] = useState(() => status?.type === "running");
-
   const { mapping, errorMessage: normalizeError } = useMemo(() => {
     const normalized = normalizeMappingResult(result as RawResult);
     if (!normalized.mapping && result && status?.type !== "running") {
@@ -221,10 +215,16 @@ function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToo
     return normalized;
   }, [result, status?.type]);
 
-  // Only create the full interactive session for live tool calls (current
-  // conversation) or submitted results (just need the success card).
-  // For stale/reloaded threads, skip the expensive init entirely.
-  const shouldInitSession = isLiveToolCall || mapping?.submitted;
+  // Decide whether to initialize the full interactive session based on
+  // DATA PRESENCE, not timing. This avoids the race where fast local
+  // models (Ollama) complete before the component mounts, making the
+  // old "was status running at mount?" heuristic unreliable.
+  //
+  // - submitted → show success card (no session needed)
+  // - csvContent present → parse + show interactive grid
+  // - csvContent empty → was confirmed (stripped) or truly stale → static card
+  const hasCsvContent = !!mapping?.csvContent;
+  const shouldInitSession = hasCsvContent || mapping?.submitted;
 
   const session = useChatImportSession({
     mapping: shouldInitSession ? mapping : null,
@@ -245,13 +245,11 @@ function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToo
       <ErrorCard message={normalizeError || "No import mapping was returned by the AI tool."} />
     );
   }
-  // Submitted imports — always show success, whether live or reloaded.
   if (mapping.submitted || session.submitted) {
     return <SuccessCard count={session.importedCount || mapping.importedCount || 0} />;
   }
-  // Stale (reloaded) non-submitted import — show static summary instead
-  // of trying to re-parse the CSV and reinitialize the full session.
-  if (!isLiveToolCall) {
+  // No CSV content → either confirmed+stripped or loaded from old thread
+  if (!hasCsvContent) {
     return <StaleImportCard mapping={mapping} />;
   }
   if (session.status === "initializing") {
