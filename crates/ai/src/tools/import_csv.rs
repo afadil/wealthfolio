@@ -113,13 +113,13 @@ pub enum MappingConfidence {
 /// The chat tool UI uses this to drive the backend pipeline (parse_csv →
 /// check_activities_import → import_activities). No drafts, no validation,
 /// no normalization happens here.
+///
+/// NOTE: csvContent is NOT echoed here — the frontend reads it from the
+/// tool call ARGS (args.csvContent) to avoid double-storing the CSV blob
+/// in both args and result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportCsvMappingOutput {
-    /// Pass-through of the raw CSV content so the frontend can call parse_csv
-    /// with the same input the AI saw.
-    pub csv_content: String,
-
     /// The mapping the AI (or saved template) settled on.
     pub applied_mapping: ImportMappingData,
 
@@ -688,7 +688,6 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         };
 
         Ok(ImportCsvMappingOutput {
-            csv_content: args.csv_content,
             applied_mapping,
             parse_config: effective_parse_config,
             account_id: args.account_id,

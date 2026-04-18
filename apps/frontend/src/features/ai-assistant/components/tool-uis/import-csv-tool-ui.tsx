@@ -46,13 +46,13 @@ interface NormalizeResult {
   errorMessage: string | null;
 }
 
-function normalizeMappingResult(raw: RawResult): NormalizeResult {
+function normalizeMappingResult(raw: RawResult, csvContent: string): NormalizeResult {
   if (!raw) return { mapping: null, errorMessage: null };
 
   // Rig wraps tool errors as plain strings — surface them directly.
   if (typeof raw === "string") {
     try {
-      return normalizeMappingResult(JSON.parse(raw));
+      return normalizeMappingResult(JSON.parse(raw), csvContent);
     } catch {
       return { mapping: null, errorMessage: raw };
     }
@@ -70,10 +70,9 @@ function normalizeMappingResult(raw: RawResult): NormalizeResult {
 
   // Unwrap { data: ... } envelope if present.
   if ("data" in obj && typeof obj.data === "object" && obj.data !== null) {
-    return normalizeMappingResult(obj.data as Record<string, unknown>);
+    return normalizeMappingResult(obj.data as Record<string, unknown>, csvContent);
   }
 
-  const csvContent = pick<string>(obj, "csvContent", "csv_content") ?? "";
   const appliedMapping = pick<Record<string, unknown>>(obj, "appliedMapping", "applied_mapping");
   const parseConfig = pick<Record<string, unknown>>(obj, "parseConfig", "parse_config");
   if (!appliedMapping) {
@@ -197,15 +196,24 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
 
 type ImportCsvToolUIContentProps = ToolCallMessagePartProps<ImportCsvArgs, unknown>;
 
-function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToolUIContentProps) {
+function ImportCsvToolUIContentImpl({
+  args,
+  result,
+  status,
+  toolCallId,
+}: ImportCsvToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
 
+  // csvContent lives in the tool ARGS (what the LLM sent), not the result
+  // (the tool no longer echoes it back to avoid double-storing in the DB).
+  const csvContent = (args as Record<string, unknown>)?.csvContent as string | undefined;
+
   const { mapping, errorMessage: normalizeError } = useMemo(() => {
-    const normalized = normalizeMappingResult(result as RawResult);
+    const normalized = normalizeMappingResult(result as RawResult, csvContent ?? "");
     if (!normalized.mapping && result && status?.type !== "running") {
       logger.warn(
         "[ImportCsvToolUI] Failed to normalize result:",
@@ -213,7 +221,7 @@ function ImportCsvToolUIContentImpl({ result, status, toolCallId }: ImportCsvToo
       );
     }
     return normalized;
-  }, [result, status?.type]);
+  }, [result, status?.type, csvContent]);
 
   // Decide whether to initialize the full interactive session based on
   // DATA PRESENCE, not timing. This avoids the race where fast local

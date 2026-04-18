@@ -859,7 +859,6 @@ export function useChatImportSession({
               importedCount,
               importRunId: result.importRunId,
               submittedAt: new Date().toISOString(),
-              csvContent: "",
             },
           });
         } catch (err) {

@@ -604,7 +604,7 @@ export interface ImportCsvSubmissionResult {
  * Mirrors `crates/ai/src/tools/import_csv.rs::ImportCsvMappingOutput`.
  */
 export interface ImportCsvMappingOutput extends ImportCsvSubmissionResult {
-  /** Raw CSV content the AI saw — passed back so the frontend can call parse_csv. */
+  /** CSV content read from tool ARGS (not echoed in result — avoids double-storing). */
   csvContent: string;
   /** The mapping the AI (or saved template) settled on. Same shape as manual import. */
   appliedMapping: import("@/lib/types").ImportMappingData;
