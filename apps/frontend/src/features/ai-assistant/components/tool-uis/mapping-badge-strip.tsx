@@ -99,7 +99,7 @@ export const MappingBadgeStrip = memo(function MappingBadgeStrip({
             size="sm"
             className="text-muted-foreground hover:text-foreground h-6 px-2 text-xs"
           >
-            Edit mapping
+            View mapping
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-80" align="end">
