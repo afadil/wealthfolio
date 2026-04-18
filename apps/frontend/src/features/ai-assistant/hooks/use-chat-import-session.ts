@@ -596,14 +596,20 @@ export function useChatImportSession({
           return;
         }
 
-        const activitiesToValidate = buildActivitiesToValidate(
-          drafts,
-          parseConfig.defaultCurrency ?? "USD",
-        );
-        const candidates = drafts
-          .map(buildImportAssetCandidateFromDraft)
-          .filter((c): c is NonNullable<typeof c> => c !== null)
-          .filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i);
+        // Only run backend validation + asset preview if an account is
+        // selected. Without an account, the backend rejects the batch with
+        // "Record not found". The user picks the account from the dropdown
+        // → triggers revalidation with a real account ID.
+        const hasAccount = !!accountId;
+        const activitiesToValidate = hasAccount
+          ? buildActivitiesToValidate(drafts, parseConfig.defaultCurrency ?? "USD")
+          : [];
+        const candidates = hasAccount
+          ? drafts
+              .map(buildImportAssetCandidateFromDraft)
+              .filter((c): c is NonNullable<typeof c> => c !== null)
+              .filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i)
+          : [];
 
         const [validated, preview] = await Promise.all([
           activitiesToValidate.length > 0
