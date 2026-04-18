@@ -6,6 +6,7 @@
  */
 
 import { AccountsToolUI } from "./accounts-tool-ui";
+import { CashBalancesToolUI } from "./cash-balances-tool-ui";
 import { ActivitiesToolUI } from "./activities-tool-ui";
 import { AllocationToolUI } from "./allocation-tool-ui";
 import { GoalsToolUI } from "./goals-tool-ui";
@@ -23,6 +24,7 @@ import { ValuationToolUI } from "./valuation-tool-ui";
  */
 export const toolUIs = {
   get_accounts: AccountsToolUI,
+  get_cash_balances: CashBalancesToolUI,
   get_asset_allocation: AllocationToolUI,
   get_goals: GoalsToolUI,
   get_holdings: HoldingsToolUI,
@@ -40,6 +42,7 @@ export type ToolUIName = keyof typeof toolUIs;
 // Re-export individual components for direct imports if needed
 export {
   AccountsToolUI,
+  CashBalancesToolUI,
   ActivitiesToolUI,
   AllocationToolUI,
   GoalsToolUI,
