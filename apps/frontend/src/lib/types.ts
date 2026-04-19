@@ -1604,6 +1604,44 @@ export interface CapabilityInfo {
 }
 
 /**
+ * Catalog-defined generation tuning defaults for a provider. Any field can be
+ * partially overridden by the user via `ProviderTuningOverrides`.
+ *
+ * Validation bounds (server-side, when overrides are persisted):
+ * - `temperature`: 0.0 – 2.0
+ * - `maxTokens` / `maxTokensThinking`: 256 – 131072
+ */
+export interface ProviderTuning {
+  /** Sampling temperature. Lower values → more deterministic output. */
+  temperature?: number;
+  /** Maximum output tokens per response (safety cap). */
+  maxTokens?: number;
+  /** Max tokens when the model's thinking/reasoning mode is enabled. */
+  maxTokensThinking?: number;
+  /**
+   * Provider-specific raw JSON (Ollama's `num_ctx`/`repeat_penalty`, Gemini's
+   * `safetySettings`, etc.). Catalog-only — not user-editable.
+   */
+  extraOptions?: Record<string, unknown>;
+}
+
+/**
+ * User-provided tuning overrides. Any field left undefined falls back to the
+ * catalog default.
+ *
+ * `extraOptionOverrides` is a per-key merge onto the catalog's `extraOptions`.
+ * Only primitive values (number, boolean, string, or null to reset) are
+ * accepted — complex shapes (arrays, objects like Gemini's `safetySettings`)
+ * remain catalog-only.
+ */
+export interface ProviderTuningOverrides {
+  temperature?: number;
+  maxTokens?: number;
+  maxTokensThinking?: number;
+  extraOptionOverrides?: Record<string, number | boolean | string | null>;
+}
+
+/**
  * A provider in the merged view returned to the UI.
  * Combines catalog data with user settings and computed fields.
  */
@@ -1638,6 +1676,14 @@ export interface MergedProvider {
   isDefault: boolean;
   /** Whether this provider supports dynamic model listing via API. */
   supportsModelListing: boolean;
+
+  // Tuning (three views: what ships, what user changed, what runtime uses)
+  /** Catalog tuning defaults for this provider (immutable reference). */
+  catalogTuning?: ProviderTuning;
+  /** User-supplied overrides; undefined means the user hasn't customized. */
+  tuningOverrides?: ProviderTuningOverrides;
+  /** Effective tuning the runtime will use (catalog merged with overrides). */
+  resolvedTuning?: ProviderTuning;
 }
 
 /**
@@ -1675,6 +1721,8 @@ export interface UpdateProviderSettingsRequest {
   favoriteModels?: string[];
   /** Update tools allowlist. null = all tools enabled, [] = no tools, [...] = only specified tools. */
   toolsAllowlist?: string[] | null;
+  /** Update user tuning overrides. null = reset to catalog defaults, {} or partial = set. */
+  tuningOverrides?: ProviderTuningOverrides | null;
 }
 
 /**

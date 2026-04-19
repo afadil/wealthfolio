@@ -5,15 +5,17 @@ import { DateRange, TimePeriod } from "@/lib/types";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, IntervalSelector } from "@wealthfolio/ui";
 import { isAfter, parseISO, subMonths } from "date-fns";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 interface ValuationArgs {
   accountId?: string;
   startDate?: string;
   endDate?: string;
+  displayMode?: "compact" | "full";
 }
 
 interface ValuationPoint {
@@ -114,7 +116,9 @@ export const ValuationToolUI = makeAssistantToolUI<ValuationArgs, ValuationResul
 
 type ValuationContentProps = ToolCallMessagePartProps<ValuationArgs, ValuationResult>;
 
-function ValuationContent({ args, result, status }: ValuationContentProps) {
+const ValuationContent = memo(ValuationContentImpl);
+
+function ValuationContentImpl({ args, result, status }: ValuationContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const [period, setPeriod] = useState<TimePeriod>("3M");
@@ -158,6 +162,11 @@ function ValuationContent({ args, result, status }: ValuationContentProps) {
   const isComplete = status?.type === "complete";
   const isIncomplete = status?.type === "incomplete" || status?.type === "requires-action";
   const hasData = chartData.length > 0;
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isRunning) {
+    return <CompactToolCard label="Fetched valuation history" />;
+  }
 
   // Empty state - don't render anything, let LLM explain
   if (isComplete && !hasData) {

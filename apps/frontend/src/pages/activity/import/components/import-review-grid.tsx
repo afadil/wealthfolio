@@ -43,6 +43,8 @@ export interface ImportReviewGridProps {
   onBulkForceImport?: (rowIndexes: number[]) => void;
   onBulkSetCurrency?: (rowIndexes: number[], currency: string) => void;
   onBulkSetAccount?: (rowIndexes: number[], accountId: string) => void;
+  /** Override the grid height (default: "calc(100vh - 360px)"). */
+  gridHeight?: string | number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ function getStatusTitle(
   if (typeof duplicateOfLineNumber === "number") {
     return `Duplicate of line ${duplicateOfLineNumber} in this import batch`;
   }
-  if (duplicateOfId) return `Duplicate of existing activity: ${duplicateOfId}`;
+  if (duplicateOfId) return "Duplicate of an existing activity in your portfolio";
   if (errors) {
     const errorDetails = Object.entries(errors)
       .flatMap(([field, msgs]) => msgs.map((msg) => `${field}: ${msg}`))
@@ -473,6 +475,7 @@ export function ImportReviewGrid({
   onBulkForceImport,
   onBulkSetCurrency,
   onBulkSetAccount,
+  gridHeight,
 }: ImportReviewGridProps) {
   const { settings } = useSettingsContext();
   const fallbackCurrency = settings?.baseCurrency ?? "USD";
@@ -829,7 +832,12 @@ export function ImportReviewGrid({
 
       {/* Data grid with context menu support */}
       <div className="min-h-0 flex-1" onContextMenu={handleContextMenu} onWheel={handleWheel}>
-        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 360px)" className="text-sm" />
+        <DataGrid
+          {...dataGrid}
+          stretchColumns
+          height={gridHeight ?? "calc(100vh - 360px)"}
+          className="text-sm"
+        />
       </div>
 
       {/* Context menu */}

@@ -67,11 +67,11 @@ export function ImportToolbar({
 
   return (
     <div
-      className="bg-muted/50 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
+      className="bg-muted/50 flex items-center gap-2 overflow-x-auto rounded-md border px-3 py-2"
       onMouseDown={handleMouseDown}
     >
       {/* Selection info */}
-      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+      <div className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
         <Icons.CheckSquare className="h-4 w-4" />
         <span className="font-medium">
           {selectedCount} row{selectedCount === 1 ? "" : "s"} selected
@@ -79,7 +79,7 @@ export function ImportToolbar({
       </div>
 
       {/* Action buttons */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         {/* Skip button */}
         <Button
           variant="outline"

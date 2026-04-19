@@ -5,7 +5,11 @@ use std::collections::HashMap;
 
 /// Current schema version for AI provider settings.
 /// Increment when making breaking changes to the settings structure.
-pub const AI_PROVIDER_SETTINGS_SCHEMA_VERSION: u32 = 1;
+///
+/// History:
+/// - v1: initial (enabled/favorite/model/url/priority/capability_overrides/tools_allowlist)
+/// - v2: adds ProviderUserSettings.tuning_overrides (purely additive, safe migration)
+pub const AI_PROVIDER_SETTINGS_SCHEMA_VERSION: u32 = 2;
 
 /// The app_settings key used to store AI provider settings.
 pub const AI_PROVIDER_SETTINGS_KEY: &str = "ai_provider_settings";
@@ -59,6 +63,165 @@ pub struct ProviderDefaultConfig {
     pub url: Option<String>,
 }
 
+/// Per-provider generation tuning defaults (catalog-defined).
+///
+/// These are sensible sampling defaults per provider that can be partially
+/// overridden by the user via `ProviderTuningOverrides`. Fields left as `None`
+/// fall through to the provider's own defaults.
+///
+/// Validation bounds (enforced when user-supplied overrides are persisted):
+/// - `temperature`: 0.0 ..= 2.0
+/// - `max_tokens` / `max_tokens_thinking`: 256 ..= 131_072
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTuning {
+    /// Sampling temperature. Lower values = more deterministic output.
+    /// Typical range for tool-calling workloads: 0.0–0.3.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    /// Maximum output tokens per response. Safety cap — model generates up to
+    /// this many tokens, then stops. Pay for actual tokens generated.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u64>,
+    /// Max tokens when the model's thinking/reasoning mode is enabled. Thinking
+    /// tokens count against max_tokens on most APIs, so this should be larger.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens_thinking: Option<u64>,
+    /// Provider-specific raw JSON merged into the additional_params blob sent
+    /// to the underlying API (e.g. Ollama's `num_ctx`/`repeat_penalty`,
+    /// Gemini's `safetySettings`). Catalog-only — users cannot override these
+    /// via the UI to avoid exposing too much surface area.
+    #[serde(default, skip_serializing_if = "value_is_null_or_empty_object")]
+    pub extra_options: serde_json::Value,
+}
+
+fn value_is_null_or_empty_object(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::Null => true,
+        serde_json::Value::Object(m) => m.is_empty(),
+        _ => false,
+    }
+}
+
+/// User-provided overrides of provider tuning. Any field left `None`/empty
+/// uses the catalog default.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTuningOverrides {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens_thinking: Option<u64>,
+    /// Per-key overrides of the catalog's `extra_options`. The UI only
+    /// exposes keys that exist in the catalog and are primitive (number,
+    /// boolean, string). Complex shapes (arrays, objects — e.g. Gemini's
+    /// `safetySettings`) remain catalog-only.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_option_overrides: HashMap<String, serde_json::Value>,
+}
+
+impl ProviderTuningOverrides {
+    /// Whether every field is empty — in which case this override is a no-op
+    /// and should be cleared from the user settings to keep things tidy.
+    pub fn is_empty(&self) -> bool {
+        self.temperature.is_none()
+            && self.max_tokens.is_none()
+            && self.max_tokens_thinking.is_none()
+            && self.extra_option_overrides.is_empty()
+    }
+
+    /// Validate user-supplied values against safe bounds. Returns the offending
+    /// field name + reason on the first failure so the error can be surfaced
+    /// in the UI toast.
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(t) = self.temperature {
+            if !(0.0..=2.0).contains(&t) || t.is_nan() {
+                return Err(format!(
+                    "temperature must be between 0.0 and 2.0 (got {})",
+                    t
+                ));
+            }
+        }
+        if let Some(m) = self.max_tokens {
+            if !(256..=131_072).contains(&m) {
+                return Err(format!(
+                    "maxTokens must be between 256 and 131072 (got {})",
+                    m
+                ));
+            }
+        }
+        if let Some(m) = self.max_tokens_thinking {
+            if !(256..=131_072).contains(&m) {
+                return Err(format!(
+                    "maxTokensThinking must be between 256 and 131072 (got {})",
+                    m
+                ));
+            }
+        }
+        // extra_option_overrides must be primitive values only (JSON number,
+        // bool, or string). Nested shapes are catalog-only to keep the UI/API
+        // surface narrow and prevent users from clobbering structured options
+        // like Gemini's `safetySettings`.
+        for (key, value) in &self.extra_option_overrides {
+            match value {
+                serde_json::Value::Number(_)
+                | serde_json::Value::Bool(_)
+                | serde_json::Value::String(_)
+                | serde_json::Value::Null => {}
+                serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+                    return Err(format!(
+                        "extraOptionOverrides.{}: arrays and objects are not user-editable \
+                         (catalog-only)",
+                        key
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ProviderTuning {
+    /// Merge user overrides on top of catalog defaults. Scalar fields fall
+    /// through to the catalog value when the override is `None`.
+    /// `extra_options` is merged per-key: user overrides replace catalog
+    /// values for keys they set, but unsupplied keys keep the catalog value.
+    /// Complex catalog shapes (arrays, objects) are preserved untouched —
+    /// user overrides must be primitives (enforced at `validate()`).
+    pub fn apply_overrides(&self, overrides: &ProviderTuningOverrides) -> Self {
+        let mut extra_options = self.extra_options.clone();
+        if !overrides.extra_option_overrides.is_empty() {
+            if !matches!(extra_options, serde_json::Value::Object(_)) {
+                extra_options = serde_json::Value::Object(serde_json::Map::new());
+            }
+            if let serde_json::Value::Object(map) = &mut extra_options {
+                for (key, value) in &overrides.extra_option_overrides {
+                    map.insert(key.clone(), value.clone());
+                }
+            }
+        }
+        Self {
+            temperature: overrides.temperature.or(self.temperature),
+            max_tokens: overrides.max_tokens.or(self.max_tokens),
+            max_tokens_thinking: overrides.max_tokens_thinking.or(self.max_tokens_thinking),
+            extra_options,
+        }
+    }
+
+    /// Return the appropriate max_tokens for the current mode — uses the
+    /// thinking-specific value when thinking is enabled and set, else falls
+    /// back to the generic max_tokens.
+    pub fn max_tokens_for_mode(&self, thinking: bool) -> Option<u64> {
+        if thinking {
+            self.max_tokens_thinking.or(self.max_tokens)
+        } else {
+            self.max_tokens
+        }
+    }
+}
+
 /// A provider definition from the catalog (immutable source of truth).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,6 +240,11 @@ pub struct CatalogProvider {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title_model_id: Option<String>,
     pub documentation_url: String,
+    /// Sampling/output defaults for this provider. May be absent for providers
+    /// where the model's own defaults are preferred (e.g. Anthropic, which
+    /// handles temperature natively).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tuning: Option<ProviderTuning>,
 }
 
 /// Capability metadata from the catalog.
@@ -150,6 +318,10 @@ pub struct ProviderUserSettings {
     /// None = all tools enabled (default), Some([]) = no tools, Some([...]) = only specified tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools_allowlist: Option<Vec<String>>,
+    /// User overrides for the catalog tuning defaults (temperature, max_tokens).
+    /// None = use catalog defaults entirely.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tuning_overrides: Option<ProviderTuningOverrides>,
 }
 
 impl Default for ProviderUserSettings {
@@ -163,6 +335,7 @@ impl Default for ProviderUserSettings {
             model_capability_overrides: HashMap::new(),
             favorite_models: Vec::new(),
             tools_allowlist: None,
+            tuning_overrides: None,
         }
     }
 }
@@ -255,6 +428,20 @@ pub struct MergedProvider {
     pub is_default: bool,
     /// Whether this provider supports dynamic model listing via API.
     pub supports_model_listing: bool,
+
+    // Tuning — three views for the UI:
+    //   catalogTuning   : immutable defaults (what the ship-default is)
+    //   tuningOverrides : user-supplied deltas (what the user chose)
+    //   resolvedTuning  : effective values (catalog ⊕ overrides), what runtime uses
+    /// Catalog tuning defaults for this provider.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub catalog_tuning: Option<ProviderTuning>,
+    /// User-supplied overrides (None when user hasn't customized anything).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tuning_overrides: Option<ProviderTuningOverrides>,
+    /// Effective tuning values the runtime will use (catalog merged with overrides).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_tuning: Option<ProviderTuning>,
 }
 
 /// The complete merged response returned to the UI.
@@ -296,6 +483,10 @@ pub struct UpdateProviderSettingsRequest {
     /// Use Some(None) to clear (all tools enabled), Some(Some([])) to set specific tools.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools_allowlist: Option<Option<Vec<String>>>,
+    /// Update user tuning overrides.
+    /// Use Some(None) to reset to catalog defaults, Some(Some(...)) to set overrides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tuning_overrides: Option<Option<ProviderTuningOverrides>>,
 }
 
 /// Update for a single model's capability overrides.

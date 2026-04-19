@@ -666,7 +666,7 @@ pub mod test_env {
         ) -> crate::types::ChatRepositoryResult<Vec<crate::types::ChatThread>> {
             let threads = self.threads.read().unwrap();
             let mut list: Vec<_> = threads.values().cloned().collect();
-            list.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            list.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
             list.truncate(limit as usize);
             Ok(list)
         }
@@ -677,7 +677,7 @@ pub mod test_env {
         ) -> crate::types::ChatRepositoryResult<crate::types::ThreadPage> {
             let threads = self.threads.read().unwrap();
             let mut list: Vec<_> = threads.values().cloned().collect();
-            list.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            list.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
 
             // Apply search filter if provided
             if let Some(ref search) = request.search {

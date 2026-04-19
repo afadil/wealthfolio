@@ -1,0 +1,17 @@
+Releve de compte
+Compte: FR76 XXXX XXXX XXXX
+Periode: 01/01/2024 - 15/04/2024
+Date d'operation;Date de valeur;Operation;ISIN;Libelle;Quantite;Cours;Montant;Frais;Devise
+15/01/2024;17/01/2024;Achat;US0378331005;Apple Inc.;25;172,50;"4.312,50";0,99;EUR
+20/01/2024;22/01/2024;Achat;;Cloudflare;50;82,10;"4.105,00";0,99;EUR
+01/02/2024;03/02/2024;Dividende;US5949181045;Microsoft Corp;;;53,40;;EUR
+12/02/2024;14/02/2024;Achat;US88160R1014;Tesla Inc.;5;180,25;"901,25";1,50;EUR
+20/02/2024;22/02/2024;Vente;US0378331005;Apple Inc.;10;185,75;"1.857,50";1,25;EUR
+01/03/2024;03/03/2024;Versement;;;;;"5.000,00";;EUR
+05/03/2024;07/03/2024;Prelevement;;;;;"-1.200,00";;EUR
+15/03/2024;17/03/2024;Achat;US02079K3059;Alphabet Inc.;3;138,90;"416,70";0,25;EUR
+20/03/2024;22/03/2024;Interet;;;;;"8,75";;EUR
+25/03/2024;27/03/2024;Achat;;"Societe Generale";10;24,50;"245,00";0,50;EUR
+10/04/2024;12/04/2024;Dividende;US5949181045;Microsoft Corp;;;54,10;;EUR
+Total mouvements: "13.754,20"
+*** Fin du releve ***

@@ -2922,13 +2922,37 @@ impl ActivityServiceTrait for ActivityService {
             let indexes: Vec<usize> = entries.iter().map(|(idx, _)| *idx).collect();
             let account_activities: Vec<ActivityImport> =
                 entries.into_iter().map(|(_, activity)| activity).collect();
-            let validated = self
-                .check_activities_import_for_account(account_id, account_activities)
-                .await?;
 
-            for (offset, activity) in validated.into_iter().enumerate() {
-                if let Some(idx) = indexes.get(offset).copied() {
-                    ordered[idx] = Some(activity);
+            match self
+                .check_activities_import_for_account(account_id.clone(), account_activities.clone())
+                .await
+            {
+                Ok(validated) => {
+                    for (offset, activity) in validated.into_iter().enumerate() {
+                        if let Some(idx) = indexes.get(offset).copied() {
+                            ordered[idx] = Some(activity);
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Per-account validation failed (e.g., account not found,
+                    // DB error). Mark all activities in this group with the
+                    // error instead of failing the entire batch.
+                    log::warn!(
+                        "check_activities_import: account {} validation failed: {}",
+                        account_id,
+                        e
+                    );
+                    for (offset, mut activity) in account_activities.into_iter().enumerate() {
+                        Self::add_activity_error(
+                            &mut activity,
+                            "general",
+                            &format!("Validation failed: {}", e),
+                        );
+                        if let Some(idx) = indexes.get(offset).copied() {
+                            ordered[idx] = Some(activity);
+                        }
+                    }
                 }
             }
         }

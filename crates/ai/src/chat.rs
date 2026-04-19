@@ -16,8 +16,9 @@ use rig::{
     client::{CompletionClient, Nothing},
     completion::{CompletionModel, Message},
     message::{
-        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageMediaType,
-        Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent,
+        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageDetail,
+        ImageMediaType, Reasoning, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent,
+        UserContent,
     },
     providers::{
         anthropic, gemini, groq,
@@ -250,9 +251,11 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
         // take messages from most recent backwards until the budget is exhausted.
         let mut history_messages: Vec<SimpleChatMessage> = Vec::new();
         let mut budget = MAX_HISTORY_CHARS;
+        let mut skipped_empty: usize = 0;
         for msg in previous_messages.iter().rev() {
             let text = msg.content.get_text_content();
             if text.is_empty() {
+                skipped_empty += 1;
                 continue;
             }
             let simple = match msg.role {
@@ -267,11 +270,18 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             history_messages.push(simple);
         }
         history_messages.reverse();
+        debug!(
+            "Thread {} history: {} msgs sent, {} stored in db, {} skipped (empty text_content)",
+            thread_id,
+            history_messages.len(),
+            previous_messages.len(),
+            skipped_empty,
+        );
 
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();
         for att in &attachments {
-            persist_text.push_str(&format!("\n[Attached: {}]", att.name));
+            persist_text.push_str(&format!("\n\u{1F4CE} {}", att.name));
         }
         let user_message = ChatMessage::user(&thread_id, &persist_text);
         repo.create_message(user_message).await?;
@@ -516,7 +526,7 @@ fn build_user_prompt(user_message: &str, attachments: &[MessageAttachment]) -> M
                 parts.push(UserContent::Image(Image {
                     data: DocumentSourceKind::Base64(att.data.clone()),
                     media_type,
-                    detail: None,
+                    detail: Some(ImageDetail::Auto),
                     additional_params: None,
                 }));
             }
@@ -692,6 +702,50 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         }
     }
 
+    // Resolve effective tuning (catalog defaults merged with user overrides) once.
+    // Drives temperature, max_tokens, and provider-specific extra_options for
+    // every builder path below.
+    let resolved_tuning = provider_service.get_resolved_tuning(&provider_id);
+
+    // Merge catalog's extra_options with per-call thinking params. The thinking
+    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking.budget_tokens`,
+    // Gemini's `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`,
+    // OpenAI's `reasoning_effort`) that can't live in the JSON catalog because
+    // they're dynamic per-capability. Catalog holds the rest
+    // (Ollama's `num_ctx`/`repeat_penalty`, Gemini's `safetySettings`).
+    fn merge_json_into(dest: &mut serde_json::Value, src: serde_json::Value) {
+        match (dest, src) {
+            (serde_json::Value::Object(dest_map), serde_json::Value::Object(src_map)) => {
+                for (k, v) in src_map {
+                    if let Some(existing) = dest_map.get_mut(&k) {
+                        merge_json_into(existing, v);
+                    } else {
+                        dest_map.insert(k, v);
+                    }
+                }
+            }
+            (dest_slot, src_val) => {
+                *dest_slot = src_val;
+            }
+        }
+    }
+
+    let combine_params = |thinking_params: Option<serde_json::Value>| -> Option<serde_json::Value> {
+        let mut combined = resolved_tuning.extra_options.clone();
+        if let Some(thinking) = thinking_params {
+            if combined.is_null() {
+                combined = thinking;
+            } else {
+                merge_json_into(&mut combined, thinking);
+            }
+        }
+        match &combined {
+            serde_json::Value::Null => None,
+            serde_json::Value::Object(m) if m.is_empty() => None,
+            _ => Some(combined),
+        }
+    };
+
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
         ($client:expr, $thinking_params:expr) => {
@@ -714,6 +768,9 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             }
             if is_allowed("get_accounts") {
                 allowed_tools.push(Box::new(tool_set.accounts));
+            }
+            if is_allowed("get_cash_balances") {
+                allowed_tools.push(Box::new(tool_set.cash_balances));
             }
             if is_allowed("search_activities") {
                 allowed_tools.push(Box::new(tool_set.activities));
@@ -752,17 +809,25 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 .tools(allowed_tools)
                 .tool_choice(ToolChoice::Auto);
 
-            // Ollama cannot enforce tool_choice and some local models are brittle at higher
-            // temperatures; use a deterministic temperature to improve tool-call reliability.
-            if provider_id == "ollama" {
-                builder = builder.temperature(0.0);
+            // Temperature from resolved tuning. Providers that shouldn't set
+            // temperature (e.g. Anthropic, per their own guidance) simply omit
+            // it from the catalog.
+            if let Some(temp) = resolved_tuning.temperature {
+                builder = builder.temperature(temp);
             }
 
-            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+            // Max output tokens — prefer caller-supplied ($max_tokens), fall
+            // back to the mode-appropriate value from resolved tuning.
+            let caller_max: Option<u64> = Into::<Option<u64>>::into($max_tokens);
+            let effective_max =
+                caller_max.or_else(|| resolved_tuning.max_tokens_for_mode(capabilities.thinking));
+            if let Some(tokens) = effective_max {
                 builder = builder.max_tokens(tokens);
             }
 
-            if let Some(params) = $thinking_params {
+            // Provider-specific additional params: catalog extra_options merged
+            // with per-call thinking params.
+            if let Some(params) = combine_params($thinking_params) {
                 builder = builder.additional_params(params);
             }
 
@@ -783,11 +848,18 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let mut builder = $client.agent(&model_id).preamble(&preamble);
 
-            if let Some(tokens) = Into::<Option<u64>>::into($max_tokens) {
+            if let Some(temp) = resolved_tuning.temperature {
+                builder = builder.temperature(temp);
+            }
+
+            let caller_max: Option<u64> = Into::<Option<u64>>::into($max_tokens);
+            let effective_max =
+                caller_max.or_else(|| resolved_tuning.max_tokens_for_mode(capabilities.thinking));
+            if let Some(tokens) = effective_max {
                 builder = builder.max_tokens(tokens);
             }
 
-            if let Some(params) = $thinking_params {
+            if let Some(params) = combine_params($thinking_params) {
                 builder = builder.additional_params(params);
             }
 
@@ -846,11 +918,11 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None
     };
 
-    // Ollama: pass think parameter to enable/disable thinking mode
-    // When false, models like qwen3 and deepseek-r1 skip chain-of-thought reasoning
-    // Note: Some models may ignore the API parameter and still emit thinking.
+    // Ollama: only the dynamic `think` flag is built inline. Static options
+    // (num_ctx, repeat_penalty, repeat_last_n) live in the catalog's
+    // `tuning.extraOptions` and are merged in via `combine_params`.
     let ollama_thinking_params: Option<serde_json::Value> = Some(serde_json::json!({
-        "think": capabilities.thinking
+        "think": capabilities.thinking,
     }));
 
     // Anthropic: extended thinking with budget_tokens
@@ -865,9 +937,6 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     } else {
         None
     };
-    // Anthropic requires max_tokens on the CompletionRequest (not in additional_params).
-    // With thinking enabled, budget_tokens counts against max_tokens so it must be larger.
-    let anthropic_max_tokens: u64 = if capabilities.thinking { 16000 } else { 8096 };
 
     // OpenAI: reasoning_effort for o1/o3 models
     // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
@@ -906,11 +975,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(
-                    client,
-                    anthropic_thinking_params.clone(),
-                    Some(anthropic_max_tokens)
-                )
+                build_with_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
@@ -942,11 +1007,7 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(
-                    client,
-                    anthropic_thinking_params.clone(),
-                    Some(anthropic_max_tokens)
-                )
+                build_without_tools_and_stream!(client, anthropic_thinking_params.clone())
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
@@ -1295,8 +1356,18 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
     message_id: String,
     title_ctx: TitleContext<E>,
 ) -> Result<(), AiError> {
-    // Start multi-turn streaming (up to 6 tool rounds)
-    let mut stream = agent.stream_chat(prompt, history).multi_turn(6).await;
+    // Attach a per-run hook that deduplicates repeated tool calls, caps the
+    // total tool-call count, and aborts stuck text-token loops. Cheap to clone
+    // (state is behind an Arc<Mutex<_>>).
+    let hook = crate::stream_hook::WealthfolioStreamHook::new();
+
+    // Start multi-turn streaming (up to 6 tool rounds). The hook provides the
+    // finer-grained guards inside those turns.
+    let mut stream = agent
+        .stream_chat(prompt, history)
+        .with_hook(hook)
+        .multi_turn(6)
+        .await;
 
     // Generate/refine title concurrently so it can update the UI during streaming.
     let should_attempt_title = title_ctx.is_new_thread

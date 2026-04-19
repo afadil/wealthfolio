@@ -13,9 +13,10 @@ import {
   TooltipTrigger,
   formatPercent,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
@@ -26,6 +27,7 @@ interface GetAssetAllocationArgs {
   groupBy?: string;
   taxonomyId?: string;
   categoryId?: string;
+  displayMode?: "compact" | "full";
 }
 
 interface AllocationDto {
@@ -162,7 +164,9 @@ type AllocationContentProps = ToolCallMessagePartProps<
   GetAssetAllocationOutput
 >;
 
-function AllocationContent({ args, result, status }: AllocationContentProps) {
+const AllocationContent = memo(AllocationContentImpl);
+
+function AllocationContentImpl({ args, result, status }: AllocationContentProps) {
   const typedArgs = args as GetAssetAllocationArgs | undefined;
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -205,6 +209,11 @@ function AllocationContent({ args, result, status }: AllocationContentProps) {
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const categoryCount = sortedCategories.length;
   const holdingsCount = sortedHoldings.length;
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return <CompactToolCard label="Fetched asset allocation" />;
+  }
 
   // Format value with privacy
   const formatValue = (value: number) => {

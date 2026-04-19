@@ -1,28 +1,70 @@
-//! CSV import tool using shared ImportMappingData format.
+//! CSV import tool — mapping inference only.
 //!
-//! Uses the same mapping format as manual import for consistency.
-//! LLM proposes mappings using header names (not column indices).
+//! The AI tool is responsible for figuring out HOW to interpret the CSV
+//! (parse config, column → field mappings, value normalization, symbol
+//! name → ticker translation). It does NOT do parse/validate/dedup — those
+//! live in the backend pipeline (`parse_csv` → `check_activities_import` →
+//! `import_activities`), which the chat tool UI drives directly.
 //!
 //! Flow:
-//! 1. Tool receives CSV content and optional account_id
-//! 2. If account has saved profile, load it as starting point
-//! 3. LLM can override/enhance mappings via import_mapping parameter
-//! 4. Tool parses CSV using core parser (same as manual import)
-//! 5. Returns activity drafts + mapping for user to save
+//! 1. Tool receives CSV content + optional account_id + LLM-proposed mapping
+//! 2. If account has a saved template, short-circuit and return it
+//! 3. Otherwise run `parse_csv` to get headers + sample rows, auto-detect
+//!    field mappings, merge with LLM-provided overrides
+//! 4. Return `(ParseConfig, ImportMappingData)` plus a small sample for UI
 
 use log::debug;
 use rig::{completion::ToolDefinition, tool::Tool};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 use std::sync::Arc;
 
-use rust_decimal::Decimal;
+/// Deserialize a HashMap<String, String> tolerating null values (drops them).
+/// LLMs sometimes produce {"key": null} when they mean "no mapping".
+fn deserialize_nullable_string_map<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw: Option<HashMap<String, Option<String>>> = Option::deserialize(deserializer)?;
+    Ok(raw.map(|m| {
+        m.into_iter()
+            .filter_map(|(k, v)| v.map(|val| (k, val)))
+            .collect()
+    }))
+}
+
+fn clean_string_map(map: Option<HashMap<String, String>>) -> HashMap<String, String> {
+    map.unwrap_or_default()
+        .into_iter()
+        .filter(|(_, value)| !value.trim().is_empty())
+        .collect()
+}
+
+fn has_usable_string_map(map: &Option<HashMap<String, String>>) -> bool {
+    map.as_ref()
+        .is_some_and(|m| m.values().any(|value| !value.trim().is_empty()))
+}
+
+fn has_usable_activity_mappings(map: &Option<HashMap<String, Vec<String>>>) -> bool {
+    map.as_ref().is_some_and(|m| {
+        m.values()
+            .any(|values| values.iter().any(|value| !value.trim().is_empty()))
+    })
+}
+
+fn has_usable_llm_mappings(args: &ImportCsvArgs) -> bool {
+    has_usable_string_map(&args.field_mappings)
+        || has_usable_activity_mappings(&args.activity_mappings)
+        || has_usable_string_map(&args.symbol_mappings)
+        || has_usable_string_map(&args.account_mappings)
+}
+
 use wealthfolio_core::activities::{
-    import_type, into_field_mapping_values, ImportMappingData, ParseConfig, ParsedCsvResult,
+    import_type, into_field_mapping_values, ImportMappingData, ParseConfig,
 };
 
-use super::constants::MAX_IMPORT_ROWS;
 use super::record_activity::AccountOption;
 use crate::env::AiEnvironment;
 use crate::error::AiError;
@@ -41,161 +83,96 @@ pub struct ImportCsvArgs {
     /// Account ID to assign to all activities and load saved mapping from.
     pub account_id: Option<String>,
 
-    /// Maps field names to CSV header names (flattened from importMapping).
-    /// Keys: date, activityType, symbol, quantity, unitPrice, amount, fee, fxRate, subtype, currency, account, comment
+    /// Maps field names to CSV header names.
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub field_mappings: Option<HashMap<String, String>>,
 
-    /// Maps canonical activity types to CSV values (flattened from importMapping).
-    /// E.g., {"BUY": ["Purchase", "Achat"]}
+    /// Maps canonical activity types to CSV values.
+    #[serde(default)]
     pub activity_mappings: Option<HashMap<String, Vec<String>>>,
 
-    /// Maps CSV symbols to canonical symbols.
-    /// E.g., {"AAPL.US": "AAPL", "MSFT.US": "MSFT"}
+    /// Maps CSV symbol *values* to canonical tickers.
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub symbol_mappings: Option<HashMap<String, String>>,
 
     /// Maps CSV account values to app account IDs.
-    /// E.g., {"My Brokerage": "account-uuid-123"}
+    #[serde(default, deserialize_with = "deserialize_nullable_string_map")]
     pub account_mappings: Option<HashMap<String, String>>,
 
-    /// CSV delimiter: ",", ";", "\t", or "auto" (default: auto-detect)
+    /// CSV delimiter: ",", ";", "\t", or "auto"
     pub delimiter: Option<String>,
 
     /// Number of rows to skip at the top before the header (default: 0)
     pub skip_top_rows: Option<usize>,
 
-    /// Date format hint: "auto" or strftime format like "%d/%m/%Y" (default: auto-detect)
+    /// Number of rows to skip at the bottom (default: 0)
+    pub skip_bottom_rows: Option<usize>,
+
+    /// Date format hint: "auto" or strftime format like "%d/%m/%Y"
     pub date_format: Option<String>,
+
+    /// Decimal separator: "auto", ".", ","
+    pub decimal_separator: Option<String>,
+
+    /// Thousands separator: "auto", ",", ".", " ", "none"
+    pub thousands_separator: Option<String>,
+
+    /// Default currency for rows that do not specify one.
+    pub default_currency: Option<String>,
 }
 
 // ============================================================================
 // Output Types
 // ============================================================================
 
-/// Output envelope for import_csv tool.
+/// Mapping confidence — rough signal for the UI badge.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MappingConfidence {
+    High,
+    Medium,
+    Low,
+}
+
+/// Output of the import_csv mapping tool.
+///
+/// The chat tool UI uses this to drive the backend pipeline (parse_csv →
+/// check_activities_import → import_activities). No drafts, no validation,
+/// no normalization happens here.
+///
+/// NOTE: csvContent is NOT echoed here — the frontend reads it from the
+/// tool call ARGS (args.csvContent) to avoid double-storing the CSV blob
+/// in both args and result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ImportCsvOutput {
-    /// Parsed activity drafts.
-    pub activities: Vec<CsvActivityDraft>,
-
-    /// The mapping that was applied (can be saved by user).
+pub struct ImportCsvMappingOutput {
+    /// The mapping the AI (or saved template) settled on.
     pub applied_mapping: ImportMappingData,
 
-    /// Data cleaning actions performed.
-    pub cleaning_actions: Vec<CleaningAction>,
+    /// Parse config the frontend should use (delimiter, date_format, skips, …).
+    pub parse_config: ParseConfig,
 
-    /// Validation summary.
-    pub validation: ValidationSummary,
-
-    /// Available accounts for selection.
-    pub available_accounts: Vec<AccountOption>,
-
-    /// Detected headers from the CSV.
-    pub detected_headers: Vec<String>,
-
-    /// Total rows in source CSV (before truncation).
-    pub total_rows: usize,
-
-    /// Whether the output was truncated.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub truncated: Option<bool>,
-
-    /// Whether a saved profile was loaded as starting point.
-    #[serde(default)]
-    pub used_saved_profile: bool,
-}
-
-/// Activity draft from CSV parsing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CsvActivityDraft {
-    /// Row number in original CSV (1-indexed, after header).
-    pub row_number: usize,
-
-    /// Activity type (BUY, SELL, DIVIDEND, etc.).
-    pub activity_type: Option<String>,
-
-    /// ISO 8601 date (normalized).
-    pub activity_date: Option<String>,
-
-    /// Symbol/ticker.
-    pub symbol: Option<String>,
-
-    /// Resolved exchange MIC for the symbol (e.g., "XNAS", "XNYS").
-    pub exchange_mic: Option<String>,
-
-    /// Quantity of shares/units.
-    pub quantity: Option<String>,
-
-    /// Price per unit.
-    pub unit_price: Option<String>,
-
-    /// Total amount.
-    pub amount: Option<String>,
-
-    /// Transaction fee.
-    pub fee: Option<String>,
-
-    /// FX rate (if provided in CSV).
-    pub fx_rate: Option<String>,
-
-    /// Currency code.
-    pub currency: Option<String>,
-
-    /// Notes/comments.
-    pub notes: Option<String>,
-
-    /// Activity subtype (optional).
-    pub subtype: Option<String>,
-
-    /// Account ID (from args or mapping).
+    /// AI's inferred account (None if ambiguous — chat UI will prompt).
     pub account_id: Option<String>,
 
-    /// Whether this row is valid.
-    pub is_valid: bool,
+    /// Headers detected by parse_csv.
+    pub detected_headers: Vec<String>,
 
-    /// Validation errors for this row.
-    pub errors: Vec<String>,
+    /// First few data rows (≤10) so the UI can preview without re-parsing.
+    pub sample_rows: Vec<Vec<String>>,
 
-    /// Validation warnings for this row.
-    pub warnings: Vec<String>,
-
-    /// Raw values from CSV (for debugging/display).
-    pub raw_values: Vec<String>,
-}
-
-/// A cleaning action performed on the data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CleaningAction {
-    /// Type of cleaning action.
-    pub action_type: String,
-
-    /// Description of what was cleaned.
-    pub description: String,
-
-    /// Number of rows affected.
-    pub affected_rows: usize,
-}
-
-/// Summary of validation results.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ValidationSummary {
-    /// Total number of rows parsed.
+    /// Total number of rows parsed (before truncation).
     pub total_rows: usize,
 
-    /// Number of valid rows.
-    pub valid_rows: usize,
+    /// Rough confidence badge for the mapping.
+    pub mapping_confidence: MappingConfidence,
 
-    /// Number of rows with errors.
-    pub error_rows: usize,
+    /// Accounts available for selection in the chat UI.
+    pub available_accounts: Vec<AccountOption>,
 
-    /// Number of rows with warnings.
-    pub warning_rows: usize,
-
-    /// Global errors (not row-specific).
-    pub global_errors: Vec<String>,
+    /// True when the mapping came from a saved template (no LLM inference).
+    #[serde(default)]
+    pub used_saved_profile: bool,
 }
 
 // ============================================================================
@@ -216,10 +193,9 @@ const FIELD_FX_RATE: &str = "fxRate";
 const FIELD_SUBTYPE: &str = "subtype";
 
 // ============================================================================
-// Header Detection Patterns (shared logic for auto-mapping)
+// Header Detection Patterns (fallback when LLM omits field_mappings)
 // ============================================================================
 
-/// Common header patterns for each field (case-insensitive).
 const DATE_PATTERNS: &[&str] = &[
     "date",
     "trade date",
@@ -345,7 +321,7 @@ const SUBTYPE_PATTERNS: &[&str] = &[
 ];
 
 // ============================================================================
-// Helper Functions
+// Helpers
 // ============================================================================
 
 /// Auto-detect field mappings from CSV headers.
@@ -385,193 +361,50 @@ fn auto_detect_field_mappings(headers: &[String]) -> HashMap<String, String> {
     mappings
 }
 
-/// Normalize a date string to ISO 8601 format.
-fn normalize_date(input: &str, _format_hints: &[String]) -> Option<String> {
-    let input = input.trim();
-    if input.is_empty() {
-        return None;
-    }
-
-    // Try ISO 8601 first (YYYY-MM-DD or with time)
-    if let Some(date_part) = input.split('T').next() {
-        if date_part.len() == 10 && date_part.chars().nth(4) == Some('-') {
-            return Some(date_part.to_string());
-        }
-    }
-
-    // Common date formats to try
-    let formats = [
-        "%Y-%m-%d",
-        "%m/%d/%Y",
-        "%d/%m/%Y",
-        "%m-%d-%Y",
-        "%d-%m-%Y",
-        "%Y/%m/%d",
-        "%d.%m.%Y",
-        "%d %b %Y",
-        "%d-%b-%Y",
-        "%b %d, %Y",
-    ];
-
-    for fmt in formats {
-        if let Ok(parsed) = chrono::NaiveDate::parse_from_str(input, fmt) {
-            return Some(parsed.format("%Y-%m-%d").to_string());
-        }
-    }
-
-    // Try parsing with chrono's flexible parser
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(input) {
-        return Some(dt.format("%Y-%m-%d").to_string());
-    }
-
-    None
-}
-
-/// Parse a number from string, handling various formats.
-fn parse_number(input: &str, strip_sign: bool) -> Option<String> {
-    let mut s = input.trim().to_string();
-    if s.is_empty() {
-        return None;
-    }
-
-    let mut is_negative = s.starts_with('(') && s.ends_with(')');
-    if is_negative {
-        s = s.trim_start_matches('(').trim_end_matches(')').to_string();
-    }
-    if s.starts_with('-') {
-        is_negative = true;
-        s = s.trim_start_matches('-').to_string();
-    }
-
-    // Remove currency symbols and formatting
-    s = s.replace(['$', '€', '£', '¥', '(', ')', ' '], "");
-
-    // Split exponent if present
-    let mut mantissa = s.as_str();
-    let mut exponent = "";
-    if let Some(idx) = s.find(['e', 'E']) {
-        mantissa = &s[..idx];
-        exponent = &s[idx + 1..];
-    }
-
-    let mut cleaned: String = mantissa
-        .chars()
-        .filter(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
-        .collect();
-
-    let last_dot = cleaned.rfind('.');
-    let last_comma = cleaned.rfind(',');
-    let decimal_sep = match (last_dot, last_comma) {
-        (Some(dot), Some(comma)) => {
-            if comma > dot {
-                Some(',')
-            } else {
-                Some('.')
-            }
-        }
-        (Some(_), None) => Some('.'),
-        (None, Some(_)) => Some(','),
-        (None, None) => None,
-    };
-
-    match decimal_sep {
-        Some(',') => {
-            let parts: Vec<&str> = cleaned.split(',').collect();
-            if parts.len() > 1 {
-                let decimal_part = parts.last().unwrap_or(&"");
-                let integer_part = parts[..parts.len() - 1].join("").replace('.', "");
-                cleaned = format!("{}.{}", integer_part, decimal_part);
-            } else {
-                cleaned = cleaned.replace(',', "");
-            }
-        }
-        Some('.') => {
-            let parts: Vec<&str> = cleaned.split('.').collect();
-            if parts.len() > 1 {
-                let decimal_part = parts.last().unwrap_or(&"");
-                let integer_part = parts[..parts.len() - 1].join("");
-                cleaned = format!("{}.{}", integer_part, decimal_part);
-            } else {
-                cleaned = cleaned.replace('.', "");
-            }
-            cleaned = cleaned.replace(',', "");
-        }
-        None => {
-            cleaned = cleaned.replace(',', "");
-            cleaned = cleaned.replace('.', "");
-        }
-        Some(_) => {
-            // Unexpected separator; treat as no decimal separator
-            cleaned = cleaned.replace(',', "");
-            cleaned = cleaned.replace('.', "");
-        }
-    }
-
-    let exp_clean: String = exponent
-        .chars()
-        .filter(|c| c.is_ascii_digit() || *c == '-' || *c == '+')
-        .collect();
-
-    let mut candidate = cleaned;
-    if candidate.is_empty() {
-        return None;
-    }
-    if is_negative && !strip_sign {
-        candidate = format!("-{}", candidate);
-    }
-    if !exp_clean.is_empty() {
-        candidate = format!("{}e{}", candidate, exp_clean);
-    }
-
-    let parsed = Decimal::from_str(&candidate)
-        .or_else(|_| Decimal::from_scientific(&candidate))
-        .ok()?;
-    let normalized = if strip_sign { parsed.abs() } else { parsed };
-    Some(normalized.normalize().to_string())
-}
-
-fn parse_decimal_value(value: &str) -> Option<Decimal> {
-    Decimal::from_str(value)
-        .or_else(|_| Decimal::from_scientific(value))
-        .ok()
-}
-
-/// Normalize activity type to canonical form.
-fn normalize_activity_type(
-    input: &str,
-    custom_mappings: &HashMap<String, Vec<String>>,
-) -> Option<String> {
-    let upper = input.trim().to_uppercase();
-    if upper.is_empty() {
-        return None;
-    }
-
-    // Check custom mappings first (ActivityType -> [csv_values])
-    for (activity_type, csv_values) in custom_mappings {
-        for csv_value in csv_values {
-            if upper == csv_value.to_uppercase() || upper.starts_with(&csv_value.to_uppercase()) {
-                return Some(activity_type.clone());
-            }
-        }
-    }
-
-    // Built-in mappings
-    let builtin: &[(&[&str], &str)] = &[
+/// Default activity-type mappings — CSV value → canonical type. Covers the
+/// common broker verbs so a plain CSV with "Buy"/"Purchase"/"Dividend" values
+/// maps correctly even when the LLM skips `activity_mappings`. Matches the
+/// manual wizard's default template behavior.
+fn default_activity_mappings() -> HashMap<String, Vec<String>> {
+    let entries: &[(&str, &[&str])] = &[
         (
-            &["BUY", "PURCHASE", "BOUGHT", "MARKET BUY", "LIMIT BUY"],
             "BUY",
+            &[
+                "BUY",
+                "BOUGHT",
+                "PURCHASE",
+                "B",
+                "LONG",
+                "MARKET BUY",
+                "LIMIT BUY",
+            ],
         ),
-        (&["SELL", "SOLD", "MARKET SELL", "LIMIT SELL"], "SELL"),
         (
-            &["DIVIDEND", "DIV", "CASH DIVIDEND", "QUALIFIED DIVIDEND"],
+            "SELL",
+            &["SELL", "SOLD", "S", "SHORT", "MARKET SELL", "LIMIT SELL"],
+        ),
+        (
             "DIVIDEND",
+            &["DIVIDEND", "DIV", "CASH DIVIDEND", "QUALIFIED DIVIDEND"],
         ),
-        (&["INTEREST", "INT", "CASH INTEREST"], "INTEREST"),
         (
-            &["DEPOSIT", "DEP", "CASH DEPOSIT", "WIRE IN", "ACH IN"],
+            "INTEREST",
+            &["INTEREST", "INT", "INTEREST EARNED", "CASH INTEREST"],
+        ),
+        (
             "DEPOSIT",
+            &[
+                "DEPOSIT",
+                "DEP",
+                "CASH DEPOSIT",
+                "WIRE IN",
+                "ACH IN",
+                "FUNDING",
+                "WIRE TRANSFER IN",
+            ],
         ),
         (
+            "WITHDRAWAL",
             &[
                 "WITHDRAWAL",
                 "WITHDRAW",
@@ -579,54 +412,82 @@ fn normalize_activity_type(
                 "WIRE OUT",
                 "ACH OUT",
             ],
-            "WITHDRAWAL",
         ),
         (
-            &["TRANSFER IN", "TRANSFER_IN", "JOURNAL IN", "ACAT IN"],
             "TRANSFER_IN",
+            &["TRANSFER IN", "TRANSFER_IN", "JOURNAL IN", "ACAT IN"],
         ),
         (
-            &["TRANSFER OUT", "TRANSFER_OUT", "JOURNAL OUT", "ACAT OUT"],
             "TRANSFER_OUT",
+            &["TRANSFER OUT", "TRANSFER_OUT", "JOURNAL OUT", "ACAT OUT"],
         ),
         (
-            &["SPLIT", "STOCK SPLIT", "FORWARD SPLIT", "REVERSE SPLIT"],
             "SPLIT",
+            &["SPLIT", "STOCK SPLIT", "FORWARD SPLIT", "REVERSE SPLIT"],
         ),
-        (&["FEE", "FEES", "SERVICE FEE", "MANAGEMENT FEE"], "FEE"),
-        (&["TAX", "TAXES", "WITHHOLDING", "TAX WITHHELD"], "TAX"),
+        ("FEE", &["FEE", "FEES", "SERVICE FEE", "MANAGEMENT FEE"]),
+        ("TAX", &["TAX", "TAXES", "WITHHOLDING", "TAX WITHHELD"]),
     ];
+    entries
+        .iter()
+        .map(|(k, vs)| (k.to_string(), vs.iter().map(|v| v.to_string()).collect()))
+        .collect()
+}
 
-    for (patterns, canonical) in builtin {
-        if patterns.iter().any(|p| upper == *p || upper.starts_with(p)) {
-            return Some(canonical.to_string());
+/// Merge LLM-provided activity mappings on top of the defaults. LLM entries
+/// win on conflict, but defaults fill in anything the LLM omitted.
+fn merge_activity_mappings(
+    llm: Option<HashMap<String, Vec<String>>>,
+) -> HashMap<String, Vec<String>> {
+    let mut merged = default_activity_mappings();
+    if let Some(llm) = llm {
+        for (canonical, csv_values) in llm {
+            let entry = merged.entry(canonical).or_default();
+            for v in csv_values {
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                let upper = trimmed.to_uppercase();
+                if !entry
+                    .iter()
+                    .any(|existing| existing.to_uppercase() == upper)
+                {
+                    entry.push(trimmed.to_string());
+                }
+            }
         }
     }
-
-    None
+    merged
 }
 
-/// Check if a row looks like metadata (should be skipped).
-fn is_metadata_row(fields: &[String]) -> bool {
-    let populated_count = fields.iter().filter(|f| !f.trim().is_empty()).count();
-    if populated_count < 3 {
-        return true;
+/// Estimate mapping confidence from how many of the "core" fields were mapped.
+/// Core = date + activityType + symbol + (quantity OR amount) + (unitPrice OR amount).
+fn estimate_confidence(mapping: &ImportMappingData) -> MappingConfidence {
+    let has = |field: &str| mapping.field_mappings.contains_key(field);
+    let has_date = has(FIELD_DATE);
+    let has_type = has(FIELD_ACTIVITY_TYPE);
+    let has_symbol = has(FIELD_SYMBOL);
+    let has_numeric = has(FIELD_QUANTITY) || has(FIELD_AMOUNT) || has(FIELD_UNIT_PRICE);
+
+    let critical = [has_date, has_type, has_symbol, has_numeric];
+    let ok = critical.iter().filter(|b| **b).count();
+
+    match ok {
+        4 => MappingConfidence::High,
+        2..=3 => MappingConfidence::Medium,
+        _ => MappingConfidence::Low,
     }
-
-    // Check if row has any numeric values
-    let has_numeric = fields.iter().any(|f| {
-        let cleaned = f.replace(['$', '€', '£', ',', ' '], "");
-        cleaned.parse::<f64>().is_ok()
-    });
-
-    !has_numeric
 }
+
+const MAX_SAMPLE_ROWS: usize = 10;
 
 // ============================================================================
 // Tool Implementation
 // ============================================================================
 
-/// Tool to import activities from CSV using shared ImportMappingData format.
+/// Tool to infer a CSV import mapping. Does NOT build drafts or validate —
+/// the frontend runs the backend pipeline with the returned mapping.
 pub struct ImportCsvTool<E: AiEnvironment> {
     env: Arc<E>,
     base_currency: String,
@@ -635,289 +496,6 @@ pub struct ImportCsvTool<E: AiEnvironment> {
 impl<E: AiEnvironment> ImportCsvTool<E> {
     pub fn new(env: Arc<E>, base_currency: String) -> Self {
         Self { env, base_currency }
-    }
-
-    /// Apply mapping to parsed CSV content.
-    fn apply_mapping(
-        &self,
-        parsed: &ParsedCsvResult,
-        mapping: &ImportMappingData,
-        account_id: Option<&str>,
-    ) -> (Vec<CsvActivityDraft>, Vec<CleaningAction>, usize) {
-        let mut activities = Vec::new();
-        let mut cleaning_actions = Vec::new();
-
-        let headers = &parsed.headers;
-        let rows = &parsed.rows;
-
-        if rows.is_empty() {
-            return (activities, cleaning_actions, 0);
-        }
-
-        // Build header name -> index lookup (case-insensitive)
-        let header_index: HashMap<String, usize> = headers
-            .iter()
-            .enumerate()
-            .map(|(i, h)| (h.to_lowercase(), i))
-            .collect();
-
-        // Helper to get column index for a field
-        let get_index = |field: &str| -> Option<usize> {
-            mapping.field_mappings.get(field).and_then(|val| {
-                let header = match val {
-                    wealthfolio_core::activities::FieldMappingValue::Single(s) => s.clone(),
-                    wealthfolio_core::activities::FieldMappingValue::Fallback(v) => {
-                        v.first()?.clone()
-                    }
-                };
-                header_index.get(&header.to_lowercase()).copied()
-            })
-        };
-
-        // Get column indices for each field
-        let date_idx = get_index(FIELD_DATE);
-        let type_idx = get_index(FIELD_ACTIVITY_TYPE);
-        let symbol_idx = get_index(FIELD_SYMBOL);
-        let qty_idx = get_index(FIELD_QUANTITY);
-        let price_idx = get_index(FIELD_UNIT_PRICE);
-        let amount_idx = get_index(FIELD_AMOUNT);
-        let fee_idx = get_index(FIELD_FEE);
-        let fx_rate_idx = get_index(FIELD_FX_RATE);
-        let subtype_idx = get_index(FIELD_SUBTYPE);
-        let currency_idx = get_index(FIELD_CURRENCY);
-        let account_idx = get_index(FIELD_ACCOUNT);
-        let comment_idx = get_index(FIELD_COMMENT);
-
-        // Track stats
-        let mut dates_normalized = 0;
-        let mut numbers_cleaned = 0;
-        let mut activity_types_mapped = 0;
-
-        // Process rows
-        let total_rows = rows.len();
-        for (row_idx, fields) in rows.iter().enumerate() {
-            let row_number = row_idx + 1;
-
-            if is_metadata_row(fields) {
-                continue;
-            }
-
-            let get_field = |idx: Option<usize>| -> Option<String> {
-                idx.and_then(|i| fields.get(i).map(|s| s.trim().to_string()))
-                    .filter(|s| !s.is_empty())
-            };
-
-            // Extract and normalize fields
-            let raw_date = get_field(date_idx);
-            let activity_date = raw_date.as_ref().and_then(|d| {
-                let result = normalize_date(d, &[]);
-                if result.is_some() {
-                    dates_normalized += 1;
-                }
-                result
-            });
-
-            let raw_type = get_field(type_idx);
-            let activity_type = raw_type.as_ref().and_then(|t| {
-                let result = normalize_activity_type(t, &mapping.activity_mappings);
-                if result.is_some() {
-                    activity_types_mapped += 1;
-                }
-                result
-            });
-
-            let raw_symbol = get_field(symbol_idx);
-            let symbol = raw_symbol.as_ref().map(|s| {
-                // Apply symbol mappings if defined
-                mapping
-                    .symbol_mappings
-                    .get(s)
-                    .cloned()
-                    .unwrap_or_else(|| s.to_uppercase())
-            });
-
-            let quantity = get_field(qty_idx).and_then(|q| {
-                let result = parse_number(&q, true);
-                if result.is_some() {
-                    numbers_cleaned += 1;
-                }
-                result
-            });
-
-            let unit_price = get_field(price_idx).and_then(|p| {
-                let result = parse_number(&p, true);
-                if result.is_some() {
-                    numbers_cleaned += 1;
-                }
-                result
-            });
-
-            let amount = get_field(amount_idx).and_then(|a| {
-                let result = parse_number(&a, false);
-                if result.is_some() {
-                    numbers_cleaned += 1;
-                }
-                result
-            });
-
-            let fee = get_field(fee_idx).and_then(|f| {
-                let result = parse_number(&f, true);
-                if result.is_some() {
-                    numbers_cleaned += 1;
-                }
-                result
-            });
-
-            let fx_rate = get_field(fx_rate_idx).and_then(|f| {
-                let result = parse_number(&f, true);
-                if result.is_some() {
-                    numbers_cleaned += 1;
-                }
-                result
-            });
-
-            let subtype = get_field(subtype_idx).map(|s| s.trim().to_uppercase());
-
-            let currency = get_field(currency_idx);
-            let notes = get_field(comment_idx);
-
-            // Determine account ID
-            let draft_account_id = account_id.map(|s| s.to_string()).or_else(|| {
-                get_field(account_idx)
-                    .and_then(|csv_acc| mapping.account_mappings.get(&csv_acc).cloned())
-            });
-
-            let mut draft = CsvActivityDraft {
-                row_number,
-                activity_type,
-                activity_date,
-                symbol,
-                exchange_mic: None,
-                quantity,
-                unit_price,
-                amount,
-                fee,
-                fx_rate,
-                currency,
-                notes,
-                subtype,
-                account_id: draft_account_id,
-                is_valid: true,
-                errors: Vec::new(),
-                warnings: Vec::new(),
-                raw_values: fields.clone(),
-            };
-
-            // Validate the draft
-            self.validate_draft(&mut draft);
-
-            activities.push(draft);
-        }
-
-        // Add cleaning stats
-        if dates_normalized > 0 {
-            cleaning_actions.push(CleaningAction {
-                action_type: "normalize_dates".to_string(),
-                description: format!("Normalized {} dates to ISO 8601", dates_normalized),
-                affected_rows: dates_normalized,
-            });
-        }
-        if numbers_cleaned > 0 {
-            cleaning_actions.push(CleaningAction {
-                action_type: "parse_numbers".to_string(),
-                description: format!("Parsed {} numeric values", numbers_cleaned),
-                affected_rows: numbers_cleaned,
-            });
-        }
-        if activity_types_mapped > 0 {
-            cleaning_actions.push(CleaningAction {
-                action_type: "map_activity_types".to_string(),
-                description: format!("Mapped {} activity types", activity_types_mapped),
-                affected_rows: activity_types_mapped,
-            });
-        }
-
-        (activities, cleaning_actions, total_rows)
-    }
-
-    /// Validate an activity draft.
-    fn validate_draft(&self, draft: &mut CsvActivityDraft) {
-        let activity_type = draft.activity_type.as_deref().unwrap_or("");
-        let quantity_value = draft.quantity.as_deref().and_then(parse_decimal_value);
-        let unit_price_value = draft.unit_price.as_deref().and_then(parse_decimal_value);
-        let fee_value = draft.fee.as_deref().and_then(parse_decimal_value);
-
-        // Date is required for all activities
-        if draft.activity_date.is_none() {
-            draft.errors.push("Date is required".to_string());
-        }
-
-        match activity_type {
-            "BUY" | "SELL" => {
-                if draft.symbol.is_none() {
-                    draft
-                        .errors
-                        .push("Symbol is required for BUY/SELL".to_string());
-                }
-                if draft.quantity.is_none() {
-                    draft
-                        .errors
-                        .push("Quantity is required for BUY/SELL".to_string());
-                }
-                if draft.unit_price.is_none() && draft.amount.is_none() {
-                    draft
-                        .errors
-                        .push("Either unit price or amount is required".to_string());
-                }
-                // Derive amount if missing
-                if draft.amount.is_none() {
-                    if let (Some(qty), Some(price)) = (quantity_value, unit_price_value) {
-                        let fee = fee_value.unwrap_or(Decimal::ZERO);
-                        let amount = qty * price + fee;
-                        draft.amount = Some(amount.normalize().to_string());
-                    }
-                }
-            }
-            "DIVIDEND" | "INTEREST" => {
-                if draft.amount.is_none() {
-                    draft
-                        .errors
-                        .push(format!("Amount is required for {}", activity_type));
-                }
-            }
-            "DEPOSIT" | "WITHDRAWAL" | "FEE" | "TAX" => {
-                if draft.amount.is_none() {
-                    draft
-                        .errors
-                        .push(format!("Amount is required for {}", activity_type));
-                }
-            }
-            "TRANSFER_IN" | "TRANSFER_OUT" => {
-                if draft.amount.is_none() && (draft.symbol.is_none() || draft.quantity.is_none()) {
-                    draft
-                        .errors
-                        .push("Either amount or symbol+quantity required".to_string());
-                }
-            }
-            "SPLIT" => {
-                if draft.symbol.is_none() {
-                    draft
-                        .errors
-                        .push("Symbol is required for SPLIT".to_string());
-                }
-                if draft.amount.is_none() {
-                    draft
-                        .errors
-                        .push("Amount (split ratio) is required for SPLIT".to_string());
-                }
-            }
-            "" => {
-                draft.errors.push("Activity type is required".to_string());
-            }
-            _ => {}
-        }
-
-        draft.is_valid = draft.errors.is_empty();
     }
 }
 
@@ -935,15 +513,28 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
 
     type Error = AiError;
     type Args = ImportCsvArgs;
-    type Output = ImportCsvOutput;
+    type Output = ImportCsvMappingOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
             description: "REQUIRED for CSV file imports. When a user attaches a CSV file or provides CSV content, \
                 you MUST call this tool. Pass the complete CSV text to csvContent. \
-                The tool parses CSV data, auto-detects column mappings, normalizes dates/numbers/activity types, \
-                and returns activity drafts for user review. Never analyze CSV content manually - always use this tool.".to_string(),
+                The tool returns a mapping (column→field, value normalization, symbol translations, parse config); \
+                the app then parses/validates the file and shows the user an inline review grid in the chat. \
+                You do NOT need to parse or validate the data yourself. \
+                \n\nIMPORTANT: csvContent must contain the COMPLETE CSV text every time this tool is called. \
+                CSV data from previous tool calls is NOT retained. If the user wants to re-import or change \
+                settings, ask them to re-attach the CSV file — do not call this tool with empty or partial content. \
+                \n\nWhen CSV symbol values look like company NAMES rather than tickers, populate `symbolMappings` with \
+                name→ticker pairs using your knowledge of public companies. Examples: {\"Cloudflare\": \"NET\", \
+                \"Apple Inc\": \"AAPL\", \"Tesla Inc.\": \"TSLA\"}. For values you are unsure about, leave them \
+                out — the user will resolve them in the chat review step. \
+                \n\nFor `parseConfig` fields (delimiter, skipTopRows, skipBottomRows, dateFormat, decimalSeparator, \
+                thousandsSeparator, defaultCurrency): detect non-defaults from the sample rows. European brokers \
+                often use `;` delimiter, `,` decimal, `.` thousands, and DD/MM/YYYY dates. Many broker exports have \
+                a multi-line preamble before the real header row — pass skipTopRows to skip it. Totals/disclaimer \
+                lines at the end need skipBottomRows.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -953,16 +544,16 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                     },
                     "accountId": {
                         "type": ["string", "null"],
-                        "description": "Account ID to assign to all imported activities. Pass null if CSV contains account column or unknown."
+                        "description": "Account UUID to assign to all imported activities. If the user mentions an account by name (e.g. 'Joint', 'RRSP'), call get_accounts first to resolve the name to an ID. Pass null only if the user didn't specify an account."
                     },
                     "fieldMappings": {
                         "type": ["object", "null"],
-                        "description": "Maps field names to CSV header names. Keys: date, activityType, symbol, quantity, unitPrice, amount, fee, fxRate, subtype, currency, account, comment. Pass null to use auto-detection.",
+                        "description": "Maps field names to CSV header names. Keys: date, activityType, symbol, quantity, unitPrice, amount, fee, fxRate, subtype, currency, account, comment.",
                         "additionalProperties": { "type": "string" }
                     },
                     "activityMappings": {
                         "type": ["object", "null"],
-                        "description": "Maps canonical activity types (BUY, SELL, DIVIDEND, etc.) to CSV values. E.g., {\"BUY\": [\"Purchase\", \"Achat\"]}. Pass null to use defaults.",
+                        "description": "Maps canonical activity types (BUY, SELL, DIVIDEND, INTEREST, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, SPLIT, FEE, TAX) to CSV values. Common English verbs (Buy/Bought/Purchase, Sell/Sold, Dividend/Div, etc.) are already covered by defaults — you only need to add non-English or broker-specific terms. E.g., {\"BUY\": [\"Achat\", \"Kopen\"], \"DIVIDEND\": [\"Dividende\"]}. Pass null if all CSV values are covered by defaults.",
                         "additionalProperties": {
                             "type": "array",
                             "items": { "type": "string" }
@@ -970,28 +561,44 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                     },
                     "symbolMappings": {
                         "type": ["object", "null"],
-                        "description": "Maps CSV symbols to canonical symbols. E.g., {\"AAPL.US\": \"AAPL\"}. Pass null if no transformation needed.",
+                        "description": "Maps CSV symbol values (tickers OR company names) to canonical tickers. Use your knowledge of public companies to translate names: {\"Cloudflare\": \"NET\", \"Apple Inc\": \"AAPL\"}.",
                         "additionalProperties": { "type": "string" }
                     },
                     "accountMappings": {
                         "type": ["object", "null"],
-                        "description": "Maps CSV account values to app account IDs. E.g., {\"My Brokerage\": \"account-uuid\"}. Pass null if using accountId or no mapping needed.",
+                        "description": "Maps CSV account values to app account IDs. Pass null if using accountId or no mapping needed.",
                         "additionalProperties": { "type": "string" }
                     },
                     "delimiter": {
                         "type": ["string", "null"],
-                        "description": "CSV delimiter: \",\", \";\", \"\\t\" (tab). Pass null for auto-detection."
+                        "description": "CSV delimiter: \",\", \";\", \"\\t\". Pass null for auto-detection."
                     },
                     "skipTopRows": {
                         "type": ["integer", "null"],
-                        "description": "Number of rows to skip at the top before the header row. Pass null or 0 if no rows to skip."
+                        "description": "Number of NON-HEADER rows to skip at the top (preamble/disclaimer lines BEFORE the column header row). Do NOT count the header row itself — only count text like account names, date ranges, disclaimers that appear before the row with column headers. Example: if rows 1-3 are preamble and row 4 is 'Date,Symbol,Qty,...', pass 3 (not 4). Pass null or 0 if the header is the first row."
+                    },
+                    "skipBottomRows": {
+                        "type": ["integer", "null"],
+                        "description": "Number of rows to skip at the bottom (totals/disclaimer footer rows). Pass null or 0 if no rows to skip."
                     },
                     "dateFormat": {
                         "type": ["string", "null"],
                         "description": "Date format hint using strftime: \"%Y-%m-%d\", \"%d/%m/%Y\", \"%m/%d/%Y\". Pass null for auto-detection."
+                    },
+                    "decimalSeparator": {
+                        "type": ["string", "null"],
+                        "description": "Decimal separator: \".\", \",\". Pass null for auto-detection."
+                    },
+                    "thousandsSeparator": {
+                        "type": ["string", "null"],
+                        "description": "Thousands separator: \",\", \".\", \" \", \"none\". Pass null for auto-detection."
+                    },
+                    "defaultCurrency": {
+                        "type": ["string", "null"],
+                        "description": "Default currency when rows don't specify one (e.g., \"EUR\" for European broker statements)."
                     }
                 },
-                "required": ["csvContent", "accountId", "fieldMappings", "activityMappings", "symbolMappings", "accountMappings", "delimiter", "skipTopRows", "dateFormat"],
+                "required": ["csvContent"],
                 "additionalProperties": false
             }),
         }
@@ -999,12 +606,20 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
 
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         debug!(
-            "import_csv called: content_len={}, account_id={:?}, delimiter={:?}, skip_top_rows={:?}",
+            "import_csv called: content_len={}, account_id={:?}, delimiter={:?}",
             args.csv_content.len(),
             args.account_id,
-            args.delimiter,
-            args.skip_top_rows
+            args.delimiter
         );
+
+        // Reject empty CSV early with a clear message the LLM can relay.
+        if args.csv_content.trim().is_empty() {
+            return Err(AiError::ToolExecutionFailed(
+                "No CSV content provided. The user needs to attach the CSV file again — \
+                 file content from previous messages is not available in follow-up turns."
+                    .to_string(),
+            ));
+        }
 
         // Get available accounts
         let accounts = self
@@ -1022,200 +637,102 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             })
             .collect();
 
-        // Parse CSV using core parser with LLM-provided config
-        let parse_config = ParseConfig {
+        // Build the parse config from LLM input (unset fields fall back to auto-detect).
+        let llm_parse_config = ParseConfig {
             delimiter: args.delimiter.clone(),
             skip_top_rows: args.skip_top_rows,
+            skip_bottom_rows: args.skip_bottom_rows,
             date_format: args.date_format.clone(),
+            decimal_separator: args.decimal_separator.clone(),
+            thousands_separator: args.thousands_separator.clone(),
+            default_currency: args
+                .default_currency
+                .clone()
+                .or_else(|| Some(self.base_currency.clone())),
             ..Default::default()
+        };
+
+        // Fast path: saved template exists for this account.
+        let mut used_saved_profile = false;
+        let mut mapping: Option<ImportMappingData> = None;
+        if let Some(ref account_id) = args.account_id {
+            if !has_usable_llm_mappings(&args) {
+                if let Ok(saved) = self
+                    .env
+                    .activity_service()
+                    .get_import_mapping(account_id.clone(), import_type::ACTIVITY.to_string())
+                {
+                    debug!("Loaded saved import mapping for account {}", account_id);
+                    used_saved_profile = true;
+                    mapping = Some(saved);
+                }
+            }
+        }
+
+        // Parse CSV to get headers + sample rows for the UI preview.
+        let effective_parse_config = match &mapping {
+            Some(m) => m
+                .parse_config
+                .clone()
+                .unwrap_or_else(|| llm_parse_config.clone()),
+            None => llm_parse_config.clone(),
         };
         let parsed_csv = self
             .env
             .activity_service()
-            .parse_csv(args.csv_content.as_bytes(), &parse_config)
+            .parse_csv(args.csv_content.as_bytes(), &effective_parse_config)
             .map_err(|e| AiError::ToolExecutionFailed(format!("CSV parse error: {}", e)))?;
 
         let headers = parsed_csv.headers.clone();
-
-        // Build mapping: LLM provided > saved profile > auto-detect
-        let mut used_saved_profile = false;
-        let has_llm_mappings = args.field_mappings.is_some()
-            || args.activity_mappings.is_some()
-            || args.symbol_mappings.is_some()
-            || args.account_mappings.is_some();
-
-        let mut mapping = if has_llm_mappings {
-            // LLM provided mappings (flattened structure)
-            ImportMappingData {
-                account_id: args.account_id.clone().unwrap_or_default(),
-                field_mappings: into_field_mapping_values(
-                    args.field_mappings.clone().unwrap_or_default(),
-                ),
-                activity_mappings: args.activity_mappings.clone().unwrap_or_default(),
-                symbol_mappings: args.symbol_mappings.clone().unwrap_or_default(),
-                account_mappings: args.account_mappings.clone().unwrap_or_default(),
-                ..Default::default()
-            }
-        } else if let Some(ref account_id) = args.account_id {
-            // Try to load saved profile
-            match self
-                .env
-                .activity_service()
-                .get_import_mapping(account_id.clone(), import_type::ACTIVITY.to_string())
-            {
-                Ok(saved) => {
-                    used_saved_profile = true;
-                    debug!("Loaded saved import mapping for account {}", account_id);
-                    saved
-                }
-                Err(_) => {
-                    // No saved profile, use auto-detection
-                    ImportMappingData {
-                        account_id: account_id.clone(),
-                        field_mappings: into_field_mapping_values(auto_detect_field_mappings(
-                            &headers,
-                        )),
-                        ..Default::default()
-                    }
-                }
-            }
-        } else {
-            // No account, use auto-detection
-            ImportMappingData {
-                account_id: String::new(),
-                field_mappings: into_field_mapping_values(auto_detect_field_mappings(&headers)),
-                ..Default::default()
-            }
-        };
-
-        // Ensure account_id is set
-        if let Some(ref account_id) = args.account_id {
-            mapping.account_id = account_id.clone();
+        let total_rows = parsed_csv.rows.len();
+        if total_rows == 0 {
+            debug!("import_csv: parse_csv returned 0 data rows");
         }
-
-        // Apply mapping
-        let (mut activities, mut cleaning_actions, total_rows) =
-            self.apply_mapping(&parsed_csv, &mapping, args.account_id.as_deref());
-
-        // Log delimiter if non-standard
-        if let Some(ref delim) = parsed_csv.detected_config.delimiter {
-            if delim != "," {
-                cleaning_actions.insert(
-                    0,
-                    CleaningAction {
-                        action_type: "detect_delimiter".to_string(),
-                        description: format!(
-                            "Detected delimiter: '{}'",
-                            if delim == "\t" { "tab" } else { delim }
-                        ),
-                        affected_rows: 0,
-                    },
-                );
-            }
-        }
-
-        // Apply base currency as default
-        for draft in &mut activities {
-            if draft.currency.is_none() {
-                draft.currency = Some(self.base_currency.clone());
-            }
-        }
-
-        // Resolve symbols for non-cash activities
-        let cash_types: HashSet<&str> = [
-            "DEPOSIT",
-            "WITHDRAWAL",
-            "INTEREST",
-            "TRANSFER_IN",
-            "TRANSFER_OUT",
-            "TAX",
-            "FEE",
-            "CREDIT",
-        ]
-        .into_iter()
-        .collect();
-
-        let symbols_to_resolve: HashSet<String> = activities
+        let sample_rows: Vec<Vec<String>> = parsed_csv
+            .rows
             .iter()
-            .filter_map(|a| {
-                let symbol = a.symbol.as_ref()?;
-                if symbol.starts_with("CASH:") {
-                    return None;
-                }
-                if let Some(ref t) = a.activity_type {
-                    if cash_types.contains(t.to_uppercase().as_str()) {
-                        return None;
-                    }
-                }
-                Some(symbol.clone())
-            })
+            .take(MAX_SAMPLE_ROWS)
+            .cloned()
             .collect();
 
-        let mut symbol_mic_cache: HashMap<String, Option<String>> = HashMap::new();
-        for symbol in &symbols_to_resolve {
-            let results = self
-                .env
-                .quote_service()
-                .search_symbol_with_currency(symbol, Some(&self.base_currency))
-                .await
-                .unwrap_or_default();
-            symbol_mic_cache.insert(
-                symbol.clone(),
-                results.first().and_then(|r| r.exchange_mic.clone()),
-            );
-        }
-
-        // Update activities with resolved MICs
-        for draft in &mut activities {
-            if let Some(ref symbol) = draft.symbol {
-                if symbol.starts_with("CASH:") {
-                    continue;
-                }
-                if let Some(ref t) = draft.activity_type {
-                    if cash_types.contains(t.to_uppercase().as_str()) {
-                        continue;
-                    }
-                }
-                if let Some(mic_opt) = symbol_mic_cache.get(symbol) {
-                    if let Some(mic) = mic_opt {
-                        draft.exchange_mic = Some(mic.clone());
-                    } else {
-                        draft
-                            .warnings
-                            .push(format!("Symbol '{}' not found in market data", symbol));
-                    }
-                }
-            }
-        }
-
-        // Truncate if needed
-        let truncated = if activities.len() > MAX_IMPORT_ROWS {
-            activities.truncate(MAX_IMPORT_ROWS);
-            Some(true)
+        // If we have no saved template, build the mapping from LLM + auto-detect.
+        let applied_mapping = if let Some(m) = mapping {
+            m
         } else {
-            None
+            let llm_field_mappings = clean_string_map(args.field_mappings.clone());
+            let field_mappings = if llm_field_mappings.is_empty() {
+                auto_detect_field_mappings(&headers)
+            } else {
+                llm_field_mappings
+            };
+
+            ImportMappingData {
+                account_id: args.account_id.clone().unwrap_or_default(),
+                context_kind: import_type::ACTIVITY.to_string(),
+                field_mappings: into_field_mapping_values(field_mappings),
+                activity_mappings: merge_activity_mappings(args.activity_mappings.clone()),
+                symbol_mappings: clean_string_map(args.symbol_mappings.clone()),
+                account_mappings: clean_string_map(args.account_mappings.clone()),
+                parse_config: Some(effective_parse_config.clone()),
+                ..Default::default()
+            }
         };
 
-        // Build validation summary
-        let valid_rows = activities.iter().filter(|a| a.is_valid).count();
-        let error_rows = activities.iter().filter(|a| !a.errors.is_empty()).count();
-        let warning_rows = activities.iter().filter(|a| !a.warnings.is_empty()).count();
+        let mapping_confidence = if used_saved_profile {
+            MappingConfidence::High
+        } else {
+            estimate_confidence(&applied_mapping)
+        };
 
-        Ok(ImportCsvOutput {
-            activities,
-            applied_mapping: mapping,
-            cleaning_actions,
-            validation: ValidationSummary {
-                total_rows,
-                valid_rows,
-                error_rows,
-                warning_rows,
-                global_errors: Vec::new(),
-            },
-            available_accounts,
+        Ok(ImportCsvMappingOutput {
+            applied_mapping,
+            parse_config: effective_parse_config,
+            account_id: args.account_id,
             detected_headers: headers,
+            sample_rows,
             total_rows,
-            truncated,
+            mapping_confidence,
+            available_accounts,
             used_saved_profile,
         })
     }
@@ -1225,69 +742,6 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
 mod tests {
     use super::*;
     use crate::env::test_env::MockEnvironment;
-
-    #[test]
-    fn test_normalize_date() {
-        assert_eq!(
-            normalize_date("2024-01-15", &[]),
-            Some("2024-01-15".to_string())
-        );
-        assert_eq!(
-            normalize_date("01/15/2024", &[]),
-            Some("2024-01-15".to_string())
-        );
-        assert_eq!(
-            normalize_date("15-Jan-2024", &[]),
-            Some("2024-01-15".to_string())
-        );
-        assert_eq!(normalize_date("invalid", &[]), None);
-    }
-
-    #[test]
-    fn test_parse_number() {
-        assert_eq!(parse_number("100.50", false), Some("100.5".to_string()));
-        assert_eq!(parse_number("$1,234.56", true), Some("1234.56".to_string()));
-        assert_eq!(parse_number("(100.00)", true), Some("100".to_string()));
-        assert_eq!(parse_number("1234,56", false), Some("1234.56".to_string()));
-        assert_eq!(parse_number("invalid", false), None);
-    }
-
-    #[test]
-    fn test_normalize_activity_type() {
-        let custom = HashMap::new();
-        assert_eq!(
-            normalize_activity_type("Buy", &custom),
-            Some("BUY".to_string())
-        );
-        assert_eq!(
-            normalize_activity_type("PURCHASE", &custom),
-            Some("BUY".to_string())
-        );
-        assert_eq!(
-            normalize_activity_type("Sell", &custom),
-            Some("SELL".to_string())
-        );
-        assert_eq!(
-            normalize_activity_type("Dividend", &custom),
-            Some("DIVIDEND".to_string())
-        );
-    }
-
-    #[test]
-    fn test_normalize_activity_type_with_custom_mappings() {
-        let mut custom = HashMap::new();
-        custom.insert("BUY".to_string(), vec!["ACHAT".to_string()]);
-        custom.insert("SELL".to_string(), vec!["VENTE".to_string()]);
-
-        assert_eq!(
-            normalize_activity_type("ACHAT", &custom),
-            Some("BUY".to_string())
-        );
-        assert_eq!(
-            normalize_activity_type("Vente", &custom),
-            Some("SELL".to_string())
-        );
-    }
 
     #[test]
     fn test_auto_detect_field_mappings() {
@@ -1308,8 +762,39 @@ mod tests {
         assert_eq!(mappings.get(FIELD_ACTIVITY_TYPE), Some(&"Type".to_string()));
     }
 
+    #[test]
+    fn test_estimate_confidence_high() {
+        let mapping = ImportMappingData {
+            field_mappings: into_field_mapping_values(
+                [
+                    (FIELD_DATE.to_string(), "Date".to_string()),
+                    (FIELD_ACTIVITY_TYPE.to_string(), "Type".to_string()),
+                    (FIELD_SYMBOL.to_string(), "Symbol".to_string()),
+                    (FIELD_QUANTITY.to_string(), "Quantity".to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(estimate_confidence(&mapping), MappingConfidence::High);
+    }
+
+    #[test]
+    fn test_estimate_confidence_low() {
+        let mapping = ImportMappingData {
+            field_mappings: into_field_mapping_values(
+                [(FIELD_DATE.to_string(), "Date".to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(estimate_confidence(&mapping), MappingConfidence::Low);
+    }
+
     #[tokio::test]
-    async fn test_import_csv_basic() {
+    async fn test_import_csv_basic_returns_mapping() {
         let env = Arc::new(MockEnvironment::new());
         let tool = ImportCsvTool::new(env, "USD".to_string());
 
@@ -1323,18 +808,92 @@ mod tests {
             account_mappings: None,
             delimiter: None,
             skip_top_rows: None,
+            skip_bottom_rows: None,
             date_format: None,
+            decimal_separator: None,
+            thousands_separator: None,
+            default_currency: None,
         };
 
         let result = tool.call(args).await.unwrap();
-        assert_eq!(result.activities.len(), 1);
-        assert_eq!(result.activities[0].symbol, Some("AAPL".to_string()));
-        assert_eq!(result.activities[0].activity_type, Some("BUY".to_string()));
-        assert_eq!(result.activities[0].quantity, Some("10".to_string()));
+        assert_eq!(result.total_rows, 1);
+        assert_eq!(result.detected_headers.len(), 5);
+        assert!(!result.used_saved_profile);
+        // Auto-detect picks the obvious columns.
+        let f = &result.applied_mapping.field_mappings;
+        assert!(f.contains_key(FIELD_DATE));
+        assert!(f.contains_key(FIELD_SYMBOL));
+        assert!(f.contains_key(FIELD_ACTIVITY_TYPE));
+        // Even with no LLM-provided activity_mappings, defaults cover the
+        // common English verbs so the frontend can map CSV values to canonical
+        // types.
+        let am = &result.applied_mapping.activity_mappings;
+        assert!(am.contains_key("BUY"));
+        assert!(am
+            .get("BUY")
+            .unwrap()
+            .iter()
+            .any(|v| v.to_uppercase() == "PURCHASE"));
+        assert!(am.contains_key("DIVIDEND"));
+    }
+
+    #[test]
+    fn test_merge_activity_mappings_llm_additions() {
+        let mut llm = HashMap::new();
+        llm.insert("BUY".to_string(), vec!["Kopen".to_string()]);
+        llm.insert("DIVIDEND".to_string(), vec!["Dividende".to_string()]);
+        let merged = merge_activity_mappings(Some(llm));
+        // Defaults preserved.
+        assert!(merged
+            .get("BUY")
+            .unwrap()
+            .iter()
+            .any(|v| v.to_uppercase() == "PURCHASE"));
+        // LLM additions merged in.
+        assert!(merged.get("BUY").unwrap().iter().any(|v| v == "Kopen"));
+        assert!(merged
+            .get("DIVIDEND")
+            .unwrap()
+            .iter()
+            .any(|v| v == "Dividende"));
+    }
+
+    #[test]
+    fn test_empty_nullable_maps_are_not_usable_llm_mappings() {
+        let args: ImportCsvArgs = serde_json::from_value(serde_json::json!({
+            "csvContent": "Date,Symbol\n2024-01-15,AAPL",
+            "fieldMappings": { "date": null },
+            "symbolMappings": { "Apple": "   " },
+            "accountMappings": {}
+        }))
+        .unwrap();
+
+        assert!(!has_usable_string_map(&args.field_mappings));
+        assert!(!has_usable_string_map(&args.symbol_mappings));
+        assert!(!has_usable_string_map(&args.account_mappings));
+        assert!(!has_usable_llm_mappings(&args));
+        assert!(clean_string_map(args.field_mappings).is_empty());
+        assert!(clean_string_map(args.symbol_mappings).is_empty());
+    }
+
+    #[test]
+    fn test_non_empty_mappings_are_usable() {
+        let mut field_mappings = HashMap::new();
+        field_mappings.insert("date".to_string(), "Datum".to_string());
+        assert!(has_usable_string_map(&Some(field_mappings)));
+
+        let mut activity_mappings = HashMap::new();
+        activity_mappings.insert("BUY".to_string(), vec!["  ".to_string()]);
+        assert!(!has_usable_activity_mappings(&Some(
+            activity_mappings.clone()
+        )));
+
+        activity_mappings.insert("BUY".to_string(), vec!["Kopen".to_string()]);
+        assert!(has_usable_activity_mappings(&Some(activity_mappings)));
     }
 
     #[tokio::test]
-    async fn test_import_csv_with_mapping() {
+    async fn test_import_csv_with_llm_mapping() {
         let env = Arc::new(MockEnvironment::new());
         let tool = ImportCsvTool::new(env, "USD".to_string());
 
@@ -1359,12 +918,52 @@ mod tests {
             account_mappings: None,
             delimiter: None,
             skip_top_rows: None,
+            skip_bottom_rows: None,
             date_format: None,
+            decimal_separator: None,
+            thousands_separator: None,
+            default_currency: None,
         };
 
         let result = tool.call(args).await.unwrap();
-        assert_eq!(result.activities.len(), 1);
-        assert_eq!(result.activities[0].symbol, Some("AAPL".to_string()));
-        assert_eq!(result.activities[0].activity_type, Some("BUY".to_string()));
+        assert_eq!(result.total_rows, 1);
+        let buy = result.applied_mapping.activity_mappings.get("BUY").unwrap();
+        assert!(buy.iter().any(|v| v == "Kopen"));
+        // Defaults are merged in alongside the LLM-provided CSV value.
+        assert!(buy.iter().any(|v| v.to_uppercase() == "PURCHASE"));
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_with_symbol_name_mapping() {
+        // AI translates company names to tickers via symbol_mappings.
+        let env = Arc::new(MockEnvironment::new());
+        let tool = ImportCsvTool::new(env, "USD".to_string());
+
+        let csv = "Date,Company,Qty\n2024-01-15,Cloudflare,50";
+
+        let mut symbol_mappings = HashMap::new();
+        symbol_mappings.insert("Cloudflare".to_string(), "NET".to_string());
+
+        let args = ImportCsvArgs {
+            csv_content: csv.to_string(),
+            account_id: None,
+            field_mappings: None,
+            activity_mappings: None,
+            symbol_mappings: Some(symbol_mappings),
+            account_mappings: None,
+            delimiter: None,
+            skip_top_rows: None,
+            skip_bottom_rows: None,
+            date_format: None,
+            decimal_separator: None,
+            thousands_separator: None,
+            default_currency: None,
+        };
+
+        let result = tool.call(args).await.unwrap();
+        assert_eq!(
+            result.applied_mapping.symbol_mappings.get("Cloudflare"),
+            Some(&"NET".to_string())
+        );
     }
 }

@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useRuntimeContext } from "../../hooks/use-runtime-context";
 import type {
   RecordActivitiesArgs,
@@ -123,7 +123,7 @@ function getRowStatusBadge(
   return { label: "Invalid", variant: "secondary", className: "" };
 }
 
-function RecordActivitiesToolUIContent({
+function RecordActivitiesToolUIContentImpl({
   result,
   status,
   toolCallId,
@@ -405,6 +405,8 @@ function RecordActivitiesToolUIContent({
     </Card>
   );
 }
+
+const RecordActivitiesToolUIContent = memo(RecordActivitiesToolUIContentImpl);
 
 export const RecordActivitiesToolUI = makeAssistantToolUI<
   RecordActivitiesArgs,

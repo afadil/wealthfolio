@@ -1462,7 +1462,7 @@ where
             });
         }
 
-        infos.sort_by(|a, b| a.priority.cmp(&b.priority));
+        infos.sort_by_key(|a| a.priority);
         Ok(infos)
     }
 

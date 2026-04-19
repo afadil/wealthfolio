@@ -14,11 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
+  CompactToolCard,
   createActivityAmountFormatter,
   createActivityQuantityFormatter,
   formatActivityAmount,
@@ -37,6 +38,7 @@ interface SearchActivitiesArgs {
   activityType?: string;
   symbol?: string;
   days?: number;
+  displayMode?: "compact" | "full";
 }
 
 interface ActivityDto {
@@ -165,7 +167,9 @@ type ActivitiesContentProps = ToolCallMessagePartProps<
   SearchActivitiesOutput
 >;
 
-function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
+const ActivitiesContent = memo(ActivitiesContentImpl);
+
+function ActivitiesContentImpl({ args, result, status }: ActivitiesContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -192,6 +196,16 @@ function ActivitiesContent({ args, result, status }: ActivitiesContentProps) {
   const isComplete = status?.type === "complete" || status?.type === "incomplete";
   const hasError = status?.type === "incomplete" && status.reason === "error";
   const activitiesCount = sortedActivities.length;
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return (
+      <CompactToolCard
+        label={`Fetched ${parsed.activities.length} activit${parsed.activities.length !== 1 ? "ies" : "y"}`}
+      />
+    );
+  }
+
   // Loading skeleton
   if (isLoading) {
     return (

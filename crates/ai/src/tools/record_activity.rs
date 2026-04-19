@@ -488,10 +488,8 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
                     missing_fields.push("unit_price".to_string());
                 }
             }
-            "DEPOSIT" | "WITHDRAWAL" | "TAX" | "FEE" | "CREDIT" => {
-                if draft.amount.is_none() {
-                    missing_fields.push("amount".to_string());
-                }
+            "DEPOSIT" | "WITHDRAWAL" | "TAX" | "FEE" | "CREDIT" if draft.amount.is_none() => {
+                missing_fields.push("amount".to_string());
             }
             "DIVIDEND" => {
                 if draft.symbol.is_none() && draft.asset_id.is_none() {
@@ -504,13 +502,12 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
                     missing_fields.push("amount".to_string());
                 }
             }
-            "INTEREST" => {
-                // Amount is required, symbol is optional
+            // Amount is required, symbol is optional
+            "INTEREST"
                 if draft.amount.is_none()
-                    && (draft.quantity.is_none() || draft.unit_price.is_none())
-                {
-                    missing_fields.push("amount".to_string());
-                }
+                    && (draft.quantity.is_none() || draft.unit_price.is_none()) =>
+            {
+                missing_fields.push("amount".to_string());
             }
             "SPLIT" => {
                 if draft.symbol.is_none() && draft.asset_id.is_none() {
@@ -520,11 +517,9 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
                     missing_fields.push("quantity".to_string());
                 }
             }
-            "TRANSFER_IN" | "TRANSFER_OUT" => {
-                // Either amount (for cash) or (symbol + quantity) for assets
-                if draft.amount.is_none() && draft.symbol.is_none() {
-                    missing_fields.push("amount".to_string());
-                }
+            // Either amount (for cash) or (symbol + quantity) for assets
+            "TRANSFER_IN" | "TRANSFER_OUT" if draft.amount.is_none() && draft.symbol.is_none() => {
+                missing_fields.push("amount".to_string());
             }
             _ => {}
         }
