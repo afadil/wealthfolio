@@ -1,28 +1,21 @@
 import type { Holding, RetirementOverview, RetirementTrajectoryPoint } from "@/lib/types";
+import { GoalFundingEditor } from "@/pages/goals/components/goal-funding-editor";
 import {
+  AnimatedToggleGroup,
   Badge,
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Skeleton,
   formatAmount,
+  formatPercent,
+  Input,
+  Skeleton,
 } from "@wealthfolio/ui";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { useMemo, useState, useCallback } from "react";
-import { GoalFundingEditor } from "@/pages/goals/components/goal-funding-editor";
-import { Input } from "@wealthfolio/ui";
-import type {
-  RetirementPlan,
-  WithdrawalConfig,
-  TaxProfile,
-  ExpenseBucket,
-  RetirementIncomeStream,
-  InvestmentAssumptions,
-} from "../types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
+import { useCallback, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -32,6 +25,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type {
+  ExpenseBucket,
+  InvestmentAssumptions,
+  RetirementIncomeStream,
+  RetirementPlan,
+  TaxProfile,
+  WithdrawalConfig,
+} from "../types";
 
 type PlannerMode = "fire" | "traditional";
 
@@ -64,59 +65,82 @@ function modeLabel(mode: PlannerMode) {
   };
 }
 
-function fmt(value: number, currency: string) {
-  return formatAmount(value, currency);
-}
-
 function fmtCompact(value: number, currency: string) {
-  if (Math.abs(value) >= 1_000_000) return formatAmount(Math.round(value / 1000) * 1000, currency);
-  return formatAmount(value, currency);
+  const abs = Math.abs(value);
+  const maximumFractionDigits = abs >= 1_000_000 ? 2 : abs >= 100_000 ? 0 : abs >= 1_000 ? 1 : 0;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      notation: "compact",
+      maximumFractionDigits,
+    }).format(value);
+  } catch {
+    return formatAmount(value, currency);
+  }
 }
 
-/** Radial progress ring */
-function RadialProgress({ value, size = 80 }: { value: number; size?: number }) {
-  const strokeWidth = 5;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.min(Math.max(value, 0), 1);
-  const offset = circumference - clamped * circumference;
+type ChartValueMode = "real" | "nominal";
+
+function ValueModeToggle({
+  value,
+  onChange,
+}: {
+  value: ChartValueMode;
+  onChange: (value: ChartValueMode) => void;
+}) {
+  return (
+    <AnimatedToggleGroup<ChartValueMode>
+      value={value}
+      onValueChange={onChange}
+      items={[
+        { value: "real", label: "Today's value" },
+        { value: "nominal", label: "Nominal" },
+      ]}
+      size="xs"
+      rounded="md"
+      className="bg-muted/30 border"
+    />
+  );
+}
+
+function ValueModeTooltip({
+  valueMode,
+  currency,
+  todayValue,
+  nominalValue,
+  children,
+}: {
+  valueMode: ChartValueMode;
+  currency: string;
+  todayValue: number;
+  nominalValue: number;
+  children: React.ReactNode;
+}) {
+  const showingLabel = valueMode === "real" ? "Today's value" : "Nominal";
+  const alternateLabel = valueMode === "real" ? "Nominal" : "Today's value";
+  const alternateValue = valueMode === "real" ? nominalValue : todayValue;
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          className="text-muted/30"
-          strokeWidth={strokeWidth}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          className="text-success"
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.6s ease" }}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
-        {Math.round(clamped * 100)}%
-      </span>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help underline decoration-dotted underline-offset-2">
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-xs">
+        <div className="text-[10px] font-semibold uppercase tracking-wider">
+          Showing {showingLabel}
+        </div>
+        <div className="mt-1 tabular-nums">
+          {alternateLabel}: {fmtCompact(alternateValue, currency)}
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
 // ─── Chart types & helpers ───────────────────────────────────────
-
-type ChartValueMode = "real" | "nominal";
 
 interface ChartPoint {
   label: string; // category axis for reliable ReferenceLine
@@ -136,6 +160,16 @@ interface ChartPoint {
 const CHART_COLORS = {
   portfolio: { fill: "hsl(38, 75%, 50%)", stroke: "hsl(38, 75%, 50%)" },
 };
+
+// Warm olive palette for income streams (coverage bar + row dots).
+// Values come from --fi-stream-N CSS variables which swap between light/dark themes.
+const INCOME_STREAM_COLORS = [
+  "var(--fi-stream-1)",
+  "var(--fi-stream-2)",
+  "var(--fi-stream-3)",
+  "var(--fi-stream-4)",
+  "var(--fi-stream-5)",
+];
 
 function RetirementChartTooltip({
   active,
@@ -271,11 +305,23 @@ function RetirementChart({
           <XAxis
             dataKey="label"
             tick={{ fontSize: 11 }}
+            tickFormatter={(label: string) => label.replace(/^Age\s+/, "")}
             interval={Math.max(1, Math.floor(data.length / 6))}
             axisLine={false}
             tickLine={false}
           />
-          <YAxis hide domain={[0, "auto"]} />
+          <YAxis
+            tick={{ fontSize: 10 }}
+            tickFormatter={(v: number) => {
+              if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+              if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+              return `$${v.toFixed(0)}`;
+            }}
+            width={60}
+            axisLine={false}
+            tickLine={false}
+            domain={[0, "auto"]}
+          />
           <RTooltip
             content={<RetirementChartTooltip currency={currency} valueMode={valueMode} />}
           />
@@ -289,7 +335,7 @@ function RetirementChart({
               strokeDasharray="4 3"
               strokeOpacity={0.8}
               label={{
-                value: "Projected FI",
+                value: `FI · ${projectedFireAge}`,
                 position: "top",
                 fontSize: 10,
                 fill: "var(--color-green-400)",
@@ -306,9 +352,10 @@ function RetirementChart({
             strokeDasharray="4 3"
             strokeOpacity={0.5}
             label={{
-              value: "Desired age",
+              value: `GOAL · ${retirementAge}`,
               position: "top",
               fontSize: 10,
+              fontWeight: 600,
               fill: "#888",
             }}
           />
@@ -371,9 +418,52 @@ function InfoLabel({ label, children }: { label: string; children: React.ReactNo
 
 function ConfigRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 py-1.5 first:pt-0 last:pb-0">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-right text-xs font-semibold tabular-nums">{children}</span>
+    <div className="flex items-center justify-between gap-2 py-2.5 first:pt-1 last:pb-1">
+      <span className="text-foreground/85 text-sm">{label}</span>
+      <span className="text-right text-sm font-semibold tabular-nums">{children}</span>
+    </div>
+  );
+}
+
+/** Sidebar monthly row: name + age-range meta on the left, big amount + /mo on the right. */
+function SidebarMonthlyRow({
+  label,
+  meta,
+  amount,
+  currency,
+}: {
+  label: string;
+  meta?: string;
+  amount: number;
+  currency: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 first:pt-1 last:pb-1">
+      <div className="min-w-0">
+        <div className="text-foreground text-sm font-semibold leading-tight">{label}</div>
+        {meta && <div className="text-muted-foreground mt-0.5 text-xs leading-tight">{meta}</div>}
+      </div>
+      <div className="whitespace-nowrap tabular-nums">
+        <span className="text-foreground text-sm font-semibold">
+          {formatAmount(amount, currency)}
+        </span>
+        <span className="text-muted-foreground text-xs">/mo</span>
+      </div>
+    </div>
+  );
+}
+
+/** Sidebar totals row: uppercase tracked label on the left, amount + /mo on the right. */
+function SidebarTotalRow({ amount, currency }: { amount: number; currency: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3">
+      <span className="text-muted-foreground text-xs uppercase tracking-[0.15em]">Total</span>
+      <div className="whitespace-nowrap tabular-nums">
+        <span className="text-foreground text-sm font-semibold">
+          {formatAmount(amount, currency)}
+        </span>
+        <span className="text-muted-foreground text-xs">/mo</span>
+      </div>
     </div>
   );
 }
@@ -412,8 +502,70 @@ function InlineField({
   );
 }
 
-function fmtPct(v: number) {
-  return (v * 100).toFixed(1) + "%";
+/** A lever: title + hint + compact readout input + full-width slider. */
+function LeverRow({
+  label,
+  hint,
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  prefix,
+  suffix,
+  format,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  prefix?: string;
+  suffix?: string;
+  format: (v: number) => string;
+}) {
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  return (
+    <div className="py-4 first:pt-1 last:pb-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-foreground text-[15px] font-semibold leading-tight">{label}</div>
+          {hint && <div className="text-muted-foreground mt-1 text-xs leading-tight">{hint}</div>}
+        </div>
+        <div className="bg-muted/70 flex h-8 min-w-[96px] items-center gap-1 rounded-md border px-2.5">
+          {prefix && <span className="text-muted-foreground text-xs tabular-nums">{prefix}</span>}
+          <input
+            type="number"
+            value={format(value)}
+            step={step}
+            min={min}
+            max={max}
+            onChange={(e) => {
+              const parsed = parseFloat(e.target.value);
+              if (!Number.isNaN(parsed)) {
+                const clamped = Math.min(max, Math.max(min, parsed));
+                onChange(suffix === "%" ? clamped / 100 : clamped);
+              }
+            }}
+            className="text-foreground w-full min-w-0 bg-transparent text-right text-sm tabular-nums outline-none"
+          />
+          {suffix && <span className="text-muted-foreground text-xs tabular-nums">{suffix}</span>}
+        </div>
+      </div>
+      <input
+        type="range"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="lever-slider mt-3 w-full"
+        style={{ ["--lever-pct" as string]: `${pct}%` }}
+      />
+    </div>
+  );
 }
 
 function pctOfTotal(value: number, total: number) {
@@ -422,6 +574,7 @@ function pctOfTotal(value: number, total: number) {
 
 /** A single sidebar card: title + edit button → read rows or edit fields */
 function SidebarCard({
+  kicker,
   title,
   editing,
   onEdit,
@@ -431,6 +584,7 @@ function SidebarCard({
   readContent,
   editContent,
 }: {
+  kicker?: string;
   title: string;
   editing: boolean;
   onEdit: () => void;
@@ -442,8 +596,15 @@ function SidebarCard({
 }) {
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">{title}</CardTitle>
+      <CardHeader className="flex-row items-start justify-between pb-4">
+        <div className="min-w-0">
+          {kicker && (
+            <div className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-[0.15em]">
+              {kicker}
+            </div>
+          )}
+          <CardTitle className="text-md leading-none tracking-tight">{title}</CardTitle>
+        </div>
         {editing ? (
           <div className="flex gap-1.5">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancel}>
@@ -454,20 +615,15 @@ function SidebarCard({
             </Button>
           </div>
         ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-                onClick={onEdit}
-                aria-label={`Edit ${title}`}
-              >
-                <Icons.Pencil className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">Edit {title.toLowerCase()}</TooltipContent>
-          </Tooltip>
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`Edit ${title}`}
+            className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 text-sm transition-colors"
+          >
+            <Icons.Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
         )}
       </CardHeader>
       <CardContent>
@@ -557,18 +713,19 @@ function SidebarConfigurator({
       expenses: { ...d.expenses, [bucket]: { ...d.expenses[bucket], ...patch } },
     }));
 
-  const addStream = () => {
+  const addStream = (preset?: Partial<RetirementIncomeStream>) => {
     update((d) => ({
       ...d,
       incomeStreams: [
         ...d.incomeStreams,
         {
           id: crypto.randomUUID?.() ?? `stream-${Date.now()}`,
-          label: `Income ${d.incomeStreams.length + 1}`,
+          label: preset?.label ?? `Income ${d.incomeStreams.length + 1}`,
           streamType: "db" as const,
-          startAge: d.personal.targetRetirementAge,
-          adjustForInflation: true,
-          monthlyAmount: 0,
+          startAge: preset?.startAge ?? d.personal.targetRetirementAge,
+          adjustForInflation: preset?.adjustForInflation ?? true,
+          monthlyAmount: preset?.monthlyAmount ?? 0,
+          ...preset,
         },
       ],
     }));
@@ -584,16 +741,28 @@ function SidebarConfigurator({
   const removeStream = (id: string) =>
     update((d) => ({ ...d, incomeStreams: d.incomeStreams.filter((s) => s.id !== id) }));
 
-  const budget = retirementOverview?.budgetBreakdown;
-  const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
   const taxBucketBalances = retirementOverview?.taxBucketBalances;
   const taxBucketTotal = taxBucketBalances
     ? taxBucketBalances.taxable + taxBucketBalances.taxDeferred + taxBucketBalances.taxFree
     : 0;
+  const averageWithdrawalTaxRate =
+    taxBucketBalances && taxBucketTotal > 0
+      ? (taxBucketBalances.taxable * (draft.tax?.taxableWithdrawalRate ?? 0) +
+          taxBucketBalances.taxDeferred * (draft.tax?.taxDeferredWithdrawalRate ?? 0) +
+          taxBucketBalances.taxFree * (draft.tax?.taxFreeWithdrawalRate ?? 0)) /
+        taxBucketTotal
+      : 0;
+  const effectivePreRetirementReturn =
+    draft.investment.preRetirementAnnualReturn - draft.investment.annualInvestmentFeeRate;
+  const effectiveRetirementReturn =
+    draft.investment.retirementAnnualReturn - draft.investment.annualInvestmentFeeRate;
   const allTaxRatesZero =
     (draft.tax?.taxableWithdrawalRate ?? 0) === 0 &&
     (draft.tax?.taxDeferredWithdrawalRate ?? 0) === 0 &&
     (draft.tax?.taxFreeWithdrawalRate ?? 0) === 0;
+  const hasCanadianPublicBenefit = draft.incomeStreams.some((stream) =>
+    /\b(cpp|qpp|oas)\b/i.test(stream.label),
+  );
 
   const strategyLabels: Record<string, string> = {
     "constant-dollar": "Constant Dollar",
@@ -605,7 +774,8 @@ function SidebarConfigurator({
     <div className="space-y-4">
       {/* ── Plan ── */}
       <SidebarCard
-        title="Retirement Timeline"
+        kicker="Levers"
+        title="Plan inputs"
         editing={editingSection === "plan"}
         onEdit={() => setEditingSection("plan")}
         onSave={saveDraft}
@@ -619,81 +789,134 @@ function SidebarConfigurator({
             </ConfigRow>
             <ConfigRow label="Plan through age">{draft.personal.planningHorizonAge}</ConfigRow>
             <ConfigRow label="Monthly contribution until retirement">
-              {fmt(draft.investment.monthlyContribution, currency)}
+              {formatAmount(draft.investment.monthlyContribution, currency)}
             </ConfigRow>
             <ConfigRow label="Target withdrawal rate for sizing">
-              {fmtPct(draft.withdrawal.safeWithdrawalRate)}
+              {formatPercent(draft.withdrawal.safeWithdrawalRate)}
             </ConfigRow>
           </div>
         }
         editContent={
-          <>
-            <InlineField
-              label="Current age"
-              value={draft.personal.currentAge}
-              onChange={(v) => setPersonal("currentAge", v)}
-              min={1}
-            />
-            <InlineField
-              label="Desired retirement age"
+          <div className="divide-border -my-1 divide-y">
+            <LeverRow
+              label="Retirement age"
+              hint="Target age to stop working"
               value={draft.personal.targetRetirementAge}
-              onChange={(v) => setPersonal("targetRetirementAge", v)}
+              onChange={(v) => setPersonal("targetRetirementAge", Math.round(v))}
               min={draft.personal.currentAge + 1}
+              max={75}
+              step={1}
+              format={(v) => String(v)}
             />
-            <InlineField
-              label="Plan through age"
-              value={draft.personal.planningHorizonAge}
-              onChange={(v) => setPersonal("planningHorizonAge", v)}
-              min={draft.personal.targetRetirementAge + 1}
-            />
-            <InlineField
-              label="Monthly contribution until retirement"
+            <LeverRow
+              label="Monthly contribution"
               value={draft.investment.monthlyContribution}
               onChange={(v) => setInvestment("monthlyContribution", v)}
-              step={100}
               min={0}
+              max={20000}
+              step={100}
+              prefix="$"
+              format={(v) => v.toLocaleString()}
             />
-            <InlineField
-              label="Target withdrawal rate for sizing"
-              value={+(draft.withdrawal.safeWithdrawalRate * 100).toFixed(2)}
-              onChange={(v) => setWithdrawal("safeWithdrawalRate", v / 100)}
-              step={0.1}
+            <LeverRow
+              label="Return before retirement"
+              value={draft.investment.preRetirementAnnualReturn}
+              onChange={(v) => setInvestment("preRetirementAnnualReturn", v)}
+              min={0.02}
+              max={0.12}
+              step={0.001}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-          </>
+            <LeverRow
+              label="Return during retirement"
+              value={draft.investment.retirementAnnualReturn}
+              onChange={(v) => setInvestment("retirementAnnualReturn", v)}
+              min={0}
+              max={0.1}
+              step={0.001}
+              suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
+            />
+            <LeverRow
+              label="Annual investment fee"
+              value={draft.investment.annualInvestmentFeeRate}
+              onChange={(v) => setInvestment("annualInvestmentFeeRate", v)}
+              min={0}
+              max={0.03}
+              step={0.0005}
+              suffix="%"
+              format={(v) => (v * 100).toFixed(2)}
+            />
+            <LeverRow
+              label="Inflation"
+              value={draft.investment.inflationRate}
+              onChange={(v) => setInvestment("inflationRate", v)}
+              min={0}
+              max={0.06}
+              step={0.001}
+              suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
+            />
+            <LeverRow
+              label="Withdrawal rate"
+              hint="SWR target at retirement"
+              value={draft.withdrawal.safeWithdrawalRate}
+              onChange={(v) => setWithdrawal("safeWithdrawalRate", v)}
+              min={0.02}
+              max={0.06}
+              step={0.001}
+              suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
+            />
+          </div>
         }
       />
 
       {/* ── Expenses ── */}
       <SidebarCard
+        kicker="Spending"
         title="Retirement Spending"
         editing={editingSection === "expenses"}
         onEdit={() => setEditingSection("expenses")}
         onSave={saveDraft}
         onCancel={cancelEdit}
         dirty={dirty}
-        readContent={
-          <div className="divide-border divide-y">
-            <ConfigRow label="Living spending">
-              {fmt(draft.expenses.living.monthlyAmount, currency)}/mo
-            </ConfigRow>
-            {draft.expenses.healthcare.monthlyAmount > 0 && (
-              <ConfigRow label="Healthcare spending">
-                {fmt(draft.expenses.healthcare.monthlyAmount, currency)}/mo
-              </ConfigRow>
-            )}
-            {draft.expenses.housing && (
-              <ConfigRow label="Housing spending">
-                {fmt(draft.expenses.housing.monthlyAmount, currency)}/mo
-              </ConfigRow>
-            )}
-            {draft.expenses.discretionary && (
-              <ConfigRow label="Discretionary spending">
-                {fmt(draft.expenses.discretionary.monthlyAmount, currency)}/mo
-              </ConfigRow>
-            )}
-          </div>
-        }
+        readContent={(() => {
+          const retireAge = draft.personal.targetRetirementAge;
+          const horizonAge = draft.personal.planningHorizonAge;
+          const ageRange = `Age ${retireAge} → ${horizonAge}`;
+          const items: { label: string; amount: number }[] = [
+            { label: "Living", amount: draft.expenses.living.monthlyAmount },
+          ];
+          if (draft.expenses.healthcare.monthlyAmount >= 0) {
+            items.push({ label: "Healthcare", amount: draft.expenses.healthcare.monthlyAmount });
+          }
+          if (draft.expenses.housing) {
+            items.push({ label: "Housing", amount: draft.expenses.housing.monthlyAmount });
+          }
+          if (draft.expenses.discretionary) {
+            items.push({
+              label: "Discretionary",
+              amount: draft.expenses.discretionary.monthlyAmount,
+            });
+          }
+          const total = items.reduce((s, i) => s + i.amount, 0);
+          return (
+            <div className="divide-border divide-y">
+              {items.map((it) => (
+                <SidebarMonthlyRow
+                  key={it.label}
+                  label={it.label}
+                  meta={ageRange}
+                  amount={it.amount}
+                  currency={currency}
+                />
+              ))}
+              <SidebarTotalRow amount={total} currency={currency} />
+            </div>
+          );
+        })()}
         editContent={
           <>
             <InlineField
@@ -755,7 +978,7 @@ function SidebarConfigurator({
             <div className="flex gap-2">
               {!draft.expenses.housing && (
                 <button
-                  className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+                  className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
                   onClick={() =>
                     update((d) => ({
                       ...d,
@@ -768,7 +991,7 @@ function SidebarConfigurator({
               )}
               {!draft.expenses.discretionary && (
                 <button
-                  className="text-muted-foreground hover:text-foreground text-[11px] underline underline-offset-2"
+                  className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
                   onClick={() =>
                     update((d) => ({
                       ...d,
@@ -786,6 +1009,7 @@ function SidebarConfigurator({
 
       {/* ── Income Streams ── */}
       <SidebarCard
+        kicker="Income"
         title="Retirement Income"
         editing={editingSection === "income"}
         onEdit={() => setEditingSection("income")}
@@ -794,15 +1018,37 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           draft.incomeStreams.length > 0 ? (
-            <div className="divide-border divide-y">
-              {draft.incomeStreams.map((s) => (
-                <ConfigRow key={s.id} label={s.label || "Stream"}>
-                  {fmt(s.monthlyAmount ?? 0, currency)}/mo from {s.startAge}
-                </ConfigRow>
-              ))}
+            <div className="space-y-2.5">
+              <div className="divide-border divide-y">
+                {draft.incomeStreams.map((s) => (
+                  <SidebarMonthlyRow
+                    key={s.id}
+                    label={s.label || "Stream"}
+                    meta={`Age ${s.startAge} → ${draft.personal.planningHorizonAge}`}
+                    amount={s.monthlyAmount ?? 0}
+                    currency={currency}
+                  />
+                ))}
+                <SidebarTotalRow
+                  amount={draft.incomeStreams.reduce((sum, s) => sum + (s.monthlyAmount ?? 0), 0)}
+                  currency={currency}
+                />
+              </div>
+              {!hasCanadianPublicBenefit && (
+                <p className="text-muted-foreground rounded-md border border-dashed px-2.5 py-2 text-xs leading-relaxed">
+                  Bank calculators often include CPP/QPP and OAS automatically. Add those streams
+                  here if you want comparable Canadian results.
+                </p>
+              )}
             </div>
           ) : (
-            <p className="text-muted-foreground text-xs">No retirement income configured</p>
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-xs">No retirement income configured</p>
+              <p className="text-muted-foreground rounded-md border border-dashed px-2.5 py-2 text-xs leading-relaxed">
+                Bank calculators often include CPP/QPP and OAS automatically. This plan only uses
+                income streams you add here.
+              </p>
+            </div>
           )
         }
         editContent={
@@ -842,17 +1088,33 @@ function SidebarConfigurator({
               </div>
             ))}
             <button
-              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-[11px] transition-colors"
-              onClick={addStream}
+              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+              onClick={() => addStream()}
             >
               <Icons.Plus className="h-3 w-3" /> Add retirement income
             </button>
+            {!hasCanadianPublicBenefit && (
+              <button
+                className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() =>
+                  addStream({
+                    label: "OAS estimate",
+                    startAge: 65,
+                    monthlyAmount: 0,
+                    adjustForInflation: true,
+                  })
+                }
+              >
+                <Icons.Plus className="h-3 w-3" /> Add OAS placeholder
+              </button>
+            )}
           </>
         }
       />
 
       {/* ── Investment ── */}
       <SidebarCard
+        kicker="Assumptions"
         title="Portfolio Assumptions"
         editing={editingSection === "investment"}
         onEdit={() => setEditingSection("investment")}
@@ -861,16 +1123,28 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           <div className="divide-border divide-y">
-            <ConfigRow label="Expected annual return">
-              {fmtPct(draft.investment.expectedAnnualReturn)}
+            <ConfigRow label="Return before retirement">
+              {formatPercent(draft.investment.preRetirementAnnualReturn)}
+            </ConfigRow>
+            <ConfigRow label="Return during retirement">
+              {formatPercent(draft.investment.retirementAnnualReturn)}
+            </ConfigRow>
+            <ConfigRow label="Annual investment fee">
+              {formatPercent(draft.investment.annualInvestmentFeeRate)}
+            </ConfigRow>
+            <ConfigRow label="Effective before-retirement return">
+              {formatPercent(effectivePreRetirementReturn)}
+            </ConfigRow>
+            <ConfigRow label="Effective retirement return">
+              {formatPercent(effectiveRetirementReturn)}
             </ConfigRow>
             <ConfigRow label="Annual volatility">
-              {fmtPct(draft.investment.expectedReturnStdDev)}
+              {formatPercent(draft.investment.annualVolatility)}
             </ConfigRow>
-            <ConfigRow label="Inflation">{fmtPct(draft.investment.inflationRate)}</ConfigRow>
+            <ConfigRow label="Inflation">{formatPercent(draft.investment.inflationRate)}</ConfigRow>
             {draft.investment.contributionGrowthRate > 0 && (
               <ConfigRow label="Contribution growth per year">
-                {fmtPct(draft.investment.contributionGrowthRate)}
+                {formatPercent(draft.investment.contributionGrowthRate)}
               </ConfigRow>
             )}
           </div>
@@ -878,16 +1152,30 @@ function SidebarConfigurator({
         editContent={
           <>
             <InlineField
-              label="Expected annual return"
-              value={+(draft.investment.expectedAnnualReturn * 100).toFixed(2)}
-              onChange={(v) => setInvestment("expectedAnnualReturn", v / 100)}
+              label="Return before retirement"
+              value={+(draft.investment.preRetirementAnnualReturn * 100).toFixed(2)}
+              onChange={(v) => setInvestment("preRetirementAnnualReturn", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+            <InlineField
+              label="Return during retirement"
+              value={+(draft.investment.retirementAnnualReturn * 100).toFixed(2)}
+              onChange={(v) => setInvestment("retirementAnnualReturn", v / 100)}
+              step={0.1}
+              suffix="%"
+            />
+            <InlineField
+              label="Annual investment fee"
+              value={+(draft.investment.annualInvestmentFeeRate * 100).toFixed(2)}
+              onChange={(v) => setInvestment("annualInvestmentFeeRate", v / 100)}
               step={0.1}
               suffix="%"
             />
             <InlineField
               label="Annual volatility"
-              value={+(draft.investment.expectedReturnStdDev * 100).toFixed(2)}
-              onChange={(v) => setInvestment("expectedReturnStdDev", v / 100)}
+              value={+(draft.investment.annualVolatility * 100).toFixed(2)}
+              onChange={(v) => setInvestment("annualVolatility", v / 100)}
               step={0.1}
               suffix="%"
             />
@@ -911,6 +1199,7 @@ function SidebarConfigurator({
 
       {/* ── Withdrawal ── */}
       <SidebarCard
+        kicker="Rule"
         title="Retirement Withdrawal Rule"
         editing={editingSection === "withdrawal"}
         onEdit={() => setEditingSection("withdrawal")}
@@ -975,6 +1264,7 @@ function SidebarConfigurator({
 
       {/* ── Tax ── */}
       <SidebarCard
+        kicker="Taxes"
         title="Withdrawal Taxes"
         editing={editingSection === "tax"}
         onEdit={() => setEditingSection("tax")}
@@ -993,7 +1283,7 @@ function SidebarConfigurator({
                   </InfoLabel>
                 }
               >
-                {fmtPct(draft.tax?.taxableWithdrawalRate ?? 0)}
+                {formatPercent(draft.tax?.taxableWithdrawalRate ?? 0)}
               </ConfigRow>
               <ConfigRow
                 label={
@@ -1004,7 +1294,7 @@ function SidebarConfigurator({
                   </InfoLabel>
                 }
               >
-                {fmtPct(draft.tax?.taxDeferredWithdrawalRate ?? 0)}
+                {formatPercent(draft.tax?.taxDeferredWithdrawalRate ?? 0)}
               </ConfigRow>
               <ConfigRow
                 label={
@@ -1014,18 +1304,19 @@ function SidebarConfigurator({
                   </InfoLabel>
                 }
               >
-                {fmtPct(draft.tax?.taxFreeWithdrawalRate ?? 0)}
+                {formatPercent(draft.tax?.taxFreeWithdrawalRate ?? 0)}
               </ConfigRow>
-              {effectiveTaxRate > 0 && (
+              {averageWithdrawalTaxRate > 0 && (
                 <ConfigRow
                   label={
-                    <InfoLabel label="Blended tax drag">
-                      The effective tax rate for the retirement withdrawal mix at the selected FI
-                      age, based on account buckets and withdrawal order.
+                    <InfoLabel label="Estimated average withdrawal tax">
+                      Weighted average tax rate based on included account balances and each account
+                      bucket's withdrawal tax rate. This is a portfolio-level estimate; yearly
+                      withdrawals still follow the withdrawal order.
                     </InfoLabel>
                   }
                 >
-                  {(effectiveTaxRate * 100).toFixed(1)}%
+                  {(averageWithdrawalTaxRate * 100).toFixed(1)}%
                 </ConfigRow>
               )}
             </div>
@@ -1059,7 +1350,7 @@ function SidebarConfigurator({
                       </InfoLabel>
                     }
                   >
-                    {fmt(taxBucketBalances.taxable, currency)}{" "}
+                    {formatAmount(taxBucketBalances.taxable, currency)}{" "}
                     <span className="text-muted-foreground ml-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxable, taxBucketTotal)}
                     </span>
@@ -1072,7 +1363,7 @@ function SidebarConfigurator({
                       </InfoLabel>
                     }
                   >
-                    {fmt(taxBucketBalances.taxDeferred, currency)}{" "}
+                    {formatAmount(taxBucketBalances.taxDeferred, currency)}{" "}
                     <span className="text-muted-foreground ml-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxDeferred, taxBucketTotal)}
                     </span>
@@ -1084,7 +1375,7 @@ function SidebarConfigurator({
                       </InfoLabel>
                     }
                   >
-                    {fmt(taxBucketBalances.taxFree, currency)}{" "}
+                    {formatAmount(taxBucketBalances.taxFree, currency)}{" "}
                     <span className="text-muted-foreground ml-1 font-normal">
                       {pctOfTotal(taxBucketBalances.taxFree, taxBucketTotal)}
                     </span>
@@ -1171,68 +1462,176 @@ export default function DashboardPage({
   const { totalValue, error } = portfolioData;
   const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
   const currency = plan.currency;
+  const [chartValueMode, setChartValueMode] = useState<ChartValueMode>("real");
+  const valueModeLabel = chartValueMode === "real" ? "today's value" : "nominal";
+  const inflationBase = Math.max(1 + plan.investment.inflationRate, 0.01);
+  const toTodayValueAtAge = useCallback(
+    (value: number, age: number) => {
+      const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+      return value / Math.pow(inflationBase, yearsFromNow);
+    },
+    [inflationBase, plan.personal.currentAge],
+  );
+  const scaleForModeAtAge = useCallback(
+    (value: number, age: number) => {
+      if (chartValueMode === "nominal") return value;
+      return toTodayValueAtAge(value, age);
+    },
+    [chartValueMode, toTodayValueAtAge],
+  );
 
   // All numbers come from the backend DTO
-  const fireTarget = retirementOverview?.grossFireTarget ?? 0;
-  const netFireTarget = retirementOverview?.netFireTarget ?? 0;
+  const retireTodayTarget = retirementOverview?.netFireTarget ?? 0;
+  const targetReconciliation = retirementOverview?.targetReconciliation;
+  const fallbackInflationFactorToGoal = Math.pow(
+    inflationBase,
+    Math.max(0, plan.personal.targetRetirementAge - plan.personal.currentAge),
+  );
+  const inflationFactorToGoal =
+    targetReconciliation?.inflationFactorToTarget ?? fallbackInflationFactorToGoal;
+  const targetNominalAtGoal =
+    targetReconciliation?.requiredCapitalNominal ??
+    retirementOverview?.requiredCapitalAtGoalAge ??
+    0;
+  const targetTodayAtGoal =
+    targetReconciliation?.requiredCapitalTodayValue ?? targetNominalAtGoal / inflationFactorToGoal;
+  const targetAtGoalDisplay =
+    chartValueMode === "nominal" ? targetNominalAtGoal : targetTodayAtGoal;
   const coastAmount = retirementOverview?.coastAmountToday ?? 0;
+  const coastAmountDisplay =
+    chartValueMode === "nominal" ? coastAmount * inflationFactorToGoal : coastAmount;
   const fiAge = retirementOverview?.fiAge ?? null;
   const retirementStartAge = retirementOverview?.retirementStartAge ?? null;
   const suggestedAge = retirementOverview?.suggestedGoalAgeIfUnchanged ?? null;
   // Effective FI age: genuine FI age, or the accumulation-only suggested age for display
   const effectiveFiAge = fiAge ?? suggestedAge;
-  const coastReached = retirementOverview?.coastReached ?? false;
-  const progress = retirementOverview?.progress ?? 0;
+  const progress = targetAtGoalDisplay > 0 ? Math.min(portfolioNow / targetAtGoalDisplay, 1) : 0;
 
   const fireAgeForBudget = retirementStartAge ?? plan.personal.targetRetirementAge;
 
   // Budget from backend DTO
   const budget = retirementOverview?.budgetBreakdown;
   const totalBudget = budget?.totalMonthlyBudget ?? 0;
-  const healthcareMonthly = budget?.monthlyHealthcare ?? 0;
-  const housingMonthly = budget?.monthlyHousing ?? 0;
-  const discretionaryMonthly = budget?.monthlyDiscretionary ?? 0;
-  const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
-  const portfolioWithdrawalAtFire = budget?.monthlyPortfolioWithdrawal ?? 0;
   const budgetStreams = budget?.incomeStreams ?? [];
+  const effectiveTaxRate = budget?.effectiveTaxRate ?? 0;
+  const fallbackMonthlyIncome = budgetStreams.reduce(
+    (sum, stream) => sum + stream.monthlyAmount,
+    0,
+  );
+  const coverageSnapshot = retirementOverview?.trajectory?.find(
+    (pt) => pt.age === fireAgeForBudget,
+  );
+  const coverageSnapshotSpending =
+    coverageSnapshot?.plannedExpenses ??
+    (coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualExpenses : undefined);
+  const coverageSnapshotIncome =
+    coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualIncome : undefined;
+  const coverageSnapshotPortfolioGap =
+    coverageSnapshot?.phase === "fire" ? coverageSnapshot.netWithdrawalFromPortfolio : undefined;
+  const coverageSnapshotGrossWithdrawal =
+    coverageSnapshot?.phase === "fire" ? coverageSnapshot.grossWithdrawal : undefined;
+  const coverageSnapshotTaxes =
+    coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualTaxes : undefined;
+  const coverageInflationFactor = Math.pow(
+    inflationBase,
+    Math.max(0, fireAgeForBudget - plan.personal.currentAge),
+  );
+  const coverageAnnualSpendingNominal =
+    coverageSnapshotSpending ?? totalBudget * 12 * coverageInflationFactor;
+  const coverageAnnualIncomeNominal =
+    coverageSnapshotIncome ?? fallbackMonthlyIncome * 12 * coverageInflationFactor;
+  const coverageAnnualPortfolioGapNominal =
+    coverageSnapshotPortfolioGap ??
+    Math.max(0, coverageAnnualSpendingNominal - coverageAnnualIncomeNominal);
+  const coverageAnnualGrossWithdrawalNominal =
+    coverageSnapshotGrossWithdrawal ??
+    (effectiveTaxRate > 0
+      ? coverageAnnualPortfolioGapNominal / Math.max(0.01, 1 - effectiveTaxRate)
+      : coverageAnnualPortfolioGapNominal);
+  const coverageAnnualEstimatedTaxesNominal =
+    coverageSnapshotTaxes ??
+    Math.max(0, coverageAnnualGrossWithdrawalNominal - coverageAnnualPortfolioGapNominal);
+  const coverageAnnualSpendingToday = toTodayValueAtAge(
+    coverageAnnualSpendingNominal,
+    fireAgeForBudget,
+  );
+  const coverageAnnualIncomeToday = toTodayValueAtAge(
+    coverageAnnualIncomeNominal,
+    fireAgeForBudget,
+  );
+  const coverageAnnualPortfolioGapToday = toTodayValueAtAge(
+    coverageAnnualPortfolioGapNominal,
+    fireAgeForBudget,
+  );
+  const coverageAnnualEstimatedTaxesToday = toTodayValueAtAge(
+    coverageAnnualEstimatedTaxesNominal,
+    fireAgeForBudget,
+  );
+  const coverageAnnualSpending =
+    chartValueMode === "nominal" ? coverageAnnualSpendingNominal : coverageAnnualSpendingToday;
+  const coverageAnnualIncome =
+    chartValueMode === "nominal" ? coverageAnnualIncomeNominal : coverageAnnualIncomeToday;
+  const coverageAnnualPortfolioGap =
+    chartValueMode === "nominal"
+      ? coverageAnnualPortfolioGapNominal
+      : coverageAnnualPortfolioGapToday;
+  const coverageAnnualEstimatedTaxes =
+    chartValueMode === "nominal"
+      ? coverageAnnualEstimatedTaxesNominal
+      : coverageAnnualEstimatedTaxesToday;
+  const coverageSpendingMonthly = coverageAnnualSpending / 12;
+  const coverageEstimatedTaxesMonthly = coverageAnnualEstimatedTaxes / 12;
+  const coverageIncomeAppliedAnnual = Math.min(coverageAnnualSpending, coverageAnnualIncome);
+  const coveragePortfolioAppliedAnnual = Math.min(
+    Math.max(0, coverageAnnualSpending - coverageIncomeAppliedAnnual),
+    coverageAnnualPortfolioGap,
+  );
+  const coverageShortfallAnnual = Math.max(
+    0,
+    coverageAnnualSpending - coverageIncomeAppliedAnnual - coveragePortfolioAppliedAnnual,
+  );
+  const coveragePortfolioAppliedMonthly = coveragePortfolioAppliedAnnual / 12;
+  const coverageShortfallMonthly = coverageShortfallAnnual / 12;
+  const coverageIncomePct =
+    coverageAnnualSpending > 0
+      ? Math.min(100, Math.max(0, (coverageIncomeAppliedAnnual / coverageAnnualSpending) * 100))
+      : 0;
+  const coveragePortfolioPct =
+    coverageAnnualSpending > 0
+      ? Math.min(
+          100 - coverageIncomePct,
+          Math.max(0, (coveragePortfolioAppliedAnnual / coverageAnnualSpending) * 100),
+        )
+      : 0;
+  const coverageShortfallPct =
+    coverageAnnualSpending > 0
+      ? Math.min(100, Math.max(0, (coverageShortfallAnnual / coverageAnnualSpending) * 100))
+      : 0;
 
   const hasPensionFunds = plan.incomeStreams.some(
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
   );
 
-  const [chartValueMode, setChartValueMode] = useState<ChartValueMode>("real");
-
   // Chart data from backend trajectory
   const chartData: ChartPoint[] = useMemo(() => {
     if (!retirementOverview?.trajectory?.length) return [];
-    const inflationBase = Math.max(1 + plan.investment.inflationRate, 0.01);
-    const scaleForAge = (value: number, age: number) => {
-      if (chartValueMode === "nominal") return value;
-      const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
-      return value / Math.pow(inflationBase, yearsFromNow);
-    };
     return retirementOverview.trajectory.map((pt) => ({
       label: `Age ${pt.age}`,
       age: pt.age,
-      portfolio: scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
-      portfolioStart: scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
-      portfolioEnd: scaleForAge(Math.max(0, pt.portfolioEnd), pt.age),
-      target: scaleForAge(pt.requiredCapital, pt.age),
-      withdrawal: scaleForAge(pt.netWithdrawalFromPortfolio, pt.age),
+      portfolio: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
+      portfolioStart: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
+      portfolioEnd: scaleForModeAtAge(Math.max(0, pt.portfolioEnd), pt.age),
+      target: scaleForModeAtAge(pt.requiredCapital, pt.age),
+      withdrawal: scaleForModeAtAge(pt.netWithdrawalFromPortfolio, pt.age),
       phase: pt.phase,
-      annualContribution: scaleForAge(pt.annualContribution, pt.age),
-      annualIncome: scaleForAge(pt.annualIncome, pt.age),
-      annualExpenses: scaleForAge(pt.plannedExpenses ?? pt.annualExpenses, pt.age),
+      annualContribution: scaleForModeAtAge(pt.annualContribution, pt.age),
+      annualIncome: scaleForModeAtAge(pt.annualIncome, pt.age),
+      annualExpenses: scaleForModeAtAge(pt.plannedExpenses ?? pt.annualExpenses, pt.age),
       netChange:
-        scaleForAge(Math.max(0, pt.portfolioEnd), pt.age) -
-        scaleForAge(Math.max(0, pt.portfolioStart), pt.age),
+        scaleForModeAtAge(Math.max(0, pt.portfolioEnd), pt.age) -
+        scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
     }));
-  }, [
-    chartValueMode,
-    plan.investment.inflationRate,
-    plan.personal.currentAge,
-    retirementOverview?.trajectory,
-  ]);
+  }, [retirementOverview?.trajectory, scaleForModeAtAge]);
 
   // Year-by-year table: all years from backend trajectory
   const allSnapshots: RetirementTrajectoryPoint[] = useMemo(() => {
@@ -1245,7 +1644,7 @@ export default function DashboardPage({
   const totalPages = Math.ceil(allSnapshots.length / PAGE_SIZE);
   const pagedSnapshots = allSnapshots.slice(tablePage * PAGE_SIZE, (tablePage + 1) * PAGE_SIZE);
 
-  const isFinanciallyIndependent = portfolioNow >= netFireTarget && netFireTarget > 0;
+  const isFinanciallyIndependent = portfolioNow >= retireTodayTarget && retireTodayTarget > 0;
   const yearsFromDesired =
     effectiveFiAge != null ? effectiveFiAge - plan.personal.targetRetirementAge : null;
   const heroHealth =
@@ -1259,7 +1658,7 @@ export default function DashboardPage({
     ? "You have reached financial independence with the current assumptions."
     : yearsFromDesired != null && yearsFromDesired > 0
       ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
-      : effectiveFiAge == null && netFireTarget > 0
+      : effectiveFiAge == null && retireTodayTarget > 0
         ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
         : null;
 
@@ -1283,200 +1682,241 @@ export default function DashboardPage({
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
+      </div>
+
       {/* Two-column layout: main + sidebar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Main column ── */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Hero + Projections (merged) */}
-          <Card>
-            <CardContent className="py-6">
-              {/* Top section: FI Age headline + status + health badge */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-5">
-                  <RadialProgress value={progress} size={80} />
-                  <div className="space-y-1">
-                    <p className="text-3xl font-bold tabular-nums">
-                      {effectiveFiAge != null
-                        ? `Age ${effectiveFiAge}`
-                        : isFinanciallyIndependent
-                          ? "FI Reached"
-                          : "Not reachable"}
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Projected FI Age
-                      {plan.personal.targetRetirementAge > 0 && (
-                        <span> · Desired: {plan.personal.targetRetirementAge}</span>
-                      )}
-                    </p>
-                    <p className="text-sm font-medium">
-                      {isFinanciallyIndependent ? (
-                        <span className="text-green-600">Financially independent</span>
-                      ) : effectiveFiAge != null ? (
-                        effectiveFiAge < plan.personal.targetRetirementAge ? (
-                          <span className="text-green-600">
-                            {plan.personal.targetRetirementAge - effectiveFiAge} year
-                            {plan.personal.targetRetirementAge - effectiveFiAge !== 1
-                              ? "s"
-                              : ""}{" "}
-                            early
-                          </span>
-                        ) : effectiveFiAge === plan.personal.targetRetirementAge ? (
-                          <span className="text-green-600">On track</span>
-                        ) : (
-                          <span className="text-amber-600">
-                            {effectiveFiAge - plan.personal.targetRetirementAge} year
-                            {effectiveFiAge - plan.personal.targetRetirementAge !== 1
-                              ? "s"
-                              : ""}{" "}
-                            late
-                          </span>
-                        )
+          {/* Verdict — the hero. Sentence-style headline with inline status. */}
+          {(() => {
+            const statusAccent =
+              heroHealth === "on_track"
+                ? "text-green-600"
+                : heroHealth === "at_risk"
+                  ? "text-amber-600"
+                  : "text-red-500";
+            const stripeAccent =
+              heroHealth === "on_track"
+                ? "bg-green-600"
+                : heroHealth === "at_risk"
+                  ? "bg-amber-500"
+                  : "bg-red-500";
+            const goalShortfallNominal =
+              targetReconciliation?.shortfallNominal ?? retirementOverview.shortfallAtGoalAge;
+            const goalShortfallToday =
+              targetReconciliation?.shortfallTodayValue ??
+              retirementOverview.shortfallAtGoalAge / inflationFactorToGoal;
+            const goalShortfall =
+              chartValueMode === "nominal" ? goalShortfallNominal : goalShortfallToday;
+            const monthlyContribLabel = `${fmtCompact(plan.investment.monthlyContribution, currency)}/mo`;
+            const annualBudgetToday =
+              targetReconciliation?.plannedAnnualExpensesTodayValue ?? totalBudget * 12;
+            const annualBudgetNominal =
+              targetReconciliation?.plannedAnnualExpensesNominal ??
+              totalBudget * 12 * inflationFactorToGoal;
+            const annualBudget =
+              chartValueMode === "nominal" ? annualBudgetNominal : annualBudgetToday;
+            const annualBudgetLabel = fmtCompact(annualBudget, currency);
+            const coastPct =
+              targetAtGoalDisplay > 0
+                ? Math.min(100, (coastAmountDisplay / targetAtGoalDisplay) * 100)
+                : 0;
+
+            return (
+              <Card className="relative overflow-hidden">
+                <div className={`absolute bottom-0 left-0 top-0 w-[3px] ${stripeAccent}`} />
+                <CardContent className="px-7 py-6">
+                  <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {heroHealth === "on_track" ? (
+                        <Badge
+                          variant="default"
+                          className="gap-1.5 bg-green-600 text-[10px] hover:bg-green-600"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+                          {isFinanciallyIndependent ? "FI reached" : "On track"}
+                        </Badge>
+                      ) : heroHealth === "at_risk" ? (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1.5 text-[10px] text-amber-700 dark:text-amber-400"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          {yearsFromDesired != null
+                            ? `${yearsFromDesired} yr${yearsFromDesired > 1 ? "s" : ""} late`
+                            : "At risk"}
+                        </Badge>
                       ) : (
-                        <span className="text-red-500">Beyond planning horizon</span>
+                        <Badge variant="destructive" className="gap-1.5 text-[10px]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+                          {yearsFromDesired != null && yearsFromDesired > 0
+                            ? `${yearsFromDesired} yrs late`
+                            : "Never reaches FI"}
+                        </Badge>
                       )}
-                    </p>
+                    </div>
                   </div>
-                </div>
-                {heroHealth === "on_track" ? (
-                  <Badge variant="default" className="bg-green-600 text-[10px]">
-                    On Track
-                  </Badge>
-                ) : heroHealth === "at_risk" ? (
-                  <Badge variant="secondary" className="text-[10px] text-amber-600">
-                    At Risk
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive" className="text-[10px]">
-                    Off Track
-                  </Badge>
-                )}
-              </div>
 
-              {/* Progress bar */}
-              <div className="mt-5">
-                <Progress
-                  value={Math.min(progress * 100, 100)}
-                  className="[&>div]:bg-success h-2.5"
-                />
-                <div className="mt-1.5 flex justify-between text-xs">
-                  <span>
-                    Included portfolio{" "}
-                    <span className="font-semibold">{fmt(portfolioNow, currency)}</span>
-                  </span>
-                  <span>
-                    <Tooltip>
-                      <TooltipTrigger className="cursor-help underline decoration-dotted">
-                        Retire-today target
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs">
-                        <p>
-                          <strong>Retire-today target</strong> - capital needed if the retirement
-                          phase started now, after subtracting income streams active now.
-                        </p>
-                        {netFireTarget < fireTarget && (
-                          <p className="mt-1">
-                            Unadjusted target is {fmt(fireTarget, currency)}. Schedule and income
-                            adjustments reduce it by {fmt(fireTarget - netFireTarget, currency)}.
-                          </p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>{" "}
-                    <span className="font-semibold">{fmt(netFireTarget, currency)}</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Key metrics grid — context-aware */}
-              {(() => {
-                const onTrack =
-                  isFinanciallyIndependent ||
-                  (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge);
-                const currentGap = netFireTarget - portfolioNow;
-                const goalShortfall = retirementOverview.shortfallAtGoalAge;
-                const goalSurplus = retirementOverview.surplusAtGoalAge;
-                return (
-                  <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 border-t pt-5 sm:grid-cols-3">
-                    {plannerMode === "fire" && (
-                      <div>
-                        <p className="text-muted-foreground text-xs">{L.coast}</p>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-base font-semibold tabular-nums">
-                          {fmt(coastAmount, currency)}
-                          {coastReached ? (
-                            <Badge variant="default" className="bg-green-600 text-[10px]">
-                              Reached
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-[10px]">
-                              Not yet
-                            </Badge>
-                          )}
-                        </p>
-                      </div>
-                    )}
-                    {onTrack ? (
+                  {/* Sentence-style verdict */}
+                  <h1 className="max-w-[95%] font-serif text-[clamp(1.5rem,2.6vw,2rem)] font-normal leading-[1.15] tracking-tight">
+                    {isFinanciallyIndependent ? (
                       <>
-                        <div>
-                          <p className="text-muted-foreground text-xs">Retire-today gap</p>
-                          <p className="mt-0.5 text-base font-semibold tabular-nums">
-                            {currentGap > 0 ? (
-                              fmt(currentGap, currency)
-                            ) : (
-                              <span className="text-green-600">None</span>
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs">Projected FI</p>
-                          <p className="mt-0.5 text-base font-semibold tabular-nums text-green-600">
-                            {effectiveFiAge != null ? `Age ${effectiveFiAge}` : "Reached"}
-                          </p>
-                        </div>
+                        You have reached{" "}
+                        <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                          financial independence
+                        </span>
+                        <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                          {" "}
+                          — with the current assumptions.
+                        </span>
+                      </>
+                    ) : effectiveFiAge != null ? (
+                      <>
+                        You'll reach financial independence at{" "}
+                        <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                          age {effectiveFiAge}
+                        </span>
+                        {yearsFromDesired != null && yearsFromDesired !== 0 ? (
+                          <>
+                            {" — "}
+                            <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                              {yearsFromDesired > 0
+                                ? `${yearsFromDesired} year${yearsFromDesired > 1 ? "s" : ""} after`
+                                : `${-yearsFromDesired} year${yearsFromDesired < -1 ? "s" : ""} before`}{" "}
+                              your goal of {plan.personal.targetRetirementAge}.
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {" — "}
+                            <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                              right on your goal of {plan.personal.targetRetirementAge}.
+                            </span>
+                          </>
+                        )}
                       </>
                     ) : (
                       <>
-                        <div>
-                          <p className="text-muted-foreground text-xs">
-                            {goalShortfall > 0
-                              ? `Shortfall at age ${plan.personal.targetRetirementAge}`
-                              : `Surplus at age ${plan.personal.targetRetirementAge}`}
-                          </p>
-                          <p className="mt-0.5 text-base font-semibold tabular-nums">
-                            <span className={goalShortfall > 0 ? "text-red-500" : "text-green-600"}>
-                              {fmt(goalShortfall > 0 ? goalShortfall : goalSurplus, currency)}
-                            </span>
-                          </p>
-                        </div>
-                        {effectiveFiAge != null && (
-                          <div>
-                            <p className="text-muted-foreground text-xs">Projected FI</p>
-                            <p className="mt-0.5 text-base font-semibold tabular-nums text-amber-600">
-                              Age {effectiveFiAge}
-                              <span className="text-muted-foreground ml-1 text-xs font-normal">
-                                ({effectiveFiAge - plan.personal.targetRetirementAge}yr late)
-                              </span>
-                            </p>
-                          </div>
-                        )}
+                        Not reachable by{" "}
+                        <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                          age {plan.personal.planningHorizonAge}
+                        </span>
+                        <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                          {" "}
+                          with current assumptions.
+                        </span>
                       </>
                     )}
+                  </h1>
+
+                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+                    At your current{" "}
+                    <span className="text-foreground tabular-nums">{monthlyContribLabel}</span>{" "}
+                    contribution, the plan funds{" "}
+                    <ValueModeTooltip
+                      valueMode={chartValueMode}
+                      currency={currency}
+                      todayValue={annualBudgetToday}
+                      nominalValue={annualBudgetNominal}
+                    >
+                      <span className="text-foreground tabular-nums">{annualBudgetLabel}</span>
+                    </ValueModeTooltip>
+                    /yr of expenses to age {plan.personal.planningHorizonAge}.
+                    {goalShortfall > 0 && yearsFromDesired != null && yearsFromDesired > 0 && (
+                      <>
+                        {" "}
+                        You're short{" "}
+                        <ValueModeTooltip
+                          valueMode={chartValueMode}
+                          currency={currency}
+                          todayValue={goalShortfallToday}
+                          nominalValue={goalShortfallNominal}
+                        >
+                          <span className="font-medium tabular-nums text-amber-600">
+                            {fmtCompact(goalShortfall, currency)}
+                          </span>
+                        </ValueModeTooltip>{" "}
+                        at age {plan.personal.targetRetirementAge}.
+                      </>
+                    )}
+                  </p>
+
+                  {/* Progress bar — portfolio vs. target with Coast FIRE marker */}
+                  <div className="mt-6">
+                    <div className="mb-2 flex items-end justify-between gap-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-muted-foreground text-[10px] uppercase tracking-wider">
+                          Portfolio today
+                        </span>
+                        <span className="text-sm font-semibold tabular-nums">
+                          {fmtCompact(portfolioNow, currency)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground cursor-help text-[10px] uppercase tracking-wider underline decoration-dotted underline-offset-2">
+                              Target at age {plan.personal.targetRetirementAge}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-xs">
+                            Capital needed at your desired retirement age after expenses, income,
+                            taxes, retirement returns, and fees. Shown in {valueModeLabel}.
+                          </TooltipContent>
+                        </Tooltip>
+                        <ValueModeTooltip
+                          valueMode={chartValueMode}
+                          currency={currency}
+                          todayValue={targetTodayAtGoal}
+                          nominalValue={targetNominalAtGoal}
+                        >
+                          <span className="text-sm font-semibold tabular-nums">
+                            {fmtCompact(targetAtGoalDisplay, currency)}
+                          </span>
+                        </ValueModeTooltip>
+                      </div>
+                    </div>
+                    <div className="bg-muted/60 relative h-2.5 overflow-hidden rounded-md border">
+                      <div
+                        className="bg-success absolute inset-y-0 left-0 transition-[width] duration-500"
+                        style={{ width: `${Math.min(progress * 100, 100)}%` }}
+                      />
+                      {targetAtGoalDisplay > 0 && coastAmountDisplay > 0 && (
+                        <div
+                          className="bg-foreground/55 absolute -bottom-0.5 -top-0.5 w-[2px]"
+                          style={{ left: `${coastPct}%` }}
+                          title="Coast FIRE"
+                        />
+                      )}
+                    </div>
+                    <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
+                      <span className="tabular-nums">{(progress * 100).toFixed(1)}% funded</span>
+                      <span className="tabular-nums">
+                        ▲ {L.coast} {fmtCompact(coastAmountDisplay, currency)}
+                      </span>
+                    </div>
                   </div>
-                );
-              })()}
-              {heroGuidance && (
-                <p
-                  className={`mt-4 border-t pt-4 text-xs ${
-                    heroHealth === "on_track"
-                      ? "text-green-700 dark:text-green-300"
-                      : heroHealth === "at_risk"
-                        ? "text-amber-700 dark:text-amber-300"
-                        : "text-red-600 dark:text-red-300"
-                  }`}
-                >
-                  {heroGuidance}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+
+                  {heroGuidance && !isFinanciallyIndependent && yearsFromDesired == null && (
+                    <p
+                      className={`mt-4 border-t pt-4 text-xs ${
+                        heroHealth === "on_track"
+                          ? "text-green-700 dark:text-green-300"
+                          : heroHealth === "at_risk"
+                            ? "text-amber-700 dark:text-amber-300"
+                            : "text-red-600 dark:text-red-300"
+                      }`}
+                    >
+                      {heroGuidance}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Retirement projection chart */}
           {chartData.length > 2 && (
@@ -1484,7 +1924,11 @@ export default function DashboardPage({
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="text-sm">Retirement Portfolio Projection</CardTitle>
+                    <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                      Projection · age {plan.personal.currentAge} →{" "}
+                      {plan.personal.planningHorizonAge}
+                    </div>
+                    <CardTitle className="text-sm">Portfolio trajectory</CardTitle>
                     <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                       <span className="flex items-center gap-1.5">
                         <span
@@ -1499,26 +1943,6 @@ export default function DashboardPage({
                       </span>
                     </div>
                   </div>
-                  <div className="bg-muted/30 flex rounded-md border p-0.5">
-                    <Button
-                      type="button"
-                      variant={chartValueMode === "real" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setChartValueMode("real")}
-                    >
-                      Today's value
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={chartValueMode === "nominal" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setChartValueMode("nominal")}
-                    >
-                      Nominal
-                    </Button>
-                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1530,145 +1954,263 @@ export default function DashboardPage({
                   valueMode={chartValueMode}
                 />
                 <p className="text-muted-foreground mt-2 text-xs">
-                  The portfolio line uses start-of-age balances to match the FI decision. In
-                  constant-dollar mode, withdrawals fund expenses after income streams; the
-                  portfolio can still grow when returns exceed withdrawals.
+                  The FI marker shows the first sustainable age. The portfolio keeps accumulating
+                  until your desired retirement age unless FI is reached later; after that,
+                  withdrawals fund expenses after income streams.
                 </p>
               </CardContent>
             </Card>
           )}
 
+          {/* Milestone strip — Coast FIRE / Lean FIRE / FI / Fat FIRE */}
+          {plannerMode === "fire" && targetAtGoalDisplay > 0 && (
+            <Card className="p-0">
+              <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-4 sm:divide-y-0">
+                {[
+                  {
+                    key: "coast",
+                    label: L.coast,
+                    value: coastAmountDisplay,
+                    hint: "Stop contributing, still retires on time",
+                    tip:
+                      chartValueMode === "nominal"
+                        ? "Coast amount translated into nominal dollars at your desired retirement age."
+                        : "Capital you need today that — with zero further contributions — grows to full FI by your retirement age.",
+                  },
+                  {
+                    key: "lean",
+                    label: "Lean FIRE",
+                    value: targetAtGoalDisplay * 0.7,
+                    hint: "70% of planned spending",
+                    tip: "Retire on a frugal budget — roughly 70% of your planned spending. Feasible earlier but leaves little margin.",
+                  },
+                  {
+                    key: "fi",
+                    label: "FI",
+                    value: targetAtGoalDisplay,
+                    hint: "Full expenses at your SWR",
+                    tip: "Capital that funds your planned expenses at your safe withdrawal rate, for the full retirement horizon.",
+                  },
+                  {
+                    key: "fat",
+                    label: "Fat FIRE",
+                    value: targetAtGoalDisplay * 1.5,
+                    hint: "150% of planned spending",
+                    tip: "Retire with ~50% more spending than planned — room for travel, gifts, volatility, and lifestyle upgrades.",
+                  },
+                ].map((m) => {
+                  const pct = m.value > 0 ? Math.min(1, portfolioNow / m.value) : 0;
+                  const reached = portfolioNow >= m.value && m.value > 0;
+                  return (
+                    <div key={m.key} className="p-4">
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+                          {m.label}
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                              aria-label={`More info about ${m.label}`}
+                            >
+                              <Icons.Info className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-xs">{m.tip}</TooltipContent>
+                        </Tooltip>
+                        {reached && (
+                          <Badge
+                            variant="default"
+                            className="h-[14px] bg-green-600 px-1.5 text-[9px] font-semibold tracking-wider hover:bg-green-600"
+                          >
+                            DONE
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-[17px] font-semibold tabular-nums tracking-tight">
+                        {fmtCompact(m.value, currency)}
+                      </div>
+                      <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
+                        <div
+                          className={`h-full transition-[width] duration-500 ${reached ? "bg-green-600" : "bg-success"}`}
+                          style={{ width: `${pct * 100}%`, opacity: 0.85 }}
+                        />
+                      </div>
+                      <div className="text-muted-foreground mt-1.5 text-[10.5px]">{m.hint}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* Retirement spending coverage */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">{L.budgetAt}</CardTitle>
-              <p className="text-muted-foreground text-xs">
-                How your planned {fmt(totalBudget, currency)}/mo retirement spending is covered at
-                the selected retirement age.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="mb-2 text-xs font-medium">
-                  At age {fireAgeForBudget} - {fmt(totalBudget, currency)}/mo planned spending
-                </p>
-                <div className="mb-3 flex h-5 w-full overflow-hidden rounded-full">
-                  {budgetStreams.map((s, i) => {
-                    const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];
-                    return (
-                      <div
-                        key={s.label}
-                        style={{
-                          width: `${s.percentageOfBudget}%`,
-                          background: colors[i % colors.length],
-                        }}
-                        title={`${s.label}: ${fmt(s.monthlyAmount, currency)}/mo`}
-                      />
-                    );
-                  })}
-                  {portfolioWithdrawalAtFire > 0 && (
-                    <div
-                      style={{
-                        width: `${totalBudget > 0 ? (portfolioWithdrawalAtFire / totalBudget) * 100 : 100}%`,
-                      }}
-                      className="bg-muted-foreground/30"
-                      title={`Portfolio: ${fmt(portfolioWithdrawalAtFire, currency)}/mo`}
-                    />
-                  )}
-                </div>
-                <div className="space-y-1">
-                  {/* Expense buckets breakdown */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Living spending</span>
-                    <span className="text-muted-foreground">
-                      {fmt(budget?.monthlyLivingExpenses ?? 0, currency)}/mo
-                    </span>
-                  </div>
-                  {healthcareMonthly > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Healthcare spending</span>
-                      <span className="text-muted-foreground">
-                        {fmt(healthcareMonthly, currency)}/mo
-                      </span>
-                    </div>
-                  )}
-                  {housingMonthly > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Housing spending</span>
-                      <span className="text-muted-foreground">
-                        {fmt(housingMonthly, currency)}/mo
-                      </span>
-                    </div>
-                  )}
-                  {discretionaryMonthly > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Discretionary spending</span>
-                      <span className="text-muted-foreground">
-                        {fmt(discretionaryMonthly, currency)}/mo
-                      </span>
-                    </div>
-                  )}
-                  {effectiveTaxRate > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Tax drag</span>
-                      <span className="text-muted-foreground">
-                        {(effectiveTaxRate * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                  )}
-                  {/* Funding sources */}
-                  {budgetStreams.map((s, i) => {
-                    const colors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899"];
-                    return (
-                      <div key={s.label} className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-full"
-                            style={{ background: colors[i % colors.length] }}
-                          />
-                          {s.label}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {fmt(s.monthlyAmount, currency)}/mo{" "}
-                          <span className="text-foreground ml-1 font-medium">
-                            {s.percentageOfBudget.toFixed(0)}%
-                          </span>
-                        </span>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-2">
-                      <span className="bg-muted-foreground/30 inline-block h-2.5 w-2.5 rounded-full" />
-                      Portfolio withdrawal
-                    </span>
-                    <span className="text-muted-foreground">
-                      {fmt(portfolioWithdrawalAtFire, currency)}/mo{" "}
-                      <span className="text-foreground ml-1 font-medium">
-                        {totalBudget > 0
-                          ? ((portfolioWithdrawalAtFire / totalBudget) * 100).toFixed(0)
-                          : 0}
-                        %
-                      </span>
-                    </span>
-                  </div>
+            <CardHeader className="pb-4">
+              <div className="mb-1 flex items-center gap-2">
+                <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
+                <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
+                  Coverage
                 </div>
               </div>
+              <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
+                {L.budgetAt}
+              </CardTitle>
+              <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                How your planned{" "}
+                <span className="text-foreground tabular-nums">
+                  {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                </span>{" "}
+                retirement spending is covered at the selected retirement age.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="text-foreground/90 text-sm">
+                At age {fireAgeForBudget} —{" "}
+                <span className="text-foreground font-semibold tabular-nums">
+                  {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                </span>{" "}
+                planned spending
+              </div>
 
-              {budgetStreams.length === 0 && (
-                <p className="text-muted-foreground text-xs">
-                  No retirement income configured. Add pension, part-time work, or annuity streams
-                  in the Plan tab to see how they reduce your portfolio withdrawal.
-                </p>
-              )}
+              {/* Split bar — income streams + portfolio + shortfall */}
+              <div className="bg-muted/60 relative flex h-2.5 w-full overflow-hidden rounded-full border">
+                {budgetStreams.map((s, i) => {
+                  const pct = Math.min(100, Math.max(0, s.percentageOfBudget * 100));
+                  if (pct <= 0) return null;
+                  return (
+                    <div
+                      key={s.label}
+                      className="h-full transition-[width] duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                      }}
+                      title={`${s.label}: ${pct.toFixed(0)}%`}
+                    />
+                  );
+                })}
+                {coveragePortfolioPct > 0 && (
+                  <div
+                    className="bg-success h-full transition-[width] duration-500"
+                    style={{ width: `${coveragePortfolioPct}%` }}
+                    title={`Portfolio withdrawal: ${coveragePortfolioPct.toFixed(0)}%`}
+                  />
+                )}
+                {coverageShortfallPct > 0 && (
+                  <div
+                    className="h-full bg-red-500/75 transition-[width] duration-500"
+                    style={{ width: `${coverageShortfallPct}%` }}
+                    title={`Unfunded: ${coverageShortfallPct.toFixed(0)}%`}
+                  />
+                )}
+              </div>
+
+              {/* Expense breakdown — no color dots */}
+              <div className="divide-border divide-y">
+                {(() => {
+                  const rows: { label: string; amount: number }[] = [
+                    { label: "Living spending", amount: plan.expenses.living.monthlyAmount },
+                  ];
+                  if (plan.expenses.healthcare) {
+                    rows.push({
+                      label: "Healthcare spending",
+                      amount: plan.expenses.healthcare.monthlyAmount,
+                    });
+                  }
+                  if (plan.expenses.housing) {
+                    rows.push({
+                      label: "Housing spending",
+                      amount: plan.expenses.housing.monthlyAmount,
+                    });
+                  }
+                  if (plan.expenses.discretionary) {
+                    rows.push({
+                      label: "Discretionary spending",
+                      amount: plan.expenses.discretionary.monthlyAmount,
+                    });
+                  }
+                  return rows.map((r) => (
+                    <div key={r.label} className="flex items-center justify-between py-2.5 text-sm">
+                      <span className="text-foreground">{r.label}</span>
+                      <span className="text-foreground tabular-nums">
+                        {fmtCompact(r.amount, currency)}/mo
+                      </span>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* Funding sources — small square dots */}
+              <div className="space-y-2.5 border-t pt-4">
+                {budgetStreams.map((s, i) => (
+                  <div key={s.label} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-sm"
+                        style={{
+                          background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                        }}
+                      />
+                      <span className="text-foreground">{s.label}</span>
+                    </span>
+                    <span className="text-foreground tabular-nums">
+                      {fmtCompact(s.monthlyAmount, currency)}/mo{" "}
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        {(s.percentageOfBudget * 100).toFixed(0)}%
+                      </span>
+                    </span>
+                  </div>
+                ))}
+                {coveragePortfolioAppliedMonthly > 0 && (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="flex items-center gap-2">
+                      <span className="bg-success inline-block h-2.5 w-2.5 rounded-sm" />
+                      <span className="text-foreground">Portfolio withdrawal</span>
+                    </span>
+                    <span className="text-foreground tabular-nums">
+                      {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        {coveragePortfolioPct.toFixed(0)}%
+                      </span>
+                    </span>
+                  </div>
+                )}
+                {coverageShortfallMonthly > 0 && (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/75" />
+                      <span className="text-foreground">Unfunded spending</span>
+                    </span>
+                    <span className="text-foreground tabular-nums">
+                      {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        {coverageShortfallPct.toFixed(0)}%
+                      </span>
+                    </span>
+                  </div>
+                )}
+                {coverageEstimatedTaxesMonthly > 0 && (
+                  <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs italic">
+                    <span>Withdrawal taxes (extra portfolio drag)</span>
+                    <span className="tabular-nums">
+                      +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
+                    </span>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
           {/* Year-by-Year Snapshot — in main column with pagination */}
           {allSnapshots.length > 0 && (
             <Card>
-              <CardHeader className="flex-row items-center justify-between pb-3">
+              <CardHeader className="flex-row items-start justify-between pb-3">
                 <div>
+                  <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
+                    Table
+                  </div>
                   <CardTitle className="text-sm">Year-by-Year Snapshot</CardTitle>
                   {hasPensionFunds && (
                     <p className="text-muted-foreground mt-1 text-xs">
@@ -1741,28 +2283,52 @@ export default function DashboardPage({
                               {isFire ? L.prefix : "Acc."}
                             </Badge>
                           </td>
-                          <td className="py-1.5 text-right">{fmt(snap.portfolioEnd, currency)}</td>
+                          <td className="py-1.5 text-right">
+                            {formatAmount(scaleForModeAtAge(snap.portfolioEnd, snap.age), currency)}
+                          </td>
                           {hasPensionFunds && (
                             <td className="py-1.5 text-right">
-                              {snap.pensionAssets > 0 ? fmt(snap.pensionAssets, currency) : "—"}
+                              {snap.pensionAssets > 0
+                                ? formatAmount(
+                                    scaleForModeAtAge(snap.pensionAssets, snap.age),
+                                    currency,
+                                  )
+                                : "—"}
                             </td>
                           )}
                           <td className="py-1.5 text-right">
                             {snap.annualContribution > 0
-                              ? fmt(snap.annualContribution, currency)
+                              ? formatAmount(
+                                  scaleForModeAtAge(snap.annualContribution, snap.age),
+                                  currency,
+                                )
                               : "—"}
                           </td>
                           <td className="py-1.5 text-right">
-                            {snap.annualIncome > 0 ? fmt(snap.annualIncome, currency) : "—"}
+                            {snap.annualIncome > 0
+                              ? formatAmount(
+                                  scaleForModeAtAge(snap.annualIncome, snap.age),
+                                  currency,
+                                )
+                              : "—"}
                           </td>
                           <td className="py-1.5 text-right">
                             {(snap.plannedExpenses ?? snap.annualExpenses) > 0
-                              ? fmt(snap.plannedExpenses ?? snap.annualExpenses, currency)
+                              ? formatAmount(
+                                  scaleForModeAtAge(
+                                    snap.plannedExpenses ?? snap.annualExpenses,
+                                    snap.age,
+                                  ),
+                                  currency,
+                                )
                               : "—"}
                           </td>
                           <td className="py-1.5 text-right">
                             {snap.netWithdrawalFromPortfolio > 0
-                              ? fmt(snap.netWithdrawalFromPortfolio, currency)
+                              ? formatAmount(
+                                  scaleForModeAtAge(snap.netWithdrawalFromPortfolio, snap.age),
+                                  currency,
+                                )
                               : "—"}
                           </td>
                         </tr>
@@ -1776,7 +2342,7 @@ export default function DashboardPage({
         </div>
 
         {/* ── Sidebar ── */}
-        <div className="lg:sticky lg:top-6 lg:col-span-1 lg:self-start">
+        <div className="space-y-4 lg:col-span-1 lg:self-start">
           <SidebarConfigurator
             plan={plan}
             currency={currency}
@@ -1785,6 +2351,40 @@ export default function DashboardPage({
             goalId={goalId}
             dcLinkedAccountIds={dcLinkedAccountIds}
           />
+
+          {/* Action card — closes the gap (on-track confirmation or guidance) */}
+          {heroHealth === "on_track" ? (
+            <Card className="border-green-600/20 bg-green-50/60 dark:bg-green-950/20">
+              <CardContent className="flex gap-2.5 py-4">
+                <Icons.CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                <div>
+                  <div className="text-foreground mb-1 text-sm font-semibold">You're on track.</div>
+                  <div className="text-muted-foreground text-xs leading-relaxed">
+                    Stress-test with a market drawdown or inflation shock in{" "}
+                    <span className="font-medium">Scenarios</span>.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : heroGuidance ? (
+            <Card
+              className={`${
+                heroHealth === "at_risk"
+                  ? "border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20"
+                  : "border-red-500/30 bg-red-50/60 dark:bg-red-950/20"
+              }`}
+            >
+              <CardContent className="py-4">
+                <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
+                  Close the gap
+                </div>
+                <div className="text-foreground text-sm font-semibold">What could help</div>
+                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                  {heroGuidance}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
 

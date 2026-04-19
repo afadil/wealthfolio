@@ -959,3 +959,62 @@ summary {
   pointer-events: none;
   z-index: 1;
 }
+
+/* Lever slider — used in retirement planner sidebar (plan inputs). */
+.lever-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--color-success) 0,
+    var(--color-success) var(--lever-pct, 0%),
+    var(--color-muted) var(--lever-pct, 0%),
+    var(--color-muted) 100%
+  );
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.lever-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--flexoki-tx-2));
+  border: 2px solid var(--color-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+}
+.lever-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+.lever-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--flexoki-tx-2));
+  border: 2px solid var(--color-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: grab;
+}
+
+/* Olive palette for retirement-planner income streams.
+   All hues live in the olive / green-yellow band (95–140) so nothing reads as brown.
+   Differentiation comes from L and hue-shifts inside that band.
+   Light mode uses darker L for contrast on cream cards; .dark lifts L for dark cards. */
+:root {
+  --fi-stream-1: oklch(0.52 0.1 100); /* warm yellow-olive */
+  --fi-stream-2: oklch(0.46 0.09 125); /* mid olive */
+  --fi-stream-3: oklch(0.6 0.07 140); /* sage */
+  --fi-stream-4: oklch(0.56 0.09 110); /* standard olive */
+  --fi-stream-5: oklch(0.5 0.08 135); /* deep cool olive */
+}
+.dark {
+  --fi-stream-1: oklch(0.78 0.11 100);
+  --fi-stream-2: oklch(0.72 0.1 125);
+  --fi-stream-3: oklch(0.82 0.07 140);
+  --fi-stream-4: oklch(0.75 0.09 110);
+  --fi-stream-5: oklch(0.7 0.09 135);
+}
