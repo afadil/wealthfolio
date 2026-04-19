@@ -1,5 +1,31 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/ci-check.sh",
+            "if": "Bash(git commit*)",
+            "timeout": 120,
+            "statusMessage": "Running pre-commit CI checks..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/ci-check.sh --full",
+            "if": "Bash(git push*)",
+            "timeout": 300,
+            "statusMessage": "Running full CI checks before push..."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
