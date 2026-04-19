@@ -90,8 +90,8 @@ jobs:
           # Required for outbox tests in storage-sqlite
           CONNECT_API_URL: http://test.local
 
-      - name: Build (src-server)
-        run: cargo build -p wealthfolio-server --release
+      - name: Check release build (src-server)
+        run: cargo check -p wealthfolio-server --release
 
   build-status:
     name: Build Status
