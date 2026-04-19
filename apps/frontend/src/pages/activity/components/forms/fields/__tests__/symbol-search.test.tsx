@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SymbolSearch } from "../symbol-search";
 
 const resolveSymbolQuoteMock = vi.fn();
@@ -17,26 +17,47 @@ vi.mock("@/components/ticker-search", () => ({
   }: {
     onSelectResult: (symbol: string, result?: Record<string, unknown>) => void;
   }) => (
-    <button
-      type="button"
-      data-testid="select-symbol"
-      onClick={() =>
-        onSelectResult("VWRPL.XC", {
-          symbol: "VWRPL.XC",
-          longName: "Vanguard FTSE All-World UCITS ETF",
-          shortName: "VWRP",
-          exchange: "CXE",
-          exchangeMic: "CXE",
-          quoteType: "EQUITY",
-          currency: "GBp",
-          // Intentionally omitted to reproduce the regression path.
-          currencySource: undefined,
-          dataSource: "YAHOO",
-        })
-      }
-    >
-      Select Symbol
-    </button>
+    <>
+      <button
+        type="button"
+        data-testid="select-symbol"
+        onClick={() =>
+          onSelectResult("VWRPL.XC", {
+            symbol: "VWRPL.XC",
+            longName: "Vanguard FTSE All-World UCITS ETF",
+            shortName: "VWRP",
+            exchange: "CXE",
+            exchangeMic: "CXE",
+            quoteType: "EQUITY",
+            currency: "GBp",
+            // Intentionally omitted to reproduce the regression path.
+            currencySource: undefined,
+            dataSource: "YAHOO",
+          })
+        }
+      >
+        Select Symbol
+      </button>
+      <button
+        type="button"
+        data-testid="select-existing-crypto"
+        onClick={() =>
+          onSelectResult("BTC", {
+            symbol: "BTC",
+            longName: "Bitcoin EUR",
+            shortName: "Bitcoin EUR",
+            exchange: "",
+            quoteType: "CRYPTOCURRENCY",
+            currency: "EUR",
+            dataSource: "YAHOO",
+            isExisting: true,
+            existingAssetId: "asset-btc-eur",
+          })
+        }
+      >
+        Select Existing Crypto
+      </button>
+    </>
   ),
 }));
 
@@ -81,6 +102,10 @@ function TestForm() {
 }
 
 describe("SymbolSearch", () => {
+  beforeEach(() => {
+    resolveSymbolQuoteMock.mockReset();
+  });
+
   it("persists provider-resolved quote currency hint even without currencySource", async () => {
     resolveSymbolQuoteMock.mockResolvedValue({
       currency: "GBP",
@@ -99,5 +124,37 @@ describe("SymbolSearch", () => {
     expect(screen.getByTestId("asset-id")).toHaveTextContent("VWRPL");
     expect(screen.getByTestId("exchange-mic")).toHaveTextContent("CXE");
     expect(screen.getByTestId("asset-name")).toHaveTextContent("Vanguard FTSE All-World UCITS ETF");
+    expect(resolveSymbolQuoteMock).toHaveBeenCalledWith(
+      "VWRPL.XC",
+      "CXE",
+      "EQUITY",
+      undefined,
+      "GBp",
+    );
+  });
+
+  it("does not overwrite an existing asset quote currency with resolver output", async () => {
+    resolveSymbolQuoteMock.mockResolvedValue({
+      currency: "CAD",
+      price: 103121.59,
+    });
+
+    const user = userEvent.setup();
+    render(<TestForm />);
+
+    await user.click(screen.getByTestId("select-existing-crypto"));
+
+    await waitFor(() => {
+      expect(resolveSymbolQuoteMock).toHaveBeenCalledWith(
+        "BTC",
+        undefined,
+        "CRYPTOCURRENCY",
+        undefined,
+        "EUR",
+      );
+    });
+
+    expect(screen.getByTestId("asset-id")).toHaveTextContent("BTC");
+    expect(screen.getByTestId("quote-ccy")).toHaveTextContent("EUR");
   });
 });

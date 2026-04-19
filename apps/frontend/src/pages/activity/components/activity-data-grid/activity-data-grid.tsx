@@ -40,6 +40,24 @@ interface ActivityDataGridProps {
   onPageSizeChange: (pageSize: number) => void;
 }
 
+function shouldApplyResolvedQuoteCurrency(result: SymbolSearchResult): boolean {
+  if (result.isExisting || result.dataSource === "MANUAL") {
+    return false;
+  }
+  return (
+    !result.currency?.trim() ||
+    result.currencySource === "exchange_inferred" ||
+    !result.currencySource
+  );
+}
+
+function shouldApplyResolvedActivityCurrency(result: SymbolSearchResult): boolean {
+  if (result.isExisting || result.dataSource === "MANUAL") {
+    return false;
+  }
+  return !result.currency?.trim() || result.currencySource === "exchange_inferred";
+}
+
 /**
  * Activity data grid component with inline editing, bulk operations, and optimistic updates
  */
@@ -202,7 +220,15 @@ export function ActivityDataGrid({
 
       // Resolve quote to confirm currency and get latest price
       if (result.dataSource !== "MANUAL") {
-        resolveSymbolQuote(result.symbol, result.exchangeMic, result.quoteType).then((resolved) => {
+        const shouldUseResolvedQuoteCurrency = shouldApplyResolvedQuoteCurrency(result);
+        const shouldUseResolvedActivityCurrency = shouldApplyResolvedActivityCurrency(result);
+        resolveSymbolQuote(
+          result.symbol,
+          result.exchangeMic,
+          result.quoteType,
+          undefined,
+          result.currency,
+        ).then((resolved) => {
           if (requestId !== latestResolveRequestId.current) return;
           if (!resolved) return;
 
@@ -219,9 +245,10 @@ export function ActivityDataGrid({
             // Update currency from resolved quote to correct exchange-inferred values
             // (e.g., search returns "GBp" inferred, resolve confirms "GBP")
             // Only overwrite if user hasn't manually changed it since selection
-            if (resolved.currency) {
+            if (resolved.currency && shouldUseResolvedQuoteCurrency) {
               const confirmedCurrency = resolved.currency.trim();
               if (
+                shouldUseResolvedActivityCurrency &&
                 confirmedCurrency &&
                 row.currency !== confirmedCurrency &&
                 row.currency === (provisionalCurrency ?? row.accountCurrency ?? fallbackCurrency)

@@ -38,6 +38,26 @@ function stripCryptoQuoteSuffix(symbol: string, currencyHint?: string): string {
   return base || trimmed;
 }
 
+function shouldApplyResolvedQuoteCurrency(searchResult: SymbolSearchResult | undefined): boolean {
+  if (!searchResult || searchResult.isExisting || searchResult.dataSource === DataSource.MANUAL) {
+    return false;
+  }
+  return (
+    !searchResult.currency?.trim() ||
+    searchResult.currencySource === "exchange_inferred" ||
+    !searchResult.currencySource
+  );
+}
+
+function shouldApplyResolvedActivityCurrency(
+  searchResult: SymbolSearchResult | undefined,
+): boolean {
+  if (!searchResult || searchResult.isExisting || searchResult.dataSource === DataSource.MANUAL) {
+    return false;
+  }
+  return !searchResult.currency?.trim() || searchResult.currencySource === "exchange_inferred";
+}
+
 interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
   /** Field name for the symbol value */
   name: FieldPath<TFieldValues>;
@@ -144,23 +164,28 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     // Update activity currency when:
     // - currency was exchange-inferred (needs provider confirmation)
     // - search result had no currency at all (e.g., OpenFIGI bonds)
+    const shouldUseResolvedQuoteCurrency = shouldApplyResolvedQuoteCurrency(searchResult);
     const needsCurrencyConfirmation =
-      currencyName &&
-      !searchResult?.isExisting &&
-      (searchResult?.currencySource === "exchange_inferred" || !searchResult?.currency);
+      currencyName && shouldApplyResolvedActivityCurrency(searchResult);
 
     if (searchResult) {
       setQuoteDisplay({ price: null, isLoading: true });
       const provisionalCurrency = searchResult.currency?.trim();
-      resolveSymbolQuote(searchResult.symbol, searchResult.exchangeMic, searchResult.quoteType)
+      resolveSymbolQuote(
+        searchResult.symbol,
+        searchResult.exchangeMic,
+        searchResult.quoteType,
+        undefined,
+        searchResult.currency,
+      )
         .then((resolved) => {
           if (requestId !== latestResolveRequestId.current) return;
           setQuoteDisplay({ price: resolved?.price ?? null, isLoading: false });
 
           const confirmedCurrency = resolved?.currency?.trim();
-          if (confirmedCurrency && quoteCcyName) {
-            // Always persist provider-resolved quote currency as a symbol hint.
-            // Activity currency may still be user-controlled below.
+          if (confirmedCurrency && quoteCcyName && shouldUseResolvedQuoteCurrency) {
+            // Only replace provisional hints; existing assets and selected pairs already
+            // carry stronger quote-currency identity.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setValue(quoteCcyName, confirmedCurrency as any);
           }

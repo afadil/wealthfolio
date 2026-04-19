@@ -213,7 +213,7 @@ pub async fn resolve_symbol_quote(
 ) -> Result<wealthfolio_core::quotes::ResolvedQuote, String> {
     let inst_type = instrument_type
         .as_deref()
-        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+        .and_then(wealthfolio_core::assets::InstrumentType::from_external_str);
     state
         .quote_service()
         .resolve_symbol_quote(

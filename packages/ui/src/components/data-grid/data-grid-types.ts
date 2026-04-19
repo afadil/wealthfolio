@@ -28,6 +28,10 @@ export interface SymbolSearchResult {
   dataSource?: string;
   /** Asset kind for custom assets (e.g., "SECURITY", "CRYPTO", "OTHER") */
   assetKind?: string;
+  /** True when this result maps to an existing persisted asset. */
+  isExisting?: boolean;
+  /** Persisted asset id when this result maps to an existing asset. */
+  existingAssetId?: string;
 }
 
 export type CellOpts =

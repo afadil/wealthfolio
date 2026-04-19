@@ -26,8 +26,9 @@ use super::sync_state::{QuoteSyncState, SymbolSyncPlan, SyncMode, SyncStateStore
 use super::types::{quote_id, AssetId, Day, QuoteSource};
 use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{
-    canonicalize_market_identity, symbol_resolution_candidates, Asset, AssetKind,
-    AssetRepositoryTrait, AssetSpec, InstrumentType, ProviderProfile, QuoteMode,
+    canonicalize_market_identity, normalize_quote_ccy_code, parse_crypto_pair_symbol,
+    symbol_resolution_candidates, Asset, AssetKind, AssetRepositoryTrait, AssetSpec,
+    InstrumentType, ProviderProfile, QuoteMode,
 };
 use crate::errors::Result;
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -1109,10 +1110,7 @@ where
             trimmed_symbol
         };
 
-        let clean_quote_ccy = quote_ccy
-            .map(str::trim)
-            .filter(|c| !c.is_empty())
-            .unwrap_or_default();
+        let requested_quote_ccy = normalize_quote_ccy_code(quote_ccy);
         let provider_config = provider_config_for_symbol_resolution(preferred_provider);
 
         for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
@@ -1151,15 +1149,47 @@ where
                 None => (attempt_symbol.clone(), None),
             };
 
+            let pair_quote_ccy = if matches!(instrument_type, Some(InstrumentType::Crypto)) {
+                parse_crypto_pair_symbol(&resolved_symbol).map(|(_, quote)| quote)
+            } else {
+                None
+            };
+            let quote_ccy_for_identity =
+                pair_quote_ccy.as_deref().or(requested_quote_ccy.as_deref());
+            let inferred_instrument_type =
+                instrument_type.cloned().unwrap_or(InstrumentType::Equity);
+            let canonical_identity = canonicalize_market_identity(
+                Some(inferred_instrument_type.clone()),
+                Some(resolved_symbol.as_str()),
+                exchange_mic,
+                quote_ccy_for_identity,
+            );
+            if matches!(
+                inferred_instrument_type,
+                InstrumentType::Crypto | InstrumentType::Fx
+            ) && canonical_identity.quote_ccy.is_none()
+            {
+                debug!(
+                    "resolve_symbol_quote: missing quote currency for {} symbol='{}'",
+                    inferred_instrument_type.as_db_str(),
+                    resolved_symbol
+                );
+                continue;
+            }
+
             let temp_asset = Asset {
                 id: format!("_QUOTE_RESOLVE_{}", attempt_symbol),
                 kind: AssetKind::Investment,
                 quote_mode: QuoteMode::Market,
-                quote_ccy: clean_quote_ccy.to_string(),
-                instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
-                instrument_symbol: Some(resolved_symbol),
-                display_code: Some(attempt_symbol.clone()),
-                instrument_exchange_mic: exchange_mic.map(str::to_string),
+                quote_ccy: canonical_identity.quote_ccy.unwrap_or_default(),
+                instrument_type: Some(inferred_instrument_type),
+                instrument_symbol: canonical_identity
+                    .instrument_symbol
+                    .or_else(|| Some(resolved_symbol.clone())),
+                display_code: canonical_identity
+                    .display_code
+                    .or_else(|| Some(attempt_symbol.clone())),
+                instrument_exchange_mic: canonical_identity.instrument_exchange_mic,
                 provider_config: provider_config.clone(),
                 metadata,
                 ..Default::default()
