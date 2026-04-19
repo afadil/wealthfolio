@@ -921,7 +921,10 @@ export function useChatImportSession({
       if (!result.summary?.success || importedCount === 0) {
         // Merge any per-row errors from the import result back into drafts.
         if (result.activities?.length) {
-          const postImportDrafts = applyBackendValidation(draftsWithCreatedAssets, result.activities);
+          const postImportDrafts = applyBackendValidation(
+            draftsWithCreatedAssets,
+            result.activities,
+          );
           dispatch({ type: "SET_DRAFTS", payload: postImportDrafts });
         }
         dispatch({

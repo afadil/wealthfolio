@@ -193,12 +193,8 @@ impl<M: CompletionModel> StreamingPromptHook<M> for WealthfolioStreamHook {
         }
     }
 
-    fn on_completion_call(
-        &self,
-        _prompt: &Message,
-        _history: &[Message],
-    ) -> impl std::future::Future<Output = HookAction> + Send {
-        async { HookAction::Continue }
+    async fn on_completion_call(&self, _prompt: &Message, _history: &[Message]) -> HookAction {
+        HookAction::Continue
     }
 }
 

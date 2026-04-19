@@ -1252,7 +1252,7 @@ where
         }
 
         // Sort by priority (highest first)
-        plans.sort_by(|a, b| b.priority.cmp(&a.priority));
+        plans.sort_by_key(|b| std::cmp::Reverse(b.priority));
         Ok(plans)
     }
 

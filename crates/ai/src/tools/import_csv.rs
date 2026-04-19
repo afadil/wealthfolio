@@ -764,28 +764,32 @@ mod tests {
 
     #[test]
     fn test_estimate_confidence_high() {
-        let mut mapping = ImportMappingData::default();
-        mapping.field_mappings = into_field_mapping_values(
-            [
-                (FIELD_DATE.to_string(), "Date".to_string()),
-                (FIELD_ACTIVITY_TYPE.to_string(), "Type".to_string()),
-                (FIELD_SYMBOL.to_string(), "Symbol".to_string()),
-                (FIELD_QUANTITY.to_string(), "Quantity".to_string()),
-            ]
-            .into_iter()
-            .collect(),
-        );
+        let mapping = ImportMappingData {
+            field_mappings: into_field_mapping_values(
+                [
+                    (FIELD_DATE.to_string(), "Date".to_string()),
+                    (FIELD_ACTIVITY_TYPE.to_string(), "Type".to_string()),
+                    (FIELD_SYMBOL.to_string(), "Symbol".to_string()),
+                    (FIELD_QUANTITY.to_string(), "Quantity".to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            ..Default::default()
+        };
         assert_eq!(estimate_confidence(&mapping), MappingConfidence::High);
     }
 
     #[test]
     fn test_estimate_confidence_low() {
-        let mut mapping = ImportMappingData::default();
-        mapping.field_mappings = into_field_mapping_values(
-            [(FIELD_DATE.to_string(), "Date".to_string())]
-                .into_iter()
-                .collect(),
-        );
+        let mapping = ImportMappingData {
+            field_mappings: into_field_mapping_values(
+                [(FIELD_DATE.to_string(), "Date".to_string())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        };
         assert_eq!(estimate_confidence(&mapping), MappingConfidence::Low);
     }
 

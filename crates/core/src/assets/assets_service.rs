@@ -1211,7 +1211,7 @@ impl AssetServiceTrait for AssetService {
         }
 
         let resolved_quote_ccy_by_key: HashMap<String, String> =
-            stream::iter(resolution_inputs_by_key.into_iter())
+            stream::iter(resolution_inputs_by_key)
                 .map(|(resolution_key, input)| async move {
                     let (
                         symbol,
