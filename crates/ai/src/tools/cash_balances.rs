@@ -131,6 +131,14 @@ impl<E: AiEnvironment + 'static> Tool for GetCashBalancesTool<E> {
         } else {
             vec![args.account_id.clone()]
         };
+        let valuation_by_account: HashMap<_, _> = self
+            .env
+            .valuation_service()
+            .get_latest_valuations(&target_ids)
+            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?
+            .into_iter()
+            .map(|valuation| (valuation.account_id.clone(), valuation))
+            .collect();
 
         let mut summaries = Vec::new();
         let mut grand_total_base = Decimal::ZERO;
@@ -158,7 +166,6 @@ impl<E: AiEnvironment + 'static> Tool for GetCashBalancesTool<E> {
                 .unwrap_or_else(|| (account_id.clone(), self.base_currency.clone()));
 
             let mut balances = Vec::new();
-            let mut total_local = Decimal::ZERO;
 
             for h in &cash_holdings {
                 let currency = h
@@ -170,23 +177,38 @@ impl<E: AiEnvironment + 'static> Tool for GetCashBalancesTool<E> {
                     currency,
                     amount: h.quantity,
                 });
-                total_local += h.market_value.local;
             }
 
-            // Use the snapshot's pre-computed base total if available (via
-            // market_value.base). Currently the holdings service sets this to 0
-            // for cash, so we fall back to reporting the local total.
+            let raw_total: Decimal = balances.iter().map(|b| b.amount).sum();
+            let all_in_account_currency = balances.iter().all(|b| b.currency == account_currency);
+            let all_in_base_currency = balances.iter().all(|b| b.currency == self.base_currency);
+            let valuation = valuation_by_account.get(account_id);
+
             let total_base: Decimal = cash_holdings.iter().map(|h| h.market_value.base).sum();
             let effective_base = if total_base != Decimal::ZERO {
                 total_base
+            } else if let Some(valuation) = valuation {
+                valuation.cash_balance * valuation.fx_rate_to_base
+            } else if all_in_base_currency {
+                raw_total
             } else {
-                // All same currency as base? Use local total directly.
-                if balances.len() == 1 && balances[0].currency == self.base_currency {
-                    total_local
-                } else {
-                    // Mixed currencies without FX — report local total as best effort
-                    total_local
-                }
+                return Err(AiError::ToolExecutionFailed(format!(
+                    "Cash balance for account '{}' includes currencies that cannot be converted to base currency.",
+                    account_id
+                )));
+            };
+
+            let total_account_currency = if let Some(valuation) = valuation {
+                valuation.cash_balance
+            } else if all_in_account_currency {
+                raw_total
+            } else if account_currency == self.base_currency {
+                effective_base
+            } else {
+                return Err(AiError::ToolExecutionFailed(format!(
+                    "Cash balance for account '{}' includes mixed currencies without an account-currency total.",
+                    account_id
+                )));
             };
 
             grand_total_base += effective_base;
@@ -195,7 +217,7 @@ impl<E: AiEnvironment + 'static> Tool for GetCashBalancesTool<E> {
                 account_name,
                 account_currency,
                 balances,
-                total_account_currency: total_local,
+                total_account_currency,
                 total_base_currency: effective_base,
             });
         }
@@ -211,7 +233,67 @@ impl<E: AiEnvironment + 'static> Tool for GetCashBalancesTool<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::test_env::MockEnvironment;
+    use crate::env::test_env::{
+        MockAccountService, MockEnvironment, MockHoldingsService, MockValuationService,
+    };
+    use chrono::{NaiveDate, Utc};
+    use rust_decimal::Decimal;
+    use wealthfolio_core::{
+        accounts::Account,
+        holdings::{Holding, HoldingType, Instrument, MonetaryValue},
+        valuation::DailyAccountValuation,
+    };
+
+    fn cash_holding(
+        account_id: &str,
+        currency: &str,
+        amount: Decimal,
+        base_value: Decimal,
+    ) -> Holding {
+        Holding {
+            id: format!("CASH-{}-{}", account_id, currency),
+            account_id: account_id.to_string(),
+            holding_type: HoldingType::Cash,
+            instrument: Some(Instrument {
+                id: format!("cash:{}", currency),
+                symbol: currency.to_string(),
+                name: Some(format!("Cash ({})", currency)),
+                currency: currency.to_string(),
+                notes: None,
+                pricing_mode: "MANUAL".to_string(),
+                preferred_provider: None,
+                exchange_mic: None,
+                classifications: None,
+            }),
+            asset_kind: None,
+            quantity: amount,
+            open_date: None,
+            lots: None,
+            contract_multiplier: Decimal::ONE,
+            local_currency: currency.to_string(),
+            base_currency: "CAD".to_string(),
+            fx_rate: None,
+            market_value: MonetaryValue {
+                local: amount,
+                base: base_value,
+            },
+            cost_basis: None,
+            price: Some(Decimal::ONE),
+            purchase_price: None,
+            unrealized_gain: None,
+            unrealized_gain_pct: None,
+            realized_gain: None,
+            realized_gain_pct: None,
+            total_gain: None,
+            total_gain_pct: None,
+            day_change: None,
+            day_change_pct: None,
+            prev_close_value: None,
+            weight: Decimal::ZERO,
+            as_of_date: NaiveDate::from_ymd_opt(2025, 1, 15).unwrap(),
+            metadata: None,
+        }
+    }
 
     #[tokio::test]
     async fn test_get_cash_balances_basic() {
@@ -224,5 +306,62 @@ mod tests {
             .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().base_currency, "USD");
+    }
+
+    #[tokio::test]
+    async fn test_get_cash_balances_uses_valuation_for_account_currency_total() {
+        let account = Account {
+            id: "acct-1".to_string(),
+            name: "CAD Account".to_string(),
+            currency: "CAD".to_string(),
+            is_active: true,
+            ..Default::default()
+        };
+        let valuation_date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let env = Arc::new(MockEnvironment {
+            base_currency: "CAD".to_string(),
+            account_service: Arc::new(MockAccountService {
+                accounts: vec![account],
+            }),
+            holdings_service: Arc::new(MockHoldingsService {
+                holdings: vec![
+                    cash_holding("acct-1", "CAD", Decimal::from(1000), Decimal::from(1000)),
+                    cash_holding("acct-1", "USD", Decimal::from(1000), Decimal::from(1350)),
+                ],
+            }),
+            valuation_service: Arc::new(MockValuationService {
+                valuations: vec![DailyAccountValuation {
+                    id: "valuation-1".to_string(),
+                    account_id: "acct-1".to_string(),
+                    valuation_date,
+                    account_currency: "CAD".to_string(),
+                    base_currency: "CAD".to_string(),
+                    fx_rate_to_base: Decimal::ONE,
+                    cash_balance: Decimal::from(2350),
+                    investment_market_value: Decimal::ZERO,
+                    total_value: Decimal::from(2350),
+                    cost_basis: Decimal::ZERO,
+                    net_contribution: Decimal::ZERO,
+                    calculated_at: Utc::now(),
+                }],
+            }),
+            ..MockEnvironment::new()
+        });
+        let tool = GetCashBalancesTool::new(env, "CAD".to_string());
+
+        let result = tool
+            .call(GetCashBalancesArgs {
+                account_id: "TOTAL".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.accounts.len(), 1);
+        assert_eq!(
+            result.accounts[0].total_account_currency,
+            Decimal::from(2350)
+        );
+        assert_eq!(result.accounts[0].total_base_currency, Decimal::from(2350));
+        assert_eq!(result.grand_total_base, Decimal::from(2350));
     }
 }

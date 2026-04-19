@@ -35,6 +35,32 @@ where
     }))
 }
 
+fn clean_string_map(map: Option<HashMap<String, String>>) -> HashMap<String, String> {
+    map.unwrap_or_default()
+        .into_iter()
+        .filter(|(_, value)| !value.trim().is_empty())
+        .collect()
+}
+
+fn has_usable_string_map(map: &Option<HashMap<String, String>>) -> bool {
+    map.as_ref()
+        .is_some_and(|m| m.values().any(|value| !value.trim().is_empty()))
+}
+
+fn has_usable_activity_mappings(map: &Option<HashMap<String, Vec<String>>>) -> bool {
+    map.as_ref().is_some_and(|m| {
+        m.values()
+            .any(|values| values.iter().any(|value| !value.trim().is_empty()))
+    })
+}
+
+fn has_usable_llm_mappings(args: &ImportCsvArgs) -> bool {
+    has_usable_string_map(&args.field_mappings)
+        || has_usable_activity_mappings(&args.activity_mappings)
+        || has_usable_string_map(&args.symbol_mappings)
+        || has_usable_string_map(&args.account_mappings)
+}
+
 use wealthfolio_core::activities::{
     import_type, into_field_mapping_values, ImportMappingData, ParseConfig,
 };
@@ -418,12 +444,16 @@ fn merge_activity_mappings(
         for (canonical, csv_values) in llm {
             let entry = merged.entry(canonical).or_default();
             for v in csv_values {
-                let upper = v.trim().to_uppercase();
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                let upper = trimmed.to_uppercase();
                 if !entry
                     .iter()
                     .any(|existing| existing.to_uppercase() == upper)
                 {
-                    entry.push(v);
+                    entry.push(trimmed.to_string());
                 }
             }
         }
@@ -626,11 +656,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         let mut used_saved_profile = false;
         let mut mapping: Option<ImportMappingData> = None;
         if let Some(ref account_id) = args.account_id {
-            let has_llm_mappings = args.field_mappings.is_some()
-                || args.activity_mappings.is_some()
-                || args.symbol_mappings.is_some()
-                || args.account_mappings.is_some();
-            if !has_llm_mappings {
+            if !has_usable_llm_mappings(&args) {
                 if let Ok(saved) = self
                     .env
                     .activity_service()
@@ -673,9 +699,11 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         let applied_mapping = if let Some(m) = mapping {
             m
         } else {
-            let field_mappings = match args.field_mappings.clone() {
-                Some(m) if !m.is_empty() => m,
-                _ => auto_detect_field_mappings(&headers),
+            let llm_field_mappings = clean_string_map(args.field_mappings.clone());
+            let field_mappings = if llm_field_mappings.is_empty() {
+                auto_detect_field_mappings(&headers)
+            } else {
+                llm_field_mappings
             };
 
             ImportMappingData {
@@ -683,8 +711,8 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                 context_kind: import_type::ACTIVITY.to_string(),
                 field_mappings: into_field_mapping_values(field_mappings),
                 activity_mappings: merge_activity_mappings(args.activity_mappings.clone()),
-                symbol_mappings: args.symbol_mappings.clone().unwrap_or_default(),
-                account_mappings: args.account_mappings.clone().unwrap_or_default(),
+                symbol_mappings: clean_string_map(args.symbol_mappings.clone()),
+                account_mappings: clean_string_map(args.account_mappings.clone()),
                 parse_config: Some(effective_parse_config.clone()),
                 ..Default::default()
             }
@@ -824,6 +852,40 @@ mod tests {
             .unwrap()
             .iter()
             .any(|v| v == "Dividende"));
+    }
+
+    #[test]
+    fn test_empty_nullable_maps_are_not_usable_llm_mappings() {
+        let args: ImportCsvArgs = serde_json::from_value(serde_json::json!({
+            "csvContent": "Date,Symbol\n2024-01-15,AAPL",
+            "fieldMappings": { "date": null },
+            "symbolMappings": { "Apple": "   " },
+            "accountMappings": {}
+        }))
+        .unwrap();
+
+        assert!(!has_usable_string_map(&args.field_mappings));
+        assert!(!has_usable_string_map(&args.symbol_mappings));
+        assert!(!has_usable_string_map(&args.account_mappings));
+        assert!(!has_usable_llm_mappings(&args));
+        assert!(clean_string_map(args.field_mappings).is_empty());
+        assert!(clean_string_map(args.symbol_mappings).is_empty());
+    }
+
+    #[test]
+    fn test_non_empty_mappings_are_usable() {
+        let mut field_mappings = HashMap::new();
+        field_mappings.insert("date".to_string(), "Datum".to_string());
+        assert!(has_usable_string_map(&Some(field_mappings)));
+
+        let mut activity_mappings = HashMap::new();
+        activity_mappings.insert("BUY".to_string(), vec!["  ".to_string()]);
+        assert!(!has_usable_activity_mappings(&Some(
+            activity_mappings.clone()
+        )));
+
+        activity_mappings.insert("BUY".to_string(), vec!["Kopen".to_string()]);
+        assert!(has_usable_activity_mappings(&Some(activity_mappings)));
     }
 
     #[tokio::test]

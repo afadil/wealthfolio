@@ -523,4 +523,27 @@ mod tests {
         assert!(catalog.capabilities.contains_key("tools"));
         assert!(catalog.capabilities.contains_key("thinking"));
     }
+
+    #[test]
+    fn test_catalog_default_models_are_cataloged() {
+        let catalog = &*PROVIDER_CATALOG;
+
+        for (provider_id, provider) in &catalog.providers {
+            assert!(
+                provider.models.contains_key(&provider.default_model),
+                "provider '{}' default_model '{}' is missing from models",
+                provider_id,
+                provider.default_model
+            );
+
+            if let Some(title_model_id) = &provider.title_model_id {
+                assert!(
+                    provider.models.contains_key(title_model_id),
+                    "provider '{}' title_model_id '{}' is missing from models",
+                    provider_id,
+                    title_model_id
+                );
+            }
+        }
+    }
 }

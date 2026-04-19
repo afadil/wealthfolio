@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
 import {
   checkActivitiesImport,
+  createAsset,
   importActivities,
   logger,
   parseCsv,
@@ -22,6 +23,7 @@ import type { DraftActivity, DraftActivityStatus } from "@/pages/activity/import
 import {
   applyAssetResolution,
   buildImportAssetCandidateFromDraft,
+  buildNewAssetFromDraft,
 } from "@/pages/activity/import/utils/asset-review-utils";
 import { createDraftActivities, validateDraft } from "@/pages/activity/import/utils/draft-utils";
 
@@ -47,6 +49,7 @@ interface ChatImportState {
   status: "initializing" | "ready" | "submitting" | "submitted" | "error";
   drafts: DraftActivity[];
   assetPreviewItems: ImportAssetPreviewItem[];
+  createdAssetIdsByKey: Record<string, string>;
   filter: ChatImportFilter;
   accountId: string;
   error: string | null;
@@ -64,6 +67,7 @@ type Action =
     }
   | { type: "INIT_ERROR"; payload: string }
   | { type: "SET_DRAFTS"; payload: DraftActivity[] }
+  | { type: "MERGE_CREATED_ASSET_IDS"; payload: Record<string, string> }
   | {
       type: "BULK_UPDATE";
       payload: { rowIndexes: number[]; updates: Partial<DraftActivity> };
@@ -80,6 +84,7 @@ const INITIAL_STATE: ChatImportState = {
   status: "initializing",
   drafts: [],
   assetPreviewItems: [],
+  createdAssetIdsByKey: {},
   filter: "all",
   accountId: "",
   error: null,
@@ -94,6 +99,7 @@ function reducer(state: ChatImportState, action: Action): ChatImportState {
         status: "ready",
         drafts: action.payload.drafts,
         assetPreviewItems: action.payload.assetPreviewItems,
+        createdAssetIdsByKey: {},
         accountId: action.payload.accountId,
         error: null,
       };
@@ -105,6 +111,14 @@ function reducer(state: ChatImportState, action: Action): ChatImportState {
         drafts: action.payload,
         status: state.status === "error" ? "ready" : state.status,
         error: state.status === "error" ? null : state.error,
+      };
+    case "MERGE_CREATED_ASSET_IDS":
+      return {
+        ...state,
+        createdAssetIdsByKey: {
+          ...state.createdAssetIdsByKey,
+          ...action.payload,
+        },
       };
     case "SET_PREVIEW":
       return { ...state, assetPreviewItems: action.payload };
@@ -180,6 +194,31 @@ function reducer(state: ChatImportState, action: Action): ChatImportState {
  */
 function csvStringAsFile(csvContent: string, name = "import.csv"): File {
   return new File([csvContent], name, { type: "text/csv" });
+}
+
+function applyCreatedAssetIdsToDrafts(
+  drafts: DraftActivity[],
+  createdAssetIdsByKey: Record<string, string>,
+): DraftActivity[] {
+  if (Object.keys(createdAssetIdsByKey).length === 0) {
+    return drafts;
+  }
+
+  return drafts.map((draft) => {
+    if (draft.assetId) {
+      return draft;
+    }
+    const key = draft.importAssetKey || draft.assetCandidateKey;
+    const assetId = key ? createdAssetIdsByKey[key] : undefined;
+    if (!assetId) {
+      return draft;
+    }
+    return {
+      ...draft,
+      assetId,
+      importAssetKey: undefined,
+    };
+  });
 }
 
 /**
@@ -784,6 +823,7 @@ export function useChatImportSession({
     if (!current) return;
 
     dispatch({ type: "SUBMITTING" });
+    const newlyCreatedAssetIdsByKey: Record<string, string> = {};
 
     try {
       // Step 1: re-run backend validation on importable drafts so we catch
@@ -824,8 +864,56 @@ export function useChatImportSession({
         return;
       }
 
-      // Step 3: import the validated activities.
-      const activitiesToImport = confirmedDrafts.map(draftToActivityImport);
+      // Step 3: create pending assets, then import the validated activities.
+      const createdAssetIdsByKey = { ...state.createdAssetIdsByKey };
+      const pendingAssets = new Map<string, NewAsset>();
+
+      for (const item of state.assetPreviewItems) {
+        if (item.status !== "AUTO_RESOLVED_NEW_ASSET" || !item.draft) {
+          continue;
+        }
+        if (!createdAssetIdsByKey[item.key]) {
+          pendingAssets.set(item.key, item.draft);
+        }
+      }
+
+      for (const draft of confirmedDrafts) {
+        if (draft.assetId) {
+          continue;
+        }
+        const key = draft.importAssetKey || draft.assetCandidateKey;
+        if (!key || createdAssetIdsByKey[key] || pendingAssets.has(key)) {
+          continue;
+        }
+        const assetDraft = buildNewAssetFromDraft(draft);
+        if (assetDraft) {
+          pendingAssets.set(key, assetDraft);
+        }
+      }
+
+      for (const [key, assetDraft] of pendingAssets.entries()) {
+        const created = await createAsset(assetDraft);
+        createdAssetIdsByKey[key] = created.id;
+        newlyCreatedAssetIdsByKey[key] = created.id;
+      }
+
+      if (Object.keys(newlyCreatedAssetIdsByKey).length > 0) {
+        dispatch({ type: "MERGE_CREATED_ASSET_IDS", payload: newlyCreatedAssetIdsByKey });
+      }
+
+      const draftsWithCreatedAssets = applyCreatedAssetIdsToDrafts(
+        mergedDrafts,
+        createdAssetIdsByKey,
+      );
+      if (draftsWithCreatedAssets !== mergedDrafts) {
+        dispatch({ type: "SET_DRAFTS", payload: draftsWithCreatedAssets });
+      }
+
+      const confirmedDraftsWithAssets = applyCreatedAssetIdsToDrafts(
+        confirmedDrafts,
+        createdAssetIdsByKey,
+      );
+      const activitiesToImport = confirmedDraftsWithAssets.map(draftToActivityImport);
       const result = await importActivities({ activities: activitiesToImport });
       const importedCount = result.summary?.imported ?? 0;
 
@@ -833,7 +921,7 @@ export function useChatImportSession({
       if (!result.summary?.success || importedCount === 0) {
         // Merge any per-row errors from the import result back into drafts.
         if (result.activities?.length) {
-          const postImportDrafts = applyBackendValidation(mergedDrafts, result.activities);
+          const postImportDrafts = applyBackendValidation(draftsWithCreatedAssets, result.activities);
           dispatch({ type: "SET_DRAFTS", payload: postImportDrafts });
         }
         dispatch({
@@ -879,12 +967,22 @@ export function useChatImportSession({
 
       dispatch({ type: "SUBMITTED", payload: importedCount });
     } catch (err) {
+      if (Object.keys(newlyCreatedAssetIdsByKey).length > 0) {
+        dispatch({ type: "MERGE_CREATED_ASSET_IDS", payload: newlyCreatedAssetIdsByKey });
+      }
       dispatch({
         type: "ERROR",
         payload: err instanceof Error ? err.message : "Failed to import activities.",
       });
     }
-  }, [state.drafts, state.accountId, threadId, toolCallId]);
+  }, [
+    state.drafts,
+    state.accountId,
+    state.assetPreviewItems,
+    state.createdAssetIdsByKey,
+    threadId,
+    toolCallId,
+  ]);
 
   const stats = useMemo(() => computeStats(state.drafts), [state.drafts]);
   const filteredDrafts = useMemo(
