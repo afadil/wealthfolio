@@ -291,7 +291,7 @@ impl AiProviderServiceTrait for AiProviderService {
                 }
 
                 // Sort models alphabetically for consistent ordering
-                models.sort_by(|a, b| a.id.cmp(&b.id));
+                models.sort_by_key(|a| a.id.clone());
 
                 // Check if provider supports dynamic model listing
                 let supports_model_listing = Self::provider_supports_model_listing(id);

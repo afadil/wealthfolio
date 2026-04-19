@@ -243,6 +243,7 @@ struct ResolveSymbolQuoteQuery {
     symbol: String,
     exchange_mic: Option<String>,
     instrument_type: Option<String>,
+    provider_id: Option<String>,
 }
 
 async fn resolve_symbol_quote(
@@ -255,7 +256,12 @@ async fn resolve_symbol_quote(
         .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
     let res = state
         .quote_service
-        .resolve_symbol_quote(&q.symbol, q.exchange_mic.as_deref(), inst_type.as_ref())
+        .resolve_symbol_quote(
+            &q.symbol,
+            q.exchange_mic.as_deref(),
+            inst_type.as_ref(),
+            q.provider_id.as_deref(),
+        )
         .await?;
     Ok(Json(res))
 }

@@ -247,7 +247,7 @@ impl ActivityService {
             || normalize_quote_ccy_code(existing_asset_quote_ccy).is_some();
         let provider_quote_ccy = if allow_provider_lookup && !has_deterministic_precedence {
             self.quote_service
-                .resolve_symbol_quote(symbol, exchange_mic, instrument_type)
+                .resolve_symbol_quote(symbol, exchange_mic, instrument_type, None)
                 .await
                 .ok()
                 .and_then(|q| q.currency)
@@ -290,7 +290,7 @@ impl ActivityService {
         }
         let result = self
             .quote_service
-            .resolve_symbol_quote(symbol, exchange_mic, instrument_type)
+            .resolve_symbol_quote(symbol, exchange_mic, instrument_type, None)
             .await
             .ok()
             .and_then(|q| q.currency);

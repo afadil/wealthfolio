@@ -187,12 +187,14 @@ export const resolveSymbolQuote = async (
   symbol: string,
   exchangeMic?: string,
   instrumentType?: string,
+  providerId?: string,
 ): Promise<ResolvedQuote | null> => {
   try {
     return await invoke<ResolvedQuote>("resolve_symbol_quote", {
       symbol,
       exchangeMic,
       instrumentType,
+      providerId,
     });
   } catch (_error) {
     logger.error("Error resolving symbol quote.");

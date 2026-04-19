@@ -265,8 +265,9 @@ pub trait QuoteServiceTrait: Send + Sync {
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
+        preferred_provider: Option<&str>,
     ) -> Result<ResolvedQuote> {
-        let _ = (symbol, exchange_mic, instrument_type);
+        let _ = (symbol, exchange_mic, instrument_type, preferred_provider);
         Ok(ResolvedQuote::default())
     }
 
@@ -1040,6 +1041,7 @@ where
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
+        preferred_provider: Option<&str>,
     ) -> Result<ResolvedQuote> {
         let trimmed_symbol = symbol.trim();
         if trimmed_symbol.is_empty() {
@@ -1062,6 +1064,9 @@ where
         } else {
             trimmed_symbol
         };
+
+        let provider_config: Option<serde_json::Value> =
+            preferred_provider.map(|p| serde_json::json!({ "preferred_provider": p }));
 
         for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
             // For bonds, populate metadata with TreasuryDirect details so
@@ -1108,6 +1113,7 @@ where
                 instrument_symbol: Some(resolved_symbol),
                 display_code: Some(attempt_symbol.clone()),
                 instrument_exchange_mic: exchange_mic.map(str::to_string),
+                provider_config: provider_config.clone(),
                 metadata,
                 ..Default::default()
             };

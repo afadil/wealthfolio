@@ -1,4 +1,4 @@
-import { getExchanges } from "@/adapters";
+import { getExchanges, resolveSymbolQuote } from "@/adapters";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
 import { TickerAvatar } from "@/components/ticker-avatar";
@@ -51,9 +51,10 @@ import {
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
 import * as z from "zod";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
 // Schema for a single provider override (type is derived from asset kind)
@@ -95,6 +96,16 @@ type AssetFormValues = z.infer<typeof assetFormSchema>;
 type ProviderOverride = z.infer<typeof providerOverrideSchema>;
 
 const normalizeMic = (mic?: string | null): string => mic?.trim().toUpperCase() ?? "";
+
+const PROVIDER_SYMBOL_HINTS: Record<string, string> = {
+  YAHOO: "e.g. AAPL, LYMS.DE",
+  COINGECKO: "e.g. bitcoin, ethereum",
+  TWELVEDATA: "e.g. AAPL, EUR/USD",
+};
+
+function getSymbolPlaceholder(provider: string): string {
+  return PROVIDER_SYMBOL_HINTS[provider] ?? "e.g. AAPL";
+}
 
 const EDIT_INSTRUMENT_TYPE_OPTIONS = [
   { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
@@ -263,6 +274,146 @@ interface AssetEditSheetProps {
   defaultTab?: EditTab;
 }
 
+type SymbolValidationStatus = "idle" | "loading" | "valid" | "invalid";
+
+interface SymbolMappingRowProps {
+  index: number;
+  fieldId: string;
+  initialSymbol?: string;
+  control: ReturnType<typeof useForm<AssetFormValues>>["control"];
+  mappingProviderOptions: ResponsiveSelectOption[];
+  onRemove: () => void;
+  onValidationChange: (fieldId: string, status: SymbolValidationStatus) => void;
+}
+
+function SymbolMappingRow({
+  index,
+  fieldId,
+  initialSymbol,
+  control,
+  mappingProviderOptions,
+  onRemove,
+  onValidationChange,
+}: SymbolMappingRowProps) {
+  const [validationStatus, setValidationStatus] = useState<SymbolValidationStatus>(
+    initialSymbol?.trim() ? "valid" : "idle",
+  );
+  // Track whether we are on the first render to avoid re-validating pre-loaded values.
+  const isFirstRender = useRef(true);
+
+  const symbol = useWatch({
+    control,
+    name: `providerConfig.${index}.symbol` as Path<AssetFormValues>,
+  }) as string | undefined;
+  const provider = useWatch({
+    control,
+    name: `providerConfig.${index}.provider` as Path<AssetFormValues>,
+  }) as string | undefined;
+
+  useEffect(() => {
+    // Skip validation on mount when the symbol is already known-good (loaded from DB).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (symbol?.trim() === initialSymbol?.trim() && initialSymbol?.trim()) {
+        return;
+      }
+    }
+
+    if (!symbol?.trim()) {
+      setValidationStatus("idle");
+      onValidationChange(fieldId, "idle");
+      return;
+    }
+
+    setValidationStatus("idle");
+
+    const timer = setTimeout(async () => {
+      setValidationStatus("loading");
+      onValidationChange(fieldId, "idle");
+      try {
+        const result = await resolveSymbolQuote(symbol.trim(), undefined, undefined, provider);
+        const status: SymbolValidationStatus = result?.price != null ? "valid" : "invalid";
+        setValidationStatus(status);
+        onValidationChange(fieldId, status);
+      } catch {
+        setValidationStatus("invalid");
+        onValidationChange(fieldId, "invalid");
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [symbol, provider, fieldId, onValidationChange]); // eslint-disable-line react-hooks/exhaustive-deps -- initialSymbol is intentionally captured at mount time only
+
+  return (
+    <tr className="border-b last:border-b-0">
+      <td className="px-4 py-2">
+        <FormField
+          control={control}
+          name={`providerConfig.${index}.provider` as Path<AssetFormValues>}
+          render={({ field: providerField }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <ResponsiveSelect
+                  value={providerField.value as string | undefined}
+                  onValueChange={providerField.onChange}
+                  options={mappingProviderOptions}
+                  placeholder="Select provider"
+                  sheetTitle="Data Provider"
+                  sheetDescription="Select the data provider for this symbol mapping"
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <FormField
+          control={control}
+          name={`providerConfig.${index}.symbol` as Path<AssetFormValues>}
+          render={({ field: symbolField }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <div className="relative flex items-center">
+                  <Input
+                    placeholder={getSymbolPlaceholder(provider ?? "")}
+                    {...{
+                      ...symbolField,
+                      value: (symbolField.value as string | undefined) ?? "",
+                    }}
+                    className="h-9 pr-8"
+                  />
+                  <span className="absolute right-2 flex items-center">
+                    {validationStatus === "loading" && (
+                      <span data-testid="symbol-validation-loading">
+                        <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                      </span>
+                    )}
+                    {validationStatus === "valid" && (
+                      <span data-testid="symbol-validation-valid">
+                        <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                      </span>
+                    )}
+                    {validationStatus === "invalid" && (
+                      <span data-testid="symbol-validation-invalid">
+                        <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
+          <Icons.Close className="h-4 w-4" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
 export function AssetEditSheet({
   asset,
   latestQuote,
@@ -271,6 +422,16 @@ export function AssetEditSheet({
   defaultTab = "general",
 }: AssetEditSheetProps) {
   const [activeTab, setActiveTab] = useState<EditTab>(defaultTab);
+  const [symbolValidations, setSymbolValidations] = useState<
+    Record<string, SymbolValidationStatus>
+  >({});
+
+  const handleSymbolValidationChange = useCallback(
+    (fieldId: string, status: SymbolValidationStatus) => {
+      setSymbolValidations((prev) => ({ ...prev, [fieldId]: status }));
+    },
+    [],
+  );
   const { data: taxonomies = [], isLoading: isTaxonomiesLoading } = useTaxonomies();
   const { updateAssetProfileMutation } = useAssetProfileMutations();
   const { data: marketDataProviders = [] } = useMarketDataProviders();
@@ -386,16 +547,24 @@ export function AssetEditSheet({
     }
   }, [asset, form]);
 
-  // Reset tab when sheet opens
+  // Reset tab and validation state when sheet opens
   useEffect(() => {
     if (open) {
       setActiveTab(defaultTab);
+      setSymbolValidations({});
     }
-  }, [open, defaultTab]);
+  }, [open, defaultTab, asset?.id]);
 
   const handleSave = useCallback(
     async (values: AssetFormValues) => {
       if (!asset) return;
+
+      const hasInvalidMappings = Object.values(symbolValidations).some((s) => s === "invalid");
+      if (hasInvalidMappings) {
+        toast.warning(
+          "Some symbol mappings could not be validated. Prices may not update for those entries.",
+        );
+      }
 
       // Serialize provider config to nested JSON format
       const serializedOverrides = serializeProviderConfig(
@@ -425,7 +594,7 @@ export function AssetEditSheet({
         // Keep sheet open so user can retry
       }
     },
-    [asset, updateAssetProfileMutation, onOpenChange],
+    [asset, updateAssetProfileMutation, onOpenChange, symbolValidations],
   );
 
   const isManualMode = form.watch("quoteMode") === QuoteMode.MANUAL;
@@ -884,56 +1053,23 @@ export function AssetEditSheet({
                               </thead>
                               <tbody>
                                 {overrideFields.map((field, index) => (
-                                  <tr key={field.id} className="border-b last:border-b-0">
-                                    <td className="px-4 py-2">
-                                      <FormField
-                                        control={form.control}
-                                        name={`providerConfig.${index}.provider`}
-                                        render={({ field: providerField }) => (
-                                          <FormItem className="space-y-0">
-                                            <FormControl>
-                                              <ResponsiveSelect
-                                                value={providerField.value}
-                                                onValueChange={providerField.onChange}
-                                                options={mappingProviderOptions}
-                                                placeholder="Select provider"
-                                                sheetTitle="Data Provider"
-                                                sheetDescription="Select the data provider for this symbol mapping"
-                                              />
-                                            </FormControl>
-                                          </FormItem>
-                                        )}
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2">
-                                      <FormField
-                                        control={form.control}
-                                        name={`providerConfig.${index}.symbol`}
-                                        render={({ field: symbolField }) => (
-                                          <FormItem className="space-y-0">
-                                            <FormControl>
-                                              <Input
-                                                placeholder="e.g., SHOP.TO"
-                                                {...symbolField}
-                                                className="h-9"
-                                              />
-                                            </FormControl>
-                                          </FormItem>
-                                        )}
-                                      />
-                                    </td>
-                                    <td className="px-2 py-2">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => removeOverride(index)}
-                                      >
-                                        <Icons.Close className="h-4 w-4" />
-                                      </Button>
-                                    </td>
-                                  </tr>
+                                  <SymbolMappingRow
+                                    key={field.id}
+                                    index={index}
+                                    fieldId={field.id}
+                                    initialSymbol={field.symbol}
+                                    control={form.control}
+                                    mappingProviderOptions={mappingProviderOptions}
+                                    onRemove={() => {
+                                      setSymbolValidations((prev) => {
+                                        const next = { ...prev };
+                                        delete next[field.id];
+                                        return next;
+                                      });
+                                      removeOverride(index);
+                                    }}
+                                    onValidationChange={handleSymbolValidationChange}
+                                  />
                                 ))}
                               </tbody>
                             </table>
