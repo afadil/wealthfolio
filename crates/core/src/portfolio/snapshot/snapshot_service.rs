@@ -13,7 +13,6 @@ use crate::lots::{
     check_lot_quantity_consistency, extract_lot_records, DisposalMethod, LotRecord,
     LotRepositoryTrait,
 };
-use crate::portfolio::performance::{classify_flow_for_scope, FlowType, PerformanceScope};
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position, SnapshotSource,
 };
@@ -1076,100 +1075,14 @@ impl SnapshotService {
         account_ids: &[String],
         base_currency: &str,
     ) -> Result<HashMap<NaiveDate, Decimal>> {
-        let activities = self
-            .activity_repository
-            .get_activities_by_account_ids(account_ids)?;
-
-        let mut grouped: HashMap<String, Vec<Activity>> = HashMap::new();
-        for activity in activities {
-            if activity.source_group_id.is_none() {
-                continue;
-            }
-
-            let activity_type = activity.activity_type.as_str();
-            if activity_type != crate::activities::ACTIVITY_TYPE_TRANSFER_IN
-                && activity_type != crate::activities::ACTIVITY_TYPE_TRANSFER_OUT
-            {
-                continue;
-            }
-
-            if classify_flow_for_scope(&activity, PerformanceScope::Portfolio) == FlowType::External
-            {
-                continue;
-            }
-
-            if let Some(group_id) = activity.source_group_id.clone() {
-                grouped.entry(group_id).or_default().push(activity);
-            }
-        }
-
-        let mut adjustments_by_date: HashMap<NaiveDate, Decimal> = HashMap::new();
-
-        for (_group_id, group_activities) in grouped {
-            let has_in = group_activities
-                .iter()
-                .any(|a| a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN);
-            let has_out = group_activities
-                .iter()
-                .any(|a| a.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_OUT);
-
-            if !(has_in && has_out) {
-                continue;
-            }
-
-            for activity in group_activities {
-                let amount = if let Some(amount) = activity.amount {
-                    amount
-                } else if let (Some(quantity), Some(unit_price)) =
-                    (activity.quantity, activity.unit_price)
-                {
-                    quantity * unit_price
-                } else {
-                    Decimal::ZERO
-                };
-
-                if amount.is_zero() {
-                    continue;
-                }
-
-                let activity_date = self.user_date(activity.activity_date);
-                let amount_base = if activity.currency == base_currency {
-                    amount
-                } else {
-                    match self
-                        .holdings_calculator
-                        .fx_service
-                        .convert_currency_for_date(
-                            amount,
-                            &activity.currency,
-                            base_currency,
-                            activity_date,
-                        ) {
-                        Ok(converted) => converted,
-                        Err(e) => {
-                            warn!(
-                                "Failed to convert transfer amount {} {} to base {} on {}: {}. Using unconverted.",
-                                amount, activity.currency, base_currency, activity_date, e
-                            );
-                            amount
-                        }
-                    }
-                };
-
-                let signed_amount =
-                    if activity.activity_type == crate::activities::ACTIVITY_TYPE_TRANSFER_IN {
-                        amount_base
-                    } else {
-                        -amount_base
-                    };
-
-                *adjustments_by_date
-                    .entry(activity_date)
-                    .or_insert(Decimal::ZERO) += signed_amount;
-            }
-        }
-
-        Ok(adjustments_by_date)
+        let timezone = self.timezone.read().unwrap().clone();
+        crate::portfolio::transfers::internal_transfer_adjustments_by_date_base(
+            self.activity_repository.as_ref(),
+            self.holdings_calculator.fx_service.as_ref(),
+            account_ids,
+            base_currency,
+            &timezone,
+        )
     }
 
     // --- Helpers ---
