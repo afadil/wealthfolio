@@ -667,7 +667,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} equity quotes for {}",
@@ -808,7 +808,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} FX quotes for {}/{}",
@@ -869,7 +869,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} crypto quotes for {}/{}",

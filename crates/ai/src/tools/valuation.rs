@@ -175,7 +175,7 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
                     },
                 )
                 .collect();
-            result.sort_by(|a, b| a.date.cmp(&b.date));
+            result.sort_by_key(|a| a.date.clone());
             result
         } else {
             // Single account valuations
