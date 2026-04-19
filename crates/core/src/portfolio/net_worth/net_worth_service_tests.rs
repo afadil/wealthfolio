@@ -262,14 +262,6 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
         unimplemented!()
     }
 
-    fn get_total_portfolio_snapshots(
-        &self,
-        _start_date: Option<NaiveDate>,
-        _end_date: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>> {
-        unimplemented!()
-    }
-
     fn get_all_non_archived_account_snapshots(
         &self,
         _start_date: Option<NaiveDate>,

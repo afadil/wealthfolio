@@ -472,14 +472,6 @@ impl SnapshotRepository {
         Ok(())
     }
 
-    pub fn get_total_portfolio_snapshots(
-        &self,
-        start_date_opt: Option<NaiveDate>,
-        end_date_opt: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>> {
-        self.get_snapshots_by_account(PORTFOLIO_TOTAL_ACCOUNT_ID, start_date_opt, end_date_opt)
-    }
-
     pub fn get_all_non_archived_account_snapshots(
         &self,
         start_date_opt: Option<NaiveDate>,
@@ -995,14 +987,6 @@ impl SnapshotRepositoryTrait for SnapshotRepository {
     ) -> Result<()> {
         self.overwrite_multiple_account_snapshot_ranges(new_snapshots)
             .await
-    }
-
-    fn get_total_portfolio_snapshots(
-        &self,
-        start_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<Vec<AccountStateSnapshot>> {
-        self.get_total_portfolio_snapshots(start_date, end_date)
     }
 
     fn get_all_non_archived_account_snapshots(

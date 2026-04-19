@@ -362,19 +362,6 @@ async fn run_portfolio_job(
         }
     }
 
-    if let Err(err) = deps
-        .snapshot_service
-        .recalculate_total_portfolio_snapshots(config.snapshot_mode)
-        .await
-    {
-        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
-        tracing::error!("{}", err_msg);
-        event_bus.publish(ServerEvent::with_payload(
-            PORTFOLIO_UPDATE_ERROR,
-            json!(err_msg),
-        ));
-        return;
-    }
 
     // Update position status from lots for quote sync planning
     match deps.lots_repository.get_open_position_quantities().await {

@@ -13,7 +13,7 @@ use wealthfolio_core::{
         holdings::Holding,
         snapshot::{
             CashBalanceInput, ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService,
-            SnapshotRecalcMode, SnapshotSource,
+            SnapshotSource,
         },
         valuation::{DailyAccountValuation, ValuationRecalcMode},
     },
@@ -296,15 +296,6 @@ pub async fn delete_snapshot_handler(
             "Failed to recalculate valuations after snapshot delete: {}",
             e
         );
-    }
-
-    // Force recalculate TOTAL portfolio snapshots (force needed because deletion invalidates existing TOTAL)
-    if let Err(e) = state
-        .snapshot_service
-        .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::Full)
-        .await
-    {
-        tracing::warn!("Failed to recalculate TOTAL snapshots after delete: {}", e);
     }
 
     // Update position status from lots for quote sync planning

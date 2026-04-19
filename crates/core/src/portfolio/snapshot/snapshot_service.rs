@@ -14,7 +14,7 @@ use crate::lots::{
     LotRepositoryTrait,
 };
 use crate::portfolio::snapshot::{
-    AccountStateSnapshot, HoldingsCalculationWarning, Lot, Position, SnapshotSource,
+    AccountStateSnapshot, HoldingsCalculationWarning, SnapshotSource,
 };
 use crate::utils::time_utils::{
     activity_date_in_tz, get_days_between, parse_user_timezone_or_default, user_today,
@@ -58,21 +58,23 @@ pub trait SnapshotServiceTrait: Send + Sync {
         mode: SnapshotRecalcMode,
     ) -> Result<usize>;
 
-    /// Retrieves calculated **holdings** keyframe snapshots for a specific account or the total portfolio within a date range.
-    /// Does NOT reconstruct daily snapshots; returns only the saved keyframes.
+    /// Retrieves calculated **holdings** keyframe snapshots for a specific
+    /// account within a date range. Does NOT reconstruct daily snapshots;
+    /// returns only the saved keyframes.
     fn get_holdings_keyframes(
         &self,
-        account_id: &str, // Use specific ID, "TOTAL" for portfolio total
+        account_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>>;
 
-    /// Retrieves **holdings** snapshots for a specific account or the total portfolio within a date range,
-    /// reconstructing daily snapshots between saved keyframes by carrying forward holdings.
-    /// Valuation fields in the returned snapshots will be zero or default.
+    /// Retrieves **holdings** snapshots for a specific account within a date
+    /// range, reconstructing daily snapshots between saved keyframes by
+    /// carrying forward holdings. Valuation fields in the returned snapshots
+    /// will be zero or default.
     fn get_daily_holdings_snapshots(
         &self,
-        account_id: &str, // Use specific ID, "TOTAL" for portfolio total
+        account_id: &str,
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<AccountStateSnapshot>>;
@@ -101,13 +103,6 @@ pub trait SnapshotServiceTrait: Send + Sync {
         account_id: &str,
         date: NaiveDate,
     ) -> Result<HashMap<String, Decimal>>;
-
-    /// Recalculates aggregated "TOTAL" portfolio snapshots using the given mode.
-    /// Should be run after `recalculate_holdings_snapshots` has processed individual accounts.
-    async fn recalculate_total_portfolio_snapshots(
-        &self,
-        mode: SnapshotRecalcMode,
-    ) -> Result<usize>;
 
     /// Saves a manual snapshot for the given account.
     /// - The snapshot's source is preserved from the input (e.g., ManualEntry or CsvImport).
@@ -146,6 +141,7 @@ pub trait SnapshotServiceTrait: Send + Sync {
 
 #[derive(Clone)]
 pub struct SnapshotService {
+    #[allow(dead_code)]
     base_currency: Arc<RwLock<String>>,
     timezone: Arc<RwLock<String>>,
     account_repository: Arc<dyn AccountRepositoryTrait>,
@@ -282,28 +278,6 @@ impl SnapshotService {
         }
     }
 
-    // Create a virtual account object for TOTAL
-    fn create_total_virtual_account(&self) -> Account {
-        let now = Utc::now().naive_utc();
-        Account {
-            id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
-            name: "Total Portfolio".to_string(),
-            currency: self.base_currency.read().unwrap().clone(),
-            is_active: true,                       // Correct field name
-            account_type: "AGGREGATE".to_string(), // Indicate it's a special type
-            group: None,
-            is_default: false,
-            created_at: now,
-            updated_at: now,
-            platform_id: None,
-            account_number: None,
-            meta: None,
-            provider: None,
-            provider_account_id: None,
-            is_archived: false,
-            tracking_mode: crate::accounts::TrackingMode::NotSet,
-        }
-    }
 
     // --- Core Calculation Logic (Internal Helper) ---
     async fn calculate_holdings_snapshots_internal(
@@ -462,9 +436,6 @@ impl SnapshotService {
         if let Some(lot_repo) = &self.lot_repository {
             let is_full_recalc = matches!(mode, SnapshotRecalcMode::Full);
             for (acc_id, snapshot) in &final_holdings_states {
-                if acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-                    continue;
-                }
                 // Skip lots sync for TRANSACTIONS accounts on non-Full recalcs
                 if !is_full_recalc {
                     if let Some(account) = accounts_to_process.get(acc_id) {
@@ -493,24 +464,19 @@ impl SnapshotService {
     }
 
     // --- Step 1-3: Fetch required data ---
-    // Fetches accounts based on `account_ids_param`. If `account_ids_param` is None or contains "TOTAL",
-    // fetches ALL active accounts and creates the virtual TOTAL account.
-    // Fetches activities ONLY for the relevant accounts (specified or all).
+    // Fetches accounts based on `account_ids_param`. TOTAL ids are silently
+    // ignored — TOTAL no longer has its own snapshots; the portfolio total is
+    // synthesized on-demand by the valuation aggregator and the cash helper.
     fn fetch_required_data(
         &self,
         account_ids_param: Option<&[String]>,
     ) -> Result<(AccountsMap, ActivitiesVec, NaiveDate, NaiveDate)> {
-        // ── ❶ decide if the caller explicitly asked for the virtual TOTAL ─────────────
-        let calculate_total = account_ids_param
-            .map(|ids| ids.iter().any(|id| *id == PORTFOLIO_TOTAL_ACCOUNT_ID))
-            .unwrap_or(false); // ← no more implicit TOTAL when param == None
-
         let mut accounts_to_process: AccountsMap = HashMap::new();
         let mut account_ids_to_fetch_activities: Vec<String> = Vec::new();
 
-        // ── ❷ collect *individual* accounts ──────────────────────────────────────────
-        // Only include TRANSACTIONS mode accounts for snapshot recalculation.
-        // HOLDINGS mode accounts manage their snapshots via manual entry/CSV import.
+        // Collect individual accounts. Only TRANSACTIONS-mode accounts
+        // participate in snapshot recalculation; HOLDINGS-mode accounts
+        // manage their snapshots via manual entry/CSV import.
         match account_ids_param {
             Some(ids) => {
                 // When specific account_ids are provided, process them regardless of is_active status
@@ -518,7 +484,7 @@ impl SnapshotService {
                 for id in ids {
                     if id == PORTFOLIO_TOTAL_ACCOUNT_ID {
                         continue;
-                    } // TOTAL is virtual
+                    }
                     if let Ok(acc) = self.account_repository.get_by_id(id) {
                         // Skip HOLDINGS mode accounts - they don't participate in transaction-based recalculation
                         if acc.tracking_mode == TrackingMode::Holdings {
@@ -549,15 +515,7 @@ impl SnapshotService {
             }
         }
 
-        // ── ❸ add the virtual TOTAL *only* if explicitly requested ───────────────────
-        if calculate_total {
-            accounts_to_process.insert(
-                PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
-                self.create_total_virtual_account(),
-            );
-        }
-
-        // ── ❹ pull activities for the collected individual accounts ──────────────────
+        // Pull activities for the collected individual accounts.
         let all_activities = if !account_ids_to_fetch_activities.is_empty() {
             self.activity_repository
                 .get_activities_by_account_ids(&account_ids_to_fetch_activities)?
@@ -618,28 +576,6 @@ impl SnapshotService {
                 .or_default()
                 .push(activity.clone());
             account_ids_with_activity.insert(activity.account_id.clone());
-        }
-
-        // If processing TOTAL (i.e., TOTAL account is present), aggregate all activities under the TOTAL key
-        if accounts_to_process.contains_key(PORTFOLIO_TOTAL_ACCOUNT_ID) {
-            let mut total_activities_by_date: BTreeMap<NaiveDate, Vec<Activity>> = BTreeMap::new();
-            for activity in &adjusted_activities {
-                // Use adjusted activities here
-                total_activities_by_date
-                    .entry(self.user_date(activity.activity_date))
-                    .or_default()
-                    .push(activity.clone());
-            }
-            if !total_activities_by_date.is_empty() {
-                activities_by_account_date.insert(
-                    PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
-                    total_activities_by_date,
-                );
-                // Mark TOTAL as having activity if any underlying account did
-                if !account_ids_with_activity.is_empty() {
-                    account_ids_with_activity.insert(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-                }
-            }
         }
 
         // Ensure all accounts being processed (even those with no activities) have an entry
@@ -955,190 +891,6 @@ impl SnapshotService {
         Ok((current_holdings_snapshots, keyframes_to_save, all_warnings))
     }
 
-    // Renamed and refined from the previous aggregate_total_portfolio_snapshot
-    fn generate_total_portfolio_snapshot_for_date(
-        &self,
-        target_date: NaiveDate,
-        // Map of Account ID -> AccountStateSnapshot for all *individual* accounts as of target_date
-        individual_snapshots_on_date: &HashMap<String, AccountStateSnapshot>,
-        base_portfolio_currency: &str,
-        internal_transfer_adjustment_base_ccy: Decimal,
-    ) -> Result<AccountStateSnapshot> {
-        let mut aggregated_cash_balances: HashMap<String, Decimal> = HashMap::new();
-        let mut aggregated_positions: HashMap<String, Position> = HashMap::new(); // Position struct from crate::portfolio::snapshot::Position
-        let mut overall_cost_basis_base_ccy = Decimal::ZERO;
-        let mut overall_net_contribution_base_ccy = Decimal::ZERO;
-
-        for (individual_acc_id, individual_snapshot) in individual_snapshots_on_date {
-            // Ensure we are only processing individual accounts here, not an old TOTAL snapshot if it exists in the input map
-            if individual_acc_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-                continue;
-            }
-
-            // 1. Aggregate Cash Balances
-            // Iterate over all cash balances in the individual snapshot (which might be multi-currency)
-            // and add them to the corresponding currency in the aggregated map.
-            for (currency, amount) in &individual_snapshot.cash_balances {
-                *aggregated_cash_balances
-                    .entry(currency.clone())
-                    .or_insert(Decimal::ZERO) += *amount;
-            }
-
-            // 2. Aggregate Net Contribution (already frozen FX)
-            overall_net_contribution_base_ccy += individual_snapshot.net_contribution_base;
-
-            // 3. Aggregate Positions & Calculate Overall Cost Basis for TOTAL (in base_portfolio_currency)
-            for pos in individual_snapshot.positions.values() {
-                let agg_pos = aggregated_positions
-                    .entry(pos.asset_id.clone())
-                    .or_insert_with(|| Position {
-                        id: format!("{}_{}", pos.asset_id, PORTFOLIO_TOTAL_ACCOUNT_ID),
-                        account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
-                        asset_id: pos.asset_id.clone(),
-                        quantity: Decimal::ZERO,
-                        average_cost: Decimal::ZERO,
-                        total_cost_basis: Decimal::ZERO, // This will be in asset's currency (pos.currency)
-                        currency: pos.currency.clone(),
-                        lots: VecDeque::new(),
-                        inception_date: pos.inception_date,
-                        created_at: Utc::now(),
-                        last_updated: Utc::now(),
-                        is_alternative: pos.is_alternative, // Inherit from source position
-                        contract_multiplier: pos.contract_multiplier, // Inherit from source position
-                    });
-
-                agg_pos.quantity += pos.quantity;
-                agg_pos.total_cost_basis += pos.total_cost_basis; // Summing in asset's currency
-                if pos.inception_date < agg_pos.inception_date {
-                    agg_pos.inception_date = pos.inception_date;
-                }
-
-                if !pos.lots.is_empty() {
-                    let agg_position_id = agg_pos.id.clone();
-                    agg_pos
-                        .lots
-                        .extend(pos.lots.iter().cloned().map(|mut lot: Lot| {
-                            lot.position_id = agg_position_id.clone();
-                            lot
-                        }));
-                }
-
-                // Convert this specific position's total_cost_basis (in asset currency) to base_portfolio_currency
-                // and add to the portfolio's overall cost_basis.
-                match self
-                    .holdings_calculator
-                    .fx_service
-                    .convert_currency_for_date(
-                        pos.total_cost_basis,
-                        &pos.currency,
-                        base_portfolio_currency,
-                        target_date,
-                    ) {
-                    Ok(converted_pos_cost_basis) => {
-                        overall_cost_basis_base_ccy += converted_pos_cost_basis;
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to convert position cost basis for asset {} ({} {} to {}) for TOTAL on {}: {}. Adding unconverted.",
-                            pos.asset_id, pos.total_cost_basis, pos.currency, base_portfolio_currency, target_date, e
-                        );
-                        if pos.currency != base_portfolio_currency {
-                            overall_cost_basis_base_ccy += pos.total_cost_basis;
-                        // Fallback
-                        } else {
-                            overall_cost_basis_base_ccy += pos.total_cost_basis;
-                            // Already in base
-                        }
-                    }
-                }
-            }
-        }
-
-        // Finalize average costs for aggregated positions
-        for agg_pos in aggregated_positions.values_mut() {
-            if agg_pos.lots.len() > 1 {
-                let mut sorted_lots: Vec<_> = agg_pos.lots.drain(..).collect();
-                sorted_lots.sort_by_key(|lot| lot.acquisition_date);
-                agg_pos.lots = sorted_lots.into();
-            }
-
-            if !agg_pos.quantity.is_zero() {
-                agg_pos.average_cost =
-                    (agg_pos.total_cost_basis / agg_pos.quantity).round_dp(DECIMAL_PRECISION);
-            } else {
-                agg_pos.average_cost = Decimal::ZERO;
-                agg_pos.total_cost_basis = Decimal::ZERO;
-            }
-        }
-
-        // Compute cash totals for TOTAL snapshot (denominated in base currency)
-        let mut cash_total_base = Decimal::ZERO;
-        for (currency, &amount) in &aggregated_cash_balances {
-            if currency == base_portfolio_currency {
-                cash_total_base += amount;
-            } else {
-                // Convert to base currency
-                match self
-                    .holdings_calculator
-                    .fx_service
-                    .convert_currency_for_date(
-                        amount,
-                        currency,
-                        base_portfolio_currency,
-                        target_date,
-                    ) {
-                    Ok(converted) => cash_total_base += converted,
-                    Err(e) => {
-                        warn!(
-                            "Failed to convert cash {} {} to base currency {}: {}. Using unconverted.",
-                            amount, currency, base_portfolio_currency, e
-                        );
-                        cash_total_base += amount;
-                    }
-                }
-            }
-        }
-
-        Ok(AccountStateSnapshot {
-            id: format!(
-                "{}_{}",
-                PORTFOLIO_TOTAL_ACCOUNT_ID,
-                target_date.format("%Y-%m-%d")
-            ),
-            account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
-            snapshot_date: target_date,
-            currency: base_portfolio_currency.to_string(), // TOTAL snapshot is denominated in base currency
-            cash_balances: aggregated_cash_balances, // Itemized by account currency holding the cash
-            positions: aggregated_positions,
-            cost_basis: overall_cost_basis_base_ccy.round_dp(DECIMAL_PRECISION),
-            net_contribution: (overall_net_contribution_base_ccy
-                - internal_transfer_adjustment_base_ccy)
-                .round_dp(DECIMAL_PRECISION),
-            net_contribution_base: (overall_net_contribution_base_ccy
-                - internal_transfer_adjustment_base_ccy)
-                .round_dp(DECIMAL_PRECISION),
-            // For TOTAL snapshot, account_currency == base_currency
-            cash_total_account_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
-            cash_total_base_currency: cash_total_base.round_dp(DECIMAL_PRECISION),
-            calculated_at: Utc::now().naive_utc(),
-            source: SnapshotSource::Calculated,
-        })
-    }
-
-    fn internal_transfer_adjustments_by_date_base(
-        &self,
-        account_ids: &[String],
-        base_currency: &str,
-    ) -> Result<HashMap<NaiveDate, Decimal>> {
-        let timezone = self.timezone.read().unwrap().clone();
-        crate::portfolio::transfers::internal_transfer_adjustments_by_date_base(
-            self.activity_repository.as_ref(),
-            self.holdings_calculator.fx_service.as_ref(),
-            account_ids,
-            base_currency,
-            &timezone,
-        )
-    }
 
     // --- Helpers ---
 
@@ -1284,279 +1036,6 @@ impl SnapshotService {
         adjusted_activities
     }
 
-    // --- New method to calculate and store TOTAL portfolio snapshots ---
-    async fn calculate_total_portfolio_snapshots_impl(
-        &self,
-        mode: &SnapshotRecalcMode,
-    ) -> Result<usize> {
-        debug!(
-            "Starting calculation of TOTAL portfolio snapshots (mode={:?})",
-            mode
-        );
-
-        // Use non-archived accounts for TOTAL calculation (includes closed but not archived accounts)
-        let non_archived_accounts = self.account_repository.list(None, Some(false), None)?;
-        if non_archived_accounts.is_empty() {
-            warn!("No non-archived accounts found. Cannot generate TOTAL snapshots.");
-            self.snapshot_repository
-                .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
-                .await?;
-            return Ok(0);
-        }
-
-        let mut all_individual_keyframes = self
-            .snapshot_repository
-            .get_all_non_archived_account_snapshots(None, None)?;
-
-        if all_individual_keyframes.is_empty() {
-            warn!("No keyframes found for any non-archived individual accounts. Cannot generate TOTAL snapshots.");
-            self.snapshot_repository
-                .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
-                .await?;
-            info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
-            return Ok(0);
-        }
-
-        // Enrich non-calculated snapshots that have empty positions (loaded from DB
-        // without JSON parsing) by batch-loading from snapshot_positions table.
-        {
-            let snap_ids_to_enrich: Vec<String> = all_individual_keyframes
-                .iter()
-                .filter(|s| s.positions.is_empty() && s.source.is_non_calculated())
-                .map(|s| s.id.clone())
-                .collect();
-
-            if !snap_ids_to_enrich.is_empty() {
-                let mut positions_by_snapshot = self
-                    .snapshot_repository
-                    .get_snapshot_positions_batch(&snap_ids_to_enrich)?;
-
-                for keyframe in &mut all_individual_keyframes {
-                    if keyframe.positions.is_empty() && keyframe.source.is_non_calculated() {
-                        if let Some(pos_map) = positions_by_snapshot.remove(&keyframe.id) {
-                            keyframe.positions = pos_map;
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut keyframes_by_account: HashMap<String, BTreeMap<NaiveDate, AccountStateSnapshot>> =
-            HashMap::new();
-        let mut all_snapshot_dates: HashSet<NaiveDate> = HashSet::new();
-        let mut max_individual_keyframe_date: Option<NaiveDate> = None;
-
-        for keyframe in all_individual_keyframes {
-            if keyframe.account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-                continue;
-            }
-            all_snapshot_dates.insert(keyframe.snapshot_date);
-            // Track the max date across all individual keyframes
-            max_individual_keyframe_date = Some(
-                max_individual_keyframe_date
-                    .map(|d| d.max(keyframe.snapshot_date))
-                    .unwrap_or(keyframe.snapshot_date),
-            );
-            keyframes_by_account
-                .entry(keyframe.account_id.clone())
-                .or_default()
-                .insert(keyframe.snapshot_date, keyframe);
-        }
-
-        if all_snapshot_dates.is_empty() {
-            info!("No individual account keyframes found after processing. Cannot generate TOTAL snapshots.");
-            return Ok(0);
-        }
-
-        // --- Determine which dates to calculate ---
-        let calculation_start_date: Option<NaiveDate>;
-
-        match mode {
-            SnapshotRecalcMode::Full => {
-                debug!("Force full calculation: will regenerate all TOTAL snapshots.");
-                calculation_start_date = None;
-            }
-            SnapshotRecalcMode::SinceDate(since) => {
-                // Rebuild TOTAL from `since` forward so backdated edits are reflected.
-                debug!("SinceDate TOTAL calculation from {}", since);
-                calculation_start_date = Some(*since);
-            }
-            SnapshotRecalcMode::IncrementalFromLast => {
-                // Check if TOTAL is already up-to-date
-                let today = self.user_today();
-                let tomorrow = today.succ_opt().unwrap_or(today);
-                let latest_total_snapshot = self
-                    .snapshot_repository
-                    .get_latest_snapshot_before_date(PORTFOLIO_TOTAL_ACCOUNT_ID, tomorrow)?;
-
-                if let Some(ref total_snapshot) = latest_total_snapshot {
-                    if let Some(max_date) = max_individual_keyframe_date {
-                        if total_snapshot.snapshot_date >= max_date {
-                            debug!(
-                                "TOTAL snapshots already up-to-date (latest TOTAL: {}, max individual: {}). Skipping recalculation.",
-                                total_snapshot.snapshot_date, max_date
-                            );
-                            return Ok(0);
-                        }
-                        // Only calculate from the day after the latest TOTAL snapshot
-                        calculation_start_date = total_snapshot.snapshot_date.succ_opt();
-                        debug!(
-                            "Incremental TOTAL calculation from {} (latest TOTAL: {}, max individual: {})",
-                            calculation_start_date.unwrap_or(total_snapshot.snapshot_date),
-                            total_snapshot.snapshot_date,
-                            max_date
-                        );
-                    } else {
-                        calculation_start_date = None;
-                    }
-                } else {
-                    debug!("No existing TOTAL snapshots. Will calculate all dates.");
-                    calculation_start_date = None;
-                }
-            }
-        }
-
-        let base_portfolio_currency = self.base_currency.read().unwrap().clone();
-        let mut total_portfolio_snapshots_to_save: Vec<AccountStateSnapshot> = Vec::new();
-
-        let mut sorted_snapshot_dates: Vec<NaiveDate> = all_snapshot_dates.into_iter().collect();
-        sorted_snapshot_dates.sort();
-
-        // Filter dates based on calculation_start_date for incremental calculation
-        let dates_to_calculate: Vec<NaiveDate> = if let Some(start_date) = calculation_start_date {
-            sorted_snapshot_dates
-                .iter()
-                .filter(|&&date| date >= start_date)
-                .copied()
-                .collect()
-        } else {
-            sorted_snapshot_dates.clone()
-        };
-
-        if dates_to_calculate.is_empty() {
-            debug!("No new dates to calculate for TOTAL snapshots.");
-            return Ok(0);
-        }
-
-        let account_ids: Vec<String> = non_archived_accounts
-            .iter()
-            .filter(|account| account.id != PORTFOLIO_TOTAL_ACCOUNT_ID)
-            .map(|account| account.id.clone())
-            .collect();
-        let transfer_adjustments_by_date = self
-            .internal_transfer_adjustments_by_date_base(&account_ids, &base_portfolio_currency)?;
-
-        // Calculate cumulative transfer adjustment up to (but not including) the first date we're calculating
-        let mut cumulative_transfer_adjustment = Decimal::ZERO;
-        if let Some(start_date) = calculation_start_date {
-            for date in &sorted_snapshot_dates {
-                if *date >= start_date {
-                    break;
-                }
-                if let Some(adjustment) = transfer_adjustments_by_date.get(date) {
-                    cumulative_transfer_adjustment += *adjustment;
-                }
-            }
-        }
-
-        for target_date in dates_to_calculate {
-            if let Some(adjustment) = transfer_adjustments_by_date.get(&target_date) {
-                cumulative_transfer_adjustment += *adjustment;
-            }
-
-            let mut individual_snapshots_on_or_before_date: HashMap<String, AccountStateSnapshot> =
-                HashMap::new();
-
-            for (account_id, account_keyframes) in &keyframes_by_account {
-                if let Some((_, latest_snapshot)) = account_keyframes.range(..=target_date).last() {
-                    individual_snapshots_on_or_before_date
-                        .insert(account_id.clone(), latest_snapshot.clone());
-                }
-            }
-
-            if !individual_snapshots_on_or_before_date.is_empty() {
-                match self.generate_total_portfolio_snapshot_for_date(
-                    target_date,
-                    &individual_snapshots_on_or_before_date,
-                    &base_portfolio_currency,
-                    cumulative_transfer_adjustment,
-                ) {
-                    Ok(total_snapshot) => {
-                        total_portfolio_snapshots_to_save.push(total_snapshot);
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to generate TOTAL portfolio snapshot for target_date {}: {}",
-                            target_date, e
-                        );
-                    }
-                }
-            }
-        }
-
-        if !total_portfolio_snapshots_to_save.is_empty() {
-            info!(
-                "Saving {} new TOTAL portfolio snapshots.",
-                total_portfolio_snapshots_to_save.len()
-            );
-
-            match mode {
-                SnapshotRecalcMode::Full => {
-                    self.snapshot_repository
-                        .overwrite_all_snapshots_for_account(
-                            PORTFOLIO_TOTAL_ACCOUNT_ID,
-                            &total_portfolio_snapshots_to_save,
-                        )
-                        .await?;
-                }
-                SnapshotRecalcMode::SinceDate(since) => {
-                    // Overwrite TOTAL snapshots from `since` forward, preserving earlier history.
-                    let end_date = self.user_today();
-                    self.snapshot_repository
-                        .overwrite_snapshots_for_account_in_range(
-                            PORTFOLIO_TOTAL_ACCOUNT_ID,
-                            *since,
-                            end_date,
-                            &total_portfolio_snapshots_to_save,
-                        )
-                        .await?;
-                }
-                SnapshotRecalcMode::IncrementalFromLast => {
-                    if calculation_start_date.is_none() {
-                        // No prior TOTAL snapshots — first-time build, overwrite all.
-                        self.snapshot_repository
-                            .overwrite_all_snapshots_for_account(
-                                PORTFOLIO_TOTAL_ACCOUNT_ID,
-                                &total_portfolio_snapshots_to_save,
-                            )
-                            .await?;
-                    } else {
-                        // Append only the newly calculated dates.
-                        for snapshot in &total_portfolio_snapshots_to_save {
-                            self.snapshot_repository
-                                .save_or_update_snapshot(snapshot)
-                                .await?;
-                        }
-                    }
-                }
-            }
-
-            // Note: We intentionally do NOT emit HoldingsChanged here.
-            // This method is called during portfolio recalculation (triggered by domain events).
-            // Emitting events here would create an infinite loop.
-
-            Ok(total_portfolio_snapshots_to_save.len())
-        } else {
-            if matches!(mode, SnapshotRecalcMode::Full) {
-                warn!("No TOTAL portfolio snapshots were generated to save. Deleting existing TOTAL snapshots.");
-                self.snapshot_repository
-                    .overwrite_all_snapshots_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, &[])
-                    .await?;
-                info!("Cleaned any existing TOTAL snapshots as no new ones were generated.");
-            }
-            Ok(0)
-        }
-    }
 }
 
 #[async_trait]
@@ -1669,17 +1148,7 @@ impl SnapshotServiceTrait for SnapshotService {
 
                 // Otherwise, history starts within our date range. We create a default "empty" state
                 // for the day before the loop, and the loop will then pick up the first keyframe correctly.
-                let account_details =
-                    self.account_repository.get_by_id(account_id).or_else(|_| {
-                        if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-                            Ok(self.create_total_virtual_account())
-                        } else {
-                            Err(Error::Repository(format!(
-                                "Account not found while reconstructing daily snapshots: {}",
-                                account_id
-                            )))
-                        }
-                    })?;
+                let account_details = self.account_repository.get_by_id(account_id)?;
                 let day_before_start = start_date.pred_opt().unwrap_or(start_date);
                 Self::create_initial_snapshot(&account_details, day_before_start)
             }
@@ -1751,13 +1220,6 @@ impl SnapshotServiceTrait for SnapshotService {
     ) -> Result<HashMap<String, Decimal>> {
         let exclusive_upper = date.succ_opt().unwrap_or(date);
         self.aggregate_cash_for_scope(account_id, exclusive_upper)
-    }
-
-    async fn recalculate_total_portfolio_snapshots(
-        &self,
-        mode: SnapshotRecalcMode,
-    ) -> Result<usize> {
-        self.calculate_total_portfolio_snapshots_impl(&mode).await
     }
 
     async fn save_manual_snapshot(

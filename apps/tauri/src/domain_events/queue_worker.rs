@@ -381,18 +381,6 @@ async fn run_portfolio_calculation(
         }
     }
 
-    // Calculate total portfolio snapshots
-    let snapshot_service = context.snapshot_service();
-    if let Err(err) = snapshot_service
-        .recalculate_total_portfolio_snapshots(snapshot_mode)
-        .await
-    {
-        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
-        error!("{}", err_msg);
-        let _ = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg);
-        return;
-    }
-
     // Update position status from lots for quote sync planning
     match context.lots_repository.get_open_position_quantities().await {
         Ok(current_holdings) => {

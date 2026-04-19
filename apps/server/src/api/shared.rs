@@ -222,20 +222,6 @@ pub async fn process_portfolio_job(
         }
     }
 
-    if let Err(err) = state
-        .snapshot_service
-        .recalculate_total_portfolio_snapshots(snapshot_mode)
-        .await
-    {
-        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
-        tracing::error!("{}", err_msg);
-        event_bus.publish(ServerEvent::with_payload(
-            PORTFOLIO_UPDATE_ERROR,
-            json!(err_msg),
-        ));
-        return Err(crate::error::ApiError::Anyhow(anyhow!(err_msg)));
-    }
-
     // Update position status from lots for quote sync planning
     match state.lots_repository.get_open_position_quantities().await {
         Ok(current_holdings) => {

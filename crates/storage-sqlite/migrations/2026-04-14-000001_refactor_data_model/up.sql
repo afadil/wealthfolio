@@ -97,7 +97,18 @@ ALTER TABLE assets
 
 
 -- ----------------------------------------------------------------------------
--- 4. snapshot_positions — relational positions for HOLDINGS-mode accounts
+-- 4. holdings_snapshots — drop stale merged-TOTAL rows
+-- ----------------------------------------------------------------------------
+-- The merged-TOTAL-snapshot pipeline is removed. TOTAL holdings are now
+-- synthesized on demand: positions from lots, cash from per-account
+-- snapshot aggregation. Pre-upgrade installs may have accumulated TOTAL
+-- rows from the old pipeline; they have no readers or writers anymore.
+
+DELETE FROM holdings_snapshots WHERE account_id = 'TOTAL';
+
+
+-- ----------------------------------------------------------------------------
+-- 5. snapshot_positions — relational positions for HOLDINGS-mode accounts
 -- ----------------------------------------------------------------------------
 -- Replaces the positions JSON blob in holdings_snapshots. Integer
 -- autoincrement PK; natural key is (snapshot_id, asset_id). Application

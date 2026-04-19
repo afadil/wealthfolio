@@ -253,23 +253,7 @@ fn handle_portfolio_calculation(
             }
         }
 
-        // --- Step 2: Calculate TOTAL portfolio snapshot ---
-        let total_result = snapshot_service
-            .recalculate_total_portfolio_snapshots(snapshot_mode)
-            .await;
-        if let Err(e) = total_result {
-            let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", e);
-            error!("{}", err_msg);
-            if let Err(e_emit) = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg) {
-                error!(
-                    "Failed to emit {} event: {}",
-                    PORTFOLIO_UPDATE_ERROR, e_emit
-                );
-            }
-            return;
-        }
-
-        // --- Step 2.5: Update position status from lots for quote sync planning ---
+        // --- Step 2: Update position status from lots for quote sync planning ---
         match context.lots_repository.get_open_position_quantities().await {
             Ok(current_holdings) => {
                 let quote_service = context.quote_service();
