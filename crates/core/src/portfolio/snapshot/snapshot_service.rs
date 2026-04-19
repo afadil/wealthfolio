@@ -84,6 +84,24 @@ pub trait SnapshotServiceTrait: Send + Sync {
         account_id: &str,
     ) -> Result<Option<AccountStateSnapshot>>;
 
+    /// Returns cash balances by currency for the given account scope.
+    ///
+    /// For `PORTFOLIO_TOTAL_ACCOUNT_ID`, aggregates each non-archived account's
+    /// latest snapshot `cash_balances` summed by currency (no merged TOTAL
+    /// snapshot involved).
+    ///
+    /// For any other account id, returns the latest snapshot's `cash_balances`
+    /// (empty map if no snapshot exists).
+    fn get_cash_balances(&self, account_id: &str) -> Result<HashMap<String, Decimal>>;
+
+    /// As-of-date variant of [`get_cash_balances`]. Uses the latest snapshot
+    /// on or before `date` for each account.
+    fn get_cash_balances_on_date(
+        &self,
+        account_id: &str,
+        date: NaiveDate,
+    ) -> Result<HashMap<String, Decimal>>;
+
     /// Recalculates aggregated "TOTAL" portfolio snapshots using the given mode.
     /// Should be run after `recalculate_holdings_snapshots` has processed individual accounts.
     async fn recalculate_total_portfolio_snapshots(
@@ -200,6 +218,43 @@ impl SnapshotService {
     fn user_today(&self) -> NaiveDate {
         let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
         user_today(tz)
+    }
+
+    /// Aggregates cash balances by walking the latest snapshot before
+    /// `exclusive_upper` for the given account scope. For
+    /// `PORTFOLIO_TOTAL_ACCOUNT_ID`, sums per-account cash by currency
+    /// across all non-archived accounts. For any other account id, returns
+    /// the latest snapshot's cash_balances (empty if none).
+    fn aggregate_cash_for_scope(
+        &self,
+        account_id: &str,
+        exclusive_upper: NaiveDate,
+    ) -> Result<HashMap<String, Decimal>> {
+        if account_id != PORTFOLIO_TOTAL_ACCOUNT_ID {
+            return Ok(self
+                .snapshot_repository
+                .get_latest_snapshot_before_date(account_id, exclusive_upper)?
+                .map(|s| s.cash_balances)
+                .unwrap_or_default());
+        }
+
+        let non_archived = self.account_repository.list(None, Some(false), None)?;
+        let mut totals: HashMap<String, Decimal> = HashMap::new();
+        for account in non_archived {
+            if account.id == PORTFOLIO_TOTAL_ACCOUNT_ID {
+                continue;
+            }
+            let Some(snapshot) = self
+                .snapshot_repository
+                .get_latest_snapshot_before_date(&account.id, exclusive_upper)?
+            else {
+                continue;
+            };
+            for (currency, amount) in snapshot.cash_balances {
+                *totals.entry(currency).or_insert(Decimal::ZERO) += amount;
+            }
+        }
+        Ok(totals)
     }
 
     /// Sets the domain event sink for emitting HoldingsChanged events.
@@ -1681,6 +1736,21 @@ impl SnapshotServiceTrait for SnapshotService {
                 Ok(None)
             }
         }
+    }
+
+    fn get_cash_balances(&self, account_id: &str) -> Result<HashMap<String, Decimal>> {
+        let today = self.user_today();
+        let tomorrow = today.succ_opt().unwrap_or(today);
+        self.aggregate_cash_for_scope(account_id, tomorrow)
+    }
+
+    fn get_cash_balances_on_date(
+        &self,
+        account_id: &str,
+        date: NaiveDate,
+    ) -> Result<HashMap<String, Decimal>> {
+        let exclusive_upper = date.succ_opt().unwrap_or(date);
+        self.aggregate_cash_for_scope(account_id, exclusive_upper)
     }
 
     async fn recalculate_total_portfolio_snapshots(

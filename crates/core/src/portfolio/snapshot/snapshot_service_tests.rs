@@ -5766,4 +5766,156 @@ mod tests {
             "cost_per_unit = buy price"
         );
     }
+
+    // ── get_cash_balances / get_cash_balances_on_date ───────────────────────
+
+    fn build_cash_test_service(
+        accounts: Vec<Account>,
+        snapshots: Vec<AccountStateSnapshot>,
+    ) -> SnapshotService {
+        let mut acct_repo = MockAccountRepository::new();
+        for a in accounts {
+            acct_repo.add_account(a);
+        }
+        let snap_repo = MockSnapshotRepository::new();
+        snap_repo.add_snapshots(snapshots);
+
+        SnapshotService::new(
+            Arc::new(RwLock::new("USD".to_string())),
+            Arc::new(acct_repo),
+            Arc::new(MockActivityRepository::new()),
+            Arc::new(snap_repo),
+            Arc::new(MockAssetRepository::new()),
+            Arc::new(MockFxService::new()),
+        )
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_per_account_returns_latest_snapshot_balances() {
+        let acc = create_test_account("acc1", "USD", "USD");
+        let mut snap = create_blank_snapshot(&acc.id, &acc.currency, "2026-01-10");
+        snap.cash_balances.insert("USD".to_string(), dec!(1000));
+        snap.cash_balances.insert("EUR".to_string(), dec!(50));
+
+        let svc = build_cash_test_service(vec![acc.clone()], vec![snap]);
+        let cash = svc.get_cash_balances(&acc.id).unwrap();
+
+        assert_eq!(cash.get("USD"), Some(&dec!(1000)));
+        assert_eq!(cash.get("EUR"), Some(&dec!(50)));
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_per_account_returns_empty_when_no_snapshot() {
+        let acc = create_test_account("acc1", "USD", "USD");
+        let svc = build_cash_test_service(vec![acc.clone()], vec![]);
+        let cash = svc.get_cash_balances(&acc.id).unwrap();
+        assert!(cash.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_total_sums_across_accounts_by_currency() {
+        let acc1 = create_test_account("acc1", "USD", "USD");
+        let acc2 = create_test_account("acc2", "USD", "USD2");
+        let acc3 = create_test_account("acc3", "EUR", "EUR");
+
+        let mut s1 = create_blank_snapshot(&acc1.id, "USD", "2026-01-10");
+        s1.cash_balances.insert("USD".to_string(), dec!(1000));
+
+        let mut s2 = create_blank_snapshot(&acc2.id, "USD", "2026-01-10");
+        s2.cash_balances.insert("USD".to_string(), dec!(250));
+        s2.cash_balances.insert("CAD".to_string(), dec!(-300));
+
+        let mut s3 = create_blank_snapshot(&acc3.id, "EUR", "2026-01-10");
+        s3.cash_balances.insert("EUR".to_string(), dec!(800));
+
+        let svc = build_cash_test_service(vec![acc1, acc2, acc3], vec![s1, s2, s3]);
+        let cash = svc.get_cash_balances(PORTFOLIO_TOTAL_ACCOUNT_ID).unwrap();
+
+        assert_eq!(cash.get("USD"), Some(&dec!(1250)));
+        assert_eq!(cash.get("EUR"), Some(&dec!(800)));
+        assert_eq!(cash.get("CAD"), Some(&dec!(-300)));
+        assert_eq!(cash.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_total_skips_archived_accounts() {
+        let mut archived = create_test_account("archived", "USD", "Old");
+        archived.is_archived = true;
+        let active = create_test_account("active", "USD", "Active");
+
+        let mut s_old = create_blank_snapshot(&archived.id, "USD", "2026-01-10");
+        s_old.cash_balances.insert("USD".to_string(), dec!(9999));
+        let mut s_new = create_blank_snapshot(&active.id, "USD", "2026-01-10");
+        s_new.cash_balances.insert("USD".to_string(), dec!(100));
+
+        let svc = build_cash_test_service(vec![archived, active], vec![s_old, s_new]);
+        let cash = svc.get_cash_balances(PORTFOLIO_TOTAL_ACCOUNT_ID).unwrap();
+
+        assert_eq!(cash.get("USD"), Some(&dec!(100)));
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_total_returns_empty_when_no_accounts_have_snapshots() {
+        let acc = create_test_account("acc1", "USD", "USD");
+        let svc = build_cash_test_service(vec![acc], vec![]);
+        let cash = svc.get_cash_balances(PORTFOLIO_TOTAL_ACCOUNT_ID).unwrap();
+        assert!(cash.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_on_date_uses_latest_snapshot_on_or_before_date() {
+        let acc = create_test_account("acc1", "USD", "USD");
+        let mut early = create_blank_snapshot(&acc.id, "USD", "2026-01-05");
+        early.cash_balances.insert("USD".to_string(), dec!(500));
+        let mut later = create_blank_snapshot(&acc.id, "USD", "2026-01-15");
+        later.cash_balances.insert("USD".to_string(), dec!(2000));
+
+        let svc = build_cash_test_service(vec![acc.clone()], vec![early, later]);
+
+        let on_jan10 = svc
+            .get_cash_balances_on_date(&acc.id, NaiveDate::from_ymd_opt(2026, 1, 10).unwrap())
+            .unwrap();
+        assert_eq!(on_jan10.get("USD"), Some(&dec!(500)));
+
+        let on_jan15 = svc
+            .get_cash_balances_on_date(&acc.id, NaiveDate::from_ymd_opt(2026, 1, 15).unwrap())
+            .unwrap();
+        assert_eq!(on_jan15.get("USD"), Some(&dec!(2000)));
+
+        let on_jan20 = svc
+            .get_cash_balances_on_date(&acc.id, NaiveDate::from_ymd_opt(2026, 1, 20).unwrap())
+            .unwrap();
+        assert_eq!(on_jan20.get("USD"), Some(&dec!(2000)));
+    }
+
+    #[tokio::test]
+    async fn get_cash_balances_on_date_total_uses_each_accounts_latest_on_or_before_date() {
+        // acc1 has snapshots on 2026-01-05 and 2026-01-15. acc2 only has 2026-01-10.
+        // Querying 2026-01-12 for TOTAL should pick acc1's Jan 5 snapshot (latest ≤ Jan 12)
+        // and acc2's Jan 10 snapshot.
+        let acc1 = create_test_account("acc1", "USD", "USD1");
+        let acc2 = create_test_account("acc2", "USD", "USD2");
+
+        let mut a1_early = create_blank_snapshot(&acc1.id, "USD", "2026-01-05");
+        a1_early.cash_balances.insert("USD".to_string(), dec!(100));
+        let mut a1_later = create_blank_snapshot(&acc1.id, "USD", "2026-01-15");
+        a1_later.cash_balances.insert("USD".to_string(), dec!(999));
+        let mut a2_mid = create_blank_snapshot(&acc2.id, "USD", "2026-01-10");
+        a2_mid.cash_balances.insert("USD".to_string(), dec!(50));
+
+        let svc = build_cash_test_service(
+            vec![acc1, acc2],
+            vec![a1_early, a1_later, a2_mid],
+        );
+
+        let cash = svc
+            .get_cash_balances_on_date(
+                PORTFOLIO_TOTAL_ACCOUNT_ID,
+                NaiveDate::from_ymd_opt(2026, 1, 12).unwrap(),
+            )
+            .unwrap();
+
+        // acc1 → 100 (Jan 5, since Jan 15 is after Jan 12), acc2 → 50 (Jan 10)
+        assert_eq!(cash.get("USD"), Some(&dec!(150)));
+    }
 }

@@ -2,13 +2,13 @@ use crate::activities::ActivityRepositoryTrait;
 use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
 use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use crate::constants::DECIMAL_PRECISION;
-use crate::errors::{CalculatorError, Error as CoreError, Result};
+use crate::errors::Result;
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::lots::{LotRecord, LotRepositoryTrait};
 use crate::portfolio::holdings::holdings_model::{
     Holding, HoldingType, Instrument, LotView, MonetaryValue,
 };
-use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
+use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
 use chrono::NaiveDate;
@@ -106,15 +106,15 @@ impl HoldingsService {
         user_today(tz)
     }
 
-    async fn build_live_holdings_from_snapshot(
+    async fn build_live_holdings_from_lots(
         &self,
         account_id: &str,
-        latest_snapshot: &snapshot::AccountStateSnapshot,
+        cash_balances: &HashMap<String, Decimal>,
         base_currency: &str,
         lots_asset_id: Option<&str>,
     ) -> Vec<Holding> {
         let today = self.today_in_user_timezone();
-        let cash_balances_map: &HashMap<String, Decimal> = &latest_snapshot.cash_balances;
+        let cash_balances_map: &HashMap<String, Decimal> = cash_balances;
 
         // --- Security positions: read from lots table ---
         // For TOTAL pseudo-account, aggregate open lots across all accounts.
@@ -480,21 +480,11 @@ impl HoldingsServiceTrait for HoldingsService {
             account_id, base_currency
         );
 
-        let latest_snapshot = match self
-            .snapshot_service
-            .get_latest_holdings_snapshot(account_id)
-        {
-            Ok(Some(snap)) => snap,
-            Ok(None) => {
-                debug!(
-                    "No calculated holdings found for account {}. Returning empty holdings list.",
-                    account_id
-                );
-                return Ok(Vec::new());
-            }
+        let cash_balances = match self.snapshot_service.get_cash_balances(account_id) {
+            Ok(map) => map,
             Err(core_error) => {
                 error!(
-                    "Failed to get latest snapshot for account {}: {}",
+                    "Failed to load cash balances for account {}: {}",
                     account_id, core_error
                 );
                 return Err(core_error);
@@ -502,7 +492,7 @@ impl HoldingsServiceTrait for HoldingsService {
         };
 
         let mut holdings = self
-            .build_live_holdings_from_snapshot(account_id, &latest_snapshot, base_currency, None)
+            .build_live_holdings_from_lots(account_id, &cash_balances, base_currency, None)
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)
             .await;
@@ -544,50 +534,19 @@ impl HoldingsServiceTrait for HoldingsService {
             asset_id, account_id, base_currency
         );
 
-        let latest_snapshot = match self
-            .snapshot_service
-            .get_latest_holdings_snapshot(account_id)
-        {
-            Ok(Some(snap)) => snap,
-            Ok(None) => {
-                debug!(
-                    "No snapshot found for account {}. Cannot get holding for asset {}.",
-                    account_id, asset_id
-                );
-                return Ok(None);
-            }
+        let cash_balances = match self.snapshot_service.get_cash_balances(account_id) {
+            Ok(map) => map,
             Err(e) => {
                 error!(
-                    "Failed to get latest snapshot for account {} while getting holding {}: {}",
+                    "Failed to load cash balances for account {} while getting holding {}: {}",
                     account_id, asset_id, e
                 );
                 return Err(e);
             }
         };
 
-        let Some(position) = latest_snapshot.positions.get(asset_id).cloned() else {
-            debug!(
-                "Asset {} not found in holdings snapshot for account {}.",
-                asset_id, account_id
-            );
-            return Ok(None);
-        };
-
-        if position.quantity == Decimal::ZERO {
-            debug!(
-                "Asset {} found but quantity is zero in snapshot for account {}.",
-                asset_id, account_id
-            );
-            return Ok(None);
-        }
-
         let mut holdings = self
-            .build_live_holdings_from_snapshot(
-                account_id,
-                &latest_snapshot,
-                base_currency,
-                Some(asset_id),
-            )
+            .build_live_holdings_from_lots(account_id, &cash_balances, base_currency, Some(asset_id))
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)
             .await;
@@ -604,13 +563,11 @@ impl HoldingsServiceTrait for HoldingsService {
         });
 
         let Some(index) = holding_index else {
-            error!(
-                "Asset {} exists in snapshot for account {} but holding view could not be built.",
+            debug!(
+                "Asset {} not held in account {}.",
                 asset_id, account_id
             );
-            return Err(CoreError::Calculation(CalculatorError::Calculation(
-                format!("Failed to build holding view for {}", asset_id),
-            )));
+            return Ok(None);
         };
 
         let mut valued_holding = holdings.swap_remove(index);
@@ -768,19 +725,14 @@ impl HoldingsServiceTrait for HoldingsService {
             }
         }
 
-        // Cash balances: fetch snapshot for the given date.
-        // NOTE: snapshot fetched only for cash_balances; will be removed once cash is
-        // tracked independently of snapshots.
-        let snapshot = self
+        // Cash balances aggregated across per-account snapshots as-of-date
+        // (for TOTAL) or pulled from this account's latest snapshot ≤ date.
+        let cash_balances = self
             .snapshot_service
-            .get_holdings_keyframes(account_id, Some(date), Some(date))
-            .ok()
-            .and_then(|mut v| v.drain(..).find(|s| s.snapshot_date == date));
+            .get_cash_balances_on_date(account_id, date)
+            .unwrap_or_default();
+        let snapshot_date = date;
 
-        let snapshot_date = snapshot.as_ref().map(|s| s.snapshot_date).unwrap_or(date);
-        let cash_balances = snapshot.map(|s| s.cash_balances).unwrap_or_default();
-
-        // Convert cash balances to holdings
         for (currency, &amount) in &cash_balances {
             if amount == Decimal::ZERO {
                 continue;
