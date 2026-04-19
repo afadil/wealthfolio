@@ -369,14 +369,23 @@ impl LotRepositoryTrait for LotsRepository {
     }
 
     async fn get_open_position_quantities(&self) -> Result<HashMap<String, Decimal>> {
-        let lots = self.get_all_open_lots().await?;
+        // Quantities are stored as TEXT for Decimal precision, so SUM() in
+        // SQLite would force a lossy REAL cast. Fetch only the two columns
+        // we need (avoiding the full LotRecordDB row) and sum as Decimal in
+        // Rust to keep precision intact.
+        use crate::schema::lots::dsl;
+
+        let mut conn = get_connection(&self.pool)?;
+        let rows: Vec<(String, String)> = dsl::lots
+            .filter(dsl::is_closed.eq(0))
+            .select((dsl::asset_id, dsl::remaining_quantity))
+            .load(&mut conn)
+            .map_err(StorageError::from)?;
+
         let mut quantities: HashMap<String, Decimal> = HashMap::new();
-        for lot in &lots {
-            let qty = lot
-                .remaining_quantity
-                .parse::<Decimal>()
-                .unwrap_or(Decimal::ZERO);
-            *quantities.entry(lot.asset_id.clone()).or_default() += qty;
+        for (asset_id, remaining) in rows {
+            let qty = remaining.parse::<Decimal>().unwrap_or(Decimal::ZERO);
+            *quantities.entry(asset_id).or_default() += qty;
         }
         Ok(quantities)
     }
