@@ -430,6 +430,7 @@ export interface SymbolSearchResult {
 export interface ResolvedQuote {
   currency?: string;
   price?: number;
+  resolvedProviderId?: string;
 }
 
 export interface ExchangeInfo {

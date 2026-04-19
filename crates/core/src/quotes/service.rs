@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 use crate::utils::time_utils;
 
 use super::client::{MarketDataClient, ProviderConfig};
-use super::constants::DATA_SOURCE_MANUAL;
+use super::constants::{DATA_SOURCE_CUSTOM_SCRAPER, DATA_SOURCE_MANUAL};
 use super::import::{ImportValidationStatus, QuoteConverter, QuoteImport, QuoteValidator};
 use super::model::{LatestQuotePair, Quote, ResolvedQuote, SymbolSearchResult};
 use super::store::{ProviderSettingsStore, QuoteStore};
@@ -135,6 +135,42 @@ fn extract_provider_id_from_sync_error(error: &str) -> Option<&'static str> {
     super::constants::MARKET_DATA_PROVIDER_IDS
         .into_iter()
         .find(|provider_id| error.contains(provider_id))
+}
+
+fn provider_config_for_symbol_resolution(
+    preferred_provider: Option<&str>,
+) -> Option<serde_json::Value> {
+    let provider = preferred_provider
+        .map(str::trim)
+        .filter(|p| !p.is_empty())?;
+
+    if let Some(custom_code) = provider
+        .strip_prefix("CUSTOM:")
+        .map(str::trim)
+        .filter(|code| !code.is_empty())
+    {
+        return Some(serde_json::json!({
+            "preferred_provider": DATA_SOURCE_CUSTOM_SCRAPER,
+            "custom_provider_code": custom_code,
+        }));
+    }
+
+    Some(serde_json::json!({ "preferred_provider": provider }))
+}
+
+fn resolved_provider_matches_requested(
+    resolved_provider: &str,
+    requested_provider: Option<&str>,
+) -> bool {
+    let Some(requested) = requested_provider.map(str::trim).filter(|p| !p.is_empty()) else {
+        return true;
+    };
+
+    if let Some(custom_code) = requested.strip_prefix("CUSTOM:") {
+        return resolved_provider == format!("{}:{}", DATA_SOURCE_CUSTOM_SCRAPER, custom_code);
+    }
+
+    resolved_provider == requested
 }
 
 /// Latest quote payload enriched with backend freshness computation.
@@ -256,7 +292,7 @@ pub trait QuoteServiceTrait: Send + Sync {
         account_currency: Option<&str>,
     ) -> Result<Vec<SymbolSearchResult>>;
 
-    /// Resolve the latest quote for a symbol (currency + price).
+    /// Resolve the latest quote for a symbol (currency, price, and provider).
     ///
     /// Best-effort: returns what the provider can give. Used during symbol selection
     /// to confirm inferred currency and pre-fill the price field.
@@ -265,9 +301,16 @@ pub trait QuoteServiceTrait: Send + Sync {
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
+        quote_ccy: Option<&str>,
         preferred_provider: Option<&str>,
     ) -> Result<ResolvedQuote> {
-        let _ = (symbol, exchange_mic, instrument_type, preferred_provider);
+        let _ = (
+            symbol,
+            exchange_mic,
+            instrument_type,
+            quote_ccy,
+            preferred_provider,
+        );
         Ok(ResolvedQuote::default())
     }
 
@@ -1041,6 +1084,7 @@ where
         symbol: &str,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
+        quote_ccy: Option<&str>,
         preferred_provider: Option<&str>,
     ) -> Result<ResolvedQuote> {
         let trimmed_symbol = symbol.trim();
@@ -1065,8 +1109,11 @@ where
             trimmed_symbol
         };
 
-        let provider_config: Option<serde_json::Value> =
-            preferred_provider.map(|p| serde_json::json!({ "preferred_provider": p }));
+        let clean_quote_ccy = quote_ccy
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+            .unwrap_or_default();
+        let provider_config = provider_config_for_symbol_resolution(preferred_provider);
 
         for attempt_symbol in symbol_resolution_candidates(clean_symbol) {
             // For bonds, populate metadata with TreasuryDirect details so
@@ -1108,7 +1155,7 @@ where
                 id: format!("_QUOTE_RESOLVE_{}", attempt_symbol),
                 kind: AssetKind::Investment,
                 quote_mode: QuoteMode::Market,
-                quote_ccy: String::new(),
+                quote_ccy: clean_quote_ccy.to_string(),
                 instrument_type: instrument_type.cloned().or(Some(InstrumentType::Equity)),
                 instrument_symbol: Some(resolved_symbol),
                 display_code: Some(attempt_symbol.clone()),
@@ -1139,7 +1186,22 @@ where
                     } else {
                         Some(quote.close)
                     };
-                    return Ok(ResolvedQuote { currency, price });
+                    let resolved_provider_id = quote.data_source.clone();
+                    if !resolved_provider_matches_requested(
+                        &resolved_provider_id,
+                        preferred_provider,
+                    ) {
+                        debug!(
+                            "resolve_symbol_quote: requested provider {:?} but resolved via {} for symbol='{}'",
+                            preferred_provider, resolved_provider_id, attempt_symbol
+                        );
+                        continue;
+                    }
+                    return Ok(ResolvedQuote {
+                        currency,
+                        price,
+                        resolved_provider_id: Some(resolved_provider_id),
+                    });
                 }
                 Err(err) => {
                     debug!(

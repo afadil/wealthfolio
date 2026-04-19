@@ -118,7 +118,7 @@ pub struct LatestQuotePair {
     pub previous: Option<Quote>,
 }
 
-/// Result from resolving a symbol's latest quote (currency + price).
+/// Result from resolving a symbol's latest quote (currency, price, and provider).
 ///
 /// Used during symbol selection to confirm inferred currency and pre-fill price.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -126,4 +126,5 @@ pub struct LatestQuotePair {
 pub struct ResolvedQuote {
     pub currency: Option<String>,
     pub price: Option<Decimal>,
+    pub resolved_provider_id: Option<String>,
 }

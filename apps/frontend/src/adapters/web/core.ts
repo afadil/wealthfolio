@@ -711,17 +711,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "resolve_symbol_quote": {
-      const { symbol, exchangeMic, instrumentType, providerId } = payload as {
+      const { symbol, exchangeMic, instrumentType, providerId, quoteCcy } = payload as {
         symbol: string;
         exchangeMic?: string;
         instrumentType?: string;
         providerId?: string;
+        quoteCcy?: string;
       };
       const params = new URLSearchParams();
       params.set("symbol", symbol);
       if (exchangeMic) params.set("exchangeMic", exchangeMic);
       if (instrumentType) params.set("instrumentType", instrumentType);
       if (providerId) params.set("providerId", providerId);
+      if (quoteCcy) params.set("quoteCcy", quoteCcy);
       url += `?${params.toString()}`;
       break;
     }
