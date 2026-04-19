@@ -4,12 +4,16 @@ import type { RetirementPlan } from "../types";
 
 export interface AutoConfigResult {
   monthlyContribution: number | null;
-  expectedAnnualReturn: number | null;
+  preRetirementAnnualReturn: number | null;
+  retirementAnnualReturn: number | null;
+  annualInvestmentFeeRate: number | null;
   targetAllocations: Record<string, number> | null;
   currency: string | null;
   notes: {
     monthlyContribution?: string;
-    expectedAnnualReturn?: string;
+    preRetirementAnnualReturn?: string;
+    retirementAnnualReturn?: string;
+    annualInvestmentFeeRate?: string;
     targetAllocations?: string;
   };
 }
@@ -168,12 +172,16 @@ export async function runAutoConfig(
 
   return {
     monthlyContribution: contribution.value,
-    expectedAnnualReturn: expectedReturn.value,
+    preRetirementAnnualReturn: expectedReturn.value,
+    retirementAnnualReturn: 0.0337,
+    annualInvestmentFeeRate: 0.006,
     targetAllocations: allocResult.value,
     currency: null,
     notes: {
       monthlyContribution: contribution.note,
-      expectedAnnualReturn: expectedReturn.note,
+      preRetirementAnnualReturn: expectedReturn.note,
+      retirementAnnualReturn: "Default retirement-phase gross return assumption.",
+      annualInvestmentFeeRate: "Default annual portfolio fee drag.",
       targetAllocations: allocResult.note,
     },
   };
@@ -187,8 +195,14 @@ export function applyAutoConfig(current: RetirementPlan, result: AutoConfigResul
       ...(result.monthlyContribution !== null
         ? { monthlyContribution: result.monthlyContribution }
         : {}),
-      ...(result.expectedAnnualReturn !== null
-        ? { expectedAnnualReturn: result.expectedAnnualReturn }
+      ...(result.preRetirementAnnualReturn !== null
+        ? { preRetirementAnnualReturn: result.preRetirementAnnualReturn }
+        : {}),
+      ...(result.retirementAnnualReturn !== null
+        ? { retirementAnnualReturn: result.retirementAnnualReturn }
+        : {}),
+      ...(result.annualInvestmentFeeRate !== null
+        ? { annualInvestmentFeeRate: result.annualInvestmentFeeRate }
         : {}),
       ...(result.targetAllocations !== null ? { targetAllocations: result.targetAllocations } : {}),
     },

@@ -34,8 +34,10 @@ pub(crate) fn sample_inflation<R: Rng>(rng: &mut R, mean: f64) -> f64 {
 
 /// MC-closure-safe version of blended return params that works with owned primitives.
 pub(crate) fn blended_return_params_mc(
-    base_mean: f64,
+    accumulation_mean: f64,
+    retirement_mean: f64,
     base_std: f64,
+    annual_fee_rate: f64,
     current_age: u32,
     retirement_start_age: u32,
     planning_horizon_age: u32,
@@ -43,13 +45,14 @@ pub(crate) fn blended_return_params_mc(
     i: u32,
     in_fire: bool,
 ) -> (f64, f64) {
+    if !in_fire {
+        return (accumulation_mean, base_std);
+    }
+
     let gp = match gp {
         Some(gp) if gp.enabled => gp,
-        _ => return (base_mean, base_std),
+        _ => return (retirement_mean, base_std),
     };
-    if !in_fire {
-        return (base_mean, base_std);
-    }
     let years_to_fire = (retirement_start_age as i32 - current_age as i32).max(0) as f64;
     let years_in_retirement =
         (planning_horizon_age as i32 - retirement_start_age as i32).max(1) as f64;
@@ -59,8 +62,9 @@ pub(crate) fn blended_return_params_mc(
         + t * (gp.bond_allocation_at_horizon - gp.bond_allocation_at_fire))
         .clamp(0.0, 1.0);
     let stock_pct = 1.0 - bond_pct;
+    let bond_mean = net_annual_return(gp.bond_return_rate, annual_fee_rate);
     (
-        stock_pct * base_mean + bond_pct * gp.bond_return_rate,
+        stock_pct * retirement_mean + bond_pct * bond_mean,
         stock_pct * base_std,
     )
 }
@@ -68,6 +72,24 @@ pub(crate) fn blended_return_params_mc(
 pub(crate) fn percentile(sorted: &[f64], p: f64) -> f64 {
     let idx = (sorted.len() as f64 * p).floor() as usize;
     sorted[idx.min(sorted.len() - 1)]
+}
+
+pub(crate) fn net_annual_return(gross_return: f64, annual_fee_rate: f64) -> f64 {
+    (gross_return - annual_fee_rate).max(-0.99)
+}
+
+pub(crate) fn plan_accumulation_return(plan: &RetirementPlan) -> f64 {
+    net_annual_return(
+        plan.investment.pre_retirement_annual_return,
+        plan.investment.annual_investment_fee_rate,
+    )
+}
+
+pub(crate) fn plan_retirement_return(plan: &RetirementPlan) -> f64 {
+    net_annual_return(
+        plan.investment.retirement_annual_return,
+        plan.investment.annual_investment_fee_rate,
+    )
 }
 
 // ─── Expense & income helpers ────────────────────────────────────────────────
@@ -278,14 +300,16 @@ pub(crate) fn plan_blended_return(
     in_fire: bool,
     retirement_start_age: u32,
 ) -> f64 {
-    let base_return = plan.investment.expected_annual_return;
+    let accumulation_return = plan_accumulation_return(plan);
+    let retirement_return = plan_retirement_return(plan);
+    if !in_fire {
+        return accumulation_return;
+    }
+
     let gp = match plan.investment.glide_path.as_ref() {
         Some(gp) if gp.enabled => gp,
-        _ => return base_return,
+        _ => return retirement_return,
     };
-    if !in_fire {
-        return base_return;
-    }
     let years_to_fire =
         (retirement_start_age as i32 - plan.personal.current_age as i32).max(0) as f64;
     let years_in_retirement =
@@ -296,7 +320,11 @@ pub(crate) fn plan_blended_return(
         + t * (gp.bond_allocation_at_horizon - gp.bond_allocation_at_fire))
         .clamp(0.0, 1.0);
     let stock_pct = 1.0 - bond_pct;
-    stock_pct * base_return + bond_pct * gp.bond_return_rate
+    let bond_return = net_annual_return(
+        gp.bond_return_rate,
+        plan.investment.annual_investment_fee_rate,
+    );
+    stock_pct * retirement_return + bond_pct * bond_return
 }
 
 /// Net FIRE target from a `RetirementPlan` at a given candidate retirement age.
@@ -435,11 +463,14 @@ pub(crate) fn retirement_start_decision(
     portfolio: f64,
     required_capital: f64,
 ) -> Option<RetirementStartReason> {
-    if portfolio >= required_capital {
-        return Some(RetirementStartReason::Funded);
-    }
     match mode {
+        RetirementTimingMode::Fire if age >= target_age && portfolio >= required_capital => {
+            Some(RetirementStartReason::Funded)
+        }
         RetirementTimingMode::Fire => None,
+        RetirementTimingMode::Traditional if age >= target_age && portfolio >= required_capital => {
+            Some(RetirementStartReason::Funded)
+        }
         RetirementTimingMode::Traditional if age >= target_age => {
             Some(RetirementStartReason::TargetAgeForced)
         }
@@ -458,7 +489,7 @@ pub fn project_retirement_with_mode(
         if years <= 0 {
             target_at_goal
         } else {
-            target_at_goal / (1.0 + plan.investment.expected_annual_return).powi(years)
+            target_at_goal / (1.0 + plan_accumulation_return(plan)).powi(years)
         }
     };
 
@@ -499,6 +530,11 @@ pub fn project_retirement_with_mode(
 
         if !in_fire {
             let required = compute_required_capital(plan, age);
+            if fire_age.is_none() && portfolio >= required {
+                fire_age = Some(age);
+                fire_year = Some(year);
+                portfolio_at_fire = portfolio;
+            }
             if let Some(start_reason) = retirement_start_decision(
                 mode,
                 age,
@@ -511,11 +547,8 @@ pub fn project_retirement_with_mode(
                 retirement_start_age = Some(age);
                 retirement_start_reason = Some(start_reason);
                 if start_reason == RetirementStartReason::Funded {
-                    fire_age = Some(age);
-                    fire_year = Some(year);
                     funded_at_retirement = true;
                 }
-                portfolio_at_fire = portfolio;
                 resolved_payouts = Some(resolve_plan_dc_payouts(
                     &plan.income_streams,
                     current_age,
@@ -636,8 +669,10 @@ mod tests {
             },
             income_streams: vec![],
             investment: InvestmentAssumptions {
-                expected_annual_return: 0.07,
-                expected_return_std_dev: 0.12,
+                pre_retirement_annual_return: 0.07,
+                retirement_annual_return: 0.07,
+                annual_investment_fee_rate: 0.0,
+                annual_volatility: 0.12,
                 inflation_rate: 0.02,
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
@@ -712,11 +747,63 @@ mod tests {
     }
 
     #[test]
+    fn phase_returns_subtract_fee() {
+        let mut p = base_plan();
+        p.investment.pre_retirement_annual_return = 0.0577;
+        p.investment.retirement_annual_return = 0.0337;
+        p.investment.annual_investment_fee_rate = 0.006;
+
+        assert!((plan_accumulation_return(&p) - 0.0517).abs() < 0.000001);
+        assert!((plan_retirement_return(&p) - 0.0277).abs() < 0.000001);
+        assert!((plan_blended_return(&p, 0, false, 55) - 0.0517).abs() < 0.000001);
+        assert!((plan_blended_return(&p, 20, true, 55) - 0.0277).abs() < 0.000001);
+    }
+
+    #[test]
+    fn required_capital_uses_retirement_return() {
+        let mut high_return = base_plan();
+        high_return.investment.retirement_annual_return = 0.07;
+
+        let mut low_return = high_return.clone();
+        low_return.investment.retirement_annual_return = 0.03;
+
+        let high_return_target =
+            compute_required_capital(&high_return, high_return.personal.target_retirement_age);
+        let low_return_target =
+            compute_required_capital(&low_return, low_return.personal.target_retirement_age);
+
+        assert!(
+            low_return_target > high_return_target,
+            "lower retirement return should require more capital: {low_return_target} <= {high_return_target}"
+        );
+    }
+
+    #[test]
     fn projection_reaches_fire() {
         let p = base_plan();
         let proj = project_retirement(&p, 100_000.0);
         assert!(proj.fire_age.is_some(), "should reach FIRE");
         assert!(proj.fire_age.unwrap() <= p.personal.target_retirement_age);
+    }
+
+    #[test]
+    fn fire_mode_reports_early_fi_but_starts_withdrawals_at_target_age() {
+        let p = base_plan();
+        let proj = project_retirement(&p, 100_000.0);
+
+        let fi_age = proj.fire_age.expect("should reach FI");
+        assert!(fi_age <= p.personal.target_retirement_age);
+        assert_eq!(
+            proj.retirement_start_age,
+            Some(p.personal.target_retirement_age)
+        );
+        assert!(
+            proj.year_by_year
+                .iter()
+                .filter(|s| s.age < p.personal.target_retirement_age)
+                .all(|s| s.phase == "accumulation"),
+            "reaching FI early should not start withdrawals before the desired retirement age"
+        );
     }
 
     #[test]

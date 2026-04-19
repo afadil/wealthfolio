@@ -38,7 +38,7 @@ interface Props {
   holdings: Holding[];
   accountIds: string[];
   accounts: Account[];
-  /** Accounts already filtered to the FIRE scope — used for auto-config expected return. */
+  /** Accounts already filtered to the FIRE scope — used for auto-config before-retirement return. */
   activeAccounts: Account[];
 }
 
@@ -835,22 +835,54 @@ export default function SettingsPage({
       {/* ── Section 4: Portfolio Assumptions ── */}
       <SettingsSection title="Portfolio Assumptions" defaultOpen={true}>
         <SliderField
-          label="Expected annual portfolio return"
-          value={draft.investment.expectedAnnualReturn}
+          label="Return before retirement"
+          value={draft.investment.preRetirementAnnualReturn}
           min={0.03}
           max={0.12}
           step={0.005}
-          displayValue={(draft.investment.expectedAnnualReturn * 100).toFixed(1) + "%"}
-          onChange={(v) => updateInvestment("expectedAnnualReturn", v)}
+          displayValue={(draft.investment.preRetirementAnnualReturn * 100).toFixed(1) + "%"}
+          onChange={(v) => updateInvestment("preRetirementAnnualReturn", v)}
         />
         <SliderField
-          label="Return standard deviation (volatility)"
-          value={draft.investment.expectedReturnStdDev}
+          label="Return during retirement"
+          value={draft.investment.retirementAnnualReturn}
+          min={0}
+          max={0.1}
+          step={0.005}
+          displayValue={(draft.investment.retirementAnnualReturn * 100).toFixed(1) + "%"}
+          onChange={(v) => updateInvestment("retirementAnnualReturn", v)}
+        />
+        <SliderField
+          label="Annual investment fee"
+          value={draft.investment.annualInvestmentFeeRate}
+          min={0}
+          max={0.03}
+          step={0.001}
+          displayValue={(draft.investment.annualInvestmentFeeRate * 100).toFixed(2) + "%"}
+          onChange={(v) => updateInvestment("annualInvestmentFeeRate", v)}
+        />
+        <p className="text-muted-foreground text-xs">
+          Effective returns after fees: before retirement{" "}
+          {(
+            (draft.investment.preRetirementAnnualReturn -
+              draft.investment.annualInvestmentFeeRate) *
+            100
+          ).toFixed(2)}
+          %, during retirement{" "}
+          {(
+            (draft.investment.retirementAnnualReturn - draft.investment.annualInvestmentFeeRate) *
+            100
+          ).toFixed(2)}
+          %. The engine uses these net values in each phase.
+        </p>
+        <SliderField
+          label="Annual volatility"
+          value={draft.investment.annualVolatility}
           min={0.05}
           max={0.25}
           step={0.005}
-          displayValue={(draft.investment.expectedReturnStdDev * 100).toFixed(1) + "%"}
-          onChange={(v) => updateInvestment("expectedReturnStdDev", v)}
+          displayValue={(draft.investment.annualVolatility * 100).toFixed(1) + "%"}
+          onChange={(v) => updateInvestment("annualVolatility", v)}
         />
         <p className="text-muted-foreground text-xs">
           Volatility is used only for Monte Carlo simulation. Higher values produce a wider fan of
@@ -1142,8 +1174,8 @@ export default function SettingsPage({
             <div>
               <CardTitle className="text-sm">Auto-configure from portfolio</CardTitle>
               <p className="text-muted-foreground mt-1 text-xs">
-                Detect monthly contribution, expected return, and target allocations from your
-                portfolio data.
+                Detect monthly contribution, before-retirement return, and target allocations from
+                your portfolio data.
               </p>
             </div>
             <Button
@@ -1175,16 +1207,42 @@ export default function SettingsPage({
                     </span>
                   </div>
                 )}
-                {autoConfigResult.expectedAnnualReturn !== null && (
+                {autoConfigResult.preRetirementAnnualReturn !== null && (
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <span className="font-medium">Expected annual return</span>
+                      <span className="font-medium">Return before retirement</span>
                       <p className="text-muted-foreground">
-                        {autoConfigResult.notes.expectedAnnualReturn}
+                        {autoConfigResult.notes.preRetirementAnnualReturn}
                       </p>
                     </div>
                     <span className="shrink-0 font-semibold text-green-600">
-                      {(autoConfigResult.expectedAnnualReturn * 100).toFixed(1)}%
+                      {(autoConfigResult.preRetirementAnnualReturn * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+                {autoConfigResult.retirementAnnualReturn !== null && (
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="font-medium">Return during retirement</span>
+                      <p className="text-muted-foreground">
+                        {autoConfigResult.notes.retirementAnnualReturn}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold text-green-600">
+                      {(autoConfigResult.retirementAnnualReturn * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+                {autoConfigResult.annualInvestmentFeeRate !== null && (
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="font-medium">Annual investment fee</span>
+                      <p className="text-muted-foreground">
+                        {autoConfigResult.notes.annualInvestmentFeeRate}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold text-green-600">
+                      {(autoConfigResult.annualInvestmentFeeRate * 100).toFixed(2)}%
                     </span>
                   </div>
                 )}
@@ -1202,7 +1260,9 @@ export default function SettingsPage({
                   </div>
                 )}
                 {autoConfigResult.monthlyContribution === null &&
-                  autoConfigResult.expectedAnnualReturn === null &&
+                  autoConfigResult.preRetirementAnnualReturn === null &&
+                  autoConfigResult.retirementAnnualReturn === null &&
+                  autoConfigResult.annualInvestmentFeeRate === null &&
                   autoConfigResult.targetAllocations === null && (
                     <p className="text-muted-foreground">
                       No data could be detected. Add activities and holdings to Wealthfolio first.
@@ -1210,7 +1270,9 @@ export default function SettingsPage({
                   )}
               </div>
               {(autoConfigResult.monthlyContribution !== null ||
-                autoConfigResult.expectedAnnualReturn !== null ||
+                autoConfigResult.preRetirementAnnualReturn !== null ||
+                autoConfigResult.retirementAnnualReturn !== null ||
+                autoConfigResult.annualInvestmentFeeRate !== null ||
                 autoConfigResult.targetAllocations !== null) && (
                 <div className="flex gap-2">
                   <Button size="sm" onClick={applyDetected}>

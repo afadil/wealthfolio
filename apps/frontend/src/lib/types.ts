@@ -2016,6 +2016,7 @@ export interface RetirementOverview {
   progress: number;
   taxBucketBalances: TaxBucketBalances;
   budgetBreakdown: BudgetBreakdown;
+  targetReconciliation: TargetReconciliation;
   trajectory: RetirementTrajectoryPoint[];
   withdrawalPolicy?: string;
 }
@@ -2032,6 +2033,8 @@ export interface RetirementTrajectoryPoint {
   portfolioEnd: number;
   requiredCapital: number;
   pensionAssets: number;
+  annualTaxes?: number;
+  grossWithdrawal?: number;
   plannedExpenses?: number;
   fundedExpenses?: number;
   annualShortfall?: number;
@@ -2052,6 +2055,30 @@ export interface BudgetStreamItem {
   label: string;
   monthlyAmount: number;
   percentageOfBudget: number;
+}
+
+export interface TargetReconciliation {
+  targetAge: number;
+  inflationFactorToTarget: number;
+  plannedAnnualExpensesTodayValue: number;
+  plannedAnnualExpensesNominal: number;
+  annualIncomeTodayValue: number;
+  annualIncomeNominal: number;
+  netAnnualSpendingGapTodayValue: number;
+  netAnnualSpendingGapNominal: number;
+  grossAnnualPortfolioWithdrawalTodayValue: number;
+  grossAnnualPortfolioWithdrawalNominal: number;
+  estimatedAnnualTaxesTodayValue: number;
+  estimatedAnnualTaxesNominal: number;
+  requiredCapitalTodayValue: number;
+  requiredCapitalNominal: number;
+  portfolioAtTargetTodayValue: number;
+  portfolioAtTargetNominal: number;
+  shortfallTodayValue: number;
+  shortfallNominal: number;
+  preRetirementNetReturn: number;
+  retirementNetReturn: number;
+  annualInvestmentFeeRate: number;
 }
 
 export interface SaveUpOverviewDTO {

@@ -160,6 +160,34 @@ pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
         )
         .into());
     }
+    let i = &plan.investment;
+    let valid_return = |r: f64| (-0.20..=0.30).contains(&r);
+    if !valid_return(i.pre_retirement_annual_return) || !valid_return(i.retirement_annual_return) {
+        return Err(crate::errors::ValidationError::InvalidInput(
+            "Return assumptions must be between -20% and 30%".into(),
+        )
+        .into());
+    }
+    if !(0.0..=0.05).contains(&i.annual_investment_fee_rate) {
+        return Err(crate::errors::ValidationError::InvalidInput(
+            "Annual investment fee must be between 0% and 5%".into(),
+        )
+        .into());
+    }
+    if !(0.0..=0.50).contains(&i.annual_volatility) {
+        return Err(crate::errors::ValidationError::InvalidInput(
+            "Annual volatility must be between 0% and 50%".into(),
+        )
+        .into());
+    }
+    if i.pre_retirement_annual_return - i.annual_investment_fee_rate <= -0.99
+        || i.retirement_annual_return - i.annual_investment_fee_rate <= -0.99
+    {
+        return Err(crate::errors::ValidationError::InvalidInput(
+            "Return after fees must be greater than -99%".into(),
+        )
+        .into());
+    }
     if let Some(ref g) = w.guardrails {
         if g.floor_rate >= g.ceiling_rate {
             return Err(crate::errors::ValidationError::InvalidInput(

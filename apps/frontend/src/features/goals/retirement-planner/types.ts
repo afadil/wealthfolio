@@ -124,7 +124,7 @@ export interface SensitivitySWRMatrix {
 // ─── Retirement Plan Types ──────────────────────────────────────────────────
 
 export interface RetirementPlan {
-  version: "v2";
+  version: "v3";
   personal: PersonalProfile;
   expenses: ExpenseBudget;
   incomeStreams: RetirementIncomeStream[];
@@ -172,8 +172,10 @@ export interface RetirementIncomeStream {
 }
 
 export interface InvestmentAssumptions {
-  expectedAnnualReturn: number;
-  expectedReturnStdDev: number;
+  preRetirementAnnualReturn: number;
+  retirementAnnualReturn: number;
+  annualInvestmentFeeRate: number;
+  annualVolatility: number;
   inflationRate: number;
   monthlyContribution: number;
   contributionGrowthRate: number;

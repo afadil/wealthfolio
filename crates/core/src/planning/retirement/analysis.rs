@@ -40,8 +40,10 @@ pub fn run_monte_carlo_with_mode(
         plan.withdrawal.strategy,
         WithdrawalPolicy::ConstantPercentage
     );
-    let mean = plan.investment.expected_annual_return;
-    let std_dev = plan.investment.expected_return_std_dev;
+    let accumulation_mean = plan_accumulation_return(plan);
+    let retirement_mean = plan_retirement_return(plan);
+    let std_dev = plan.investment.annual_volatility;
+    let annual_fee_rate = plan.investment.annual_investment_fee_rate;
 
     // Clone fields needed inside the parallel closure
     let expenses_clone = plan.expenses.clone();
@@ -89,23 +91,25 @@ pub fn run_monte_carlo_with_mode(
 
                 if !in_fire {
                     let required = per_age_capitals[i as usize];
-                    if let Some(start_reason) =
-                        retirement_start_decision(mode, age, target_fire_age, portfolio, required)
+                    if sim_fi_age.is_none() && portfolio >= required {
+                        sim_fi_age = Some(age);
+                    }
+                    if retirement_start_decision(mode, age, target_fire_age, portfolio, required)
+                        .is_some()
                     {
                         in_fire = true;
                         sim_retirement_age = age;
                         portfolio_at_retirement_start = portfolio;
                         sim_resolved_payouts = Some(&per_age_payouts[i as usize]);
-                        if start_reason == RetirementStartReason::Funded {
-                            sim_fi_age = Some(age);
-                        }
                     }
                 }
 
                 // Glide-path-blended return distribution for this year
                 let (eff_mean, eff_std) = blended_return_params_mc(
-                    mean,
+                    accumulation_mean,
+                    retirement_mean,
                     std_dev,
+                    annual_fee_rate,
                     current_age,
                     sim_retirement_age,
                     planning_horizon_age,
@@ -255,7 +259,8 @@ pub fn run_scenario_analysis_with_mode(
         .iter()
         .map(|(label, delta)| {
             let mut adjusted = plan.clone();
-            adjusted.investment.expected_annual_return += delta;
+            adjusted.investment.pre_retirement_annual_return += delta;
+            adjusted.investment.retirement_annual_return += delta;
             let proj = project_retirement_with_mode(&adjusted, current_portfolio, mode);
             let portfolio_at_horizon = proj
                 .year_by_year
@@ -276,7 +281,7 @@ pub fn run_scenario_analysis_with_mode(
             };
             ScenarioResult {
                 label: label.to_string(),
-                annual_return: adjusted.investment.expected_annual_return,
+                annual_return: plan_accumulation_return(&adjusted),
                 fire_age: proj.fire_age,
                 portfolio_at_horizon,
                 funded_at_goal_age,
@@ -310,7 +315,7 @@ pub fn run_sorr(
         retirement_start_age,
         plan.withdrawal.safe_withdrawal_rate,
     );
-    let r = plan.investment.expected_annual_return;
+    let r = plan_retirement_return(plan);
     let years =
         (plan.personal.planning_horizon_age as i32 - retirement_start_age as i32).max(10) as usize;
     let years_to_fire =
@@ -461,7 +466,8 @@ pub fn run_sensitivity_analysis_with_mode(
                 .map(|&ret| {
                     let mut adjusted = plan.clone();
                     adjusted.investment.monthly_contribution = contribution;
-                    adjusted.investment.expected_annual_return = ret;
+                    adjusted.investment.pre_retirement_annual_return =
+                        ret + adjusted.investment.annual_investment_fee_rate;
                     project_retirement_with_mode(&adjusted, current_portfolio, mode).fire_age
                 })
                 .collect()
@@ -476,7 +482,10 @@ pub fn run_sensitivity_analysis_with_mode(
                 .map(|&ret| {
                     let mut adjusted = plan.clone();
                     adjusted.withdrawal.safe_withdrawal_rate = swr;
-                    adjusted.investment.expected_annual_return = ret;
+                    adjusted.investment.pre_retirement_annual_return =
+                        ret + adjusted.investment.annual_investment_fee_rate;
+                    adjusted.investment.retirement_annual_return =
+                        ret + adjusted.investment.annual_investment_fee_rate;
                     project_retirement_with_mode(&adjusted, current_portfolio, mode).fire_age
                 })
                 .collect()
@@ -558,8 +567,10 @@ mod tests {
             },
             income_streams: vec![],
             investment: InvestmentAssumptions {
-                expected_annual_return: 0.07,
-                expected_return_std_dev: 0.12,
+                pre_retirement_annual_return: 0.07,
+                retirement_annual_return: 0.07,
+                annual_investment_fee_rate: 0.0,
+                annual_volatility: 0.12,
                 inflation_rate: 0.02,
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,

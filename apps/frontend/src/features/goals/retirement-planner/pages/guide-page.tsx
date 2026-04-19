@@ -46,9 +46,9 @@ export default function GuidePage({ country }: { country?: string }) {
             money — inflation is handled automatically. Saving will also create a "FIRE" goal in
             your portfolio, visible on the main Dashboard.
           </Step>
-          <Step n={2} title="Set your monthly contribution and expected return">
-            Enter how much you invest each month and your expected annual portfolio return (7% is a
-            common long-term figure for a diversified equity portfolio). If you enter your annual
+          <Step n={2} title="Set contributions, returns, and fees">
+            Enter how much you invest each month, the expected return before retirement, the
+            expected return during retirement, and annual investment fees. If you enter your annual
             salary the planner shows your savings rate and can grow contributions with raises.
           </Step>
           <Step n={3} title="Add income streams (pension, part-time, annuity…)">
@@ -115,10 +115,10 @@ export default function GuidePage({ country }: { country?: string }) {
         <div className="space-y-4">
           <Term t="Monte Carlo (100,000 simulations)">
             Runs your plan 100,000 times using a two-regime fat-tailed return distribution: 85% of
-            years draw from a normal distribution centred on your expected return, 15% are stress
-            years with heavier downside. Inflation is stochastic per year. The fan chart shows
-            percentile bands P10–P90. Success rate = % of simulations where the portfolio survives
-            to your planning horizon. Aim for ≥ 90%.
+            years draw from a normal distribution centred on the phase-specific net return, 15% are
+            stress years with heavier downside. Inflation is stochastic per year. The fan chart
+            shows percentile bands P10–P90. Success rate = % of simulations where the portfolio
+            survives to your planning horizon. Aim for ≥ 90%.
           </Term>
           <Term t="Strategy Comparison">
             Compares constant-dollar withdrawal (fixed real amount each year) against
@@ -193,11 +193,10 @@ export default function GuidePage({ country }: { country?: string }) {
             The default 2% matches the ECB target.
             {isIT && " Use 2.5–3% for a more conservative Italian CPI assumption."}
           </Term>
-          <Term t="Expected return and volatility">
-            Expected return is the average annual growth of your portfolio. For a diversified global
-            equity portfolio, 6–8% (nominal) is a common long-term assumption. Volatility (std dev)
-            is used only in Monte Carlo — higher values produce a wider fan of outcomes. 12% is
-            typical for a mixed equity/bond portfolio.
+          <Term t="Returns, fees, and volatility">
+            Return before retirement drives accumulation. Return during retirement drives the
+            withdrawal phase and required capital. Annual investment fees are subtracted from both.
+            Volatility is used only in Monte Carlo — higher values produce a wider fan of outcomes.
           </Term>
           <Term t="Planning horizon age">
             How long the portfolio must last. The FIRE target and all simulations run to this age.
@@ -211,9 +210,9 @@ export default function GuidePage({ country }: { country?: string }) {
         <Section title="Italian FIRE setup (fondo pensione, TFR, INPS)">
           <div className="space-y-4">
             <Term t="Investment portfolio (Golden Butterfly, All-Weather…)">
-              This is your main portfolio — the value Wealthfolio tracks. Set your expected return
-              and monthly contribution here. It is the primary accumulation engine of your FIRE
-              plan.
+              This is your main portfolio — the value Wealthfolio tracks. Set your return
+              assumptions, fee drag, and monthly contribution here. It is the primary accumulation
+              engine of your FIRE plan.
             </Term>
             <Term t="Fondo pensione integrativo (supplementary pension fund)">
               Add it as an income stream and enable "Has accumulation fund". Enter the current fund

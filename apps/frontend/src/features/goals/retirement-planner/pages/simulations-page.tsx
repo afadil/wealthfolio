@@ -145,9 +145,19 @@ function MonteCarloSection({
         <div>
           <CardTitle className="text-sm">Monte Carlo Simulation</CardTitle>
           <p className="text-muted-foreground mt-1 text-xs">
-            100,000 simulations · fat-tailed two-regime returns (μ={" "}
-            {(plan.investment.expectedAnnualReturn * 100).toFixed(1)}%, σ={" "}
-            {(plan.investment.expectedReturnStdDev * 100).toFixed(1)}%) · stochastic inflation ·{" "}
+            100,000 simulations · fat-tailed two-regime returns (net μ{" "}
+            {(
+              (plan.investment.preRetirementAnnualReturn -
+                plan.investment.annualInvestmentFeeRate) *
+              100
+            ).toFixed(1)}
+            % before retirement /{" "}
+            {(
+              (plan.investment.retirementAnnualReturn - plan.investment.annualInvestmentFeeRate) *
+              100
+            ).toFixed(1)}
+            % during retirement, σ {(plan.investment.annualVolatility * 100).toFixed(1)}%) ·
+            stochastic inflation ·{" "}
             <span className="font-medium">
               {strategy === "constant-dollar"
                 ? "constant-dollar"
@@ -438,7 +448,7 @@ function ScenarioSection({
     <Card>
       <CardHeader>
         <CardTitle className="text-sm">Scenario Analysis</CardTitle>
-        <p className="text-muted-foreground text-xs">Same settings, three return assumptions</p>
+        <p className="text-muted-foreground text-xs">Same settings, three net return assumptions</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <p className="text-destructive py-2 text-sm">{error}</p>}
@@ -494,7 +504,7 @@ function ScenarioSection({
               <thead>
                 <tr className="text-muted-foreground border-b">
                   <th className="pb-2 text-left">Scenario</th>
-                  <th className="pb-2 text-right">Return</th>
+                  <th className="pb-2 text-right">Net return</th>
                   <th className="pb-2 text-right">FIRE Age</th>
                   <th className="pb-2 text-right">Portfolio at Horizon</th>
                 </tr>
@@ -777,7 +787,11 @@ function SensitivitySection({
     return Math.abs(contrib - plan.investment.monthlyContribution) < 1;
   }
   function isCurrentReturn(ret: number) {
-    return Math.abs(ret - plan.investment.expectedAnnualReturn) < 0.001;
+    return (
+      Math.abs(
+        ret - (plan.investment.preRetirementAnnualReturn - plan.investment.annualInvestmentFeeRate),
+      ) < 0.001
+    );
   }
 
   const { contribution, swr } = sensitivity ?? {};
@@ -787,7 +801,7 @@ function SensitivitySection({
       <CardHeader>
         <CardTitle className="text-sm">Sensitivity Analysis</CardTitle>
         <p className="text-muted-foreground text-xs">
-          FIRE age by monthly contribution × expected return.{" "}
+          FIRE age by monthly contribution × net return.{" "}
           <span className="text-blue-600">Blue = your settings.</span>
         </p>
       </CardHeader>

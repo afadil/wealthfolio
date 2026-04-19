@@ -3,6 +3,22 @@ use std::collections::HashMap;
 
 use crate::portfolio::fire::GlidepathSettings;
 
+fn default_pre_retirement_annual_return() -> f64 {
+    0.0577
+}
+
+fn default_retirement_annual_return() -> f64 {
+    0.0337
+}
+
+fn default_annual_investment_fee_rate() -> f64 {
+    0.006
+}
+
+fn default_annual_volatility() -> f64 {
+    0.12
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RetirementPlan {
@@ -89,8 +105,17 @@ pub enum StreamKind {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct InvestmentAssumptions {
-    pub expected_annual_return: f64,
-    pub expected_return_std_dev: f64,
+    #[serde(
+        alias = "expectedAnnualReturn",
+        default = "default_pre_retirement_annual_return"
+    )]
+    pub pre_retirement_annual_return: f64,
+    #[serde(default = "default_retirement_annual_return")]
+    pub retirement_annual_return: f64,
+    #[serde(default = "default_annual_investment_fee_rate")]
+    pub annual_investment_fee_rate: f64,
+    #[serde(alias = "expectedReturnStdDev", default = "default_annual_volatility")]
+    pub annual_volatility: f64,
     pub inflation_rate: f64,
     pub monthly_contribution: f64,
     pub contribution_growth_rate: f64,
