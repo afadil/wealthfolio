@@ -107,6 +107,22 @@ function getSymbolPlaceholder(provider: string): string {
   return PROVIDER_SYMBOL_HINTS[provider] ?? "e.g. AAPL";
 }
 
+function isResolvedByRequestedProvider(
+  resolvedProviderId: string | undefined,
+  requestedProvider: string | undefined,
+): boolean {
+  const requested = requestedProvider?.trim();
+  if (!requested) return true;
+  if (!resolvedProviderId) return false;
+
+  if (requested.startsWith("CUSTOM:")) {
+    const customProviderId = requested.slice("CUSTOM:".length);
+    return resolvedProviderId === `CUSTOM_SCRAPER:${customProviderId}`;
+  }
+
+  return resolvedProviderId === requested;
+}
+
 const EDIT_INSTRUMENT_TYPE_OPTIONS = [
   { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
   { value: "CRYPTO", label: "Cryptocurrency" },
@@ -300,6 +316,7 @@ function SymbolMappingRow({
   );
   // Track whether we are on the first render to avoid re-validating pre-loaded values.
   const isFirstRender = useRef(true);
+  const validationRequestSeq = useRef(0);
 
   const symbol = useWatch({
     control,
@@ -309,8 +326,22 @@ function SymbolMappingRow({
     control,
     name: `providerConfig.${index}.provider` as Path<AssetFormValues>,
   }) as string | undefined;
+  const instrumentType = useWatch({
+    control,
+    name: "instrumentType" as Path<AssetFormValues>,
+  }) as string | undefined;
+  const exchangeMic = useWatch({
+    control,
+    name: "instrumentExchangeMic" as Path<AssetFormValues>,
+  }) as string | undefined;
+  const quoteCcy = useWatch({
+    control,
+    name: "quoteCcy" as Path<AssetFormValues>,
+  }) as string | undefined;
 
   useEffect(() => {
+    const requestId = ++validationRequestSeq.current;
+
     // Skip validation on mount when the symbol is already known-good (loaded from DB).
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -319,30 +350,51 @@ function SymbolMappingRow({
       }
     }
 
-    if (!symbol?.trim()) {
+    const trimmedSymbol = symbol?.trim();
+    if (!trimmedSymbol) {
       setValidationStatus("idle");
       onValidationChange(fieldId, "idle");
       return;
     }
 
     setValidationStatus("idle");
+    const requestExchangeMic = normalizeMic(exchangeMic) || undefined;
+    const requestInstrumentType = instrumentType?.trim() || undefined;
+    const requestQuoteCcy = quoteCcy?.trim() || undefined;
+    const requestProvider = provider?.trim() || undefined;
 
     const timer = setTimeout(async () => {
+      if (validationRequestSeq.current !== requestId) return;
+
       setValidationStatus("loading");
       onValidationChange(fieldId, "idle");
       try {
-        const result = await resolveSymbolQuote(symbol.trim(), undefined, undefined, provider);
-        const status: SymbolValidationStatus = result?.price != null ? "valid" : "invalid";
+        const result = await resolveSymbolQuote(
+          trimmedSymbol,
+          requestExchangeMic,
+          requestInstrumentType,
+          requestProvider,
+          requestQuoteCcy,
+        );
+        if (validationRequestSeq.current !== requestId) return;
+
+        const status: SymbolValidationStatus =
+          result?.price != null &&
+          isResolvedByRequestedProvider(result.resolvedProviderId, requestProvider)
+            ? "valid"
+            : "invalid";
         setValidationStatus(status);
         onValidationChange(fieldId, status);
       } catch {
+        if (validationRequestSeq.current !== requestId) return;
+
         setValidationStatus("invalid");
         onValidationChange(fieldId, "invalid");
       }
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [symbol, provider, fieldId, onValidationChange]); // eslint-disable-line react-hooks/exhaustive-deps -- initialSymbol is intentionally captured at mount time only
+  }, [symbol, provider, instrumentType, exchangeMic, quoteCcy, fieldId, onValidationChange]); // eslint-disable-line react-hooks/exhaustive-deps -- initialSymbol is intentionally captured at mount time only
 
   return (
     <tr className="border-b last:border-b-0">
