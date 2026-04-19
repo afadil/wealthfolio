@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-use super::{DailyFxRateMap, DailyPortfolioValuation};
+use super::DailyFxRateMap;
 use crate::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 
 /// Controls the scope of a valuation history recalculation.
@@ -200,11 +200,11 @@ impl ValuationService {
         Ok(fx_rates_by_date)
     }
 
-    /// Aggregate per-account valuations into portfolio-level rows.
+    /// Aggregate per-account valuations into TOTAL rows in `daily_account_valuation`.
     ///
-    /// Instead of recalculating from lots, sums existing per-account
-    /// `daily_account_valuation` rows (converted to base currency via fx_rate_to_base)
-    /// and stores the result in `daily_portfolio_valuation`.
+    /// Sums existing per-account rows (converted to base currency via
+    /// fx_rate_to_base) and writes the portfolio total back into the same
+    /// table with `account_id = PORTFOLIO_TOTAL_ACCOUNT_ID`.
     async fn aggregate_portfolio_valuations(&self, mode: ValuationRecalcMode) -> CoreResult<()> {
         let start_time = Instant::now();
         let base_currency = self.base_currency.read().unwrap().clone();
@@ -214,19 +214,19 @@ impl ValuationService {
         match &mode {
             ValuationRecalcMode::Full => {
                 self.valuation_repository
-                    .delete_portfolio_valuations(None)
+                    .delete_valuations_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, None)
                     .await?;
             }
             ValuationRecalcMode::SinceDate(date) => {
                 self.valuation_repository
-                    .delete_portfolio_valuations(Some(*date))
+                    .delete_valuations_for_account(PORTFOLIO_TOTAL_ACCOUNT_ID, Some(*date))
                     .await?;
                 start_date = Some(*date);
             }
             ValuationRecalcMode::IncrementalFromLast => {
                 let last = self
                     .valuation_repository
-                    .load_latest_portfolio_valuation_date()?;
+                    .load_latest_valuation_date(PORTFOLIO_TOTAL_ACCOUNT_ID)?;
                 if let Some(d) = last {
                     start_date = Some(d);
                 }
@@ -284,7 +284,7 @@ impl ValuationService {
 
         if !portfolio_rows.is_empty() {
             self.valuation_repository
-                .save_portfolio_valuations(&portfolio_rows)
+                .save_valuations(&portfolio_rows)
                 .await?;
         }
 
@@ -312,11 +312,11 @@ pub(crate) fn aggregate_rows_with_transfer_netting(
     seed_cumulative: Decimal,
     base_currency: &str,
     calculated_at: chrono::DateTime<chrono::Utc>,
-) -> Vec<DailyPortfolioValuation> {
+) -> Vec<DailyAccountValuation> {
     let mut sorted_dates: Vec<NaiveDate> = by_date.keys().copied().collect();
     sorted_dates.sort();
 
-    let mut portfolio_rows: Vec<DailyPortfolioValuation> = Vec::with_capacity(sorted_dates.len());
+    let mut portfolio_rows: Vec<DailyAccountValuation> = Vec::with_capacity(sorted_dates.len());
     let mut cumulative_transfer_adjustment = seed_cumulative;
 
     for date in sorted_dates {
@@ -342,21 +342,22 @@ pub(crate) fn aggregate_rows_with_transfer_netting(
 
         contrib -= cumulative_transfer_adjustment;
 
-        let total_assets = cash + inv + alt;
+        let total_value = cash + inv + alt;
 
-        portfolio_rows.push(DailyPortfolioValuation {
-            id: format!("PORTFOLIO_{}", date),
+        portfolio_rows.push(DailyAccountValuation {
+            id: format!("{}_{}", PORTFOLIO_TOTAL_ACCOUNT_ID, date),
+            account_id: PORTFOLIO_TOTAL_ACCOUNT_ID.to_string(),
             valuation_date: date,
+            account_currency: base_currency.to_string(),
             base_currency: base_currency.to_string(),
+            fx_rate_to_base: Decimal::ONE,
             cash_balance: cash,
             investment_market_value: inv,
-            alternative_market_value: alt,
-            total_assets,
-            total_liabilities: Decimal::ZERO,
-            net_worth: total_assets,
+            total_value,
             cost_basis: cost,
             net_contribution: contrib,
             calculated_at,
+            alternative_market_value: alt,
         });
     }
 
@@ -721,17 +722,6 @@ impl ValuationServiceTrait for ValuationService {
             account_id, start_date_opt, end_date_opt
         );
 
-        // Portfolio-level: read from dedicated table, convert for frontend compat.
-        if account_id == PORTFOLIO_TOTAL_ACCOUNT_ID {
-            let portfolio_history = self
-                .valuation_repository
-                .get_portfolio_history(start_date_opt, end_date_opt)?;
-            return Ok(portfolio_history
-                .into_iter()
-                .map(|p| p.to_account_valuation())
-                .collect());
-        }
-
         self.valuation_repository.get_historical_valuations(
             account_id,
             start_date_opt,
@@ -744,26 +734,7 @@ impl ValuationServiceTrait for ValuationService {
         account_ids: &[String],
     ) -> CoreResult<Vec<DailyAccountValuation>> {
         debug!("Loading latest valuations for accounts: {:?}", account_ids);
-
-        // Split TOTAL from real accounts — TOTAL now lives in a separate table.
-        let has_total = account_ids
-            .iter()
-            .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID);
-        let real_ids: Vec<String> = account_ids
-            .iter()
-            .filter(|id| id.as_str() != PORTFOLIO_TOTAL_ACCOUNT_ID)
-            .cloned()
-            .collect();
-
-        let mut results = self.valuation_repository.get_latest_valuations(&real_ids)?;
-
-        if has_total {
-            if let Some(latest) = self.valuation_repository.get_latest_portfolio_valuation()? {
-                results.push(latest.to_account_valuation());
-            }
-        }
-
-        Ok(results)
+        self.valuation_repository.get_latest_valuations(account_ids)
     }
 
     fn get_valuations_on_date(
@@ -775,30 +746,8 @@ impl ValuationServiceTrait for ValuationService {
             "Loading valuations for accounts {:?} on date {}",
             account_ids, date
         );
-
-        let has_total = account_ids
-            .iter()
-            .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID);
-        let real_ids: Vec<String> = account_ids
-            .iter()
-            .filter(|id| id.as_str() != PORTFOLIO_TOTAL_ACCOUNT_ID)
-            .cloned()
-            .collect();
-
-        let mut results = self
-            .valuation_repository
-            .get_valuations_on_date(&real_ids, date)?;
-
-        if has_total {
-            let portfolio = self
-                .valuation_repository
-                .get_portfolio_history(Some(date), Some(date))?;
-            if let Some(val) = portfolio.first() {
-                results.push(val.to_account_valuation());
-            }
-        }
-
-        Ok(results)
+        self.valuation_repository
+            .get_valuations_on_date(account_ids, date)
     }
 
     fn get_accounts_with_negative_balance(

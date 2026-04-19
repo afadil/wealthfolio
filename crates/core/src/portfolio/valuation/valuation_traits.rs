@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 
-use super::{DailyAccountValuation, DailyPortfolioValuation, NegativeBalanceInfo};
+use super::{DailyAccountValuation, NegativeBalanceInfo};
 use crate::errors::Result;
 
 /// Repository trait for managing daily account valuations.
@@ -48,28 +48,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         account_ids: &[String],
     ) -> Result<Vec<NegativeBalanceInfo>>;
 
-    // ─── Portfolio-level methods (replaces TOTAL pseudo-account) ────────
-
-    /// Save portfolio-level valuation records.
-    async fn save_portfolio_valuations(&self, records: &[DailyPortfolioValuation]) -> Result<()>;
-
-    /// Get historical portfolio valuations within optional date range.
-    fn get_portfolio_history(
-        &self,
-        start_date: Option<NaiveDate>,
-        end_date: Option<NaiveDate>,
-    ) -> Result<Vec<DailyPortfolioValuation>>;
-
-    /// Get the latest portfolio valuation date.
-    fn load_latest_portfolio_valuation_date(&self) -> Result<Option<NaiveDate>>;
-
-    /// Get the single most recent portfolio valuation row, if any.
-    fn get_latest_portfolio_valuation(&self) -> Result<Option<DailyPortfolioValuation>>;
-
-    /// Delete portfolio valuations, optionally since a given date.
-    async fn delete_portfolio_valuations(&self, since_date: Option<NaiveDate>) -> Result<()>;
-
-    /// Get all per-account valuations (excluding TOTAL) within optional date range,
+    /// Get all per-account valuations (excluding the synthesized TOTAL row),
     /// for portfolio aggregation.
     fn get_all_account_valuations(
         &self,

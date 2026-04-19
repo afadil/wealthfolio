@@ -1070,35 +1070,6 @@ impl ValuationRepositoryTrait for MockValuationRepository {
         Ok(Vec::new())
     }
 
-    async fn save_portfolio_valuations(
-        &self,
-        _records: &[crate::portfolio::valuation::DailyPortfolioValuation],
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    fn get_portfolio_history(
-        &self,
-        _start_date: Option<NaiveDate>,
-        _end_date: Option<NaiveDate>,
-    ) -> Result<Vec<crate::portfolio::valuation::DailyPortfolioValuation>> {
-        Ok(Vec::new())
-    }
-
-    fn load_latest_portfolio_valuation_date(&self) -> Result<Option<NaiveDate>> {
-        Ok(None)
-    }
-
-    fn get_latest_portfolio_valuation(
-        &self,
-    ) -> Result<Option<crate::portfolio::valuation::DailyPortfolioValuation>> {
-        Ok(None)
-    }
-
-    async fn delete_portfolio_valuations(&self, _since_date: Option<NaiveDate>) -> Result<()> {
-        Ok(())
-    }
-
     fn get_all_account_valuations(
         &self,
         _start_date: Option<NaiveDate>,

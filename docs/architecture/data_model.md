@@ -105,11 +105,11 @@ Quote updates no longer trigger history replay.
 Eleven fixes that collapsed the four valuation paths onto the lots
 table and made liabilities explicit.
 
-- **`daily_portfolio_valuation`** is a new table that replaces the
-  `TOTAL` pseudo-account rows in `daily_account_valuation`. Portfolio
-  totals are aggregated per-account values rather than a separate
-  computation. Migration backfills and then deletes the old `TOTAL`
-  rows.
+- **Portfolio totals are aggregated**, not separately computed. The
+  TOTAL pseudo-account row in `daily_account_valuation` is regenerated
+  by summing per-account rows (with paired internal transfers netted
+  out) on every portfolio recalc, instead of running the full
+  recalc-from-lots pipeline a second time at portfolio scope.
 - **`alternative_market_value`** column on `daily_account_valuation`
   lets the Investments page filter out precious metals, property, and
   other non-tradable assets consistently in both header and account
@@ -177,7 +177,7 @@ The original five problems from §1:
 |---|---|
 | Positions stored as JSON blob | Resolved. Positions live in `lots` and `snapshot_positions`. JSON column remains vestigial for sync compatibility. |
 | No persistent lot tracking | Resolved. Materialized `lots` table with open/closed state, `original_quantity`, and activity-id links. |
-| Four inconsistent valuation paths | Resolved. Single read pipeline; `daily_portfolio_valuation` replaces the `TOTAL` pseudo-account. |
+| Four inconsistent valuation paths | Resolved. Single read pipeline; portfolio TOTAL row in `daily_account_valuation` is now aggregated from per-account rows instead of recomputed from lots. |
 | Liabilities as negative cash | Resolved. `assets.kind = LIABILITY`, optional `account_id` link. |
 | No tax classification | **Still open** — Phase D proposal follows. |
 

@@ -213,23 +213,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    daily_portfolio_valuation (id) {
-        id -> Text,
-        valuation_date -> Date,
-        base_currency -> Text,
-        cash_balance -> Text,
-        investment_market_value -> Text,
-        alternative_market_value -> Text,
-        total_assets -> Text,
-        total_liabilities -> Text,
-        net_worth -> Text,
-        cost_basis -> Text,
-        net_contribution -> Text,
-        calculated_at -> Text,
-    }
-}
-
-diesel::table! {
     goals (id) {
         id -> Text,
         title -> Text,
@@ -544,7 +527,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     contribution_limits,
     market_data_custom_providers,
     daily_account_valuation,
-    daily_portfolio_valuation,
     goals,
     goals_allocation,
     health_issue_dismissals,
