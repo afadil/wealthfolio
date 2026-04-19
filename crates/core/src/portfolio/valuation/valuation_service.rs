@@ -1,9 +1,12 @@
+use crate::accounts::AccountRepositoryTrait;
+use crate::activities::ActivityRepositoryTrait;
 use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error as CoreError, Result as CoreResult};
 use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
 use crate::lots::LotRepositoryTrait;
 use crate::portfolio::snapshot::{Position, SnapshotServiceTrait};
+use crate::portfolio::transfers;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
 use crate::portfolio::valuation::valuation_model::{DailyAccountValuation, NegativeBalanceInfo};
 use crate::portfolio::valuation::ValuationRepositoryTrait;
@@ -95,10 +98,13 @@ pub trait ValuationServiceTrait: Send + Sync {
 #[derive(Clone)]
 pub struct ValuationService {
     base_currency: Arc<RwLock<String>>,
+    timezone: Arc<RwLock<String>>,
     valuation_repository: Arc<dyn ValuationRepositoryTrait>,
     snapshot_service: Arc<dyn SnapshotServiceTrait>,
     lot_repository: Arc<dyn LotRepositoryTrait>,
     asset_repository: Arc<dyn AssetRepositoryTrait>,
+    account_repository: Arc<dyn AccountRepositoryTrait>,
+    activity_repository: Arc<dyn ActivityRepositoryTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     fx_service: Arc<dyn FxServiceTrait>,
 }
@@ -110,15 +116,46 @@ impl ValuationService {
         snapshot_service: Arc<dyn SnapshotServiceTrait>,
         lot_repository: Arc<dyn LotRepositoryTrait>,
         asset_repository: Arc<dyn AssetRepositoryTrait>,
+        account_repository: Arc<dyn AccountRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        quote_service: Arc<dyn QuoteServiceTrait>,
+        fx_service: Arc<dyn FxServiceTrait>,
+    ) -> Self {
+        Self::new_with_timezone(
+            base_currency,
+            Arc::new(RwLock::new(String::new())),
+            valuation_repository,
+            snapshot_service,
+            lot_repository,
+            asset_repository,
+            account_repository,
+            activity_repository,
+            quote_service,
+            fx_service,
+        )
+    }
+
+    pub fn new_with_timezone(
+        base_currency: Arc<RwLock<String>>,
+        timezone: Arc<RwLock<String>>,
+        valuation_repository: Arc<dyn ValuationRepositoryTrait>,
+        snapshot_service: Arc<dyn SnapshotServiceTrait>,
+        lot_repository: Arc<dyn LotRepositoryTrait>,
+        asset_repository: Arc<dyn AssetRepositoryTrait>,
+        account_repository: Arc<dyn AccountRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
         quote_service: Arc<dyn QuoteServiceTrait>,
         fx_service: Arc<dyn FxServiceTrait>,
     ) -> Self {
         Self {
             base_currency,
+            timezone,
             valuation_repository,
             snapshot_service,
             lot_repository,
             asset_repository,
+            account_repository,
+            activity_repository,
             quote_service,
             fx_service,
         }
@@ -206,46 +243,44 @@ impl ValuationService {
             by_date.entry(v.valuation_date).or_default().push(v);
         }
 
-        // Aggregate into portfolio rows
-        let mut portfolio_rows: Vec<DailyPortfolioValuation> = Vec::new();
-        let now = chrono::Utc::now();
+        // Per-account net_contribution treats paired internal transfers as
+        // external (deposit on TRANSFER_IN, withdrawal on TRANSFER_OUT).
+        // At the portfolio level those legs must cancel; compute the per-date
+        // adjustments and accumulate them into a running total so the
+        // cumulative amount can be subtracted from each date's contribution.
+        let timezone = self.timezone.read().unwrap().clone();
+        let non_archived_accounts = self.account_repository.list(None, Some(false), None)?;
+        let account_ids: Vec<String> = non_archived_accounts
+            .iter()
+            .filter(|a| a.id != PORTFOLIO_TOTAL_ACCOUNT_ID)
+            .map(|a| a.id.clone())
+            .collect();
+        let transfer_adjustments_by_date = transfers::internal_transfer_adjustments_by_date_base(
+            self.activity_repository.as_ref(),
+            self.fx_service.as_ref(),
+            &account_ids,
+            &base_currency,
+            &timezone,
+        )?;
 
-        for (date, vals) in &by_date {
-            let mut cash = Decimal::ZERO;
-            let mut inv = Decimal::ZERO;
-            let mut alt = Decimal::ZERO;
-            let mut cost = Decimal::ZERO;
-            let mut contrib = Decimal::ZERO;
-
-            for v in vals {
-                let fx = v.fx_rate_to_base;
-                cash += v.cash_balance * fx;
-                inv += v.investment_market_value * fx;
-                alt += v.alternative_market_value * fx;
-                cost += v.cost_basis * fx;
-                contrib += v.net_contribution * fx;
+        // Seed cumulative adjustment with all transfers strictly before the
+        // first date being processed (incremental modes only).
+        let mut cumulative_transfer_adjustment = Decimal::ZERO;
+        if let Some(start) = start_date {
+            for (date, adj) in &transfer_adjustments_by_date {
+                if *date < start {
+                    cumulative_transfer_adjustment += *adj;
+                }
             }
-
-            let total_assets = cash + inv + alt;
-
-            portfolio_rows.push(DailyPortfolioValuation {
-                id: format!("PORTFOLIO_{}", date),
-                valuation_date: *date,
-                base_currency: base_currency.clone(),
-                cash_balance: cash,
-                investment_market_value: inv,
-                alternative_market_value: alt,
-                total_assets,
-                total_liabilities: Decimal::ZERO,
-                net_worth: total_assets,
-                cost_basis: cost,
-                net_contribution: contrib,
-                calculated_at: now,
-            });
         }
 
-        // Sort by date before saving
-        portfolio_rows.sort_by_key(|r| r.valuation_date);
+        let portfolio_rows = aggregate_rows_with_transfer_netting(
+            by_date,
+            &transfer_adjustments_by_date,
+            cumulative_transfer_adjustment,
+            &base_currency,
+            chrono::Utc::now(),
+        );
 
         if !portfolio_rows.is_empty() {
             self.valuation_repository
@@ -261,6 +296,71 @@ impl ValuationService {
 
         Ok(())
     }
+}
+
+/// Sums per-account valuations into portfolio rows, subtracting the cumulative
+/// internal-transfer adjustment from each date's net_contribution.
+///
+/// `seed_cumulative` is the running adjustment total from all transfer dates
+/// strictly before the first date in `by_date` (non-zero only in incremental
+/// modes). Within the loop the cumulative is advanced **before** subtracting
+/// so a transfer on date D is netted out of date D's contribution — matching
+/// the merged-snapshot pipeline's semantics.
+pub(crate) fn aggregate_rows_with_transfer_netting(
+    by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>>,
+    transfer_adjustments_by_date: &HashMap<NaiveDate, Decimal>,
+    seed_cumulative: Decimal,
+    base_currency: &str,
+    calculated_at: chrono::DateTime<chrono::Utc>,
+) -> Vec<DailyPortfolioValuation> {
+    let mut sorted_dates: Vec<NaiveDate> = by_date.keys().copied().collect();
+    sorted_dates.sort();
+
+    let mut portfolio_rows: Vec<DailyPortfolioValuation> = Vec::with_capacity(sorted_dates.len());
+    let mut cumulative_transfer_adjustment = seed_cumulative;
+
+    for date in sorted_dates {
+        if let Some(adj) = transfer_adjustments_by_date.get(&date) {
+            cumulative_transfer_adjustment += *adj;
+        }
+
+        let vals = &by_date[&date];
+        let mut cash = Decimal::ZERO;
+        let mut inv = Decimal::ZERO;
+        let mut alt = Decimal::ZERO;
+        let mut cost = Decimal::ZERO;
+        let mut contrib = Decimal::ZERO;
+
+        for v in vals {
+            let fx = v.fx_rate_to_base;
+            cash += v.cash_balance * fx;
+            inv += v.investment_market_value * fx;
+            alt += v.alternative_market_value * fx;
+            cost += v.cost_basis * fx;
+            contrib += v.net_contribution * fx;
+        }
+
+        contrib -= cumulative_transfer_adjustment;
+
+        let total_assets = cash + inv + alt;
+
+        portfolio_rows.push(DailyPortfolioValuation {
+            id: format!("PORTFOLIO_{}", date),
+            valuation_date: date,
+            base_currency: base_currency.to_string(),
+            cash_balance: cash,
+            investment_market_value: inv,
+            alternative_market_value: alt,
+            total_assets,
+            total_liabilities: Decimal::ZERO,
+            net_worth: total_assets,
+            cost_basis: cost,
+            net_contribution: contrib,
+            calculated_at,
+        });
+    }
+
+    portfolio_rows
 }
 
 #[async_trait]
@@ -707,5 +807,195 @@ impl ValuationServiceTrait for ValuationService {
     ) -> CoreResult<Vec<NegativeBalanceInfo>> {
         self.valuation_repository
             .get_accounts_with_negative_balance(account_ids)
+    }
+}
+
+#[cfg(test)]
+mod aggregator_tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use rust_decimal_macros::dec;
+
+    fn val(account_id: &str, date: NaiveDate, contrib: Decimal, fx: Decimal) -> DailyAccountValuation {
+        DailyAccountValuation {
+            id: format!("{}_{}", account_id, date),
+            account_id: account_id.to_string(),
+            valuation_date: date,
+            account_currency: "USD".to_string(),
+            base_currency: "USD".to_string(),
+            fx_rate_to_base: fx,
+            cash_balance: Decimal::ZERO,
+            investment_market_value: Decimal::ZERO,
+            total_value: Decimal::ZERO,
+            cost_basis: Decimal::ZERO,
+            net_contribution: contrib,
+            calculated_at: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+            alternative_market_value: Decimal::ZERO,
+        }
+    }
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    #[test]
+    fn no_transfers_means_naive_sum() {
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 1, 10), vec![
+            val("A", d(2026, 1, 10), dec!(1000), Decimal::ONE),
+            val("B", d(2026, 1, 10), dec!(500), Decimal::ONE),
+        ]);
+        let adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].net_contribution, dec!(1500));
+    }
+
+    #[test]
+    fn paired_transfer_on_same_day_nets_to_zero() {
+        // Same-currency, same-day paired transfer: helper emits 0 net for that
+        // date, aggregator should match the naive sum (no over-correction).
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 1, 1), vec![
+            val("A", d(2026, 1, 1), dec!(1000), Decimal::ONE),
+            val("B", d(2026, 1, 1), dec!(0), Decimal::ONE),
+        ]);
+        by_date.insert(d(2026, 1, 2), vec![
+            val("A", d(2026, 1, 2), dec!(700), Decimal::ONE),
+            val("B", d(2026, 1, 2), dec!(300), Decimal::ONE),
+        ]);
+
+        // Helper output for a paired same-day transfer: net 0 on that date.
+        let mut adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+        adjustments.insert(d(2026, 1, 2), Decimal::ZERO);
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].net_contribution, dec!(1000));
+        assert_eq!(rows[1].net_contribution, dec!(1000));
+    }
+
+    #[test]
+    fn unpaired_transfer_is_not_netted() {
+        // Helper only emits adjustments for paired source_group_id entries,
+        // so an unpaired TRANSFER_IN (e.g. from an archived counterparty) is
+        // treated as a genuine external contribution.
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 1, 1), vec![
+            val("A", d(2026, 1, 1), dec!(500), Decimal::ONE),
+        ]);
+        let adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows[0].net_contribution, dec!(500));
+    }
+
+    #[test]
+    fn cumulative_advances_across_dates() {
+        // Day 2 adjustment +50, day 4 adjustment -20. Cumulative subtracted
+        // each day: 0, 50, 50, 30.
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        for (day, c) in [(1, dec!(100)), (2, dec!(200)), (3, dec!(300)), (4, dec!(400))] {
+            by_date.insert(d(2026, 1, day), vec![
+                val("A", d(2026, 1, day), c, Decimal::ONE),
+            ]);
+        }
+        let mut adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+        adjustments.insert(d(2026, 1, 2), dec!(50));
+        adjustments.insert(d(2026, 1, 4), dec!(-20));
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows[0].net_contribution, dec!(100));
+        assert_eq!(rows[1].net_contribution, dec!(150));
+        assert_eq!(rows[2].net_contribution, dec!(250));
+        assert_eq!(rows[3].net_contribution, dec!(370));
+    }
+
+    #[test]
+    fn seed_cumulative_applied_in_incremental_mode() {
+        // Caller seeds cumulative=80 (from pre-start_date transfers).
+        // Day 5: no new adjustment, cumulative stays 80.
+        // Day 6: +25 adjustment, cumulative becomes 105.
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 2, 5), vec![
+            val("A", d(2026, 2, 5), dec!(1000), Decimal::ONE),
+        ]);
+        by_date.insert(d(2026, 2, 6), vec![
+            val("A", d(2026, 2, 6), dec!(1100), Decimal::ONE),
+        ]);
+        let mut adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+        adjustments.insert(d(2026, 2, 6), dec!(25));
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, dec!(80), "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows[0].net_contribution, dec!(920));
+        assert_eq!(rows[1].net_contribution, dec!(995));
+    }
+
+    #[test]
+    fn fx_applied_to_per_account_contribution() {
+        // A is a EUR account with contrib 1000 EUR and fx_rate_to_base = 1.10.
+        // Naive base sum = 1100.
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 3, 1), vec![
+            val("A", d(2026, 3, 1), dec!(1000), dec!(1.10)),
+        ]);
+        let adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows[0].net_contribution, dec!(1100.00));
+    }
+
+    #[test]
+    fn empty_input_yields_empty_output() {
+        let by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        let adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn rows_sorted_by_date() {
+        let mut by_date: HashMap<NaiveDate, Vec<DailyAccountValuation>> = HashMap::new();
+        by_date.insert(d(2026, 1, 3), vec![val("A", d(2026, 1, 3), dec!(3), Decimal::ONE)]);
+        by_date.insert(d(2026, 1, 1), vec![val("A", d(2026, 1, 1), dec!(1), Decimal::ONE)]);
+        by_date.insert(d(2026, 1, 2), vec![val("A", d(2026, 1, 2), dec!(2), Decimal::ONE)]);
+        let adjustments: HashMap<NaiveDate, Decimal> = HashMap::new();
+
+        let rows = aggregate_rows_with_transfer_netting(
+            by_date, &adjustments, Decimal::ZERO, "USD",
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        );
+
+        assert_eq!(rows[0].valuation_date, d(2026, 1, 1));
+        assert_eq!(rows[1].valuation_date, d(2026, 1, 2));
+        assert_eq!(rows[2].valuation_date, d(2026, 1, 3));
     }
 }

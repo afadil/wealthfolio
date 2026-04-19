@@ -222,12 +222,15 @@ pub async fn initialize_context(
         timezone.clone(),
     ));
 
-    let valuation_service = Arc::new(ValuationService::new(
+    let valuation_service = Arc::new(ValuationService::new_with_timezone(
         base_currency.clone(),
+        timezone.clone(),
         valuation_repository.clone(),
         snapshot_service.clone(),
         lots_repository.clone(),
         asset_repository.clone(),
+        account_repository.clone(),
+        activity_repository.clone(),
         quote_service.clone(),
         fx_service.clone(),
     ));
