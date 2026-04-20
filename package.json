@@ -16,6 +16,7 @@
     "build": "pnpm --filter frontend build",
     "build:tauri": "pnpm --filter frontend build:tauri",
     "build:types": "pnpm -r run build:types",
+    "hooks:install": "git config core.hooksPath .githooks",
     "build:addons": "pnpm -r --filter './addons/*' build",
     "bundle:addons": "pnpm -r --filter './addons/*' bundle",
     "preview": "pnpm --filter frontend preview",

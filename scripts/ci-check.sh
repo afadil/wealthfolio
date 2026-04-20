@@ -1,98 +1,156 @@
 #!/usr/bin/env bash
-# ci-check.sh — mirrors CI checks before git commit/push
+# Run local CI checks before commit/push.
 # Usage:
 #   bash scripts/ci-check.sh           # fast checks (commit mode)
-#   bash scripts/ci-check.sh --full    # + cargo test + pnpm test (push mode)
-#
-# Reads hook JSON from stdin (Claude Code PreToolUse format).
-# Outputs {"decision":"block","reason":"..."} on failure.
+#   bash scripts/ci-check.sh --full    # full PR CI checks (push mode)
 
 set -euo pipefail
 
 FULL=false
 if [[ "${1:-}" == "--full" ]]; then
   FULL=true
+  shift
 fi
 
-REPO_ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
+if [[ "$#" -ne 0 ]]; then
+  echo "Usage: scripts/ci-check.sh [--full]" >&2
+  exit 2
+fi
+
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")/.." rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-# ── Determine changed files ──────────────────────────────────────────────────
-# Commit mode: check staged files. Push mode: check branch diff vs main.
-if [[ "$FULL" == "false" ]]; then
-  CHANGED=$(git diff --cached --name-only 2>/dev/null || true)
-else
-  BASE=$(git merge-base HEAD main 2>/dev/null || echo "HEAD~1")
-  CHANGED=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || true)
-fi
+changed_files() {
+  if [[ "$FULL" == "false" ]]; then
+    git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true
+    return
+  fi
 
-HAS_RUST=$(echo "$CHANGED" | grep -qE '\.rs$' && echo "true" || echo "false")
-HAS_FRONTEND=$(echo "$CHANGED" | grep -qE '\.(ts|tsx|js|jsx|css)$' && echo "true" || echo "false")
+  local base=""
+  if git rev-parse --verify --quiet "@{upstream}" >/dev/null; then
+    base="$(git merge-base HEAD "@{upstream}")"
+  elif git rev-parse --verify --quiet origin/main >/dev/null; then
+    base="$(git merge-base HEAD origin/main)"
+  elif git rev-parse --verify --quiet main >/dev/null; then
+    base="$(git merge-base HEAD main)"
+  fi
 
-# Nothing relevant changed
-if [[ "$HAS_RUST" == "false" && "$HAS_FRONTEND" == "false" ]]; then
+  if [[ -n "$base" ]]; then
+    git diff --name-only --diff-filter=ACMR "$base"...HEAD 2>/dev/null || true
+  else
+    git diff --name-only --diff-filter=ACMR HEAD~1...HEAD 2>/dev/null || true
+  fi
+}
+
+is_docs_only_file() {
+  case "$1" in
+    *.md|*.mdx|*.txt|LICENSE|CLA.md|TRADEMARKS.md|docs/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+CHANGED="$(changed_files)"
+
+if [[ -z "$CHANGED" ]]; then
   exit 0
 fi
 
-# ── Helper: block the hook ───────────────────────────────────────────────────
-block() {
-  local reason="$1"
-  echo '{"decision":"block","reason":"'"$reason"'"}'
-  exit 0  # exit 0 so Claude reads the JSON output; decision:block does the blocking
-}
+RUN_RUST=false
+RUN_FRONTEND=false
+HAS_NON_DOC=false
 
-# ── Rust checks ──────────────────────────────────────────────────────────────
-if [[ "$HAS_RUST" == "true" ]]; then
-  # Tauri build context prerequisite
+while IFS= read -r file; do
+  [[ -z "$file" ]] && continue
+
+  if ! is_docs_only_file "$file"; then
+    HAS_NON_DOC=true
+  fi
+
+  case "$file" in
+    *.rs|Cargo.toml|Cargo.lock|rust-toolchain*|.cargo/*)
+      RUN_RUST=true
+      ;;
+    crates/*/Cargo.toml|apps/*/Cargo.toml)
+      RUN_RUST=true
+      ;;
+    *.ts|*.tsx|*.js|*.jsx|*.css|*.mjs|*.cjs|*.json)
+      RUN_FRONTEND=true
+      ;;
+    package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig*.json)
+      RUN_FRONTEND=true
+      ;;
+    vite.config.*|eslint.config.*|prettier.config.*)
+      RUN_FRONTEND=true
+      ;;
+    postcss.config.*|tailwind.config.*)
+      RUN_FRONTEND=true
+      ;;
+    apps/frontend/*|packages/*/package.json|addons/*/package.json)
+      RUN_FRONTEND=true
+      ;;
+    .github/workflows/pr-check.yml|scripts/ci-check.sh)
+      RUN_RUST=true
+      RUN_FRONTEND=true
+      ;;
+  esac
+done <<< "$CHANGED"
+
+if [[ "$FULL" == "true" && "$HAS_NON_DOC" == "true" ]]; then
+  RUN_RUST=true
+  RUN_FRONTEND=true
+fi
+
+if [[ "$RUN_RUST" == "false" && "$RUN_FRONTEND" == "false" ]]; then
+  exit 0
+fi
+
+ensure_tauri_dist() {
   if [[ ! -f dist/index.html ]]; then
     mkdir -p dist
     echo '<!DOCTYPE html><html><head></head><body></body></html>' > dist/index.html
   fi
+}
+
+if [[ "$RUN_RUST" == "true" ]]; then
+  ensure_tauri_dist
 
   echo "=== cargo fmt ===" >&2
-  if ! cargo fmt --all -- --check 2>&1; then
-    block "cargo fmt failed — run 'cargo fmt --all' to fix"
-  fi
+  cargo fmt --all -- --check
 
   echo "=== cargo clippy ===" >&2
-  if ! cargo clippy --workspace --all-targets --all-features -- -D warnings 2>&1; then
-    block "cargo clippy failed — fix warnings above before committing"
-  fi
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   if [[ "$FULL" == "true" ]]; then
     echo "=== cargo test ===" >&2
-    if ! CONNECT_API_URL=http://test.local cargo test --workspace 2>&1; then
-      block "cargo test failed — fix failing tests before pushing"
-    fi
+    CONNECT_API_URL=http://test.local cargo test --workspace
+
+    echo "=== cargo build (wealthfolio-server) ===" >&2
+    cargo build -p wealthfolio-server --release
   fi
 fi
 
-# ── Frontend checks ──────────────────────────────────────────────────────────
-if [[ "$HAS_FRONTEND" == "true" ]]; then
+if [[ "$RUN_FRONTEND" == "true" ]]; then
   echo "=== pnpm build:types ===" >&2
-  if ! pnpm run build:types 2>&1; then
-    block "pnpm build:types failed"
-  fi
+  pnpm run build:types
 
   echo "=== pnpm format:check ===" >&2
-  if ! pnpm format:check 2>&1; then
-    block "pnpm format:check failed — run 'pnpm format' to fix"
-  fi
+  pnpm format:check
 
   echo "=== pnpm lint ===" >&2
-  if ! pnpm lint 2>&1; then
-    block "pnpm lint failed — fix lint errors above before committing"
-  fi
+  pnpm lint
 
   echo "=== pnpm type-check ===" >&2
-  if ! pnpm type-check 2>&1; then
-    block "pnpm type-check failed — fix type errors above before committing"
-  fi
+  pnpm type-check
 
   if [[ "$FULL" == "true" ]]; then
     echo "=== pnpm test ===" >&2
-    if ! pnpm test 2>&1; then
-      block "pnpm test failed — fix failing tests before pushing"
-    fi
+    pnpm test
+
+    echo "=== pnpm build ===" >&2
+    pnpm build
   fi
 fi
