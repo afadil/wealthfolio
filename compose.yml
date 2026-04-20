@@ -25,8 +25,9 @@ services:
       # Required when listening on 0.0.0.0 (the default for Docker).
       # Provide an Argon2id PHC hash of your password.
       #
-      # IMPORTANT — the hash contains "$" signs that need escaping:
-      #   .env file  → WF_AUTH_PASSWORD_HASH=$argon2id$v=19$...  (no quotes, no escaping)
+      # IMPORTANT — Docker Compose interpolates "$" in .env files and YAML:
+      #   .env file  → WF_AUTH_PASSWORD_HASH='$argon2id$v=19$...'  (single quotes)
+      #   .env file  → WF_AUTH_PASSWORD_HASH=$$argon2id$$v=19$$...  (double every $)
       #   YAML inline → WF_AUTH_PASSWORD_HASH: '$$argon2id$$v=19$$...'  (double every $)
       #
       # Generate a hash:

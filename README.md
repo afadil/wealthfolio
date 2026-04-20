@@ -280,19 +280,22 @@ All configuration is done via environment variables in `.env.web`.
   > - The first argument is the **salt** (use 16+ characters); the password is
   >   read from stdin.
   > - Use `printf` instead of `echo -n` to avoid hidden newline issues.
-  > - For Docker Compose, double every `$` in the hash (`$$argon2id$$...`).
+  > - For Docker Compose `.env` / `--env-file`, single-quote the hash or double
+  >   every `$` (`$$argon2id$$...`).
 
   Copy the full output (starting with `$argon2id$...`) into `.env.web`.
 
   **Dollar-sign (`$`) escaping cheat-sheet** — Argon2 hashes contain `$`
   characters that shells and Compose interpret as variable references:
 
-  | Context                      | Syntax                                | Notes                                            |
-  | ---------------------------- | ------------------------------------- | ------------------------------------------------ |
-  | `.env` file                  | `WF_AUTH_PASSWORD_HASH=$argon2id$...` | No quotes, no escaping needed                    |
-  | Docker Compose YAML inline   | `HASH: '$$argon2id$$v=19$$...'`       | Double every `$` to escape Compose interpolation |
-  | `docker run` (single quotes) | `-e HASH='$argon2id$...'`             | Single quotes prevent shell expansion            |
-  | `docker run` (double quotes) | `-e HASH="\$argon2id\$..."`           | Backslash-escape each `$`                        |
+  | Context                            | Syntax                                  | Notes                                            |
+  | ---------------------------------- | --------------------------------------- | ------------------------------------------------ |
+  | `.env.web` / app-loaded dotenv     | `WF_AUTH_PASSWORD_HASH=$argon2id$...`   | Loaded by the app; no Compose interpolation      |
+  | Docker Compose `.env`/`--env-file` | `WF_AUTH_PASSWORD_HASH='$argon2id$...'` | Single quotes prevent Compose interpolation      |
+  | Docker Compose `.env`/`--env-file` | `WF_AUTH_PASSWORD_HASH=$$argon2id$$...` | Alternative: double every `$`                    |
+  | Docker Compose YAML inline         | `HASH: '$$argon2id$$v=19$$...'`         | Double every `$` to escape Compose interpolation |
+  | `docker run` (single quotes)       | `-e HASH='$argon2id$...'`               | Single quotes prevent shell expansion            |
+  | `docker run` (double quotes)       | `-e HASH="\$argon2id\$..."`             | Backslash-escape each `$`                        |
 
 - Sessions are cookie-based (`HttpOnly`, `SameSite=Lax`, `Path=/api`). The login
   endpoint sets the session cookie automatically — no token is exposed to
