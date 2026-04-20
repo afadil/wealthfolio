@@ -105,7 +105,8 @@ impl Config {
                      \n\
                      1. Set WF_AUTH_PASSWORD_HASH to an Argon2id hash of your password.\n\
                         Generate one with: printf 'your-password' | argon2 yoursalt16chars! -id -e\n\
-                        In a .env file, no escaping is needed.\n\
+                        In app-loaded dotenv files, use the hash as-is.\n\
+                        In Docker Compose .env/--env-file, single-quote it or double every $ sign.\n\
                         In Docker Compose YAML, double every $ sign: '$$argon2id$$v=19$$...'\n\
                      \n\
                      2. Set WF_AUTH_REQUIRED=false if a reverse proxy handles authentication."

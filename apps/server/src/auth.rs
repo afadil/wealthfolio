@@ -106,8 +106,8 @@ impl AuthManager {
             anyhow::anyhow!(
                 "Failed to parse WF_AUTH_PASSWORD_HASH: {e}. \
                  The hash must be a valid Argon2id PHC string starting with '$argon2id$'. \
-                 If using Docker Compose YAML, double every '$' (e.g. '$$argon2id$$v=19$$...'). \
-                 If using a .env file, no escaping is needed."
+                 If using Docker Compose .env/--env-file, single-quote it or double every '$'. \
+                 If using Docker Compose YAML, double every '$' (e.g. '$$argon2id$$v=19$$...')."
             )
         })?;
         let encoding_key = EncodingKey::from_secret(&config.jwt_secret);

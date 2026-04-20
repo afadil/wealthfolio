@@ -30,7 +30,8 @@ Key environment variables
   ```
   The first argument is the **salt** (use 16+ characters); the password is read from stdin.
   Use `printf` instead of `echo -n` to avoid hidden newline issues.
-  For Docker Compose, double every `$` in the hash (`$$argon2id$$...`).
+  For Docker Compose `.env`/`--env-file`, single-quote the value or double every `$`;
+  for YAML inline values, double every `$` in the hash (`$$argon2id$$...`).
   When unset, authentication is disabled.
 - `WF_AUTH_TOKEN_TTL_MINUTES`: Optional JWT access token lifetime (minutes). Defaults to `60`.
 - `WF_SECRET_FILE`: Optional override for where encrypted secrets are stored. Defaults to `<data-root>/secrets.json`.
