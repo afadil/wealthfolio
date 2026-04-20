@@ -65,6 +65,7 @@ export const ActivityTableMobile = ({
         const isCash = isTransferActivity
           ? isCashTransfer(activityType, symbol, activity.assetId)
           : isCashActivity(activityType) && !isAssetBackedIncome;
+        const hasAsset = Boolean(activity.assetId?.trim());
         const isOptionActivity = activity.instrumentType === "OPTION";
         const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
         const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
