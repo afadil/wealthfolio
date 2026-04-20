@@ -494,6 +494,7 @@ function ConnectionItem({
   const logoUrl =
     connection.brokerage?.aws_s3_square_logo_url ?? connection.brokerage?.aws_s3_logo_url;
   const isConnected = connection.status === "connected" && !connection.disabled;
+  const syncSummary = getConnectionSyncSummary(syncEnabledCount, totalAccountCount);
 
   return (
     <div className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3">
@@ -505,10 +506,7 @@ function ConnectionItem({
       </Avatar>
       <div className="min-w-0 flex-1">
         <span className="truncate text-sm font-medium">{name}</span>
-        <p className="text-muted-foreground text-xs">
-          {syncEnabledCount} of {totalAccountCount}{" "}
-          {totalAccountCount === 1 ? "account" : "accounts"} syncing
-        </p>
+        <p className="text-muted-foreground text-xs">{syncSummary}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Badge
@@ -533,6 +531,25 @@ function ConnectionItem({
       </div>
     </div>
   );
+}
+
+function getConnectionSyncSummary(syncEnabledCount: number, totalAccountCount: number): string {
+  if (totalAccountCount === 0) {
+    return "No accounts found";
+  }
+
+  if (syncEnabledCount === 0) {
+    return "All accounts excluded";
+  }
+
+  const accountLabel = totalAccountCount === 1 ? "account" : "accounts";
+  if (syncEnabledCount === totalAccountCount) {
+    return `${totalAccountCount} ${accountLabel} syncing`;
+  }
+
+  const excludedCount = totalAccountCount - syncEnabledCount;
+  const excludedLabel = excludedCount === 1 ? "account excluded" : "accounts excluded";
+  return `${syncEnabledCount} of ${totalAccountCount} ${accountLabel} syncing · ${excludedCount} ${excludedLabel}`;
 }
 
 function DeviceSyncStatusBadge({

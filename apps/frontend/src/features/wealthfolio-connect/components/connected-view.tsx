@@ -178,7 +178,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
                 )}
               </TooltipTrigger>
               <TooltipContent>
-                {account.sync_enabled ? "Sync enabled" : "Sync disabled"}
+                {account.sync_enabled ? "Sync enabled" : "Excluded from sync"}
               </TooltipContent>
             </Tooltip>
           </div>
