@@ -210,6 +210,78 @@ describe("Activity Utilities", () => {
 
       expect(calculateActivityValue(transferOut)).toBe(1010);
     });
+
+    it("treats blank-asset transfers as cash and uses amount", () => {
+      const transferIn = createActivity({
+        activityType: ActivityType.TRANSFER_IN,
+        assetSymbol: "",
+        assetId: "",
+        quantity: "0",
+        unitPrice: "0",
+        amount: "500",
+        fee: "0",
+      });
+
+      expect(calculateActivityValue(transferIn)).toBe(500);
+    });
+
+    it("treats broker cash placeholders ($CASH-EUR, CASH-GBP, CASH_GBP) as cash and uses amount", () => {
+      const placeholders = ["$CASH-EUR", "CASH-GBP", "CASH_GBP", "$CASH_CAD"];
+      for (const symbol of placeholders) {
+        const transferIn = createActivity({
+          activityType: ActivityType.TRANSFER_IN,
+          assetSymbol: symbol,
+          assetId: symbol,
+          quantity: "0",
+          unitPrice: "0",
+          amount: "750",
+          fee: "0",
+        });
+        expect(calculateActivityValue(transferIn)).toBe(750);
+      }
+    });
+
+    it("preserves amount for securities transfers missing unitPrice (legacy imports)", () => {
+      const transferIn = createActivity({
+        activityType: ActivityType.TRANSFER_IN,
+        assetSymbol: "AAPL",
+        assetId: "AAPL",
+        quantity: "10",
+        unitPrice: "0",
+        amount: "1500",
+        fee: "0",
+      });
+
+      expect(calculateActivityValue(transferIn)).toBe(1500);
+    });
+
+    it("should calculate securities transfer value from qty × unitPrice, not amount", () => {
+      // Simulates a real DB row where `amount` is stale/corrupted but
+      // quantity and unitPrice are correct. For securities transfers the
+      // activity value must derive from qty × unitPrice, NOT the amount field.
+      const transferIn = createActivity({
+        activityType: ActivityType.TRANSFER_IN,
+        assetSymbol: "FWIA",
+        quantity: "2078",
+        unitPrice: "7.29",
+        amount: "31478832.36", // bogus value that must be ignored
+        fee: "0",
+      });
+
+      expect(calculateActivityValue(transferIn)).toBeCloseTo(15148.62, 2);
+
+      const transferOut = createActivity({
+        activityType: ActivityType.TRANSFER_OUT,
+        assetSymbol: "AAPL",
+        quantity: "10",
+        unitPrice: "150",
+        amount: "999999", // bogus
+        fee: "5",
+      });
+
+      // Transfer out of securities: qty × price + fee (mirrors SELL-like handling for value display)
+      expect(calculateActivityValue(transferOut)).toBe(1500);
+    });
   });
 
   describe("formatSplitRatio", () => {

@@ -23,6 +23,7 @@ import {
   isAssetBackedIncomeActivity,
   isCashActivity,
   isCashTransfer,
+  isSecuritiesTransfer,
   isFeeActivity,
   isIncomeActivity,
   isSplitActivity,
@@ -161,7 +162,7 @@ export const ActivityTable = ({
           const isAssetBackedIncome = isAssetBackedIncomeActivity(activityType, symbol, assetId);
           const hasAsset = Boolean(assetId?.trim());
           const isCash = isTransferActivity
-            ? !hasAsset || isCashTransfer(activityType, symbol)
+            ? isCashTransfer(activityType, symbol, assetId)
             : isCashActivity(activityType) && !isAssetBackedIncome;
 
           // Parse OCC symbol for options
@@ -241,9 +242,8 @@ export const ActivityTable = ({
           );
           const isTransfer =
             activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
-          const hasAsset = Boolean(row.original.assetId?.trim());
           const isCash = isTransfer
-            ? !hasAsset || isCashTransfer(activityType, assetSymbol)
+            ? isCashTransfer(activityType, assetSymbol, row.original.assetId)
             : isCashActivity(activityType) && !isAssetBackedIncome;
 
           if (
@@ -308,8 +308,10 @@ export const ActivityTable = ({
             return <div className="text-right">{formatSplitRatio(Number(amount))}</div>;
           }
           if (
-            (isCashActivity(activityType) && !isAssetBackedIncome) ||
-            isCashTransfer(activityType, assetSymbol) ||
+            (isCashActivity(activityType) &&
+              !isAssetBackedIncome &&
+              !isSecuritiesTransfer(activityType, assetSymbol, row.original.assetId)) ||
+            isCashTransfer(activityType, assetSymbol, row.original.assetId) ||
             (isIncomeActivity(activityType) && !isAssetBackedIncome)
           ) {
             return <div className="text-right">{formatAmount(Number(amount), currency)}</div>;

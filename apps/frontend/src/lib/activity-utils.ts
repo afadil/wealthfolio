@@ -65,30 +65,65 @@ export const needsImportAssetResolution = (
 };
 
 /**
- * Determines if an activity is a cash transfer based on its type and symbol
- * @param activityType The activity type to check
- * @param assetSymbol The asset symbol to check
- * @returns True if the activity is a cash transfer
+ * Determines if an activity is a cash transfer based on its type and identifiers.
+ * A transfer is cash when:
+ * - it has no asset identifier at all (blank symbol AND blank assetId), OR
+ * - its symbol/assetId matches any supported cash placeholder:
+ *   `CASH`, `CASH:USD`, `$CASH-EUR`, `CASH-GBP`, `CASH_GBP`, etc.
  */
-export const isCashTransfer = (activityType: string, assetSymbol: string): boolean => {
+export const isCashTransfer = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
   if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
     return false;
   }
-  // Recognize cash transfers by symbol:
-  // - CASH:{currency} (e.g., CASH:USD)
-  // - Display value: "CASH" (set by applyCashDefaults)
-  const upperSymbol = assetSymbol.toUpperCase();
 
-  if (upperSymbol === "CASH") {
+  const symbol = assetSymbol?.trim() ?? "";
+  const id = assetId?.trim() ?? "";
+
+  // No asset at all → cash transfer
+  if (!symbol && !id) {
     return true;
   }
 
-  if (upperSymbol.startsWith("CASH:")) {
-    const currency = upperSymbol.slice("CASH:".length);
+  const upper = (symbol || id).toUpperCase();
+
+  // Display placeholder used by applyCashDefaults
+  if (upper === "CASH") {
+    return true;
+  }
+
+  // Canonical backend form: CASH:{ccy}
+  if (upper.startsWith("CASH:")) {
+    const currency = upper.slice("CASH:".length);
     return /^[A-Z]{3}$/.test(currency);
   }
 
-  return false;
+  // Broker-export placeholders: $CASH-XXX, $CASH_XXX, CASH-XXX, CASH_XXX
+  return isCashSymbol(symbol) || isCashSymbol(id);
+};
+
+/**
+ * Securities transfer: TRANSFER_IN/OUT whose asset identifiers clearly refer
+ * to a real security (not cash, not blank). These move shares/units, so their
+ * value derives from quantity × unitPrice (or a stored amount when unitPrice
+ * is absent on legacy/imported rows).
+ */
+export const isSecuritiesTransfer = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
+  if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
+    return false;
+  }
+  const hasConcreteAsset = Boolean((assetSymbol?.trim() || assetId?.trim())?.length);
+  if (!hasConcreteAsset) {
+    return false;
+  }
+  return !isCashTransfer(activityType, assetSymbol, assetId);
 };
 
 const isCanonicalCashIdentifier = (identifier: string): boolean => {
@@ -220,7 +255,7 @@ export const getUnitPrice = (activity: ActivityDetails): number => {
  * @returns The calculated value
  */
 export const calculateActivityValue = (activity: ActivityDetails): number => {
-  const { activityType, assetSymbol } = activity;
+  const { activityType, assetSymbol, assetId } = activity;
 
   // Handle special cases first
   if (activityType === ActivityType.SPLIT) {
@@ -235,10 +270,12 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     return roundCurrency(getFee(activity));
   }
 
-  // Handle cash activities
+  const isSecTransfer = isSecuritiesTransfer(activityType, assetSymbol, assetId);
+
+  // Handle cash activities (but NOT securities transfers, which need qty × price)
   if (
-    isCashActivity(activityType) ||
-    isCashTransfer(activityType, assetSymbol) ||
+    (isCashActivity(activityType) && !isSecTransfer) ||
+    isCashTransfer(activityType, assetSymbol, assetId) ||
     isIncomeActivity(activityType)
   ) {
     const amount = getAmount(activity);
@@ -253,11 +290,21 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     return roundCurrency(Number(amount) - Number(fee));
   }
 
-  // Handle trading activities
+  // Handle trading activities (and securities transfers)
   const quantity = getQuantity(activity);
   const unitPrice = getUnitPrice(activity);
   const fee = getFee(activity);
-  const activityAmount = roundCurrency(Number(quantity) * Number(unitPrice));
+  let activityAmount = roundCurrency(Number(quantity) * Number(unitPrice));
+
+  // Securities transfers imported without a unit price (legacy / some broker
+  // exports) carry their monetary value on `amount`. Fall back to it so those
+  // rows don't render as 0 just because we no longer trust `amount` by default.
+  if (isSecTransfer && activityAmount === 0) {
+    const storedAmount = getAmount(activity);
+    if (storedAmount !== 0) {
+      activityAmount = roundCurrency(storedAmount);
+    }
+  }
 
   if (activityType === ActivityType.BUY) {
     return roundCurrency(Number(activityAmount) + Number(fee)); // Total cost including fees
