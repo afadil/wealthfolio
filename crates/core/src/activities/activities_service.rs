@@ -1488,8 +1488,11 @@ impl ActivityService {
         // Securities transfers derive monetary value from quantity × unit_price at
         // read time. Any inbound `amount` is redundant and has historically been
         // a source of corruption (e.g. amount = qty² × unit_price stored on the
-        // row). Force it to None so the DB holds a single source of truth.
-        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+        // row). Clear it only when unit_price is present so legacy imports that
+        // carry qty + amount (no unit_price) keep their monetary value.
+        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref())
+            && activity.unit_price.is_some()
+        {
             activity.amount = None;
         }
 
@@ -1874,9 +1877,14 @@ impl ActivityService {
         activity.amount = activity.amount.map(|v| v.map(|d| d.abs()));
         activity.fee = activity.fee.map(|v| v.map(|d| d.abs()));
 
-        // Securities transfers derive value from quantity × unit_price; always
-        // clear `amount` on update so a caller cannot re-introduce a stale value.
-        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+        // Securities transfers derive value from quantity × unit_price; clear
+        // `amount` on update only when the patch carries a unit_price so callers
+        // cannot re-introduce a stale value. Legacy rows that lack unit_price
+        // rely on amount as their monetary source of truth, so leave amount
+        // alone when unit_price isn't being set.
+        if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref())
+            && matches!(activity.unit_price, Some(Some(_)))
+        {
             activity.amount = Some(None);
         }
 
@@ -4141,8 +4149,12 @@ impl ActivityService {
             activity.fee = activity.fee.map(|v| v.abs());
 
             // Securities transfers derive monetary value from quantity × unit_price;
-            // never persist an inbound `amount` for them (see prepare_new_activity).
-            if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref()) {
+            // never persist an inbound `amount` for them when unit_price is present
+            // (see prepare_new_activity). Legacy imports with qty + amount and no
+            // unit_price keep their monetary value.
+            if is_securities_transfer(&activity.activity_type, resolved_asset_id.as_deref())
+                && activity.unit_price.is_some()
+            {
                 activity.amount = None;
             }
 
