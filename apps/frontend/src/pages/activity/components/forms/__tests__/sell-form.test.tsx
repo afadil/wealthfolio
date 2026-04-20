@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SellForm } from "../sell-form";
 import type { AccountSelectOption } from "../fields";
+import type { Holding } from "@/lib/types";
+
+interface UseHoldingsResult {
+  holdings: Holding[];
+  isLoading: boolean;
+}
+
+const holdingsHook = vi.hoisted(() => ({
+  useHoldings: vi.fn<() => UseHoldingsResult>(() => ({
+    holdings: [],
+    isLoading: false,
+  })),
+}));
 
 // Mock useSettings hook to avoid AuthProvider dependency
 vi.mock("@/hooks/use-settings", () => ({
@@ -15,54 +28,85 @@ vi.mock("@/hooks/use-settings", () => ({
 
 // Mock the useHoldings hook
 vi.mock("@/hooks/use-holdings", () => ({
-  useHoldings: () => ({
-    holdings: [],
-    isLoading: false,
-  }),
+  useHoldings: holdingsHook.useHoldings,
 }));
 
 // Mock the fields components
-vi.mock("../fields", () => ({
-  AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => (
-    <select data-testid={`select-${name}`} name={name}>
-      <option value="">Select account...</option>
-      {accounts.map((acc) => (
-        <option key={acc.value} value={acc.value}>
-          {acc.label}
-        </option>
-      ))}
-    </select>
-  ),
-  SymbolSearch: ({ name }: { name: string }) => (
-    <input data-testid={`symbol-search-${name}`} name={name} />
-  ),
-  DatePicker: ({ name, label }: { name: string; label: string }) => (
-    <div data-testid={`date-picker-${name}`}>{label}</div>
-  ),
-  AmountInput: ({ name, label }: { name: string; label: string }) => (
-    <div>
-      <label htmlFor={name}>{label}</label>
-      <input data-testid={`input-${name}`} name={name} type="number" id={name} />
-    </div>
-  ),
-  QuantityInput: ({ name, label }: { name: string; label: string }) => (
-    <div>
-      <label htmlFor={name}>{label}</label>
-      <input data-testid={`input-${name}`} name={name} type="number" id={name} />
-    </div>
-  ),
-  NotesInput: ({ name, label }: { name: string; label: string }) => (
-    <div>
-      <label htmlFor={name}>{label}</label>
-      <textarea data-testid={`textarea-${name}`} name={name} id={name} />
-    </div>
-  ),
-  AssetTypeSelector: ({ name }: { name: string }) => (
-    <div data-testid={`asset-type-selector-${name}`} />
-  ),
-  AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
-  createValidatedSubmit: vi.fn((_form, handler) => handler),
-}));
+vi.mock("../fields", async () => {
+  const { useFormContext } =
+    await vi.importActual<typeof import("react-hook-form")>("react-hook-form");
+
+  return {
+    AccountSelect: ({ name, accounts }: { name: string; accounts: AccountSelectOption[] }) => {
+      const { register } = useFormContext();
+
+      return (
+        <select data-testid={`select-${name}`} {...register(name)}>
+          <option value="">Select account...</option>
+          {accounts.map((acc) => (
+            <option key={acc.value} value={acc.value}>
+              {acc.label}
+            </option>
+          ))}
+        </select>
+      );
+    },
+    SymbolSearch: ({ name }: { name: string }) => {
+      const { register } = useFormContext();
+
+      return <input data-testid={`symbol-search-${name}`} {...register(name)} />;
+    },
+    DatePicker: ({ name, label }: { name: string; label: string }) => (
+      <div data-testid={`date-picker-${name}`}>{label}</div>
+    ),
+    AmountInput: ({ name, label }: { name: string; label: string }) => {
+      const { register } = useFormContext();
+
+      return (
+        <div>
+          <label htmlFor={name}>{label}</label>
+          <input
+            data-testid={`input-${name}`}
+            type="number"
+            id={name}
+            {...register(name, { valueAsNumber: true })}
+          />
+        </div>
+      );
+    },
+    QuantityInput: ({ name, label }: { name: string; label: string }) => {
+      const { register } = useFormContext();
+
+      return (
+        <div>
+          <label htmlFor={name}>{label}</label>
+          <input
+            data-testid={`input-${name}`}
+            type="number"
+            id={name}
+            {...register(name, { valueAsNumber: true })}
+          />
+        </div>
+      );
+    },
+    NotesInput: ({ name, label }: { name: string; label: string }) => {
+      const { register } = useFormContext();
+
+      return (
+        <div>
+          <label htmlFor={name}>{label}</label>
+          <textarea data-testid={`textarea-${name}`} id={name} {...register(name)} />
+        </div>
+      );
+    },
+    OptionContractFields: () => <div data-testid="option-contract-fields" />,
+    AssetTypeSelector: ({ name }: { name: string }) => (
+      <div data-testid={`asset-type-selector-${name}`} />
+    ),
+    AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
+    createValidatedSubmit: vi.fn((form, handler) => form.handleSubmit(handler)),
+  };
+});
 
 // Mock UI components
 vi.mock("@wealthfolio/ui/components/ui/button", () => ({
@@ -118,12 +162,38 @@ const mockAccounts: AccountSelectOption[] = [
   { value: "acc-2", label: "Investment Account", currency: "EUR" },
 ];
 
+const baseSellDefaults = {
+  accountId: "acc-1",
+  assetId: "CJR28A",
+  assetType: "bond" as const,
+  activityDate: new Date("2026-04-16T16:00:00"),
+  quantity: 100_000,
+  unitPrice: 1,
+  fee: 0,
+  currency: "USD",
+};
+
+function createHolding(symbol: string, quantity: number, assetId = symbol): Holding {
+  return {
+    id: `SEC-acc-1-${assetId}`,
+    instrument: {
+      id: assetId,
+      symbol,
+    },
+    quantity,
+  } as Holding;
+}
+
 describe("SellForm", () => {
   const mockOnSubmit = vi.fn();
   const mockOnCancel = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    holdingsHook.useHoldings.mockReturnValue({
+      holdings: [],
+      isLoading: false,
+    });
   });
 
   describe("Render Tests", () => {
@@ -231,6 +301,126 @@ describe("SellForm", () => {
       render(<SellForm accounts={mockAccounts} onSubmit={mockOnSubmit} isEditing={false} />);
 
       expect(screen.getByTestId("plus-icon")).toBeInTheDocument();
+    });
+  });
+
+  describe("Holdings Warning", () => {
+    it("does not warn when editing a sell that fully closed the holding", () => {
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          defaultValues={baseSellDefaults}
+          onSubmit={mockOnSubmit}
+          isEditing={true}
+        />,
+      );
+
+      expect(screen.queryByTestId("alert")).not.toBeInTheDocument();
+      expect(screen.getByText("Available: 100,000")).toBeInTheDocument();
+    });
+
+    it("adds back the original sell quantity when editing the same holding", async () => {
+      const user = userEvent.setup();
+      holdingsHook.useHoldings.mockReturnValue({
+        holdings: [createHolding("CJR28A", 60)],
+        isLoading: false,
+      });
+
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          defaultValues={{ ...baseSellDefaults, quantity: 40 }}
+          onSubmit={mockOnSubmit}
+          isEditing={true}
+        />,
+      );
+
+      expect(screen.getByText("Available: 100")).toBeInTheDocument();
+
+      const quantityInput = screen.getByTestId("input-quantity");
+      await user.clear(quantityInput);
+      await user.type(quantityInput, "80");
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("alert")).not.toBeInTheDocument();
+      });
+    });
+
+    it("warns when an edited sell exceeds the adjusted available quantity", async () => {
+      const user = userEvent.setup();
+      holdingsHook.useHoldings.mockReturnValue({
+        holdings: [createHolding("CJR28A", 60)],
+        isLoading: false,
+      });
+
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          defaultValues={{ ...baseSellDefaults, quantity: 40 }}
+          onSubmit={mockOnSubmit}
+          isEditing={true}
+        />,
+      );
+
+      const quantityInput = screen.getByTestId("input-quantity");
+      await user.clear(quantityInput);
+      await user.type(quantityInput, "101");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alert-description")).toHaveTextContent(
+          "than your available holdings (100)",
+        );
+      });
+    });
+
+    it("does not add back the original sell quantity after changing the asset", async () => {
+      const user = userEvent.setup();
+      holdingsHook.useHoldings.mockReturnValue({
+        holdings: [createHolding("CJR28A", 60)],
+        isLoading: false,
+      });
+
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          defaultValues={{ ...baseSellDefaults, quantity: 40 }}
+          onSubmit={mockOnSubmit}
+          isEditing={true}
+        />,
+      );
+
+      const symbolInput = screen.getByTestId("symbol-search-assetId");
+      await user.clear(symbolInput);
+      await user.type(symbolInput, "MSFT");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alert-description")).toHaveTextContent(
+          "than your available holdings (0)",
+        );
+      });
+    });
+
+    it("matches current holdings by instrument id as well as display symbol", () => {
+      holdingsHook.useHoldings.mockReturnValue({
+        holdings: [createHolding("CJR28A", 10, "SEC:CJR28A:XTSE")],
+        isLoading: false,
+      });
+
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          defaultValues={{
+            ...baseSellDefaults,
+            assetId: "SEC:CJR28A:XTSE",
+            assetType: "stock",
+            quantity: 5,
+          }}
+          onSubmit={mockOnSubmit}
+        />,
+      );
+
+      expect(screen.queryByTestId("alert")).not.toBeInTheDocument();
+      expect(screen.getByText("Available: 10")).toBeInTheDocument();
     });
   });
 });
