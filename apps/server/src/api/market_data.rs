@@ -254,7 +254,7 @@ async fn resolve_symbol_quote(
     let inst_type = q
         .instrument_type
         .as_deref()
-        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+        .and_then(wealthfolio_core::assets::InstrumentType::from_external_str);
     let res = state
         .quote_service
         .resolve_symbol_quote(

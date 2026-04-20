@@ -233,6 +233,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_instrument_type_external_aliases() {
+        assert_eq!(
+            InstrumentType::from_external_str("CRYPTOCURRENCY"),
+            Some(InstrumentType::Crypto)
+        );
+        assert_eq!(
+            InstrumentType::from_external_str("ETF"),
+            Some(InstrumentType::Equity)
+        );
+        assert_eq!(
+            InstrumentType::from_external_str("FOREX"),
+            Some(InstrumentType::Fx)
+        );
+    }
+
     // Test AssetKind db roundtrip
     #[test]
     fn test_asset_kind_db_roundtrip() {

@@ -97,6 +97,22 @@ impl InstrumentType {
             _ => None,
         }
     }
+
+    /// Parses provider/UI instrument labels into the canonical instrument type.
+    pub fn from_external_str(s: &str) -> Option<Self> {
+        match s.trim().to_uppercase().as_str() {
+            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "MUTUAL FUND" | "INDEX"
+            | "FUTURE" | "FUTURES" => Some(InstrumentType::Equity),
+            "CRYPTO" | "CRYPTOCURRENCY" => Some(InstrumentType::Crypto),
+            "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
+            "OPTION" => Some(InstrumentType::Option),
+            "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
+            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" | "MONEYMARKET" => {
+                Some(InstrumentType::Bond)
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Option contract specification stored in Asset.metadata
