@@ -265,19 +265,67 @@ export function SellForm({
     return assetId;
   }, [isOption, assetId, watch]);
 
+  const originalEffectiveAssetId = useMemo(() => {
+    if (!isEditing || !defaultValues) return "";
+    if (defaultValues.assetType !== "option") return defaultValues.assetId ?? "";
+
+    const { underlyingSymbol, strikePrice, expirationDate, optionType } = defaultValues;
+    if (underlyingSymbol && strikePrice && expirationDate && optionType) {
+      return buildOccSymbol(underlyingSymbol, expirationDate, optionType, strikePrice);
+    }
+    return defaultValues.assetId ?? "";
+  }, [
+    isEditing,
+    defaultValues?.assetType,
+    defaultValues?.assetId,
+    defaultValues?.underlyingSymbol,
+    defaultValues?.strikePrice,
+    defaultValues?.expirationDate,
+    defaultValues?.optionType,
+  ]);
+
+  const originalSellQuantity = useMemo(() => {
+    if (!isEditing) return 0;
+    const quantity = Number(defaultValues?.quantity);
+    return Number.isFinite(quantity) ? Math.abs(quantity) : 0;
+  }, [isEditing, defaultValues?.quantity]);
+
   // Find the current holding quantity for the selected symbol
   const currentHoldingQuantity = useMemo(() => {
     const id = effectiveAssetId;
     if (!id || !holdings) return 0;
-    const holding = holdings.find((h) => h.instrument?.symbol === id || h.id === id);
+    const holding = holdings.find(
+      (h) => h.instrument?.symbol === id || h.instrument?.id === id || h.id === id,
+    );
     return holding?.quantity ?? 0;
   }, [effectiveAssetId, holdings]);
 
-  // Check if selling more than current holdings
+  const availableHoldingQuantity = useMemo(() => {
+    const isSameEditedHolding =
+      isEditing &&
+      !!accountId &&
+      accountId === defaultValues?.accountId &&
+      !!effectiveAssetId &&
+      effectiveAssetId === originalEffectiveAssetId;
+
+    return isSameEditedHolding
+      ? currentHoldingQuantity + originalSellQuantity
+      : currentHoldingQuantity;
+  }, [
+    isEditing,
+    accountId,
+    defaultValues?.accountId,
+    effectiveAssetId,
+    originalEffectiveAssetId,
+    currentHoldingQuantity,
+    originalSellQuantity,
+  ]);
+
+  // Check if selling more than the quantity available for this form state
   const isSellingMoreThanHoldings = useMemo(() => {
     if (!optQuantity || optQuantity <= 0 || !effectiveAssetId) return false;
-    return optQuantity > currentHoldingQuantity;
-  }, [optQuantity, currentHoldingQuantity, effectiveAssetId]);
+    return optQuantity > availableHoldingQuantity;
+  }, [optQuantity, availableHoldingQuantity, effectiveAssetId]);
 
   const handleSubmit = createValidatedSubmit(form, async (data) => {
     // Ensure currency is set (required by backend) — fall back to account currency
@@ -391,14 +439,14 @@ export function SellForm({
                     <span>x</span>
                   </div>
                 )}
-                {!isOption && currentHoldingQuantity > 0 && (
+                {!isOption && availableHoldingQuantity > 0 && (
                   <p className="text-muted-foreground mt-1.5 text-xs">
-                    Available: {currentHoldingQuantity.toLocaleString()}
+                    Available: {availableHoldingQuantity.toLocaleString()}
                   </p>
                 )}
-                {isOption && currentHoldingQuantity > 0 && (
+                {isOption && availableHoldingQuantity > 0 && (
                   <p className="text-muted-foreground mt-1.5 text-xs">
-                    Holding: {currentHoldingQuantity.toLocaleString()} contracts
+                    Holding: {availableHoldingQuantity.toLocaleString()} contracts
                   </p>
                 )}
               </div>
@@ -459,8 +507,8 @@ export function SellForm({
                 <Icons.AlertTriangle className="text-warning h-4 w-4" />
                 <AlertDescription className="text-warning text-sm">
                   You are selling more {isOption ? "contracts" : "shares"} (
-                  {optQuantity?.toLocaleString()}) than your current holdings (
-                  {currentHoldingQuantity.toLocaleString()}). This may result in a short position.
+                  {optQuantity?.toLocaleString()}) than your available holdings (
+                  {availableHoldingQuantity.toLocaleString()}). This may result in a short position.
                 </AlertDescription>
               </Alert>
             )}
