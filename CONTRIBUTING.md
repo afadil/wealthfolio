@@ -52,8 +52,8 @@ Install the tracked Git hooks to run CI-equivalent checks before `git push`:
 pnpm hooks:install
 ```
 
-Git does not enable repository hooks automatically, so each contributor must
-opt in once per clone.
+Git does not enable repository hooks automatically, so each contributor must opt
+in once per clone.
 
 ### Code Style
 
