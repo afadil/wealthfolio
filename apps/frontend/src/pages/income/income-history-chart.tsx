@@ -215,6 +215,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
           <ChartContainer
             config={accountChartConfig}
             className={cn("h-[280px] w-full md:h-[380px]")}
+            data-no-swipe-drag
           >
             <BarChart
               key={selectedPeriod}
@@ -295,6 +296,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
               },
             }}
             className={cn("h-[280px] w-full md:h-[380px]")}
+            data-no-swipe-drag
           >
             <ComposedChart
               data={chartData}
