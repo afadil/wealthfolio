@@ -65,6 +65,7 @@ export const ActivityTableMobile = ({
         const isCash = isTransferActivity
           ? isCashTransfer(activityType, symbol, activity.assetId)
           : isCashActivity(activityType) && !isAssetBackedIncome;
+        const hasAsset = Boolean(activity.assetId?.trim());
         const isOptionActivity = activity.instrumentType === "OPTION";
         const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
         const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
@@ -215,7 +216,11 @@ export const ActivityTableMobile = ({
                       ? "Ratio"
                       : (isCashActivity(activity.activityType) &&
                             !isAssetBackedIncome &&
-                            !isSecuritiesTransfer(activity.activityType, symbol, activity.assetId)) ||
+                            !isSecuritiesTransfer(
+                              activity.activityType,
+                              symbol,
+                              activity.assetId,
+                            )) ||
                           isCashTransfer(activity.activityType, symbol, activity.assetId) ||
                           (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                         ? "Amount"
@@ -230,7 +235,11 @@ export const ActivityTableMobile = ({
                         ? formatSplitRatio(Number(activity.amount))
                         : (isCashActivity(activity.activityType) &&
                               !isAssetBackedIncome &&
-                              !isSecuritiesTransfer(activity.activityType, symbol, activity.assetId)) ||
+                              !isSecuritiesTransfer(
+                                activity.activityType,
+                                symbol,
+                                activity.assetId,
+                              )) ||
                             isCashTransfer(activity.activityType, symbol, activity.assetId) ||
                             (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                           ? formatAmount(Number(activity.amount), activity.currency)
