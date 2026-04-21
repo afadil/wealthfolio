@@ -190,6 +190,7 @@ impl CustomProviderService {
                     raw_response: None,
                     detected_elements: None,
                     detected_tables: None,
+                    ..Default::default()
                 });
             }
         };
@@ -199,6 +200,7 @@ impl CustomProviderService {
             if len > MAX_RESPONSE_BYTES as u64 {
                 return Ok(TestSourceResult {
                     success: false,
+                    status_code: Some(status.as_u16()),
                     price: None,
                     currency: None,
                     date: None,
@@ -209,6 +211,7 @@ impl CustomProviderService {
                     raw_response: None,
                     detected_elements: None,
                     detected_tables: None,
+                    ..Default::default()
                 });
             }
         }
@@ -217,6 +220,7 @@ impl CustomProviderService {
             Err(e) => {
                 return Ok(TestSourceResult {
                     success: false,
+                    status_code: Some(status.as_u16()),
                     price: None,
                     currency: None,
                     date: None,
@@ -224,12 +228,14 @@ impl CustomProviderService {
                     raw_response: None,
                     detected_elements: None,
                     detected_tables: None,
+                    ..Default::default()
                 });
             }
         };
         if body_bytes.len() > MAX_RESPONSE_BYTES {
             return Ok(TestSourceResult {
                 success: false,
+                status_code: Some(status.as_u16()),
                 price: None,
                 currency: None,
                 date: None,
@@ -241,6 +247,7 @@ impl CustomProviderService {
                 raw_response: None,
                 detected_elements: None,
                 detected_tables: None,
+                ..Default::default()
             });
         }
         let body = String::from_utf8_lossy(&body_bytes).to_string();
@@ -248,6 +255,7 @@ impl CustomProviderService {
         if !status.is_success() {
             return Ok(TestSourceResult {
                 success: false,
+                status_code: Some(status.as_u16()),
                 price: None,
                 currency: None,
                 date: None,
@@ -255,6 +263,7 @@ impl CustomProviderService {
                 raw_response: Some(body),
                 detected_elements: None,
                 detected_tables: None,
+                ..Default::default()
             });
         }
 
@@ -274,28 +283,53 @@ impl CustomProviderService {
                     .as_ref()
                     .map(|dp| expand_path(dp))
                     .and_then(|dp| extract_json_string(&body, &dp));
+                let open = payload
+                    .open_path
+                    .as_ref()
+                    .map(|op| expand_path(op))
+                    .and_then(|op| extract_json_value(&body, &op))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let high = payload
+                    .high_path
+                    .as_ref()
+                    .map(|hp| expand_path(hp))
+                    .and_then(|hp| extract_json_value(&body, &hp))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let low = payload
+                    .low_path
+                    .as_ref()
+                    .map(|lp| expand_path(lp))
+                    .and_then(|lp| extract_json_value(&body, &lp))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let volume = payload
+                    .volume_path
+                    .as_ref()
+                    .map(|vp| expand_path(vp))
+                    .and_then(|vp| extract_json_value(&body, &vp));
 
                 match price {
-                    Some(mut p) => {
-                        if let Some(factor) = payload.factor {
-                            p *= factor;
-                        }
-                        if payload.invert == Some(true) && p != 0.0 {
-                            p = 1.0 / p;
-                        }
+                    Some(p) => {
+                        let p = apply_test_factor_invert(p, &payload);
                         Ok(TestSourceResult {
                             success: true,
+                            status_code: Some(status.as_u16()),
                             price: Some(p),
+                            open,
+                            high,
+                            low,
+                            volume,
                             currency,
                             date,
                             error: None,
                             raw_response: Some(body),
                             detected_elements: None,
                             detected_tables: None,
+                            ..Default::default()
                         })
                     }
                     None => Ok(TestSourceResult {
                         success: false,
+                        status_code: Some(status.as_u16()),
                         price: None,
                         currency: None,
                         date: None,
@@ -306,6 +340,7 @@ impl CustomProviderService {
                         raw_response: Some(body),
                         detected_elements: None,
                         detected_tables: None,
+                        ..Default::default()
                     }),
                 }
             }
@@ -313,27 +348,42 @@ impl CustomProviderService {
                 let detected = detect_html_elements(&body, payload.locale.as_deref());
                 let price =
                     extract_html_value(&body, &payload.price_path, payload.locale.as_deref());
+                let high = payload
+                    .high_path
+                    .as_ref()
+                    .and_then(|p| extract_html_value(&body, p, payload.locale.as_deref()))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let low = payload
+                    .low_path
+                    .as_ref()
+                    .and_then(|p| extract_html_value(&body, p, payload.locale.as_deref()))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let volume = payload
+                    .volume_path
+                    .as_ref()
+                    .and_then(|p| extract_html_value(&body, p, payload.locale.as_deref()));
                 match price {
-                    Some(mut p) => {
-                        if let Some(factor) = payload.factor {
-                            p *= factor;
-                        }
-                        if payload.invert == Some(true) && p != 0.0 {
-                            p = 1.0 / p;
-                        }
+                    Some(p) => {
+                        let p = apply_test_factor_invert(p, &payload);
                         Ok(TestSourceResult {
                             success: true,
+                            status_code: Some(status.as_u16()),
                             price: Some(p),
+                            high,
+                            low,
+                            volume,
                             currency: None,
                             date: None,
                             error: None,
                             raw_response: None,
                             detected_elements: Some(detected),
                             detected_tables: None,
+                            ..Default::default()
                         })
                     }
                     None => Ok(TestSourceResult {
                         success: false,
+                        status_code: Some(status.as_u16()),
                         price: None,
                         currency: None,
                         date: None,
@@ -344,6 +394,7 @@ impl CustomProviderService {
                         raw_response: None,
                         detected_elements: Some(detected),
                         detected_tables: None,
+                        ..Default::default()
                     }),
                 }
             }
@@ -359,28 +410,53 @@ impl CustomProviderService {
                     .as_ref()
                     .filter(|dp| !dp.is_empty())
                     .and_then(|dp| extract_table_string(&body, dp));
+                let open = payload
+                    .open_path
+                    .as_ref()
+                    .filter(|p| !p.is_empty())
+                    .and_then(|p| extract_table_value(&body, p, payload.locale.as_deref()))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let high = payload
+                    .high_path
+                    .as_ref()
+                    .filter(|p| !p.is_empty())
+                    .and_then(|p| extract_table_value(&body, p, payload.locale.as_deref()))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let low = payload
+                    .low_path
+                    .as_ref()
+                    .filter(|p| !p.is_empty())
+                    .and_then(|p| extract_table_value(&body, p, payload.locale.as_deref()))
+                    .map(|v| apply_test_factor_invert(v, &payload));
+                let volume = payload
+                    .volume_path
+                    .as_ref()
+                    .filter(|p| !p.is_empty())
+                    .and_then(|p| extract_table_value(&body, p, payload.locale.as_deref()));
 
                 match price {
-                    Some(mut p) => {
-                        if let Some(factor) = payload.factor {
-                            p *= factor;
-                        }
-                        if payload.invert == Some(true) && p != 0.0 {
-                            p = 1.0 / p;
-                        }
+                    Some(p) => {
+                        let p = apply_test_factor_invert(p, &payload);
                         Ok(TestSourceResult {
                             success: true,
+                            status_code: Some(status.as_u16()),
                             price: Some(p),
+                            open,
+                            high,
+                            low,
+                            volume,
                             currency: None,
                             date,
                             error: None,
                             raw_response: None,
                             detected_elements: None,
                             detected_tables: Some(tables),
+                            ..Default::default()
                         })
                     }
                     None => Ok(TestSourceResult {
                         success: !tables.is_empty(),
+                        status_code: Some(status.as_u16()),
                         price: None,
                         currency: None,
                         date: None,
@@ -392,35 +468,61 @@ impl CustomProviderService {
                         raw_response: None,
                         detected_elements: None,
                         detected_tables: Some(tables),
+                        ..Default::default()
                     }),
                 }
             }
             "csv" => match parse_csv_test(&body, &payload.price_path, payload.locale.as_deref()) {
-                Some(mut p) => {
-                    if let Some(factor) = payload.factor {
-                        p *= factor;
-                    }
-                    if payload.invert == Some(true) && p != 0.0 {
-                        p = 1.0 / p;
-                    }
+                Some(p) => {
+                    let p = apply_test_factor_invert(p, &payload);
                     let date = payload
                         .date_path
                         .as_ref()
                         .filter(|dp| !dp.is_empty())
                         .and_then(|dp| extract_csv_string(&body, dp));
+                    let open = payload
+                        .open_path
+                        .as_ref()
+                        .filter(|p| !p.is_empty())
+                        .and_then(|p| parse_csv_test(&body, p, payload.locale.as_deref()))
+                        .map(|v| apply_test_factor_invert(v, &payload));
+                    let high = payload
+                        .high_path
+                        .as_ref()
+                        .filter(|p| !p.is_empty())
+                        .and_then(|p| parse_csv_test(&body, p, payload.locale.as_deref()))
+                        .map(|v| apply_test_factor_invert(v, &payload));
+                    let low = payload
+                        .low_path
+                        .as_ref()
+                        .filter(|p| !p.is_empty())
+                        .and_then(|p| parse_csv_test(&body, p, payload.locale.as_deref()))
+                        .map(|v| apply_test_factor_invert(v, &payload));
+                    let volume = payload
+                        .volume_path
+                        .as_ref()
+                        .filter(|p| !p.is_empty())
+                        .and_then(|p| parse_csv_test(&body, p, payload.locale.as_deref()));
                     Ok(TestSourceResult {
                         success: true,
+                        status_code: Some(status.as_u16()),
                         price: Some(p),
+                        open,
+                        high,
+                        low,
+                        volume,
                         currency: None,
                         date,
                         error: None,
                         raw_response: Some(body),
                         detected_elements: None,
                         detected_tables: None,
+                        ..Default::default()
                     })
                 }
                 None => Ok(TestSourceResult {
                     success: false,
+                    status_code: Some(status.as_u16()),
                     price: None,
                     currency: None,
                     date: None,
@@ -431,10 +533,12 @@ impl CustomProviderService {
                     raw_response: Some(body),
                     detected_elements: None,
                     detected_tables: None,
+                    ..Default::default()
                 }),
             },
             _ => Ok(TestSourceResult {
                 success: false,
+                status_code: Some(status.as_u16()),
                 price: None,
                 currency: None,
                 date: None,
@@ -442,6 +546,7 @@ impl CustomProviderService {
                 raw_response: None,
                 detected_elements: None,
                 detected_tables: None,
+                ..Default::default()
             }),
         }
     }
@@ -466,6 +571,16 @@ fn validate_source_kind_format(kind: &str, format: &str) -> crate::errors::Resul
         .into());
     }
     Ok(())
+}
+
+fn apply_test_factor_invert(mut value: f64, payload: &TestSourceRequest) -> f64 {
+    if let Some(factor) = payload.factor {
+        value *= factor;
+    }
+    if payload.invert == Some(true) && value != 0.0 {
+        value = 1.0 / value;
+    }
+    value
 }
 
 /// Extract a numeric value from JSON using a JSONPath expression.

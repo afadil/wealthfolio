@@ -113,7 +113,12 @@ export interface TestSourceResult {
   success: boolean;
   // Rust `Option<T>::None` serializes to JSON `null` (no `skip_serializing_if`
   // attribute). Typing these as `T | null` makes TS flag unsafe direct access.
+  statusCode?: number | null;
   price?: number | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  volume?: number | null;
   currency?: string | null;
   date?: string | null;
   error?: string | null;

@@ -118,7 +118,7 @@ function StatusPill({
     return (
       <span className="text-success border-success/40 bg-success/10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs">
         <span className="bg-success h-1.5 w-1.5 rounded-full" />
-        200 OK
+        {status.code} OK
       </span>
     );
   }
@@ -379,41 +379,29 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
         {runtime.armedField ? ` to ${labelForField(runtime.armedField)}` : ""}.
       </p>
       <div className="max-h-[420px] space-y-2 overflow-y-auto">
-        {list.map((el) => {
-          const field = runtime.armedField ?? "pricePath";
-          const selected =
-            form_value_equals(runtime, field, el.selector) && runtime.armedField === field;
-          return (
-            <button
-              key={el.selector}
-              type="button"
-              onClick={() =>
-                runtime.handlePathSelect(el.selector, runtime.armedField ?? "pricePath")
-              }
-              className={cn(
-                "group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all",
-                selected
-                  ? "bg-background border-foreground/30 ring-foreground/5 shadow-sm ring-1"
-                  : "bg-background hover:bg-muted/30",
+        {list.map((el) => (
+          <button
+            key={el.selector}
+            type="button"
+            onClick={() => runtime.handlePathSelect(el.selector, runtime.armedField ?? "pricePath")}
+            className="bg-background hover:bg-muted/30 group flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all"
+          >
+            <div className="min-w-0 flex-1 space-y-1">
+              <code className="bg-muted/60 inline-block max-w-full truncate rounded px-1.5 py-0.5 font-mono text-[11px]">
+                {el.selector}
+              </code>
+              {el.label && <p className="text-muted-foreground text-[11px]">{el.label}</p>}
+              {el.htmlContext && (
+                <pre className="bg-muted/40 text-muted-foreground/80 mt-1.5 overflow-x-auto rounded p-2 font-mono text-[10px] leading-relaxed">
+                  {el.htmlContext}
+                </pre>
               )}
-            >
-              <div className="min-w-0 flex-1 space-y-1">
-                <code className="bg-muted/60 inline-block max-w-full truncate rounded px-1.5 py-0.5 font-mono text-[11px]">
-                  {el.selector}
-                </code>
-                {el.label && <p className="text-muted-foreground text-[11px]">{el.label}</p>}
-                {el.htmlContext && (
-                  <pre className="bg-muted/40 text-muted-foreground/80 mt-1.5 overflow-x-auto rounded p-2 font-mono text-[10px] leading-relaxed">
-                    {el.htmlContext}
-                  </pre>
-                )}
-              </div>
-              <span className="shrink-0 pt-0.5 font-mono text-base font-semibold tabular-nums">
-                {formatNumber(el.value)}
-              </span>
-            </button>
-          );
-        })}
+            </div>
+            <span className="shrink-0 pt-0.5 font-mono text-base font-semibold tabular-nums">
+              {formatNumber(el.value)}
+            </span>
+          </button>
+        ))}
       </div>
       {hasMore && !showAll && (
         <button
@@ -426,12 +414,6 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
       )}
     </div>
   );
-}
-
-function form_value_equals(_runtime: SourceRuntime, _f: MappingField, _v: string): boolean {
-  // runtime doesn't carry form snapshots; kept as placeholder hook — always false.
-  // Selection highlighting is visually handled by the FieldMapping rows below.
-  return false;
 }
 
 function formatNumber(n: number): string {
@@ -805,6 +787,58 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
                   display={
                     runtime.testResult.date ? (
                       <span className="font-mono text-xs">{runtime.testResult.date}</span>
+                    ) : null
+                  }
+                />
+              )}
+              {values.openPath && (
+                <ExtractedRow
+                  color="bg-yellow-500"
+                  label="Open"
+                  display={
+                    runtime.testResult.open != null ? (
+                      <span className="tabular-nums">
+                        {runtime.testResult.open.toLocaleString()}
+                      </span>
+                    ) : null
+                  }
+                />
+              )}
+              {values.highPath && (
+                <ExtractedRow
+                  color="bg-orange-500"
+                  label="High"
+                  display={
+                    runtime.testResult.high != null ? (
+                      <span className="tabular-nums">
+                        {runtime.testResult.high.toLocaleString()}
+                      </span>
+                    ) : null
+                  }
+                />
+              )}
+              {values.lowPath && (
+                <ExtractedRow
+                  color="bg-rose-500"
+                  label="Low"
+                  display={
+                    runtime.testResult.low != null ? (
+                      <span className="tabular-nums">
+                        {runtime.testResult.low.toLocaleString()}
+                      </span>
+                    ) : null
+                  }
+                />
+              )}
+              {values.volumePath && (
+                <ExtractedRow
+                  color="bg-violet-500"
+                  label="Volume"
+                  display={
+                    runtime.testResult.volume != null ? (
+                      <span className="tabular-nums">
+                        {runtime.testResult.volume.toLocaleString()}
+                      </span>
                     ) : null
                   }
                 />

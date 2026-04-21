@@ -298,11 +298,16 @@ pub struct DetectedHtmlTable {
 }
 
 /// Result of testing a source configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TestSourceResult {
     pub success: bool,
+    pub status_code: Option<u16>,
     pub price: Option<f64>,
+    pub open: Option<f64>,
+    pub high: Option<f64>,
+    pub low: Option<f64>,
+    pub volume: Option<f64>,
     pub currency: Option<String>,
     pub date: Option<String>,
     pub error: Option<String>,

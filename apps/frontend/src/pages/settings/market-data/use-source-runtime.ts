@@ -201,21 +201,20 @@ export function useSourceRuntime({
       },
       {
         onSuccess: (result) => {
-          const httpStatusMatch = result.error?.match(/^HTTP\s+(\d{3})/);
-          if (httpStatusMatch) {
-            const code = Number(httpStatusMatch[1]);
+          const statusCode = result.statusCode ?? undefined;
+          if (statusCode != null && (statusCode < 200 || statusCode >= 400)) {
             setRawResponse(null);
             setDetectedElements([]);
             setDetectedTables([]);
             setFetchError(result.error ?? "HTTP request failed.");
-            setStatus({ code, ok: false });
+            setStatus({ code: statusCode, ok: false });
             if (result.error && /403|forbidden|denied/i.test(result.error)) {
               onAdvancedOpen?.();
             }
             return;
           }
 
-          setStatus({ code: 200, ok: true });
+          setStatus({ code: statusCode ?? 200, ok: true });
           setDetectedElements(result.detectedElements ?? []);
           setDetectedTables(result.detectedTables ?? []);
 
@@ -285,6 +284,10 @@ export function useSourceRuntime({
             invert: values?.invert ?? undefined,
             locale: values?.locale || undefined,
             headers: values?.headers || undefined,
+            openPath: values?.openPath || undefined,
+            highPath: values?.highPath || undefined,
+            lowPath: values?.lowPath || undefined,
+            volumePath: values?.volumePath || undefined,
             symbol,
             currency: normalizedCurrencyInput(inputsState.currency),
             from: isHistorical ? inputsState.from : undefined,
