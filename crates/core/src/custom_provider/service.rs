@@ -324,7 +324,6 @@ impl CustomProviderService {
                             raw_response: Some(body),
                             detected_elements: None,
                             detected_tables: None,
-                            ..Default::default()
                         })
                     }
                     None => Ok(TestSourceResult {
@@ -451,7 +450,6 @@ impl CustomProviderService {
                             raw_response: None,
                             detected_elements: None,
                             detected_tables: Some(tables),
-                            ..Default::default()
                         })
                     }
                     None => Ok(TestSourceResult {
@@ -517,7 +515,6 @@ impl CustomProviderService {
                         raw_response: Some(body),
                         detected_elements: None,
                         detected_tables: None,
-                        ..Default::default()
                     })
                 }
                 None => Ok(TestSourceResult {
