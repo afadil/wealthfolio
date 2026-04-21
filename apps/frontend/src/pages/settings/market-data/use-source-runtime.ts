@@ -377,13 +377,13 @@ export function useSourceRuntime({
       form.setValue(`${prefix}.url`, t.url);
       form.setValue(`${prefix}.pricePath`, t.pricePath);
       form.setValue(`${prefix}.datePath`, t.datePath ?? "");
-      form.setValue(`${prefix}.dateFormat`, "");
+      form.setValue(`${prefix}.dateFormat`, t.dateFormat ?? "");
       form.setValue(`${prefix}.openPath`, t.openPath ?? "");
       form.setValue(`${prefix}.highPath`, t.highPath ?? "");
       form.setValue(`${prefix}.lowPath`, t.lowPath ?? "");
       form.setValue(`${prefix}.volumePath`, t.volumePath ?? "");
       form.setValue(`${prefix}.headers`, t.headers ?? "");
-      form.setValue(`${prefix}.currencyPath`, "");
+      form.setValue(`${prefix}.currencyPath`, t.currencyPath ?? "");
       form.setValue(`${prefix}.locale`, "");
       form.setValue(`${prefix}.factor`, undefined);
       form.setValue(`${prefix}.invert`, false);

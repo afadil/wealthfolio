@@ -7,6 +7,8 @@ export interface ProviderTemplate {
   url: string;
   pricePath: string;
   datePath?: string;
+  dateFormat?: string;
+  currencyPath?: string;
   openPath?: string;
   highPath?: string;
   lowPath?: string;
@@ -16,6 +18,17 @@ export interface ProviderTemplate {
 }
 
 export const LATEST_TEMPLATES: ProviderTemplate[] = [
+  {
+    name: "Vanguard",
+    description: "Workplace fund prices (fund code)",
+    format: "json",
+    url: "https://workplace.vanguard.com/investments/product-details/fund/api/price-distribution/fundPrice/{SYMBOL}?startDate={DATE:%Y-01-01}&endDate={TODAY}",
+    pricePath: "$.body.fundPrice.content[-1:].price",
+    datePath: "$.body.fundPrice.content[-1:].effectiveDate",
+    dateFormat: "%Y-%m-%d",
+    currencyPath: "$.body.fundPrice.content[-1:].currencyCode",
+    testSymbol: "M219",
+  },
   {
     name: "CoinGecko",
     description: "Free crypto (use coin ID: bitcoin, ethereum...)",
@@ -68,6 +81,17 @@ export const LATEST_TEMPLATES: ProviderTemplate[] = [
 ];
 
 export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
+  {
+    name: "Vanguard",
+    description: "Workplace fund price history (fund code)",
+    format: "json",
+    url: "https://workplace.vanguard.com/investments/product-details/fund/api/price-distribution/fundPrice/{SYMBOL}?startDate={FROM}&endDate={TO}",
+    pricePath: "$.body.fundPrice.content[*].price",
+    datePath: "$.body.fundPrice.content[*].effectiveDate",
+    dateFormat: "%Y-%m-%d",
+    currencyPath: "$.body.fundPrice.content[*].currencyCode",
+    testSymbol: "M219",
+  },
   {
     name: "Twelve Data (JSON)",
     description: "Stocks, crypto, FX (set API key in headers)",
