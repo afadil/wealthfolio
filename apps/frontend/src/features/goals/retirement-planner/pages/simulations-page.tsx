@@ -9,8 +9,6 @@ import {
   formatAmount,
 } from "@wealthfolio/ui";
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
   Legend,
   Line,
@@ -25,6 +23,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { RetirementPlan, RetirementIncomeStream } from "../types";
 import type { PlannerMode, RetirementOverview } from "@/lib/types";
+import { totalMonthlyExpenseAtAge } from "../lib/expense-items";
 import {
   runRetirementMonteCarlo,
   runRetirementStrategyComparison,
@@ -536,211 +535,6 @@ function ScenarioSection({
   );
 }
 
-// ─── Retirement Income Projection Section ─────────────────────────────────────
-
-const STREAM_COLORS = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#ec4899", "#14b8a6"];
-
-function IncomeProjectionSection({
-  plan,
-  actualFireAge,
-}: {
-  plan: RetirementPlan;
-  actualFireAge: number;
-}) {
-  const streams = plan.incomeStreams;
-  if (streams.length === 0) return null;
-
-  const { currentAge, planningHorizonAge } = plan.personal;
-  const horizonYears = Math.max(1, planningHorizonAge - currentAge);
-  const fireAge = actualFireAge;
-  const dcPayouts = resolveDcPayouts(
-    streams,
-    currentAge,
-    fireAge,
-    plan.withdrawal.safeWithdrawalRate,
-  );
-
-  const inflationRate = plan.investment.inflationRate;
-
-  function realStreamValue(s: (typeof streams)[number], i: number): number {
-    const baseMonthly = dcPayouts.get(s.id) ?? s.monthlyAmount ?? 0;
-    const rate =
-      s.annualGrowthRate !== undefined
-        ? s.annualGrowthRate
-        : s.adjustForInflation
-          ? inflationRate
-          : 0;
-    const nominal = baseMonthly * 12 * Math.pow(1 + rate, i);
-    return nominal / Math.pow(1 + inflationRate, i);
-  }
-
-  const totalMonthlyExpenses =
-    plan.expenses.living.monthlyAmount +
-    plan.expenses.healthcare.monthlyAmount +
-    (plan.expenses.housing?.monthlyAmount ?? 0) +
-    (plan.expenses.discretionary?.monthlyAmount ?? 0);
-  const realExpenses = totalMonthlyExpenses * 12;
-
-  const chartData = useMemo(() => {
-    return Array.from({ length: horizonYears + 1 }, (_, i) => {
-      const age = currentAge + i;
-      const entry: Record<string, number | null> = {
-        age,
-        expenses: age >= fireAge ? realExpenses : null,
-      };
-      for (const s of streams) {
-        entry[s.id] = age >= s.startAge ? realStreamValue(s, i) : 0;
-      }
-      return entry;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streams, fireAge, horizonYears, realExpenses]);
-
-  const keyAges = useMemo(() => {
-    const ages = new Set<number>([fireAge, fireAge + 5, fireAge + 10, fireAge + 20]);
-    streams.forEach((s) => ages.add(s.startAge));
-    return [...ages]
-      .filter((a) => a >= currentAge && a <= planningHorizonAge)
-      .sort((a, b) => a - b);
-  }, [streams, fireAge, currentAge, planningHorizonAge]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">Retirement Income Projection</CardTitle>
-        <p className="text-muted-foreground text-xs">
-          All amounts are shown in today's money. Inflation-indexed income appears flat; non-indexed
-          income loses purchasing power over time. The gap between retirement income and planned
-          spending is what the portfolio must cover each year.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="age" />
-            <YAxis tickFormatter={fmtCompact} />
-            <Tooltip
-              formatter={(value: number | undefined, name: string | undefined) => {
-                const stream = streams.find((s) => s.id === name);
-                const label = stream ? stream.label || "Stream" : (name ?? "");
-                return [fmt(value ?? 0, plan.currency), label];
-              }}
-              labelFormatter={(age) => `Age ${age} (today's money)`}
-            />
-            <Legend
-              formatter={(value) => {
-                const stream = streams.find((s) => s.id === value);
-                return stream ? stream.label || "Stream" : value;
-              }}
-            />
-            {streams.map((s, i) => (
-              <Area
-                key={s.id}
-                type="monotone"
-                dataKey={s.id}
-                name={s.id}
-                stackId="income"
-                stroke={STREAM_COLORS[i % STREAM_COLORS.length]}
-                fill={STREAM_COLORS[i % STREAM_COLORS.length]}
-                fillOpacity={0.35}
-                dot={false}
-              />
-            ))}
-            <Line
-              dataKey="expenses"
-              name="Planned retirement spending"
-              stroke="#ef4444"
-              dot={false}
-              strokeWidth={2}
-              strokeDasharray="5 3"
-              connectNulls={false}
-            />
-            <ReferenceLine
-              x={fireAge}
-              stroke="#94a3b8"
-              strokeDasharray="4 2"
-              label={{ value: "FIRE", position: "top", fontSize: 10 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-muted-foreground border-b">
-              <th className="pb-2 text-left">Age</th>
-              {streams.map((s) => (
-                <th key={s.id} className="pb-2 text-right">
-                  {s.label || "Stream"}
-                </th>
-              ))}
-              <th className="pb-2 text-right">Retirement income/yr</th>
-              <th className="pb-2 text-right">Planned spending/yr</th>
-              <th className="pb-2 text-right">Coverage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {keyAges.map((age) => {
-              const i = age - currentAge;
-              const totalIncome = streams.reduce((sum, s) => {
-                if (age < s.startAge) return sum;
-                return sum + realStreamValue(s, i);
-              }, 0);
-              const expenses = age >= fireAge ? realExpenses : null;
-              const coverage = expenses && expenses > 0 ? totalIncome / expenses : null;
-              const isFireRow = age === fireAge;
-
-              return (
-                <tr
-                  key={age}
-                  className={`border-b last:border-0 ${isFireRow ? "font-semibold" : ""}`}
-                >
-                  <td className="py-1.5">
-                    {age}
-                    {isFireRow && (
-                      <span className="text-muted-foreground ml-1 font-normal">(FIRE)</span>
-                    )}
-                  </td>
-                  {streams.map((s) => {
-                    if (age < s.startAge)
-                      return (
-                        <td key={s.id} className="text-muted-foreground py-1.5 text-right">
-                          —
-                        </td>
-                      );
-                    return (
-                      <td key={s.id} className="py-1.5 text-right">
-                        {fmt(realStreamValue(s, i), plan.currency)}
-                      </td>
-                    );
-                  })}
-                  <td className="py-1.5 text-right">{fmt(totalIncome, plan.currency)}</td>
-                  <td className="py-1.5 text-right">
-                    {expenses !== null ? fmt(expenses, plan.currency) : "—"}
-                  </td>
-                  <td
-                    className={`py-1.5 text-right font-medium ${
-                      coverage === null
-                        ? ""
-                        : coverage >= 1
-                          ? "text-green-600"
-                          : coverage >= 0.5
-                            ? "text-yellow-600"
-                            : "text-muted-foreground"
-                    }`}
-                  >
-                    {coverage !== null ? (coverage * 100).toFixed(0) + "%" : "—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── Sensitivity Analysis Section ─────────────────────────────────────────────
 
 function SensitivitySection({
@@ -967,12 +761,7 @@ function SorrSection({
     });
   }, [scenarios, retirementStartAge]);
 
-  const annualExpenses =
-    (plan.expenses.living.monthlyAmount +
-      plan.expenses.healthcare.monthlyAmount +
-      (plan.expenses.housing?.monthlyAmount ?? 0) +
-      (plan.expenses.discretionary?.monthlyAmount ?? 0)) *
-    12;
+  const annualExpenses = totalMonthlyExpenseAtAge(plan.expenses, retirementStartAge) * 12;
   const dcPayouts = resolveDcPayouts(
     plan.incomeStreams,
     plan.personal.currentAge,
@@ -1130,7 +919,6 @@ export default function SimulationsPage({
         plannerMode={plannerMode}
         goalId={goalId}
       />
-      <IncomeProjectionSection plan={plan} actualFireAge={actualRetirementStartAge} />
       <SensitivitySection
         plan={plan}
         totalValue={portfolioNow}

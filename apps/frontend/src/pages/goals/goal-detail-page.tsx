@@ -8,14 +8,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  AnimatedToggleGroup,
   Page,
   PageContent,
   PageHeader,
   Skeleton,
   Tabs,
   TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -37,11 +36,9 @@ import {
 } from "@/features/goals/retirement-planner/lib/plan-adapter";
 import { usePortfolioData } from "@/features/goals/retirement-planner/hooks/use-portfolio";
 import DashboardPage from "@/features/goals/retirement-planner/pages/dashboard-page";
+import RiskLabPage from "@/features/goals/retirement-planner/pages/risk-lab-page";
 import SimulationsPage from "@/features/goals/retirement-planner/pages/simulations-page";
-import AllocationPage from "@/features/goals/retirement-planner/pages/allocation-page";
-import SettingsPage from "@/features/goals/retirement-planner/pages/settings-page";
 import SaveUpDetailPage from "./components/save-up-detail";
-import { GoalFundingEditor } from "./components/goal-funding-editor";
 import { GoalEditDialog } from "./components/goal-edit-dialog";
 
 const GOAL_TYPE_LABELS: Record<string, string> = {
@@ -95,8 +92,8 @@ export default function GoalDetailPage() {
   // Feed portfolio data from funding-rule-derived accounts
   const portfolioData = usePortfolioData(isRetirement ? eligibleAccountIds : undefined);
 
-  // Default tab: plan if setup, overview otherwise
-  const [activeTab, setActiveTab] = useState(isSetup ? "plan" : "overview");
+  // Setup now lands on Overview because all primary settings live in the dashboard sidebar.
+  const [activeTab, setActiveTab] = useState("overview");
 
   // On setup, auto-create the retirement plan
   const planCreationPending = savePlanMutation.isPending;
@@ -189,24 +186,81 @@ export default function GoalDetailPage() {
       ],
     },
   ] satisfies ActionPaletteGroup[];
-
-  return (
-    <Page>
+  const hasRetirementTabs = isRetirement && Boolean(plan);
+  const retirementTabItems = [
+    {
+      value: "overview",
+      label: (
+        <span className="flex items-center gap-2">
+          <Icons.CircleGauge className="size-3.5" />
+          Overview
+        </span>
+      ),
+    },
+    {
+      value: "scenarios",
+      label: (
+        <span className="flex items-center gap-2">
+          <Icons.Wand2 className="size-3.5" />
+          Scenarios
+        </span>
+      ),
+    },
+    {
+      value: "risk-lab",
+      label: (
+        <span className="flex items-center gap-2">
+          <Icons.ShieldAlert className="size-3.5" />
+          Risk Lab
+        </span>
+      ),
+    },
+  ];
+  const retirementTabs = hasRetirementTabs ? (
+    <div className="hidden md:block">
+      <AnimatedToggleGroup
+        variant="default"
+        size="sm"
+        rounded="full"
+        className="bg-muted/60 p-1"
+        items={retirementTabItems}
+        value={activeTab}
+        onValueChange={setActiveTab}
+      />
+    </div>
+  ) : null;
+  const mobileRetirementTabs = hasRetirementTabs ? (
+    <div className="mb-4 md:hidden">
+      <AnimatedToggleGroup
+        variant="default"
+        size="sm"
+        rounded="full"
+        className="bg-muted/60 p-1"
+        items={retirementTabItems}
+        value={activeTab}
+        onValueChange={setActiveTab}
+      />
+    </div>
+  ) : null;
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {retirementTabs}
+      {goal.statusLifecycle === "achieved" && <Badge variant="default">Achieved</Badge>}
+      <ActionPalette
+        open={actionPaletteOpen}
+        onOpenChange={setActionPaletteOpen}
+        title={goal.title}
+        groups={actionGroups}
+      />
+    </div>
+  );
+  const content = (
+    <>
       <PageHeader
         heading={goal.title}
         text={goal.description ? `${typeLabel} goal · ${goal.description}` : `${typeLabel} goal`}
         onBack={() => navigate("/goals")}
-        actions={
-          <div className="flex items-center gap-2">
-            {goal.statusLifecycle === "achieved" && <Badge variant="default">Achieved</Badge>}
-            <ActionPalette
-              open={actionPaletteOpen}
-              onOpenChange={setActionPaletteOpen}
-              title={goal.title}
-              groups={actionGroups}
-            />
-          </div>
-        }
+        actions={headerActions}
       />
       {goal && <GoalEditDialog goal={goal} open={editOpen} onClose={() => setEditOpen(false)} />}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -240,17 +294,19 @@ export default function GoalDetailPage() {
       <PageContent>
         {isRetirement ? (
           plan ? (
-            <RetirementDetail
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              plan={retirementPlan}
-              portfolioData={portfolioData}
-              onSavePlan={handleSaveRetirementPlan}
-              plannerMode={(plan.plannerMode! as "fire" | "traditional") ?? "fire"}
-              goalId={goalId!}
-              dcLinkedAccountIds={dcLinkedAccountIds}
-              retirementOverview={retirementOverview}
-            />
+            <>
+              {mobileRetirementTabs}
+              <RetirementDetail
+                onTabChange={setActiveTab}
+                plan={retirementPlan}
+                portfolioData={portfolioData}
+                onSavePlan={handleSaveRetirementPlan}
+                plannerMode={(plan.plannerMode! as "fire" | "traditional") ?? "fire"}
+                goalId={goalId!}
+                dcLinkedAccountIds={dcLinkedAccountIds}
+                retirementOverview={retirementOverview}
+              />
+            </>
           ) : (
             <div className="space-y-3">
               <Skeleton className="h-10 w-64" />
@@ -267,12 +323,23 @@ export default function GoalDetailPage() {
           </div>
         )}
       </PageContent>
+    </>
+  );
+
+  return (
+    <Page>
+      {hasRetirementTabs ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="contents">
+          {content}
+        </Tabs>
+      ) : (
+        content
+      )}
     </Page>
   );
 }
 
 function RetirementDetail({
-  activeTab,
   onTabChange,
   plan,
   portfolioData,
@@ -282,7 +349,6 @@ function RetirementDetail({
   dcLinkedAccountIds,
   retirementOverview,
 }: {
-  activeTab: string;
   onTabChange: (tab: string) => void;
   plan: RetirementPlan;
   portfolioData: ReturnType<typeof usePortfolioData>;
@@ -293,15 +359,7 @@ function RetirementDetail({
   retirementOverview?: RetirementOverview;
 }) {
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="plan">Plan</TabsTrigger>
-        <TabsTrigger value="funding">Funding</TabsTrigger>
-        <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
-        <TabsTrigger value="allocation">Allocation</TabsTrigger>
-      </TabsList>
-
+    <>
       <TabsContent value="overview">
         <DashboardPage
           plan={plan}
@@ -312,26 +370,6 @@ function RetirementDetail({
           onNavigateToTab={onTabChange}
           retirementOverview={retirementOverview}
           goalId={goalId}
-          dcLinkedAccountIds={dcLinkedAccountIds}
-        />
-      </TabsContent>
-
-      <TabsContent value="plan">
-        <SettingsPage
-          plan={plan}
-          onSave={onSavePlan}
-          isSaving={false}
-          holdings={portfolioData.holdings}
-          accountIds={portfolioData.activeAccountIds}
-          accounts={portfolioData.accounts}
-          activeAccounts={portfolioData.activeAccounts}
-        />
-      </TabsContent>
-
-      <TabsContent value="funding">
-        <GoalFundingEditor
-          goalId={goalId}
-          goalType="retirement"
           dcLinkedAccountIds={dcLinkedAccountIds}
         />
       </TabsContent>
@@ -347,15 +385,16 @@ function RetirementDetail({
         />
       </TabsContent>
 
-      <TabsContent value="allocation">
-        <AllocationPage
+      <TabsContent value="risk-lab">
+        <RiskLabPage
           plan={plan}
-          holdings={portfolioData.holdings}
-          accountIds={portfolioData.activeAccountIds}
+          totalValue={portfolioData.totalValue}
           isLoading={portfolioData.isLoading}
-          onSetupTargets={() => onTabChange("plan")}
+          retirementOverview={retirementOverview}
+          plannerMode={plannerMode}
+          goalId={goalId}
         />
       </TabsContent>
-    </Tabs>
+    </>
   );
 }

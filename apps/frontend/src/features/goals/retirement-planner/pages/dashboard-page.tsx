@@ -11,22 +11,31 @@ import {
   formatAmount,
   formatPercent,
   Input,
+  MoneyInput,
   Skeleton,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
+  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip as RTooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  activeExpenseItems,
+  createExpenseItem,
+  expenseAgeRangeLabel,
+  expenseItems,
+  totalMonthlyExpenseAtAge,
+} from "../lib/expense-items";
 import type {
-  ExpenseBucket,
+  ExpenseItem,
   InvestmentAssumptions,
   RetirementIncomeStream,
   RetirementPlan,
@@ -81,6 +90,7 @@ function fmtCompact(value: number, currency: string) {
 }
 
 type ChartValueMode = "real" | "nominal";
+type CoverageView = "at-retirement" | "over-time";
 
 function ValueModeToggle({
   value,
@@ -171,6 +181,83 @@ const INCOME_STREAM_COLORS = [
   "var(--fi-stream-5)",
 ];
 
+const COVERAGE_COLORS = {
+  income: "var(--fi-stream-1)",
+  portfolio: CHART_COLORS.portfolio.stroke,
+  shortfall: "hsl(8, 67%, 48%)",
+  planned: "#888",
+};
+
+interface CoverageProjectionPoint {
+  label: string;
+  age: number;
+  plannedSpending: number;
+  retirementIncome: number;
+  portfolioWithdrawal: number;
+  shortfall: number;
+  taxes: number;
+}
+
+function projectedAnnualExpenseNominalAtAge(plan: RetirementPlan, age: number) {
+  const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+  return activeExpenseItems(plan.expenses, age).reduce((sum, item) => {
+    const rate = item.inflationRate ?? plan.investment.inflationRate;
+    return sum + item.monthlyAmount * 12 * Math.pow(1 + rate, yearsFromNow);
+  }, 0);
+}
+
+function projectedDcMonthlyPayout(
+  stream: RetirementIncomeStream,
+  currentAge: number,
+  retirementAge: number,
+  safeWithdrawalRate: number,
+) {
+  const totalYears = Math.max(0, stream.startAge - currentAge);
+  const contribYears = Math.max(0, Math.min(stream.startAge, retirementAge) - currentAge);
+  const growthOnlyYears = totalYears - contribYears;
+  const r = stream.accumulationReturn ?? 0.04;
+  const initial = stream.currentValue ?? 0;
+  const monthly = stream.monthlyContribution ?? 0;
+  const fvLump = initial * Math.pow(1 + r, totalYears);
+  const fvAnnuityAtStop =
+    r > 1e-9
+      ? (monthly * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+      : monthly * 12 * contribYears;
+  const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+  return ((fvLump + fvAnnuity) * safeWithdrawalRate) / 12;
+}
+
+function projectedAnnualIncomeNominalAtAge(
+  plan: RetirementPlan,
+  age: number,
+  retirementAge: number,
+) {
+  const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+
+  return plan.incomeStreams.reduce((sum, stream) => {
+    if (age < stream.startAge) return sum;
+
+    const baseMonthly =
+      stream.streamType === "dc"
+        ? projectedDcMonthlyPayout(
+            stream,
+            plan.personal.currentAge,
+            retirementAge,
+            plan.withdrawal.safeWithdrawalRate,
+          )
+        : (stream.monthlyAmount ?? 0);
+    const annual = baseMonthly * 12;
+
+    if (stream.annualGrowthRate !== undefined) {
+      return sum + annual * Math.pow(1 + stream.annualGrowthRate, yearsFromNow);
+    }
+    if (stream.adjustForInflation) {
+      return sum + annual * Math.pow(1 + plan.investment.inflationRate, yearsFromNow);
+    }
+    return sum + annual;
+  }, 0);
+}
+
 function RetirementChartTooltip({
   active,
   payload,
@@ -215,7 +302,7 @@ function RetirementChartTooltip({
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-1.5">
             <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
-            <span className="text-muted-foreground text-xs">Required path:</span>
+            <span className="text-muted-foreground text-xs">What you'll need:</span>
           </div>
           <span className="text-xs font-semibold tabular-nums">
             {fmtCompact(point.target, currency)}
@@ -270,6 +357,104 @@ function RetirementChartTooltip({
   );
 }
 
+function CoverageProjectionTooltip({
+  active,
+  payload,
+  currency,
+  valueMode,
+}: {
+  active?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  payload?: any[];
+  currency: string;
+  valueMode: ChartValueMode;
+}) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload as CoverageProjectionPoint | undefined;
+  if (!point) return null;
+  const valueLabel = valueMode === "real" ? "today's money" : "nominal money";
+  const funded = point.retirementIncome + point.portfolioWithdrawal;
+  const coveragePct =
+    point.plannedSpending > 0 ? Math.min(100, (funded / point.plannedSpending) * 100) : 0;
+
+  return (
+    <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2.5 shadow-md">
+      <p className="text-muted-foreground text-xs font-medium">
+        Age {point.age} · {valueLabel}
+      </p>
+      <div className="flex items-center justify-between gap-5">
+        <div className="flex items-center gap-1.5">
+          <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
+          <span className="text-muted-foreground text-xs">Planned spending/yr:</span>
+        </div>
+        <span className="text-xs font-semibold tabular-nums">
+          {fmtCompact(point.plannedSpending, currency)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-5">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="block h-2 w-2 rounded-sm"
+            style={{ backgroundColor: COVERAGE_COLORS.income }}
+          />
+          <span className="text-muted-foreground text-xs">Retirement income used/yr:</span>
+        </div>
+        <span className="text-xs font-semibold tabular-nums">
+          {fmtCompact(point.retirementIncome, currency)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-5">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="block h-2 w-2 rounded-sm"
+            style={{ backgroundColor: COVERAGE_COLORS.portfolio }}
+          />
+          <span className="text-muted-foreground text-xs">Portfolio withdrawal used/yr:</span>
+        </div>
+        <span className="text-xs font-semibold tabular-nums">
+          {fmtCompact(point.portfolioWithdrawal, currency)}
+        </span>
+      </div>
+      {point.shortfall > 0 && (
+        <div className="flex items-center justify-between gap-5">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="block h-2 w-2 rounded-sm"
+              style={{ backgroundColor: COVERAGE_COLORS.shortfall }}
+            />
+            <span className="text-muted-foreground text-xs">Unfunded spending/yr:</span>
+          </div>
+          <span className="text-xs font-semibold tabular-nums text-red-500">
+            {fmtCompact(point.shortfall, currency)}
+          </span>
+        </div>
+      )}
+      {point.taxes > 0 && (
+        <div className="flex items-center justify-between gap-5">
+          <span className="text-muted-foreground text-xs">Withdrawal taxes/yr:</span>
+          <span className="text-xs font-semibold tabular-nums">
+            +{fmtCompact(point.taxes, currency)}
+          </span>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-5 border-t pt-1">
+        <span className="text-muted-foreground text-xs">Spending covered:</span>
+        <span
+          className={`text-xs font-semibold tabular-nums ${
+            coveragePct >= 100
+              ? "text-green-600"
+              : coveragePct >= 75
+                ? "text-amber-600"
+                : "text-red-500"
+          }`}
+        >
+          {coveragePct.toFixed(0)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function RetirementChart({
   data,
   currency,
@@ -293,8 +478,8 @@ function RetirementChart({
 
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data} margin={{ top: 24, right: 10, left: 0, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={280}>
+        <AreaChart data={data} margin={{ top: 24, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="retirementPortfolio" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={CHART_COLORS.portfolio.fill} stopOpacity={0.3} />
@@ -364,7 +549,7 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="target"
-            name="Required capital path"
+            name="What you'll need"
             stroke="#888"
             strokeWidth={1.5}
             strokeDasharray="6 4"
@@ -377,7 +562,7 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="portfolio"
-            name="Projected portfolio"
+            name="What you'll have"
             stroke={CHART_COLORS.portfolio.stroke}
             strokeWidth={1.5}
             fill="url(#retirementPortfolio)"
@@ -468,44 +653,11 @@ function SidebarTotalRow({ amount, currency }: { amount: number; currency: strin
   );
 }
 
-/** Inline number input */
-function InlineField({
-  label,
-  value,
-  onChange,
-  step = 1,
-  min,
-  suffix,
-}: {
-  label: React.ReactNode;
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  min?: number;
-  suffix?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="text-muted-foreground min-w-0 shrink text-xs font-normal">{label}</div>
-      <div className="flex items-center gap-1">
-        <Input
-          type="number"
-          value={value}
-          step={step}
-          min={min}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="h-7 w-20 px-2 text-right text-xs tabular-nums"
-        />
-        {suffix && <span className="text-muted-foreground text-[10px]">{suffix}</span>}
-      </div>
-    </div>
-  );
-}
-
 /** A lever: title + hint + compact readout input + full-width slider. */
 function LeverRow({
   label,
   hint,
+  kind = "number",
   value,
   onChange,
   min,
@@ -515,8 +667,9 @@ function LeverRow({
   suffix,
   format,
 }: {
-  label: string;
+  label: React.ReactNode;
   hint?: string;
+  kind?: "money" | "number";
   value: number;
   onChange: (v: number) => void;
   min: number;
@@ -526,37 +679,49 @@ function LeverRow({
   suffix?: string;
   format: (v: number) => string;
 }) {
-  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  const clampedValue = Math.min(max, Math.max(min, value));
+  const pct = max > min ? ((clampedValue - min) / (max - min)) * 100 : 0;
+  const inputScale = suffix === "%" ? 100 : 1;
+  const clampInputValue = (next: number) =>
+    Math.min(max * inputScale, Math.max(min * inputScale, next)) / inputScale;
+
   return (
     <div className="py-4 first:pt-1 last:pb-1">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-foreground text-[15px] font-semibold leading-tight">{label}</div>
+          <div className="text-foreground text-sm font-semibold leading-tight">{label}</div>
           {hint && <div className="text-muted-foreground mt-1 text-xs leading-tight">{hint}</div>}
         </div>
-        <div className="bg-muted/70 flex h-8 min-w-[96px] items-center gap-1 rounded-md border px-2.5">
+        <div className="bg-muted/70 flex h-8 w-32 items-center gap-1 rounded-md border px-2.5">
           {prefix && <span className="text-muted-foreground text-xs tabular-nums">{prefix}</span>}
-          <input
-            type="number"
-            value={format(value)}
-            step={step}
-            min={min}
-            max={max}
-            onChange={(e) => {
-              const parsed = parseFloat(e.target.value);
-              if (!Number.isNaN(parsed)) {
-                const clamped = Math.min(max, Math.max(min, parsed));
-                onChange(suffix === "%" ? clamped / 100 : clamped);
-              }
-            }}
-            className="text-foreground w-full min-w-0 bg-transparent text-right text-sm tabular-nums outline-none"
-          />
+          {kind === "money" ? (
+            <MoneyInput
+              value={value}
+              onValueChange={(next) => onChange(Math.min(max, Math.max(min, next ?? 0)))}
+              thousandSeparator
+              maxDecimalPlaces={0}
+              className="text-foreground h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-right text-sm tabular-nums shadow-none outline-none ring-0 focus-visible:ring-0"
+            />
+          ) : (
+            <input
+              type="text"
+              inputMode={suffix === "%" ? "decimal" : "numeric"}
+              value={format(value)}
+              onChange={(e) => {
+                const parsed = parseFloat(e.target.value.replace(/,/g, ""));
+                if (!Number.isNaN(parsed)) {
+                  onChange(clampInputValue(parsed));
+                }
+              }}
+              className="text-foreground w-full min-w-0 bg-transparent text-right text-sm tabular-nums outline-none"
+            />
+          )}
           {suffix && <span className="text-muted-foreground text-xs tabular-nums">{suffix}</span>}
         </div>
       </div>
       <input
         type="range"
-        value={value}
+        value={clampedValue}
         min={min}
         max={max}
         step={step}
@@ -570,6 +735,99 @@ function LeverRow({
 
 function pctOfTotal(value: number, total: number) {
   return total > 0 ? ((value / total) * 100).toFixed(0) + "%" : "0%";
+}
+
+function sliderMaxFor(value: number, baseMax: number, increment: number) {
+  return Math.max(baseMax, Math.ceil(value / increment) * increment + increment);
+}
+
+function AgeBoundInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  min,
+  max,
+}: {
+  label: string;
+  value?: number;
+  onChange: (value: number | undefined) => void;
+  placeholder: string;
+  min: number;
+  max: number;
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-muted-foreground text-xs font-medium">{label}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value ?? ""}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (!raw) {
+            onChange(undefined);
+            return;
+          }
+          const parsed = parseInt(raw, 10);
+          if (!Number.isNaN(parsed)) onChange(Math.min(max, Math.max(min, parsed)));
+        }}
+        className="bg-muted/70 text-foreground h-8 w-full rounded-md border px-2.5 text-right text-sm tabular-nums outline-none placeholder:text-left placeholder:text-xs"
+      />
+    </label>
+  );
+}
+
+function PercentOverrideInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value?: number;
+  placeholder: string;
+  onChange: (value: number | undefined) => void;
+}) {
+  const formatDraft = useCallback(
+    (next?: number) => (next === undefined ? "" : (next * 100).toFixed(1)),
+    [],
+  );
+  const [draft, setDraft] = useState(formatDraft(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(formatDraft(value));
+  }, [focused, formatDraft, value]);
+
+  return (
+    <div className="bg-muted/70 flex h-8 w-full items-center gap-1 rounded-md border px-2.5">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setDraft(formatDraft(value));
+        }}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/,/g, "");
+          setDraft(raw);
+          if (!raw.trim()) {
+            onChange(undefined);
+            return;
+          }
+          const parsed = parseFloat(raw);
+          if (!Number.isNaN(parsed)) {
+            onChange(Math.min(50, Math.max(0, parsed)) / 100);
+          }
+        }}
+        className="text-foreground min-w-0 flex-1 bg-transparent text-right text-sm tabular-nums outline-none placeholder:text-left placeholder:text-xs"
+      />
+      <span className="text-muted-foreground text-xs tabular-nums">%</span>
+    </div>
+  );
 }
 
 /** A single sidebar card: title + edit button → read rows or edit fields */
@@ -594,6 +852,17 @@ function SidebarCard({
   readContent: React.ReactNode;
   editContent: React.ReactNode;
 }) {
+  const renderEditActions = () => (
+    <div className="flex items-center justify-end gap-1.5">
+      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button size="sm" className="h-7 text-xs" onClick={onSave} disabled={!dirty}>
+        Save
+      </Button>
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between pb-4">
@@ -606,14 +875,7 @@ function SidebarCard({
           <CardTitle className="text-md leading-none tracking-tight">{title}</CardTitle>
         </div>
         {editing ? (
-          <div className="flex gap-1.5">
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button size="sm" className="h-7 text-xs" onClick={onSave} disabled={!dirty}>
-              Save
-            </Button>
-          </div>
+          renderEditActions()
         ) : (
           <button
             type="button"
@@ -627,7 +889,16 @@ function SidebarCard({
         )}
       </CardHeader>
       <CardContent>
-        {editing ? <div className="space-y-2.5">{editContent}</div> : readContent}
+        {editing ? (
+          <div className="space-y-3">
+            <div className="space-y-2.5">{editContent}</div>
+            <div className="border-border flex justify-end border-t pt-3">
+              {renderEditActions()}
+            </div>
+          </div>
+        ) : (
+          readContent
+        )}
       </CardContent>
     </Card>
   );
@@ -652,12 +923,16 @@ function SidebarConfigurator({
   const [draft, setDraft] = useState<RetirementPlan>(() => structuredClone(plan));
   const [dirty, setDirty] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
+  const [expandedIncomeId, setExpandedIncomeId] = useState<string | null>(null);
 
   const planKey = JSON.stringify(plan);
   useMemo(() => {
     setDraft(structuredClone(plan));
     setDirty(false);
     setEditingSection(null);
+    setExpandedExpenseId(null);
+    setExpandedIncomeId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planKey]);
 
@@ -670,12 +945,16 @@ function SidebarConfigurator({
     onSavePlan?.(draft);
     setDirty(false);
     setEditingSection(null);
+    setExpandedExpenseId(null);
+    setExpandedIncomeId(null);
   }, [draft, onSavePlan]);
 
   const cancelEdit = useCallback(() => {
     setDraft(structuredClone(plan));
     setDirty(false);
     setEditingSection(null);
+    setExpandedExpenseId(null);
+    setExpandedIncomeId(null);
   }, [plan]);
 
   // Shorthand updaters
@@ -704,22 +983,43 @@ function SidebarConfigurator({
       },
     }));
 
-  const setExpense = (
-    bucket: "living" | "healthcare" | "housing" | "discretionary",
-    patch: Partial<ExpenseBucket>,
-  ) =>
+  const updateExpenseItem = (id: string, patch: Partial<ExpenseItem>) =>
     update((d) => ({
       ...d,
-      expenses: { ...d.expenses, [bucket]: { ...d.expenses[bucket], ...patch } },
+      expenses: {
+        items: expenseItems(d.expenses).map((item) =>
+          item.id === id ? { ...item, ...patch } : item,
+        ),
+      },
     }));
 
+  const addExpenseItem = (label: string, patch: Partial<ExpenseItem> = {}) => {
+    const item = createExpenseItem(label, 0, patch);
+    update((d) => ({
+      ...d,
+      expenses: {
+        items: [...expenseItems(d.expenses), item],
+      },
+    }));
+    setExpandedExpenseId(item.id);
+  };
+
+  const removeExpenseItem = (id: string) => {
+    update((d) => ({
+      ...d,
+      expenses: { items: expenseItems(d.expenses).filter((item) => item.id !== id) },
+    }));
+    setExpandedExpenseId((current) => (current === id ? null : current));
+  };
+
   const addStream = (preset?: Partial<RetirementIncomeStream>) => {
+    const id = crypto.randomUUID?.() ?? `stream-${Date.now()}`;
     update((d) => ({
       ...d,
       incomeStreams: [
         ...d.incomeStreams,
         {
-          id: crypto.randomUUID?.() ?? `stream-${Date.now()}`,
+          id,
           label: preset?.label ?? `Income ${d.incomeStreams.length + 1}`,
           streamType: "db" as const,
           startAge: preset?.startAge ?? d.personal.targetRetirementAge,
@@ -730,6 +1030,7 @@ function SidebarConfigurator({
       ],
     }));
     setEditingSection("income");
+    setExpandedIncomeId(id);
   };
 
   const updateStream = (id: string, patch: Partial<RetirementIncomeStream>) =>
@@ -738,8 +1039,10 @@ function SidebarConfigurator({
       incomeStreams: d.incomeStreams.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     }));
 
-  const removeStream = (id: string) =>
+  const removeStream = (id: string) => {
     update((d) => ({ ...d, incomeStreams: d.incomeStreams.filter((s) => s.id !== id) }));
+    setExpandedIncomeId((current) => (current === id ? null : current));
+  };
 
   const taxBucketBalances = retirementOverview?.taxBucketBalances;
   const taxBucketTotal = taxBucketBalances
@@ -787,7 +1090,7 @@ function SidebarConfigurator({
             <ConfigRow label="Desired retirement age">
               {draft.personal.targetRetirementAge}
             </ConfigRow>
-            <ConfigRow label="Plan through age">{draft.personal.planningHorizonAge}</ConfigRow>
+            <ConfigRow label="Life expectancy">{draft.personal.planningHorizonAge}</ConfigRow>
             <ConfigRow label="Monthly contribution until retirement">
               {formatAmount(draft.investment.monthlyContribution, currency)}
             </ConfigRow>
@@ -799,24 +1102,79 @@ function SidebarConfigurator({
         editContent={
           <div className="divide-border -my-1 divide-y">
             <LeverRow
+              label="Current age"
+              hint="Your age today"
+              value={draft.personal.currentAge}
+              onChange={(v) => {
+                const currentAge = Math.round(v);
+                update((d) => {
+                  const targetRetirementAge = Math.max(
+                    currentAge + 1,
+                    d.personal.targetRetirementAge,
+                  );
+                  const planningHorizonAge = Math.max(
+                    targetRetirementAge + 1,
+                    d.personal.planningHorizonAge,
+                  );
+                  return {
+                    ...d,
+                    personal: {
+                      ...d.personal,
+                      currentAge,
+                      targetRetirementAge,
+                      planningHorizonAge,
+                    },
+                  };
+                });
+              }}
+              min={1}
+              max={Math.max(1, draft.personal.targetRetirementAge - 1)}
+              step={1}
+              format={(v) => String(Math.round(v))}
+            />
+            <LeverRow
               label="Retirement age"
               hint="Target age to stop working"
               value={draft.personal.targetRetirementAge}
-              onChange={(v) => setPersonal("targetRetirementAge", Math.round(v))}
+              onChange={(v) => {
+                const targetRetirementAge = Math.round(v);
+                update((d) => ({
+                  ...d,
+                  personal: {
+                    ...d.personal,
+                    targetRetirementAge,
+                    planningHorizonAge: Math.max(
+                      targetRetirementAge + 1,
+                      d.personal.planningHorizonAge,
+                    ),
+                  },
+                }));
+              }}
               min={draft.personal.currentAge + 1}
-              max={75}
+              max={Math.max(draft.personal.currentAge + 1, draft.personal.planningHorizonAge - 1)}
               step={1}
-              format={(v) => String(v)}
+              format={(v) => String(Math.round(v))}
+            />
+            <LeverRow
+              label="Life expectancy"
+              hint="Last age the plan should fund"
+              value={draft.personal.planningHorizonAge}
+              onChange={(v) => setPersonal("planningHorizonAge", Math.round(v))}
+              min={draft.personal.targetRetirementAge + 1}
+              max={110}
+              step={1}
+              format={(v) => String(Math.round(v))}
             />
             <LeverRow
               label="Monthly contribution"
+              kind="money"
               value={draft.investment.monthlyContribution}
               onChange={(v) => setInvestment("monthlyContribution", v)}
               min={0}
-              max={20000}
+              max={sliderMaxFor(draft.investment.monthlyContribution, 20000, 5000)}
               step={100}
               prefix="$"
-              format={(v) => v.toLocaleString()}
+              format={(v) => String(Math.round(v))}
             />
             <LeverRow
               label="Return before retirement"
@@ -878,38 +1236,34 @@ function SidebarConfigurator({
         kicker="Spending"
         title="Retirement Spending"
         editing={editingSection === "expenses"}
-        onEdit={() => setEditingSection("expenses")}
+        onEdit={() => {
+          setEditingSection("expenses");
+          setExpandedExpenseId(null);
+        }}
         onSave={saveDraft}
         onCancel={cancelEdit}
         dirty={dirty}
         readContent={(() => {
           const retireAge = draft.personal.targetRetirementAge;
           const horizonAge = draft.personal.planningHorizonAge;
-          const ageRange = `Age ${retireAge} → ${horizonAge}`;
-          const items: { label: string; amount: number }[] = [
-            { label: "Living", amount: draft.expenses.living.monthlyAmount },
-          ];
-          if (draft.expenses.healthcare.monthlyAmount >= 0) {
-            items.push({ label: "Healthcare", amount: draft.expenses.healthcare.monthlyAmount });
-          }
-          if (draft.expenses.housing) {
-            items.push({ label: "Housing", amount: draft.expenses.housing.monthlyAmount });
-          }
-          if (draft.expenses.discretionary) {
-            items.push({
-              label: "Discretionary",
-              amount: draft.expenses.discretionary.monthlyAmount,
-            });
-          }
-          const total = items.reduce((s, i) => s + i.amount, 0);
+          const items = expenseItems(draft.expenses);
+          const total = totalMonthlyExpenseAtAge(draft.expenses, retireAge);
           return (
             <div className="divide-border divide-y">
               {items.map((it) => (
                 <SidebarMonthlyRow
-                  key={it.label}
+                  key={it.id}
                   label={it.label}
-                  meta={ageRange}
-                  amount={it.amount}
+                  meta={[
+                    expenseAgeRangeLabel(it, horizonAge),
+                    (it.essential ?? true) ? "Must-have" : "Flexible",
+                    it.inflationRate !== undefined
+                      ? `${(it.inflationRate * 100).toFixed(1)}% inflation`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  amount={it.monthlyAmount}
                   currency={currency}
                 />
               ))}
@@ -918,92 +1272,165 @@ function SidebarConfigurator({
           );
         })()}
         editContent={
-          <>
-            <InlineField
-              label="Living spending"
-              value={draft.expenses.living.monthlyAmount}
-              onChange={(v) => setExpense("living", { monthlyAmount: v })}
-              step={100}
-              suffix="/mo"
-            />
-            <InlineField
-              label="Healthcare spending"
-              value={draft.expenses.healthcare.monthlyAmount}
-              onChange={(v) => setExpense("healthcare", { monthlyAmount: v })}
-              step={50}
-              suffix="/mo"
-            />
-            {draft.expenses.housing && (
-              <div className="flex items-center gap-1">
-                <div className="flex-1">
-                  <InlineField
-                    label="Housing spending"
-                    value={draft.expenses.housing.monthlyAmount}
-                    onChange={(v) => setExpense("housing", { monthlyAmount: v })}
-                    step={100}
-                    suffix="/mo"
-                  />
+          <div className="space-y-3">
+            {expenseItems(draft.expenses).map((item) => {
+              const expanded = expandedExpenseId === item.id;
+              const meta = [
+                expenseAgeRangeLabel(item, draft.personal.planningHorizonAge),
+                (item.essential ?? true) ? "Must-have" : "Flexible",
+                item.inflationRate !== undefined
+                  ? `${(item.inflationRate * 100).toFixed(1)}% inflation`
+                  : "Plan inflation",
+              ].join(" · ");
+
+              return (
+                <div
+                  key={item.id}
+                  className={`overflow-hidden rounded-lg border transition-colors ${
+                    expanded ? "bg-muted/20" : "bg-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedExpenseId(expanded ? null : item.id)}
+                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                      aria-expanded={expanded}
+                    >
+                      <Icons.ChevronDown
+                        className={`text-muted-foreground h-3.5 w-3.5 shrink-0 transition-transform ${
+                          expanded ? "rotate-180" : ""
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-foreground block truncate text-sm font-semibold">
+                          {item.label || "Spending"}
+                        </span>
+                        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+                          {meta}
+                        </span>
+                      </span>
+                      <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
+                        {formatAmount(item.monthlyAmount, currency)}
+                        <span className="text-muted-foreground text-xs font-normal">/mo</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeExpenseItem(item.id)}
+                      className="text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground mr-2 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`Remove ${item.label || "spending item"}`}
+                      disabled={expenseItems(draft.expenses).length <= 1}
+                    >
+                      <Icons.X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {expanded && (
+                    <div className="space-y-4 border-t px-3 pb-3 pt-3">
+                      <Input
+                        value={item.label}
+                        onChange={(e) => updateExpenseItem(item.id, { label: e.target.value })}
+                        placeholder="Spending name"
+                        className="bg-muted/70 h-8 px-2 text-sm font-semibold shadow-none"
+                      />
+                      <LeverRow
+                        label="Monthly spending"
+                        kind="money"
+                        value={item.monthlyAmount}
+                        onChange={(v) => updateExpenseItem(item.id, { monthlyAmount: v })}
+                        min={0}
+                        max={sliderMaxFor(item.monthlyAmount, 20000, 5000)}
+                        step={100}
+                        prefix="$"
+                        suffix="/mo"
+                        format={(v) => String(Math.round(v))}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <AgeBoundInput
+                          label="From age"
+                          value={item.startAge}
+                          onChange={(v) => updateExpenseItem(item.id, { startAge: v })}
+                          placeholder="Retirement"
+                          min={draft.personal.currentAge}
+                          max={draft.personal.planningHorizonAge}
+                        />
+                        <AgeBoundInput
+                          label="To age"
+                          value={item.endAge}
+                          onChange={(v) => updateExpenseItem(item.id, { endAge: v })}
+                          placeholder={`${draft.personal.planningHorizonAge}`}
+                          min={draft.personal.currentAge + 1}
+                          max={draft.personal.planningHorizonAge}
+                        />
+                      </div>
+                      <div className="bg-muted/20 grid gap-3 rounded-lg border p-3">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-3">
+                          <div className="min-w-0">
+                            <div className="text-foreground text-xs font-semibold">
+                              Spending type
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                              Guardrails protect must-have spending before flexible spending.
+                            </div>
+                          </div>
+                          <AnimatedToggleGroup<"essential" | "flexible">
+                            variant="secondary"
+                            size="xs"
+                            items={[
+                              { value: "essential", label: "Must-have" },
+                              { value: "flexible", label: "Flexible" },
+                            ]}
+                            value={(item.essential ?? true) ? "essential" : "flexible"}
+                            onValueChange={(value) =>
+                              updateExpenseItem(item.id, { essential: value === "essential" })
+                            }
+                          />
+                        </div>
+                        <div className="border-border grid gap-2 border-t pt-3 sm:grid-cols-[1fr_8rem] sm:items-center sm:gap-3">
+                          <div className="min-w-0">
+                            <div className="text-foreground text-xs font-semibold">
+                              Inflation override
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                              Leave blank to use plan inflation.
+                            </div>
+                          </div>
+                          <PercentOverrideInput
+                            value={item.inflationRate}
+                            placeholder={`Plan ${(draft.investment.inflationRate * 100).toFixed(1)}`}
+                            onChange={(value) =>
+                              updateExpenseItem(item.id, { inflationRate: value })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() =>
-                    update((d) => ({ ...d, expenses: { ...d.expenses, housing: undefined } }))
-                  }
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Icons.X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-            {draft.expenses.discretionary && (
-              <div className="flex items-center gap-1">
-                <div className="flex-1">
-                  <InlineField
-                    label="Discretionary spending"
-                    value={draft.expenses.discretionary.monthlyAmount}
-                    onChange={(v) => setExpense("discretionary", { monthlyAmount: v })}
-                    step={50}
-                    suffix="/mo"
-                  />
-                </div>
-                <button
-                  onClick={() =>
-                    update((d) => ({ ...d, expenses: { ...d.expenses, discretionary: undefined } }))
-                  }
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Icons.X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-            <div className="flex gap-2">
-              {!draft.expenses.housing && (
-                <button
-                  className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
-                  onClick={() =>
-                    update((d) => ({
-                      ...d,
-                      expenses: { ...d.expenses, housing: { monthlyAmount: 0 } },
-                    }))
-                  }
-                >
-                  + Housing spending
-                </button>
-              )}
-              {!draft.expenses.discretionary && (
-                <button
-                  className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
-                  onClick={() =>
-                    update((d) => ({
-                      ...d,
-                      expenses: { ...d.expenses, discretionary: { monthlyAmount: 0 } },
-                    }))
-                  }
-                >
-                  + Discretionary spending
-                </button>
-              )}
+              );
+            })}
+            <div className="flex gap-2 pt-3">
+              <button
+                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() => addExpenseItem("Housing", { essential: false })}
+              >
+                + Housing
+              </button>
+              <button
+                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() => addExpenseItem("Travel", { essential: false })}
+              >
+                + Travel
+              </button>
+              <button
+                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() => addExpenseItem("Other spending", { essential: false })}
+              >
+                + Other
+              </button>
             </div>
-          </>
+          </div>
         }
       />
 
@@ -1012,7 +1439,10 @@ function SidebarConfigurator({
         kicker="Income"
         title="Retirement Income"
         editing={editingSection === "income"}
-        onEdit={() => setEditingSection("income")}
+        onEdit={() => {
+          setEditingSection("income");
+          setExpandedIncomeId(null);
+        }}
         onSave={saveDraft}
         onCancel={cancelEdit}
         dirty={dirty}
@@ -1052,41 +1482,147 @@ function SidebarConfigurator({
           )
         }
         editContent={
-          <>
-            {draft.incomeStreams.map((s) => (
-              <div key={s.id} className="space-y-1.5 rounded-md border p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Input
-                    value={s.label}
-                    onChange={(e) => updateStream(s.id, { label: e.target.value })}
-                    placeholder="Label"
-                    className="h-6 flex-1 border-0 px-0 text-xs font-medium shadow-none focus-visible:ring-0"
-                  />
-                  <button
-                    onClick={() => removeStream(s.id)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Icons.X className="h-3 w-3" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {s.streamType !== "dc" && (
-                    <InlineField
-                      label="Monthly income"
-                      value={s.monthlyAmount ?? 0}
-                      onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
-                      suffix="/mo"
-                    />
+          <div className="space-y-3">
+            {draft.incomeStreams.map((s) => {
+              const expanded = expandedIncomeId === s.id;
+              const amount = s.monthlyAmount ?? 0;
+              const growthMeta =
+                s.annualGrowthRate !== undefined
+                  ? `${(s.annualGrowthRate * 100).toFixed(1)}% growth`
+                  : s.adjustForInflation
+                    ? "Inflation indexed"
+                    : "Fixed nominal";
+              const meta = [
+                `Age ${s.startAge} → ${draft.personal.planningHorizonAge}`,
+                growthMeta,
+              ].join(" · ");
+
+              return (
+                <div
+                  key={s.id}
+                  className={`overflow-hidden rounded-lg border transition-colors ${
+                    expanded ? "bg-muted/20" : "bg-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedIncomeId(expanded ? null : s.id)}
+                      className="hover:bg-muted/30 flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                      aria-expanded={expanded}
+                    >
+                      <Icons.ChevronDown
+                        className={`text-muted-foreground h-3.5 w-3.5 shrink-0 transition-transform ${
+                          expanded ? "rotate-180" : ""
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="text-foreground block truncate text-sm font-semibold">
+                          {s.label || "Income"}
+                        </span>
+                        <span className="text-muted-foreground mt-0.5 block truncate text-[11px]">
+                          {meta}
+                        </span>
+                      </span>
+                      <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
+                        {formatAmount(amount, currency)}
+                        <span className="text-muted-foreground text-xs font-normal">/mo</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeStream(s.id)}
+                      className="text-muted-foreground hover:text-foreground mr-2 rounded-md p-1 transition-colors"
+                      aria-label={`Remove ${s.label || "retirement income"}`}
+                    >
+                      <Icons.X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {expanded && (
+                    <div className="space-y-4 border-t px-3 pb-3 pt-3">
+                      <Input
+                        value={s.label}
+                        onChange={(e) => updateStream(s.id, { label: e.target.value })}
+                        placeholder="Income name"
+                        className="bg-muted/70 h-8 px-2 text-sm font-semibold shadow-none"
+                      />
+                      <div className="divide-border divide-y">
+                        {s.streamType !== "dc" && (
+                          <LeverRow
+                            label="Monthly income"
+                            kind="money"
+                            value={amount}
+                            onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
+                            min={0}
+                            max={sliderMaxFor(amount, 10000, 2500)}
+                            step={50}
+                            prefix="$"
+                            suffix="/mo"
+                            format={(v) => String(Math.round(v))}
+                          />
+                        )}
+                        <LeverRow
+                          label="Start age"
+                          value={s.startAge}
+                          onChange={(v) => updateStream(s.id, { startAge: Math.round(v) })}
+                          min={draft.personal.currentAge}
+                          max={draft.personal.planningHorizonAge}
+                          step={1}
+                          format={(v) => String(Math.round(v))}
+                        />
+                      </div>
+                      <div className="bg-muted/20 grid gap-3 rounded-lg border p-3">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-3">
+                          <div className="min-w-0">
+                            <div className="text-foreground text-xs font-semibold">
+                              Income growth
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                              Choose whether this income rises with plan inflation or stays fixed.
+                            </div>
+                          </div>
+                          <AnimatedToggleGroup<"indexed" | "fixed">
+                            variant="secondary"
+                            size="xs"
+                            items={[
+                              { value: "indexed", label: "Indexed" },
+                              { value: "fixed", label: "Fixed" },
+                            ]}
+                            value={s.adjustForInflation ? "indexed" : "fixed"}
+                            onValueChange={(value) =>
+                              updateStream(s.id, {
+                                adjustForInflation: value === "indexed",
+                                annualGrowthRate: undefined,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="border-border grid gap-2 border-t pt-3 sm:grid-cols-[1fr_8rem] sm:items-center sm:gap-3">
+                          <div className="min-w-0">
+                            <div className="text-foreground text-xs font-semibold">
+                              Custom annual growth
+                            </div>
+                            <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                              Optional override for pensions or fixed-step benefits.
+                            </div>
+                          </div>
+                          <PercentOverrideInput
+                            value={s.annualGrowthRate}
+                            placeholder={
+                              s.adjustForInflation
+                                ? `Inflation ${(draft.investment.inflationRate * 100).toFixed(1)}`
+                                : "Fixed 0.0"
+                            }
+                            onChange={(value) => updateStream(s.id, { annualGrowthRate: value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  <InlineField
-                    label="Start age"
-                    value={s.startAge}
-                    onChange={(v) => updateStream(s.id, { startAge: v })}
-                    min={1}
-                  />
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <button
               className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
               onClick={() => addStream()}
@@ -1108,14 +1644,14 @@ function SidebarConfigurator({
                 <Icons.Plus className="h-3 w-3" /> Add OAS placeholder
               </button>
             )}
-          </>
+          </div>
         }
       />
 
       {/* ── Investment ── */}
       <SidebarCard
         kicker="Assumptions"
-        title="Portfolio Assumptions"
+        title="Projection Assumptions"
         editing={editingSection === "investment"}
         onEdit={() => setEditingSection("investment")}
         onSave={saveDraft}
@@ -1147,118 +1683,147 @@ function SidebarConfigurator({
                 {formatPercent(draft.investment.contributionGrowthRate)}
               </ConfigRow>
             )}
+            <ConfigRow label="Withdrawal strategy">
+              {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
+            </ConfigRow>
+            {draft.withdrawal.strategy === "guardrails" && (
+              <>
+                <ConfigRow label="Guardrail ceiling">
+                  {formatPercent(draft.withdrawal.guardrails?.ceilingRate ?? 0.06)}
+                </ConfigRow>
+                <ConfigRow label="Guardrail floor">
+                  {formatPercent(draft.withdrawal.guardrails?.floorRate ?? 0.03)}
+                </ConfigRow>
+              </>
+            )}
           </div>
         }
         editContent={
-          <>
-            <InlineField
+          <div className="divide-border -my-1 divide-y">
+            <LeverRow
               label="Return before retirement"
-              value={+(draft.investment.preRetirementAnnualReturn * 100).toFixed(2)}
-              onChange={(v) => setInvestment("preRetirementAnnualReturn", v / 100)}
-              step={0.1}
+              value={draft.investment.preRetirementAnnualReturn}
+              onChange={(v) => setInvestment("preRetirementAnnualReturn", v)}
+              min={0.02}
+              max={0.12}
+              step={0.001}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label="Return during retirement"
-              value={+(draft.investment.retirementAnnualReturn * 100).toFixed(2)}
-              onChange={(v) => setInvestment("retirementAnnualReturn", v / 100)}
-              step={0.1}
+              value={draft.investment.retirementAnnualReturn}
+              onChange={(v) => setInvestment("retirementAnnualReturn", v)}
+              min={0}
+              max={0.1}
+              step={0.001}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label="Annual investment fee"
-              value={+(draft.investment.annualInvestmentFeeRate * 100).toFixed(2)}
-              onChange={(v) => setInvestment("annualInvestmentFeeRate", v / 100)}
-              step={0.1}
+              value={draft.investment.annualInvestmentFeeRate}
+              onChange={(v) => setInvestment("annualInvestmentFeeRate", v)}
+              min={0}
+              max={0.03}
+              step={0.0005}
               suffix="%"
+              format={(v) => (v * 100).toFixed(2)}
             />
-            <InlineField
+            <LeverRow
               label="Annual volatility"
-              value={+(draft.investment.annualVolatility * 100).toFixed(2)}
-              onChange={(v) => setInvestment("annualVolatility", v / 100)}
-              step={0.1}
+              value={draft.investment.annualVolatility}
+              onChange={(v) => setInvestment("annualVolatility", v)}
+              min={0}
+              max={0.5}
+              step={0.005}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label="Inflation"
-              value={+(draft.investment.inflationRate * 100).toFixed(2)}
-              onChange={(v) => setInvestment("inflationRate", v / 100)}
-              step={0.1}
+              value={draft.investment.inflationRate}
+              onChange={(v) => setInvestment("inflationRate", v)}
+              min={0}
+              max={0.06}
+              step={0.001}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label="Contribution growth per year"
-              value={+(draft.investment.contributionGrowthRate * 100).toFixed(2)}
-              onChange={(v) => setInvestment("contributionGrowthRate", v / 100)}
-              step={0.1}
+              value={draft.investment.contributionGrowthRate}
+              onChange={(v) => setInvestment("contributionGrowthRate", v)}
+              min={0}
+              max={0.1}
+              step={0.001}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-          </>
-        }
-      />
-
-      {/* ── Withdrawal ── */}
-      <SidebarCard
-        kicker="Rule"
-        title="Retirement Withdrawal Rule"
-        editing={editingSection === "withdrawal"}
-        onEdit={() => setEditingSection("withdrawal")}
-        onSave={saveDraft}
-        onCancel={cancelEdit}
-        dirty={dirty}
-        readContent={
-          <ConfigRow label="Withdrawal strategy">
-            {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
-          </ConfigRow>
-        }
-        editContent={
-          <>
-            <div className="space-y-1.5">
-              {(["constant-dollar", "constant-percentage", "guardrails"] as const).map((s) => (
-                <label
-                  key={s}
-                  className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${draft.withdrawal.strategy === s ? "border-foreground/30 bg-muted/50" : "border-transparent"}`}
-                >
-                  <input
-                    type="radio"
-                    name="strategy"
-                    checked={draft.withdrawal.strategy === s}
-                    onChange={() => setWithdrawal("strategy", s)}
-                    className="accent-foreground h-3 w-3"
-                  />
-                  {strategyLabels[s]}
-                </label>
-              ))}
-            </div>
-            {draft.withdrawal.strategy === "guardrails" && (
-              <div className="space-y-1.5 pt-1">
-                <InlineField
-                  label="Ceiling rate"
-                  value={+((draft.withdrawal.guardrails?.ceilingRate ?? 0.06) * 100).toFixed(2)}
-                  onChange={(v) =>
-                    setWithdrawal("guardrails", {
-                      ceilingRate: v / 100,
-                      floorRate: draft.withdrawal.guardrails?.floorRate ?? 0.03,
-                    })
-                  }
-                  step={0.1}
-                  suffix="%"
-                />
-                <InlineField
-                  label="Floor rate"
-                  value={+((draft.withdrawal.guardrails?.floorRate ?? 0.03) * 100).toFixed(2)}
-                  onChange={(v) =>
-                    setWithdrawal("guardrails", {
-                      ceilingRate: draft.withdrawal.guardrails?.ceilingRate ?? 0.06,
-                      floorRate: v / 100,
-                    })
-                  }
-                  step={0.1}
-                  suffix="%"
-                />
+            <div className="space-y-2 py-4 first:pt-1 last:pb-1">
+              <div>
+                <div className="text-foreground text-sm font-semibold leading-tight">
+                  Withdrawal strategy
+                </div>
+                <div className="text-muted-foreground mt-1 text-xs leading-tight">
+                  Controls how retirement spending is withdrawn from the portfolio.
+                </div>
               </div>
-            )}
-          </>
+              <div className="space-y-1.5">
+                {(["constant-dollar", "constant-percentage", "guardrails"] as const).map((s) => (
+                  <label
+                    key={s}
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${draft.withdrawal.strategy === s ? "border-foreground/30 bg-muted/50" : "border-transparent"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={draft.withdrawal.strategy === s}
+                      onChange={() => setWithdrawal("strategy", s)}
+                      className="accent-foreground h-3 w-3"
+                    />
+                    {strategyLabels[s]}
+                  </label>
+                ))}
+              </div>
+              {draft.withdrawal.strategy === "guardrails" && (
+                <div className="divide-border divide-y pt-2">
+                  <LeverRow
+                    label="Ceiling rate"
+                    hint="Reduce spending above this withdrawal rate"
+                    value={draft.withdrawal.guardrails?.ceilingRate ?? 0.06}
+                    onChange={(v) =>
+                      setWithdrawal("guardrails", {
+                        ceilingRate: v,
+                        floorRate: draft.withdrawal.guardrails?.floorRate ?? 0.03,
+                      })
+                    }
+                    min={0.02}
+                    max={0.12}
+                    step={0.001}
+                    suffix="%"
+                    format={(v) => (v * 100).toFixed(1)}
+                  />
+                  <LeverRow
+                    label="Floor rate"
+                    hint="Allow spending increases below this withdrawal rate"
+                    value={draft.withdrawal.guardrails?.floorRate ?? 0.03}
+                    onChange={(v) =>
+                      setWithdrawal("guardrails", {
+                        ceilingRate: draft.withdrawal.guardrails?.ceilingRate ?? 0.06,
+                        floorRate: v,
+                      })
+                    }
+                    min={0.01}
+                    max={0.08}
+                    step={0.001}
+                    suffix="%"
+                    format={(v) => (v * 100).toFixed(1)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         }
       />
 
@@ -1306,6 +1871,28 @@ function SidebarConfigurator({
               >
                 {formatPercent(draft.tax?.taxFreeWithdrawalRate ?? 0)}
               </ConfigRow>
+              <ConfigRow
+                label={
+                  <InfoLabel label="Early withdrawal penalty">
+                    Extra penalty applied to tax-deferred withdrawals before the cutoff age. Use 0%
+                    when the country or account wrapper has no early-withdrawal penalty.
+                  </InfoLabel>
+                }
+              >
+                {formatPercent(draft.tax?.earlyWithdrawalPenaltyRate ?? 0)}
+              </ConfigRow>
+              {(draft.tax?.earlyWithdrawalPenaltyRate ?? 0) > 0 && (
+                <ConfigRow
+                  label={
+                    <InfoLabel label="Penalty cutoff age">
+                      Age when the early-withdrawal penalty stops applying to tax-deferred
+                      withdrawals.
+                    </InfoLabel>
+                  }
+                >
+                  {draft.tax?.earlyWithdrawalPenaltyAge ?? 59}
+                </ConfigRow>
+              )}
               {averageWithdrawalTaxRate > 0 && (
                 <ConfigRow
                   label={
@@ -1393,42 +1980,80 @@ function SidebarConfigurator({
           </div>
         }
         editContent={
-          <>
-            <InlineField
+          <div className="divide-border -my-1 divide-y">
+            <LeverRow
               label={
                 <InfoLabel label="Taxable account rate">
                   Effective tax rate applied when withdrawing from taxable or non-registered
                   accounts.
                 </InfoLabel>
               }
-              value={+((draft.tax?.taxableWithdrawalRate ?? 0) * 100).toFixed(1)}
-              onChange={(v) => setTax("taxableWithdrawalRate", v / 100)}
-              step={0.5}
+              value={draft.tax?.taxableWithdrawalRate ?? 0}
+              onChange={(v) => setTax("taxableWithdrawalRate", v)}
+              min={0}
+              max={0.6}
+              step={0.005}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label={
                 <InfoLabel label="Tax-deferred account rate">
                   Effective tax rate applied to RRSP, IRA, pension, or similar withdrawals.
                 </InfoLabel>
               }
-              value={+((draft.tax?.taxDeferredWithdrawalRate ?? 0) * 100).toFixed(1)}
-              onChange={(v) => setTax("taxDeferredWithdrawalRate", v / 100)}
-              step={0.5}
+              value={draft.tax?.taxDeferredWithdrawalRate ?? 0}
+              onChange={(v) => setTax("taxDeferredWithdrawalRate", v)}
+              min={0}
+              max={0.6}
+              step={0.005}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-            <InlineField
+            <LeverRow
               label={
                 <InfoLabel label="Tax-free account rate">
                   Effective tax rate applied to TFSA, Roth, or similar withdrawals. Usually 0%.
                 </InfoLabel>
               }
-              value={+((draft.tax?.taxFreeWithdrawalRate ?? 0) * 100).toFixed(1)}
-              onChange={(v) => setTax("taxFreeWithdrawalRate", v / 100)}
-              step={0.5}
+              value={draft.tax?.taxFreeWithdrawalRate ?? 0}
+              onChange={(v) => setTax("taxFreeWithdrawalRate", v)}
+              min={0}
+              max={0.3}
+              step={0.005}
               suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
             />
-          </>
+            <LeverRow
+              label={
+                <InfoLabel label="Early withdrawal penalty">
+                  Extra penalty applied to tax-deferred withdrawals before the cutoff age.
+                </InfoLabel>
+              }
+              hint="Set to 0% for Canada-style RRSP modeling unless you intentionally want a penalty."
+              value={draft.tax?.earlyWithdrawalPenaltyRate ?? 0}
+              onChange={(v) => setTax("earlyWithdrawalPenaltyRate", v)}
+              min={0}
+              max={0.3}
+              step={0.005}
+              suffix="%"
+              format={(v) => (v * 100).toFixed(1)}
+            />
+            <LeverRow
+              label={
+                <InfoLabel label="Penalty cutoff age">
+                  Age when the early-withdrawal penalty stops applying. The tax rate above still
+                  applies after this age.
+                </InfoLabel>
+              }
+              value={draft.tax?.earlyWithdrawalPenaltyAge ?? 59}
+              onChange={(v) => setTax("earlyWithdrawalPenaltyAge", Math.round(v))}
+              min={draft.personal.currentAge}
+              max={draft.personal.planningHorizonAge}
+              step={1}
+              format={(v) => String(Math.round(v))}
+            />
+          </div>
         }
       />
 
@@ -1438,6 +2063,8 @@ function SidebarConfigurator({
           goalId={goalId}
           goalType="retirement"
           dcLinkedAccountIds={dcLinkedAccountIds}
+          editing={editingSection === "funding"}
+          onEditingChange={(next) => setEditingSection(next ? "funding" : null)}
         />
       )}
     </div>
@@ -1463,6 +2090,7 @@ export default function DashboardPage({
   const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
   const currency = plan.currency;
   const [chartValueMode, setChartValueMode] = useState<ChartValueMode>("real");
+  const [coverageView, setCoverageView] = useState<CoverageView>("at-retirement");
   const valueModeLabel = chartValueMode === "real" ? "today's value" : "nominal";
   const inflationBase = Math.max(1 + plan.investment.inflationRate, 0.01);
   const toTodayValueAtAge = useCallback(
@@ -1633,6 +2261,60 @@ export default function DashboardPage({
     }));
   }, [retirementOverview?.trajectory, scaleForModeAtAge]);
 
+  const coverageProjectionData: CoverageProjectionPoint[] = useMemo(() => {
+    if (!retirementOverview?.trajectory?.length) return [];
+    const coverageStartAge = plan.personal.targetRetirementAge;
+    return retirementOverview.trajectory
+      .filter((pt) => pt.age >= coverageStartAge && pt.age <= plan.personal.planningHorizonAge)
+      .map((pt) => {
+        const plannedSpending = Math.max(
+          0,
+          pt.plannedExpenses ?? projectedAnnualExpenseNominalAtAge(plan, pt.age),
+        );
+        const retirementIncomeAvailable = Math.max(
+          0,
+          pt.phase === "fire"
+            ? pt.annualIncome
+            : projectedAnnualIncomeNominalAtAge(plan, pt.age, coverageStartAge),
+        );
+        const portfolioWithdrawalAvailable =
+          pt.phase === "fire" ? Math.max(0, pt.netWithdrawalFromPortfolio) : 0;
+        const retirementIncome = Math.min(plannedSpending, retirementIncomeAvailable);
+        const remainingAfterIncome = Math.max(0, plannedSpending - retirementIncome);
+        const portfolioWithdrawal = Math.min(remainingAfterIncome, portfolioWithdrawalAvailable);
+        const shortfall = Math.max(
+          0,
+          pt.annualShortfall ?? plannedSpending - retirementIncome - portfolioWithdrawal,
+        );
+        return {
+          label: `Age ${pt.age}`,
+          age: pt.age,
+          plannedSpending: scaleForModeAtAge(plannedSpending, pt.age),
+          retirementIncome: scaleForModeAtAge(retirementIncome, pt.age),
+          portfolioWithdrawal: scaleForModeAtAge(portfolioWithdrawal, pt.age),
+          shortfall: scaleForModeAtAge(shortfall, pt.age),
+          taxes: scaleForModeAtAge(Math.max(0, pt.annualTaxes ?? 0), pt.age),
+        };
+      });
+  }, [plan, retirementOverview?.trajectory, scaleForModeAtAge]);
+
+  const coverageProjectionTicks = useMemo(() => {
+    if (coverageProjectionData.length === 0) return [];
+
+    const firstAge = coverageProjectionData[0].age;
+    const lastAge = coverageProjectionData[coverageProjectionData.length - 1].age;
+    const span = Math.max(1, lastAge - firstAge);
+    const step = Math.max(1, Math.ceil(span / 5));
+    const ticks = new Set<number>([firstAge, lastAge, fireAgeForBudget]);
+
+    const firstSteppedAge = Math.ceil(firstAge / step) * step;
+    for (let age = firstSteppedAge; age <= lastAge; age += step) {
+      ticks.add(age);
+    }
+
+    return [...ticks].sort((a, b) => a - b);
+  }, [coverageProjectionData, fireAgeForBudget]);
+
   // Year-by-year table: all years from backend trajectory
   const allSnapshots: RetirementTrajectoryPoint[] = useMemo(() => {
     return retirementOverview?.trajectory ?? [];
@@ -1661,6 +2343,37 @@ export default function DashboardPage({
       : effectiveFiAge == null && retireTodayTarget > 0
         ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
         : null;
+  const statusCallout =
+    heroHealth === "on_track" ? (
+      <Card className="border-green-600/20 bg-green-50/60 dark:bg-green-950/20">
+        <CardContent className="flex gap-2.5 py-4">
+          <Icons.CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+          <div>
+            <div className="text-foreground mb-1 text-sm font-semibold">You're on track.</div>
+            <div className="text-muted-foreground text-xs leading-relaxed">
+              Stress-test with a market drawdown or inflation shock in{" "}
+              <span className="font-medium">Scenarios</span>.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ) : heroGuidance ? (
+      <Card
+        className={`${
+          heroHealth === "at_risk"
+            ? "border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20"
+            : "border-red-500/30 bg-red-50/60 dark:bg-red-950/20"
+        }`}
+      >
+        <CardContent className="py-4">
+          <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
+            Close the gap
+          </div>
+          <div className="text-foreground text-sm font-semibold">What could help</div>
+          <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">{heroGuidance}</p>
+        </CardContent>
+      </Card>
+    ) : null;
 
   if (isLoading || !retirementOverview) {
     return (
@@ -1682,10 +2395,6 @@ export default function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
-      </div>
-
       {/* Two-column layout: main + sidebar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Main column ── */}
@@ -1758,10 +2467,11 @@ export default function DashboardPage({
                         </Badge>
                       )}
                     </div>
+                    <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
                   </div>
 
                   {/* Sentence-style verdict */}
-                  <h1 className="max-w-[95%] font-serif text-[clamp(1.5rem,2.6vw,2rem)] font-normal leading-[1.15] tracking-tight">
+                  <h1 className="max-w-[95%] font-serif text-2xl font-normal leading-[1.15] tracking-tight">
                     {isFinanciallyIndependent ? (
                       <>
                         You have reached{" "}
@@ -1921,27 +2631,65 @@ export default function DashboardPage({
           {/* Retirement projection chart */}
           {chartData.length > 2 && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
                       Projection · age {plan.personal.currentAge} →{" "}
                       {plan.personal.planningHorizonAge}
                     </div>
-                    <CardTitle className="text-sm">Portfolio trajectory</CardTitle>
-                    <div className="text-muted-foreground mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
-                        />
-                        Projected portfolio
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <span className="inline-block h-0 w-3 border-b border-dashed border-[#888]" />
-                        Required capital path
-                      </span>
+                    <div className="flex items-center gap-1.5">
+                      <CardTitle className="text-sm">Portfolio trajectory</CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                            aria-label="More info about portfolio trajectory"
+                          >
+                            <Icons.Info className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-sm text-xs">
+                          The FI marker shows the first sustainable age. "What you'll need" is the
+                          minimum balance needed at each age after crediting your remaining planned
+                          contributions. It only starts at today's portfolio if you are exactly on
+                          track. "What you'll have" is the projected portfolio path.
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
+                  </div>
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
+                      />
+                      What you'll have
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex cursor-help items-center gap-1.5 underline decoration-dotted underline-offset-2">
+                          <svg viewBox="0 0 24 4" aria-hidden="true" className="h-1 w-6 shrink-0">
+                            <line
+                              x1="1"
+                              y1="2"
+                              x2="23"
+                              y2="2"
+                              stroke="#888"
+                              strokeWidth="1.5"
+                              strokeDasharray="6 4"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          What you'll need
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs">
+                        Minimum balance needed at each age to still hit the desired retirement-age
+                        target after crediting the planned contributions you have left.
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </CardHeader>
@@ -1953,11 +2701,6 @@ export default function DashboardPage({
                   projectedFireAge={effectiveFiAge}
                   valueMode={chartValueMode}
                 />
-                <p className="text-muted-foreground mt-2 text-xs">
-                  The FI marker shows the first sustainable age. The portfolio keeps accumulating
-                  until your desired retirement age unless FI is reached later; after that,
-                  withdrawals fund expenses after income streams.
-                </p>
               </CardContent>
             </Card>
           )}
@@ -2048,158 +2791,359 @@ export default function DashboardPage({
           {/* Retirement spending coverage */}
           <Card>
             <CardHeader className="pb-4">
-              <div className="mb-1 flex items-center gap-2">
-                <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
-                <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
-                  Coverage
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
+                    <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
+                      Coverage
+                    </div>
+                  </div>
+                  <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
+                    {L.budgetAt}
+                  </CardTitle>
+                  <div className="mt-2 flex items-start gap-1.5">
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      {coverageView === "at-retirement" ? (
+                        <>
+                          How your planned{" "}
+                          <span className="text-foreground tabular-nums">
+                            {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                          </span>{" "}
+                          retirement spending is covered at the selected retirement age.
+                        </>
+                      ) : (
+                        <>
+                          How income and portfolio withdrawals cover planned spending through
+                          retirement.
+                        </>
+                      )}
+                    </p>
+                    {coverageView === "over-time" && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground mt-0.5 rounded-full transition-colors"
+                            aria-label="Coverage chart details"
+                          >
+                            <Icons.Info className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">
+                          Values are shown in {valueModeLabel}. The stacked area shows how spending
+                          is funded; the dashed line is planned retirement spending.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
+                <AnimatedToggleGroup<CoverageView>
+                  value={coverageView}
+                  onValueChange={setCoverageView}
+                  items={[
+                    { value: "at-retirement", label: "At retirement" },
+                    { value: "over-time", label: "Over time" },
+                  ]}
+                  variant="secondary"
+                  size="xs"
+                  rounded="md"
+                />
               </div>
-              <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
-                {L.budgetAt}
-              </CardTitle>
-              <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                How your planned{" "}
-                <span className="text-foreground tabular-nums">
-                  {fmtCompact(coverageSpendingMonthly, currency)}/mo
-                </span>{" "}
-                retirement spending is covered at the selected retirement age.
-              </p>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="text-foreground/90 text-sm">
-                At age {fireAgeForBudget} —{" "}
-                <span className="text-foreground font-semibold tabular-nums">
-                  {fmtCompact(coverageSpendingMonthly, currency)}/mo
-                </span>{" "}
-                planned spending
-              </div>
+              {coverageView === "at-retirement" ? (
+                <>
+                  <div className="text-foreground/90 text-sm">
+                    At age {fireAgeForBudget} —{" "}
+                    <span className="text-foreground font-semibold tabular-nums">
+                      {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                    </span>{" "}
+                    planned spending
+                  </div>
 
-              {/* Split bar — income streams + portfolio + shortfall */}
-              <div className="bg-muted/60 relative flex h-2.5 w-full overflow-hidden rounded-full border">
-                {budgetStreams.map((s, i) => {
-                  const pct = Math.min(100, Math.max(0, s.percentageOfBudget * 100));
-                  if (pct <= 0) return null;
-                  return (
-                    <div
-                      key={s.label}
-                      className="h-full transition-[width] duration-500"
-                      style={{
-                        width: `${pct}%`,
-                        background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
-                      }}
-                      title={`${s.label}: ${pct.toFixed(0)}%`}
-                    />
-                  );
-                })}
-                {coveragePortfolioPct > 0 && (
-                  <div
-                    className="bg-success h-full transition-[width] duration-500"
-                    style={{ width: `${coveragePortfolioPct}%` }}
-                    title={`Portfolio withdrawal: ${coveragePortfolioPct.toFixed(0)}%`}
-                  />
-                )}
-                {coverageShortfallPct > 0 && (
-                  <div
-                    className="h-full bg-red-500/75 transition-[width] duration-500"
-                    style={{ width: `${coverageShortfallPct}%` }}
-                    title={`Unfunded: ${coverageShortfallPct.toFixed(0)}%`}
-                  />
-                )}
-              </div>
+                  {/* Split bar — income streams + portfolio + shortfall */}
+                  <div className="bg-muted/60 relative flex h-2.5 w-full overflow-hidden rounded-full border">
+                    {budgetStreams.map((s, i) => {
+                      const pct = Math.min(100, Math.max(0, s.percentageOfBudget * 100));
+                      if (pct <= 0) return null;
+                      return (
+                        <div
+                          key={s.label}
+                          className="h-full transition-[width] duration-500"
+                          style={{
+                            width: `${pct}%`,
+                            background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                          }}
+                          title={`${s.label}: ${pct.toFixed(0)}%`}
+                        />
+                      );
+                    })}
+                    {coveragePortfolioPct > 0 && (
+                      <div
+                        className="bg-success h-full transition-[width] duration-500"
+                        style={{ width: `${coveragePortfolioPct}%` }}
+                        title={`Portfolio withdrawal: ${coveragePortfolioPct.toFixed(0)}%`}
+                      />
+                    )}
+                    {coverageShortfallPct > 0 && (
+                      <div
+                        className="h-full bg-red-500/75 transition-[width] duration-500"
+                        style={{ width: `${coverageShortfallPct}%` }}
+                        title={`Unfunded: ${coverageShortfallPct.toFixed(0)}%`}
+                      />
+                    )}
+                  </div>
 
-              {/* Expense breakdown — no color dots */}
-              <div className="divide-border divide-y">
-                {(() => {
-                  const rows: { label: string; amount: number }[] = [
-                    { label: "Living spending", amount: plan.expenses.living.monthlyAmount },
-                  ];
-                  if (plan.expenses.healthcare) {
-                    rows.push({
-                      label: "Healthcare spending",
-                      amount: plan.expenses.healthcare.monthlyAmount,
-                    });
-                  }
-                  if (plan.expenses.housing) {
-                    rows.push({
-                      label: "Housing spending",
-                      amount: plan.expenses.housing.monthlyAmount,
-                    });
-                  }
-                  if (plan.expenses.discretionary) {
-                    rows.push({
-                      label: "Discretionary spending",
-                      amount: plan.expenses.discretionary.monthlyAmount,
-                    });
-                  }
-                  return rows.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between py-2.5 text-sm">
-                      <span className="text-foreground">{r.label}</span>
-                      <span className="text-foreground tabular-nums">
-                        {fmtCompact(r.amount, currency)}/mo
+                  {/* Expense breakdown — no color dots */}
+                  <div className="divide-border divide-y">
+                    {activeExpenseItems(plan.expenses, fireAgeForBudget).map((r) => (
+                      <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
+                        <span className="min-w-0">
+                          <span className="text-foreground block truncate">{r.label}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {expenseAgeRangeLabel(r, plan.personal.planningHorizonAge)}
+                          </span>
+                        </span>
+                        <span className="text-foreground tabular-nums">
+                          {fmtCompact(r.monthlyAmount, currency)}/mo
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Funding sources — small square dots */}
+                  <div className="space-y-2.5 border-t pt-4">
+                    {budgetStreams.map((s, i) => (
+                      <div
+                        key={s.label}
+                        className="flex items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-sm"
+                            style={{
+                              background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                            }}
+                          />
+                          <span className="text-foreground">{s.label}</span>
+                        </span>
+                        <span className="text-foreground tabular-nums">
+                          {fmtCompact(s.monthlyAmount, currency)}/mo{" "}
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            {(s.percentageOfBudget * 100).toFixed(0)}%
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                    {coveragePortfolioAppliedMonthly > 0 && (
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className="bg-success inline-block h-2.5 w-2.5 rounded-sm" />
+                          <span className="text-foreground">Portfolio withdrawal</span>
+                        </span>
+                        <span className="text-foreground tabular-nums">
+                          {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            {coveragePortfolioPct.toFixed(0)}%
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                    {coverageShortfallMonthly > 0 && (
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/75" />
+                          <span className="text-foreground">Unfunded spending</span>
+                        </span>
+                        <span className="text-foreground tabular-nums">
+                          {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            {coverageShortfallPct.toFixed(0)}%
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                    {coverageEstimatedTaxesMonthly > 0 && (
+                      <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs italic">
+                        <span>Withdrawal taxes (extra portfolio drag)</span>
+                        <span className="tabular-nums">
+                          +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : coverageProjectionData.length > 1 ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-sm"
+                          style={{ background: COVERAGE_COLORS.income }}
+                        />
+                        Retirement income
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-sm"
+                          style={{ background: COVERAGE_COLORS.portfolio }}
+                        />
+                        Portfolio withdrawal
+                      </span>
+                      {coverageProjectionData.some((pt) => pt.shortfall > 0) && (
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-sm"
+                            style={{ background: COVERAGE_COLORS.shortfall }}
+                          />
+                          Unfunded
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="block h-0 w-4 border-b border-dashed"
+                          style={{ borderColor: COVERAGE_COLORS.planned }}
+                        />
+                        Planned spending
                       </span>
                     </div>
-                  ));
-                })()}
-              </div>
+                    <span className="bg-muted/60 text-muted-foreground rounded-full px-2.5 py-1 text-[11px] font-medium">
+                      Showing {valueModeLabel}
+                    </span>
+                  </div>
 
-              {/* Funding sources — small square dots */}
-              <div className="space-y-2.5 border-t pt-4">
-                {budgetStreams.map((s, i) => (
-                  <div key={s.label} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="inline-block h-2.5 w-2.5 rounded-sm"
-                        style={{
-                          background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart
+                      data={coverageProjectionData}
+                      margin={{ top: 16, right: 28, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="coverageIncome" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={COVERAGE_COLORS.income} stopOpacity={0.38} />
+                          <stop
+                            offset="100%"
+                            stopColor={COVERAGE_COLORS.income}
+                            stopOpacity={0.08}
+                          />
+                        </linearGradient>
+                        <linearGradient id="coveragePortfolio" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="5%"
+                            stopColor={COVERAGE_COLORS.portfolio}
+                            stopOpacity={0.32}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor={COVERAGE_COLORS.portfolio}
+                            stopOpacity={0.08}
+                          />
+                        </linearGradient>
+                        <linearGradient id="coverageShortfall" x1="0" y1="0" x2="0" y2="1">
+                          <stop
+                            offset="5%"
+                            stopColor={COVERAGE_COLORS.shortfall}
+                            stopOpacity={0.5}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor={COVERAGE_COLORS.shortfall}
+                            stopOpacity={0.18}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <XAxis
+                        dataKey="age"
+                        type="number"
+                        domain={["dataMin", "dataMax"]}
+                        ticks={coverageProjectionTicks}
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(age: number) => String(Math.round(age))}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDataOverflow={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v: number) => {
+                          if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+                          if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
+                          return `$${v.toFixed(0)}`;
+                        }}
+                        width={60}
+                        axisLine={false}
+                        tickLine={false}
+                        domain={[0, "auto"]}
+                      />
+                      <RTooltip
+                        content={
+                          <CoverageProjectionTooltip
+                            currency={currency}
+                            valueMode={chartValueMode}
+                          />
+                        }
+                      />
+                      <ReferenceLine
+                        x={fireAgeForBudget}
+                        stroke="#888"
+                        strokeWidth={1}
+                        strokeDasharray="4 3"
+                        strokeOpacity={0.5}
+                        label={{
+                          value: `${L.prefix} · ${fireAgeForBudget}`,
+                          position: "top",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          fill: "#888",
                         }}
                       />
-                      <span className="text-foreground">{s.label}</span>
-                    </span>
-                    <span className="text-foreground tabular-nums">
-                      {fmtCompact(s.monthlyAmount, currency)}/mo{" "}
-                      <span className="text-muted-foreground ml-1 text-xs">
-                        {(s.percentageOfBudget * 100).toFixed(0)}%
-                      </span>
-                    </span>
-                  </div>
-                ))}
-                {coveragePortfolioAppliedMonthly > 0 && (
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="bg-success inline-block h-2.5 w-2.5 rounded-sm" />
-                      <span className="text-foreground">Portfolio withdrawal</span>
-                    </span>
-                    <span className="text-foreground tabular-nums">
-                      {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
-                      <span className="text-muted-foreground ml-1 text-xs">
-                        {coveragePortfolioPct.toFixed(0)}%
-                      </span>
-                    </span>
-                  </div>
-                )}
-                {coverageShortfallMonthly > 0 && (
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/75" />
-                      <span className="text-foreground">Unfunded spending</span>
-                    </span>
-                    <span className="text-foreground tabular-nums">
-                      {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
-                      <span className="text-muted-foreground ml-1 text-xs">
-                        {coverageShortfallPct.toFixed(0)}%
-                      </span>
-                    </span>
-                  </div>
-                )}
-                {coverageEstimatedTaxesMonthly > 0 && (
-                  <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs italic">
-                    <span>Withdrawal taxes (extra portfolio drag)</span>
-                    <span className="tabular-nums">
-                      +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
-                    </span>
-                  </div>
-                )}
-              </div>
+                      <Area
+                        type="linear"
+                        dataKey="retirementIncome"
+                        stackId="coverage"
+                        stroke={COVERAGE_COLORS.income}
+                        strokeWidth={0}
+                        fill="url(#coverageIncome)"
+                        animationDuration={300}
+                      />
+                      <Area
+                        type="linear"
+                        dataKey="portfolioWithdrawal"
+                        stackId="coverage"
+                        stroke={COVERAGE_COLORS.portfolio}
+                        strokeWidth={0}
+                        fill="url(#coveragePortfolio)"
+                        animationDuration={300}
+                      />
+                      <Area
+                        type="linear"
+                        dataKey="shortfall"
+                        stackId="coverage"
+                        stroke={COVERAGE_COLORS.shortfall}
+                        strokeWidth={1.2}
+                        strokeOpacity={0.8}
+                        fill="url(#coverageShortfall)"
+                        animationDuration={300}
+                      />
+                      <Line
+                        type="linear"
+                        dataKey="plannedSpending"
+                        stroke={COVERAGE_COLORS.planned}
+                        strokeWidth={1.5}
+                        strokeDasharray="6 4"
+                        dot={false}
+                        activeDot={false}
+                        animationDuration={300}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-muted-foreground rounded-md border border-dashed py-8 text-center text-sm">
+                  Coverage projection is unavailable for this plan.
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -2339,6 +3283,8 @@ export default function DashboardPage({
               </CardContent>
             </Card>
           )}
+
+          {statusCallout}
         </div>
 
         {/* ── Sidebar ── */}
@@ -2351,40 +3297,6 @@ export default function DashboardPage({
             goalId={goalId}
             dcLinkedAccountIds={dcLinkedAccountIds}
           />
-
-          {/* Action card — closes the gap (on-track confirmation or guidance) */}
-          {heroHealth === "on_track" ? (
-            <Card className="border-green-600/20 bg-green-50/60 dark:bg-green-950/20">
-              <CardContent className="flex gap-2.5 py-4">
-                <Icons.CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                <div>
-                  <div className="text-foreground mb-1 text-sm font-semibold">You're on track.</div>
-                  <div className="text-muted-foreground text-xs leading-relaxed">
-                    Stress-test with a market drawdown or inflation shock in{" "}
-                    <span className="font-medium">Scenarios</span>.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : heroGuidance ? (
-            <Card
-              className={`${
-                heroHealth === "at_risk"
-                  ? "border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20"
-                  : "border-red-500/30 bg-red-50/60 dark:bg-red-950/20"
-              }`}
-            >
-              <CardContent className="py-4">
-                <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
-                  Close the gap
-                </div>
-                <div className="text-foreground text-sm font-semibold">What could help</div>
-                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
-                  {heroGuidance}
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
         </div>
       </div>
 

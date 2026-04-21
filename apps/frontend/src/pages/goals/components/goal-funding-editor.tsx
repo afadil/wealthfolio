@@ -1,6 +1,6 @@
 import { useAccounts } from "@/hooks/use-accounts";
 import type { GoalFundingRuleInput } from "@/lib/types";
-import { Button, Input } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -43,9 +43,41 @@ interface Props {
   goalId: string;
   goalType: string;
   dcLinkedAccountIds?: string[];
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
 }
 
-export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }: Props) {
+function SharePercentInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="bg-muted/70 flex h-8 w-20 shrink-0 items-center gap-1 rounded-md border px-2">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={Number.isFinite(value) ? String(value) : "0"}
+        onChange={(e) => {
+          const parsed = parseFloat(e.target.value.replace(/,/g, ""));
+          if (!Number.isNaN(parsed)) onChange(parsed);
+        }}
+        className="text-foreground min-w-0 flex-1 bg-transparent text-right text-sm tabular-nums outline-none"
+      />
+      <span className="text-muted-foreground text-xs tabular-nums">%</span>
+    </div>
+  );
+}
+
+export function GoalFundingEditor({
+  goalId,
+  goalType,
+  dcLinkedAccountIds = [],
+  editing,
+  onEditingChange,
+}: Props) {
   const { accounts } = useAccounts();
   const { fundingRules } = useGoalDetail(goalId);
   const { saveFundingMutation } = useGoalPlanMutations(goalId);
@@ -59,9 +91,20 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
   const [sharePercents, setSharePercents] = useState<Map<string, number>>(new Map());
   const [taxBuckets, setTaxBuckets] = useState<Map<string, string>>(new Map());
   const [dirty, setDirty] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [internalEditing, setInternalEditing] = useState(false);
+  const isEditing = editing ?? internalEditing;
+  const setEditing = useCallback(
+    (next: boolean) => {
+      if (onEditingChange) {
+        onEditingChange(next);
+      } else {
+        setInternalEditing(next);
+      }
+    },
+    [onEditingChange],
+  );
 
-  useEffect(() => {
+  const resetDraft = useCallback(() => {
     const spMap = new Map<string, number>();
     const tbMap = new Map<string, string>();
     for (const rule of fundingRules) {
@@ -72,6 +115,14 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     setTaxBuckets(tbMap);
     setDirty(false);
   }, [fundingRules]);
+
+  useEffect(() => {
+    resetDraft();
+  }, [resetDraft]);
+
+  useEffect(() => {
+    if (editing === false && dirty) resetDraft();
+  }, [dirty, editing, resetDraft]);
 
   const addAccount = useCallback((accountId: string) => {
     setSharePercents((prev) => new Map(prev).set(accountId, 100));
@@ -120,21 +171,13 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
     }
     saveFundingMutation.mutate(rules);
     setDirty(false);
-    setIsEditing(false);
-  }, [sharePercents, taxBuckets, isRetirement, saveFundingMutation]);
+    setEditing(false);
+  }, [sharePercents, taxBuckets, isRetirement, saveFundingMutation, setEditing]);
 
   const handleCancel = useCallback(() => {
-    const spMap = new Map<string, number>();
-    const tbMap = new Map<string, string>();
-    for (const rule of fundingRules) {
-      spMap.set(rule.accountId, rule.sharePercent);
-      if (rule.taxBucket) tbMap.set(rule.accountId, rule.taxBucket);
-    }
-    setSharePercents(spMap);
-    setTaxBuckets(tbMap);
-    setDirty(false);
-    setIsEditing(false);
-  }, [fundingRules]);
+    resetDraft();
+    setEditing(false);
+  }, [resetDraft, setEditing]);
 
   const dcLinkedSet = useMemo(() => new Set(dcLinkedAccountIds), [dcLinkedAccountIds]);
 
@@ -150,8 +193,8 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">Account Shares</CardTitle>
+      <CardHeader className="flex-row items-start justify-between pb-4">
+        <CardTitle className="text-md leading-none tracking-tight">Account Shares</CardTitle>
         {isEditing ? (
           <div className="flex gap-1.5">
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancel}>
@@ -167,15 +210,15 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
             </Button>
           </div>
         ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setIsEditing(true)}
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit Account Shares"
+            className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 text-sm transition-colors"
           >
-            <Icons.Pencil className="mr-1.5 h-3 w-3" />
+            <Icons.Pencil className="h-3.5 w-3.5" />
             Edit
-          </Button>
+          </button>
         )}
       </CardHeader>
       <CardContent>
@@ -199,9 +242,11 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                   return (
                     <div
                       key={a.id}
-                      className="bg-muted/30 flex items-center gap-2 rounded-lg px-2.5 py-2"
+                      className="bg-muted/30 flex items-center gap-3 rounded-lg px-3 py-2.5"
                     >
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{a.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {a.name}
+                      </span>
 
                       {/* Tax bucket pill (retirement only) */}
                       {isRetirement && !isDcLinked && (
@@ -218,17 +263,10 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
 
                       {/* Share % input */}
                       {!isDcLinked && (
-                        <div className="flex w-14 shrink-0 items-center gap-0.5">
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={percent}
-                            onChange={(e) => updateSharePercent(a.id, Number(e.target.value))}
-                            className="h-6 w-10 px-1 text-center text-[11px]"
-                          />
-                          <span className="text-muted-foreground text-[10px]">%</span>
-                        </div>
+                        <SharePercentInput
+                          value={percent}
+                          onChange={(value) => updateSharePercent(a.id, value)}
+                        />
                       )}
 
                       {/* DC linked badge */}
@@ -249,9 +287,10 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                       {!isDcLinked && (
                         <button
                           onClick={() => removeAccount(a.id)}
-                          className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                          className="text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 transition-colors"
+                          aria-label={`Remove ${a.name}`}
                         >
-                          <Icons.X className="h-3 w-3" />
+                          <Icons.X className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
@@ -292,7 +331,7 @@ export function GoalFundingEditor({ goalId, goalType, dcLinkedAccountIds = [] }:
                 No accounts assigned.{" "}
                 <button
                   className="text-foreground underline underline-offset-2"
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => setEditing(true)}
                 >
                   Add accounts
                 </button>
