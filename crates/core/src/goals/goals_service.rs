@@ -154,9 +154,14 @@ pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
         )
         .into());
     }
-    if plan.expenses.living.monthly_amount < 0.0 {
+    if plan
+        .expenses
+        .all_buckets()
+        .iter()
+        .any(|(bucket, _)| bucket.monthly_amount < 0.0)
+    {
         return Err(crate::errors::ValidationError::InvalidInput(
-            "Living expenses cannot be negative".into(),
+            "Retirement spending cannot be negative".into(),
         )
         .into());
     }

@@ -206,9 +206,11 @@ export {
 // FIRE Planner (desktop-only feature)
 export {
   calculateRetirementProjection,
+  runRetirementDecisionSensitivity,
   runRetirementMonteCarlo,
   runRetirementScenarioAnalysis,
   runRetirementSorr,
   runRetirementSensitivity,
+  runRetirementStressTests,
   runRetirementStrategyComparison,
 } from "./fire-planner";

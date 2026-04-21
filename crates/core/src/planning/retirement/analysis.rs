@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rayon::prelude::*;
 
 use super::dto::*;
@@ -24,6 +25,16 @@ pub fn run_monte_carlo_with_mode(
     current_portfolio: f64,
     n_sims: u32,
     mode: RetirementTimingMode,
+) -> MonteCarloResult {
+    run_monte_carlo_with_mode_and_seed(plan, current_portfolio, n_sims, mode, None)
+}
+
+pub fn run_monte_carlo_with_mode_and_seed(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    n_sims: u32,
+    mode: RetirementTimingMode,
+    seed: Option<u64>,
 ) -> MonteCarloResult {
     let current_age = plan.personal.current_age;
     let target_fire_age = plan.personal.target_retirement_age;
@@ -72,8 +83,11 @@ pub fn run_monte_carlo_with_mode(
     // paths[sim] = (year_values, survived, fi_age)
     let sim_results: Vec<(Vec<f64>, bool, Option<u32>)> = (0..n_sims)
         .into_par_iter()
-        .map(|_| {
-            let mut rng = rand::thread_rng();
+        .map(|sim_idx| {
+            let sim_seed = seed
+                .map(|base| splitmix64(base ^ sim_idx as u64))
+                .unwrap_or_else(|| rand::thread_rng().gen::<u64>());
+            let mut rng = StdRng::seed_from_u64(sim_seed);
             let mut buckets = initial_withdrawal_buckets(&tax_clone, current_portfolio);
             let mut in_fire = false;
             let mut sim_fi_age: Option<u32> = None;
@@ -238,6 +252,14 @@ pub fn run_monte_carlo_with_mode(
     }
 }
 
+fn splitmix64(mut x: u64) -> u64 {
+    x = x.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = x;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
 // ─── Scenario Analysis ───────────────────────────────────────────────────────
 
 pub fn run_scenario_analysis(plan: &RetirementPlan, current_portfolio: f64) -> Vec<ScenarioResult> {
@@ -291,6 +313,305 @@ pub fn run_scenario_analysis_with_mode(
             }
         })
         .collect()
+}
+
+// ─── Stress Tests ───────────────────────────────────────────────────────────
+
+pub fn run_stress_tests(plan: &RetirementPlan, current_portfolio: f64) -> Vec<StressTestResult> {
+    run_stress_tests_with_mode(plan, current_portfolio, RetirementTimingMode::Fire)
+}
+
+pub fn run_stress_tests_with_mode(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> Vec<StressTestResult> {
+    let baseline_overview = compute_retirement_overview_with_mode(plan, current_portfolio, mode);
+    let baseline = stress_outcome_from_overview(&baseline_overview);
+    let severity_base = baseline_overview.required_capital_at_goal_age.max(1.0);
+
+    let mut specs = vec![
+        build_plan_stress(
+            StressTestId::ReturnDrag,
+            "Lower returns",
+            "Pre-retirement and retirement returns are 2 percentage points lower.",
+            StressCategory::Market,
+            plan,
+            current_portfolio,
+            mode,
+            &baseline,
+            severity_base,
+            apply_return_drag_stress,
+        ),
+        build_plan_stress(
+            StressTestId::InflationShock,
+            "Inflation shock",
+            "General inflation is 1.5 percentage points higher.",
+            StressCategory::Inflation,
+            plan,
+            current_portfolio,
+            mode,
+            &baseline,
+            severity_base,
+            apply_inflation_shock_stress,
+        ),
+        build_plan_stress(
+            StressTestId::SpendingShock,
+            "Higher spending",
+            "All retirement spending lines are 10% higher.",
+            StressCategory::Spending,
+            plan,
+            current_portfolio,
+            mode,
+            &baseline,
+            severity_base,
+            apply_spending_shock_stress,
+        ),
+        build_plan_stress(
+            StressTestId::RetireEarlier,
+            "Retire 2 years earlier",
+            "Desired retirement age is moved two years earlier.",
+            StressCategory::Timing,
+            plan,
+            current_portfolio,
+            mode,
+            &baseline,
+            severity_base,
+            apply_retire_earlier_stress,
+        ),
+        build_plan_stress(
+            StressTestId::SaveLess,
+            "Save less",
+            "Monthly contributions are 25% lower.",
+            StressCategory::Saving,
+            plan,
+            current_portfolio,
+            mode,
+            &baseline,
+            severity_base,
+            apply_save_less_stress,
+        ),
+        build_early_crash_stress(plan, &baseline_overview, &baseline, severity_base),
+    ];
+
+    specs.sort_by(|a, b| {
+        severity_rank(&b.severity)
+            .cmp(&severity_rank(&a.severity))
+            .then_with(|| {
+                b.delta
+                    .shortfall_at_goal_age
+                    .partial_cmp(&a.delta.shortfall_at_goal_age)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+    specs
+}
+
+fn build_plan_stress<F>(
+    id: StressTestId,
+    label: &str,
+    description: &str,
+    category: StressCategory,
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+    baseline: &StressOutcome,
+    severity_base: f64,
+    mutate: F,
+) -> StressTestResult
+where
+    F: FnOnce(&mut RetirementPlan),
+{
+    let mut stressed_plan = plan.clone();
+    mutate(&mut stressed_plan);
+    let overview = compute_retirement_overview_with_mode(&stressed_plan, current_portfolio, mode);
+    let stressed = stress_outcome_from_overview(&overview);
+    build_stress_result(
+        id,
+        label,
+        description,
+        category,
+        baseline.clone(),
+        stressed,
+        severity_base,
+    )
+}
+
+fn build_early_crash_stress(
+    plan: &RetirementPlan,
+    baseline_overview: &RetirementOverview,
+    baseline: &StressOutcome,
+    severity_base: f64,
+) -> StressTestResult {
+    let retirement_age = plan.personal.target_retirement_age;
+    let portfolio_at_goal = baseline_overview.portfolio_at_goal_age.max(0.0);
+    let crash = run_sorr(plan, portfolio_at_goal, retirement_age)
+        .into_iter()
+        .find(|s| s.label == "Crash Year 1 (-30%)");
+
+    let stressed = match crash {
+        Some(scenario) => StressOutcome {
+            fi_age: baseline.fi_age,
+            retirement_start_age: Some(retirement_age),
+            funded_at_goal_age: baseline.funded_at_goal_age,
+            shortfall_at_goal_age: baseline.shortfall_at_goal_age,
+            portfolio_at_horizon: scenario.final_value,
+            failure_age: scenario.failure_age.or_else(|| {
+                if scenario.survived {
+                    None
+                } else {
+                    Some(retirement_age)
+                }
+            }),
+        },
+        None => StressOutcome {
+            fi_age: baseline.fi_age,
+            retirement_start_age: Some(retirement_age),
+            funded_at_goal_age: false,
+            shortfall_at_goal_age: baseline.shortfall_at_goal_age,
+            portfolio_at_horizon: 0.0,
+            failure_age: Some(retirement_age),
+        },
+    };
+
+    build_stress_result(
+        StressTestId::EarlyCrash,
+        "Retire into a crash",
+        "A 30% market drop happens in the first retirement year.",
+        StressCategory::Market,
+        baseline.clone(),
+        stressed,
+        severity_base,
+    )
+}
+
+fn build_stress_result(
+    id: StressTestId,
+    label: &str,
+    description: &str,
+    category: StressCategory,
+    baseline: StressOutcome,
+    stressed: StressOutcome,
+    severity_base: f64,
+) -> StressTestResult {
+    let delta = StressDelta {
+        fi_age_years: match (baseline.fi_age, stressed.fi_age) {
+            (Some(base), Some(stress)) => Some(stress as i32 - base as i32),
+            _ => None,
+        },
+        shortfall_at_goal_age: stressed.shortfall_at_goal_age - baseline.shortfall_at_goal_age,
+        portfolio_at_horizon: stressed.portfolio_at_horizon - baseline.portfolio_at_horizon,
+    };
+    let severity = classify_stress(&baseline, &stressed, &delta, severity_base);
+
+    StressTestResult {
+        id,
+        label: label.to_string(),
+        description: description.to_string(),
+        category,
+        baseline,
+        stressed,
+        delta,
+        severity,
+    }
+}
+
+fn stress_outcome_from_overview(overview: &RetirementOverview) -> StressOutcome {
+    let portfolio_at_horizon = overview
+        .trajectory
+        .last()
+        .map(|pt| pt.portfolio_end)
+        .unwrap_or(0.0);
+    let failure_age = overview
+        .trajectory
+        .iter()
+        .find(|pt| {
+            pt.phase == "fire"
+                && (pt.annual_shortfall.unwrap_or(0.0) > 0.0 || pt.portfolio_end <= 0.0)
+        })
+        .map(|pt| pt.age);
+
+    StressOutcome {
+        fi_age: overview.fi_age,
+        retirement_start_age: overview.retirement_start_age,
+        funded_at_goal_age: overview.funded_at_goal_age,
+        shortfall_at_goal_age: overview.shortfall_at_goal_age,
+        portfolio_at_horizon,
+        failure_age,
+    }
+}
+
+fn classify_stress(
+    baseline: &StressOutcome,
+    stressed: &StressOutcome,
+    delta: &StressDelta,
+    severity_base: f64,
+) -> StressSeverity {
+    let shortfall_increase = delta.shortfall_at_goal_age.max(0.0);
+    if stressed.failure_age.is_some()
+        || (baseline.fi_age.is_some() && stressed.fi_age.is_none())
+        || delta.fi_age_years.map_or(false, |years| years >= 3)
+        || shortfall_increase >= severity_base * 0.15
+    {
+        StressSeverity::High
+    } else if delta.fi_age_years.map_or(false, |years| years >= 1)
+        || shortfall_increase >= severity_base * 0.05
+    {
+        StressSeverity::Medium
+    } else {
+        StressSeverity::Low
+    }
+}
+
+fn severity_rank(severity: &StressSeverity) -> u8 {
+    match severity {
+        StressSeverity::Low => 0,
+        StressSeverity::Medium => 1,
+        StressSeverity::High => 2,
+    }
+}
+
+fn apply_return_drag_stress(plan: &mut RetirementPlan) {
+    plan.investment.pre_retirement_annual_return -= 0.02;
+    plan.investment.retirement_annual_return -= 0.02;
+}
+
+fn apply_inflation_shock_stress(plan: &mut RetirementPlan) {
+    plan.investment.inflation_rate += 0.015;
+}
+
+fn apply_spending_shock_stress(plan: &mut RetirementPlan) {
+    scale_expenses(&mut plan.expenses, 1.10);
+}
+
+fn apply_retire_earlier_stress(plan: &mut RetirementPlan) {
+    plan.personal.target_retirement_age = plan
+        .personal
+        .target_retirement_age
+        .saturating_sub(2)
+        .max(plan.personal.current_age + 1);
+}
+
+fn apply_save_less_stress(plan: &mut RetirementPlan) {
+    plan.investment.monthly_contribution *= 0.75;
+}
+
+fn scale_expenses(expenses: &mut ExpenseBudget, factor: f64) {
+    if !expenses.items.is_empty() {
+        for item in &mut expenses.items {
+            item.monthly_amount *= factor;
+        }
+        return;
+    }
+
+    expenses.living.monthly_amount *= factor;
+    expenses.healthcare.monthly_amount *= factor;
+    if let Some(housing) = &mut expenses.housing {
+        housing.monthly_amount *= factor;
+    }
+    if let Some(discretionary) = &mut expenses.discretionary {
+        discretionary.monthly_amount *= factor;
+    }
 }
 
 // ─── Sequence of Returns Risk ────────────────────────────────────────────────
@@ -506,6 +827,297 @@ pub fn run_sensitivity_analysis_with_mode(
     }
 }
 
+pub fn run_decision_sensitivity_analysis(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+) -> DecisionSensitivityResult {
+    run_decision_sensitivity_analysis_with_mode(plan, current_portfolio, RetirementTimingMode::Fire)
+}
+
+pub fn run_decision_sensitivity_analysis_with_mode(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> DecisionSensitivityResult {
+    DecisionSensitivityResult {
+        contribution_return: build_contribution_return_sensitivity(plan, current_portfolio, mode),
+        retirement_age_spending: build_retirement_age_spending_sensitivity(
+            plan,
+            current_portfolio,
+            mode,
+        ),
+    }
+}
+
+fn build_contribution_return_sensitivity(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> DecisionSensitivityMatrix {
+    let base_contribution = plan.investment.monthly_contribution;
+    let base_net_return = plan_accumulation_return(plan);
+    let contribution_values = contribution_axis(base_contribution);
+    let return_values = return_axis(base_net_return);
+    let baseline_row = return_values
+        .iter()
+        .position(|value| approx_eq(*value, base_net_return, 0.000_001));
+    let baseline_column = contribution_values
+        .iter()
+        .position(|value| approx_eq(*value, base_contribution, 0.01));
+
+    let cells = return_values
+        .iter()
+        .map(|&net_return| {
+            contribution_values
+                .iter()
+                .map(|&contribution| {
+                    let mut adjusted = plan.clone();
+                    adjusted.investment.monthly_contribution = contribution;
+                    apply_return_delta(&mut adjusted, net_return - base_net_return);
+                    decision_cell_from_plan(&adjusted, current_portfolio, mode)
+                })
+                .collect()
+        })
+        .collect();
+
+    DecisionSensitivityMatrix {
+        row_label: "Expected return".to_string(),
+        column_label: "Monthly contribution".to_string(),
+        row_labels: return_values
+            .iter()
+            .map(|value| format!("{:.1}%", value * 100.0))
+            .collect(),
+        column_labels: contribution_values
+            .iter()
+            .map(|value| format!("{:.0}", value))
+            .collect(),
+        row_values: return_values,
+        column_values: contribution_values,
+        cells,
+        baseline_row,
+        baseline_column,
+    }
+}
+
+fn build_retirement_age_spending_sensitivity(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> DecisionSensitivityMatrix {
+    let base_retirement_age = plan.personal.target_retirement_age;
+    let base_monthly_spending = active_monthly_expense_today(plan, base_retirement_age);
+    let spending_values = spending_axis(base_monthly_spending);
+    let retirement_age_values = retirement_age_axis(plan);
+    let baseline_row = spending_values
+        .iter()
+        .position(|value| approx_eq(*value, base_monthly_spending, 0.01));
+    let baseline_column = retirement_age_values
+        .iter()
+        .position(|value| *value as u32 == base_retirement_age);
+
+    let cells = spending_values
+        .iter()
+        .map(|&monthly_spending| {
+            retirement_age_values
+                .iter()
+                .map(|&retirement_age| {
+                    let mut adjusted = plan.clone();
+                    adjusted.personal.target_retirement_age = retirement_age as u32;
+                    set_total_monthly_expense(
+                        &mut adjusted.expenses,
+                        base_monthly_spending,
+                        monthly_spending,
+                    );
+                    decision_cell_from_plan(&adjusted, current_portfolio, mode)
+                })
+                .collect()
+        })
+        .collect();
+
+    DecisionSensitivityMatrix {
+        row_label: "Monthly spending".to_string(),
+        column_label: "Retirement age".to_string(),
+        row_labels: spending_values
+            .iter()
+            .map(|value| format!("{:.0}", value))
+            .collect(),
+        column_labels: retirement_age_values
+            .iter()
+            .map(|value| format!("{value}"))
+            .collect(),
+        row_values: spending_values,
+        column_values: retirement_age_values,
+        cells,
+        baseline_row,
+        baseline_column,
+    }
+}
+
+fn decision_cell_from_plan(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> DecisionSensitivityCell {
+    let overview = compute_retirement_overview_with_mode(plan, current_portfolio, mode);
+    let target_factor = inflation_factor_to_age(plan, overview.desired_fire_age);
+    let horizon_factor = inflation_factor_to_age(plan, plan.personal.planning_horizon_age);
+    DecisionSensitivityCell {
+        fi_age: overview.fi_age,
+        retirement_start_age: overview.retirement_start_age,
+        funded_at_goal_age: overview.funded_at_goal_age,
+        shortfall_at_goal_age: overview.shortfall_at_goal_age / target_factor,
+        portfolio_at_horizon: overview
+            .trajectory
+            .last()
+            .map(|point| point.portfolio_end)
+            .unwrap_or(0.0)
+            / horizon_factor,
+    }
+}
+
+fn inflation_factor_to_age(plan: &RetirementPlan, age: u32) -> f64 {
+    let years = (age as i32 - plan.personal.current_age as i32).max(0);
+    (1.0_f64 + plan.investment.inflation_rate)
+        .max(0.01)
+        .powi(years)
+}
+
+fn apply_return_delta(plan: &mut RetirementPlan, delta: f64) {
+    plan.investment.pre_retirement_annual_return =
+        (plan.investment.pre_retirement_annual_return + delta).max(-0.99);
+    plan.investment.retirement_annual_return =
+        (plan.investment.retirement_annual_return + delta).max(-0.99);
+}
+
+fn contribution_axis(base: f64) -> Vec<f64> {
+    if base <= 0.0 {
+        return vec![0.0, 500.0, 1_000.0, 1_500.0, 2_000.0];
+    }
+
+    let mut values = Vec::with_capacity(5);
+    for multiplier in [0.6_f64, 0.8, 1.0, 1.2, 1.4] {
+        let value = if approx_eq(multiplier, 1.0, 0.000_001) {
+            base
+        } else {
+            round_money_axis(base * multiplier)
+        };
+        push_unique_axis_value(&mut values, value);
+    }
+    fill_money_axis(&mut values, base);
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    values
+}
+
+fn return_axis(base: f64) -> Vec<f64> {
+    [-0.02_f64, -0.01, 0.0, 0.01, 0.02]
+        .iter()
+        .map(|delta| (base + delta).max(-0.95))
+        .collect()
+}
+
+fn spending_axis(base: f64) -> Vec<f64> {
+    if base <= 0.0 {
+        return vec![0.0, 1_000.0, 2_000.0, 3_000.0, 4_000.0];
+    }
+
+    let mut values = Vec::with_capacity(5);
+    for multiplier in [0.8_f64, 0.9, 1.0, 1.1, 1.2] {
+        let value = if approx_eq(multiplier, 1.0, 0.000_001) {
+            base
+        } else {
+            round_money_axis(base * multiplier)
+        };
+        push_unique_axis_value(&mut values, value);
+    }
+    fill_money_axis(&mut values, base);
+    values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    values
+}
+
+fn retirement_age_axis(plan: &RetirementPlan) -> Vec<f64> {
+    let target = plan.personal.target_retirement_age as i32;
+    let min_age = plan.personal.current_age as i32 + 1;
+    let max_age = plan.personal.planning_horizon_age as i32;
+    let mut values = Vec::with_capacity(5);
+    for offset in [-3_i32, -1, 0, 2, 4] {
+        let age = (target + offset).clamp(min_age, max_age);
+        if !values.contains(&age) {
+            values.push(age);
+        }
+    }
+    let mut next = target;
+    while values.len() < 5 && next < max_age {
+        next += 1;
+        if !values.contains(&next) {
+            values.push(next);
+        }
+    }
+    let mut prev = target;
+    while values.len() < 5 && prev > min_age {
+        prev -= 1;
+        if !values.contains(&prev) {
+            values.push(prev);
+        }
+    }
+    values.sort_unstable();
+    values.into_iter().map(f64::from).collect()
+}
+
+fn active_monthly_expense_today(plan: &RetirementPlan, age: u32) -> f64 {
+    plan.expenses
+        .all_buckets()
+        .into_iter()
+        .filter(|(bucket, _)| {
+            bucket.start_age.map_or(true, |start| age >= start)
+                && bucket.end_age.map_or(true, |end| age < end)
+        })
+        .map(|(bucket, _)| bucket.monthly_amount)
+        .sum()
+}
+
+fn set_total_monthly_expense(expenses: &mut ExpenseBudget, base_total: f64, target_total: f64) {
+    if base_total > 0.0 {
+        scale_expenses(expenses, target_total / base_total);
+        return;
+    }
+
+    if !expenses.items.is_empty() {
+        if let Some(first) = expenses.items.first_mut() {
+            first.monthly_amount = target_total;
+        }
+        return;
+    }
+
+    expenses.living.monthly_amount = target_total;
+}
+
+fn round_money_axis(value: f64) -> f64 {
+    let step = if value.abs() >= 1_000.0 { 100.0 } else { 50.0 };
+    (value / step).round() * step
+}
+
+fn push_unique_axis_value(values: &mut Vec<f64>, value: f64) {
+    if !values
+        .iter()
+        .any(|existing| approx_eq(*existing, value, 0.01))
+    {
+        values.push(value.max(0.0));
+    }
+}
+
+fn fill_money_axis(values: &mut Vec<f64>, base: f64) {
+    let step = round_money_axis((base.abs() * 0.2).max(100.0)).max(100.0);
+    let mut next = base + step;
+    while values.len() < 5 {
+        push_unique_axis_value(values, round_money_axis(next));
+        next += step;
+    }
+}
+
+fn approx_eq(left: f64, right: f64, epsilon: f64) -> bool {
+    (left - right).abs() <= epsilon
+}
+
 // ─── Strategy Comparison ─────────────────────────────────────────────────────
 
 pub fn run_strategy_comparison(
@@ -548,6 +1160,7 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
+                items: vec![],
                 living: ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
@@ -575,7 +1188,6 @@ mod tests {
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-                target_allocations: HashMap::new(),
             },
             withdrawal: WithdrawalConfig {
                 safe_withdrawal_rate: 0.04,
@@ -601,6 +1213,34 @@ mod tests {
     }
 
     #[test]
+    fn seeded_monte_carlo_is_stable() {
+        let p = base_plan();
+        let a = run_monte_carlo_with_mode_and_seed(
+            &p,
+            100_000.0,
+            100,
+            RetirementTimingMode::Fire,
+            Some(42),
+        );
+        let b = run_monte_carlo_with_mode_and_seed(
+            &p,
+            100_000.0,
+            100,
+            RetirementTimingMode::Fire,
+            Some(42),
+        );
+
+        assert_eq!(a.success_rate, b.success_rate);
+        assert_eq!(a.median_fire_age, b.median_fire_age);
+        assert_eq!(a.percentiles.p10, b.percentiles.p10);
+        assert_eq!(a.percentiles.p50, b.percentiles.p50);
+        assert_eq!(
+            a.final_portfolio_at_horizon.p10,
+            b.final_portfolio_at_horizon.p10
+        );
+    }
+
+    #[test]
     fn sorr_produces_five_scenarios() {
         let p = base_plan();
         let scenarios = run_sorr(&p, 900_000.0, p.personal.target_retirement_age);
@@ -617,6 +1257,172 @@ mod tests {
         assert_eq!(result.contribution.return_columns.len(), 6);
         assert_eq!(result.contribution.fire_ages.len(), 5);
         assert_eq!(result.swr.swr_rows.len(), 5);
+    }
+
+    #[test]
+    fn decision_sensitivity_returns_two_outcome_grids() {
+        let p = base_plan();
+        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+
+        assert_eq!(result.contribution_return.row_values.len(), 5);
+        assert_eq!(result.contribution_return.column_values.len(), 5);
+        assert_eq!(result.contribution_return.cells.len(), 5);
+        assert!(result
+            .contribution_return
+            .cells
+            .iter()
+            .all(|row| row.len() == 5));
+        assert_eq!(result.retirement_age_spending.row_values.len(), 5);
+        assert_eq!(result.retirement_age_spending.column_values.len(), 5);
+        assert_eq!(result.retirement_age_spending.cells.len(), 5);
+        assert!(result
+            .retirement_age_spending
+            .cells
+            .iter()
+            .all(|row| row.len() == 5));
+    }
+
+    #[test]
+    fn decision_sensitivity_highlights_baseline_cell() {
+        let p = base_plan();
+        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+
+        assert_eq!(result.contribution_return.baseline_row, Some(2));
+        assert_eq!(result.contribution_return.baseline_column, Some(2));
+        assert_eq!(result.retirement_age_spending.baseline_row, Some(2));
+        assert_eq!(result.retirement_age_spending.baseline_column, Some(2));
+    }
+
+    #[test]
+    fn decision_sensitivity_baseline_matches_overview() {
+        let p = base_plan();
+        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+        let overview =
+            compute_retirement_overview_with_mode(&p, 100_000.0, RetirementTimingMode::Fire);
+        let expected_horizon = overview
+            .trajectory
+            .last()
+            .map(|point| point.portfolio_end)
+            .unwrap_or(0.0)
+            / inflation_factor_to_age(&p, p.personal.planning_horizon_age);
+        let cell = &result.contribution_return.cells
+            [result.contribution_return.baseline_row.unwrap()]
+            [result.contribution_return.baseline_column.unwrap()];
+
+        assert_eq!(cell.fi_age, overview.fi_age);
+        assert!((cell.portfolio_at_horizon - expected_horizon).abs() < 0.01);
+    }
+
+    #[test]
+    fn stress_tests_return_expected_presets() {
+        let p = base_plan();
+        let stresses = run_stress_tests(&p, 100_000.0);
+        let mut ids: Vec<_> = stresses.iter().map(|s| s.id.clone()).collect();
+        ids.sort_by_key(|id| format!("{:?}", id));
+
+        assert_eq!(stresses.len(), 6);
+        assert!(ids.contains(&StressTestId::ReturnDrag));
+        assert!(ids.contains(&StressTestId::InflationShock));
+        assert!(ids.contains(&StressTestId::SpendingShock));
+        assert!(ids.contains(&StressTestId::RetireEarlier));
+        assert!(ids.contains(&StressTestId::SaveLess));
+        assert!(ids.contains(&StressTestId::EarlyCrash));
+    }
+
+    #[test]
+    fn stress_deltas_use_same_baseline() {
+        let p = base_plan();
+        let stresses = run_stress_tests(&p, 100_000.0);
+        let baseline_shortfall = stresses[0].baseline.shortfall_at_goal_age;
+        let baseline_horizon = stresses[0].baseline.portfolio_at_horizon;
+
+        for stress in stresses {
+            assert_eq!(stress.baseline.shortfall_at_goal_age, baseline_shortfall);
+            assert_eq!(stress.baseline.portfolio_at_horizon, baseline_horizon);
+            assert!(
+                (stress.delta.shortfall_at_goal_age
+                    - (stress.stressed.shortfall_at_goal_age
+                        - stress.baseline.shortfall_at_goal_age))
+                    .abs()
+                    < 0.01
+            );
+            assert!(
+                (stress.delta.portfolio_at_horizon
+                    - (stress.stressed.portfolio_at_horizon
+                        - stress.baseline.portfolio_at_horizon))
+                    .abs()
+                    < 0.01
+            );
+        }
+    }
+
+    #[test]
+    fn stress_mutators_change_only_intended_inputs() {
+        let p = base_plan();
+
+        let mut actual = p.clone();
+        apply_return_drag_stress(&mut actual);
+        let mut expected = p.clone();
+        expected.investment.pre_retirement_annual_return -= 0.02;
+        expected.investment.retirement_annual_return -= 0.02;
+        assert_eq!(actual, expected);
+
+        let mut actual = p.clone();
+        apply_inflation_shock_stress(&mut actual);
+        let mut expected = p.clone();
+        expected.investment.inflation_rate += 0.015;
+        assert_eq!(actual, expected);
+
+        let mut actual = p.clone();
+        apply_spending_shock_stress(&mut actual);
+        let mut expected = p.clone();
+        expected.expenses.living.monthly_amount *= 1.10;
+        expected.expenses.healthcare.monthly_amount *= 1.10;
+        assert_eq!(actual, expected);
+
+        let mut actual = p.clone();
+        apply_retire_earlier_stress(&mut actual);
+        let mut expected = p.clone();
+        expected.personal.target_retirement_age =
+            (expected.personal.target_retirement_age.saturating_sub(2))
+                .max(expected.personal.current_age + 1);
+        assert_eq!(actual, expected);
+
+        let mut actual = p.clone();
+        apply_save_less_stress(&mut actual);
+        let mut expected = p.clone();
+        expected.investment.monthly_contribution *= 0.75;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn severe_stress_is_classified_high() {
+        let baseline = StressOutcome {
+            fi_age: Some(55),
+            retirement_start_age: Some(55),
+            funded_at_goal_age: true,
+            shortfall_at_goal_age: 0.0,
+            portfolio_at_horizon: 100_000.0,
+            failure_age: None,
+        };
+        let stressed = StressOutcome {
+            fi_age: Some(59),
+            retirement_start_age: Some(59),
+            funded_at_goal_age: false,
+            shortfall_at_goal_age: 200_000.0,
+            portfolio_at_horizon: 0.0,
+            failure_age: None,
+        };
+        let delta = StressDelta {
+            fi_age_years: Some(4),
+            shortfall_at_goal_age: 200_000.0,
+            portfolio_at_horizon: -100_000.0,
+        };
+
+        assert_eq!(
+            classify_stress(&baseline, &stressed, &delta, 1_000_000.0),
+            StressSeverity::High
+        );
     }
 
     #[test]

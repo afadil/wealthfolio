@@ -1,4 +1,5 @@
 import type { RetirementPlan } from "../types";
+import { normalizeExpenseBudget } from "./expense-items";
 
 export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
   version: "v3",
@@ -8,8 +9,10 @@ export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
     planningHorizonAge: 90,
   },
   expenses: {
-    living: { monthlyAmount: 3000 },
-    healthcare: { monthlyAmount: 0 },
+    items: [
+      { id: "living", label: "Living", monthlyAmount: 3000, essential: true },
+      { id: "healthcare", label: "Healthcare", monthlyAmount: 0, essential: true },
+    ],
   },
   incomeStreams: [],
   investment: {
@@ -20,7 +23,6 @@ export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
     inflationRate: 0.02,
     monthlyContribution: 1000,
     contributionGrowthRate: 0.02,
-    targetAllocations: {},
   },
   withdrawal: {
     safeWithdrawalRate: 0.035,
@@ -33,20 +35,19 @@ export function parseSettingsJson(json: string): RetirementPlan {
   try {
     const raw = JSON.parse(json);
     const rawInvestment = raw.investment ?? {};
-    const { expectedAnnualReturn, expectedReturnStdDev, ...investmentWithoutLegacy } =
-      rawInvestment;
+    const {
+      expectedAnnualReturn,
+      expectedReturnStdDev,
+      targetAllocations,
+      ...investmentWithoutLegacy
+    } = rawInvestment;
+    void targetAllocations;
     return {
       ...DEFAULT_RETIREMENT_PLAN,
       ...raw,
       version: "v3",
       personal: { ...DEFAULT_RETIREMENT_PLAN.personal, ...raw.personal },
-      expenses: {
-        living: { ...DEFAULT_RETIREMENT_PLAN.expenses.living, ...raw.expenses?.living },
-        healthcare: { ...DEFAULT_RETIREMENT_PLAN.expenses.healthcare, ...raw.expenses?.healthcare },
-        housing: raw.expenses?.housing ?? DEFAULT_RETIREMENT_PLAN.expenses.housing,
-        discretionary:
-          raw.expenses?.discretionary ?? DEFAULT_RETIREMENT_PLAN.expenses.discretionary,
-      },
+      expenses: normalizeExpenseBudget(raw.expenses ?? DEFAULT_RETIREMENT_PLAN.expenses),
       incomeStreams: raw.incomeStreams ?? DEFAULT_RETIREMENT_PLAN.incomeStreams,
       investment: {
         ...DEFAULT_RETIREMENT_PLAN.investment,

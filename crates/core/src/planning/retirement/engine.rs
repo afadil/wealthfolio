@@ -650,6 +650,7 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
+                items: vec![],
                 living: ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
@@ -677,7 +678,6 @@ mod tests {
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-                target_allocations: HashMap::new(),
             },
             withdrawal: WithdrawalConfig {
                 safe_withdrawal_rate: 0.04,
@@ -944,6 +944,37 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn expense_items_override_legacy_buckets() {
+        let mut plan = base_plan();
+        plan.expenses.items = vec![
+            ExpenseBucket {
+                monthly_amount: 1_000.0,
+                inflation_rate: None,
+                start_age: None,
+                end_age: Some(65),
+                essential: Some(true),
+            },
+            ExpenseBucket {
+                monthly_amount: 500.0,
+                inflation_rate: None,
+                start_age: Some(70),
+                end_age: None,
+                essential: Some(false),
+            },
+        ];
+
+        let (age_55_expenses, age_55_essential) =
+            annual_expenses_at_year(&plan.expenses, 55, 0, plan.investment.inflation_rate);
+        let (age_70_expenses, age_70_essential) =
+            annual_expenses_at_year(&plan.expenses, 70, 0, plan.investment.inflation_rate);
+
+        assert_eq!(age_55_expenses, 12_000.0);
+        assert_eq!(age_55_essential, 12_000.0);
+        assert_eq!(age_70_expenses, 6_000.0);
+        assert_eq!(age_70_essential, 0.0);
     }
 
     #[test]

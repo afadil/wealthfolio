@@ -141,10 +141,103 @@ pub struct SensitivityResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DecisionSensitivityCell {
+    pub fi_age: Option<u32>,
+    pub retirement_start_age: Option<u32>,
+    pub funded_at_goal_age: bool,
+    pub shortfall_at_goal_age: f64,
+    pub portfolio_at_horizon: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionSensitivityMatrix {
+    pub row_label: String,
+    pub column_label: String,
+    pub row_values: Vec<f64>,
+    pub column_values: Vec<f64>,
+    pub row_labels: Vec<String>,
+    pub column_labels: Vec<String>,
+    pub cells: Vec<Vec<DecisionSensitivityCell>>,
+    pub baseline_row: Option<usize>,
+    pub baseline_column: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionSensitivityResult {
+    pub contribution_return: DecisionSensitivityMatrix,
+    pub retirement_age_spending: DecisionSensitivityMatrix,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StrategyComparisonResult {
     pub constant_dollar: MonteCarloResult,
     pub constant_percentage: MonteCarloResult,
     pub guardrails: MonteCarloResult,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum StressTestId {
+    ReturnDrag,
+    InflationShock,
+    SpendingShock,
+    RetireEarlier,
+    SaveLess,
+    EarlyCrash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StressCategory {
+    Market,
+    Inflation,
+    Spending,
+    Timing,
+    Saving,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub enum StressSeverity {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StressOutcome {
+    pub fi_age: Option<u32>,
+    pub retirement_start_age: Option<u32>,
+    pub funded_at_goal_age: bool,
+    pub shortfall_at_goal_age: f64,
+    pub portfolio_at_horizon: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure_age: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StressDelta {
+    pub fi_age_years: Option<i32>,
+    pub shortfall_at_goal_age: f64,
+    pub portfolio_at_horizon: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StressTestResult {
+    pub id: StressTestId,
+    pub label: String,
+    pub description: String,
+    pub category: StressCategory,
+    pub baseline: StressOutcome,
+    pub stressed: StressOutcome,
+    pub delta: StressDelta,
+    pub severity: StressSeverity,
 }
 
 // ─── Retirement Overview ────────────────────────────────────────────────────
@@ -294,33 +387,46 @@ fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> Budge
             && b.end_age.map_or(true, |e| e > retirement_age)
     };
 
-    let monthly_living = if active(&plan.expenses.living) {
-        plan.expenses.living.monthly_amount
-    } else {
-        0.0
-    };
-    let monthly_healthcare = if active(&plan.expenses.healthcare) {
-        plan.expenses.healthcare.monthly_amount
-    } else {
-        0.0
-    };
-    let monthly_housing = plan
+    let active_buckets: Vec<_> = plan
         .expenses
-        .housing
-        .as_ref()
-        .filter(|b| active(b))
-        .map(|b| b.monthly_amount);
-    let monthly_discretionary = plan
-        .expenses
-        .discretionary
-        .as_ref()
-        .filter(|b| active(b))
-        .map(|b| b.monthly_amount);
+        .all_buckets()
+        .into_iter()
+        .filter(|(bucket, _)| active(bucket))
+        .collect();
 
-    let total_monthly_budget = monthly_living
-        + monthly_healthcare
-        + monthly_housing.unwrap_or(0.0)
-        + monthly_discretionary.unwrap_or(0.0);
+    let total_monthly_budget = active_buckets
+        .iter()
+        .map(|(bucket, _)| bucket.monthly_amount)
+        .sum::<f64>();
+
+    let legacy_bucket_amount = |label: &str| -> Option<f64> {
+        if !plan.expenses.items.is_empty() {
+            return None;
+        }
+        match label {
+            "living" if active(&plan.expenses.living) => Some(plan.expenses.living.monthly_amount),
+            "healthcare" if active(&plan.expenses.healthcare) => {
+                Some(plan.expenses.healthcare.monthly_amount)
+            }
+            "housing" => plan
+                .expenses
+                .housing
+                .as_ref()
+                .filter(|bucket| active(bucket))
+                .map(|bucket| bucket.monthly_amount),
+            "discretionary" => plan
+                .expenses
+                .discretionary
+                .as_ref()
+                .filter(|bucket| active(bucket))
+                .map(|bucket| bucket.monthly_amount),
+            _ => None,
+        }
+    };
+    let monthly_living = legacy_bucket_amount("living").unwrap_or(0.0);
+    let monthly_healthcare = legacy_bucket_amount("healthcare").unwrap_or(0.0);
+    let monthly_housing = legacy_bucket_amount("housing");
+    let monthly_discretionary = legacy_bucket_amount("discretionary");
 
     let resolved = resolve_plan_dc_payouts(
         &plan.income_streams,
@@ -436,6 +542,37 @@ fn compute_target_reconciliation(
     }
 }
 
+fn required_balance_after_remaining_contributions(
+    plan: &RetirementPlan,
+    age: u32,
+    goal_age: u32,
+    target_at_goal: f64,
+) -> f64 {
+    if age >= goal_age {
+        return target_at_goal.max(0.0);
+    }
+
+    let growth_factor = (1.0_f64 + plan_accumulation_return(plan)).max(0.000001);
+    let contribution_growth = plan
+        .personal
+        .salary_growth_rate
+        .unwrap_or(plan.investment.contribution_growth_rate);
+    let first_offset = (age as i32 - plan.personal.current_age as i32).max(0) as u32;
+    let goal_offset = (goal_age as i32 - plan.personal.current_age as i32).max(0) as u32;
+
+    // Match the projection engine timing: each accumulation year grows the
+    // start-of-age portfolio first, then adds that year's contribution.
+    let mut required_next = target_at_goal.max(0.0);
+    for offset in (first_offset..goal_offset).rev() {
+        let annual_contribution = plan.investment.monthly_contribution
+            * 12.0
+            * (1.0_f64 + contribution_growth).powi(offset as i32);
+        required_next = ((required_next - annual_contribution).max(0.0)) / growth_factor;
+    }
+
+    required_next
+}
+
 /// Plan-aware trajectory builder.
 fn build_trajectory(
     year_by_year: &[YearlySnapshot],
@@ -443,21 +580,22 @@ fn build_trajectory(
     _net_target: f64,
 ) -> Vec<RetirementTrajectoryPoint> {
     let goal_age = plan.personal.target_retirement_age;
-    let r = plan_accumulation_return(plan);
-
     // Target at goal age: schedule-based capital needed when retirement starts.
     let target_at_goal = compute_required_capital(plan, goal_age);
 
-    // Pre-retirement: smooth growth curve from today's PV of the goal-age target
-    // (what the portfolio needs to be on track at each age).
+    // Pre-retirement: minimum start-of-age balance needed to still hit the goal,
+    // after crediting remaining planned contributions.
     // Post-retirement: declining required capital (fewer years left to fund), reaching 0 at horizon.
     let required_capitals: Vec<f64> = year_by_year
         .iter()
         .map(|snap| {
             if snap.age <= goal_age {
-                // Accumulation: PV of the goal-age target discounted back from goal_age to snap.age
-                let years_to_goal = (goal_age as i32 - snap.age as i32).max(0);
-                target_at_goal / (1.0_f64 + r).powi(years_to_goal)
+                required_balance_after_remaining_contributions(
+                    plan,
+                    snap.age,
+                    goal_age,
+                    target_at_goal,
+                )
             } else {
                 // Retirement: what you still need at this age to fund remaining years
                 compute_required_capital(plan, snap.age)
@@ -704,7 +842,6 @@ pub fn compute_retirement_overview_with_mode(
 mod tests {
     use super::*;
     use crate::planning::retirement::*;
-    use std::collections::HashMap;
 
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
@@ -716,6 +853,7 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
+                items: vec![],
                 living: ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
@@ -743,7 +881,6 @@ mod tests {
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-                target_allocations: HashMap::new(),
             },
             withdrawal: WithdrawalConfig {
                 safe_withdrawal_rate: 0.04,
@@ -879,6 +1016,65 @@ mod tests {
                 overview.trajectory[idx].required_capital,
             );
         }
+    }
+
+    #[test]
+    fn required_glidepath_credits_remaining_contributions() {
+        let mut with_contributions = base_plan();
+        with_contributions.investment.monthly_contribution = 2_000.0;
+
+        let mut without_contributions = with_contributions.clone();
+        without_contributions.investment.monthly_contribution = 0.0;
+
+        let with_overview = compute_retirement_overview(&with_contributions, 100_000.0, "fire");
+        let without_overview =
+            compute_retirement_overview(&without_contributions, 100_000.0, "fire");
+
+        let with_required_today = with_overview.trajectory.first().unwrap().required_capital;
+        let without_required_today = without_overview
+            .trajectory
+            .first()
+            .unwrap()
+            .required_capital;
+
+        assert!(
+            with_required_today < without_required_today,
+            "planned future contributions should lower today's required glidepath balance"
+        );
+        assert!(
+            (with_overview
+                .trajectory
+                .iter()
+                .find(|pt| pt.age == with_contributions.personal.target_retirement_age)
+                .unwrap()
+                .required_capital
+                - with_overview.required_capital_at_goal_age)
+                .abs()
+                < 0.01,
+            "required glidepath should still meet the full target at retirement age"
+        );
+    }
+
+    #[test]
+    fn required_glidepath_balance_reaches_goal_with_planned_contributions() {
+        let mut p = base_plan();
+        p.investment.monthly_contribution = 500.0;
+        let required_today = compute_retirement_overview(&p, 0.0, "traditional")
+            .trajectory
+            .first()
+            .unwrap()
+            .required_capital;
+
+        let overview = compute_retirement_overview(&p, required_today, "traditional");
+        let at_goal = overview.target_reconciliation.portfolio_at_target_nominal;
+
+        assert!(
+            (at_goal - overview.required_capital_at_goal_age).abs() < 0.01,
+            "starting at the required glidepath balance should land exactly on the target: at_goal={}, target={}, required_today={}",
+            at_goal,
+            overview.required_capital_at_goal_age,
+            required_today,
+        );
     }
 
     #[test]

@@ -6,12 +6,14 @@ use crate::context::ServiceContext;
 use wealthfolio_core::goals::validate_retirement_plan;
 use wealthfolio_core::planning::retirement::{RetirementPlan, RetirementTimingMode};
 use wealthfolio_core::portfolio::fire::{
-    project_retirement_with_mode, run_monte_carlo_with_mode, run_scenario_analysis_with_mode,
+    project_retirement_with_mode, run_decision_sensitivity_analysis_with_mode,
+    run_monte_carlo_with_mode_and_seed, run_scenario_analysis_with_mode,
     run_sensitivity_analysis_with_mode, run_sorr, run_strategy_comparison_with_mode,
+    run_stress_tests_with_mode,
 };
 use wealthfolio_core::portfolio::fire::{
-    FireProjection, MonteCarloResult, ScenarioResult, SensitivityResult, SorrScenario,
-    StrategyComparisonResult,
+    DecisionSensitivityResult, FireProjection, MonteCarloResult, ScenarioResult, SensitivityResult,
+    SorrScenario, StrategyComparisonResult, StressTestResult,
 };
 
 const MAX_SIMS: u32 = 500_000;
@@ -95,6 +97,7 @@ pub async fn run_retirement_monte_carlo(
     plan: RetirementPlan,
     current_portfolio: f64,
     n_sims: Option<u32>,
+    seed: Option<u64>,
     goal_id: Option<String>,
     planner_mode: Option<RetirementTimingMode>,
     state: State<'_, Arc<ServiceContext>>,
@@ -102,10 +105,28 @@ pub async fn run_retirement_monte_carlo(
     let n = n_sims.unwrap_or(10_000).min(MAX_SIMS);
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_monte_carlo_with_mode(
+    Ok(run_monte_carlo_with_mode_and_seed(
         &plan,
         current_portfolio,
         n,
+        planner_mode,
+        seed,
+    ))
+}
+
+#[tauri::command]
+pub async fn run_retirement_stress_tests(
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<StressTestResult>, String> {
+    let (plan, current_portfolio, planner_mode) =
+        resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
+    Ok(run_stress_tests_with_mode(
+        &plan,
+        current_portfolio,
         planner_mode,
     ))
 }
@@ -161,6 +182,23 @@ pub async fn run_retirement_sensitivity(
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
     Ok(run_sensitivity_analysis_with_mode(
+        &plan,
+        current_portfolio,
+        planner_mode,
+    ))
+}
+
+#[tauri::command]
+pub async fn run_retirement_decision_sensitivity(
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<DecisionSensitivityResult, String> {
+    let (plan, current_portfolio, planner_mode) =
+        resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
+    Ok(run_decision_sensitivity_analysis_with_mode(
         &plan,
         current_portfolio,
         planner_mode,

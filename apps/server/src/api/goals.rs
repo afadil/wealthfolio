@@ -20,8 +20,8 @@ use wealthfolio_core::{
     planning::retirement::{RetirementPlan, RetirementTimingMode},
     planning::SaveUpOverview,
     portfolio::fire::{
-        self, MonteCarloResult, RetirementOverview, ScenarioResult, SensitivityResult,
-        SorrScenario, StrategyComparisonResult,
+        self, DecisionSensitivityResult, MonteCarloResult, RetirementOverview, ScenarioResult,
+        SensitivityResult, SorrScenario, StrategyComparisonResult, StressTestResult,
     },
 };
 
@@ -166,6 +166,7 @@ struct RetirementMonteCarloRequest {
     plan: RetirementPlan,
     current_portfolio: f64,
     n_sims: Option<u32>,
+    seed: Option<u64>,
     goal_id: Option<String>,
     planner_mode: Option<RetirementTimingMode>,
 }
@@ -246,7 +247,29 @@ async fn retirement_monte_carlo(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_monte_carlo_with_mode(&plan, current_portfolio, n, planner_mode);
+    let result = fire::run_monte_carlo_with_mode_and_seed(
+        &plan,
+        current_portfolio,
+        n,
+        planner_mode,
+        req.seed,
+    );
+    Ok(Json(result))
+}
+
+async fn retirement_stress_tests(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSimulationRequest>,
+) -> ApiResult<Json<Vec<StressTestResult>>> {
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result = fire::run_stress_tests_with_mode(&plan, current_portfolio, planner_mode);
     Ok(Json(result))
 }
 
@@ -279,6 +302,23 @@ async fn retirement_sensitivity_analysis(
     )
     .await?;
     let result = fire::run_sensitivity_analysis_with_mode(&plan, current_portfolio, planner_mode);
+    Ok(Json(result))
+}
+
+async fn retirement_decision_sensitivity_analysis(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RetirementSimulationRequest>,
+) -> ApiResult<Json<DecisionSensitivityResult>> {
+    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
+        &state,
+        &req.goal_id,
+        req.planner_mode,
+        req.plan,
+        req.current_portfolio,
+    )
+    .await?;
+    let result =
+        fire::run_decision_sensitivity_analysis_with_mode(&plan, current_portfolio, planner_mode);
     Ok(Json(result))
 }
 
@@ -350,12 +390,20 @@ pub fn router() -> Router<Arc<AppState>> {
             axum::routing::post(retirement_monte_carlo),
         )
         .route(
+            "/retirement/stress-tests",
+            axum::routing::post(retirement_stress_tests),
+        )
+        .route(
             "/retirement/scenario-analysis",
             axum::routing::post(retirement_scenario_analysis),
         )
         .route(
             "/retirement/sensitivity-analysis",
             axum::routing::post(retirement_sensitivity_analysis),
+        )
+        .route(
+            "/retirement/decision-sensitivity-analysis",
+            axum::routing::post(retirement_decision_sensitivity_analysis),
         )
         .route(
             "/retirement/sequence-of-returns",

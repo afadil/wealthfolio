@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::portfolio::fire::GlidepathSettings;
 
@@ -17,6 +16,26 @@ fn default_annual_investment_fee_rate() -> f64 {
 
 fn default_annual_volatility() -> f64 {
     0.12
+}
+
+fn default_living_expense() -> ExpenseBucket {
+    ExpenseBucket {
+        monthly_amount: 3_000.0,
+        inflation_rate: None,
+        start_age: None,
+        end_age: None,
+        essential: Some(true),
+    }
+}
+
+fn default_healthcare_expense() -> ExpenseBucket {
+    ExpenseBucket {
+        monthly_amount: 0.0,
+        inflation_rate: None,
+        start_age: None,
+        end_age: None,
+        essential: Some(true),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -44,9 +63,15 @@ pub struct PersonalProfile {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseBudget {
+    #[serde(default)]
+    pub items: Vec<ExpenseBucket>,
+    #[serde(default = "default_living_expense")]
     pub living: ExpenseBucket,
+    #[serde(default = "default_healthcare_expense")]
     pub healthcare: ExpenseBucket,
+    #[serde(default)]
     pub housing: Option<ExpenseBucket>,
+    #[serde(default)]
     pub discretionary: Option<ExpenseBucket>,
 }
 
@@ -64,6 +89,14 @@ impl ExpenseBudget {
     /// Returns all buckets with their essential flag.
     /// Living and healthcare default to essential=true; housing and discretionary default to false.
     pub fn all_buckets(&self) -> Vec<(&ExpenseBucket, bool)> {
+        if !self.items.is_empty() {
+            return self
+                .items
+                .iter()
+                .map(|bucket| (bucket, bucket.essential.unwrap_or(true)))
+                .collect();
+        }
+
         let mut out = vec![
             (&self.living, self.living.essential.unwrap_or(true)),
             (&self.healthcare, self.healthcare.essential.unwrap_or(true)),
@@ -120,7 +153,6 @@ pub struct InvestmentAssumptions {
     pub monthly_contribution: f64,
     pub contribution_growth_rate: f64,
     pub glide_path: Option<GlidepathSettings>,
-    pub target_allocations: HashMap<String, f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,11 +1,13 @@
 import { invoke } from "./core";
 import type {
+  DecisionSensitivityResult,
   FireProjection,
   MonteCarloResult,
   RetirementPlan,
   ScenarioResult,
   SorrScenario,
   SensitivityResult,
+  StressTestResult,
   StrategyComparisonResult,
 } from "@/features/goals/retirement-planner/types";
 import type { PlannerMode } from "@/lib/types";
@@ -32,11 +34,27 @@ export const runRetirementMonteCarlo = async (
   nSims = 100_000,
   plannerMode?: PlannerMode,
   goalId?: string,
+  seed?: number,
 ): Promise<MonteCarloResult> => {
   return invoke<MonteCarloResult>("run_retirement_monte_carlo", {
     plan,
     currentPortfolio,
     nSims,
+    plannerMode,
+    goalId,
+    seed,
+  });
+};
+
+export const runRetirementStressTests = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<StressTestResult[]> => {
+  return invoke<StressTestResult[]>("run_retirement_stress_tests", {
+    plan,
+    currentPortfolio,
     plannerMode,
     goalId,
   });
@@ -77,6 +95,20 @@ export const runRetirementSensitivity = async (
   goalId?: string,
 ): Promise<SensitivityResult> => {
   return invoke<SensitivityResult>("run_retirement_sensitivity", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
+};
+
+export const runRetirementDecisionSensitivity = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<DecisionSensitivityResult> => {
+  return invoke<DecisionSensitivityResult>("run_retirement_decision_sensitivity", {
     plan,
     currentPortfolio,
     plannerMode,

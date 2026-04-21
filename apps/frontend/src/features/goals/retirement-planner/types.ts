@@ -103,10 +103,73 @@ export interface SensitivityResult {
   swr: SensitivitySWRMatrix;
 }
 
+export interface DecisionSensitivityResult {
+  contributionReturn: DecisionSensitivityMatrix;
+  retirementAgeSpending: DecisionSensitivityMatrix;
+}
+
+export interface DecisionSensitivityMatrix {
+  rowLabel: string;
+  columnLabel: string;
+  rowValues: number[];
+  columnValues: number[];
+  rowLabels: string[];
+  columnLabels: string[];
+  cells: DecisionSensitivityCell[][];
+  baselineRow?: number | null;
+  baselineColumn?: number | null;
+}
+
+export interface DecisionSensitivityCell {
+  fiAge: number | null;
+  retirementStartAge: number | null;
+  fundedAtGoalAge: boolean;
+  shortfallAtGoalAge: number;
+  portfolioAtHorizon: number;
+}
+
 export interface StrategyComparisonResult {
   constantDollar: MonteCarloResult;
   constantPercentage: MonteCarloResult;
   guardrails: MonteCarloResult;
+}
+
+export type StressTestId =
+  | "return-drag"
+  | "inflation-shock"
+  | "spending-shock"
+  | "retire-earlier"
+  | "save-less"
+  | "early-crash";
+
+export type StressCategory = "market" | "inflation" | "spending" | "timing" | "saving";
+
+export type StressSeverity = "low" | "medium" | "high";
+
+export interface StressOutcome {
+  fiAge: number | null;
+  retirementStartAge: number | null;
+  fundedAtGoalAge: boolean;
+  shortfallAtGoalAge: number;
+  portfolioAtHorizon: number;
+  failureAge?: number | null;
+}
+
+export interface StressDelta {
+  fiAgeYears: number | null;
+  shortfallAtGoalAge: number;
+  portfolioAtHorizon: number;
+}
+
+export interface StressTestResult {
+  id: StressTestId;
+  label: string;
+  description: string;
+  category: StressCategory;
+  baseline: StressOutcome;
+  stressed: StressOutcome;
+  delta: StressDelta;
+  severity: StressSeverity;
 }
 
 export interface SensitivityMatrix {
@@ -143,19 +206,25 @@ export interface PersonalProfile {
 }
 
 export interface ExpenseBudget {
-  living: ExpenseBucket;
-  healthcare: ExpenseBucket;
+  items: ExpenseItem[];
+  /** Legacy fields accepted during plan normalization. Prefer `items`. */
+  living?: ExpenseBucket;
+  healthcare?: ExpenseBucket;
   housing?: ExpenseBucket;
   discretionary?: ExpenseBucket;
 }
 
-export interface ExpenseBucket {
+export interface ExpenseItem {
+  id: string;
+  label: string;
   monthlyAmount: number;
   inflationRate?: number;
   startAge?: number;
   endAge?: number;
   essential?: boolean;
 }
+
+export type ExpenseBucket = ExpenseItem;
 
 export interface RetirementIncomeStream {
   id: string;
@@ -180,7 +249,6 @@ export interface InvestmentAssumptions {
   monthlyContribution: number;
   contributionGrowthRate: number;
   glidePath?: GlidepathSettings;
-  targetAllocations: Record<string, number>;
 }
 
 export interface GuardrailsConfig {
