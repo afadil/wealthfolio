@@ -7,6 +7,9 @@
 export interface PathEntry {
   path: string;
   value: number;
+  /** Original source-string form if this entry came from a stringified number
+   *  (e.g. "105.90"). Preserves trailing zeros so downstream text lookups match. */
+  raw?: string;
 }
 
 /** Recursively collect all numeric leaf paths from a parsed JSON value.
@@ -18,7 +21,7 @@ export function walkJson(value: unknown, path = "$"): PathEntry[] {
   }
   if (typeof value === "string") {
     const n = parseFloat(value);
-    if (!isNaN(n) && isFinite(n)) return [{ path, value: n }];
+    if (!isNaN(n) && isFinite(n)) return [{ path, value: n, raw: value }];
     return [];
   }
   if (Array.isArray(value)) {

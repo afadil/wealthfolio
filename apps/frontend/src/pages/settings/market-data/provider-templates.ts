@@ -7,6 +7,7 @@ export interface ProviderTemplate {
   url: string;
   pricePath: string;
   datePath?: string;
+  openPath?: string;
   highPath?: string;
   lowPath?: string;
   volumePath?: string;
@@ -74,6 +75,7 @@ export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
     url: "https://api.twelvedata.com/time_series?symbol={SYMBOL}&interval=1day&start_date={FROM}&end_date={TO}&format=JSON",
     pricePath: "$.values[*].close",
     datePath: "$.values[*].datetime",
+    openPath: "$.values[*].open",
     highPath: "$.values[*].high",
     lowPath: "$.values[*].low",
     volumePath: "$.values[*].volume",
@@ -87,6 +89,7 @@ export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
     url: "https://api.twelvedata.com/time_series?symbol={SYMBOL}&interval=1day&start_date={FROM}&end_date={TO}&format=CSV",
     pricePath: "close",
     datePath: "datetime",
+    openPath: "open",
     highPath: "high",
     lowPath: "low",
     volumePath: "volume",
@@ -100,6 +103,7 @@ export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
     url: "https://markets.ft.com/data/etfs/tearsheet/historical?s={SYMBOL}:LSE:GBX",
     pricePath: "0:4",
     datePath: "0:0",
+    openPath: "0:1",
     highPath: "0:2",
     lowPath: "0:3",
     volumePath: "0:5",

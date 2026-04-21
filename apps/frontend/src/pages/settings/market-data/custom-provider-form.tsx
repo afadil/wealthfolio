@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -15,58 +15,41 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@wealthfolio/ui";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@wealthfolio/ui/components/ui/collapsible";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@wealthfolio/ui";
 
+import { ExternalLink } from "@/components/external-link";
 import { useCreateCustomProvider, useUpdateCustomProvider } from "@/hooks/use-custom-providers";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type {
   CustomProviderWithSources,
   NewCustomProviderSource,
 } from "@/lib/types/custom-provider";
+import { cn } from "@/lib/utils";
 
 import { SourceConfigPanel } from "./source-config-panel";
+import { LivePreviewPane } from "./live-preview-pane";
+import { useSourceRuntime, type SourceRuntime } from "./use-source-runtime";
 
+const DOCS_URL = "https://wealthfolio.app/docs/guide/custom-providers/";
+
+// Base fields use `.default(...)` so zod substitutes sane defaults when the
+// inactive source's inputs aren't mounted (e.g. Dated-series mode only renders
+// the historical panel, so `latestSource` fields may come through undefined).
+// Real required-field checking is done in the `superRefine` below, gated by
+// `latestEnabled` / `historicalEnabled`.
 const sourceSchema = z.object({
-  format: z.enum(["json", "html", "html_table", "csv"]),
-  url: z
-    .string()
-    .min(1, "URL is required")
-    .refine((val) => /^https?:\/\//i.test(val), {
-      message: "URL must start with http:// or https://",
-    }),
-  pricePath: z.string().min(1, "Price path is required"),
+  format: z.enum(["json", "html", "html_table", "csv"]).default("json"),
+  url: z.string().default(""),
+  pricePath: z.string().default(""),
   datePath: z.string().optional(),
   dateFormat: z.string().optional(),
   currencyPath: z.string().optional(),
   factor: z.coerce.number().optional(),
   invert: z.boolean().optional(),
   locale: z.string().optional(),
-  headers: z
-    .string()
-    .optional()
-    .refine(
-      (val) => {
-        if (!val || val.trim() === "") return true;
-        try {
-          JSON.parse(val);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { message: "Headers must be valid JSON" },
-    ),
+  headers: z.string().optional(),
+  openPath: z.string().optional(),
   highPath: z.string().optional(),
   lowPath: z.string().optional(),
   volumePath: z.string().optional(),
@@ -74,20 +57,112 @@ const sourceSchema = z.object({
   dateTimezone: z.string().optional(),
 });
 
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  code: z
-    .string()
-    .min(1, "Code is required")
-    .regex(/^[a-z0-9-]+$/, "Lowercase alphanumeric and hyphens only"),
-  description: z.string().optional(),
-  priority: z.coerce.number().int().min(1).default(50),
-  latestSource: sourceSchema,
-  historicalEnabled: z.boolean(),
-  historicalSource: sourceSchema.optional(),
-});
+const formSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    code: z
+      .string()
+      .min(1, "Code is required")
+      .regex(/^[a-z0-9-]+$/, "Lowercase alphanumeric and hyphens only"),
+    description: z.string().optional(),
+    priority: z.coerce.number().int().min(1).default(50),
+    latestEnabled: z.boolean(),
+    latestSource: sourceSchema,
+    historicalEnabled: z.boolean(),
+    historicalSource: sourceSchema,
+  })
+  .superRefine((values, ctx) => {
+    if (!values.latestEnabled && !values.historicalEnabled) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["latestEnabled"],
+        message: "Enable at least one price source",
+      });
+    }
+    if (values.latestEnabled) validateSource(ctx, "latestSource", values.latestSource);
+    if (values.historicalEnabled) validateSource(ctx, "historicalSource", values.historicalSource);
+  });
 
 export type FormValues = z.infer<typeof formSchema>;
+type SourceFormValues = z.infer<typeof sourceSchema>;
+export type SourceKey = "latestSource" | "historicalSource";
+type SourceMode = "historical" | "latest" | "both";
+type SubTab = "latest" | "historical";
+
+const URL_RE = /^https?:\/\//i;
+
+function emptySource(dateTimezoneDefault = ""): SourceFormValues {
+  return {
+    format: "json",
+    url: "",
+    pricePath: "",
+    datePath: "",
+    dateFormat: "",
+    currencyPath: "",
+    locale: "",
+    headers: "",
+    openPath: "",
+    highPath: "",
+    lowPath: "",
+    volumePath: "",
+    dateTimezone: dateTimezoneDefault,
+  };
+}
+
+function sourceDefaults(
+  source?: CustomProviderWithSources["sources"][number],
+  dateTimezoneDefault = "",
+): SourceFormValues {
+  return source
+    ? {
+        format: source.format ?? "json",
+        url: source.url,
+        pricePath: source.pricePath,
+        datePath: source.datePath ?? "",
+        dateFormat: source.dateFormat ?? "",
+        currencyPath: source.currencyPath ?? "",
+        factor: source.factor ?? undefined,
+        invert: source.invert ?? false,
+        locale: source.locale ?? "",
+        headers: source.headers ?? "",
+        openPath: source.openPath ?? "",
+        highPath: source.highPath ?? "",
+        lowPath: source.lowPath ?? "",
+        volumePath: source.volumePath ?? "",
+        defaultPrice: source.defaultPrice ?? undefined,
+        dateTimezone: source.dateTimezone ?? "",
+      }
+    : emptySource(dateTimezoneDefault);
+}
+
+function addSourceIssue(
+  ctx: z.RefinementCtx,
+  sourceKey: SourceKey,
+  field: keyof SourceFormValues,
+  message: string,
+) {
+  ctx.addIssue({ code: z.ZodIssueCode.custom, path: [sourceKey, field], message });
+}
+
+function validateSource(ctx: z.RefinementCtx, sourceKey: SourceKey, source: SourceFormValues) {
+  const url = source.url.trim();
+  if (!url) {
+    addSourceIssue(ctx, sourceKey, "url", "URL is required");
+  } else if (!URL_RE.test(url)) {
+    addSourceIssue(ctx, sourceKey, "url", "URL must start with http:// or https://");
+  }
+  if (!source.pricePath.trim()) {
+    addSourceIssue(ctx, sourceKey, "pricePath", "Price path is required");
+  }
+  const headers = source.headers?.trim();
+  if (headers) {
+    try {
+      JSON.parse(headers);
+    } catch {
+      addSourceIssue(ctx, sourceKey, "headers", "Headers must be valid JSON");
+    }
+  }
+}
 
 function generateCode(name: string): string {
   return name
@@ -96,13 +171,10 @@ function generateCode(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Extract a human-friendly name from a URL domain (e.g. "CoinGecko" from "https://api.coingecko.com/...") */
 function nameFromUrl(url: string): string | null {
   try {
     const hostname = new URL(url).hostname;
-    // Extract the main domain name (e.g., "euronext" from "live.euronext.com")
     const parts = hostname.split(".");
-    // For "euronext.com" → "euronext", "live.euronext.com" → "euronext"
     const domain = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
     if (!domain) return null;
     return domain.charAt(0).toUpperCase() + domain.slice(1);
@@ -111,16 +183,14 @@ function nameFromUrl(url: string): string | null {
   }
 }
 
+// ---------------------------------------------------------------------------
+
 interface CustomProviderFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   provider?: CustomProviderWithSources;
 }
 
-/**
- * Thin shell: renders the Dialog and keys the inner content so it
- * remounts (= full reset) whenever the dialog opens or the provider changes.
- */
 export function CustomProviderForm({ open, onOpenChange, provider }: CustomProviderFormProps) {
   const [saving, setSaving] = useState(false);
   return (
@@ -131,7 +201,10 @@ export function CustomProviderForm({ open, onOpenChange, provider }: CustomProvi
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent className="flex h-[90vh] max-h-[800px] w-[95vw] max-w-5xl flex-col overflow-hidden sm:h-[85vh]">
+      <DialogContent
+        className="flex h-[92vh] w-[98vw] max-w-[1400px] flex-col overflow-hidden p-0 [--input-height:2.25rem]"
+        showCloseButton={false}
+      >
         {open && (
           <CustomProviderFormContent
             key={provider?.id ?? "__new__"}
@@ -145,6 +218,8 @@ export function CustomProviderForm({ open, onOpenChange, provider }: CustomProvi
   );
 }
 
+// ---------------------------------------------------------------------------
+
 function CustomProviderFormContent({
   provider,
   onOpenChange,
@@ -157,11 +232,19 @@ function CustomProviderFormContent({
   const isEditing = !!provider;
   const { mutate: createProvider, isPending: isCreating } = useCreateCustomProvider();
   const { mutate: updateProvider, isPending: isUpdating } = useUpdateCustomProvider();
+  const { settings } = useSettingsContext();
   const isSaving = isCreating || isUpdating;
-  onSavingChange(isSaving);
 
-  const latestSource = provider?.sources.find((s) => s.kind === "latest");
-  const historicalSource = provider?.sources.find((s) => s.kind === "historical");
+  useEffect(() => {
+    onSavingChange(isSaving);
+  }, [isSaving, onSavingChange]);
+
+  const latestSourceInitial = provider?.sources.find((s) => s.kind === "latest");
+  const historicalSourceInitial = provider?.sources.find((s) => s.kind === "historical");
+
+  // For brand-new providers, seed dateTimezone with the user's global timezone
+  // from app settings. Editing an existing provider keeps whatever was saved.
+  const defaultTimezone = settings?.timezone ?? "";
 
   const form = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,51 +254,19 @@ function CustomProviderFormContent({
       code: provider?.id ?? "",
       description: provider?.description ?? "",
       priority: provider?.priority ?? 50,
-      latestSource: {
-        format: latestSource?.format ?? "json",
-        url: latestSource?.url ?? "",
-        pricePath: latestSource?.pricePath ?? "",
-        datePath: latestSource?.datePath ?? "",
-        dateFormat: latestSource?.dateFormat ?? "",
-        currencyPath: latestSource?.currencyPath ?? "",
-        factor: latestSource?.factor ?? undefined,
-        invert: latestSource?.invert ?? false,
-        locale: latestSource?.locale ?? "",
-        headers: latestSource?.headers ?? "",
-        highPath: latestSource?.highPath ?? "",
-        lowPath: latestSource?.lowPath ?? "",
-        volumePath: latestSource?.volumePath ?? "",
-        defaultPrice: latestSource?.defaultPrice ?? undefined,
-        dateTimezone: latestSource?.dateTimezone ?? "",
-      },
-      historicalEnabled: !!historicalSource,
-      historicalSource: historicalSource
-        ? {
-            format: historicalSource.format ?? "json",
-            url: historicalSource.url,
-            pricePath: historicalSource.pricePath,
-            datePath: historicalSource.datePath ?? "",
-            dateFormat: historicalSource.dateFormat ?? "",
-            currencyPath: historicalSource.currencyPath ?? "",
-            factor: historicalSource.factor ?? undefined,
-            invert: historicalSource.invert ?? false,
-            locale: historicalSource.locale ?? "",
-            headers: historicalSource.headers ?? "",
-            highPath: historicalSource.highPath ?? "",
-            lowPath: historicalSource.lowPath ?? "",
-            volumePath: historicalSource.volumePath ?? "",
-            defaultPrice: historicalSource.defaultPrice ?? undefined,
-            dateTimezone: historicalSource.dateTimezone ?? "",
-          }
-        : undefined,
+      latestEnabled: !!latestSourceInitial || !historicalSourceInitial,
+      latestSource: sourceDefaults(latestSourceInitial, defaultTimezone),
+      historicalEnabled: !!historicalSourceInitial,
+      historicalSource: sourceDefaults(historicalSourceInitial, defaultTimezone),
     },
   });
 
   const [nameManuallyEdited, setNameManuallyEdited] = useState(isEditing);
   const [codeManuallyEdited, setCodeManuallyEdited] = useState(isEditing);
-  const [descriptionOpen, setDescriptionOpen] = useState(!!provider?.description);
+  const [subTab, setSubTab] = useState<SubTab>(
+    historicalSourceInitial && !latestSourceInitial ? "historical" : "latest",
+  );
 
-  // Called by SourceConfigPanel when the URL input changes
   const handleUrlChange = useCallback(
     (url: string) => {
       if (isEditing) return;
@@ -239,10 +290,87 @@ function CustomProviderFormContent({
     }
   };
 
+  const latestRuntime = useSourceRuntime({
+    form,
+    prefix: "latestSource",
+    isHistorical: false,
+    onUrlChange: handleUrlChange,
+  });
+  const historicalRuntime = useSourceRuntime({
+    form,
+    prefix: "historicalSource",
+    isHistorical: true,
+    onUrlChange: handleUrlChange,
+  });
+
+  const latestEnabled = form.watch("latestEnabled");
+  const historicalEnabled = form.watch("historicalEnabled");
+  const name = form.watch("name");
+
+  const sourceMode: SourceMode =
+    latestEnabled && historicalEnabled ? "both" : historicalEnabled ? "historical" : "latest";
+
+  const setSourceMode = (mode: SourceMode) => {
+    form.clearErrors(["latestEnabled", "latestSource", "historicalSource"]);
+    form.setValue("latestEnabled", mode === "latest" || mode === "both", { shouldValidate: true });
+    form.setValue("historicalEnabled", mode === "historical" || mode === "both", {
+      shouldValidate: true,
+    });
+    setSubTab(mode === "historical" ? "historical" : "latest");
+  };
+
+  const activeSource: SubTab =
+    sourceMode === "both" ? subTab : sourceMode === "historical" ? "historical" : "latest";
+
+  const activePrefix: SourceKey = activeSource === "latest" ? "latestSource" : "historicalSource";
+  const activeRuntime: SourceRuntime =
+    activeSource === "latest" ? latestRuntime : historicalRuntime;
+
+  // Watched values feed the footer checklist — using `watch` (not `getValues`)
+  // so the memo recomputes whenever the user edits the URL or Price path.
+  const latestUrlValue = form.watch("latestSource.url");
+  const latestPriceValue = form.watch("latestSource.pricePath");
+  const historicalUrlValue = form.watch("historicalSource.url");
+  const historicalPriceValue = form.watch("historicalSource.pricePath");
+
+  const checklist = useMemo(() => {
+    const check = (enabled: boolean, url: string | undefined, price: string | undefined) => {
+      if (!enabled) return { url: true, mapped: true };
+      return { url: !!url && URL_RE.test(url), mapped: !!price };
+    };
+    const latestCheck = check(latestEnabled, latestUrlValue, latestPriceValue);
+    const historicalCheck = check(historicalEnabled, historicalUrlValue, historicalPriceValue);
+    return {
+      urlTemplate: latestCheck.url && historicalCheck.url && (latestEnabled || historicalEnabled),
+      fetchSucceeds:
+        (!latestEnabled ||
+          latestRuntime.status?.ok === true ||
+          !!latestRuntime.testResult?.success) &&
+        (!historicalEnabled ||
+          historicalRuntime.status?.ok === true ||
+          !!historicalRuntime.testResult?.success) &&
+        (latestEnabled || historicalEnabled),
+      requiredFieldsMapped: latestCheck.mapped && historicalCheck.mapped,
+      providerName: !!name,
+    };
+  }, [
+    latestEnabled,
+    historicalEnabled,
+    latestUrlValue,
+    latestPriceValue,
+    historicalUrlValue,
+    historicalPriceValue,
+    latestRuntime.status,
+    latestRuntime.testResult,
+    historicalRuntime.status,
+    historicalRuntime.testResult,
+    name,
+  ]);
+
   const handleSave = useCallback(
     (values: FormValues) => {
       const mapSource = (
-        src: FormValues["latestSource"],
+        src: SourceFormValues,
         kind: "latest" | "historical",
       ): NewCustomProviderSource => ({
         kind,
@@ -256,6 +384,7 @@ function CustomProviderFormContent({
         invert: src.invert ?? undefined,
         locale: src.locale || undefined,
         headers: src.headers || undefined,
+        openPath: src.openPath || undefined,
         highPath: src.highPath || undefined,
         lowPath: src.lowPath || undefined,
         volumePath: src.volumePath || undefined,
@@ -263,11 +392,9 @@ function CustomProviderFormContent({
         dateTimezone: src.dateTimezone || undefined,
       });
 
-      const sources: NewCustomProviderSource[] = [mapSource(values.latestSource, "latest")];
-
-      if (values.historicalEnabled && values.historicalSource) {
-        sources.push(mapSource(values.historicalSource, "historical"));
-      }
+      const sources: NewCustomProviderSource[] = [];
+      if (values.latestEnabled) sources.push(mapSource(values.latestSource, "latest"));
+      if (values.historicalEnabled) sources.push(mapSource(values.historicalSource, "historical"));
 
       if (isEditing && provider) {
         updateProvider(
@@ -298,220 +425,242 @@ function CustomProviderFormContent({
     [isEditing, provider, createProvider, updateProvider, onOpenChange],
   );
 
-  const historicalEnabled = form.watch("historicalEnabled");
+  // Sub-pill dot colour — green when source looks configured
+  const latestConfigured = isSubConfigured(form, "latestSource", latestRuntime);
+  const historicalConfigured = isSubConfigured(form, "historicalSource", historicalRuntime);
 
   return (
-    <>
-      <DialogHeader className="shrink-0">
-        <DialogTitle>{isEditing ? "Edit Custom Provider" : "Add Custom Provider"}</DialogTitle>
-        <DialogDescription>
-          Configure a custom data source to fetch market prices.
-        </DialogDescription>
-      </DialogHeader>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleSave, (errors) => {
+          console.warn("[CustomProviderForm] validation errors:", errors);
+          const messages = collectErrorMessages(errors);
+          toast({
+            title: "Form has errors",
+            description:
+              messages.length > 0
+                ? messages.slice(0, 4).join(" · ")
+                : "One or more fields are invalid.",
+            variant: "destructive",
+          });
+          if (errors.name || errors.code) {
+            document.getElementById("provider-identity-card")?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        })}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        {/* ── Header ── */}
+        <div className="bg-background flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4">
+          <div>
+            <DialogTitle className="text-lg font-semibold">
+              {isEditing ? "Edit custom provider" : "Add custom provider"}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Configure a custom data source to fetch market prices.
+            </DialogDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <ExternalLink
+              href={DOCS_URL}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors"
+            >
+              <Icons.FileText className="h-3.5 w-3.5" />
+              Docs
+            </ExternalLink>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              disabled={isSaving}
+              className="h-8 w-8"
+              aria-label="Close"
+            >
+              <Icons.Close className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(handleSave, (errors) => {
-            // Scroll to the first visible error
-            if (errors.latestSource || errors.historicalSource) {
-              // Source errors are at the top — scroll up
-              document.getElementById("source-config-area")?.scrollTo({
-                top: 0,
-                behavior: "smooth",
-              });
-            } else if (errors.name || errors.code) {
-              // Name/Code are at the bottom — scroll to them
-              document.getElementById("provider-identity")?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-              });
-            }
-          })}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <Tabs defaultValue="latest" className="flex min-h-0 flex-1 flex-col">
-            <TabsList className="w-full shrink-0">
-              <TabsTrigger value="latest" className="flex-1">
-                Latest Price
-              </TabsTrigger>
-              <TabsTrigger value="historical" className="flex-1">
-                Historical
-                <span className="text-muted-foreground ml-1 text-[10px] font-normal">
-                  (optional)
-                </span>
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Scrollable content area */}
-            <div id="source-config-area" className="min-h-0 flex-1 overflow-y-auto">
-              <TabsContent value="latest" className="mt-3">
-                <SourceConfigPanel
-                  form={form}
-                  prefix="latestSource"
-                  onUrlChange={handleUrlChange}
+        {/* ── Body: two-pane ── */}
+        <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_560px]">
+          {/* LEFT pane */}
+          <div className="min-h-0 space-y-3 overflow-y-auto border-r p-4">
+            {/* Provider Mode */}
+            <div>
+              <div className="text-muted-foreground mb-2 text-[11px] font-medium uppercase tracking-wide">
+                Provider mode
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <ModeCard
+                  selected={sourceMode === "historical"}
+                  icon={<Icons.History className="h-4 w-4 shrink-0" />}
+                  title="Dated series"
+                  subtitle="newest row = latest"
+                  onClick={() => setSourceMode("historical")}
                 />
-              </TabsContent>
+                <ModeCard
+                  selected={sourceMode === "latest"}
+                  icon={<Icons.TrendingUp className="h-4 w-4 shrink-0" />}
+                  title="Latest only"
+                  subtitle="one endpoint"
+                  onClick={() => setSourceMode("latest")}
+                />
+                <ModeCard
+                  selected={sourceMode === "both"}
+                  icon={<Icons.BarChart className="h-4 w-4 shrink-0" />}
+                  title="Both"
+                  subtitle="series + override"
+                  onClick={() => setSourceMode("both")}
+                />
+              </div>
 
-              <TabsContent value="historical" className="mt-3">
-                {!historicalEnabled ? (
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8">
-                    <Icons.Clock className="text-muted-foreground/40 h-8 w-8" />
-                    <div className="text-center">
-                      <p className="text-muted-foreground text-sm">Historical source is optional</p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        If not configured, daily prices accumulate from the latest source.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        form.setValue("historicalEnabled", true);
-                        form.setValue("historicalSource", {
-                          format: "json",
-                          url: "",
-                          pricePath: "",
-                          datePath: "",
-                          dateFormat: "",
-                          currencyPath: "",
-                          locale: "",
-                          headers: "",
-                          highPath: "",
-                          lowPath: "",
-                          volumePath: "",
-                          dateTimezone: "",
-                        });
-                      }}
-                    >
-                      <Icons.Plus className="mr-1 h-3 w-3" />
-                      Enable Historical Source
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <p className="text-muted-foreground text-xs">
-                        Source for fetching historical price data (JSON, HTML table, or CSV).
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground h-6 text-xs"
-                        onClick={() => {
-                          form.setValue("historicalEnabled", false);
-                          form.setValue("historicalSource", undefined);
-                        }}
-                      >
-                        Disable
-                      </Button>
-                    </div>
-                    <SourceConfigPanel form={form} prefix="historicalSource" isHistorical />
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Provider identity — inside scroll area, always visible */}
-              <div id="provider-identity" className="mt-4 border-t pt-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px_80px]">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Provider Name
-                          {!nameManuallyEdited && !isEditing && form.getValues("name") && (
-                            <span className="text-muted-foreground ml-1 font-normal">
-                              (from URL)
-                            </span>
-                          )}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g. My Provider"
-                            {...field}
-                            onChange={(e) => handleNameChange(e.target.value, field.onChange)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+              {sourceMode === "both" && (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <SubPill
+                    selected={subTab === "latest"}
+                    label="Latest price"
+                    configured={latestConfigured}
+                    onClick={() => setSubTab("latest")}
                   />
-                  <FormField
-                    control={form.control}
-                    name="code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Code <span className="text-muted-foreground font-normal">(auto)</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="my-provider"
-                            disabled={isEditing}
-                            {...field}
-                            onChange={(e) => {
-                              setCodeManuallyEdited(true);
-                              field.onChange(e.target.value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <FormControl>
-                          <Input type="number" min={1} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <SubPill
+                    selected={subTab === "historical"}
+                    label="Historical"
+                    configured={historicalConfigured}
+                    onClick={() => setSubTab("historical")}
                   />
                 </div>
-                <Collapsible open={descriptionOpen} onOpenChange={setDescriptionOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground mt-2 h-8"
-                    >
-                      <Icons.FileText className="mr-1 h-3 w-3" />
-                      Description
-                      <Icons.ChevronDown
-                        className={`ml-1 h-3 w-3 transition-transform ${descriptionOpen ? "rotate-180" : ""}`}
-                      />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem className="mt-2">
-                          <FormControl>
-                            <Textarea rows={2} placeholder="Optional description" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-            </div>
-          </Tabs>
+              )}
 
-          {/* Footer — fixed at bottom */}
-          <div className="flex shrink-0 justify-end gap-3 border-t pt-3">
+              {form.formState.errors.latestEnabled?.message && (
+                <p className="text-destructive mt-2 text-xs">
+                  {form.formState.errors.latestEnabled.message}
+                </p>
+              )}
+            </div>
+
+            {/* Step 1 + 2 */}
+            <SourceConfigPanel
+              form={form}
+              prefix={activePrefix}
+              runtime={activeRuntime}
+              onUrlChange={handleUrlChange}
+            />
+
+            {/* Step 3 — Provider identity */}
+            <div id="provider-identity-card" className="bg-background rounded-xl border p-4">
+              <div className="mb-3 flex items-center gap-2.5">
+                <div className="bg-muted text-muted-foreground flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                  3
+                </div>
+                <h3 className="text-sm font-semibold">Provider identity</h3>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px_80px]">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                        Provider name
+                        {!nameManuallyEdited && !isEditing && form.getValues("name") && (
+                          <span className="text-muted-foreground ml-1 font-normal normal-case tracking-normal">
+                            (from URL)
+                          </span>
+                        )}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. My Provider"
+                          {...field}
+                          onChange={(e) => handleNameChange(e.target.value, field.onChange)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                        Code <span className="font-normal normal-case tracking-normal">(auto)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="my-provider"
+                          disabled={isEditing}
+                          {...field}
+                          onChange={(e) => {
+                            setCodeManuallyEdited(true);
+                            field.onChange(e.target.value);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                        Priority
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem className="mt-3">
+                    <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                      Description{" "}
+                      <span className="font-normal normal-case tracking-normal">· optional</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={2}
+                        placeholder="Short note — what this provider covers, caveats, etc."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* RIGHT pane */}
+          <div className="min-h-0 overflow-hidden">
+            <LivePreviewPane form={form} prefix={activePrefix} runtime={activeRuntime} />
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className="bg-background flex shrink-0 items-center justify-between gap-3 border-t px-5 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <ChecklistItem done={checklist.urlTemplate} label="URL template" />
+            <ChecklistItem done={checklist.fetchSucceeds} label="Fetch succeeds" />
+            <ChecklistItem done={checklist.requiredFieldsMapped} label="Required fields mapped" />
+            <ChecklistItem done={checklist.providerName} label="Provider name" />
+          </div>
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -522,18 +671,143 @@ function CustomProviderFormContent({
             </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
-                <span className="flex items-center gap-2">
-                  <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
-                </span>
-              ) : isEditing ? (
-                "Save Changes"
+                <>
+                  <Icons.Spinner className="mr-1.5 h-4 w-4 animate-spin" />
+                  Saving
+                </>
               ) : (
-                "Create Provider"
+                <>
+                  <Icons.Check className="mr-1.5 h-4 w-4" />
+                  {isEditing ? "Save changes" : "Create provider"}
+                </>
               )}
             </Button>
           </div>
-        </form>
-      </Form>
-    </>
+        </div>
+      </form>
+    </Form>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Small presentational helpers
+// ---------------------------------------------------------------------------
+
+function ModeCard({
+  selected,
+  icon,
+  title,
+  subtitle,
+  onClick,
+}: {
+  selected: boolean;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 rounded-lg border p-3 text-left transition-all",
+        selected
+          ? "bg-background border-foreground/30 ring-foreground/5 shadow-sm ring-1"
+          : "bg-background/50 border-border hover:bg-background",
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+          selected ? "border-foreground bg-foreground" : "border-muted-foreground/40",
+        )}
+      >
+        {selected && <div className="bg-background h-1.5 w-1.5 rounded-full" />}
+      </div>
+      {icon}
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="text-muted-foreground block text-xs">{subtitle}</span>
+      </span>
+    </button>
+  );
+}
+
+function SubPill({
+  selected,
+  label,
+  configured,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  configured: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors",
+        selected
+          ? "bg-background border-foreground/30 shadow-sm"
+          : "bg-background/30 text-muted-foreground hover:bg-background/60",
+      )}
+    >
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          configured ? "bg-success" : "bg-muted-foreground/40",
+        )}
+      />
+      <span className="font-medium">{label}</span>
+    </button>
+  );
+}
+
+function ChecklistItem({ done, label }: { done: boolean; label: string }) {
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs",
+        done ? "text-foreground" : "text-muted-foreground",
+      )}
+    >
+      {done ? (
+        <Icons.CheckCircle className="text-success h-4 w-4 shrink-0" />
+      ) : (
+        <Icons.Circle className="text-muted-foreground/40 h-4 w-4 shrink-0" />
+      )}
+      {label}
+    </div>
+  );
+}
+
+/** Walk react-hook-form's nested error object, return human-readable messages with field paths. */
+function collectErrorMessages(errors: unknown, path = ""): string[] {
+  if (!errors || typeof errors !== "object") return [];
+  const out: string[] = [];
+  const record = errors as Record<string, unknown>;
+  // react-hook-form marks leaf errors with a `message` string and a `type`.
+  if (typeof record.message === "string" && record.message.length > 0) {
+    return [path ? `${path}: ${record.message}` : record.message];
+  }
+  for (const [k, v] of Object.entries(record)) {
+    if (k === "ref" || k === "type") continue;
+    const nextPath = path ? `${path}.${k}` : k;
+    out.push(...collectErrorMessages(v, nextPath));
+  }
+  return out;
+}
+
+function isSubConfigured(
+  form: ReturnType<typeof useForm<FormValues>>,
+  prefix: SourceKey,
+  runtime: SourceRuntime,
+): boolean {
+  const url = form.getValues(`${prefix}.url`);
+  const price = form.getValues(`${prefix}.pricePath`);
+  return !!url && !!price && (runtime.status?.ok === true || !!runtime.testResult?.success);
 }
