@@ -106,6 +106,12 @@ pub fn plan_portfolio_job(events: &[DomainEvent], timezone: &str) -> Option<Port
                     }
                 }
             }
+            DomainEvent::CostBasisMethodChanged { account_id, .. } => {
+                has_recalc_event = true;
+                if !account_id.is_empty() {
+                    account_ids.insert(account_id.clone());
+                }
+            }
             DomainEvent::AssetsMerged { .. } | DomainEvent::TrackingModeChanged { .. } => {}
         }
     }

@@ -122,6 +122,14 @@ impl AccountServiceTrait for AccountService {
             ));
         }
 
+        if existing.cost_basis_method != result.cost_basis_method {
+            self.event_sink.emit(DomainEvent::cost_basis_method_changed(
+                result.id.clone(),
+                existing.cost_basis_method,
+                result.cost_basis_method,
+            ));
+        }
+
         Ok(result)
     }
 
