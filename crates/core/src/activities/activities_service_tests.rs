@@ -908,6 +908,7 @@ mod tests {
             provider_account_id: None,
             is_archived: false,
             tracking_mode: crate::accounts::TrackingMode::NotSet,
+            cost_basis_method: crate::accounts::CostBasisMethod::Fifo,
         }
     }
 

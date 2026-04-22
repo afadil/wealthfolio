@@ -825,6 +825,7 @@ fn create_test_account(id: &str, account_type: &str, currency: &str) -> Account 
         provider_account_id: None,
         is_archived: false,
         tracking_mode: crate::accounts::TrackingMode::NotSet,
+        cost_basis_method: crate::accounts::CostBasisMethod::Fifo,
     }
 }
 
@@ -1723,6 +1724,7 @@ fn create_test_account_with_archive_state(
         provider_account_id: None,
         is_archived,
         tracking_mode: crate::accounts::TrackingMode::NotSet,
+        cost_basis_method: crate::accounts::CostBasisMethod::Fifo,
     }
 }
 
