@@ -73,11 +73,11 @@ function fmt(value: number, currency: string) {
   return formatAmount(value, currency);
 }
 
-function fmtCompact(value: number, currency = "USD") {
+function fmtCompact(value: number, currency: string) {
   const abs = Math.abs(value);
   const maximumFractionDigits = abs >= 1_000_000 ? 2 : abs >= 100_000 ? 0 : abs >= 1_000 ? 1 : 0;
   try {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency,
       notation: "compact",
@@ -398,7 +398,7 @@ function PlanResilienceHero({
             label="Success probability"
             value={mc ? pct(mc.successRate) : "—"}
             detail={mc ? `${mc.nSimulations.toLocaleString()} paths` : "not run"}
-            tone={mc ? (mc.successRate >= 0.8 ? "good" : "bad") : "default"}
+            tone={mc ? (mc.successRate >= 0.9 ? "good" : "bad") : "default"}
           />
         </div>
       </CardContent>
@@ -421,7 +421,8 @@ function fiAgeDeltaLabel(stress: StressTestResult) {
 }
 
 function retirementOutcomeLabel(outcome: StressTestResult["baseline"]) {
-  if (outcome.failureAge) return `Runs short ${outcome.failureAge}`;
+  if (outcome.failureAge) return `Depletes at ${outcome.failureAge}`;
+  if (outcome.spendingShortfallAge) return `Gap starts ${outcome.spendingShortfallAge}`;
   if (outcome.fundedAtGoalAge) return "Funded";
   if (outcome.shortfallAtGoalAge > 0) return "Shortfall";
   return "Funded";
@@ -620,7 +621,8 @@ function StressTestsSection({
                           isTraditional
                             ? stress.stressed.shortfallAtGoalAge >
                                 stress.baseline.shortfallAtGoalAge ||
-                              Boolean(stress.stressed.failureAge)
+                              Boolean(stress.stressed.failureAge) ||
+                              Boolean(stress.stressed.spendingShortfallAge)
                             : stress.delta.fiAgeYears && stress.delta.fiAgeYears > 0
                         )
                           ? "text-destructive"
@@ -924,7 +926,7 @@ function MonteCarloDistributionSection({
                 label="Success rate"
                 value={pct(result.successRate)}
                 detail="portfolio > 0 at horizon"
-                tone={result.successRate >= 0.8 ? "good" : "bad"}
+                tone={result.successRate >= 0.9 ? "good" : "bad"}
               />
               <SimulationMetric
                 label={isTraditional ? "Retirement age" : "Median FI age"}
@@ -1414,7 +1416,7 @@ function StrategyComparisonTable({
 }) {
   const isTraditional = plannerMode === "traditional";
   const rows = [
-    ["Constant dollar", result.constantDollar],
+    ["Planned spending", result.plannedSpending],
     ["Constant percentage", result.constantPercentage],
     ["Guardrails", result.guardrails],
   ] as const;
@@ -1522,13 +1524,12 @@ function SorrChart({
         />
         <XAxis
           dataKey="age"
-          hide
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
         />
         <YAxis
-          hide
+          width={54}
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
@@ -1647,7 +1648,9 @@ function AdvancedSection({
                     <span className="font-medium">
                       {scenario.survived
                         ? fmtCompact(scenario.finalValue, plan.currency)
-                        : `Fails ${scenario.failureAge ?? "?"}`}
+                        : scenario.failureAge
+                          ? `Depletes ${scenario.failureAge}`
+                          : `Gap ${scenario.spendingShortfallAge ?? "?"}`}
                     </span>
                   </div>
                 ))}

@@ -36,6 +36,10 @@ import {
   totalMonthlyExpenseAtAge,
 } from "../lib/expense-items";
 import {
+  resolveCoverageAnnualNominalValues,
+  resolveFundedProgress,
+} from "../lib/dashboard-math";
+import {
   ageFromBirthYearMonth,
   inferBirthYearMonthFromAge,
   normalizeRetirementPlan,
@@ -86,7 +90,7 @@ function fmtCompact(value: number, currency: string) {
   const abs = Math.abs(value);
   const maximumFractionDigits = abs >= 1_000_000 ? 2 : abs >= 100_000 ? 0 : abs >= 1_000 ? 1 : 0;
   try {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: currency || "USD",
       notation: "compact",
@@ -95,6 +99,27 @@ function fmtCompact(value: number, currency: string) {
   } catch {
     return formatAmount(value, currency);
   }
+}
+
+function currencySymbol(currency: string) {
+  try {
+    return (
+      new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: currency || "USD",
+        currencyDisplay: "narrowSymbol",
+        maximumFractionDigits: 0,
+      })
+        .formatToParts(0)
+        .find((part) => part.type === "currency")?.value ?? "$"
+    );
+  } catch {
+    return "$";
+  }
+}
+
+function boundedInflationFactor(rate: number, years: number) {
+  return Math.max(0.01, Math.pow(1 + rate, Math.max(0, years)));
 }
 
 type ChartValueMode = "real" | "nominal";
@@ -288,17 +313,28 @@ function projectedDcMonthlyPayout(
   currentAge: number,
   retirementAge: number,
   safeWithdrawalRate: number,
+  defaultAccumulationReturn: number,
 ) {
+  if (stream.startAge <= currentAge) {
+    const fallback = Math.max(0, stream.currentValue ?? 0) * safeWithdrawalRate / 12;
+    return Math.max(0, stream.monthlyAmount ?? fallback);
+  }
   const totalYears = Math.max(0, stream.startAge - currentAge);
   const contribYears = Math.max(0, Math.min(stream.startAge, retirementAge) - currentAge);
   const growthOnlyYears = totalYears - contribYears;
-  const r = stream.accumulationReturn ?? 0.04;
+  const r = stream.accumulationReturn ?? defaultAccumulationReturn;
   const initial = stream.currentValue ?? 0;
   const monthly = stream.monthlyContribution ?? 0;
   const fvLump = initial * Math.pow(1 + r, totalYears);
+  const monthlyGrowth = Math.pow(Math.max(0.01, 1 + r), 1 / 12);
+  const monthlyReturn = monthlyGrowth - 1;
+  const annualContributionEndValue =
+    Math.abs(monthlyReturn) <= 1e-9
+      ? monthly * 12
+      : (monthly * (Math.pow(monthlyGrowth, 12) - 1)) / monthlyReturn;
   const fvAnnuityAtStop =
     r > 1e-9
-      ? (monthly * 12 * (Math.pow(1 + r, contribYears) - 1)) / r
+      ? (annualContributionEndValue * (Math.pow(1 + r, contribYears) - 1)) / r
       : monthly * 12 * contribYears;
   const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
   return ((fvLump + fvAnnuity) * safeWithdrawalRate) / 12;
@@ -321,6 +357,7 @@ function projectedAnnualIncomeNominalAtAge(
             plan.personal.currentAge,
             retirementAge,
             plan.withdrawal.safeWithdrawalRate,
+            plan.investment.preRetirementAnnualReturn,
           )
         : (stream.monthlyAmount ?? 0);
     const annual = baseMonthly * 12;
@@ -342,6 +379,7 @@ function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: RetirementIncom
       plan.personal.currentAge,
       plan.personal.targetRetirementAge,
       plan.withdrawal.safeWithdrawalRate,
+      plan.investment.preRetirementAnnualReturn,
     );
   }
   return stream.monthlyAmount ?? 0;
@@ -644,11 +682,7 @@ function RetirementChart({
           />
           <YAxis
             tick={{ fontSize: 10 }}
-            tickFormatter={(v: number) => {
-              if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
-              if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-              return `$${v.toFixed(0)}`;
-            }}
+            tickFormatter={(v: number) => fmtCompact(v, currency)}
             width={48}
             axisLine={false}
             tickLine={false}
@@ -1196,6 +1230,7 @@ function SidebarConfigurator({
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [expandedIncomeId, setExpandedIncomeId] = useState<string | null>(null);
   const L = modeLabel(draftMode);
+  const moneyPrefix = currencySymbol(currency);
 
   const planKey = JSON.stringify(plan);
   useEffect(() => {
@@ -1346,7 +1381,7 @@ function SidebarConfigurator({
   );
 
   const strategyLabels: Record<string, string> = {
-    "constant-dollar": "Constant Dollar",
+    "planned-spending": "Planned spending",
     "constant-percentage": "Constant %",
     guardrails: "Guardrails",
   };
@@ -1354,8 +1389,8 @@ function SidebarConfigurator({
     draft.withdrawal.strategy === "constant-percentage"
       ? "Each year, withdrawals are capped at this share of the portfolio. If that is not enough to cover planned spending, the plan shows a funding gap."
       : draft.withdrawal.strategy === "guardrails"
-        ? "Sets the starting withdrawal level. Guardrails can then reduce or increase withdrawals within the floor and ceiling limits."
-        : "Used to estimate how much you need at retirement. Yearly withdrawals still follow the spending plan you entered.";
+        ? "Sets the starting withdrawal level. Guardrails can reduce flexible spending when the plan would draw too much from the portfolio."
+        : "Used to size the retirement target. Yearly withdrawals follow the spending plan you entered.";
   const birthYearMonth =
     draft.personal.birthYearMonth ?? inferBirthYearMonthFromAge(draft.personal.currentAge);
   const maxBirthYearMonth = inferBirthYearMonthFromAge(0);
@@ -1507,14 +1542,14 @@ function SidebarConfigurator({
               min={0}
               max={sliderMaxFor(draft.investment.monthlyContribution, 20000, 5000)}
               step={100}
-              prefix="$"
+              prefix={moneyPrefix}
               format={(v) => String(Math.round(v))}
             />
             <LeverRow
               label="Return before retirement"
               value={draft.investment.preRetirementAnnualReturn}
               onChange={(v) => setInvestment("preRetirementAnnualReturn", v)}
-              min={0.02}
+              min={0}
               max={0.12}
               step={0.001}
               suffix="%"
@@ -1672,7 +1707,7 @@ function SidebarConfigurator({
                         min={0}
                         max={sliderMaxFor(item.monthlyAmount, 20000, 5000)}
                         step={100}
-                        prefix="$"
+                        prefix={moneyPrefix}
                         suffix="/mo"
                         format={(v) => String(Math.round(v))}
                       />
@@ -1801,13 +1836,16 @@ function SidebarConfigurator({
                   <SidebarMonthlyRow
                     key={s.id}
                     label={s.label || "Stream"}
-                    meta={`Age ${s.startAge} → ${draft.personal.planningHorizonAge}`}
-                    amount={s.monthlyAmount ?? 0}
+                    meta={`${s.streamType === "dc" ? "Pension fund" : "Income"} · Age ${s.startAge} → ${draft.personal.planningHorizonAge}`}
+                    amount={incomeStreamMonthlyAmount(draft, s)}
                     currency={currency}
                   />
                 ))}
                 <SidebarTotalRow
-                  amount={draft.incomeStreams.reduce((sum, s) => sum + (s.monthlyAmount ?? 0), 0)}
+                  amount={draft.incomeStreams.reduce(
+                    (sum, s) => sum + incomeStreamMonthlyAmount(draft, s),
+                    0,
+                  )}
                   currency={currency}
                 />
               </div>
@@ -1832,9 +1870,11 @@ function SidebarConfigurator({
           <div className="space-y-3">
             {draft.incomeStreams.map((s) => {
               const expanded = expandedIncomeId === s.id;
-              const amount = s.monthlyAmount ?? 0;
+              const amount = incomeStreamMonthlyAmount(draft, s);
               const growthMeta =
-                s.annualGrowthRate !== undefined
+                s.streamType === "dc"
+                  ? "Balance-derived payout"
+                  : s.annualGrowthRate !== undefined
                   ? `${(s.annualGrowthRate * 100).toFixed(1)}% growth`
                   : s.adjustForInflation
                     ? "Inflation indexed"
@@ -1894,20 +1934,104 @@ function SidebarConfigurator({
                         placeholder="Income name"
                         className="bg-muted/70 h-8 px-2 text-sm font-semibold shadow-none"
                       />
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center sm:gap-3">
+                        <div className="min-w-0">
+                          <div className="text-foreground text-xs font-semibold">Income type</div>
+                          <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
+                            Use income for pensions paid monthly. Use fund for RRSP/RRIF/DC-style
+                            balances that convert to an estimated payout.
+                          </div>
+                        </div>
+                        <AnimatedToggleGroup<"db" | "dc">
+                          variant="secondary"
+                          size="xs"
+                          items={[
+                            { value: "db", label: "Income" },
+                            { value: "dc", label: "Fund" },
+                          ]}
+                          value={s.streamType}
+                          onValueChange={(value) =>
+                            updateStream(s.id, {
+                              streamType: value,
+                              currentValue: value === "dc" ? (s.currentValue ?? 0) : s.currentValue,
+                              monthlyContribution:
+                                value === "dc" ? (s.monthlyContribution ?? 0) : s.monthlyContribution,
+                              accumulationReturn:
+                                value === "dc"
+                                  ? (s.accumulationReturn ??
+                                    draft.investment.preRetirementAnnualReturn)
+                                  : s.accumulationReturn,
+                            })
+                          }
+                        />
+                      </div>
                       <div className="divide-border divide-y">
                         {s.streamType !== "dc" && (
                           <LeverRow
-                            label="Monthly income"
+                            label="Monthly income after tax"
                             kind="money"
-                            value={amount}
+                            value={s.monthlyAmount ?? 0}
                             onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
                             min={0}
                             max={sliderMaxFor(amount, 10000, 2500)}
                             step={50}
-                            prefix="$"
+                            prefix={moneyPrefix}
                             suffix="/mo"
                             format={(v) => String(Math.round(v))}
                           />
+                        )}
+                        {s.streamType === "dc" && (
+                          <>
+                            <LeverRow
+                              label="Current fund balance"
+                              kind="money"
+                              value={s.currentValue ?? 0}
+                              onChange={(v) => updateStream(s.id, { currentValue: v })}
+                              min={0}
+                              max={sliderMaxFor(s.currentValue ?? 0, 2_000_000, 250_000)}
+                              step={1000}
+                              prefix={moneyPrefix}
+                              format={(v) => String(Math.round(v))}
+                            />
+                            <LeverRow
+                              label="Monthly fund contribution"
+                              kind="money"
+                              value={s.monthlyContribution ?? 0}
+                              onChange={(v) => updateStream(s.id, { monthlyContribution: v })}
+                              min={0}
+                              max={sliderMaxFor(s.monthlyContribution ?? 0, 10000, 2500)}
+                              step={50}
+                              prefix={moneyPrefix}
+                              suffix="/mo"
+                              format={(v) => String(Math.round(v))}
+                            />
+                            <LeverRow
+                              label="Fund return before payout"
+                              value={
+                                s.accumulationReturn ?? draft.investment.preRetirementAnnualReturn
+                              }
+                              onChange={(v) => updateStream(s.id, { accumulationReturn: v })}
+                              min={0}
+                              max={0.12}
+                              step={0.001}
+                              suffix="%"
+                              format={(v) => (v * 100).toFixed(1)}
+                            />
+                            {s.startAge <= draft.personal.currentAge && (
+                              <LeverRow
+                                label="Monthly payout after tax"
+                                kind="money"
+                                value={s.monthlyAmount ?? amount}
+                                onChange={(v) => updateStream(s.id, { monthlyAmount: v })}
+                                min={0}
+                                max={sliderMaxFor(s.monthlyAmount ?? amount, 10000, 2500)}
+                                step={50}
+                                prefix={moneyPrefix}
+                                suffix="/mo"
+                                format={(v) => String(Math.round(v))}
+                              />
+                            )}
+                          </>
                         )}
                         <LeverRow
                           label="Start age"
@@ -1976,6 +2100,23 @@ function SidebarConfigurator({
             >
               <Icons.Plus className="h-3 w-3" /> Add retirement income
             </button>
+            <button
+              className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+              onClick={() =>
+                addStream({
+                  label: "Pension fund",
+                  streamType: "dc",
+                  startAge: draft.personal.targetRetirementAge,
+                  monthlyAmount: undefined,
+                  currentValue: 0,
+                  monthlyContribution: 0,
+                  accumulationReturn: draft.investment.preRetirementAnnualReturn,
+                  adjustForInflation: false,
+                })
+              }
+            >
+              <Icons.Plus className="h-3 w-3" /> Add pension fund
+            </button>
             {!hasCanadianPublicBenefit && (
               <button
                 className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
@@ -2021,7 +2162,14 @@ function SidebarConfigurator({
             <ConfigRow label="Effective retirement return">
               {formatPercent(effectiveRetirementReturn)}
             </ConfigRow>
-            <ConfigRow label="Annual volatility">
+            <ConfigRow
+              label={
+                <InfoLabel label="Annual volatility">
+                  How much yearly returns can vary around the expected return. Higher volatility
+                  widens the Monte Carlo outcome range.
+                </InfoLabel>
+              }
+            >
               {formatPercent(draft.investment.annualVolatility)}
             </ConfigRow>
             <ConfigRow label="Inflation">{formatPercent(draft.investment.inflationRate)}</ConfigRow>
@@ -2033,9 +2181,9 @@ function SidebarConfigurator({
             <ConfigRow
               label={
                 <InfoLabel label="Withdrawal strategy">
-                  Choose how money is taken from your portfolio in retirement. Constant Dollar
-                  follows your spending plan, Constant % takes a fixed portfolio share, and
-                  Guardrails adjusts withdrawals within limits.
+                  Choose how money is taken from your portfolio in retirement. Planned spending
+                  funds your spending plan, Constant % takes a fixed portfolio share, and
+                  Guardrails can reduce flexible spending when withdrawals are too high.
                 </InfoLabel>
               }
             >
@@ -2051,14 +2199,9 @@ function SidebarConfigurator({
               {formatPercent(draft.withdrawal.safeWithdrawalRate)}
             </ConfigRow>
             {draft.withdrawal.strategy === "guardrails" && (
-              <>
-                <ConfigRow label="Guardrail ceiling">
-                  {formatPercent(draft.withdrawal.guardrails?.ceilingRate ?? 0.06)}
-                </ConfigRow>
-                <ConfigRow label="Guardrail floor">
-                  {formatPercent(draft.withdrawal.guardrails?.floorRate ?? 0.03)}
-                </ConfigRow>
-              </>
+              <ConfigRow label="Guardrail ceiling">
+                {formatPercent(draft.withdrawal.guardrails?.ceilingRate ?? 0.06)}
+              </ConfigRow>
             )}
           </div>
         }
@@ -2068,7 +2211,7 @@ function SidebarConfigurator({
               label="Return before retirement"
               value={draft.investment.preRetirementAnnualReturn}
               onChange={(v) => setInvestment("preRetirementAnnualReturn", v)}
-              min={0.02}
+              min={0}
               max={0.12}
               step={0.001}
               suffix="%"
@@ -2095,7 +2238,12 @@ function SidebarConfigurator({
               format={(v) => (v * 100).toFixed(2)}
             />
             <LeverRow
-              label="Annual volatility"
+              label={
+                <InfoLabel label="Annual volatility">
+                  How much yearly returns can vary around the expected return. Higher volatility
+                  widens the Monte Carlo outcome range.
+                </InfoLabel>
+              }
               value={draft.investment.annualVolatility}
               onChange={(v) => setInvestment("annualVolatility", v)}
               min={0}
@@ -2128,9 +2276,9 @@ function SidebarConfigurator({
               <div>
                 <div className="text-foreground text-sm font-semibold leading-tight">
                   <InfoLabel label="Withdrawal strategy">
-                    Choose how money is taken from your portfolio in retirement. Constant Dollar
-                    follows your spending plan, Constant % takes a fixed portfolio share, and
-                    Guardrails adjusts withdrawals within limits.
+                    Choose how money is taken from your portfolio in retirement. Planned spending
+                    funds your spending plan, Constant % takes a fixed portfolio share, and
+                    Guardrails can reduce flexible spending when withdrawals are too high.
                   </InfoLabel>
                 </div>
                 <div className="text-muted-foreground mt-1 text-xs leading-tight">
@@ -2138,7 +2286,7 @@ function SidebarConfigurator({
                 </div>
               </div>
               <div className="space-y-1.5">
-                {(["constant-dollar", "constant-percentage", "guardrails"] as const).map((s) => (
+                {(["planned-spending", "constant-percentage", "guardrails"] as const).map((s) => (
                   <label
                     key={s}
                     className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${draft.withdrawal.strategy === s ? "border-foreground/30 bg-muted/50" : "border-transparent"}`}
@@ -2175,32 +2323,15 @@ function SidebarConfigurator({
                 <div className="divide-border divide-y pt-2">
                   <LeverRow
                     label="Ceiling rate"
-                    hint="Reduce spending above this withdrawal rate"
+                    hint="Reduce flexible spending above this withdrawal rate"
                     value={draft.withdrawal.guardrails?.ceilingRate ?? 0.06}
                     onChange={(v) =>
                       setWithdrawal("guardrails", {
                         ceilingRate: v,
-                        floorRate: draft.withdrawal.guardrails?.floorRate ?? 0.03,
                       })
                     }
                     min={0.02}
                     max={0.12}
-                    step={0.001}
-                    suffix="%"
-                    format={(v) => (v * 100).toFixed(1)}
-                  />
-                  <LeverRow
-                    label="Floor rate"
-                    hint="Allow spending increases below this withdrawal rate"
-                    value={draft.withdrawal.guardrails?.floorRate ?? 0.03}
-                    onChange={(v) =>
-                      setWithdrawal("guardrails", {
-                        ceilingRate: draft.withdrawal.guardrails?.ceilingRate ?? 0.06,
-                        floorRate: v,
-                      })
-                    }
-                    min={0.01}
-                    max={0.08}
                     step={0.001}
                     suffix="%"
                     format={(v) => (v * 100).toFixed(1)}
@@ -2478,13 +2609,12 @@ export default function DashboardPage({
   const [chartValueMode, setChartValueMode] = useState<ChartValueMode>("real");
   const [coverageView, setCoverageView] = useState<CoverageView>("at-retirement");
   const valueModeLabel = chartValueMode === "real" ? "today's value" : "nominal";
-  const inflationBase = Math.max(1 + plan.investment.inflationRate, 0.01);
   const toTodayValueAtAge = useCallback(
     (value: number, age: number) => {
       const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
-      return value / Math.pow(inflationBase, yearsFromNow);
+      return value / boundedInflationFactor(plan.investment.inflationRate, yearsFromNow);
     },
-    [inflationBase, plan.personal.currentAge],
+    [plan.investment.inflationRate, plan.personal.currentAge],
   );
   const scaleForModeAtAge = useCallback(
     (value: number, age: number) => {
@@ -2497,8 +2627,8 @@ export default function DashboardPage({
   // All numbers come from the backend DTO
   const retireTodayTarget = retirementOverview?.netFireTarget ?? 0;
   const targetReconciliation = retirementOverview?.targetReconciliation;
-  const fallbackInflationFactorToGoal = Math.pow(
-    inflationBase,
+  const fallbackInflationFactorToGoal = boundedInflationFactor(
+    plan.investment.inflationRate,
     Math.max(0, plan.personal.targetRetirementAge - plan.personal.currentAge),
   );
   const inflationFactorToGoal =
@@ -2517,9 +2647,16 @@ export default function DashboardPage({
   const fiAge = retirementOverview?.fiAge ?? null;
   const retirementStartAge = retirementOverview?.retirementStartAge ?? null;
   const suggestedAge = retirementOverview?.suggestedGoalAgeIfUnchanged ?? null;
+  const requiredCapitalReachable = retirementOverview?.requiredCapitalReachable ?? true;
   // Effective FI age: genuine FI age, or the accumulation-only suggested age for display
   const effectiveFiAge = fiAge ?? suggestedAge;
-  const progress = targetAtGoalDisplay > 0 ? Math.min(portfolioNow / targetAtGoalDisplay, 1) : 0;
+  const progress = resolveFundedProgress(
+    retirementOverview?.progress,
+    portfolioNow,
+    targetTodayAtGoal,
+  );
+  const milestonePortfolioDisplay =
+    chartValueMode === "nominal" ? portfolioNow * inflationFactorToGoal : portfolioNow;
 
   const fireAgeForBudget = retirementStartAge ?? plan.personal.targetRetirementAge;
   const coverageExpenseItems = useMemo(() => expenseItems(plan.expenses), [plan.expenses]);
@@ -2537,36 +2674,17 @@ export default function DashboardPage({
   const coverageSnapshot = retirementOverview?.trajectory?.find(
     (pt) => pt.age === fireAgeForBudget,
   );
-  const coverageSnapshotSpending =
-    coverageSnapshot?.plannedExpenses ??
-    (coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualExpenses : undefined);
-  const coverageSnapshotIncome =
-    coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualIncome : undefined;
-  const coverageSnapshotPortfolioGap =
-    coverageSnapshot?.phase === "fire" ? coverageSnapshot.netWithdrawalFromPortfolio : undefined;
-  const coverageSnapshotGrossWithdrawal =
-    coverageSnapshot?.phase === "fire" ? coverageSnapshot.grossWithdrawal : undefined;
-  const coverageSnapshotTaxes =
-    coverageSnapshot?.phase === "fire" ? coverageSnapshot.annualTaxes : undefined;
-  const coverageInflationFactor = Math.pow(
-    inflationBase,
-    Math.max(0, fireAgeForBudget - plan.personal.currentAge),
-  );
-  const coverageAnnualSpendingNominal =
-    coverageSnapshotSpending ?? totalBudget * 12 * coverageInflationFactor;
-  const coverageAnnualIncomeNominal =
-    coverageSnapshotIncome ?? fallbackMonthlyIncome * 12 * coverageInflationFactor;
-  const coverageAnnualPortfolioGapNominal =
-    coverageSnapshotPortfolioGap ??
-    Math.max(0, coverageAnnualSpendingNominal - coverageAnnualIncomeNominal);
-  const coverageAnnualGrossWithdrawalNominal =
-    coverageSnapshotGrossWithdrawal ??
-    (effectiveTaxRate > 0
-      ? coverageAnnualPortfolioGapNominal / Math.max(0.01, 1 - effectiveTaxRate)
-      : coverageAnnualPortfolioGapNominal);
-  const coverageAnnualEstimatedTaxesNominal =
-    coverageSnapshotTaxes ??
-    Math.max(0, coverageAnnualGrossWithdrawalNominal - coverageAnnualPortfolioGapNominal);
+  const {
+    annualSpendingNominal: coverageAnnualSpendingNominal,
+    annualIncomeNominal: coverageAnnualIncomeNominal,
+    annualPortfolioGapNominal: coverageAnnualPortfolioGapNominal,
+    annualEstimatedTaxesNominal: coverageAnnualEstimatedTaxesNominal,
+  } = resolveCoverageAnnualNominalValues({
+    snapshot: coverageSnapshot,
+    totalMonthlyBudget: totalBudget,
+    fallbackMonthlyIncome,
+    effectiveTaxRate,
+  });
   const coverageAnnualSpendingToday = toTodayValueAtAge(
     coverageAnnualSpendingNominal,
     fireAgeForBudget,
@@ -2645,7 +2763,7 @@ export default function DashboardPage({
       portfolio: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
       portfolioStart: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
       portfolioEnd: scaleForModeAtAge(Math.max(0, pt.portfolioEnd), pt.age),
-      target: scaleForModeAtAge(pt.requiredCapital, pt.age),
+      target: pt.requiredCapital == null ? undefined : scaleForModeAtAge(pt.requiredCapital, pt.age),
       withdrawal: scaleForModeAtAge(pt.netWithdrawalFromPortfolio, pt.age),
       phase: pt.phase,
       annualContribution: scaleForModeAtAge(pt.annualContribution, pt.age),
@@ -2727,25 +2845,41 @@ export default function DashboardPage({
   const yearsFromDesired =
     effectiveFiAge != null ? effectiveFiAge - plan.personal.targetRetirementAge : null;
   const traditionalStatus = retirementOverview?.successStatus;
+  const spendingShortfallAge = retirementOverview?.spendingShortfallAge ?? null;
+  const firstUnfundedAge = retirementOverview
+    ? [retirementOverview.failureAge, spendingShortfallAge]
+        .filter((age): age is number => typeof age === "number")
+        .reduce<number | null>((earliest, age) => (earliest == null ? age : Math.min(earliest, age)), null)
+    : null;
   const heroHealth = isTraditionalMode
-    ? traditionalStatus === "on_track" || traditionalStatus === "overfunded"
+    ? !requiredCapitalReachable
+      ? "off_track"
+      : traditionalStatus === "on_track" || traditionalStatus === "overfunded"
       ? "on_track"
       : traditionalStatus === "shortfall"
         ? "at_risk"
         : "off_track"
-    : isFinanciallyIndependent ||
+    : !requiredCapitalReachable
+      ? "off_track"
+      : isFinanciallyIndependent ||
         (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge)
       ? "on_track"
       : effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge + 3
         ? "at_risk"
         : "off_track";
   const heroGuidance = isTraditionalMode
-    ? traditionalStatus === "shortfall"
-      ? `Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
+    ? !requiredCapitalReachable
+      ? "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon."
+      : traditionalStatus === "shortfall"
+      ? spendingShortfallAge != null
+        ? `Projected spending gap starts at age ${spendingShortfallAge}. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
+        : `Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
       : traditionalStatus === "depleted"
-        ? `Projected to run short before age ${retirementOverview?.fundedThroughAge ?? plan.personal.planningHorizonAge}. Reduce spending, retire later, or add retirement income.`
+        ? `Projected portfolio depletion at age ${retirementOverview?.failureAge ?? firstUnfundedAge ?? plan.personal.planningHorizonAge}. Reduce spending, retire later, or add retirement income.`
         : null
-    : isFinanciallyIndependent
+    : !requiredCapitalReachable
+      ? "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon."
+      : isFinanciallyIndependent
       ? "You have reached financial independence with the current assumptions."
       : yearsFromDesired != null && yearsFromDesired > 0
         ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
@@ -2935,7 +3069,18 @@ export default function DashboardPage({
                   {/* Sentence-style verdict */}
                   <h1 className="max-w-[95%] font-serif text-2xl font-normal leading-[1.15] tracking-tight">
                     {isTraditionalMode ? (
-                      traditionalStatus === "shortfall" ? (
+                      traditionalStatus === "shortfall" && spendingShortfallAge != null && goalShortfall <= 0 ? (
+                        <>
+                          Spending gap starts at{" "}
+                          <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                            age {spendingShortfallAge}
+                          </span>
+                          <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                            {" "}
+                            before the plan reaches age {plan.personal.planningHorizonAge}.
+                          </span>
+                        </>
+                      ) : traditionalStatus === "shortfall" ? (
                         <>
                           At age {plan.personal.targetRetirementAge}, you're short{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
@@ -2948,9 +3093,9 @@ export default function DashboardPage({
                         </>
                       ) : traditionalStatus === "depleted" ? (
                         <>
-                          This plan runs short at{" "}
+                          Portfolio depletes at{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
-                            age {retirementOverview.failureAge ?? retirementOverview.fundedThroughAge}
+                            age {retirementOverview.failureAge ?? firstUnfundedAge}
                           </span>
                           <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
                             {" "}
@@ -3034,7 +3179,12 @@ export default function DashboardPage({
                     At your current{" "}
                     <span className="text-foreground tabular-nums">{monthlyContribLabel}</span>{" "}
                     contribution,{" "}
-                    {isTraditionalMode ? (
+                    {!requiredCapitalReachable ? (
+                      <>
+                        the required capital target is not available with the current assumptions.
+                        Review spending, inflation, returns, and life expectancy.
+                      </>
+                    ) : isTraditionalMode ? (
                       <>
                         projected retirement balance is{" "}
                         <ValueModeTooltip
@@ -3074,7 +3224,8 @@ export default function DashboardPage({
                         /yr of expenses to age {plan.personal.planningHorizonAge}.
                       </>
                     )}
-                    {!isTraditionalMode &&
+                    {requiredCapitalReachable &&
+                      !isTraditionalMode &&
                       goalShortfall > 0 &&
                       yearsFromDesired != null &&
                       yearsFromDesired > 0 && (
@@ -3093,7 +3244,7 @@ export default function DashboardPage({
                         </ValueModeTooltip>{" "}
                         at age {plan.personal.targetRetirementAge}.
                       </>
-                    )}
+                      )}
                   </p>
 
                   {/* Progress bar — portfolio vs. target with Coast FIRE marker */}
@@ -3121,16 +3272,22 @@ export default function DashboardPage({
                             {valueModeLabel}.
                           </TooltipContent>
                         </Tooltip>
-                        <ValueModeTooltip
-                          valueMode={chartValueMode}
-                          currency={currency}
-                          todayValue={targetTodayAtGoal}
-                          nominalValue={targetNominalAtGoal}
-                        >
-                          <span className="text-sm font-semibold tabular-nums">
-                            {fmtCompact(targetAtGoalDisplay, currency)}
+                        {requiredCapitalReachable ? (
+                          <ValueModeTooltip
+                            valueMode={chartValueMode}
+                            currency={currency}
+                            todayValue={targetTodayAtGoal}
+                            nominalValue={targetNominalAtGoal}
+                          >
+                            <span className="text-sm font-semibold tabular-nums">
+                              {fmtCompact(targetAtGoalDisplay, currency)}
+                            </span>
+                          </ValueModeTooltip>
+                        ) : (
+                          <span className="text-muted-foreground text-sm font-semibold">
+                            Not available
                           </span>
-                        </ValueModeTooltip>
+                        )}
                       </div>
                     </div>
                     <div className="bg-muted/60 relative h-2.5 overflow-hidden rounded-md border">
@@ -3138,13 +3295,16 @@ export default function DashboardPage({
                         className="bg-success absolute inset-y-0 left-0 transition-[width] duration-500"
                         style={{ width: `${Math.min(progress * 100, 100)}%` }}
                       />
-                      {!isTraditionalMode && targetAtGoalDisplay > 0 && coastAmountDisplay > 0 && (
-                        <div
-                          className="bg-foreground/55 absolute -bottom-0.5 -top-0.5 w-[2px]"
-                          style={{ left: `${coastPct}%` }}
-                          title="Coast FIRE"
-                        />
-                      )}
+                      {!isTraditionalMode &&
+                        requiredCapitalReachable &&
+                        targetAtGoalDisplay > 0 &&
+                        coastAmountDisplay > 0 && (
+                          <div
+                            className="bg-foreground/55 absolute -bottom-0.5 -top-0.5 w-[2px]"
+                            style={{ left: `${coastPct}%` }}
+                            title="Coast FIRE"
+                          />
+                        )}
                     </div>
                     <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
                       <span className="tabular-nums">{(progress * 100).toFixed(1)}% funded</span>
@@ -3292,8 +3452,8 @@ export default function DashboardPage({
                     tip: "Retire with ~50% more spending than planned — room for travel, gifts, volatility, and lifestyle upgrades.",
                   },
                 ].map((m) => {
-                  const pct = m.value > 0 ? Math.min(1, portfolioNow / m.value) : 0;
-                  const reached = portfolioNow >= m.value && m.value > 0;
+                  const pct = m.value > 0 ? Math.min(1, milestonePortfolioDisplay / m.value) : 0;
+                  const reached = milestonePortfolioDisplay >= m.value && m.value > 0;
                   return (
                     <div key={m.key} className="p-4">
                       <div className="mb-1.5 flex items-center gap-1.5">
@@ -3711,11 +3871,7 @@ export default function DashboardPage({
                       />
                       <YAxis
                         tick={{ fontSize: 10 }}
-                        tickFormatter={(v: number) => {
-                          if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
-                          if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
-                          return `$${v.toFixed(0)}`;
-                        }}
+                        tickFormatter={(v: number) => fmtCompact(v, currency)}
                         width={60}
                         axisLine={false}
                         tickLine={false}

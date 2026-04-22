@@ -80,7 +80,7 @@ export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
   },
   withdrawal: {
     safeWithdrawalRate: 0.035,
-    strategy: "constant-dollar",
+    strategy: "planned-spending",
   },
   tax: {
     taxableWithdrawalRate: 0.15,
@@ -103,6 +103,14 @@ export function parseSettingsJson(json: string): RetirementPlan {
       ...investmentWithoutLegacy
     } = rawInvestment;
     void targetAllocations;
+    const rawWithdrawal = raw.withdrawal ?? {};
+    const guardrails = rawWithdrawal.guardrails
+      ? {
+          ceilingRate:
+            rawWithdrawal.guardrails.ceilingRate ??
+            DEFAULT_RETIREMENT_PLAN.withdrawal.guardrails?.ceilingRate,
+        }
+      : rawWithdrawal.guardrails;
     return {
       ...DEFAULT_RETIREMENT_PLAN,
       ...raw,
@@ -128,7 +136,12 @@ export function parseSettingsJson(json: string): RetirementPlan {
           expectedReturnStdDev ??
           DEFAULT_RETIREMENT_PLAN.investment.annualVolatility,
       },
-      withdrawal: { ...DEFAULT_RETIREMENT_PLAN.withdrawal, ...raw.withdrawal },
+      withdrawal: {
+        ...DEFAULT_RETIREMENT_PLAN.withdrawal,
+        ...rawWithdrawal,
+        strategy: rawWithdrawal.strategy ?? DEFAULT_RETIREMENT_PLAN.withdrawal.strategy,
+        guardrails,
+      },
       tax: raw.tax ?? DEFAULT_RETIREMENT_PLAN.tax,
     };
   } catch {

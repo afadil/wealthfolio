@@ -52,9 +52,9 @@ export default function GuidePage({ country }: { country?: string }) {
             salary the planner shows your savings rate and can grow contributions with raises.
           </Step>
           <Step n={3} title="Add income streams (pension, part-time, annuity…)">
-            Each stream has a monthly amount (in today's money) and a payout start age. Streams
-            active from your FIRE age reduce how much the portfolio must cover. Deferred streams
-            (e.g. state pension at 67) are modelled as separate phases that kick in later.
+            Each stream has an after-tax monthly amount in today's money and a payout start age.
+            Streams active from your FIRE age reduce how much the portfolio must cover. Deferred
+            streams (e.g. state pension at 67) are modelled as separate phases that kick in later.
           </Step>
           <Step
             n={4}
@@ -114,16 +114,15 @@ export default function GuidePage({ country }: { country?: string }) {
       <Section title="Understanding What If">
         <div className="space-y-4">
           <Term t="Monte Carlo (100,000 simulations)">
-            Runs your plan 100,000 times using a two-regime fat-tailed return distribution: 85% of
-            years draw from a normal distribution centred on the phase-specific net return, 15% are
-            stress years with heavier downside. Inflation is stochastic per year. The fan chart
-            shows percentile bands P10–P90. Success rate = % of simulations where the portfolio
-            survives to your planning horizon. Aim for ≥ 90%.
+            Runs your plan across many market paths using lognormal return sampling, stochastic
+            inflation, and a modeled relationship between returns and inflation. The fan chart shows
+            P10–P90 outcomes. Success rate means essential spending stays funded, the portfolio
+            survives to your planning horizon, and FIRE plans reach financial independence. Aim for
+            ≥ 90%.
           </Term>
           <Term t="Strategy Comparison">
-            Compares constant-dollar withdrawal (fixed real amount each year) against
-            constant-percentage withdrawal (fixed % of remaining portfolio). Constant-%
-            mathematically never depletes the portfolio but annual spending fluctuates with markets.
+            Compares planned spending withdrawals against constant-percentage withdrawals. Constant
+            % rarely depletes the portfolio, but spending can fall below the amount you planned.
             Run "Compare Strategies" to see which fits your risk tolerance.
           </Term>
           <Term t="Scenario Analysis">
@@ -162,7 +161,7 @@ export default function GuidePage({ country }: { country?: string }) {
             Its role depends on which withdrawal strategy you choose:
             <ul className="text-muted-foreground mt-2 list-disc space-y-1.5 pl-4 text-xs">
               <li>
-                <strong>Constant Dollar</strong> — Your expenses drive the withdrawal, not the rate.
+                <strong>Planned spending</strong> — Your expenses drive the withdrawal, not the rate.
                 Each year you withdraw exactly what you need (expenses minus income, grossed up for
                 taxes). The rate is only used to convert defined-contribution pension fund balances
                 into monthly income.
@@ -172,10 +171,9 @@ export default function GuidePage({ country }: { country?: string }) {
                 regardless of expenses. Income varies with market performance.
               </li>
               <li>
-                <strong>Guardrails</strong> — Targets your expenses like Constant Dollar, but clips
-                withdrawals to ceiling (1.5× the rate) or floor (0.8× the rate) bands relative to
-                the portfolio. Protects against overspending in down markets while allowing raises
-                in up markets.
+                <strong>Guardrails</strong> — Targets your expenses like Planned spending, but clips
+                withdrawals to a ceiling relative to the portfolio. Protects must-have spending
+                first and trims flexible spending in weak markets.
               </li>
             </ul>
           </Term>
@@ -214,13 +212,11 @@ export default function GuidePage({ country }: { country?: string }) {
               engine of your FIRE plan.
             </Term>
             <Term t="Fondo pensione integrativo (supplementary pension fund)">
-              Add it as an income stream and enable "Has accumulation fund". Enter the current fund
-              balance (or link the Wealthfolio account and click Sync), the monthly TFR
+              Add it as a pension fund. Enter the current fund balance, the monthly TFR
               contribution, and the fund's net annual return (check your fund's factsheet — 3–5%
               after fees is common). Set the payout start age to when you plan to draw it (typically
               65–67). The planner accumulates contributions until FIRE, then lets the fund grow
-              without new contributions until payout age. The linked account is automatically
-              included in your FIRE goal allocations.
+              without new contributions until payout age.
             </Term>
             <Term t="Pensione INPS (state pension — previdenza obbligatoria)">
               Add it as a plain income stream (no accumulation fund). Enter your estimated monthly

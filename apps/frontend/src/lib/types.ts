@@ -2007,11 +2007,13 @@ export interface RetirementOverview {
   netFireTarget: number;
   grossFireTarget: number;
   portfolioAtGoalAge: number;
+  requiredCapitalReachable: boolean;
   requiredCapitalAtGoalAge: number;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
   fundedThroughAge: number | null;
   failureAge: number | null;
+  spendingShortfallAge: number | null;
   requiredAdditionalMonthlyContribution: number;
   suggestedGoalAgeIfUnchanged: number | null;
   coastAmountToday: number;
@@ -2034,7 +2036,7 @@ export interface RetirementTrajectoryPoint {
   annualExpenses: number;
   netWithdrawalFromPortfolio: number;
   portfolioEnd: number;
-  requiredCapital: number;
+  requiredCapital: number | null;
   pensionAssets: number;
   annualTaxes?: number;
   grossWithdrawal?: number;
@@ -2058,6 +2060,7 @@ export interface BudgetStreamItem {
 
 export interface TargetReconciliation {
   targetAge: number;
+  requiredCapitalReachable: boolean;
   inflationFactorToTarget: number;
   plannedAnnualExpensesTodayValue: number;
   plannedAnnualExpensesNominal: number;

@@ -32,6 +32,7 @@ export interface YearlySnapshot {
   year: number;
   phase: "accumulation" | "fire";
   portfolioValue: number;
+  portfolioEndValue: number;
   annualContribution: number;
   annualWithdrawal: number;
   annualIncome: number;
@@ -86,6 +87,7 @@ export interface ScenarioResult {
   fundedAtGoalAge: boolean;
   success: boolean;
   failureAge?: number | null;
+  spendingShortfallAge?: number | null;
   yearByYear: YearlySnapshot[];
 }
 
@@ -96,6 +98,7 @@ export interface SorrScenario {
   finalValue: number;
   survived: boolean;
   failureAge?: number | null;
+  spendingShortfallAge?: number | null;
 }
 
 export type DecisionSensitivityMap = "contribution-return" | "retirement-age-spending";
@@ -121,7 +124,7 @@ export interface DecisionSensitivityCell {
 }
 
 export interface StrategyComparisonResult {
-  constantDollar: MonteCarloResult;
+  plannedSpending: MonteCarloResult;
   constantPercentage: MonteCarloResult;
   guardrails: MonteCarloResult;
 }
@@ -145,6 +148,7 @@ export interface StressOutcome {
   shortfallAtGoalAge: number;
   portfolioAtHorizon: number;
   failureAge?: number | null;
+  spendingShortfallAge?: number | null;
 }
 
 export interface StressDelta {
@@ -227,12 +231,11 @@ export interface InvestmentAssumptions {
 
 export interface GuardrailsConfig {
   ceilingRate: number;
-  floorRate: number;
 }
 
 export interface WithdrawalConfig {
   safeWithdrawalRate: number;
-  strategy: "constant-dollar" | "constant-percentage" | "guardrails";
+  strategy: "planned-spending" | "constant-percentage" | "guardrails";
   guardrails?: GuardrailsConfig;
 }
 

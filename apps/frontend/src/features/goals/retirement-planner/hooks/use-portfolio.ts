@@ -2,8 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { getAccounts, getLatestValuations, getHoldings } from "@/adapters";
 import type { Holding } from "@/lib/types";
 
-const INVESTMENT_TYPES = new Set(["SECURITIES", "CRYPTOCURRENCY"]);
-
 export function usePortfolioData(accountIds?: string[]) {
   const accountsQuery = useQuery({
     queryKey: ["fire-planner-accounts"],
@@ -17,7 +15,7 @@ export function usePortfolioData(accountIds?: string[]) {
   const activeAccountIds = (
     accountIds !== undefined
       ? allActiveAccounts.filter((a) => accountIds.includes(a.id))
-      : allActiveAccounts.filter((a) => INVESTMENT_TYPES.has(a.accountType))
+      : []
   ).map((a) => a.id);
 
   const valuationsQuery = useQuery({
