@@ -12,6 +12,11 @@ pub static DATE_TEMPLATE_RE: std::sync::LazyLock<regex::Regex> =
 /// Maximum HTTP response body size (10 MB).
 pub const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
 
+/// Browser-like user agent used by custom provider test and runtime requests.
+pub const CUSTOM_PROVIDER_USER_AGENT: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+     (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 /// Context for expanding template variables in URLs and paths.
 pub struct TemplateContext<'a> {
     pub symbol: &'a str,
@@ -78,6 +83,50 @@ pub fn validate_url(raw: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Build default browser-like headers for custom provider HTTP requests.
+pub fn build_browser_like_headers(format: &str, url: &str) -> reqwest::header::HeaderMap {
+    let mut headers = reqwest::header::HeaderMap::new();
+    let default_accept = match format {
+        "json" => "application/json, text/plain, */*",
+        "csv" => "text/csv, text/plain, */*",
+        _ => {
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        }
+    };
+    for (name, value) in [
+        ("accept", default_accept),
+        ("accept-language", "en-US,en;q=0.9"),
+        ("sec-fetch-dest", "empty"),
+        ("sec-fetch-mode", "cors"),
+        ("sec-fetch-site", "same-origin"),
+        (
+            "sec-ch-ua",
+            "\"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+        ),
+        ("sec-ch-ua-mobile", "?0"),
+        ("sec-ch-ua-platform", "\"macOS\""),
+        ("upgrade-insecure-requests", "1"),
+    ] {
+        if let (Ok(n), Ok(v)) = (
+            reqwest::header::HeaderName::from_bytes(name.as_bytes()),
+            reqwest::header::HeaderValue::from_str(value),
+        ) {
+            headers.insert(n, v);
+        }
+    }
+
+    if let Ok(parsed) = reqwest::Url::parse(url) {
+        let origin = parsed.origin().ascii_serialization();
+        if origin != "null" {
+            if let Ok(v) = reqwest::header::HeaderValue::from_str(&format!("{origin}/")) {
+                headers.insert(reqwest::header::REFERER, v);
+            }
+        }
+    }
+
+    headers
+}
+
 /// Extract a numeric value from HTML using a CSS selector.
 ///
 /// Shared between `custom_provider::service` (test_source) and
@@ -111,6 +160,8 @@ pub struct CustomProviderSource {
     pub locale: Option<String>,
     /// JSON object string of extra HTTP headers
     pub headers: Option<String>,
+    #[serde(default)]
+    pub open_path: Option<String>,
     pub high_path: Option<String>,
     pub low_path: Option<String>,
     pub volume_path: Option<String>,
@@ -170,6 +221,8 @@ pub struct NewCustomProviderSource {
     pub invert: Option<bool>,
     pub locale: Option<String>,
     pub headers: Option<String>,
+    #[serde(default)]
+    pub open_path: Option<String>,
     pub high_path: Option<String>,
     pub low_path: Option<String>,
     pub volume_path: Option<String>,
@@ -195,6 +248,12 @@ pub struct TestSourceRequest {
     pub symbol: String,
     /// Currency for {currency}/{CURRENCY} placeholders (defaults to "usd")
     pub currency: Option<String>,
+    /// Start date for {FROM} placeholders while testing historical sources.
+    pub from: Option<String>,
+    /// End date for {TO} placeholders while testing historical sources.
+    pub to: Option<String>,
+    #[serde(default)]
+    pub open_path: Option<String>,
     pub high_path: Option<String>,
     pub low_path: Option<String>,
     pub volume_path: Option<String>,
@@ -239,11 +298,16 @@ pub struct DetectedHtmlTable {
 }
 
 /// Result of testing a source configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TestSourceResult {
     pub success: bool,
+    pub status_code: Option<u16>,
     pub price: Option<f64>,
+    pub open: Option<f64>,
+    pub high: Option<f64>,
+    pub low: Option<f64>,
+    pub volume: Option<f64>,
     pub currency: Option<String>,
     pub date: Option<String>,
     pub error: Option<String>,

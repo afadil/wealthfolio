@@ -1,5 +1,6 @@
-import { useMemo, useCallback } from "react";
-import { walkJson } from "./json-path-suggestions";
+import { Fragment, useMemo } from "react";
+
+import { cn } from "@/lib/utils";
 
 interface RawResponseViewerProps {
   rawResponse: string;
@@ -7,10 +8,10 @@ interface RawResponseViewerProps {
   onPathClick?: (path: string) => void;
 }
 
-/** Scrollable raw response viewer. JSON gets clickable numbers; HTML is plain text. */
+/** Scrollable raw response viewer. JSON gets clickable leaves; HTML is plain text. */
 export function RawResponseViewer({ rawResponse, format, onPathClick }: RawResponseViewerProps) {
   if (format === "json") {
-    return <JsonPreview rawResponse={rawResponse} onPathClick={onPathClick} />;
+    return <JsonTreeViewer rawResponse={rawResponse} onPathClick={onPathClick} />;
   }
   return (
     <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-[12px] leading-relaxed">
@@ -19,89 +20,266 @@ export function RawResponseViewer({ rawResponse, format, onPathClick }: RawRespo
   );
 }
 
-function JsonPreview({
+// ---------------------------------------------------------------------------
+// JSON tree
+// ---------------------------------------------------------------------------
+
+const INDENT = "  ";
+
+function JsonTreeViewer({
   rawResponse,
   onPathClick,
 }: {
   rawResponse: string;
   onPathClick?: (path: string) => void;
 }) {
-  const { formatted, pathMap } = useMemo(() => {
+  const parsed = useMemo(() => {
     try {
-      const parsed: unknown = JSON.parse(rawResponse);
-      const entries = walkJson(parsed);
-      const map = new Map<string, string>();
-      for (const entry of entries) {
-        const key = String(entry.value);
-        if (!map.has(key)) {
-          map.set(key, entry.path);
-        }
-      }
-      return { formatted: JSON.stringify(parsed, null, 2), pathMap: map };
+      return { ok: true as const, value: JSON.parse(rawResponse) as unknown };
     } catch {
-      return { formatted: rawResponse, pathMap: new Map<string, string>() };
+      return { ok: false as const };
     }
   }, [rawResponse]);
 
-  const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const path = target.dataset?.jsonpath;
-      if (path && onPathClick) {
-        onPathClick(path);
-      }
-    },
-    [onPathClick],
-  );
-
-  const htmlContent = useMemo(() => {
-    // IMPORTANT: escape the entire string first to prevent XSS from malicious
-    // JSON string values (e.g. "<img onerror=...>"), then insert clickable spans.
-    const escaped = escapeHtml(formatted);
-
-    if (pathMap.size === 0) return escaped;
-
-    const usedPaths = new Map<string, number>();
-
-    return escaped.replace(
-      /: (-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
-      (match: string, numStr: string) => {
-        const key = numStr;
-        const count = usedPaths.get(key) ?? 0;
-        usedPaths.set(key, count + 1);
-
-        const entries = Array.from(pathMap.entries()).filter(([k]) => k === key);
-        const entry = entries[0];
-        if (!entry) return match; // already escaped
-
-        const path = entry[1];
-        // numStr is only digits/dots/e — no HTML-special chars — safe to inject as-is
-        return `: <span class="json-number" data-jsonpath="${escapeAttr(path)}">${numStr}</span>`;
-      },
+  if (!parsed.ok) {
+    return (
+      <pre className="text-muted-foreground whitespace-pre-wrap break-all p-3 text-[12px] leading-relaxed">
+        {rawResponse}
+      </pre>
     );
-  }, [formatted, pathMap]);
+  }
 
   return (
-    <pre
-      className="json-preview p-3 text-[12px] leading-relaxed"
-      onClick={handleClick}
-      dangerouslySetInnerHTML={{ __html: htmlContent }}
-    />
+    <pre className="p-3 font-mono text-[12px] leading-relaxed">
+      <JsonValue value={parsed.value} path="$" depth={0} onSelect={onPathClick} />
+    </pre>
   );
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function JsonValue({
+  value,
+  path,
+  depth,
+  onSelect,
+}: {
+  value: unknown;
+  path: string;
+  depth: number;
+  onSelect?: (path: string) => void;
+}): React.ReactElement {
+  if (value === null || value === undefined)
+    return <PrimitiveSpan kind="null" display="null" path={path} onSelect={onSelect} />;
+  if (typeof value === "boolean")
+    return <PrimitiveSpan kind="bool" display={String(value)} path={path} onSelect={onSelect} />;
+  if (typeof value === "number")
+    return <PrimitiveSpan kind="number" display={String(value)} path={path} onSelect={onSelect} />;
+  if (typeof value === "string")
+    return (
+      <PrimitiveSpan
+        kind="string"
+        display={JSON.stringify(value)}
+        path={path}
+        onSelect={onSelect}
+      />
+    );
+
+  if (Array.isArray(value))
+    return <ArrayBlock items={value} path={path} depth={depth} onSelect={onSelect} />;
+
+  if (typeof value === "object") {
+    return (
+      <ObjectBlock
+        entries={Object.entries(value as Record<string, unknown>)}
+        path={path}
+        depth={depth}
+        onSelect={onSelect}
+      />
+    );
+  }
+
+  // Unreachable under typed JSON input; fallback for exhaustive safety.
+  return <span className="text-muted-foreground">…</span>;
 }
 
-function escapeAttr(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function ArrayBlock({
+  items,
+  path,
+  depth,
+  onSelect,
+}: {
+  items: unknown[];
+  path: string;
+  depth: number;
+  onSelect?: (path: string) => void;
+}) {
+  if (items.length === 0) return <span>[]</span>;
+  const pad = INDENT.repeat(depth + 1);
+  const padClose = INDENT.repeat(depth);
+  return (
+    <>
+      {"["}
+      {"\n"}
+      {items.map((item, i) => {
+        // Path: use `[*]` for the first element (acts as the "all items" hint),
+        // `[i]` for the rest. Users wanting a specific index can edit manually.
+        const childPath = `${path}[${i === 0 ? "*" : i}]`;
+        const last = i === items.length - 1;
+        return (
+          <Fragment key={i}>
+            {pad}
+            <JsonValue value={item} path={childPath} depth={depth + 1} onSelect={onSelect} />
+            {!last && ","}
+            {"\n"}
+          </Fragment>
+        );
+      })}
+      {padClose}
+      {"]"}
+    </>
+  );
+}
+
+function ObjectBlock({
+  entries,
+  path,
+  depth,
+  onSelect,
+}: {
+  entries: [string, unknown][];
+  path: string;
+  depth: number;
+  onSelect?: (path: string) => void;
+}) {
+  if (entries.length === 0) return <span>{"{}"}</span>;
+  const pad = INDENT.repeat(depth + 1);
+  const padClose = INDENT.repeat(depth);
+  return (
+    <>
+      {"{"}
+      {"\n"}
+      {entries.map(([key, val], i) => {
+        const childPath = `${path}.${key}`;
+        const last = i === entries.length - 1;
+        return (
+          <Fragment key={key}>
+            {pad}
+            <Entry
+              keyName={key}
+              value={val}
+              path={childPath}
+              depth={depth + 1}
+              onSelect={onSelect}
+            />
+            {!last && ","}
+            {"\n"}
+          </Fragment>
+        );
+      })}
+      {padClose}
+      {"}"}
+    </>
+  );
+}
+
+/** One `"key": value` line. Primitive values make the whole line clickable. */
+function Entry({
+  keyName,
+  value,
+  path,
+  depth,
+  onSelect,
+}: {
+  keyName: string;
+  value: unknown;
+  path: string;
+  depth: number;
+  onSelect?: (path: string) => void;
+}) {
+  const isPrimitive =
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean";
+
+  if (isPrimitive && onSelect) {
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect(path)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect(path);
+          }
+        }}
+        title={path}
+        className="hover:bg-primary/10 focus:bg-primary/10 -mx-1 cursor-pointer rounded px-1 outline-none focus:outline-none"
+      >
+        <KeyLabel keyName={keyName} />
+        {": "}
+        <JsonValue value={value} path={path} depth={depth} onSelect={undefined} />
+      </span>
+    );
+  }
+
+  // Non-primitive (object/array) — key label is inert; nested content renders its own clickable leaves
+  return (
+    <>
+      <KeyLabel keyName={keyName} />
+      {": "}
+      <JsonValue value={value} path={path} depth={depth} onSelect={onSelect} />
+    </>
+  );
+}
+
+function KeyLabel({ keyName }: { keyName: string }) {
+  return <span className="text-slate-500 dark:text-slate-400">{JSON.stringify(keyName)}</span>;
+}
+
+/** Primitive leaf. When `onSelect` is provided (standalone value, not inside an
+ *  Entry line), the span is itself clickable. When `onSelect` is undefined the
+ *  wrapping Entry handles the click, so this renders as plain text. */
+function PrimitiveSpan({
+  kind,
+  display,
+  path,
+  onSelect,
+}: {
+  kind: "string" | "number" | "bool" | "null";
+  display: string;
+  path: string;
+  onSelect?: (path: string) => void;
+}) {
+  const colorClass = cn(
+    kind === "number" && "text-sky-600 dark:text-sky-400",
+    kind === "string" && "text-emerald-700 dark:text-emerald-400",
+    kind === "bool" && "text-violet-600 dark:text-violet-400",
+    kind === "null" && "text-muted-foreground",
+  );
+
+  if (!onSelect) {
+    return <span className={colorClass}>{display}</span>;
+  }
+
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(path)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(path);
+        }
+      }}
+      title={path}
+      className={cn(
+        colorClass,
+        "hover:bg-primary/10 focus:bg-primary/10 -mx-0.5 cursor-pointer rounded px-0.5 outline-none focus:outline-none",
+      )}
+    >
+      {display}
+    </span>
+  );
 }

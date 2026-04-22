@@ -9,7 +9,8 @@ use log::debug;
 use rust_decimal::Decimal;
 
 use crate::custom_provider::model::{
-    expand_template, extract_html_value, validate_url, TemplateContext, MAX_RESPONSE_BYTES,
+    build_browser_like_headers, expand_template, extract_html_value, validate_url, TemplateContext,
+    CUSTOM_PROVIDER_USER_AGENT, MAX_RESPONSE_BYTES,
 };
 use crate::custom_provider::service::{
     detect_html_locale, parse_csv_records, parse_number_string, resolve_csv_column,
@@ -39,10 +40,8 @@ impl CustomScraperProvider {
     ) -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
-            .redirect(reqwest::redirect::Policy::none())
-            .user_agent(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
-            )
+            .redirect(reqwest::redirect::Policy::limited(5))
+            .user_agent(CUSTOM_PROVIDER_USER_AGENT)
             .build()
             .expect("failed to build reqwest HTTP client");
         Self {
@@ -93,8 +92,9 @@ impl CustomScraperProvider {
     fn build_headers(
         &self,
         source: &CustomProviderSource,
+        url: &str,
     ) -> Result<reqwest::header::HeaderMap, MarketDataError> {
-        let mut headers = reqwest::header::HeaderMap::new();
+        let mut headers = build_browser_like_headers(&source.format, url);
         if let Some(headers_json) = &source.headers {
             if let Ok(map) =
                 serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(headers_json)
@@ -192,6 +192,71 @@ impl CustomScraperProvider {
             })
     }
 
+    async fn fetch_latest_from_historical_sources(
+        &self,
+        context: &QuoteContext,
+        symbol: &str,
+        currency_hint: Option<&str>,
+    ) -> Result<MarketQuote, MarketDataError> {
+        let sources = self.find_sources(context, "historical")?;
+        let to = Utc::now();
+        let from = to - chrono::Duration::days(90);
+        let from_str = from.format("%Y-%m-%d").to_string();
+        let to_str = to.format("%Y-%m-%d").to_string();
+
+        let mut last_err = None;
+        for source in &sources {
+            let sym = Self::resolve_symbol(context, source, symbol);
+            match self
+                .fetch_from_source_with_dates(
+                    source,
+                    &sym,
+                    currency_hint,
+                    Some(context),
+                    Some(&from_str),
+                    Some(&to_str),
+                )
+                .await
+            {
+                Ok(quotes) => {
+                    if let Some(quote) = quotes.into_iter().max_by_key(|q| q.timestamp) {
+                        return Ok(quote);
+                    }
+                    last_err = Some((
+                        source.provider_id.clone(),
+                        MarketDataError::ProviderError {
+                            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                            message: format!("No historical quotes extracted for symbol '{}'", sym),
+                        },
+                    ));
+                }
+                Err(e) => {
+                    log::debug!(
+                        "CustomScraper [{}]: historical latest fallback failed for '{}': {}",
+                        source.provider_id,
+                        sym,
+                        e
+                    );
+                    last_err = Some((source.provider_id.clone(), e));
+                }
+            }
+        }
+
+        let (pid, e) = last_err.unwrap_or_else(|| {
+            (
+                "unknown".to_string(),
+                MarketDataError::ProviderError {
+                    provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                    message: "No historical providers found".to_string(),
+                },
+            )
+        });
+        Err(MarketDataError::ProviderError {
+            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+            message: format!("[{}] {}", pid, extract_inner_message(&e)),
+        })
+    }
+
     /// Load and execute a source config, returning one or more quotes.
     async fn fetch_from_source_with_dates(
         &self,
@@ -223,7 +288,7 @@ impl CustomScraperProvider {
             message: e.to_string(),
         })?;
 
-        let headers = self.build_headers(source)?;
+        let headers = self.build_headers(source, &url)?;
 
         debug!("CustomScraper: fetching {} for symbol '{}'", url, symbol);
 
@@ -241,7 +306,7 @@ impl CustomScraperProvider {
             }
         };
 
-        let currency = resolve_currency(source, symbol, currency_hint, &body);
+        let currency = resolve_currency(source, symbol, currency_hint, &body, from, to);
 
         // Auto-detect locale from HTML lang if not explicitly set
         let locale = source.locale.as_deref().map(|s| s.to_string()).or_else(|| {
@@ -278,7 +343,8 @@ impl CustomScraperProvider {
                 Ok(rows_to_quotes(rows, source, &currency))
             }
             "json" => {
-                let rows = extract_json_rows(&body, source, symbol, currency_hint, locale_ref);
+                let rows =
+                    extract_json_rows(&body, source, symbol, currency_hint, locale_ref, from, to);
                 if rows.is_empty() {
                     return Err(MarketDataError::ProviderError {
                         provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
@@ -399,42 +465,50 @@ impl MarketDataProvider for CustomScraperProvider {
             }
         };
 
-        let sources = self.find_sources(context, "latest")?;
         let currency_hint = context.currency_hint.as_deref();
 
+        let sources = self.find_sources(context, "latest").ok();
         let mut last_err = None;
-        for source in &sources {
-            let sym = Self::resolve_symbol(context, source, &symbol);
-            match self
-                .fetch_from_source(source, &sym, currency_hint, Some(context))
-                .await
-            {
-                Ok(quote) => return Ok(quote),
-                Err(e) => {
-                    log::debug!(
-                        "CustomScraper [{}]: failed for symbol '{}': {}",
-                        source.provider_id,
-                        sym,
-                        e
-                    );
-                    last_err = Some((source.provider_id.clone(), e));
+        if let Some(sources) = sources {
+            for source in &sources {
+                let sym = Self::resolve_symbol(context, source, &symbol);
+                match self
+                    .fetch_from_source(source, &sym, currency_hint, Some(context))
+                    .await
+                {
+                    Ok(quote) => return Ok(quote),
+                    Err(e) => {
+                        log::debug!(
+                            "CustomScraper [{}]: failed for symbol '{}': {}",
+                            source.provider_id,
+                            sym,
+                            e
+                        );
+                        last_err = Some((source.provider_id.clone(), e));
+                    }
                 }
             }
         }
 
-        let (pid, e) = last_err.unwrap_or_else(|| {
-            (
-                "unknown".to_string(),
-                MarketDataError::ProviderError {
+        match self
+            .fetch_latest_from_historical_sources(context, &symbol, currency_hint)
+            .await
+        {
+            Ok(quote) => Ok(quote),
+            Err(historical_err) => {
+                let Some((pid, e)) = last_err else {
+                    return Err(historical_err);
+                };
+                log::debug!(
+                    "CustomScraper: latest source failed and historical fallback also failed: {}",
+                    historical_err
+                );
+                Err(MarketDataError::ProviderError {
                     provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
-                    message: "No providers found".to_string(),
-                },
-            )
-        });
-        Err(MarketDataError::ProviderError {
-            provider: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
-            message: format!("[{}] {}", pid, extract_inner_message(&e)),
-        })
+                    message: format!("[{}] {}", pid, extract_inner_message(&e)),
+                })
+            }
+        }
     }
 
     async fn get_historical_quotes(
@@ -608,6 +682,7 @@ impl CustomScraperProvider {
 struct ExtractedRow {
     date: Option<NaiveDate>,
     close: f64,
+    open: Option<f64>,
     high: Option<f64>,
     low: Option<f64>,
     volume: Option<f64>,
@@ -644,6 +719,8 @@ fn resolve_currency(
     symbol: &str,
     currency_hint: Option<&str>,
     body: &str,
+    from: Option<&str>,
+    to: Option<&str>,
 ) -> String {
     if source.format == "json" {
         let currency = currency_hint.unwrap_or("USD");
@@ -652,8 +729,8 @@ fn resolve_currency(
             currency,
             isin: None,
             mic: None,
-            from: None,
-            to: None,
+            from,
+            to,
         };
         source
             .currency_path
@@ -692,6 +769,7 @@ fn rows_to_quotes(
 
             let src = format!("{}:{}", DATA_SOURCE_CUSTOM_SCRAPER, source.provider_id);
             let mut quote = MarketQuote::new(ts, to_decimal(close), currency.to_string(), src);
+            quote.open = row.open.map(|v| to_decimal(apply_factor_invert(v, source)));
             quote.high = row.high.map(|v| to_decimal(apply_factor_invert(v, source)));
             quote.low = row.low.map(|v| to_decimal(apply_factor_invert(v, source)));
             quote.volume = row.volume.map(to_decimal);
@@ -820,6 +898,11 @@ fn extract_table_rows(
         .as_ref()
         .and_then(|p| parse_table_col_path(p))
         .map(|(_, c)| c);
+    let open_col = source
+        .open_path
+        .as_ref()
+        .and_then(|p| parse_table_col_path(p))
+        .map(|(_, c)| c);
     let high_col = source
         .high_path
         .as_ref()
@@ -861,6 +944,9 @@ fn extract_table_rows(
         let date = date_col
             .and_then(|c| cells.get(c))
             .and_then(|s| parse_date(s, date_fmt));
+        let open = open_col
+            .and_then(|c| cells.get(c))
+            .and_then(|s| parse_number_string(s, locale));
         let high = high_col
             .and_then(|c| cells.get(c))
             .and_then(|s| parse_number_string(s, locale));
@@ -874,6 +960,7 @@ fn extract_table_rows(
         rows.push(ExtractedRow {
             date,
             close,
+            open,
             high,
             low,
             volume,
@@ -916,6 +1003,10 @@ fn extract_csv_rows(
         .date_path
         .as_ref()
         .and_then(|p| resolve_csv_column(headers, p));
+    let open_col = source
+        .open_path
+        .as_ref()
+        .and_then(|p| resolve_csv_column(headers, p));
     let high_col = source
         .high_path
         .as_ref()
@@ -940,6 +1031,9 @@ fn extract_csv_rows(
             let date = date_col
                 .and_then(|c| row.get(c))
                 .and_then(|s| parse_date(s, date_fmt));
+            let open = open_col
+                .and_then(|c| row.get(c))
+                .and_then(|s| parse_number_string(s, locale));
             let high = high_col
                 .and_then(|c| row.get(c))
                 .and_then(|s| parse_number_string(s, locale));
@@ -953,6 +1047,7 @@ fn extract_csv_rows(
             Some(ExtractedRow {
                 date,
                 close,
+                open,
                 high,
                 low,
                 volume,
@@ -969,6 +1064,8 @@ fn extract_json_rows(
     symbol: &str,
     currency_hint: Option<&str>,
     locale: Option<&str>,
+    from: Option<&str>,
+    to: Option<&str>,
 ) -> Vec<ExtractedRow> {
     use jsonpath_rust::JsonPathQuery;
 
@@ -983,8 +1080,8 @@ fn extract_json_rows(
         currency,
         isin: None,
         mic: None,
-        from: None,
-        to: None,
+        from,
+        to,
     };
     let expand_path = |p: &str| -> String { expand_template(p, &tctx) };
 
@@ -1011,9 +1108,11 @@ fn extract_json_rows(
         })
         .unwrap_or_default();
 
+    let open_path = source.open_path.as_deref().map(expand_path);
     let high_path = source.high_path.as_deref().map(expand_path);
     let low_path = source.low_path.as_deref().map(expand_path);
     let volume_path = source.volume_path.as_deref().map(expand_path);
+    let opens = extract_json_f64_array(&json, open_path.as_deref(), locale);
     let highs = extract_json_f64_array(&json, high_path.as_deref(), locale);
     let lows = extract_json_f64_array(&json, low_path.as_deref(), locale);
     let volumes = extract_json_f64_array(&json, volume_path.as_deref(), locale);
@@ -1041,6 +1140,7 @@ fn extract_json_rows(
             Some(ExtractedRow {
                 date,
                 close,
+                open: opens.get(i).copied().flatten(),
                 high: highs.get(i).copied().flatten(),
                 low: lows.get(i).copied().flatten(),
                 volume: volumes.get(i).copied().flatten(),
@@ -1109,6 +1209,71 @@ mod tests {
 
     fn ymd(y: i32, m: u32, d: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    fn json_source(price_path: &str) -> CustomProviderSource {
+        CustomProviderSource {
+            id: "test:historical".to_string(),
+            provider_id: "test".to_string(),
+            kind: "historical".to_string(),
+            format: "json".to_string(),
+            url: "https://example.test/prices".to_string(),
+            price_path: price_path.to_string(),
+            date_path: None,
+            date_format: None,
+            currency_path: None,
+            factor: None,
+            invert: None,
+            locale: None,
+            headers: None,
+            open_path: None,
+            high_path: None,
+            low_path: None,
+            volume_path: None,
+            default_price: None,
+            date_timezone: None,
+        }
+    }
+
+    #[test]
+    fn extract_json_rows_expands_historical_date_placeholders() {
+        let body = r#"{
+            "series": {
+                "2026-01-01": [{ "date": "2026-01-01", "close": "10.50", "open": "10.00" }],
+                "2026-02-01": [{ "date": "2026-02-01", "close": "12.50", "open": "12.00" }]
+            },
+            "meta": {
+                "currencyByTo": { "2026-02-01": "CAD" }
+            }
+        }"#;
+        let mut source = json_source("$.series.{TO}[*].close");
+        source.date_path = Some("$.series.{TO}[*].date".to_string());
+        source.open_path = Some("$.series.{TO}[*].open".to_string());
+        source.currency_path = Some("$.meta.currencyByTo.{TO}".to_string());
+
+        let rows = extract_json_rows(
+            body,
+            &source,
+            "ABC",
+            Some("USD"),
+            None,
+            Some("2026-01-01"),
+            Some("2026-02-01"),
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].date, Some(ymd(2026, 2, 1)));
+        assert_eq!(rows[0].close, 12.5);
+        assert_eq!(rows[0].open, Some(12.0));
+
+        let currency = resolve_currency(
+            &source,
+            "ABC",
+            Some("USD"),
+            body,
+            Some("2026-01-01"),
+            Some("2026-02-01"),
+        );
+        assert_eq!(currency, "CAD");
     }
 
     #[test]

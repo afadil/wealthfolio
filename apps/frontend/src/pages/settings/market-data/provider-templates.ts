@@ -7,6 +7,9 @@ export interface ProviderTemplate {
   url: string;
   pricePath: string;
   datePath?: string;
+  dateFormat?: string;
+  currencyPath?: string;
+  openPath?: string;
   highPath?: string;
   lowPath?: string;
   volumePath?: string;
@@ -15,6 +18,17 @@ export interface ProviderTemplate {
 }
 
 export const LATEST_TEMPLATES: ProviderTemplate[] = [
+  {
+    name: "Vanguard",
+    description: "Workplace fund prices (fund code)",
+    format: "json",
+    url: "https://workplace.vanguard.com/investments/product-details/fund/api/price-distribution/fundPrice/{SYMBOL}?startDate={DATE:%Y-01-01}&endDate={TODAY}",
+    pricePath: "$.body.fundPrice.content[-1:].price",
+    datePath: "$.body.fundPrice.content[-1:].effectiveDate",
+    dateFormat: "%Y-%m-%d",
+    currencyPath: "$.body.fundPrice.content[-1:].currencyCode",
+    testSymbol: "M219",
+  },
   {
     name: "CoinGecko",
     description: "Free crypto (use coin ID: bitcoin, ethereum...)",
@@ -68,12 +82,24 @@ export const LATEST_TEMPLATES: ProviderTemplate[] = [
 
 export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
   {
+    name: "Vanguard",
+    description: "Workplace fund price history (fund code)",
+    format: "json",
+    url: "https://workplace.vanguard.com/investments/product-details/fund/api/price-distribution/fundPrice/{SYMBOL}?startDate={FROM}&endDate={TO}",
+    pricePath: "$.body.fundPrice.content[*].price",
+    datePath: "$.body.fundPrice.content[*].effectiveDate",
+    dateFormat: "%Y-%m-%d",
+    currencyPath: "$.body.fundPrice.content[*].currencyCode",
+    testSymbol: "M219",
+  },
+  {
     name: "Twelve Data (JSON)",
     description: "Stocks, crypto, FX (set API key in headers)",
     format: "json",
     url: "https://api.twelvedata.com/time_series?symbol={SYMBOL}&interval=1day&start_date={FROM}&end_date={TO}&format=JSON",
     pricePath: "$.values[*].close",
     datePath: "$.values[*].datetime",
+    openPath: "$.values[*].open",
     highPath: "$.values[*].high",
     lowPath: "$.values[*].low",
     volumePath: "$.values[*].volume",
@@ -87,6 +113,7 @@ export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
     url: "https://api.twelvedata.com/time_series?symbol={SYMBOL}&interval=1day&start_date={FROM}&end_date={TO}&format=CSV",
     pricePath: "close",
     datePath: "datetime",
+    openPath: "open",
     highPath: "high",
     lowPath: "low",
     volumePath: "volume",
@@ -100,6 +127,7 @@ export const HISTORICAL_TEMPLATES: ProviderTemplate[] = [
     url: "https://markets.ft.com/data/etfs/tearsheet/historical?s={SYMBOL}:LSE:GBX",
     pricePath: "0:4",
     datePath: "0:0",
+    openPath: "0:1",
     highPath: "0:2",
     lowPath: "0:3",
     volumePath: "0:5",
