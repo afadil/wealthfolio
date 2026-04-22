@@ -14,7 +14,7 @@ export function useGoals() {
     queryFn: getGoals,
   });
 
-  // Refresh summaries once on first load to ensure cached fields are current.
+  // Refresh summaries once on first load to ensure persisted summary fields are current.
   // After this, the domain event pipeline keeps them up to date.
   useEffect(() => {
     if (query.data && query.data.length > 0 && !hasRefreshed.current) {

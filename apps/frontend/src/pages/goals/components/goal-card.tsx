@@ -1,4 +1,5 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
 import type { Goal } from "@/lib/types";
 import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -41,15 +42,17 @@ const HEALTH_CONFIG: Record<
 
 export function GoalCard({ goal }: { goal: Goal }) {
   const { isBalanceHidden } = useBalancePrivacy();
-  const progress = goal.progressCached ?? 0;
+  const { settings } = useSettingsContext();
+  const progress = goal.summaryProgress ?? 0;
   const health = HEALTH_CONFIG[goal.statusHealth] ?? HEALTH_CONFIG.not_applicable;
   const typeLabel = GOAL_TYPE_LABELS[goal.goalType] ?? "Goal";
   const coverImage = coverImageSrc(goal.coverImageKey ?? goal.goalType);
   const icon = GOAL_TYPE_ICONS[goal.goalType] ?? GOAL_TYPE_ICONS.custom_save_up;
-  const target = goal.targetAmountCached ?? goal.targetAmount ?? 0;
-  const current = goal.currentValueCached ?? 0;
-  const currency = goal.currency ?? "USD";
+  const target = goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
+  const current = goal.summaryCurrentValue ?? 0;
+  const currency = settings?.baseCurrency ?? goal.currency ?? "USD";
   const isAchieved = goal.statusLifecycle === "achieved";
+  const displayDate = goal.targetDate ?? goal.projectedCompletionDate;
 
   return (
     <Link to={`/goals/${goal.id}`} className="group block">
@@ -81,12 +84,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
             </h3>
             <p className="flex items-center gap-1.5 text-[11px] text-white/80 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">
               {typeLabel}
-              {goal.goalType === "retirement" && (
-                <span className="rounded bg-white/20 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
-                  FIRE
-                </span>
-              )}
-              {goal.targetDate && <> &middot; {new Date(goal.targetDate).toLocaleDateString()}</>}
+              {displayDate && <> &middot; {new Date(displayDate).toLocaleDateString()}</>}
             </p>
           </div>
 
