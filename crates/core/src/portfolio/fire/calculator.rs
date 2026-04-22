@@ -5,5 +5,5 @@ pub use crate::planning::retirement::dto::{
 };
 pub use crate::planning::retirement::engine::{
     compute_required_capital, plan_net_fire_target, project_retirement,
-    project_retirement_with_mode,
+    project_retirement_with_mode, try_compute_required_capital,
 };

@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::engine::{
-    annual_expenses_at_year, compute_required_capital, plan_accumulation_return,
-    plan_income_at_age, plan_retirement_return, project_retirement, project_retirement_with_mode,
-    resolve_plan_dc_payouts,
+    annual_expenses_at_year, end_of_year_value_of_monthly_contributions, plan_accumulation_return,
+    plan_income_at_age, plan_retirement_return, project_retirement,
+    project_retirement_with_mode_cached, required_capital_for, resolve_plan_dc_payouts,
+    RequiredCapitalCache,
 };
 use super::model::{
     RetirementPlan, RetirementStartReason, RetirementTimingMode, TaxBucketBalances,
@@ -19,6 +20,7 @@ pub struct YearlySnapshot {
     pub year: u32,
     pub phase: String,
     pub portfolio_value: f64,
+    pub portfolio_end_value: f64,
     pub annual_contribution: f64,
     pub annual_withdrawal: f64,
     pub annual_income: f64,
@@ -101,6 +103,8 @@ pub struct ScenarioResult {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_age: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spending_shortfall_age: Option<u32>,
     pub year_by_year: Vec<YearlySnapshot>,
 }
 
@@ -114,6 +118,8 @@ pub struct SorrScenario {
     pub survived: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_age: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spending_shortfall_age: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,7 +179,7 @@ pub enum DecisionSensitivityMap {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StrategyComparisonResult {
-    pub constant_dollar: MonteCarloResult,
+    pub planned_spending: MonteCarloResult,
     pub constant_percentage: MonteCarloResult,
     pub guardrails: MonteCarloResult,
 }
@@ -217,6 +223,8 @@ pub struct StressOutcome {
     pub portfolio_at_horizon: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_age: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spending_shortfall_age: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -258,8 +266,7 @@ pub struct StressTestResult {
 ///   earlier.
 ///
 /// - Success (Monte Carlo): Essential spending is funded every year AND portfolio
-///   stays above zero at horizon. For `ConstantPercentage` (exploratory): portfolio
-///   stays above 5% of retirement-start value.
+///   stays above zero at horizon.
 ///
 /// - Failure: Any year where essential spending cannot be fully funded, or portfolio
 ///   hits zero before the horizon.
@@ -287,11 +294,13 @@ pub struct RetirementOverview {
     pub net_fire_target: f64,
     pub gross_fire_target: f64,
     pub portfolio_at_goal_age: f64,
+    pub required_capital_reachable: bool,
     pub required_capital_at_goal_age: f64,
     pub shortfall_at_goal_age: f64,
     pub surplus_at_goal_age: f64,
     pub funded_through_age: Option<u32>,
     pub failure_age: Option<u32>,
+    pub spending_shortfall_age: Option<u32>,
     pub required_additional_monthly_contribution: f64,
     pub suggested_goal_age_if_unchanged: Option<u32>,
     pub coast_amount_today: f64,
@@ -317,7 +326,7 @@ pub struct RetirementTrajectoryPoint {
     pub annual_expenses: f64,
     pub net_withdrawal_from_portfolio: f64,
     pub portfolio_end: f64,
-    pub required_capital: f64,
+    pub required_capital: Option<f64>,
     pub pension_assets: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annual_taxes: Option<f64>,
@@ -353,6 +362,7 @@ pub struct BudgetStreamItem {
 #[serde(rename_all = "camelCase")]
 pub struct TargetReconciliation {
     pub target_age: u32,
+    pub required_capital_reachable: bool,
     pub inflation_factor_to_target: f64,
     pub planned_annual_expenses_today_value: f64,
     pub planned_annual_expenses_nominal: f64,
@@ -377,43 +387,53 @@ pub struct TargetReconciliation {
 
 // ─── Overview builders ──────────────────────────────────────────────────────
 
-/// Plan-aware budget breakdown at the given retirement age.
-/// Filters expense buckets by age bounds so only active buckets contribute.
+fn bounded_inflation_factor(rate: f64, years: u32) -> f64 {
+    (1.0_f64 + rate).powi(years as i32).clamp(0.01, f64::MAX)
+}
+
+/// Plan-aware nominal monthly budget breakdown at the given retirement age.
 fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> BudgetBreakdown {
-    // Helper: is a bucket active at the given age?
-    let active = |b: &super::model::ExpenseBucket| -> bool {
-        b.start_age.map_or(true, |s| s <= retirement_age)
-            && b.end_age.map_or(true, |e| e > retirement_age)
-    };
-
-    let active_buckets: Vec<_> = plan
-        .expenses
-        .all_buckets()
-        .into_iter()
-        .filter(|(bucket, _)| active(bucket))
-        .collect();
-
-    let total_monthly_budget = active_buckets
-        .iter()
-        .map(|(bucket, _)| bucket.monthly_amount)
-        .sum::<f64>();
+    let years_from_now = (retirement_age as i32 - plan.personal.current_age as i32).max(0) as u32;
+    let (annual_budget, _) = annual_expenses_at_year(
+        &plan.expenses,
+        retirement_age,
+        years_from_now,
+        plan.investment.inflation_rate,
+    );
+    let total_monthly_budget = annual_budget / 12.0;
 
     let resolved = resolve_plan_dc_payouts(
         &plan.income_streams,
         plan.personal.current_age,
         retirement_age,
         plan.withdrawal.safe_withdrawal_rate,
+        plan_accumulation_return(plan),
     );
 
     let mut income_streams = Vec::new();
-    let mut total_income_monthly = 0.0_f64;
+    let total_income_monthly = plan_income_at_age(
+        &plan.income_streams,
+        &resolved,
+        retirement_age,
+        years_from_now,
+        plan.investment.inflation_rate,
+    ) / 12.0;
     for s in &plan.income_streams {
         if s.start_age <= retirement_age {
-            let monthly = resolved
+            let base_monthly = resolved
                 .get(&s.id)
                 .copied()
                 .unwrap_or(s.monthly_amount.unwrap_or(0.0));
-            total_income_monthly += monthly;
+            let annual = if let Some(r) = s.annual_growth_rate {
+                base_monthly * 12.0 * (1.0 + r).powi(years_from_now as i32)
+            } else if s.adjust_for_inflation {
+                base_monthly
+                    * 12.0
+                    * (1.0 + plan.investment.inflation_rate).powi(years_from_now as i32)
+            } else {
+                base_monthly * 12.0
+            };
+            let monthly = annual / 12.0;
             income_streams.push(BudgetStreamItem {
                 label: s.label.clone(),
                 monthly_amount: monthly,
@@ -450,13 +470,12 @@ fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> Budge
 fn compute_target_reconciliation(
     plan: &RetirementPlan,
     retirement_age: u32,
-    required_capital: f64,
+    required_capital: Option<f64>,
     portfolio_at_target: f64,
 ) -> TargetReconciliation {
     let years_to_target = (retirement_age as i32 - plan.personal.current_age as i32).max(0) as u32;
-    let inflation_factor = (1.0_f64 + plan.investment.inflation_rate)
-        .max(0.01)
-        .powi(years_to_target as i32);
+    let inflation_factor =
+        bounded_inflation_factor(plan.investment.inflation_rate, years_to_target);
     let today_value = |value: f64| value / inflation_factor;
 
     let (planned_expenses_nominal, _) = annual_expenses_at_year(
@@ -470,6 +489,7 @@ fn compute_target_reconciliation(
         plan.personal.current_age,
         retirement_age,
         plan.withdrawal.safe_withdrawal_rate,
+        plan_accumulation_return(plan),
     );
     let annual_income_nominal = plan_income_at_age(
         &plan.income_streams,
@@ -481,10 +501,14 @@ fn compute_target_reconciliation(
     let net_gap_nominal = (planned_expenses_nominal - annual_income_nominal).max(0.0);
     let (gross_withdrawal_nominal, taxes_nominal) =
         compute_gross_withdrawal(net_gap_nominal, &plan.tax, retirement_age);
-    let shortfall_nominal = (required_capital - portfolio_at_target).max(0.0);
+    let required_capital_nominal = required_capital.unwrap_or(0.0);
+    let shortfall_nominal = required_capital
+        .map(|target| (target - portfolio_at_target).max(0.0))
+        .unwrap_or(0.0);
 
     TargetReconciliation {
         target_age: retirement_age,
+        required_capital_reachable: required_capital.is_some(),
         inflation_factor_to_target: inflation_factor,
         planned_annual_expenses_today_value: today_value(planned_expenses_nominal),
         planned_annual_expenses_nominal: planned_expenses_nominal,
@@ -496,8 +520,8 @@ fn compute_target_reconciliation(
         gross_annual_portfolio_withdrawal_nominal: gross_withdrawal_nominal,
         estimated_annual_taxes_today_value: today_value(taxes_nominal),
         estimated_annual_taxes_nominal: taxes_nominal,
-        required_capital_today_value: today_value(required_capital),
-        required_capital_nominal: required_capital,
+        required_capital_today_value: today_value(required_capital_nominal),
+        required_capital_nominal,
         portfolio_at_target_today_value: today_value(portfolio_at_target),
         portfolio_at_target_nominal: portfolio_at_target,
         shortfall_today_value: today_value(shortfall_nominal),
@@ -527,12 +551,15 @@ fn required_balance_after_remaining_contributions(
     let goal_offset = (goal_age as i32 - plan.personal.current_age as i32).max(0) as u32;
 
     // Match the projection engine timing: each accumulation year grows the
-    // start-of-age portfolio first, then adds that year's contribution.
+    // start-of-age portfolio first, then adds the end-of-year value of monthly deposits.
     let mut required_next = target_at_goal.max(0.0);
     for offset in (first_offset..goal_offset).rev() {
-        let annual_contribution = plan.investment.monthly_contribution
-            * 12.0
+        let monthly_contribution = plan.investment.monthly_contribution
             * (1.0_f64 + contribution_growth).powi(offset as i32);
+        let annual_contribution = end_of_year_value_of_monthly_contributions(
+            monthly_contribution,
+            plan_accumulation_return(plan),
+        );
         required_next = ((required_next - annual_contribution).max(0.0)) / growth_factor;
     }
 
@@ -543,28 +570,26 @@ fn required_balance_after_remaining_contributions(
 fn build_trajectory(
     year_by_year: &[YearlySnapshot],
     plan: &RetirementPlan,
-    _net_target: f64,
+    _net_target: Option<f64>,
+    required_capital_cache: &mut RequiredCapitalCache,
 ) -> Vec<RetirementTrajectoryPoint> {
     let goal_age = plan.personal.target_retirement_age;
     // Target at goal age: schedule-based capital needed when retirement starts.
-    let target_at_goal = compute_required_capital(plan, goal_age);
+    let target_at_goal = required_capital_for(plan, goal_age, required_capital_cache);
 
     // Pre-retirement: minimum start-of-age balance needed to still hit the goal,
     // after crediting remaining planned contributions.
     // Post-retirement: declining required capital (fewer years left to fund), reaching 0 at horizon.
-    let required_capitals: Vec<f64> = year_by_year
+    let required_capitals: Vec<Option<f64>> = year_by_year
         .iter()
         .map(|snap| {
             if snap.age <= goal_age {
-                required_balance_after_remaining_contributions(
-                    plan,
-                    snap.age,
-                    goal_age,
-                    target_at_goal,
-                )
+                target_at_goal.map(|target| {
+                    required_balance_after_remaining_contributions(plan, snap.age, goal_age, target)
+                })
             } else {
                 // Retirement: what you still need at this age to fund remaining years
-                compute_required_capital(plan, snap.age)
+                required_capital_for(plan, snap.age, required_capital_cache)
             }
         })
         .collect();
@@ -572,31 +597,23 @@ fn build_trajectory(
     year_by_year
         .iter()
         .enumerate()
-        .map(|(idx, snap)| {
-            let portfolio_end = if idx + 1 < year_by_year.len() {
-                year_by_year[idx + 1].portfolio_value
-            } else {
-                snap.portfolio_value
-            };
-
-            RetirementTrajectoryPoint {
-                age: snap.age,
-                year: snap.year,
-                phase: snap.phase.clone(),
-                portfolio_start: snap.portfolio_value,
-                annual_contribution: snap.annual_contribution,
-                annual_income: snap.annual_income,
-                annual_expenses: snap.planned_expenses.unwrap_or(snap.annual_withdrawal),
-                net_withdrawal_from_portfolio: snap.net_withdrawal_from_portfolio,
-                portfolio_end,
-                required_capital: required_capitals[idx],
-                pension_assets: snap.pension_assets,
-                annual_taxes: snap.annual_taxes,
-                gross_withdrawal: snap.gross_withdrawal,
-                planned_expenses: snap.planned_expenses,
-                funded_expenses: snap.funded_expenses,
-                annual_shortfall: snap.annual_shortfall,
-            }
+        .map(|(idx, snap)| RetirementTrajectoryPoint {
+            age: snap.age,
+            year: snap.year,
+            phase: snap.phase.clone(),
+            portfolio_start: snap.portfolio_value,
+            annual_contribution: snap.annual_contribution,
+            annual_income: snap.annual_income,
+            annual_expenses: snap.planned_expenses.unwrap_or(snap.annual_withdrawal),
+            net_withdrawal_from_portfolio: snap.net_withdrawal_from_portfolio,
+            portfolio_end: snap.portfolio_end_value,
+            required_capital: required_capitals[idx],
+            pension_assets: snap.pension_assets,
+            annual_taxes: snap.annual_taxes,
+            gross_withdrawal: snap.gross_withdrawal,
+            planned_expenses: snap.planned_expenses,
+            funded_expenses: snap.funded_expenses,
+            annual_shortfall: snap.annual_shortfall,
         })
         .collect()
 }
@@ -608,20 +625,36 @@ fn solve_required_additional_monthly(
     current_portfolio: f64,
     required_capital: f64,
 ) -> f64 {
-    let mut lo = 0.0_f64;
-    let mut hi = required_capital / 12.0;
-    for _ in 0..50 {
-        let mid = (lo + hi) / 2.0;
+    let projected_at_goal = |extra_monthly: f64| {
         let mut adjusted = plan.clone();
-        adjusted.investment.monthly_contribution += mid;
+        adjusted.investment.monthly_contribution += extra_monthly;
         let proj = project_retirement(&adjusted, current_portfolio);
-        let portfolio_at_goal = proj
-            .year_by_year
+        proj.year_by_year
             .iter()
             .find(|s| s.age == plan.personal.target_retirement_age)
             .map(|s| s.portfolio_value)
-            .unwrap_or(0.0);
-        if portfolio_at_goal >= required_capital {
+            .unwrap_or(0.0)
+    };
+
+    let mut lo = 0.0_f64;
+    let mut hi = (required_capital / 12.0).max(1.0);
+    for _ in 0..32 {
+        if projected_at_goal(hi) >= required_capital {
+            break;
+        }
+        if !hi.is_finite() || hi >= f64::MAX / 2.0 {
+            return hi;
+        }
+        hi *= 2.0;
+    }
+
+    if projected_at_goal(hi) < required_capital {
+        return hi;
+    }
+
+    for _ in 0..50 {
+        let mid = (lo + hi) / 2.0;
+        if projected_at_goal(mid) >= required_capital {
             hi = mid;
         } else {
             lo = mid;
@@ -632,7 +665,11 @@ fn solve_required_additional_monthly(
 
 /// Scan accumulation-only (no forced retirement) to find the earliest age at which
 /// FI would be reached if the user delays retirement.
-fn find_fi_age_accumulation_only(plan: &RetirementPlan, current_portfolio: f64) -> Option<u32> {
+fn find_fi_age_accumulation_only(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    required_capital_cache: &mut RequiredCapitalCache,
+) -> Option<u32> {
     let current_age = plan.personal.current_age;
     let horizon = plan.personal.planning_horizon_age;
     let contrib_growth = plan
@@ -644,12 +681,14 @@ fn find_fi_age_accumulation_only(plan: &RetirementPlan, current_portfolio: f64) 
     let mut portfolio = current_portfolio;
     for i in 0..=(horizon as i32 - current_age as i32).max(0) as u32 {
         let age = current_age + i;
-        let required = compute_required_capital(plan, age);
-        if portfolio >= required {
+        let required = required_capital_for(plan, age, required_capital_cache);
+        if required.is_some_and(|target| portfolio >= target) {
             return Some(age);
         }
+        let monthly_contribution =
+            plan.investment.monthly_contribution * (1.0 + contrib_growth).powi(i as i32);
         let annual_contribution =
-            plan.investment.monthly_contribution * 12.0 * (1.0 + contrib_growth).powi(i as i32);
+            end_of_year_value_of_monthly_contributions(monthly_contribution, r);
         portfolio = portfolio * (1.0 + r) + annual_contribution;
     }
     None
@@ -672,6 +711,7 @@ pub fn compute_retirement_overview_with_mode(
     current_portfolio: f64,
     mode: RetirementTimingMode,
 ) -> RetirementOverview {
+    let mut required_capital_cache = RequiredCapitalCache::new();
     let gross_target: f64 = plan
         .expenses
         .all_buckets()
@@ -682,17 +722,31 @@ pub fn compute_retirement_overview_with_mode(
         / plan.withdrawal.safe_withdrawal_rate;
 
     // Schedule-based targets
-    let net_target_today = compute_required_capital(plan, plan.personal.current_age);
-    let required_capital = compute_required_capital(plan, plan.personal.target_retirement_age);
+    let net_target_today =
+        required_capital_for(plan, plan.personal.current_age, &mut required_capital_cache);
+    let required_capital = required_capital_for(
+        plan,
+        plan.personal.target_retirement_age,
+        &mut required_capital_cache,
+    );
+    let net_target_today_value = net_target_today.unwrap_or(0.0);
+    let required_capital_value = required_capital.unwrap_or(0.0);
     let coast = {
         let years = plan.personal.target_retirement_age as i32 - plan.personal.current_age as i32;
         if years <= 0 {
-            required_capital
+            required_capital_value
         } else {
-            required_capital / (1.0_f64 + plan_accumulation_return(plan)).powi(years)
+            required_capital
+                .map(|target| target / (1.0_f64 + plan_accumulation_return(plan)).powi(years))
+                .unwrap_or(0.0)
         }
     };
-    let projection = project_retirement_with_mode(plan, current_portfolio, mode);
+    let projection = project_retirement_with_mode_cached(
+        plan,
+        current_portfolio,
+        mode,
+        &mut required_capital_cache,
+    );
 
     let fi_age = projection.fire_age;
 
@@ -715,23 +769,36 @@ pub fn compute_retirement_overview_with_mode(
         .map(|s| s.portfolio_value)
         .unwrap_or(0.0);
 
-    let funded_at_goal_age = portfolio_at_goal >= required_capital;
-    let shortfall = (required_capital - portfolio_at_goal).max(0.0);
-    let surplus = (portfolio_at_goal - required_capital).max(0.0);
+    let required_capital_reachable = required_capital.is_some();
+    let funded_at_goal_age = required_capital.is_some_and(|target| portfolio_at_goal >= target);
+    let shortfall = required_capital
+        .map(|target| (target - portfolio_at_goal).max(0.0))
+        .unwrap_or(0.0);
+    let surplus = required_capital
+        .map(|target| (portfolio_at_goal - target).max(0.0))
+        .unwrap_or(0.0);
     let failure_age = projection
         .year_by_year
         .iter()
-        .find(|snap| {
-            snap.phase == "fire"
-                && (snap.annual_shortfall.unwrap_or(0.0) > 0.0 || snap.portfolio_value <= 0.0)
-        })
+        .find(|snap| snap.phase == "fire" && snap.portfolio_value <= 0.0)
         .map(|snap| snap.age);
-    let funded_through_age = failure_age
+    let spending_shortfall_age = projection
+        .year_by_year
+        .iter()
+        .find(|snap| snap.phase == "fire" && snap.annual_shortfall.unwrap_or(0.0) > 0.0)
+        .map(|snap| snap.age);
+    let first_unfunded_age = match (failure_age, spending_shortfall_age) {
+        (Some(depletion), Some(shortfall)) => Some(depletion.min(shortfall)),
+        (Some(depletion), None) => Some(depletion),
+        (None, Some(shortfall)) => Some(shortfall),
+        (None, None) => None,
+    };
+    let funded_through_age = first_unfunded_age
         .map(|age| age.saturating_sub(1))
         .or(Some(plan.personal.planning_horizon_age));
 
     let required_additional = if shortfall > 0.0 {
-        solve_required_additional_monthly(plan, current_portfolio, required_capital)
+        solve_required_additional_monthly(plan, current_portfolio, required_capital_value)
     } else {
         0.0
     };
@@ -739,14 +806,19 @@ pub fn compute_retirement_overview_with_mode(
     // If not funded at goal age, find the earliest age at which FI would be reached
     // by scanning accumulation-only (no forced retirement).
     let suggested_age = if !funded_at_goal_age {
-        find_fi_age_accumulation_only(plan, current_portfolio)
+        find_fi_age_accumulation_only(plan, current_portfolio, &mut required_capital_cache)
     } else {
         None
     };
     let effective_fi_age = fi_age.or(suggested_age);
     let eventually_reaches_fi = effective_fi_age.is_some();
+    let has_retirement_gap = failure_age.is_some() || spending_shortfall_age.is_some();
 
-    let status = if current_portfolio >= net_target_today {
+    let status = if !required_capital_reachable || net_target_today.is_none() {
+        "off_track"
+    } else if has_retirement_gap {
+        "at_risk"
+    } else if current_portfolio >= net_target_today_value {
         "achieved"
     } else if funded_at_goal_age {
         "on_track"
@@ -755,18 +827,20 @@ pub fn compute_retirement_overview_with_mode(
     } else {
         "off_track"
     };
-    let success_status = if failure_age.is_some() {
-        "depleted"
-    } else if shortfall > 0.0 {
+    let success_status = if !required_capital_reachable {
         "shortfall"
-    } else if required_capital > 0.0 && surplus >= required_capital * 0.1 {
+    } else if failure_age.is_some() {
+        "depleted"
+    } else if shortfall > 0.0 || spending_shortfall_age.is_some() {
+        "shortfall"
+    } else if required_capital_value > 0.0 && surplus >= required_capital_value * 0.1 {
         "overfunded"
     } else {
         "on_track"
     };
 
-    let progress = if net_target_today > 0.0 {
-        (current_portfolio / net_target_today).min(1.0)
+    let progress = if net_target_today_value > 0.0 {
+        (current_portfolio / net_target_today_value).min(1.0)
     } else {
         0.0
     };
@@ -785,7 +859,12 @@ pub fn compute_retirement_overview_with_mode(
         .map(|tax| tax.withdrawal_buckets)
         .unwrap_or_default();
 
-    let trajectory = build_trajectory(&projection.year_by_year, plan, net_target_today);
+    let trajectory = build_trajectory(
+        &projection.year_by_year,
+        plan,
+        net_target_today,
+        &mut required_capital_cache,
+    );
 
     RetirementOverview {
         analysis_mode: mode.as_str().to_string(),
@@ -800,29 +879,29 @@ pub fn compute_retirement_overview_with_mode(
         funded_at_retirement_start: projection.funded_at_retirement,
         portfolio_now: current_portfolio,
         portfolio_at_retirement_start,
-        net_fire_target: net_target_today,
+        net_fire_target: net_target_today_value,
         gross_fire_target: gross_target,
         portfolio_at_goal_age: portfolio_at_goal,
-        required_capital_at_goal_age: required_capital,
+        required_capital_reachable,
+        required_capital_at_goal_age: required_capital_value,
         shortfall_at_goal_age: shortfall,
         surplus_at_goal_age: surplus,
         funded_through_age,
         failure_age,
+        spending_shortfall_age,
         required_additional_monthly_contribution: required_additional,
         suggested_goal_age_if_unchanged: suggested_age,
         coast_amount_today: coast,
-        coast_reached: current_portfolio >= coast,
+        coast_reached: required_capital_reachable && current_portfolio >= coast,
         progress,
         tax_bucket_balances,
         budget_breakdown: budget,
         target_reconciliation,
         trajectory,
         withdrawal_policy: Some(match plan.withdrawal.strategy {
-            super::model::WithdrawalPolicy::ConstantDollar => "constant-dollar".to_string(),
+            super::model::WithdrawalPolicy::PlannedSpending => "planned-spending".to_string(),
             super::model::WithdrawalPolicy::Guardrails => "guardrails".to_string(),
-            super::model::WithdrawalPolicy::ConstantPercentage => {
-                "constant-percentage-exploratory".to_string()
-            }
+            super::model::WithdrawalPolicy::ConstantPercentage => "constant-percentage".to_string(),
         }),
     }
 }
@@ -864,7 +943,7 @@ mod tests {
             },
             withdrawal: WithdrawalConfig {
                 safe_withdrawal_rate: 0.04,
-                strategy: WithdrawalPolicy::ConstantDollar,
+                strategy: WithdrawalPolicy::PlannedSpending,
                 guardrails: None,
             },
             tax: None,
@@ -966,13 +1045,132 @@ mod tests {
     }
 
     #[test]
-    fn constant_percentage_labeled_exploratory() {
+    fn constant_percentage_uses_plain_policy_label() {
         let mut plan = base_plan();
         plan.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
         let overview = compute_retirement_overview(&plan, 100_000.0, "fire");
         assert_eq!(
             overview.withdrawal_policy,
-            Some("constant-percentage-exploratory".to_string()),
+            Some("constant-percentage".to_string()),
+        );
+    }
+
+    #[test]
+    fn budget_breakdown_uses_same_age_and_units_for_expenses_and_income() {
+        let mut plan = base_plan();
+        plan.personal.current_age = 35;
+        plan.personal.target_retirement_age = 65;
+        plan.expenses.items[0].monthly_amount = 1_000.0;
+        plan.investment.inflation_rate = 0.02;
+        plan.income_streams.push(RetirementIncomeStream {
+            id: "pension".into(),
+            label: "Pension".into(),
+            stream_type: StreamKind::DefinedBenefit,
+            start_age: 65,
+            adjust_for_inflation: true,
+            annual_growth_rate: None,
+            monthly_amount: Some(500.0),
+            linked_account_id: None,
+            current_value: None,
+            monthly_contribution: None,
+            accumulation_return: None,
+        });
+
+        let budget = compute_budget_breakdown(&plan, 65);
+        let inflation_factor = 1.02_f64.powi(30);
+
+        assert!((budget.total_monthly_budget - 1_000.0 * inflation_factor).abs() < 0.01);
+        assert!((budget.income_streams[0].monthly_amount - 500.0 * inflation_factor).abs() < 0.01);
+        assert!((budget.income_streams[0].percentage_of_budget - 0.5).abs() < 0.0001);
+    }
+
+    #[test]
+    fn constant_percentage_shortfall_is_not_reported_as_depletion() {
+        let mut plan = base_plan();
+        plan.personal.current_age = 65;
+        plan.personal.target_retirement_age = 65;
+        plan.personal.planning_horizon_age = 66;
+        plan.investment.retirement_annual_return = 0.0;
+        plan.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
+        plan.expenses.items[0].monthly_amount = 10_000.0;
+
+        let overview = compute_retirement_overview(&plan, 1_000_000.0, "traditional");
+
+        assert_eq!(overview.success_status, "shortfall");
+        assert_eq!(overview.failure_age, None);
+        assert_eq!(
+            overview.spending_shortfall_age,
+            overview.retirement_start_age
+        );
+        assert_eq!(
+            overview.funded_through_age,
+            overview
+                .spending_shortfall_age
+                .map(|age| age.saturating_sub(1))
+        );
+    }
+
+    #[test]
+    fn trajectory_last_point_uses_end_of_year_portfolio() {
+        let mut plan = base_plan();
+        plan.personal.current_age = 30;
+        plan.personal.target_retirement_age = 35;
+        plan.personal.planning_horizon_age = 36;
+        plan.investment.monthly_contribution = 1_000.0;
+        plan.expenses.items[0].monthly_amount = 1_000_000.0;
+
+        let overview = compute_retirement_overview(&plan, 0.0, "fire");
+        let last = overview.trajectory.last().unwrap();
+
+        assert!(
+            last.portfolio_end > last.portfolio_start,
+            "the terminal trajectory point should include the final year's growth and contributions"
+        );
+    }
+
+    #[test]
+    fn unreachable_required_capital_stays_unavailable_in_trajectory() {
+        let mut plan = base_plan();
+        plan.expenses.items[0].monthly_amount = f64::MAX / 4.0;
+
+        let overview = compute_retirement_overview(&plan, 0.0, "fire");
+
+        assert!(!overview.required_capital_reachable);
+        assert!(
+            overview
+                .trajectory
+                .iter()
+                .all(|point| point.required_capital.is_none()),
+            "unreachable plans must not render the required path as zero"
+        );
+    }
+
+    #[test]
+    fn required_additional_contribution_expands_until_feasible() {
+        let mut plan = base_plan();
+        plan.personal.current_age = 54;
+        plan.personal.target_retirement_age = 55;
+        plan.personal.planning_horizon_age = 56;
+        plan.investment.monthly_contribution = 0.0;
+        plan.investment.pre_retirement_annual_return = -0.50;
+
+        let required_capital = 1_000_000.0;
+        let additional = solve_required_additional_monthly(&plan, 0.0, required_capital);
+        let mut adjusted = plan.clone();
+        adjusted.investment.monthly_contribution += additional;
+        let portfolio_at_goal = project_retirement(&adjusted, 0.0)
+            .year_by_year
+            .iter()
+            .find(|snapshot| snapshot.age == plan.personal.target_retirement_age)
+            .map(|snapshot| snapshot.portfolio_value)
+            .unwrap_or(0.0);
+
+        assert!(
+            portfolio_at_goal >= required_capital * 0.999,
+            "solver returned {}, but projected only {} toward {}",
+            additional,
+            portfolio_at_goal,
+            required_capital
         );
     }
 
@@ -982,18 +1180,24 @@ mod tests {
         let overview = compute_retirement_overview(&p, 100_000.0, "fire");
         let fire_start = overview.trajectory.iter().position(|pt| pt.phase == "fire");
         if let Some(idx) = fire_start {
+            let retirement_required = overview.trajectory[idx]
+                .required_capital
+                .expect("retirement year should have a required capital value");
             // Required capital should be positive during retirement
             assert!(
-                overview.trajectory[idx].required_capital > 0.0,
+                retirement_required > 0.0,
                 "retirement year should have non-zero required capital",
             );
             // Required capital should decline as fewer years remain
             let last = overview.trajectory.last().unwrap();
+            let last_required = last
+                .required_capital
+                .expect("horizon year should have a required capital value");
             assert!(
-                last.required_capital < overview.trajectory[idx].required_capital,
+                last_required < retirement_required,
                 "required capital at horizon ({}) should be less than at retirement ({})",
-                last.required_capital,
-                overview.trajectory[idx].required_capital,
+                last_required,
+                retirement_required,
             );
         }
     }
@@ -1010,12 +1214,18 @@ mod tests {
         let without_overview =
             compute_retirement_overview(&without_contributions, 100_000.0, "fire");
 
-        let with_required_today = with_overview.trajectory.first().unwrap().required_capital;
+        let with_required_today = with_overview
+            .trajectory
+            .first()
+            .unwrap()
+            .required_capital
+            .expect("required glidepath should be available");
         let without_required_today = without_overview
             .trajectory
             .first()
             .unwrap()
-            .required_capital;
+            .required_capital
+            .expect("required glidepath should be available");
 
         assert!(
             with_required_today < without_required_today,
@@ -1028,6 +1238,7 @@ mod tests {
                 .find(|pt| pt.age == with_contributions.personal.target_retirement_age)
                 .unwrap()
                 .required_capital
+                .expect("target-age required capital should be available")
                 - with_overview.required_capital_at_goal_age)
                 .abs()
                 < 0.01,
@@ -1043,7 +1254,8 @@ mod tests {
             .trajectory
             .first()
             .unwrap()
-            .required_capital;
+            .required_capital
+            .expect("required glidepath should be available");
 
         let overview = compute_retirement_overview(&p, required_today, "traditional");
         let at_goal = overview.target_reconciliation.portfolio_at_target_nominal;
@@ -1068,6 +1280,10 @@ mod tests {
         assert_eq!(overview.analysis_mode, "traditional");
         assert_eq!(overview.success_status, "depleted");
         assert_eq!(overview.failure_age, overview.retirement_start_age);
+        assert_eq!(
+            overview.spending_shortfall_age,
+            overview.retirement_start_age
+        );
         assert_eq!(
             overview.funded_through_age,
             overview.failure_age.map(|age| age.saturating_sub(1))

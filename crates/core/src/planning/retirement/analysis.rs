@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use rayon::prelude::*;
 
 use super::dto::*;
@@ -9,6 +10,8 @@ use super::model::*;
 use super::withdrawal::{
     add_contribution, apply_growth, apply_withdrawal_policy, initial_withdrawal_buckets,
 };
+
+const FUNDING_TOLERANCE: f64 = 0.999;
 
 // ─── Monte Carlo ─────────────────────────────────────────────────────────────
 
@@ -36,6 +39,7 @@ pub fn run_monte_carlo_with_mode_and_seed(
     mode: RetirementTimingMode,
     seed: Option<u64>,
 ) -> MonteCarloResult {
+    let n_sims = n_sims.max(1);
     let current_age = plan.personal.current_age;
     let target_fire_age = plan.personal.target_retirement_age;
     let planning_horizon_age = plan.personal.planning_horizon_age;
@@ -47,14 +51,12 @@ pub fn run_monte_carlo_with_mode_and_seed(
         .salary_growth_rate
         .unwrap_or(plan.investment.contribution_growth_rate);
     let swr = plan.withdrawal.safe_withdrawal_rate;
-    let use_constant_pct = matches!(
-        plan.withdrawal.strategy,
-        WithdrawalPolicy::ConstantPercentage
-    );
     let accumulation_mean = plan_accumulation_return(plan);
     let retirement_mean = plan_retirement_return(plan);
     let std_dev = plan.investment.annual_volatility;
     let annual_fee_rate = plan.investment.annual_investment_fee_rate;
+    let base_seed =
+        seed.unwrap_or_else(|| strategy_comparison_seed(plan, current_portfolio, n_sims, mode));
 
     // Clone fields needed inside the parallel closure
     let expenses_clone = plan.expenses.clone();
@@ -66,8 +68,8 @@ pub fn run_monte_carlo_with_mode_and_seed(
     // Precompute per-age required capital and DC payouts for all possible retirement ages.
     // These are deterministic and shared across all simulations.
     let age_range = horizon_years as usize + 1;
-    let per_age_capitals: Vec<f64> = (0..age_range)
-        .map(|i| compute_required_capital(plan, current_age + i as u32))
+    let per_age_capitals: Vec<Option<f64>> = (0..age_range)
+        .map(|i| try_compute_required_capital(plan, current_age + i as u32))
         .collect();
     let per_age_payouts: Vec<HashMap<String, f64>> = (0..age_range)
         .map(|i| {
@@ -76,6 +78,7 @@ pub fn run_monte_carlo_with_mode_and_seed(
                 current_age,
                 current_age + i as u32,
                 swr,
+                plan_accumulation_return(plan),
             )
         })
         .collect();
@@ -84,14 +87,11 @@ pub fn run_monte_carlo_with_mode_and_seed(
     let sim_results: Vec<(Vec<f64>, bool, Option<u32>)> = (0..n_sims)
         .into_par_iter()
         .map(|sim_idx| {
-            let sim_seed = seed
-                .map(|base| splitmix64(base ^ sim_idx as u64))
-                .unwrap_or_else(|| rand::thread_rng().gen::<u64>());
+            let sim_seed = splitmix64(base_seed ^ sim_idx as u64);
             let mut rng = StdRng::seed_from_u64(sim_seed);
             let mut buckets = initial_withdrawal_buckets(&tax_clone, current_portfolio);
             let mut in_fire = false;
             let mut sim_fi_age: Option<u32> = None;
-            let mut portfolio_at_retirement_start = current_portfolio;
             let mut essential_funded_every_year = true;
             let mut path = Vec::with_capacity(horizon_years as usize + 1);
             let mut cumulative_inflation = 1.0_f64;
@@ -105,7 +105,7 @@ pub fn run_monte_carlo_with_mode_and_seed(
 
                 if !in_fire {
                     let required = per_age_capitals[i as usize];
-                    if sim_fi_age.is_none() && portfolio >= required {
+                    if sim_fi_age.is_none() && required.is_some_and(|target| portfolio >= target) {
                         sim_fi_age = Some(age);
                     }
                     if retirement_start_decision(mode, age, target_fire_age, portfolio, required)
@@ -113,7 +113,6 @@ pub fn run_monte_carlo_with_mode_and_seed(
                     {
                         in_fire = true;
                         sim_retirement_age = age;
-                        portfolio_at_retirement_start = portfolio;
                         sim_resolved_payouts = Some(&per_age_payouts[i as usize]);
                     }
                 }
@@ -131,7 +130,8 @@ pub fn run_monte_carlo_with_mode_and_seed(
                     i,
                     in_fire,
                 );
-                let annual_return = sample_return(&mut rng, eff_mean, eff_std);
+                let (annual_return, annual_inflation) =
+                    sample_return_and_inflation(&mut rng, eff_mean, eff_std, inflation_rate);
 
                 if in_fire {
                     let payouts = sim_resolved_payouts.unwrap();
@@ -163,29 +163,29 @@ pub fn run_monte_carlo_with_mode_and_seed(
 
                     // Track essential spending funding
                     let essential_gap = (essential_expenses - income).max(0.0);
-                    if outcome.spending_funded < essential_gap * 0.99 {
+                    if outcome.spending_funded < essential_gap * FUNDING_TOLERANCE {
                         essential_funded_every_year = false;
                     }
 
                     buckets = outcome.remaining_buckets;
                 } else {
-                    let annual_contribution =
-                        monthly_contribution * 12.0 * (1.0 + contrib_growth).powi(i as i32);
+                    let year_monthly_contribution =
+                        monthly_contribution * (1.0 + contrib_growth).powi(i as i32);
+                    let annual_contribution = end_of_year_value_of_monthly_contributions(
+                        year_monthly_contribution,
+                        annual_return,
+                    );
                     let grown_buckets = apply_growth(buckets, annual_return);
                     buckets = add_contribution(grown_buckets, annual_contribution, &tax_clone);
                 }
 
-                cumulative_inflation *= 1.0 + sample_inflation(&mut rng, inflation_rate);
+                cumulative_inflation *= 1.0 + annual_inflation;
             }
 
-            // Success: essential spending funded every year AND portfolio survives.
-            // For constant-percentage, portfolio never hits 0, so use 5% floor.
+            // Success: essential spending funded, portfolio survives, and FIRE plans reach FI.
+            // Use the same definition for every withdrawal strategy so comparisons are apples-to-apples.
             let ending_portfolio = buckets.total();
-            let portfolio_survived = if use_constant_pct {
-                ending_portfolio > portfolio_at_retirement_start * 0.05
-            } else {
-                ending_portfolio > 0.0
-            };
+            let portfolio_survived = ending_portfolio > 0.0;
             let survived = essential_funded_every_year
                 && portfolio_survived
                 && (matches!(mode, RetirementTimingMode::Traditional) || sim_fi_age.is_some());
@@ -224,7 +224,7 @@ pub fn run_monte_carlo_with_mode_and_seed(
     final_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     // None when fewer than 50% of simulations reached FI (underfunded plan)
-    let median_fire_age = if fire_ages.len() > n_sims as usize / 2 {
+    let median_fire_age = if !fire_ages.is_empty() && fire_ages.len() * 2 >= n_sims as usize {
         Some(fire_ages[fire_ages.len() / 2])
     } else {
         None
@@ -260,6 +260,23 @@ fn splitmix64(mut x: u64) -> u64 {
     z ^ (z >> 31)
 }
 
+fn strategy_comparison_seed(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    n_sims: u32,
+    mode: RetirementTimingMode,
+) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    match serde_json::to_string(plan) {
+        Ok(serialized) => serialized.hash(&mut hasher),
+        Err(_) => format!("{:?}", plan).hash(&mut hasher),
+    }
+    current_portfolio.to_bits().hash(&mut hasher);
+    n_sims.hash(&mut hasher);
+    mode.as_str().hash(&mut hasher);
+    hasher.finish()
+}
+
 // ─── Scenario Analysis ───────────────────────────────────────────────────────
 
 pub fn run_scenario_analysis(plan: &RetirementPlan, current_portfolio: f64) -> Vec<ScenarioResult> {
@@ -284,31 +301,23 @@ pub fn run_scenario_analysis_with_mode(
             adjusted.investment.pre_retirement_annual_return += delta;
             adjusted.investment.retirement_annual_return += delta;
             let proj = project_retirement_with_mode(&adjusted, current_portfolio, mode);
+            let overview =
+                compute_retirement_overview_with_mode(&adjusted, current_portfolio, mode);
             let portfolio_at_horizon = proj
                 .year_by_year
                 .last()
-                .map(|s| s.portfolio_value)
+                .map(|s| s.portfolio_end_value)
                 .unwrap_or(0.0);
-            let funded_at_goal_age = proj
-                .fire_age
-                .map_or(false, |a| a <= adjusted.personal.target_retirement_age);
-            let success = proj.retirement_start_age.is_some() && portfolio_at_horizon > 0.0;
-            let failure_age = if !success {
-                proj.year_by_year
-                    .iter()
-                    .find(|s| s.phase == "fire" && s.portfolio_value <= 0.0)
-                    .map(|s| s.age)
-            } else {
-                None
-            };
+            let success = matches!(overview.success_status.as_str(), "on_track" | "overfunded");
             ScenarioResult {
                 label: label.to_string(),
                 annual_return: plan_accumulation_return(&adjusted),
                 fire_age: proj.fire_age,
                 portfolio_at_horizon,
-                funded_at_goal_age,
+                funded_at_goal_age: overview.funded_at_goal_age,
                 success,
-                failure_age,
+                failure_age: overview.failure_age,
+                spending_shortfall_age: overview.spending_shortfall_age,
                 year_by_year: proj.year_by_year,
             }
         })
@@ -443,9 +452,20 @@ fn build_early_crash_stress(
     baseline: &StressOutcome,
     severity_base: f64,
 ) -> StressTestResult {
-    let retirement_age = plan.personal.target_retirement_age;
-    let portfolio_at_goal = baseline_overview.portfolio_at_goal_age.max(0.0);
-    let crash = run_sorr(plan, portfolio_at_goal, retirement_age)
+    let Some(retirement_age) = baseline_overview.retirement_start_age else {
+        return build_stress_result(
+            StressTestId::EarlyCrash,
+            "Retire into a crash",
+            "A 30% market drop happens in the first retirement year.",
+            StressCategory::Market,
+            baseline.clone(),
+            baseline.clone(),
+            severity_base,
+        );
+    };
+
+    let portfolio_at_start = baseline_overview.portfolio_at_retirement_start.max(0.0);
+    let crash = run_sorr(plan, portfolio_at_start, retirement_age)
         .into_iter()
         .find(|s| s.label == "Crash Year 1 (-30%)");
 
@@ -463,6 +483,7 @@ fn build_early_crash_stress(
                     Some(retirement_age)
                 }
             }),
+            spending_shortfall_age: scenario.spending_shortfall_age,
         },
         None => StressOutcome {
             fi_age: baseline.fi_age,
@@ -471,6 +492,7 @@ fn build_early_crash_stress(
             shortfall_at_goal_age: baseline.shortfall_at_goal_age,
             portfolio_at_horizon: 0.0,
             failure_age: Some(retirement_age),
+            spending_shortfall_age: Some(retirement_age),
         },
     };
 
@@ -522,22 +544,14 @@ fn stress_outcome_from_overview(overview: &RetirementOverview) -> StressOutcome 
         .last()
         .map(|pt| pt.portfolio_end)
         .unwrap_or(0.0);
-    let failure_age = overview
-        .trajectory
-        .iter()
-        .find(|pt| {
-            pt.phase == "fire"
-                && (pt.annual_shortfall.unwrap_or(0.0) > 0.0 || pt.portfolio_end <= 0.0)
-        })
-        .map(|pt| pt.age);
-
     StressOutcome {
         fi_age: overview.fi_age,
         retirement_start_age: overview.retirement_start_age,
         funded_at_goal_age: overview.funded_at_goal_age,
         shortfall_at_goal_age: overview.shortfall_at_goal_age,
         portfolio_at_horizon,
-        failure_age,
+        failure_age: overview.failure_age,
+        spending_shortfall_age: overview.spending_shortfall_age,
     }
 }
 
@@ -549,6 +563,7 @@ fn classify_stress(
 ) -> StressSeverity {
     let shortfall_increase = delta.shortfall_at_goal_age.max(0.0);
     if stressed.failure_age.is_some()
+        || stressed.spending_shortfall_age.is_some()
         || (baseline.fi_age.is_some() && stressed.fi_age.is_none())
         || delta.fi_age_years.map_or(false, |years| years >= 3)
         || shortfall_increase >= severity_base * 0.15
@@ -613,16 +628,12 @@ pub fn run_sorr(
         return vec![]; // SORR disabled when not funded
     }
 
-    let use_constant_pct = matches!(
-        plan.withdrawal.strategy,
-        WithdrawalPolicy::ConstantPercentage
-    );
-
     let resolved_payouts = resolve_plan_dc_payouts(
         &plan.income_streams,
         plan.personal.current_age,
         retirement_start_age,
         plan.withdrawal.safe_withdrawal_rate,
+        plan_accumulation_return(plan),
     );
     let r = plan_retirement_return(plan);
     let years =
@@ -700,7 +711,9 @@ pub fn run_sorr(
                     age,
                 );
                 let essential_gap = (essential_expenses - income).max(0.0);
-                if failure_age.is_none() && outcome.spending_funded < essential_gap * 0.99 {
+                if failure_age.is_none()
+                    && outcome.spending_funded < essential_gap * FUNDING_TOLERANCE
+                {
                     essential_funded_every_year = false;
                     failure_age = Some(age);
                 }
@@ -709,24 +722,14 @@ pub fn run_sorr(
             let portfolio = buckets.total();
             path.push(portfolio.max(0.0));
 
-            let portfolio_survived = if use_constant_pct {
-                portfolio > portfolio_at_fire * 0.05
-            } else {
-                portfolio > 0.0
-            };
+            let portfolio_survived = portfolio > 0.0;
             let survived = essential_funded_every_year && portfolio_survived;
-            let floor = if use_constant_pct {
-                portfolio_at_fire * 0.05
-            } else {
-                0.0
-            };
-            let failure_age = if failure_age.is_some() {
-                failure_age
-            } else if !survived {
-                // Find the first year where portfolio hit the floor
+            let spending_shortfall_age = failure_age;
+            let failure_age = if !portfolio_survived {
+                // Find the first year where portfolio was depleted.
                 path.iter()
                     .enumerate()
-                    .find(|(_, &v)| v <= floor)
+                    .find(|(_, &v)| v <= 0.0)
                     .map(|(idx, _)| retirement_start_age + idx as u32)
             } else {
                 None
@@ -738,6 +741,7 @@ pub fn run_sorr(
                 final_value: portfolio,
                 survived,
                 failure_age,
+                spending_shortfall_age,
             }
         })
         .collect()
@@ -776,6 +780,8 @@ pub fn run_sensitivity_analysis_with_mode(
                     let mut adjusted = plan.clone();
                     adjusted.investment.monthly_contribution = contribution;
                     adjusted.investment.pre_retirement_annual_return =
+                        ret + adjusted.investment.annual_investment_fee_rate;
+                    adjusted.investment.retirement_annual_return =
                         ret + adjusted.investment.annual_investment_fee_rate;
                     project_retirement_with_mode(&adjusted, current_portfolio, mode).fire_age
                 })
@@ -960,8 +966,8 @@ fn decision_cell_from_plan(
 fn inflation_factor_to_age(plan: &RetirementPlan, age: u32) -> f64 {
     let years = (age as i32 - plan.personal.current_age as i32).max(0);
     (1.0_f64 + plan.investment.inflation_rate)
-        .max(0.01)
         .powi(years)
+        .clamp(0.01, f64::MAX)
 }
 
 fn apply_return_delta(plan: &mut RetirementPlan, delta: f64) {
@@ -1119,16 +1125,40 @@ pub fn run_strategy_comparison_with_mode(
     n_sims: u32,
     mode: RetirementTimingMode,
 ) -> StrategyComparisonResult {
-    let mut plan_cd = plan.clone();
-    plan_cd.withdrawal.strategy = WithdrawalPolicy::ConstantDollar;
+    let mut plan_planned = plan.clone();
+    plan_planned.withdrawal.strategy = WithdrawalPolicy::PlannedSpending;
     let mut plan_cp = plan.clone();
     plan_cp.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
     let mut plan_gr = plan.clone();
     plan_gr.withdrawal.strategy = WithdrawalPolicy::Guardrails;
+    let seed = Some(strategy_comparison_seed(
+        plan,
+        current_portfolio,
+        n_sims,
+        mode,
+    ));
     StrategyComparisonResult {
-        constant_dollar: run_monte_carlo_with_mode(&plan_cd, current_portfolio, n_sims, mode),
-        constant_percentage: run_monte_carlo_with_mode(&plan_cp, current_portfolio, n_sims, mode),
-        guardrails: run_monte_carlo_with_mode(&plan_gr, current_portfolio, n_sims, mode),
+        planned_spending: run_monte_carlo_with_mode_and_seed(
+            &plan_planned,
+            current_portfolio,
+            n_sims,
+            mode,
+            seed,
+        ),
+        constant_percentage: run_monte_carlo_with_mode_and_seed(
+            &plan_cp,
+            current_portfolio,
+            n_sims,
+            mode,
+            seed,
+        ),
+        guardrails: run_monte_carlo_with_mode_and_seed(
+            &plan_gr,
+            current_portfolio,
+            n_sims,
+            mode,
+            seed,
+        ),
     }
 }
 
@@ -1167,7 +1197,7 @@ mod tests {
             },
             withdrawal: WithdrawalConfig {
                 safe_withdrawal_rate: 0.04,
-                strategy: WithdrawalPolicy::ConstantDollar,
+                strategy: WithdrawalPolicy::PlannedSpending,
                 guardrails: None,
             },
             tax: None,
@@ -1214,6 +1244,69 @@ mod tests {
             a.final_portfolio_at_horizon.p10,
             b.final_portfolio_at_horizon.p10
         );
+    }
+
+    #[test]
+    fn monte_carlo_clamps_zero_simulations_to_one() {
+        let p = base_plan();
+        let result = run_monte_carlo_with_mode_and_seed(
+            &p,
+            100_000.0,
+            0,
+            RetirementTimingMode::Fire,
+            Some(42),
+        );
+
+        assert_eq!(result.n_simulations, 1);
+        assert_eq!(result.age_axis.first(), Some(&p.personal.current_age));
+        assert_eq!(
+            result.age_axis.last(),
+            Some(&p.personal.planning_horizon_age)
+        );
+    }
+
+    #[test]
+    fn monte_carlo_accepts_zero_volatility() {
+        let mut p = base_plan();
+        p.investment.annual_volatility = 0.0;
+
+        let result = run_monte_carlo_with_mode_and_seed(
+            &p,
+            100_000.0,
+            25,
+            RetirementTimingMode::Fire,
+            Some(42),
+        );
+
+        assert_eq!(result.n_simulations, 25);
+        assert!(result.success_rate >= 0.0 && result.success_rate <= 1.0);
+    }
+
+    #[test]
+    fn strategy_comparison_uses_stable_common_random_numbers() {
+        let p = base_plan();
+        let a = run_strategy_comparison_with_mode(
+            &p,
+            100_000.0,
+            100,
+            RetirementTimingMode::Traditional,
+        );
+        let b = run_strategy_comparison_with_mode(
+            &p,
+            100_000.0,
+            100,
+            RetirementTimingMode::Traditional,
+        );
+
+        assert_eq!(
+            a.planned_spending.percentiles.p50,
+            b.planned_spending.percentiles.p50
+        );
+        assert_eq!(
+            a.constant_percentage.percentiles.p50,
+            b.constant_percentage.percentiles.p50
+        );
+        assert_eq!(a.guardrails.percentiles.p50, b.guardrails.percentiles.p50);
     }
 
     #[test]
@@ -1354,6 +1447,24 @@ mod tests {
     }
 
     #[test]
+    fn early_crash_is_neutral_when_fire_plan_does_not_retire() {
+        let mut p = base_plan();
+        p.investment.monthly_contribution = 0.0;
+        let stresses = run_stress_tests_with_mode(&p, 0.0, RetirementTimingMode::Fire);
+        let early_crash = stresses
+            .iter()
+            .find(|stress| stress.id == StressTestId::EarlyCrash)
+            .expect("early crash stress should be returned");
+
+        assert_eq!(early_crash.baseline.retirement_start_age, None);
+        assert_eq!(early_crash.stressed.retirement_start_age, None);
+        assert_eq!(early_crash.delta.fi_age_years, None);
+        assert_eq!(early_crash.delta.shortfall_at_goal_age, 0.0);
+        assert_eq!(early_crash.delta.portfolio_at_horizon, 0.0);
+        assert_eq!(early_crash.severity, StressSeverity::Low);
+    }
+
+    #[test]
     fn stress_mutators_change_only_intended_inputs() {
         let p = base_plan();
 
@@ -1402,6 +1513,7 @@ mod tests {
             shortfall_at_goal_age: 0.0,
             portfolio_at_horizon: 100_000.0,
             failure_age: None,
+            spending_shortfall_age: None,
         };
         let stressed = StressOutcome {
             fi_age: Some(59),
@@ -1410,6 +1522,7 @@ mod tests {
             shortfall_at_goal_age: 200_000.0,
             portfolio_at_horizon: 0.0,
             failure_age: None,
+            spending_shortfall_age: None,
         };
         let delta = StressDelta {
             fi_age_years: Some(4),

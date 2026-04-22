@@ -121,6 +121,7 @@ pub struct RetirementIncomeStream {
     pub start_age: u32,
     pub adjust_for_inflation: bool,
     pub annual_growth_rate: Option<f64>,
+    /// Net monthly payout in today's money. Tax on portfolio withdrawals is modeled separately.
     pub monthly_amount: Option<f64>,
     pub linked_account_id: Option<String>,
     pub current_value: Option<f64>,
@@ -161,8 +162,6 @@ pub struct InvestmentAssumptions {
 pub struct GuardrailsConfig {
     /// Cut spending when gross_withdrawal / portfolio exceeds this rate.
     pub ceiling_rate: f64,
-    /// Raise spending when gross_withdrawal / portfolio falls below this rate.
-    pub floor_rate: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -176,8 +175,8 @@ pub struct WithdrawalConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum WithdrawalPolicy {
     #[default]
-    #[serde(rename = "constant-dollar")]
-    ConstantDollar,
+    #[serde(rename = "planned-spending")]
+    PlannedSpending,
     #[serde(rename = "constant-percentage")]
     ConstantPercentage,
     #[serde(rename = "guardrails")]
@@ -269,6 +268,8 @@ pub struct TaxProfile {
     /// Country code for future locale-specific presets.
     pub country_code: Option<String>,
     /// Retirement-only spendable balances by tax bucket.
+    /// Until contribution routing exists, these balances also define the tax-bucket mix for
+    /// future contributions.
     #[serde(default)]
     pub withdrawal_buckets: TaxBucketBalances,
 }

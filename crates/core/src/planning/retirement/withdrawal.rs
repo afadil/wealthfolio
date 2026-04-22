@@ -67,10 +67,11 @@ pub(crate) fn add_contribution(
     }
 }
 
-/// Gross up a net spending gap for taxes. Returns `(gross_withdrawal, tax_amount)`.
+/// Gross up a net spending gap for display-only tax estimates.
 ///
-/// For bucket-aware plans this uses the configured withdrawal buckets in
-/// taxable -> tax-deferred -> tax-free order.
+/// The projection ledger withdraws from finite bucket balances. This helper is
+/// used by budget/reconciliation DTOs, so it uses the configured bucket mix as a
+/// tax-rate blend and does not cap estimates by today's balances.
 pub(crate) fn compute_gross_withdrawal(
     spending_gap: f64,
     tax: &Option<TaxProfile>,
@@ -79,17 +80,26 @@ pub(crate) fn compute_gross_withdrawal(
     if spending_gap <= 0.0 {
         return (0.0, 0.0);
     }
-    let available = match tax {
-        Some(profile) if profile.withdrawal_buckets.total() > 0.0 => profile.withdrawal_buckets,
-        Some(profile) => {
-            let rate = effective_tax_rate(profile, TaxBucketKind::Taxable, age);
-            let gross = spending_gap / (1.0 - rate);
-            return (gross, gross - spending_gap);
-        }
-        None => return (spending_gap, 0.0),
+    let Some(profile) = tax else {
+        return (spending_gap, 0.0);
     };
-    let outcome = withdraw_for_net_target(spending_gap, available, tax, age);
-    (outcome.gross_withdrawal, outcome.tax_amount)
+
+    let buckets = profile.withdrawal_buckets;
+    let total = buckets.total();
+    let rate = if total > 0.0 {
+        let taxable = buckets.taxable / total;
+        let deferred = buckets.tax_deferred / total;
+        let tax_free = buckets.tax_free / total;
+        taxable * effective_tax_rate(profile, TaxBucketKind::Taxable, age)
+            + deferred * effective_tax_rate(profile, TaxBucketKind::TaxDeferred, age)
+            + tax_free * effective_tax_rate(profile, TaxBucketKind::TaxFree, age)
+    } else {
+        effective_tax_rate(profile, TaxBucketKind::Taxable, age)
+    }
+    .clamp(0.0, 0.99);
+
+    let gross = spending_gap / (1.0 - rate);
+    (gross, gross - spending_gap)
 }
 
 /// Apply the withdrawal policy for one year.
@@ -108,14 +118,13 @@ pub(crate) fn apply_withdrawal_policy(
             let gross_target = config.safe_withdrawal_rate * available_total;
             withdraw_for_gross_target(gross_target, *available_buckets, tax, age)
         }
-        WithdrawalPolicy::ConstantDollar => {
+        WithdrawalPolicy::PlannedSpending => {
             let spending_gap = (total_expenses - income).max(0.0);
             withdraw_for_net_target(spending_gap, *available_buckets, tax, age)
         }
         WithdrawalPolicy::Guardrails => {
             let default_guardrails = GuardrailsConfig {
                 ceiling_rate: config.safe_withdrawal_rate * 1.5,
-                floor_rate: config.safe_withdrawal_rate * 0.8,
             };
             let guardrails = config.guardrails.as_ref().unwrap_or(&default_guardrails);
 
@@ -141,13 +150,6 @@ pub(crate) fn apply_withdrawal_policy(
                 } else {
                     ceiling
                 }
-            } else if ratio < guardrails.floor_rate {
-                withdraw_for_gross_target(
-                    available_total * guardrails.floor_rate,
-                    *available_buckets,
-                    tax,
-                    age,
-                )
             } else {
                 target
             }
@@ -338,11 +340,12 @@ mod tests {
     }
 
     #[test]
-    fn compute_gross_withdrawal_uses_bucket_order() {
+    fn compute_gross_withdrawal_uses_bucket_mix_without_balance_cap() {
         let (gross, tax_amt) = compute_gross_withdrawal(60_000.0, &tax_with_buckets(), 60);
-        // 50k taxable at 20% funds 40k net, remaining 20k net from tax-deferred at 30% => 28,571 gross.
-        assert!((gross - 78_571.43).abs() < 0.1, "gross = {}", gross);
-        assert!((tax_amt - 18_571.43).abs() < 0.1, "tax = {}", tax_amt);
+        // Display gross-up uses the bucket mix as a blended rate and does not
+        // stop at today's finite bucket balances.
+        assert!((gross - 80_000.0).abs() < 0.1, "gross = {}", gross);
+        assert!((tax_amt - 20_000.0).abs() < 0.1, "tax = {}", tax_amt);
     }
 
     #[test]
@@ -371,10 +374,10 @@ mod tests {
     }
 
     #[test]
-    fn constant_dollar_returns_correct_tuple() {
+    fn planned_spending_returns_correct_tuple() {
         let config = WithdrawalConfig {
             safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::ConstantDollar,
+            strategy: WithdrawalPolicy::PlannedSpending,
             guardrails: None,
         };
         let outcome = apply_withdrawal_policy(
@@ -445,10 +448,7 @@ mod tests {
         let config = WithdrawalConfig {
             safe_withdrawal_rate: 0.04,
             strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig {
-                ceiling_rate: 0.06,
-                floor_rate: 0.03,
-            }),
+            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
         };
         let outcome = apply_withdrawal_policy(
             &config,
@@ -467,14 +467,11 @@ mod tests {
     }
 
     #[test]
-    fn guardrails_floor_raises_spending() {
+    fn guardrails_do_not_create_unplanned_spending() {
         let config = WithdrawalConfig {
             safe_withdrawal_rate: 0.04,
             strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig {
-                ceiling_rate: 0.06,
-                floor_rate: 0.03,
-            }),
+            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
         };
         let outcome = apply_withdrawal_policy(
             &config,
@@ -489,18 +486,16 @@ mod tests {
             &None,
             65,
         );
-        assert!((outcome.gross_withdrawal - 30_000.0).abs() < 0.01);
+        assert!((outcome.gross_withdrawal - 10_000.0).abs() < 0.01);
+        assert!((outcome.spending_funded - 10_000.0).abs() < 0.01);
     }
 
     #[test]
-    fn guardrails_essential_floor_protects_basics() {
+    fn guardrails_ceiling_protects_basics() {
         let config = WithdrawalConfig {
             safe_withdrawal_rate: 0.04,
             strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig {
-                ceiling_rate: 0.02,
-                floor_rate: 0.01,
-            }),
+            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.02 }),
         };
         let outcome = apply_withdrawal_policy(
             &config,
@@ -523,10 +518,7 @@ mod tests {
         let config = WithdrawalConfig {
             safe_withdrawal_rate: 0.04,
             strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig {
-                ceiling_rate: 0.06,
-                floor_rate: 0.03,
-            }),
+            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
         };
         let outcome = apply_withdrawal_policy(
             &config,
