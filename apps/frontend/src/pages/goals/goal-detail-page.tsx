@@ -28,16 +28,19 @@ import {
   useSaveUpOverview,
 } from "./hooks/use-goal-detail";
 import { useGoalMutations } from "./hooks/use-goals";
-import type { RetirementOverview } from "@/lib/types";
+import { useSettingsContext } from "@/lib/settings-provider";
+import type { PlannerMode, RetirementOverview } from "@/lib/types";
 import type { RetirementPlan } from "@/features/goals/retirement-planner/types";
 import {
   parseSettingsJson,
   DEFAULT_RETIREMENT_PLAN,
+  normalizeRetirementPlan,
+  inferBirthYearMonthFromAge,
+  ageFromBirthYearMonth,
 } from "@/features/goals/retirement-planner/lib/plan-adapter";
 import { usePortfolioData } from "@/features/goals/retirement-planner/hooks/use-portfolio";
 import DashboardPage from "@/features/goals/retirement-planner/pages/dashboard-page";
 import RiskLabPage from "@/features/goals/retirement-planner/pages/risk-lab-page";
-import SimulationsPage from "@/features/goals/retirement-planner/pages/simulations-page";
 import SaveUpDetailPage from "./components/save-up-detail";
 import { GoalEditDialog } from "./components/goal-edit-dialog";
 
@@ -50,19 +53,35 @@ const GOAL_TYPE_LABELS: Record<string, string> = {
   custom_save_up: "Savings Goal",
 };
 
+function parseSetupAge(value: string | null) {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
+}
+
+function parseSetupBirthYearMonth(value: string | null) {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return undefined;
+  return ageFromBirthYearMonth(value) == null ? undefined : value;
+}
+
 export default function GoalDetailPage() {
   const { goalId } = useParams<{ goalId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isSetup = searchParams.get("setup") === "true";
   const setupMode = searchParams.get("mode");
+  const setupBirthYearMonth = parseSetupBirthYearMonth(searchParams.get("birthYearMonth"));
+  const setupCurrentAge = parseSetupAge(searchParams.get("age"));
+  const setupRetirementAge = parseSetupAge(searchParams.get("retirementAge"));
 
   const { goal, plan, fundingRules, isLoading, error } = useGoalDetail(goalId);
   const { savePlanMutation } = useGoalPlanMutations(goalId ?? "");
   const { deleteMutation } = useGoalMutations();
+  const { settings } = useSettingsContext();
 
   const isRetirement = goal?.goalType === "retirement";
   const isSaveUp = goal && !isRetirement;
+  const baseCurrency = settings?.baseCurrency ?? goal?.currency ?? "USD";
 
   // Fetch backend-computed retirement overview when a retirement plan exists
   const { data: retirementOverview } = useRetirementOverview(
@@ -77,10 +96,10 @@ export default function GoalDetailPage() {
   // Parse retirement plan from settings JSON
   const retirementPlan: RetirementPlan = useMemo(() => {
     if (!plan?.settingsJson || plan.planKind !== "retirement") {
-      return { ...DEFAULT_RETIREMENT_PLAN };
+      return { ...DEFAULT_RETIREMENT_PLAN, currency: baseCurrency };
     }
-    return parseSettingsJson(plan.settingsJson);
-  }, [plan]);
+    return { ...parseSettingsJson(plan.settingsJson), currency: baseCurrency };
+  }, [baseCurrency, plan]);
 
   // DC-linked account IDs from retirement plan income streams
   const dcLinkedAccountIds = useMemo(() => {
@@ -100,12 +119,34 @@ export default function GoalDetailPage() {
   useEffect(() => {
     if (isSetup && goalId && !plan && !planCreationPending) {
       if (isRetirement || setupMode) {
-        const mode = (setupMode ?? "fire") as "fire" | "traditional";
+        const mode = (setupMode ?? "traditional") as "fire" | "traditional";
+        const currentAge =
+          (setupBirthYearMonth ? ageFromBirthYearMonth(setupBirthYearMonth) : undefined) ??
+          setupCurrentAge ??
+          DEFAULT_RETIREMENT_PLAN.personal.currentAge;
+        const targetRetirementAge = Math.max(
+          currentAge + 1,
+          setupRetirementAge ?? DEFAULT_RETIREMENT_PLAN.personal.targetRetirementAge,
+        );
+        const initialPlan = {
+          ...DEFAULT_RETIREMENT_PLAN,
+          currency: baseCurrency,
+          personal: {
+            ...DEFAULT_RETIREMENT_PLAN.personal,
+            birthYearMonth: setupBirthYearMonth ?? inferBirthYearMonthFromAge(currentAge),
+            currentAge,
+            targetRetirementAge,
+            planningHorizonAge: Math.max(
+              DEFAULT_RETIREMENT_PLAN.personal.planningHorizonAge,
+              targetRetirementAge + 1,
+            ),
+          },
+        };
         savePlanMutation.mutate({
           goalId,
           planKind: "retirement",
           plannerMode: mode,
-          settingsJson: JSON.stringify({ ...DEFAULT_RETIREMENT_PLAN }),
+          settingsJson: JSON.stringify(normalizeRetirementPlan(initialPlan)),
         });
       }
     }
@@ -113,14 +154,16 @@ export default function GoalDetailPage() {
   }, [isSetup, goalId, plan, isRetirement, setupMode, planCreationPending]);
 
   const handleSaveRetirementPlan = useCallback(
-    (updated: RetirementPlan) => {
+    (updated: RetirementPlan, nextPlannerMode?: PlannerMode) => {
       if (!goalId) return;
       savePlanMutation.mutate(
         {
           goalId,
           planKind: "retirement",
-          plannerMode: plan?.plannerMode ?? "fire",
-          settingsJson: JSON.stringify(updated),
+          plannerMode: nextPlannerMode ?? plan?.plannerMode ?? "traditional",
+          settingsJson: JSON.stringify(
+            normalizeRetirementPlan({ ...updated, currency: baseCurrency }),
+          ),
         },
         {
           onSuccess: () => {
@@ -129,7 +172,7 @@ export default function GoalDetailPage() {
         },
       );
     },
-    [goalId, plan?.plannerMode, savePlanMutation],
+    [baseCurrency, goalId, plan?.plannerMode, savePlanMutation],
   );
 
   const [editOpen, setEditOpen] = useState(false);
@@ -198,20 +241,11 @@ export default function GoalDetailPage() {
       ),
     },
     {
-      value: "scenarios",
-      label: (
-        <span className="flex items-center gap-2">
-          <Icons.Wand2 className="size-3.5" />
-          Scenarios
-        </span>
-      ),
-    },
-    {
       value: "risk-lab",
       label: (
         <span className="flex items-center gap-2">
           <Icons.ShieldAlert className="size-3.5" />
-          Risk Lab
+          What If
         </span>
       ),
     },
@@ -230,7 +264,7 @@ export default function GoalDetailPage() {
     </div>
   ) : null;
   const mobileRetirementTabs = hasRetirementTabs ? (
-    <div className="mb-4 md:hidden">
+    <div className="mb-4 overflow-x-auto pb-1 md:hidden">
       <AnimatedToggleGroup
         variant="default"
         size="sm"
@@ -301,7 +335,7 @@ export default function GoalDetailPage() {
                 plan={retirementPlan}
                 portfolioData={portfolioData}
                 onSavePlan={handleSaveRetirementPlan}
-                plannerMode={(plan.plannerMode! as "fire" | "traditional") ?? "fire"}
+                plannerMode={plan.plannerMode ?? "traditional"}
                 goalId={goalId!}
                 dcLinkedAccountIds={dcLinkedAccountIds}
                 retirementOverview={retirementOverview}
@@ -352,8 +386,8 @@ function RetirementDetail({
   onTabChange: (tab: string) => void;
   plan: RetirementPlan;
   portfolioData: ReturnType<typeof usePortfolioData>;
-  onSavePlan: (p: RetirementPlan) => void;
-  plannerMode: "fire" | "traditional";
+  onSavePlan: (p: RetirementPlan, plannerMode?: PlannerMode) => void;
+  plannerMode: PlannerMode;
   goalId: string;
   dcLinkedAccountIds: string[];
   retirementOverview?: RetirementOverview;
@@ -371,17 +405,6 @@ function RetirementDetail({
           retirementOverview={retirementOverview}
           goalId={goalId}
           dcLinkedAccountIds={dcLinkedAccountIds}
-        />
-      </TabsContent>
-
-      <TabsContent value="scenarios">
-        <SimulationsPage
-          plan={plan}
-          totalValue={portfolioData.totalValue}
-          isLoading={portfolioData.isLoading}
-          retirementOverview={retirementOverview}
-          plannerMode={plannerMode}
-          goalId={goalId}
         />
       </TabsContent>
 

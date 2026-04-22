@@ -32,8 +32,14 @@ import {
   createExpenseItem,
   expenseAgeRangeLabel,
   expenseItems,
+  isExpenseActiveAtAge,
   totalMonthlyExpenseAtAge,
 } from "../lib/expense-items";
+import {
+  ageFromBirthYearMonth,
+  inferBirthYearMonthFromAge,
+  normalizeRetirementPlan,
+} from "../lib/plan-adapter";
 import type {
   ExpenseItem,
   InvestmentAssumptions,
@@ -55,7 +61,7 @@ interface Props {
   };
   isLoading: boolean;
   plannerMode?: PlannerMode;
-  onSavePlan?: (plan: RetirementPlan) => void;
+  onSavePlan?: (plan: RetirementPlan, plannerMode?: PlannerMode) => void;
   onNavigateToTab?: (tab: string) => void;
   retirementOverview?: RetirementOverview;
   goalId?: string;
@@ -66,11 +72,13 @@ function modeLabel(mode: PlannerMode) {
   return {
     target: mode === "fire" ? "FIRE Target" : "Retirement Target",
     targetNet: mode === "fire" ? "FIRE Target (net)" : "Retirement Target (net)",
-    estAge: mode === "fire" ? "Projected FI Age" : "Retirement Age",
+    estAge: mode === "fire" ? "Projected FI Age" : "Target Retirement Age",
     progress: mode === "fire" ? "FIRE Progress" : "Retirement Progress",
-    coast: mode === "fire" ? "Coast FIRE" : "Coast Amount",
+    coast: "Coast FIRE",
     budgetAt: "Retirement spending coverage",
     prefix: mode === "fire" ? "FIRE" : "Retirement",
+    targetAge: mode === "fire" ? "Desired retirement age" : "Retirement age",
+    horizonAge: mode === "fire" ? "Plan through age" : "Life expectancy",
   };
 }
 
@@ -109,7 +117,7 @@ function ValueModeToggle({
       ]}
       size="xs"
       rounded="md"
-      className="bg-muted/30 border"
+      className="bg-muted/30 border max-sm:[&_button]:px-2 max-sm:[&_button]:text-[11px]"
     />
   );
 }
@@ -170,6 +178,75 @@ interface ChartPoint {
 const CHART_COLORS = {
   portfolio: { fill: "hsl(38, 75%, 50%)", stroke: "hsl(38, 75%, 50%)" },
 };
+
+interface ChartCalloutLabelProps {
+  viewBox?: {
+    x?: number;
+    y?: number;
+  };
+  amount: string;
+  fill: string;
+  dy?: number;
+}
+
+interface RetirementAxisTickProps {
+  x?: number | string;
+  y?: number | string;
+  payload?: {
+    value?: string;
+  };
+  retirementLabel: string;
+  eventLabel: string;
+}
+
+function RetirementAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+  retirementLabel,
+  eventLabel,
+}: RetirementAxisTickProps) {
+  const value = payload?.value ?? "";
+  const tickX = typeof x === "number" ? x : Number(x) || 0;
+  const tickY = typeof y === "number" ? y : Number(y) || 0;
+  if (value === retirementLabel) {
+    return (
+      <g transform={`translate(${tickX},${tickY})`}>
+        <text textAnchor="middle" fill="hsl(var(--foreground))">
+          <tspan x={0} dy={16} fontSize={12} fontWeight={500}>
+            {value}
+          </tspan>
+          <tspan x={0} dy={18} fontSize={12} fontWeight={700}>
+            {eventLabel}
+          </tspan>
+        </text>
+      </g>
+    );
+  }
+
+  return (
+    <g transform={`translate(${tickX},${tickY})`}>
+      <text textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={11}>
+        {value.replace(/^Age\s+/, "")}
+      </text>
+    </g>
+  );
+}
+
+function ChartCalloutLabel({ viewBox, amount, fill, dy = 0 }: ChartCalloutLabelProps) {
+  const x = typeof viewBox?.x === "number" ? viewBox.x : 0;
+  const y = typeof viewBox?.y === "number" ? viewBox.y : 0;
+  const labelX = x + 12;
+  const labelY = y + dy;
+
+  return (
+    <text x={labelX} y={labelY} textAnchor="start" fill={fill}>
+      <tspan x={labelX} dy={0} fontSize={12} fontWeight={700}>
+        {amount}
+      </tspan>
+    </text>
+  );
+}
 
 // Warm olive palette for income streams (coverage bar + row dots).
 // Values come from --fi-stream-N CSS variables which swap between light/dark themes.
@@ -256,6 +333,38 @@ function projectedAnnualIncomeNominalAtAge(
     }
     return sum + annual;
   }, 0);
+}
+
+function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: RetirementIncomeStream) {
+  if (stream.streamType === "dc") {
+    return projectedDcMonthlyPayout(
+      stream,
+      plan.personal.currentAge,
+      plan.personal.targetRetirementAge,
+      plan.withdrawal.safeWithdrawalRate,
+    );
+  }
+  return stream.monthlyAmount ?? 0;
+}
+
+function incomeAgeRangeLabel(stream: RetirementIncomeStream, horizonAge: number) {
+  return `Age ${stream.startAge} → ${horizonAge}`;
+}
+
+function isIncomeActiveAtAge(stream: RetirementIncomeStream, age: number) {
+  return age >= stream.startAge;
+}
+
+function coverageTimingLabel(
+  isActive: boolean,
+  startAge: number | undefined,
+  endAge: number | undefined,
+  age: number,
+) {
+  if (isActive) return null;
+  if (startAge !== undefined && age < startAge) return `Starts at ${startAge}`;
+  if (endAge !== undefined && age >= endAge) return `Ended at ${endAge}`;
+  return "Not active";
 }
 
 function RetirementChartTooltip({
@@ -461,25 +570,56 @@ function RetirementChart({
   retirementAge,
   projectedFireAge,
   valueMode,
+  plannerMode,
 }: {
   data: ChartPoint[];
   currency: string;
   retirementAge: number;
   projectedFireAge?: number | null;
   valueMode: ChartValueMode;
+  plannerMode: PlannerMode;
 }) {
   if (data.length < 2) return null;
 
   const retirementLabel = `Age ${retirementAge}`;
-  const showProjectedFiLine = projectedFireAge != null && projectedFireAge !== retirementAge;
+  const isFireMode = plannerMode === "fire";
+  const eventLabel = isFireMode ? "Goal" : "Retirement";
+  const showProjectedFiLine =
+    isFireMode && projectedFireAge != null && projectedFireAge !== retirementAge;
   const projectedFiLabel = showProjectedFiLine ? `Age ${projectedFireAge}` : "";
+  const retirementPoint = data.find((point) => point.age === retirementAge);
+  const retirementPortfolioValueLabel =
+    retirementPoint && retirementPoint.portfolio > 0
+      ? fmtCompact(retirementPoint.portfolio, currency)
+      : null;
+  const retirementTargetValue =
+    retirementPoint && typeof retirementPoint.target === "number" ? retirementPoint.target : null;
+  const retirementTargetValueLabel =
+    retirementTargetValue != null && retirementTargetValue > 0
+      ? fmtCompact(retirementTargetValue, currency)
+      : null;
+  const retirementIndex = data.findIndex((point) => point.age === retirementAge);
+  const calloutEndLabel =
+    retirementIndex >= 0
+      ? data[Math.min(retirementIndex + 1, data.length - 1)]?.label
+      : retirementLabel;
+  const axisTicks = useMemo(() => {
+    const interval = Math.max(1, Math.floor(data.length / 6));
+    const ticks = new Set<string>();
+    data.forEach((point, index) => {
+      if (index % interval === 0) ticks.add(point.label);
+    });
+    ticks.add(retirementLabel);
+    ticks.add(data[data.length - 1]?.label);
+    return data.map((point) => point.label).filter((label) => ticks.has(label));
+  }, [data, retirementLabel]);
   // Offset labels vertically when ages are close to avoid overlap
   const agesClose = showProjectedFiLine && Math.abs((projectedFireAge ?? 0) - retirementAge) <= 3;
 
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data} margin={{ top: 24, right: 12, left: 0, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={320}>
+        <AreaChart data={data} margin={{ top: 24, right: 12, left: -12, bottom: 38 }}>
           <defs>
             <linearGradient id="retirementPortfolio" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={CHART_COLORS.portfolio.fill} stopOpacity={0.3} />
@@ -489,9 +629,16 @@ function RetirementChart({
           </defs>
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11 }}
+            tick={(props) => (
+              <RetirementAxisTick
+                {...props}
+                retirementLabel={retirementLabel}
+                eventLabel={eventLabel}
+              />
+            )}
             tickFormatter={(label: string) => label.replace(/^Age\s+/, "")}
-            interval={Math.max(1, Math.floor(data.length / 6))}
+            ticks={axisTicks}
+            interval={0}
             axisLine={false}
             tickLine={false}
           />
@@ -502,7 +649,7 @@ function RetirementChart({
               if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
               return `$${v.toFixed(0)}`;
             }}
-            width={60}
+            width={48}
             axisLine={false}
             tickLine={false}
             domain={[0, "auto"]}
@@ -536,13 +683,6 @@ function RetirementChart({
             strokeWidth={1}
             strokeDasharray="4 3"
             strokeOpacity={0.5}
-            label={{
-              value: `GOAL · ${retirementAge}`,
-              position: "top",
-              fontSize: 10,
-              fontWeight: 600,
-              fill: "#888",
-            }}
           />
 
           {/* Target — dashed line (no fill, just stroke) */}
@@ -570,6 +710,48 @@ function RetirementChart({
             animationDuration={300}
             animationEasing="ease-out"
           />
+
+          {retirementPoint &&
+            retirementTargetValue != null &&
+            retirementTargetValueLabel &&
+            calloutEndLabel && (
+            <ReferenceLine
+              segment={[
+                { x: retirementLabel, y: retirementTargetValue },
+                { x: calloutEndLabel, y: retirementTargetValue },
+              ]}
+              stroke="#888"
+              strokeOpacity={0.55}
+              strokeWidth={1}
+              label={(props) => (
+                <ChartCalloutLabel
+                  {...props}
+                  amount={retirementTargetValueLabel}
+                  fill="#555"
+                  dy={-6}
+                />
+              )}
+            />
+          )}
+          {retirementPoint && retirementPortfolioValueLabel && calloutEndLabel && (
+            <ReferenceLine
+              segment={[
+                { x: retirementLabel, y: retirementPoint.portfolio },
+                { x: calloutEndLabel, y: retirementPoint.portfolio },
+              ]}
+              stroke={CHART_COLORS.portfolio.stroke}
+              strokeOpacity={0.55}
+              strokeWidth={1}
+              label={(props) => (
+                <ChartCalloutLabel
+                  {...props}
+                  amount={retirementPortfolioValueLabel}
+                  fill="#222"
+                  dy={-6}
+                />
+              )}
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -684,6 +866,32 @@ function LeverRow({
   const inputScale = suffix === "%" ? 100 : 1;
   const clampInputValue = (next: number) =>
     Math.min(max * inputScale, Math.max(min * inputScale, next)) / inputScale;
+  const [draftValue, setDraftValue] = useState(format(value));
+  const [inputFocused, setInputFocused] = useState(false);
+
+  useEffect(() => {
+    if (!inputFocused) {
+      setDraftValue(format(value));
+    }
+  }, [format, inputFocused, value]);
+
+  const commitDraftValue = () => {
+    const raw = draftValue.trim();
+    if (!raw) {
+      setDraftValue(format(value));
+      return;
+    }
+
+    const parsed = parseFloat(raw.replace(/,/g, ""));
+    if (Number.isNaN(parsed)) {
+      setDraftValue(format(value));
+      return;
+    }
+
+    const next = clampInputValue(parsed);
+    onChange(next);
+    setDraftValue(format(next));
+  };
 
   return (
     <div className="py-4 first:pt-1 last:pb-1">
@@ -706,11 +914,28 @@ function LeverRow({
             <input
               type="text"
               inputMode={suffix === "%" ? "decimal" : "numeric"}
-              value={format(value)}
+              value={draftValue}
+              onFocus={() => {
+                setInputFocused(true);
+                setDraftValue(format(value));
+              }}
               onChange={(e) => {
-                const parsed = parseFloat(e.target.value.replace(/,/g, ""));
-                if (!Number.isNaN(parsed)) {
-                  onChange(clampInputValue(parsed));
+                const next = e.target.value;
+                if (/^-?\d*([.,]\d*)?$/.test(next)) {
+                  setDraftValue(next);
+                }
+              }}
+              onBlur={() => {
+                setInputFocused(false);
+                commitDraftValue();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+                if (e.key === "Escape") {
+                  setDraftValue(format(value));
+                  e.currentTarget.blur();
                 }
               }}
               className="text-foreground w-full min-w-0 bg-transparent text-right text-sm tabular-nums outline-none"
@@ -756,22 +981,64 @@ function AgeBoundInput({
   min: number;
   max: number;
 }) {
+  const [draftValue, setDraftValue] = useState(value === undefined ? "" : String(value));
+  const [inputFocused, setInputFocused] = useState(false);
+
+  useEffect(() => {
+    if (!inputFocused) {
+      setDraftValue(value === undefined ? "" : String(value));
+    }
+  }, [inputFocused, value]);
+
+  const commitDraftValue = () => {
+    const raw = draftValue.trim();
+    if (!raw) {
+      onChange(undefined);
+      setDraftValue("");
+      return;
+    }
+
+    const parsed = parseInt(raw, 10);
+    if (Number.isNaN(parsed)) {
+      setDraftValue(value === undefined ? "" : String(value));
+      return;
+    }
+
+    const next = Math.min(max, Math.max(min, parsed));
+    onChange(next);
+    setDraftValue(String(next));
+  };
+
   return (
     <label className="block space-y-1.5">
       <span className="text-muted-foreground text-xs font-medium">{label}</span>
       <input
         type="text"
         inputMode="numeric"
-        value={value ?? ""}
+        value={draftValue}
         placeholder={placeholder}
+        onFocus={() => {
+          setInputFocused(true);
+          setDraftValue(value === undefined ? "" : String(value));
+        }}
         onChange={(e) => {
-          const raw = e.target.value.trim();
-          if (!raw) {
-            onChange(undefined);
-            return;
+          const next = e.target.value;
+          if (/^\d*$/.test(next)) {
+            setDraftValue(next);
           }
-          const parsed = parseInt(raw, 10);
-          if (!Number.isNaN(parsed)) onChange(Math.min(max, Math.max(min, parsed)));
+        }}
+        onBlur={() => {
+          setInputFocused(false);
+          commitDraftValue();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur();
+          }
+          if (e.key === "Escape") {
+            setDraftValue(value === undefined ? "" : String(value));
+            e.currentTarget.blur();
+          }
         }}
         className="bg-muted/70 text-foreground h-8 w-full rounded-md border px-2.5 text-right text-sm tabular-nums outline-none placeholder:text-left placeholder:text-xs"
       />
@@ -908,6 +1175,7 @@ function SidebarCard({
 function SidebarConfigurator({
   plan,
   currency,
+  plannerMode,
   onSavePlan,
   retirementOverview,
   goalId,
@@ -915,26 +1183,30 @@ function SidebarConfigurator({
 }: {
   plan: RetirementPlan;
   currency: string;
-  onSavePlan?: (plan: RetirementPlan) => void;
+  plannerMode: PlannerMode;
+  onSavePlan?: (plan: RetirementPlan, plannerMode?: PlannerMode) => void;
   retirementOverview?: RetirementOverview;
   goalId?: string;
   dcLinkedAccountIds?: string[];
 }) {
   const [draft, setDraft] = useState<RetirementPlan>(() => structuredClone(plan));
+  const [draftMode, setDraftMode] = useState<PlannerMode>(plannerMode);
   const [dirty, setDirty] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [expandedIncomeId, setExpandedIncomeId] = useState<string | null>(null);
+  const L = modeLabel(draftMode);
 
   const planKey = JSON.stringify(plan);
-  useMemo(() => {
+  useEffect(() => {
     setDraft(structuredClone(plan));
+    setDraftMode(plannerMode);
     setDirty(false);
     setEditingSection(null);
     setExpandedExpenseId(null);
     setExpandedIncomeId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planKey]);
+  }, [planKey, plannerMode]);
 
   const update = useCallback((updater: (d: RetirementPlan) => RetirementPlan) => {
     setDraft((prev) => updater(prev));
@@ -942,20 +1214,21 @@ function SidebarConfigurator({
   }, []);
 
   const saveDraft = useCallback(() => {
-    onSavePlan?.(draft);
+    onSavePlan?.(normalizeRetirementPlan(draft), draftMode);
     setDirty(false);
     setEditingSection(null);
     setExpandedExpenseId(null);
     setExpandedIncomeId(null);
-  }, [draft, onSavePlan]);
+  }, [draft, draftMode, onSavePlan]);
 
   const cancelEdit = useCallback(() => {
     setDraft(structuredClone(plan));
+    setDraftMode(plannerMode);
     setDirty(false);
     setEditingSection(null);
     setExpandedExpenseId(null);
     setExpandedIncomeId(null);
-  }, [plan]);
+  }, [plan, plannerMode]);
 
   // Shorthand updaters
   const setPersonal = <K extends keyof RetirementPlan["personal"]>(
@@ -970,6 +1243,11 @@ function SidebarConfigurator({
 
   const setWithdrawal = <K extends keyof WithdrawalConfig>(key: K, val: WithdrawalConfig[K]) =>
     update((d) => ({ ...d, withdrawal: { ...d.withdrawal, [key]: val } }));
+
+  const setPlannerModeDraft = (mode: PlannerMode) => {
+    setDraftMode(mode);
+    setDirty(true);
+  };
 
   const setTax = <K extends keyof TaxProfile>(key: K, val: TaxProfile[K]) =>
     update((d) => ({
@@ -1072,6 +1350,33 @@ function SidebarConfigurator({
     "constant-percentage": "Constant %",
     guardrails: "Guardrails",
   };
+  const withdrawalRateHint =
+    draft.withdrawal.strategy === "constant-percentage"
+      ? "Each year, withdrawals are capped at this share of the portfolio. If that is not enough to cover planned spending, the plan shows a funding gap."
+      : draft.withdrawal.strategy === "guardrails"
+        ? "Sets the starting withdrawal level. Guardrails can then reduce or increase withdrawals within the floor and ceiling limits."
+        : "Used to estimate how much you need at retirement. Yearly withdrawals still follow the spending plan you entered.";
+  const birthYearMonth =
+    draft.personal.birthYearMonth ?? inferBirthYearMonthFromAge(draft.personal.currentAge);
+  const maxBirthYearMonth = inferBirthYearMonthFromAge(0);
+  const updateBirthYearMonth = (nextBirthYearMonth: string) => {
+    if (!nextBirthYearMonth) return;
+    const nextAge = ageFromBirthYearMonth(nextBirthYearMonth) ?? draft.personal.currentAge;
+    update((d) => {
+      const targetRetirementAge = Math.max(nextAge + 1, d.personal.targetRetirementAge);
+      const planningHorizonAge = Math.max(targetRetirementAge + 1, d.personal.planningHorizonAge);
+      return {
+        ...d,
+        personal: {
+          ...d.personal,
+          birthYearMonth: nextBirthYearMonth,
+          currentAge: nextAge,
+          targetRetirementAge,
+          planningHorizonAge,
+        },
+      };
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -1086,55 +1391,80 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           <div className="divide-border divide-y">
-            <ConfigRow label="Current age">{draft.personal.currentAge}</ConfigRow>
-            <ConfigRow label="Desired retirement age">
-              {draft.personal.targetRetirementAge}
+            <ConfigRow label="Planner type">
+              {draftMode === "fire" ? "FIRE" : "Traditional"}
             </ConfigRow>
-            <ConfigRow label="Life expectancy">{draft.personal.planningHorizonAge}</ConfigRow>
+            <ConfigRow label="Current age">{draft.personal.currentAge}</ConfigRow>
+            <ConfigRow label={L.targetAge}>{draft.personal.targetRetirementAge}</ConfigRow>
+            <ConfigRow label={L.horizonAge}>{draft.personal.planningHorizonAge}</ConfigRow>
             <ConfigRow label="Monthly contribution until retirement">
               {formatAmount(draft.investment.monthlyContribution, currency)}
-            </ConfigRow>
-            <ConfigRow label="Target withdrawal rate for sizing">
-              {formatPercent(draft.withdrawal.safeWithdrawalRate)}
             </ConfigRow>
           </div>
         }
         editContent={
           <div className="divide-border -my-1 divide-y">
+            <div className="space-y-3 py-4 first:pt-0">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Planner type</p>
+                  <p className="text-muted-foreground mt-1 max-w-[260px] text-xs leading-snug">
+                    Switch how the retirement age is interpreted. Existing accounts, spending,
+                    income, taxes, and assumptions are kept.
+                  </p>
+                </div>
+                <AnimatedToggleGroup<PlannerMode>
+                  value={draftMode}
+                  onValueChange={setPlannerModeDraft}
+                  items={[
+                    { value: "fire", label: "FIRE" },
+                    { value: "traditional", label: "Traditional" },
+                  ]}
+                  size="xs"
+                  rounded="md"
+                  className="bg-muted/30 shrink-0 border"
+                />
+              </div>
+              {draftMode !== plannerMode && (
+                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                  This changes the calculation model only.{" "}
+                  {draftMode === "traditional"
+                    ? "Your desired retirement age becomes a fixed retirement start age."
+                    : "Your retirement age becomes the desired FI age; the planner will search for the first sustainable age."}
+                </p>
+              )}
+            </div>
+            <div className="py-4 first:pt-1 last:pb-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-foreground text-sm font-semibold leading-tight">
+                    Birth month
+                  </div>
+                  <div className="text-muted-foreground mt-1 max-w-[240px] text-xs leading-tight">
+                    Used to keep your current age current over time.
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <input
+                    type="month"
+                    value={birthYearMonth}
+                    max={maxBirthYearMonth}
+                    onChange={(e) => updateBirthYearMonth(e.target.value)}
+                    className="bg-muted/70 text-foreground h-8 w-36 rounded-md border px-2.5 text-right text-sm tabular-nums outline-none"
+                  />
+                  <span className="text-muted-foreground text-xs">
+                    Current age {draft.personal.currentAge}
+                  </span>
+                </div>
+              </div>
+            </div>
             <LeverRow
-              label="Current age"
-              hint="Your age today"
-              value={draft.personal.currentAge}
-              onChange={(v) => {
-                const currentAge = Math.round(v);
-                update((d) => {
-                  const targetRetirementAge = Math.max(
-                    currentAge + 1,
-                    d.personal.targetRetirementAge,
-                  );
-                  const planningHorizonAge = Math.max(
-                    targetRetirementAge + 1,
-                    d.personal.planningHorizonAge,
-                  );
-                  return {
-                    ...d,
-                    personal: {
-                      ...d.personal,
-                      currentAge,
-                      targetRetirementAge,
-                      planningHorizonAge,
-                    },
-                  };
-                });
-              }}
-              min={1}
-              max={Math.max(1, draft.personal.targetRetirementAge - 1)}
-              step={1}
-              format={(v) => String(Math.round(v))}
-            />
-            <LeverRow
-              label="Retirement age"
-              hint="Target age to stop working"
+              label={draftMode === "fire" ? "Desired retirement age" : "Retirement age"}
+              hint={
+                draftMode === "fire"
+                  ? "Desired age to be financially independent"
+                  : "Target age to stop working"
+              }
               value={draft.personal.targetRetirementAge}
               onChange={(v) => {
                 const targetRetirementAge = Math.round(v);
@@ -1142,25 +1472,29 @@ function SidebarConfigurator({
                   ...d,
                   personal: {
                     ...d.personal,
-                    targetRetirementAge,
-                    planningHorizonAge: Math.max(
-                      targetRetirementAge + 1,
-                      d.personal.planningHorizonAge,
+                    targetRetirementAge: Math.min(
+                      targetRetirementAge,
+                      d.personal.planningHorizonAge - 1,
                     ),
                   },
                 }));
               }}
               min={draft.personal.currentAge + 1}
-              max={Math.max(draft.personal.currentAge + 1, draft.personal.planningHorizonAge - 1)}
+              max={110}
               step={1}
               format={(v) => String(Math.round(v))}
             />
             <LeverRow
-              label="Life expectancy"
+              label={L.horizonAge}
               hint="Last age the plan should fund"
               value={draft.personal.planningHorizonAge}
-              onChange={(v) => setPersonal("planningHorizonAge", Math.round(v))}
-              min={draft.personal.targetRetirementAge + 1}
+              onChange={(v) =>
+                setPersonal(
+                  "planningHorizonAge",
+                  Math.max(Math.round(v), draft.personal.targetRetirementAge + 1),
+                )
+              }
+              min={draft.personal.currentAge + 2}
               max={110}
               step={1}
               format={(v) => String(Math.round(v))}
@@ -1216,17 +1550,6 @@ function SidebarConfigurator({
               suffix="%"
               format={(v) => (v * 100).toFixed(1)}
             />
-            <LeverRow
-              label="Withdrawal rate"
-              hint="SWR target at retirement"
-              value={draft.withdrawal.safeWithdrawalRate}
-              onChange={(v) => setWithdrawal("safeWithdrawalRate", v)}
-              min={0.02}
-              max={0.06}
-              step={0.001}
-              suffix="%"
-              format={(v) => (v * 100).toFixed(1)}
-            />
           </div>
         }
       />
@@ -1248,6 +1571,14 @@ function SidebarConfigurator({
           const horizonAge = draft.personal.planningHorizonAge;
           const items = expenseItems(draft.expenses);
           const total = totalMonthlyExpenseAtAge(draft.expenses, retireAge);
+          if (items.length === 0) {
+            return (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs">No retirement spending configured</p>
+                <SidebarTotalRow amount={0} currency={currency} />
+              </div>
+            );
+          }
           return (
             <div className="divide-border divide-y">
               {items.map((it) => (
@@ -1280,7 +1611,7 @@ function SidebarConfigurator({
                 (item.essential ?? true) ? "Must-have" : "Flexible",
                 item.inflationRate !== undefined
                   ? `${(item.inflationRate * 100).toFixed(1)}% inflation`
-                  : "Plan inflation",
+                  : undefined,
               ].join(" · ");
 
               return (
@@ -1320,7 +1651,6 @@ function SidebarConfigurator({
                       onClick={() => removeExpenseItem(item.id)}
                       className="text-muted-foreground hover:text-foreground disabled:hover:text-muted-foreground mr-2 rounded-md p-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={`Remove ${item.label || "spending item"}`}
-                      disabled={expenseItems(draft.expenses).length <= 1}
                     >
                       <Icons.X className="h-3.5 w-3.5" />
                     </button>
@@ -1410,21 +1740,38 @@ function SidebarConfigurator({
                 </div>
               );
             })}
-            <div className="flex gap-2 pt-3">
+            {expenseItems(draft.expenses).length === 0 && (
+              <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs leading-relaxed">
+                No spending items. Add a preset below, then adjust the amount and dates.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-2 pt-3">
               <button
-                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                className="text-muted-foreground hover:text-foreground rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() => addExpenseItem("Living", { essential: true })}
+              >
+                + Living
+              </button>
+              <button
+                className="text-muted-foreground hover:text-foreground rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                onClick={() => addExpenseItem("Healthcare", { essential: true })}
+              >
+                + Healthcare
+              </button>
+              <button
+                className="text-muted-foreground hover:text-foreground rounded-md border border-dashed py-1.5 text-xs transition-colors"
                 onClick={() => addExpenseItem("Housing", { essential: false })}
               >
                 + Housing
               </button>
               <button
-                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                className="text-muted-foreground hover:text-foreground rounded-md border border-dashed py-1.5 text-xs transition-colors"
                 onClick={() => addExpenseItem("Travel", { essential: false })}
               >
                 + Travel
               </button>
               <button
-                className="text-muted-foreground hover:text-foreground flex-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
+                className="text-muted-foreground hover:text-foreground col-span-2 rounded-md border border-dashed py-1.5 text-xs transition-colors"
                 onClick={() => addExpenseItem("Other spending", { essential: false })}
               >
                 + Other
@@ -1683,8 +2030,25 @@ function SidebarConfigurator({
                 {formatPercent(draft.investment.contributionGrowthRate)}
               </ConfigRow>
             )}
-            <ConfigRow label="Withdrawal strategy">
+            <ConfigRow
+              label={
+                <InfoLabel label="Withdrawal strategy">
+                  Choose how money is taken from your portfolio in retirement. Constant Dollar
+                  follows your spending plan, Constant % takes a fixed portfolio share, and
+                  Guardrails adjusts withdrawals within limits.
+                </InfoLabel>
+              }
+            >
               {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
+            </ConfigRow>
+            <ConfigRow
+              label={
+                <InfoLabel label="Target withdrawal rate">
+                  {withdrawalRateHint}
+                </InfoLabel>
+              }
+            >
+              {formatPercent(draft.withdrawal.safeWithdrawalRate)}
             </ConfigRow>
             {draft.withdrawal.strategy === "guardrails" && (
               <>
@@ -1763,7 +2127,11 @@ function SidebarConfigurator({
             <div className="space-y-2 py-4 first:pt-1 last:pb-1">
               <div>
                 <div className="text-foreground text-sm font-semibold leading-tight">
-                  Withdrawal strategy
+                  <InfoLabel label="Withdrawal strategy">
+                    Choose how money is taken from your portfolio in retirement. Constant Dollar
+                    follows your spending plan, Constant % takes a fixed portfolio share, and
+                    Guardrails adjusts withdrawals within limits.
+                  </InfoLabel>
                 </div>
                 <div className="text-muted-foreground mt-1 text-xs leading-tight">
                   Controls how retirement spending is withdrawn from the portfolio.
@@ -1785,6 +2153,23 @@ function SidebarConfigurator({
                     {strategyLabels[s]}
                   </label>
                 ))}
+              </div>
+              <div className="divide-border divide-y pt-2">
+                <LeverRow
+                  label={
+                    <InfoLabel label="Target withdrawal rate">
+                      {withdrawalRateHint}
+                    </InfoLabel>
+                  }
+                  hint={withdrawalRateHint}
+                  value={draft.withdrawal.safeWithdrawalRate}
+                  onChange={(v) => setWithdrawal("safeWithdrawalRate", v)}
+                  min={0.02}
+                  max={0.06}
+                  step={0.001}
+                  suffix="%"
+                  format={(v) => (v * 100).toFixed(1)}
+                />
               </div>
               {draft.withdrawal.strategy === "guardrails" && (
                 <div className="divide-border divide-y pt-2">
@@ -2086,6 +2471,7 @@ export default function DashboardPage({
 }: Props) {
   void _onNavigateToTab; // kept in Props for tab navigation; unused in new sidebar
   const L = modeLabel(plannerMode);
+  const isTraditionalMode = plannerMode === "traditional";
   const { totalValue, error } = portfolioData;
   const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
   const currency = plan.currency;
@@ -2136,6 +2522,8 @@ export default function DashboardPage({
   const progress = targetAtGoalDisplay > 0 ? Math.min(portfolioNow / targetAtGoalDisplay, 1) : 0;
 
   const fireAgeForBudget = retirementStartAge ?? plan.personal.targetRetirementAge;
+  const coverageExpenseItems = useMemo(() => expenseItems(plan.expenses), [plan.expenses]);
+  const coverageIncomeStreams = plan.incomeStreams;
 
   // Budget from backend DTO
   const budget = retirementOverview?.budgetBreakdown;
@@ -2235,6 +2623,14 @@ export default function DashboardPage({
     coverageAnnualSpending > 0
       ? Math.min(100, Math.max(0, (coverageShortfallAnnual / coverageAnnualSpending) * 100))
       : 0;
+  const nextIncomeStartAge =
+    coverageIncomeStreams
+      .filter((stream) => stream.startAge > fireAgeForBudget)
+      .reduce<number | null>(
+        (earliest, stream) =>
+          earliest === null ? stream.startAge : Math.min(earliest, stream.startAge),
+        null,
+      ) ?? null;
 
   const hasPensionFunds = plan.incomeStreams.some(
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
@@ -2326,23 +2722,36 @@ export default function DashboardPage({
   const totalPages = Math.ceil(allSnapshots.length / PAGE_SIZE);
   const pagedSnapshots = allSnapshots.slice(tablePage * PAGE_SIZE, (tablePage + 1) * PAGE_SIZE);
 
-  const isFinanciallyIndependent = portfolioNow >= retireTodayTarget && retireTodayTarget > 0;
+  const isFinanciallyIndependent =
+    !isTraditionalMode && portfolioNow >= retireTodayTarget && retireTodayTarget > 0;
   const yearsFromDesired =
     effectiveFiAge != null ? effectiveFiAge - plan.personal.targetRetirementAge : null;
-  const heroHealth =
-    isFinanciallyIndependent ||
-    (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge)
+  const traditionalStatus = retirementOverview?.successStatus;
+  const heroHealth = isTraditionalMode
+    ? traditionalStatus === "on_track" || traditionalStatus === "overfunded"
+      ? "on_track"
+      : traditionalStatus === "shortfall"
+        ? "at_risk"
+        : "off_track"
+    : isFinanciallyIndependent ||
+        (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge)
       ? "on_track"
       : effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge + 3
         ? "at_risk"
         : "off_track";
-  const heroGuidance = isFinanciallyIndependent
-    ? "You have reached financial independence with the current assumptions."
-    : yearsFromDesired != null && yearsFromDesired > 0
-      ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
-      : effectiveFiAge == null && retireTodayTarget > 0
-        ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
-        : null;
+  const heroGuidance = isTraditionalMode
+    ? traditionalStatus === "shortfall"
+      ? `Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
+      : traditionalStatus === "depleted"
+        ? `Projected to run short before age ${retirementOverview?.fundedThroughAge ?? plan.personal.planningHorizonAge}. Reduce spending, retire later, or add retirement income.`
+        : null
+    : isFinanciallyIndependent
+      ? "You have reached financial independence with the current assumptions."
+      : yearsFromDesired != null && yearsFromDesired > 0
+        ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
+        : effectiveFiAge == null && retireTodayTarget > 0
+          ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
+          : null;
   const statusCallout =
     heroHealth === "on_track" ? (
       <Card className="border-green-600/20 bg-green-50/60 dark:bg-green-950/20">
@@ -2352,7 +2761,7 @@ export default function DashboardPage({
             <div className="text-foreground mb-1 text-sm font-semibold">You're on track.</div>
             <div className="text-muted-foreground text-xs leading-relaxed">
               Stress-test with a market drawdown or inflation shock in{" "}
-              <span className="font-medium">Scenarios</span>.
+              <span className="font-medium">What If</span>.
             </div>
           </div>
         </CardContent>
@@ -2420,6 +2829,18 @@ export default function DashboardPage({
               retirementOverview.shortfallAtGoalAge / inflationFactorToGoal;
             const goalShortfall =
               chartValueMode === "nominal" ? goalShortfallNominal : goalShortfallToday;
+            const goalSurplusNominal = retirementOverview.surplusAtGoalAge;
+            const goalSurplusToday = goalSurplusNominal / inflationFactorToGoal;
+            const goalSurplus =
+              chartValueMode === "nominal" ? goalSurplusNominal : goalSurplusToday;
+            const portfolioAtTargetToday =
+              targetReconciliation?.portfolioAtTargetTodayValue ??
+              retirementOverview.portfolioAtGoalAge / inflationFactorToGoal;
+            const portfolioAtTargetNominal =
+              targetReconciliation?.portfolioAtTargetNominal ??
+              retirementOverview.portfolioAtGoalAge;
+            const portfolioAtTarget =
+              chartValueMode === "nominal" ? portfolioAtTargetNominal : portfolioAtTargetToday;
             const monthlyContribLabel = `${fmtCompact(plan.investment.monthlyContribution, currency)}/mo`;
             const annualBudgetToday =
               targetReconciliation?.plannedAnnualExpensesTodayValue ?? totalBudget * 12;
@@ -2433,6 +2854,14 @@ export default function DashboardPage({
               targetAtGoalDisplay > 0
                 ? Math.min(100, (coastAmountDisplay / targetAtGoalDisplay) * 100)
                 : 0;
+            const traditionalBadge =
+              traditionalStatus === "depleted"
+                ? "Runs short"
+                : traditionalStatus === "shortfall"
+                  ? "Shortfall"
+                  : traditionalStatus === "overfunded"
+                    ? "Surplus"
+                    : "On track";
 
             return (
               <Card className="relative overflow-hidden">
@@ -2446,7 +2875,11 @@ export default function DashboardPage({
                           className="gap-1.5 bg-green-600 text-[10px] hover:bg-green-600"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
-                          {isFinanciallyIndependent ? "FI reached" : "On track"}
+                          {isTraditionalMode
+                            ? traditionalBadge
+                            : isFinanciallyIndependent
+                              ? "FI reached"
+                              : "On track"}
                         </Badge>
                       ) : heroHealth === "at_risk" ? (
                         <Badge
@@ -2454,25 +2887,100 @@ export default function DashboardPage({
                           className="gap-1.5 text-[10px] text-amber-700 dark:text-amber-400"
                         >
                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                          {yearsFromDesired != null
-                            ? `${yearsFromDesired} yr${yearsFromDesired > 1 ? "s" : ""} late`
-                            : "At risk"}
+                          {isTraditionalMode
+                            ? traditionalBadge
+                            : yearsFromDesired != null
+                              ? `${yearsFromDesired} yr${yearsFromDesired > 1 ? "s" : ""} late`
+                              : "At risk"}
                         </Badge>
                       ) : (
                         <Badge variant="destructive" className="gap-1.5 text-[10px]">
                           <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
-                          {yearsFromDesired != null && yearsFromDesired > 0
-                            ? `${yearsFromDesired} yrs late`
-                            : "Never reaches FI"}
+                          {isTraditionalMode
+                            ? traditionalBadge
+                            : yearsFromDesired != null && yearsFromDesired > 0
+                              ? `${yearsFromDesired} yrs late`
+                              : "Never reaches FI"}
                         </Badge>
                       )}
                     </div>
-                    <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
+                    <div className="flex items-center gap-2">
+                      <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="text-muted-foreground/70 hover:text-foreground inline-flex rounded-full transition-colors"
+                            aria-label="Today's value and nominal values explained"
+                          >
+                            <Icons.Info className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">
+                          <div className="font-semibold">Today's value</div>
+                          <p className="mt-1 text-muted-foreground">
+                            Converts future dollars back into today's purchasing power, so amounts
+                            feel comparable to your current budget.
+                          </p>
+                          <div className="mt-3 font-semibold">Nominal</div>
+                          <p className="mt-1 text-muted-foreground">
+                            Shows the future dollar amount after inflation. This is the amount you
+                            would see in that future year.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
 
                   {/* Sentence-style verdict */}
                   <h1 className="max-w-[95%] font-serif text-2xl font-normal leading-[1.15] tracking-tight">
-                    {isFinanciallyIndependent ? (
+                    {isTraditionalMode ? (
+                      traditionalStatus === "shortfall" ? (
+                        <>
+                          At age {plan.personal.targetRetirementAge}, you're short{" "}
+                          <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                            {fmtCompact(goalShortfall, currency)}
+                          </span>
+                          <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                            {" "}
+                            to fund retirement through age {plan.personal.planningHorizonAge}.
+                          </span>
+                        </>
+                      ) : traditionalStatus === "depleted" ? (
+                        <>
+                          This plan runs short at{" "}
+                          <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                            age {retirementOverview.failureAge ?? retirementOverview.fundedThroughAge}
+                          </span>
+                          <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                            {" "}
+                            after retiring at {plan.personal.targetRetirementAge}.
+                          </span>
+                        </>
+                      ) : goalSurplus > 0 ? (
+                        <>
+                          You're projected to retire at age {plan.personal.targetRetirementAge} with{" "}
+                          <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                            {fmtCompact(goalSurplus, currency)}
+                          </span>
+                          <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                            {" "}
+                            surplus.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          You're projected to retire at{" "}
+                          <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
+                            age {plan.personal.targetRetirementAge}
+                          </span>
+                          <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
+                            {" "}
+                            on track.
+                          </span>
+                        </>
+                      )
+                    ) : isFinanciallyIndependent ? (
                       <>
                         You have reached{" "}
                         <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
@@ -2525,17 +3033,51 @@ export default function DashboardPage({
                   <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
                     At your current{" "}
                     <span className="text-foreground tabular-nums">{monthlyContribLabel}</span>{" "}
-                    contribution, the plan funds{" "}
-                    <ValueModeTooltip
-                      valueMode={chartValueMode}
-                      currency={currency}
-                      todayValue={annualBudgetToday}
-                      nominalValue={annualBudgetNominal}
-                    >
-                      <span className="text-foreground tabular-nums">{annualBudgetLabel}</span>
-                    </ValueModeTooltip>
-                    /yr of expenses to age {plan.personal.planningHorizonAge}.
-                    {goalShortfall > 0 && yearsFromDesired != null && yearsFromDesired > 0 && (
+                    contribution,{" "}
+                    {isTraditionalMode ? (
+                      <>
+                        projected retirement balance is{" "}
+                        <ValueModeTooltip
+                          valueMode={chartValueMode}
+                          currency={currency}
+                          todayValue={portfolioAtTargetToday}
+                          nominalValue={portfolioAtTargetNominal}
+                        >
+                          <span className="text-foreground tabular-nums">
+                            {fmtCompact(portfolioAtTarget, currency)}
+                          </span>
+                        </ValueModeTooltip>{" "}
+                        vs. required capital of{" "}
+                        <ValueModeTooltip
+                          valueMode={chartValueMode}
+                          currency={currency}
+                          todayValue={targetTodayAtGoal}
+                          nominalValue={targetNominalAtGoal}
+                        >
+                          <span className="text-foreground tabular-nums">
+                            {fmtCompact(targetAtGoalDisplay, currency)}
+                          </span>
+                        </ValueModeTooltip>{" "}
+                        at age {plan.personal.targetRetirementAge}.
+                      </>
+                    ) : (
+                      <>
+                        the plan funds{" "}
+                        <ValueModeTooltip
+                          valueMode={chartValueMode}
+                          currency={currency}
+                          todayValue={annualBudgetToday}
+                          nominalValue={annualBudgetNominal}
+                        >
+                          <span className="text-foreground tabular-nums">{annualBudgetLabel}</span>
+                        </ValueModeTooltip>
+                        /yr of expenses to age {plan.personal.planningHorizonAge}.
+                      </>
+                    )}
+                    {!isTraditionalMode &&
+                      goalShortfall > 0 &&
+                      yearsFromDesired != null &&
+                      yearsFromDesired > 0 && (
                       <>
                         {" "}
                         You're short{" "}
@@ -2569,12 +3111,14 @@ export default function DashboardPage({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="text-muted-foreground cursor-help text-[10px] uppercase tracking-wider underline decoration-dotted underline-offset-2">
-                              Target at age {plan.personal.targetRetirementAge}
+                              {isTraditionalMode ? "Required at" : "Target at"} age{" "}
+                              {plan.personal.targetRetirementAge}
                             </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs text-xs">
-                            Capital needed at your desired retirement age after expenses, income,
-                            taxes, retirement returns, and fees. Shown in {valueModeLabel}.
+                            Capital needed at your {isTraditionalMode ? "retirement" : "desired retirement"} age
+                            after expenses, income, taxes, retirement returns, and fees. Shown in{" "}
+                            {valueModeLabel}.
                           </TooltipContent>
                         </Tooltip>
                         <ValueModeTooltip
@@ -2594,7 +3138,7 @@ export default function DashboardPage({
                         className="bg-success absolute inset-y-0 left-0 transition-[width] duration-500"
                         style={{ width: `${Math.min(progress * 100, 100)}%` }}
                       />
-                      {targetAtGoalDisplay > 0 && coastAmountDisplay > 0 && (
+                      {!isTraditionalMode && targetAtGoalDisplay > 0 && coastAmountDisplay > 0 && (
                         <div
                           className="bg-foreground/55 absolute -bottom-0.5 -top-0.5 w-[2px]"
                           style={{ left: `${coastPct}%` }}
@@ -2604,13 +3148,18 @@ export default function DashboardPage({
                     </div>
                     <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
                       <span className="tabular-nums">{(progress * 100).toFixed(1)}% funded</span>
-                      <span className="tabular-nums">
-                        ▲ {L.coast} {fmtCompact(coastAmountDisplay, currency)}
-                      </span>
+                      {!isTraditionalMode && (
+                        <span className="tabular-nums">
+                          ▲ {L.coast} {fmtCompact(coastAmountDisplay, currency)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {heroGuidance && !isFinanciallyIndependent && yearsFromDesired == null && (
+                  {!isTraditionalMode &&
+                    heroGuidance &&
+                    !isFinanciallyIndependent &&
+                    yearsFromDesired == null && (
                     <p
                       className={`mt-4 border-t pt-4 text-xs ${
                         heroHealth === "on_track"
@@ -2632,7 +3181,7 @@ export default function DashboardPage({
           {chartData.length > 2 && (
             <Card>
               <CardHeader className="pb-2">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                   <div>
                     <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
                       Projection · age {plan.personal.currentAge} →{" "}
@@ -2651,15 +3200,14 @@ export default function DashboardPage({
                           </button>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-sm text-xs">
-                          The FI marker shows the first sustainable age. "What you'll need" is the
-                          minimum balance needed at each age after crediting your remaining planned
-                          contributions. It only starts at today's portfolio if you are exactly on
-                          track. "What you'll have" is the projected portfolio path.
+                          {isTraditionalMode
+                            ? "The retirement marker shows when withdrawals start. \"What you'll need\" is the minimum balance needed at each age to still fund planned retirement spending through life expectancy."
+                            : "The FI marker shows the first sustainable age. \"What you'll need\" is the minimum balance needed at each age after crediting your remaining planned contributions. It only starts at today's portfolio if you are exactly on track. \"What you'll have\" is the projected portfolio path."}
                         </TooltipContent>
                       </Tooltip>
                     </div>
                   </div>
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1.5">
                       <span
                         className="inline-block h-2 w-2 rounded-full"
@@ -2686,20 +3234,22 @@ export default function DashboardPage({
                         </span>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
-                        Minimum balance needed at each age to still hit the desired retirement-age
-                        target after crediting the planned contributions you have left.
+                        {isTraditionalMode
+                          ? "Minimum balance needed at each age to still retire at your target age and fund planned spending through life expectancy."
+                          : "Minimum balance needed at each age to still hit the desired retirement-age target after crediting the planned contributions you have left."}
                       </TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-2 sm:px-6">
                 <RetirementChart
                   data={chartData}
                   currency={currency}
                   retirementAge={plan.personal.targetRetirementAge}
                   projectedFireAge={effectiveFiAge}
                   valueMode={chartValueMode}
+                  plannerMode={plannerMode}
                 />
               </CardContent>
             </Card>
@@ -2790,71 +3340,66 @@ export default function DashboardPage({
 
           {/* Retirement spending coverage */}
           <Card>
-            <CardHeader className="pb-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
-                    <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
-                      Coverage
-                    </div>
-                  </div>
-                  <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
-                    {L.budgetAt}
-                  </CardTitle>
-                  <div className="mt-2 flex items-start gap-1.5">
-                    <p className="text-muted-foreground text-sm leading-relaxed">
-                      {coverageView === "at-retirement" ? (
-                        <>
-                          How your planned{" "}
-                          <span className="text-foreground tabular-nums">
-                            {fmtCompact(coverageSpendingMonthly, currency)}/mo
-                          </span>{" "}
-                          retirement spending is covered at the selected retirement age.
-                        </>
-                      ) : (
-                        <>
-                          How income and portfolio withdrawals cover planned spending through
-                          retirement.
-                        </>
-                      )}
-                    </p>
-                    {coverageView === "over-time" && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-foreground mt-0.5 rounded-full transition-colors"
-                            aria-label="Coverage chart details"
-                          >
-                            <Icons.Info className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs text-xs">
-                          Values are shown in {valueModeLabel}. The stacked area shows how spending
-                          is funded; the dashed line is planned retirement spending.
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+            <CardHeader className="relative pb-4 sm:pr-56">
+              <div className="min-w-0">
+                <div className="mb-1 flex items-center gap-2">
+                  <Icons.CreditCard className="text-muted-foreground h-3.5 w-3.5" />
+                  <div className="text-muted-foreground text-[11px] font-medium uppercase tracking-[0.15em]">
+                    Coverage
                   </div>
                 </div>
-                <AnimatedToggleGroup<CoverageView>
-                  value={coverageView}
-                  onValueChange={setCoverageView}
-                  items={[
-                    { value: "at-retirement", label: "At retirement" },
-                    { value: "over-time", label: "Over time" },
-                  ]}
-                  variant="secondary"
-                  size="xs"
-                  rounded="md"
-                />
+                <CardTitle className="text-[17px] font-semibold leading-none tracking-tight">
+                  {L.budgetAt}
+                </CardTitle>
+                <div className="mt-2 flex items-start gap-1.5">
+                  <p className="text-muted-foreground max-w-4xl text-sm leading-relaxed">
+                    {coverageView === "at-retirement" ? (
+                      <>
+                        Snapshot at age {fireAgeForBudget}: planned{" "}
+                        <span className="text-foreground tabular-nums">
+                          {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                        </span>{" "}
+                        spending and funding. Future items stay visible and are counted when active.
+                      </>
+                    ) : (
+                      <>How income and portfolio withdrawals cover planned spending through retirement.</>
+                    )}
+                  </p>
+                  {coverageView === "over-time" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground mt-0.5 rounded-full transition-colors"
+                          aria-label="Coverage chart details"
+                        >
+                          <Icons.Info className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs">
+                        Values are shown in {valueModeLabel}. The stacked area shows how spending is
+                        funded; the dashed line is planned retirement spending.
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
+              <AnimatedToggleGroup<CoverageView>
+                value={coverageView}
+                onValueChange={setCoverageView}
+                items={[
+                  { value: "at-retirement", label: "At retirement" },
+                  { value: "over-time", label: "Over time" },
+                ]}
+                size="xs"
+                rounded="md"
+                className="mt-4 w-fit bg-muted/30 border sm:absolute sm:right-5 sm:top-5 sm:mt-0"
+              />
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-3.5">
               {coverageView === "at-retirement" ? (
                 <>
-                  <div className="text-foreground/90 text-sm">
+                  <div className="text-foreground/90 text-[13px]">
                     At age {fireAgeForBudget} —{" "}
                     <span className="text-foreground font-semibold tabular-nums">
                       {fmtCompact(coverageSpendingMonthly, currency)}/mo
@@ -2894,84 +3439,184 @@ export default function DashboardPage({
                       />
                     )}
                   </div>
-
-                  {/* Expense breakdown — no color dots */}
-                  <div className="divide-border divide-y">
-                    {activeExpenseItems(plan.expenses, fireAgeForBudget).map((r) => (
-                      <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <span className="min-w-0">
-                          <span className="text-foreground block truncate">{r.label}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {expenseAgeRangeLabel(r, plan.personal.planningHorizonAge)}
-                          </span>
-                        </span>
-                        <span className="text-foreground tabular-nums">
-                          {fmtCompact(r.monthlyAmount, currency)}/mo
-                        </span>
-                      </div>
-                    ))}
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    {budgetStreams.length > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block h-2 w-2 rounded-sm"
+                          style={{ background: COVERAGE_COLORS.income }}
+                        />
+                        Income {coverageIncomePct.toFixed(0)}%
+                      </span>
+                    )}
+                    {coveragePortfolioPct > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="bg-success inline-block h-2 w-2 rounded-sm" />
+                        Portfolio {coveragePortfolioPct.toFixed(0)}%
+                      </span>
+                    )}
+                    {coverageShortfallPct > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-sm bg-red-500/75" />
+                        Unfunded {coverageShortfallPct.toFixed(0)}%
+                      </span>
+                    )}
+                    {budgetStreams.length === 0 && nextIncomeStartAge !== null && (
+                      <span>
+                        No income active at age {fireAgeForBudget}; first income starts at{" "}
+                        {nextIncomeStartAge}.
+                      </span>
+                    )}
                   </div>
 
-                  {/* Funding sources — small square dots */}
-                  <div className="space-y-2.5 border-t pt-4">
-                    {budgetStreams.map((s, i) => (
-                      <div
-                        key={s.label}
-                        className="flex items-center justify-between gap-3 text-sm"
-                      >
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-sm"
-                            style={{
-                              background: INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
-                            }}
-                          />
-                          <span className="text-foreground">{s.label}</span>
-                        </span>
-                        <span className="text-foreground tabular-nums">
-                          {fmtCompact(s.monthlyAmount, currency)}/mo{" "}
-                          <span className="text-muted-foreground ml-1 text-xs">
-                            {(s.percentageOfBudget * 100).toFixed(0)}%
-                          </span>
-                        </span>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {/* Expense breakdown — no color dots */}
+                    <div className="min-w-0">
+                      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                        Spending schedule
                       </div>
-                    ))}
-                    {coveragePortfolioAppliedMonthly > 0 && (
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="bg-success inline-block h-2.5 w-2.5 rounded-sm" />
-                          <span className="text-foreground">Portfolio withdrawal</span>
-                        </span>
-                        <span className="text-foreground tabular-nums">
-                          {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
-                          <span className="text-muted-foreground ml-1 text-xs">
-                            {coveragePortfolioPct.toFixed(0)}%
-                          </span>
-                        </span>
+                      <div className="divide-border divide-y">
+                        {coverageExpenseItems.map((r) => {
+                          const isActive = isExpenseActiveAtAge(r, fireAgeForBudget);
+                          const status = coverageTimingLabel(
+                            isActive,
+                            r.startAge,
+                            r.endAge,
+                            fireAgeForBudget,
+                          );
+                          return (
+                            <div
+                              key={r.id}
+                              className="flex items-center justify-between gap-3 py-1.5 text-[13px]"
+                            >
+                              <span className="min-w-0">
+                                <span className="text-foreground block truncate font-medium">
+                                  {r.label}
+                                </span>
+                                <span className="text-muted-foreground block truncate text-[11px]">
+                                  {expenseAgeRangeLabel(r, plan.personal.planningHorizonAge)}
+                                  {status ? ` · ${status}` : ""}
+                                </span>
+                              </span>
+                              <span className="text-foreground shrink-0 tabular-nums">
+                                {fmtCompact(r.monthlyAmount, currency)}/mo
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-                    {coverageShortfallMonthly > 0 && (
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="flex items-center gap-2">
-                          <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/75" />
-                          <span className="text-foreground">Unfunded spending</span>
-                        </span>
-                        <span className="text-foreground tabular-nums">
-                          {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
-                          <span className="text-muted-foreground ml-1 text-xs">
-                            {coverageShortfallPct.toFixed(0)}%
-                          </span>
-                        </span>
+                    </div>
+
+                    {/* Income schedule + current-age funding sources */}
+                    <div className="min-w-0 border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                        Income schedule
                       </div>
-                    )}
-                    {coverageEstimatedTaxesMonthly > 0 && (
-                      <div className="text-muted-foreground flex items-center justify-between gap-3 text-xs italic">
-                        <span>Withdrawal taxes (extra portfolio drag)</span>
-                        <span className="tabular-nums">
-                          +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
-                        </span>
+                      <div className="space-y-1.5">
+                        {coverageIncomeStreams.length === 0 && (
+                          <div className="text-muted-foreground py-1 text-[12px]">
+                            No retirement income configured
+                          </div>
+                        )}
+                        {coverageIncomeStreams.map((s, i) => {
+                          const isActive = isIncomeActiveAtAge(s, fireAgeForBudget);
+                          const matchedBudgetStream = budgetStreams.find(
+                            (stream) => stream.label === s.label,
+                          );
+                          const monthlyAmount =
+                            isActive && matchedBudgetStream
+                              ? matchedBudgetStream.monthlyAmount
+                              : incomeStreamMonthlyAmount(plan, s);
+                          const status = coverageTimingLabel(
+                            isActive,
+                            s.startAge,
+                            undefined,
+                            fireAgeForBudget,
+                          );
+
+                          return (
+                            <div
+                              key={s.id}
+                              className="flex items-center justify-between gap-3 text-[13px]"
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span
+                                  className="inline-block h-2 w-2 shrink-0 rounded-sm"
+                                  style={{
+                                    background:
+                                      INCOME_STREAM_COLORS[i % INCOME_STREAM_COLORS.length],
+                                  }}
+                                />
+                                <span className="min-w-0">
+                                  <span className="text-foreground block truncate font-medium">
+                                    {s.label}
+                                  </span>
+                                  <span className="text-muted-foreground block truncate text-[11px]">
+                                    {incomeAgeRangeLabel(s, plan.personal.planningHorizonAge)}
+                                    {status ? ` · ${status}` : ""}
+                                  </span>
+                                </span>
+                              </span>
+                              <span className="text-foreground shrink-0 tabular-nums">
+                                {fmtCompact(monthlyAmount, currency)}/mo{" "}
+                                {isActive && matchedBudgetStream ? (
+                                  <span className="text-muted-foreground ml-1 text-[11px]">
+                                    {(matchedBudgetStream.percentageOfBudget * 100).toFixed(0)}%
+                                  </span>
+                                ) : null}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {(coveragePortfolioAppliedMonthly > 0 ||
+                          coverageShortfallMonthly > 0 ||
+                          coverageEstimatedTaxesMonthly > 0) && (
+                          <div className="text-muted-foreground border-border mt-2 border-t pt-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                            Funding at age {fireAgeForBudget}
+                          </div>
+                        )}
+                        {coveragePortfolioAppliedMonthly > 0 && (
+                          <div className="flex items-center justify-between gap-3 text-[13px]">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="bg-success inline-block h-2 w-2 shrink-0 rounded-sm" />
+                              <span className="text-foreground truncate font-medium">
+                                Portfolio withdrawal
+                              </span>
+                            </span>
+                            <span className="text-foreground shrink-0 tabular-nums">
+                              {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
+                              <span className="text-muted-foreground ml-1 text-[11px]">
+                                {coveragePortfolioPct.toFixed(0)}%
+                              </span>
+                            </span>
+                          </div>
+                        )}
+                        {coverageShortfallMonthly > 0 && (
+                          <div className="flex items-center justify-between gap-3 text-[13px]">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="inline-block h-2 w-2 shrink-0 rounded-sm bg-red-500/75" />
+                              <span className="text-foreground truncate font-medium">
+                                Unfunded spending
+                              </span>
+                            </span>
+                            <span className="text-foreground shrink-0 tabular-nums">
+                              {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
+                              <span className="text-muted-foreground ml-1 text-[11px]">
+                                {coverageShortfallPct.toFixed(0)}%
+                              </span>
+                            </span>
+                          </div>
+                        )}
+                        {coverageEstimatedTaxesMonthly > 0 && (
+                          <div className="text-muted-foreground flex items-center justify-between gap-3 pt-1 text-[11px] italic">
+                            <span>Withdrawal taxes</span>
+                            <span className="tabular-nums">
+                              +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </>
               ) : coverageProjectionData.length > 1 ? (
@@ -3292,6 +3937,7 @@ export default function DashboardPage({
           <SidebarConfigurator
             plan={plan}
             currency={currency}
+            plannerMode={plannerMode}
             onSavePlan={onSavePlan}
             retirementOverview={retirementOverview}
             goalId={goalId}

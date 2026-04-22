@@ -1,5 +1,5 @@
 import {
-  runRetirementDecisionSensitivity,
+  runRetirementDecisionSensitivityMap,
   runRetirementMonteCarlo,
   runRetirementSorr,
   runRetirementStrategyComparison,
@@ -41,7 +41,6 @@ import {
 import type {
   DecisionSensitivityCell,
   DecisionSensitivityMatrix,
-  DecisionSensitivityResult,
   MonteCarloResult,
   RetirementPlan,
   SorrScenario,
@@ -167,7 +166,11 @@ function InlineAmountTooltip({
   );
 }
 
-function deterministicRiskContent(stress: StressTestResult | undefined, currency: string) {
+function deterministicRiskContent(
+  stress: StressTestResult | undefined,
+  currency: string,
+  plannerMode: PlannerMode,
+) {
   if (!stress) return "Stress tests are loading.";
   if (stress.severity === "low") {
     return "No preset stress materially changes the baseline result.";
@@ -207,7 +210,7 @@ function deterministicRiskContent(stress: StressTestResult | undefined, currency
       </>,
     );
   }
-  if (stress.delta.fiAgeYears && stress.delta.fiAgeYears > 0) {
+  if (plannerMode === "fire" && stress.delta.fiAgeYears && stress.delta.fiAgeYears > 0) {
     fragments.push(
       <>
         FI moves{" "}
@@ -238,6 +241,13 @@ function baselineStatusCopy(isFunded: boolean, fiAge: number | null, desiredAge:
   const years = fiAge - desiredAge;
   if (years <= 0) return "on track";
   return `${years} ${years === 1 ? "year" : "years"} late`;
+}
+
+function retirementStatusCopy(status?: string) {
+  if (status === "depleted") return "projected to run short";
+  if (status === "shortfall") return "short at retirement";
+  if (status === "overfunded") return "ahead of plan";
+  return "on track";
 }
 
 function HeroMetric({
@@ -276,35 +286,49 @@ function PlanResilienceHero({
   stresses,
   stressLoading,
   mc,
+  plannerMode = "fire",
 }: {
   plan: RetirementPlan;
   overview?: RetirementOverview;
   stresses?: StressTestResult[];
   stressLoading: boolean;
   mc?: MonteCarloResult;
+  plannerMode?: PlannerMode;
 }) {
   const currency = plan.currency;
+  const isTraditional = plannerMode === "traditional";
   const desiredAge = overview?.desiredFireAge ?? plan.personal.targetRetirementAge;
   const fiAge = overview?.fiAge ?? null;
   const isFunded = overview?.fundedAtGoalAge ?? false;
-  const status = baselineStatusCopy(isFunded, fiAge, desiredAge);
+  const status = isTraditional
+    ? retirementStatusCopy(overview?.successStatus)
+    : baselineStatusCopy(isFunded, fiAge, desiredAge);
   const topRisk = topStress(stresses);
   const risk = stressLoading
     ? "Stress tests are loading."
-    : deterministicRiskContent(topRisk, currency);
+    : deterministicRiskContent(topRisk, currency, plannerMode);
+  const hasGap = (overview?.shortfallAtGoalAge ?? 0) > 0;
+  const surplus = overview?.surplusAtGoalAge ?? 0;
   const gapLabel =
-    !overview || overview.shortfallAtGoalAge <= 0
-      ? "None"
-      : fmt(overview.shortfallAtGoalAge, currency);
+    !overview || !hasGap
+      ? isTraditional && surplus > 0
+        ? fmtCompact(surplus, currency)
+        : "None"
+      : fmtCompact(overview.shortfallAtGoalAge, currency);
   const gapDetail =
-    !overview || overview.shortfallAtGoalAge <= 0
-      ? "funded"
-      : `${fmt(overview.shortfallAtGoalAge, currency)} gap`;
+    !overview || !hasGap
+      ? isTraditional && surplus > 0
+        ? "surplus"
+        : "funded"
+      : `${fmtCompact(overview.shortfallAtGoalAge, currency)} gap`;
   const fiDetail = fiAge
     ? fiAge <= desiredAge
       ? "on target"
       : `${fiAge - desiredAge} ${fiAge - desiredAge === 1 ? "year" : "years"} late`
     : "not reached";
+  const isBaselineHealthy = isTraditional
+    ? overview?.successStatus === "on_track" || overview?.successStatus === "overfunded"
+    : isFunded;
 
   return (
     <Card className="overflow-hidden shadow-sm">
@@ -313,20 +337,20 @@ function PlanResilienceHero({
           <div
             className={cn(
               "mt-2 h-14 w-1.5 shrink-0 rounded-full",
-              isFunded ? "bg-[hsl(111,25%,48%)]" : "bg-destructive",
+              isBaselineHealthy ? "bg-[hsl(111,25%,48%)]" : "bg-destructive",
             )}
           />
           <div className="min-w-0 space-y-3">
             <div>
               <p className="text-muted-foreground text-[9px] font-semibold uppercase tracking-[0.22em]">
-                Risk Lab · deterministic
+                What If · baseline plan
               </p>
               <h2 className="mt-2 max-w-[95%] font-serif text-2xl font-normal leading-[1.15] tracking-tight">
                 Your plan is{" "}
                 <span
                   className={cn(
                     "whitespace-nowrap font-medium",
-                    isFunded ? "text-[hsl(111,25%,43%)]" : "text-destructive",
+                    isBaselineHealthy ? "text-[hsl(111,25%,43%)]" : "text-destructive",
                   )}
                 >
                   {status}
@@ -344,18 +368,31 @@ function PlanResilienceHero({
         </div>
 
         <div className="bg-muted/25 grid overflow-hidden rounded-lg border md:grid-cols-4">
-          <HeroMetric label="Desired age" value={desiredAge} detail="your goal" />
           <HeroMetric
-            label="Baseline FI age"
-            value={fiAge ?? "—"}
-            detail={fiDetail}
-            tone={fiAge && fiAge <= desiredAge ? "good" : fiAge ? "bad" : "default"}
+            label={isTraditional ? "Retirement age" : "Desired age"}
+            value={desiredAge}
+            detail="your goal"
           />
+          {isTraditional ? (
+            <HeroMetric
+              label="Projected balance"
+              value={overview ? fmtCompact(overview.portfolioAtGoalAge, currency) : "—"}
+              detail={`at age ${desiredAge}`}
+              tone={isBaselineHealthy ? "good" : "bad"}
+            />
+          ) : (
+            <HeroMetric
+              label="Baseline FI age"
+              value={fiAge ?? "—"}
+              detail={fiDetail}
+              tone={fiAge && fiAge <= desiredAge ? "good" : fiAge ? "bad" : "default"}
+            />
+          )}
           <HeroMetric
-            label="Shortfall at goal"
+            label={isTraditional ? "Gap / surplus" : "Shortfall at goal"}
             value={gapLabel}
             detail={gapDetail}
-            tone={overview && overview.shortfallAtGoalAge <= 0 ? "good" : "bad"}
+            tone={overview && !hasGap ? "good" : "bad"}
           />
           <HeroMetric
             label="Success probability"
@@ -381,6 +418,13 @@ function fiAgeDeltaLabel(stress: StressTestResult) {
   if (delta === null) return "—";
   if (delta === 0) return "unchanged";
   return delta > 0 ? `↑+${delta} yr` : `↓${Math.abs(delta)} yr`;
+}
+
+function retirementOutcomeLabel(outcome: StressTestResult["baseline"]) {
+  if (outcome.failureAge) return `Runs short ${outcome.failureAge}`;
+  if (outcome.fundedAtGoalAge) return "Funded";
+  if (outcome.shortfallAtGoalAge > 0) return "Shortfall";
+  return "Funded";
 }
 
 function severityBadgeClass(severity: StressSeverity) {
@@ -476,12 +520,15 @@ function StressTestsSection({
   loading,
   error,
   currency,
+  plannerMode = "fire",
 }: {
   stresses?: StressTestResult[];
   loading: boolean;
   error: unknown;
   currency: string;
+  plannerMode?: PlannerMode;
 }) {
+  const isTraditional = plannerMode === "traditional";
   const sorted = useMemo(
     () =>
       [...(stresses ?? [])].sort(
@@ -557,11 +604,25 @@ function StressTestsSection({
                 <div className="mt-5 border-t pt-4">
                   <div className="grid grid-cols-3 gap-4">
                     <StressMetric
-                      label="FI age"
-                      value={fiAgeDeltaLabel(stress)}
-                      from={stress.baseline.fiAge ?? "—"}
+                      label={isTraditional ? "Readiness" : "FI age"}
+                      value={
+                        isTraditional
+                          ? retirementOutcomeLabel(stress.stressed)
+                          : fiAgeDeltaLabel(stress)
+                      }
+                      from={
+                        isTraditional
+                          ? retirementOutcomeLabel(stress.baseline)
+                          : (stress.baseline.fiAge ?? "—")
+                      }
                       tone={
-                        stress.delta.fiAgeYears && stress.delta.fiAgeYears > 0
+                        (
+                          isTraditional
+                            ? stress.stressed.shortfallAtGoalAge >
+                                stress.baseline.shortfallAtGoalAge ||
+                              Boolean(stress.stressed.failureAge)
+                            : stress.delta.fiAgeYears && stress.delta.fiAgeYears > 0
+                        )
                           ? "text-destructive"
                           : undefined
                       }
@@ -665,10 +726,14 @@ function MonteCarloFanChart({
   result,
   currency,
   desiredAge,
+  showMedianFiLine = true,
+  goalLabel = "goal",
 }: {
   result: MonteCarloResult;
   currency: string;
   desiredAge: number;
+  showMedianFiLine?: boolean;
+  goalLabel?: string;
 }) {
   const chartData = result.ageAxis.map((age, index) => {
     const p10 = result.percentiles.p10[index] ?? 0;
@@ -722,13 +787,13 @@ function MonteCarloFanChart({
           label={(props) => (
             <ReferenceCaption
               {...props}
-              value={`goal @${desiredAge}`}
+              value={`${goalLabel} @${desiredAge}`}
               fill="hsl(50 3% 42%)"
               side="left"
             />
           )}
         />
-        {result.medianFireAge && result.medianFireAge !== desiredAge && (
+        {showMedianFiLine && result.medianFireAge && result.medianFireAge !== desiredAge && (
           <ReferenceLine
             x={result.medianFireAge}
             stroke="hsl(91,34%,29%)"
@@ -755,15 +820,18 @@ function MonteCarloDistributionSection({
   running,
   error,
   onRun,
+  plannerMode = "fire",
 }: {
   plan: RetirementPlan;
   result?: MonteCarloResult;
   running: boolean;
   error: unknown;
   onRun: (nSims: number) => void;
+  plannerMode?: PlannerMode;
 }) {
   const message = errorMessage(error);
   const desiredAge = plan.personal.targetRetirementAge;
+  const isTraditional = plannerMode === "traditional";
 
   return (
     <Card className="overflow-hidden">
@@ -774,7 +842,7 @@ function MonteCarloDistributionSection({
               Monte Carlo · stochastic
             </p>
             <CardTitle className="mt-2 font-serif text-[23px] font-normal leading-[1.05] tracking-[-0.02em]">
-              How often does this plan succeed?
+              How often does this {isTraditional ? "retirement plan" : "plan"} succeed?
             </CardTitle>
             <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
               Each simulation draws a new sequence of returns from your expected return and
@@ -802,9 +870,17 @@ function MonteCarloDistributionSection({
       <CardContent className="space-y-0 p-0">
         {message && <p className="text-destructive text-sm">{message}</p>}
         {running && (
-          <div className="space-y-3 p-5 md:p-6">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-[320px] w-full rounded-xl" />
+          <div className="m-5 rounded-xl border bg-muted/20 md:m-6">
+            <div className="flex min-h-44 flex-col items-center justify-center px-5 py-8 text-center">
+              <span className="flex size-11 items-center justify-center rounded-full bg-[hsl(91,34%,29%)]/10 text-[hsl(91,34%,29%)]">
+                <Icons.Spinner className="size-5 animate-spin" />
+              </span>
+              <p className="mt-4 text-sm font-semibold">Running simulations</p>
+              <p className="text-muted-foreground mt-1 max-w-md text-sm leading-relaxed">
+                Testing many possible market paths. Results and the fan chart will appear when the
+                run finishes.
+              </p>
+            </div>
           </div>
         )}
         {!running && !result && (
@@ -812,8 +888,9 @@ function MonteCarloDistributionSection({
             <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
               <div>
                 <p className="text-sm font-semibold">No stochastic run yet.</p>
-                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[hsl(91,22%,32%)]">
-                  Run 10k simulations to estimate success probability, median FI age, and downside
+                <p className="mt-1 max-w-4xl text-sm leading-relaxed text-[hsl(91,22%,32%)]">
+                  Run 10k simulations to estimate success probability,{" "}
+                  {isTraditional ? "downside depletion risk" : "median FI age"}, and downside
                   horizon value.
                 </p>
               </div>
@@ -840,7 +917,7 @@ function MonteCarloDistributionSection({
             </div>
           </div>
         )}
-        {!running && result && (
+        {result && (
           <>
             <div className="bg-muted/10 grid border-b md:grid-cols-5">
               <SimulationMetric
@@ -850,9 +927,9 @@ function MonteCarloDistributionSection({
                 tone={result.successRate >= 0.8 ? "good" : "bad"}
               />
               <SimulationMetric
-                label="Median FI age"
-                value={result.medianFireAge ?? "—"}
-                detail={`vs goal ${desiredAge}`}
+                label={isTraditional ? "Retirement age" : "Median FI age"}
+                value={isTraditional ? desiredAge : (result.medianFireAge ?? "—")}
+                detail={isTraditional ? "withdrawals start" : `vs goal ${desiredAge}`}
               />
               <SimulationMetric
                 label="Horizon · P10"
@@ -877,6 +954,8 @@ function MonteCarloDistributionSection({
                 result={result}
                 currency={plan.currency}
                 desiredAge={desiredAge}
+                showMedianFiLine={!isTraditional}
+                goalLabel={isTraditional ? "retire" : "goal"}
               />
               <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-5 text-sm">
                 <span className="flex items-center gap-2">
@@ -889,9 +968,9 @@ function MonteCarloDistributionSection({
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="border-muted-foreground h-0 w-6 border-t border-dashed" />
-                  Goal age
+                  {isTraditional ? "Retirement age" : "Goal age"}
                 </span>
-                {result.medianFireAge && result.medianFireAge !== desiredAge && (
+                {!isTraditional && result.medianFireAge && result.medianFireAge !== desiredAge && (
                   <span className="flex items-center gap-2">
                     <span className="h-0 w-6 border-t border-dashed border-[hsl(91,34%,29%)]" />
                     Median FI age
@@ -1019,7 +1098,9 @@ function sensitivityCellStyle({
     };
   }
 
-  const baselinePortfolio = displayMetricBucket(baseline?.portfolioAtHorizon ?? range.baselinePortfolio);
+  const baselinePortfolio = displayMetricBucket(
+    baseline?.portfolioAtHorizon ?? range.baselinePortfolio,
+  );
   const delta = displayMetricBucket(cell.portfolioAtHorizon) - baselinePortfolio;
 
   if (delta === 0) {
@@ -1050,12 +1131,14 @@ function DecisionHeatmap({
   formatRow,
   formatColumn,
   flatColumnHint,
+  ageMetricLabel,
 }: {
   matrix: DecisionSensitivityMatrix;
   currency: string;
   formatRow: (value: number, label: string) => string;
   formatColumn: (value: number, label: string) => string;
   flatColumnHint?: string;
+  ageMetricLabel: string;
 }) {
   const range = matrixDeltaRange(matrix);
   const baseline = matrixBaselineCell(matrix);
@@ -1153,7 +1236,7 @@ function DecisionHeatmap({
                               currency,
                             )}
                           </span>
-                          <span className="text-muted-foreground">FI age</span>
+                          <span className="text-muted-foreground">{ageMetricLabel}</span>
                           <span className="text-right">{cell.fiAge ?? "Not reached"}</span>
                           <span className="text-muted-foreground">Goal shortfall today</span>
                           <span className="text-right">
@@ -1174,88 +1257,162 @@ function DecisionHeatmap({
 }
 
 function WhatMovesThePlanSection({
-  sensitivity,
-  loading,
+  contributionReturn,
+  retirementAgeSpending,
+  contributionLoading,
+  spendingLoading,
   error,
+  onRun,
   plan,
   plannerMode = "fire",
 }: {
-  sensitivity?: DecisionSensitivityResult;
-  loading: boolean;
+  contributionReturn?: DecisionSensitivityMatrix;
+  retirementAgeSpending?: DecisionSensitivityMatrix;
+  contributionLoading: boolean;
+  spendingLoading: boolean;
   error: unknown;
+  onRun: () => void;
   plan: RetirementPlan;
   plannerMode?: PlannerMode;
 }) {
   const message = errorMessage(error);
   const isFireMode = plannerMode !== "traditional";
+  const loading = contributionLoading || spendingLoading;
+  const hasAnyMap = Boolean(contributionReturn || retirementAgeSpending);
 
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-muted-foreground/55 text-[10px] font-normal uppercase leading-none tracking-[0.24em]">
-            Sensitivity · 2 grids
+            Sensitivity analysis
           </p>
           <h2 className="mt-2 font-serif text-[23px] font-normal leading-[1.05] tracking-[-0.02em]">
             What moves the plan?
           </h2>
         </div>
-        <p className="text-muted-foreground/55 pt-0.5 text-[13px] font-normal italic leading-none">
-          Baseline highlighted.
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-muted-foreground/55 hidden pt-0.5 text-[13px] font-normal italic leading-none sm:block">
+            Baseline highlighted.
+          </p>
+          {hasAnyMap && (
+            <Button variant="ghost" size="sm" onClick={onRun} disabled={loading}>
+              {loading ? "Updating..." : "Refresh maps"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {message && <p className="text-destructive text-sm">{message}</p>}
-      {loading && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+      {!hasAnyMap && !message && (
+        <div className="rounded-xl border border-dashed bg-muted/10 p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold">See which changes would help most.</p>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
+                Compare saving more, earning a different return, spending less, or retiring at a
+                different age.
+              </p>
+            </div>
+            <Button size="sm" onClick={onRun} disabled={loading}>
+              <Icons.Sparkles className="mr-2 size-3.5" />
+              {loading ? "Building..." : "Build maps"}
+            </Button>
+          </div>
         </div>
       )}
-      {!loading && sensitivity && (
+      {hasAnyMap && (
         <div className="grid gap-3 lg:grid-cols-2">
-          <SensitivityMatrixCard
-            title="Contribution × Return"
-            subtitle="Portfolio at horizon in today's dollars"
-            axisLabel="Expected return ↑ / Monthly contribution ↔"
-          >
-            <DecisionHeatmap
-              matrix={sensitivity.contributionReturn}
-              currency={plan.currency}
-              formatRow={(value, label) => label || `${(value * 100).toFixed(1)}%`}
-              formatColumn={(value) => axisMoney(value, plan.currency)}
+          {contributionReturn ? (
+            <SensitivityMatrixCard
+              title="Contribution × Return"
+              subtitle="Portfolio at horizon in today's dollars"
+              axisLabel="Expected return ↑ / Monthly contribution ↔"
+            >
+              <DecisionHeatmap
+                matrix={contributionReturn}
+                currency={plan.currency}
+                formatRow={(value, label) => label || `${(value * 100).toFixed(1)}%`}
+                formatColumn={(value) => axisMoney(value, plan.currency)}
+                ageMetricLabel={isFireMode ? "FI age" : "Readiness age"}
+              />
+            </SensitivityMatrixCard>
+          ) : (
+            <SensitivityLoadingCard
+              title="Contribution × Return"
+              description="Checking how saving and market returns change the result."
             />
-          </SensitivityMatrixCard>
+          )}
 
-          <SensitivityMatrixCard
-            title={`${isFireMode ? "Desired age" : "Retirement age"} × Spending`}
-            subtitle="Portfolio at horizon in today's dollars"
-            axisLabel={`Monthly spending ↑ / ${isFireMode ? "Desired age" : "Retirement age"} ↔`}
-          >
-            <DecisionHeatmap
-              matrix={sensitivity.retirementAgeSpending}
-              currency={plan.currency}
-              formatRow={(value) => axisMoney(value, plan.currency)}
-              formatColumn={(value, label) => label || String(Math.round(value))}
-              flatColumnHint={
-                isFireMode
-                  ? "No material change: in FIRE mode, withdrawals still start when the plan reaches FI, not necessarily at this desired age."
-                  : undefined
-              }
+          {retirementAgeSpending ? (
+            <SensitivityMatrixCard
+              title={`${isFireMode ? "Desired age" : "Retirement age"} × Spending`}
+              subtitle="Portfolio at horizon in today's dollars"
+              axisLabel={`Monthly spending ↑ / ${isFireMode ? "Desired age" : "Retirement age"} ↔`}
+            >
+              <DecisionHeatmap
+                matrix={retirementAgeSpending}
+                currency={plan.currency}
+                formatRow={(value) => axisMoney(value, plan.currency)}
+                formatColumn={(value, label) => label || String(Math.round(value))}
+                ageMetricLabel={isFireMode ? "FI age" : "Readiness age"}
+                flatColumnHint={
+                  isFireMode
+                    ? "No material change: in FIRE mode, withdrawals still start when the plan reaches FI, not necessarily at this desired age."
+                    : undefined
+                }
+              />
+            </SensitivityMatrixCard>
+          ) : (
+            <SensitivityLoadingCard
+              title={`${isFireMode ? "Desired age" : "Retirement age"} × Spending`}
+              description="Checking how timing and retirement spending change the result."
             />
-          </SensitivityMatrixCard>
+          )}
         </div>
       )}
     </section>
   );
 }
+
+function SensitivityLoadingCard({ title, description }: { title: string; description: string }) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="border-b px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-base">{title}</CardTitle>
+            <p className="text-muted-foreground mt-1 text-sm">{description}</p>
+          </div>
+          <Icons.Spinner className="text-muted-foreground mt-1 size-4 animate-spin" />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 p-5">
+        <div className="grid grid-cols-5 gap-1.5">
+          {Array.from({ length: 25 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-10 animate-pulse rounded-md bg-muted/50"
+              style={{ animationDelay: `${(index % 5) * 45}ms` }}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 function StrategyComparisonTable({
   result,
   currency,
+  plannerMode = "fire",
+  retirementAge,
 }: {
   result: StrategyComparisonResult;
   currency: string;
+  plannerMode?: PlannerMode;
+  retirementAge: number;
 }) {
+  const isTraditional = plannerMode === "traditional";
   const rows = [
     ["Constant dollar", result.constantDollar],
     ["Constant percentage", result.constantPercentage],
@@ -1274,7 +1431,11 @@ function StrategyComparisonTable({
             <p className="text-muted-foreground mt-0.5 text-xs">{pct(row.successRate)} success</p>
           </div>
           <p className="text-muted-foreground tabular-nums">
-            {row.medianFireAge ? `FI ${row.medianFireAge}` : "No FI"}
+            {isTraditional
+              ? `Retire ${retirementAge}`
+              : row.medianFireAge
+                ? `FI ${row.medianFireAge}`
+                : "No FI"}
           </p>
           <p className="min-w-24 text-right font-semibold tabular-nums">
             {fmtCompact(row.finalPortfolioAtHorizon.p50, currency)}
@@ -1396,6 +1557,7 @@ function SorrChart({
 function AdvancedSection({
   plan,
   overview,
+  plannerMode = "fire",
   strategyResult,
   strategyRunning,
   strategyError,
@@ -1407,6 +1569,7 @@ function AdvancedSection({
 }: {
   plan: RetirementPlan;
   overview?: RetirementOverview;
+  plannerMode?: PlannerMode;
   strategyResult?: StrategyComparisonResult;
   strategyRunning: boolean;
   strategyError: unknown;
@@ -1418,6 +1581,7 @@ function AdvancedSection({
 }) {
   const retirementStartAge = overview?.retirementStartAge ?? plan.personal.targetRetirementAge;
   const canRunSorr = (overview?.portfolioAtRetirementStart ?? 0) > 0;
+  const isTraditional = plannerMode === "traditional";
 
   return (
     <details open className="bg-card group overflow-hidden rounded-xl border">
@@ -1522,10 +1686,16 @@ function AdvancedSection({
           )}
           <div className="mt-4">
             {strategyResult ? (
-              <StrategyComparisonTable result={strategyResult} currency={plan.currency} />
+              <StrategyComparisonTable
+                result={strategyResult}
+                currency={plan.currency}
+                plannerMode={plannerMode}
+                retirementAge={plan.personal.targetRetirementAge}
+              />
             ) : (
               <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-                Compare strategies to see FI age and median horizon value.
+                Compare strategies to see {isTraditional ? "success rate" : "FI age"} and median
+                horizon value.
               </div>
             )}
           </div>
@@ -1556,16 +1726,45 @@ export default function RiskLabPage({
     staleTime: 5 * 60 * 1000,
   });
 
-  const sensitivityQuery = useQuery({
+  const contributionSensitivityQuery = useQuery({
     queryKey: [
-      "retirement-risk-lab-decision-sensitivity",
+      "retirement-risk-lab-decision-sensitivity-map",
+      "contribution-return",
       goalId,
       plannerMode,
       planKey,
       portfolioNow,
     ],
-    queryFn: () => runRetirementDecisionSensitivity(plan, portfolioNow, plannerMode, goalId),
-    enabled: !isLoading,
+    queryFn: () =>
+      runRetirementDecisionSensitivityMap(
+        plan,
+        portfolioNow,
+        "contribution-return",
+        plannerMode,
+        goalId,
+      ),
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const spendingSensitivityQuery = useQuery({
+    queryKey: [
+      "retirement-risk-lab-decision-sensitivity-map",
+      "retirement-age-spending",
+      goalId,
+      plannerMode,
+      planKey,
+      portfolioNow,
+    ],
+    queryFn: () =>
+      runRetirementDecisionSensitivityMap(
+        plan,
+        portfolioNow,
+        "retirement-age-spending",
+        plannerMode,
+        goalId,
+      ),
+    enabled: false,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1608,6 +1807,7 @@ export default function RiskLabPage({
         stresses={stressQuery.data}
         stressLoading={stressQuery.isLoading}
         mc={monteCarlo.data}
+        plannerMode={plannerMode}
       />
 
       <MonteCarloDistributionSection
@@ -1616,6 +1816,7 @@ export default function RiskLabPage({
         running={monteCarlo.isPending}
         error={monteCarlo.error}
         onRun={(nSims) => monteCarlo.mutate(nSims)}
+        plannerMode={plannerMode}
       />
 
       <StressTestsSection
@@ -1623,12 +1824,19 @@ export default function RiskLabPage({
         loading={stressQuery.isLoading}
         error={stressQuery.error}
         currency={plan.currency}
+        plannerMode={plannerMode}
       />
 
       <WhatMovesThePlanSection
-        sensitivity={sensitivityQuery.data}
-        loading={sensitivityQuery.isLoading}
-        error={sensitivityQuery.error}
+        contributionReturn={contributionSensitivityQuery.data}
+        retirementAgeSpending={spendingSensitivityQuery.data}
+        contributionLoading={contributionSensitivityQuery.isFetching}
+        spendingLoading={spendingSensitivityQuery.isFetching}
+        error={contributionSensitivityQuery.error ?? spendingSensitivityQuery.error}
+        onRun={() => {
+          void contributionSensitivityQuery.refetch();
+          void spendingSensitivityQuery.refetch();
+        }}
         plan={plan}
         plannerMode={plannerMode}
       />
@@ -1636,6 +1844,7 @@ export default function RiskLabPage({
       <AdvancedSection
         plan={plan}
         overview={retirementOverview}
+        plannerMode={plannerMode}
         strategyResult={strategyComparison.data}
         strategyRunning={strategyComparison.isPending}
         strategyError={strategyComparison.error}

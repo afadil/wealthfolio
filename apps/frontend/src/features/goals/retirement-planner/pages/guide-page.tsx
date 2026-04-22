@@ -69,10 +69,10 @@ export default function GuidePage({ country }: { country?: string }) {
             account to pull the live balance with one click. The planner accumulates the fund until
             FIRE, then lets it grow contribution-free until payout age.
           </Step>
-          <Step n={5} title="Read the Dashboard, then explore Simulations">
+          <Step n={5} title="Read the Dashboard, then test What Ifs">
             The Dashboard shows your retire-today target, projected FI age, retirement spending
-            coverage, and a year-by-year table. Simulations runs Monte Carlo (100,000 paths),
-            scenario analysis, sensitivity heatmaps, and sequence-of-returns crash tests.
+            coverage, and a year-by-year table. What If shows stress tests, Monte Carlo,
+            sensitivity maps, and sequence-of-returns paths.
           </Step>
         </div>
       </Section>
@@ -111,7 +111,7 @@ export default function GuidePage({ country }: { country?: string }) {
         </div>
       </Section>
 
-      <Section title="Understanding Simulations">
+      <Section title="Understanding What If">
         <div className="space-y-4">
           <Term t="Monte Carlo (100,000 simulations)">
             Runs your plan 100,000 times using a two-regime fat-tailed return distribution: 85% of
@@ -144,9 +144,8 @@ export default function GuidePage({ country }: { country?: string }) {
             streams cover more than 30% of expenses.
           </Term>
           <Term t="Sensitivity Analysis">
-            Two heatmaps: FIRE age across contribution levels × return rates, and FIRE age across
-            withdrawal rate × return rates. Your current settings are highlighted in blue. Use this
-            to identify which lever — saving more, earning more, or spending less — matters most.
+            Two maps compare saving, returns, retirement age, and spending. Your current settings
+            are highlighted so you can see which change would move the plan most.
           </Term>
         </div>
       </Section>
