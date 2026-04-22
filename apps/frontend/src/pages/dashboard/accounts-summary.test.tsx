@@ -120,6 +120,7 @@ function createAccount(overrides: Partial<Account>): Account {
     meta: overrides.meta,
     provider: overrides.provider,
     providerAccountId: overrides.providerAccountId,
+    costBasisMethod: overrides.costBasisMethod ?? "FIFO",
   };
 }
 

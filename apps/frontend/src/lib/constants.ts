@@ -24,6 +24,7 @@ export function createPortfolioAccount(baseCurrency: string) {
     isActive: true,
     isArchived: false,
     trackingMode: "NOT_SET" as const,
+    costBasisMethod: "FIFO" as const,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

@@ -23,6 +23,7 @@ const createMockAccount = (overrides: Partial<Account> = {}): Account => ({
   isActive: true,
   isArchived: false,
   trackingMode: "TRANSACTIONS",
+  costBasisMethod: "FIFO",
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

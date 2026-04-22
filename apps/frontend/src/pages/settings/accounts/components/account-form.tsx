@@ -543,8 +543,9 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                 </AlertDialogTitle>
               </div>
               <AlertDialogDescription>
-                Changing the cost basis method will affect how gains and losses are calculated for
-                future sells. Existing closed positions are not retroactively recalculated.
+                Changing the cost basis method will trigger a full recalculation of all holdings for
+                this account. Your average cost and capital gains history will be updated to reflect
+                the new method.
               </AlertDialogDescription>
             </AlertDialogHeader>
           </div>
