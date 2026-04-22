@@ -580,7 +580,7 @@ impl Position {
 
         // Convert to Vec, sort descending by date (LIFO), operate, convert back later
         let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
-        vec_lots.sort_by(|a, b| b.acquisition_date.cmp(&a.acquisition_date));
+        vec_lots.sort_by_key(|b| std::cmp::Reverse(b.acquisition_date));
 
         let mut lot_indices_to_remove = Vec::new();
         let mut lot_updates = Vec::new();
