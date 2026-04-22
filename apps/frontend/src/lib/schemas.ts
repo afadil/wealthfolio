@@ -92,6 +92,7 @@ export const newAccountSchema = z.object({
   accountType: accountTypeSchema,
   currency: z.string({ required_error: "Please select a currency." }),
   trackingMode: trackingModeSchema.optional().default("NOT_SET"),
+  costBasisMethod: z.enum(["FIFO", "LIFO", "WAC"]).default("FIFO"),
   meta: z.string().nullable().optional(),
 });
 

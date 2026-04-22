@@ -54,6 +54,7 @@ export interface Account {
   isActive: boolean;
   isArchived: boolean;
   trackingMode: TrackingMode;
+  costBasisMethod?: "FIFO" | "LIFO" | "WAC";
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional - links to platform/broker
