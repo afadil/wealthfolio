@@ -24,6 +24,7 @@ export function AccountEditModal({ account, open, onClose }: AccountEditModalPro
     isActive: account?.id ? account?.isActive : true,
     isArchived: account?.isArchived ?? false,
     trackingMode: account?.trackingMode,
+    costBasisMethod: account?.costBasisMethod,
     meta: account?.meta,
   };
 
