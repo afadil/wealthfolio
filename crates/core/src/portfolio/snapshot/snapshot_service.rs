@@ -711,7 +711,7 @@ impl SnapshotService {
                 HashMap::with_capacity(accounts_to_process_today.len());
             let mut keyframes_today = Vec::new();
 
-            for (account_id, _account) in accounts_to_process_today {
+            for (account_id, account) in accounts_to_process_today {
                 let previous_holdings_snapshot = current_holdings_snapshots
                     .get(account_id)
                      .ok_or_else(|| {
@@ -748,6 +748,7 @@ impl SnapshotService {
                         previous_holdings_snapshot,
                         &activities_today, // Pass the already fetched activities
                         current_date,
+                        account.cost_basis_method,
                     ) {
                         Ok(calc_result) => {
                             // Collect any warnings from activity processing
