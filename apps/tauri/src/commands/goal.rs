@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::context::ServiceContext;
 use log::debug;
+use rust_decimal::prelude::ToPrimitive;
 use tauri::State;
 use wealthfolio_core::goals::{
     Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan,
@@ -252,8 +253,15 @@ async fn build_valuation_map(
 
     let mut map = std::collections::HashMap::new();
     for v in &valuations {
-        let value_in_base = v.total_value.to_string().parse::<f64>().unwrap_or(0.0)
-            * v.fx_rate_to_base.to_string().parse::<f64>().unwrap_or(1.0);
+        let total = v
+            .total_value
+            .to_f64()
+            .ok_or_else(|| format!("Invalid valuation total for account {}", v.account_id))?;
+        let fx = v
+            .fx_rate_to_base
+            .to_f64()
+            .ok_or_else(|| format!("Invalid FX rate for account {}", v.account_id))?;
+        let value_in_base = total * fx;
         map.insert(v.account_id.clone(), value_in_base);
     }
     Ok(map)

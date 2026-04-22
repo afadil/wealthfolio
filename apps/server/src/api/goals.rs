@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    api::shared::trigger_lightweight_portfolio_update, error::ApiResult, main_lib::AppState,
+    api::shared::trigger_lightweight_portfolio_update,
+    error::{ApiError, ApiResult},
+    main_lib::AppState,
 };
 use axum::{
     extract::{Path, State},
@@ -10,6 +12,7 @@ use axum::{
     routing::get,
     Json, Router,
 };
+use rust_decimal::prelude::ToPrimitive;
 use serde::Deserialize;
 use wealthfolio_core::{
     accounts::AccountServiceTrait,
@@ -146,8 +149,16 @@ async fn build_valuation_map(state: &AppState) -> ApiResult<HashMap<String, f64>
 
     let mut map = HashMap::new();
     for v in &valuations {
-        let value_in_base = v.total_value.to_string().parse::<f64>().unwrap_or(0.0)
-            * v.fx_rate_to_base.to_string().parse::<f64>().unwrap_or(1.0);
+        let total = v.total_value.to_f64().ok_or_else(|| {
+            ApiError::Internal(format!(
+                "Invalid valuation total for account {}",
+                v.account_id
+            ))
+        })?;
+        let fx = v.fx_rate_to_base.to_f64().ok_or_else(|| {
+            ApiError::Internal(format!("Invalid FX rate for account {}", v.account_id))
+        })?;
+        let value_in_base = total * fx;
         map.insert(v.account_id.clone(), value_in_base);
     }
     Ok(map)
@@ -180,6 +191,24 @@ async fn get_save_up_overview(
 // ─── RetirementPlan-based Simulation Endpoints ───────────────────────────────
 
 const MAX_SIMS: u32 = 500_000;
+const DEFAULT_SIMS: u32 = 10_000;
+
+fn normalize_sim_count(n_sims: Option<u32>) -> u32 {
+    n_sims.unwrap_or(DEFAULT_SIMS).clamp(1, MAX_SIMS)
+}
+
+#[cfg(test)]
+mod retirement_simulation_tests {
+    use super::*;
+
+    #[test]
+    fn simulation_count_is_clamped_at_the_http_boundary() {
+        assert_eq!(normalize_sim_count(Some(0)), 1);
+        assert_eq!(normalize_sim_count(Some(42)), 42);
+        assert_eq!(normalize_sim_count(Some(MAX_SIMS + 1)), MAX_SIMS);
+        assert_eq!(normalize_sim_count(None), DEFAULT_SIMS);
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -280,7 +309,7 @@ async fn retirement_monte_carlo(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RetirementMonteCarloRequest>,
 ) -> ApiResult<Json<MonteCarloResult>> {
-    let n = req.n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let n = normalize_sim_count(req.n_sims);
     let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
         &state,
         &req.goal_id,
@@ -377,7 +406,7 @@ async fn retirement_strategy_comparison(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RetirementStrategyComparisonRequest>,
 ) -> ApiResult<Json<StrategyComparisonResult>> {
-    let n = req.n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let n = normalize_sim_count(req.n_sims);
     let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
         &state,
         &req.goal_id,

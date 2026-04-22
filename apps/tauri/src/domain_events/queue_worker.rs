@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::{debug, error, info, warn};
+use rust_decimal::prelude::ToPrimitive;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
@@ -494,8 +495,21 @@ async fn refresh_all_goal_summaries(context: &Arc<ServiceContext>) {
 
     let mut valuation_map = std::collections::HashMap::new();
     for v in &valuations {
-        let value_in_base = v.total_value.to_string().parse::<f64>().unwrap_or(0.0)
-            * v.fx_rate_to_base.to_string().parse::<f64>().unwrap_or(1.0);
+        let Some(total) = v.total_value.to_f64() else {
+            warn!(
+                "Skipping goal summary refresh: invalid valuation total for account {}",
+                v.account_id
+            );
+            return;
+        };
+        let Some(fx) = v.fx_rate_to_base.to_f64() else {
+            warn!(
+                "Skipping goal summary refresh: invalid FX rate for account {}",
+                v.account_id
+            );
+            return;
+        };
+        let value_in_base = total * fx;
         valuation_map.insert(v.account_id.clone(), value_in_base);
     }
 

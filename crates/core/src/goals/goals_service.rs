@@ -99,6 +99,39 @@ fn compute_summary_current_value(
     }
 }
 
+fn retirement_goal_health_from_overview_status(status: &str) -> String {
+    match status {
+        "achieved" | "on_track" => "on_track".to_string(),
+        "at_risk" => "at_risk".to_string(),
+        "off_track" => "off_track".to_string(),
+        _ => "not_applicable".to_string(),
+    }
+}
+
+fn invalid_input(message: impl Into<String>) -> Result<()> {
+    Err(crate::errors::ValidationError::InvalidInput(message.into()).into())
+}
+
+fn validate_finite_range(label: &str, value: f64, min: f64, max: f64) -> Result<()> {
+    if !value.is_finite() || value < min || value > max {
+        invalid_input(format!(
+            "{label} must be between {:.0}% and {:.0}%",
+            min * 100.0,
+            max * 100.0
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_non_negative_amount(label: &str, value: f64) -> Result<()> {
+    if !value.is_finite() || value < 0.0 {
+        invalid_input(format!("{label} cannot be negative"))
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_goal_lifecycle(status_lifecycle: &str) -> Result<()> {
     if matches!(
         status_lifecycle,
@@ -138,87 +171,125 @@ fn compute_tax_bucket_balances(
 pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
     let p = &plan.personal;
     if p.current_age >= p.planning_horizon_age {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Current age must be less than planning horizon".into(),
-        )
-        .into());
+        return invalid_input("Current age must be less than planning horizon");
     }
     if p.target_retirement_age <= p.current_age {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Target retirement age must be after current age".into(),
-        )
-        .into());
+        return invalid_input("Target retirement age must be after current age");
     }
     if p.target_retirement_age > p.planning_horizon_age {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Target retirement age must be before planning horizon".into(),
-        )
-        .into());
+        return invalid_input("Target retirement age must be before planning horizon");
+    }
+    if let Some(value) = p.current_annual_salary {
+        validate_non_negative_amount("Current salary", value)?;
+    }
+    if let Some(value) = p.salary_growth_rate {
+        validate_finite_range("Salary growth", value, -0.50, 0.50)?;
     }
     let w = &plan.withdrawal;
-    if w.safe_withdrawal_rate <= 0.0 || w.safe_withdrawal_rate > 0.20 {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "SWR must be between 0% and 20%".into(),
-        )
-        .into());
-    }
-    if plan
-        .expenses
-        .all_buckets()
-        .iter()
-        .any(|(bucket, _)| bucket.monthly_amount < 0.0)
+    if !w.safe_withdrawal_rate.is_finite()
+        || w.safe_withdrawal_rate <= 0.0
+        || w.safe_withdrawal_rate > 0.20
     {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Retirement spending cannot be negative".into(),
-        )
-        .into());
+        return invalid_input("SWR must be between 0% and 20%");
+    }
+    for (bucket, _) in plan.expenses.all_buckets() {
+        validate_non_negative_amount("Retirement spending", bucket.monthly_amount)?;
+        if let Some(rate) = bucket.inflation_rate {
+            validate_finite_range("Spending inflation override", rate, -0.10, 0.20)?;
+        }
+        if let (Some(start_age), Some(end_age)) = (bucket.start_age, bucket.end_age) {
+            if start_age >= end_age {
+                return invalid_input("Spending To age must be after From age");
+            }
+        }
     }
     let i = &plan.investment;
-    let valid_return = |r: f64| (-0.20..=0.30).contains(&r);
-    if !valid_return(i.pre_retirement_annual_return) || !valid_return(i.retirement_annual_return) {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Return assumptions must be between -20% and 30%".into(),
-        )
-        .into());
-    }
-    if !(0.0..=0.05).contains(&i.annual_investment_fee_rate) {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Annual investment fee must be between 0% and 5%".into(),
-        )
-        .into());
-    }
-    if !(0.0..=0.50).contains(&i.annual_volatility) {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Annual volatility must be between 0% and 50%".into(),
-        )
-        .into());
-    }
+    validate_finite_range(
+        "Return before retirement",
+        i.pre_retirement_annual_return,
+        -0.20,
+        0.30,
+    )?;
+    validate_finite_range(
+        "Return during retirement",
+        i.retirement_annual_return,
+        -0.20,
+        0.30,
+    )?;
+    validate_finite_range(
+        "Annual investment fee",
+        i.annual_investment_fee_rate,
+        0.0,
+        0.05,
+    )?;
+    validate_finite_range("Annual volatility", i.annual_volatility, 0.0, 0.50)?;
+    validate_finite_range("Inflation", i.inflation_rate, -0.10, 0.20)?;
+    validate_non_negative_amount("Monthly contribution", i.monthly_contribution)?;
+    validate_finite_range(
+        "Contribution growth",
+        i.contribution_growth_rate,
+        -0.50,
+        0.50,
+    )?;
     if i.pre_retirement_annual_return - i.annual_investment_fee_rate <= -0.99
         || i.retirement_annual_return - i.annual_investment_fee_rate <= -0.99
     {
-        return Err(crate::errors::ValidationError::InvalidInput(
-            "Return after fees must be greater than -99%".into(),
-        )
-        .into());
+        return invalid_input("Return after fees must be greater than -99%");
+    }
+    for stream in &plan.income_streams {
+        if stream.start_age > p.planning_horizon_age {
+            return invalid_input("Income start age must be within the planning horizon");
+        }
+        if let Some(value) = stream.monthly_amount {
+            validate_non_negative_amount("Income amount", value)?;
+        }
+        if let Some(value) = stream.annual_growth_rate {
+            validate_finite_range("Income growth", value, -0.10, 0.20)?;
+        }
+        if let Some(value) = stream.current_value {
+            validate_non_negative_amount("Defined-contribution current value", value)?;
+        }
+        if let Some(value) = stream.monthly_contribution {
+            validate_non_negative_amount("Defined-contribution contribution", value)?;
+        }
+        if let Some(value) = stream.accumulation_return {
+            validate_finite_range("Defined-contribution return", value, -0.20, 0.30)?;
+        }
     }
     if let Some(ref g) = w.guardrails {
-        if g.floor_rate >= g.ceiling_rate {
-            return Err(crate::errors::ValidationError::InvalidInput(
-                "Guardrails floor must be below ceiling".into(),
-            )
-            .into());
+        validate_finite_range("Guardrail ceiling", g.ceiling_rate, 0.0, 1.0)?;
+        if g.ceiling_rate < w.safe_withdrawal_rate {
+            return invalid_input("Guardrail ceiling must be at or above the withdrawal rate");
         }
     }
     if let Some(ref tax) = plan.tax {
-        let valid_rate = |r: f64| (0.0..=1.0).contains(&r);
-        if !valid_rate(tax.taxable_withdrawal_rate)
-            || !valid_rate(tax.tax_deferred_withdrawal_rate)
-            || !valid_rate(tax.tax_free_withdrawal_rate)
-        {
-            return Err(crate::errors::ValidationError::InvalidInput(
-                "Tax rates must be between 0% and 100%".into(),
-            )
-            .into());
+        validate_finite_range(
+            "Taxable withdrawal tax rate",
+            tax.taxable_withdrawal_rate,
+            0.0,
+            1.0,
+        )?;
+        validate_finite_range(
+            "Tax-deferred withdrawal tax rate",
+            tax.tax_deferred_withdrawal_rate,
+            0.0,
+            1.0,
+        )?;
+        validate_finite_range(
+            "Tax-free withdrawal tax rate",
+            tax.tax_free_withdrawal_rate,
+            0.0,
+            1.0,
+        )?;
+        if let Some(rate) = tax.early_withdrawal_penalty_rate {
+            validate_finite_range("Early withdrawal penalty", rate, 0.0, 1.0)?;
+        }
+        if let Some(age) = tax.early_withdrawal_penalty_age {
+            if age > p.planning_horizon_age {
+                return invalid_input(
+                    "Early withdrawal penalty age must be within the planning horizon",
+                );
+            }
         }
     }
     // Reject duplicate linkedAccountId values across DC streams
@@ -527,28 +598,29 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let current_value = compute_summary_current_value(&goal, &rules, valuations);
 
         let retirement_summary = if is_retirement {
-            self.prepare_retirement_input(goal_id, valuations)
-                .ok()
-                .map(|prepared| {
-                    let overview = compute_retirement_overview_with_mode(
-                        &prepared.plan,
-                        prepared.current_portfolio,
-                        prepared.planner_mode,
-                    );
-                    let completion_age = match prepared.planner_mode {
-                        RetirementTimingMode::Fire => overview
-                            .fi_age
-                            .or(overview.suggested_goal_age_if_unchanged)
-                            .unwrap_or(prepared.plan.personal.target_retirement_age),
-                        RetirementTimingMode::Traditional => {
-                            prepared.plan.personal.target_retirement_age
-                        }
-                    };
-                    (
-                        overview.required_capital_at_goal_age,
-                        date_for_plan_age(&prepared.plan, completion_age),
-                    )
-                })
+            let prepared = self.prepare_retirement_input(goal_id, valuations)?;
+            let overview = compute_retirement_overview_with_mode(
+                &prepared.plan,
+                prepared.current_portfolio,
+                prepared.planner_mode,
+            );
+            let completion_age = match prepared.planner_mode {
+                RetirementTimingMode::Fire => overview
+                    .fi_age
+                    .or(overview.suggested_goal_age_if_unchanged)
+                    .unwrap_or(prepared.plan.personal.target_retirement_age),
+                RetirementTimingMode::Traditional => prepared.plan.personal.target_retirement_age,
+            };
+            Some((
+                if overview.required_capital_reachable {
+                    Some(overview.required_capital_at_goal_age)
+                } else {
+                    None
+                },
+                date_for_plan_age(&prepared.plan, completion_age),
+                overview.portfolio_at_goal_age,
+                overview.status,
+            ))
         } else {
             None
         };
@@ -557,7 +629,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let target = if is_retirement {
             retirement_summary
                 .as_ref()
-                .map(|(target, _)| *target)
+                .and_then(|(target, _, _, _)| *target)
                 .or(goal.summary_target_amount)
         } else {
             goal.target_amount.or(goal.summary_target_amount)
@@ -568,10 +640,20 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             _ => None,
         };
 
+        let projected_value_at_target_date = retirement_summary
+            .as_ref()
+            .map(|(_, _, projected, _)| *projected)
+            .or(goal.projected_value_at_target_date);
+
         let health = if goal.status_lifecycle == GOAL_LIFECYCLE_ACHIEVED {
             "on_track".to_string()
+        } else if is_retirement {
+            retirement_summary
+                .as_ref()
+                .map(|(_, _, _, status)| retirement_goal_health_from_overview_status(status))
+                .unwrap_or_else(|| "not_applicable".to_string())
         } else {
-            match (goal.projected_value_at_target_date, target) {
+            match (projected_value_at_target_date, target) {
                 (Some(proj), Some(t)) if t > 0.0 => {
                     let ratio = proj / t;
                     if ratio >= 1.0 {
@@ -592,9 +674,10 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             summary_current_value: Some(current_value),
             summary_progress: progress,
             projected_completion_date: retirement_summary
-                .and_then(|(_, date)| date)
+                .as_ref()
+                .and_then(|(_, date, _, _)| date.clone())
                 .or(goal.projected_completion_date.clone()),
-            projected_value_at_target_date: goal.projected_value_at_target_date,
+            projected_value_at_target_date,
             status_health: health,
         };
 
@@ -671,6 +754,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
 mod tests {
     use super::*;
     use crate::goals::goals_model::GoalFundingRule;
+    use crate::planning::retirement::*;
     use chrono::NaiveDateTime;
 
     fn test_account(id: &str, account_type: &str) -> Account {
@@ -727,6 +811,46 @@ mod tests {
             tax_bucket: None,
             created_at: String::new(),
             updated_at: String::new(),
+        }
+    }
+
+    fn valid_retirement_plan() -> RetirementPlan {
+        RetirementPlan {
+            personal: PersonalProfile {
+                birth_year_month: None,
+                current_age: 45,
+                target_retirement_age: 55,
+                planning_horizon_age: 90,
+                current_annual_salary: None,
+                salary_growth_rate: None,
+            },
+            expenses: ExpenseBudget {
+                items: vec![ExpenseBucket {
+                    monthly_amount: 3_000.0,
+                    inflation_rate: None,
+                    start_age: None,
+                    end_age: None,
+                    essential: Some(true),
+                }],
+            },
+            income_streams: vec![],
+            investment: InvestmentAssumptions {
+                pre_retirement_annual_return: 0.0577,
+                retirement_annual_return: 0.0337,
+                annual_investment_fee_rate: 0.006,
+                annual_volatility: 0.12,
+                inflation_rate: 0.02,
+                monthly_contribution: 1_000.0,
+                contribution_growth_rate: 0.0,
+                glide_path: None,
+            },
+            withdrawal: WithdrawalConfig {
+                safe_withdrawal_rate: 0.035,
+                strategy: WithdrawalPolicy::PlannedSpending,
+                guardrails: None,
+            },
+            tax: None,
+            currency: "USD".into(),
         }
     }
 
@@ -807,6 +931,98 @@ mod tests {
         assert!((b.taxable - 50_000.0).abs() < 0.01);
         assert!((b.tax_deferred).abs() < 0.01);
         assert!((b.tax_free).abs() < 0.01);
+    }
+
+    #[test]
+    fn retirement_plan_validation_rejects_inverted_spending_window() {
+        let mut plan = valid_retirement_plan();
+        plan.expenses.items[0].start_age = Some(75);
+        plan.expenses.items[0].end_age = Some(65);
+
+        let err = validate_retirement_plan(&plan).expect_err("window should be rejected");
+        assert!(err.to_string().contains("To age must be after From age"));
+    }
+
+    #[test]
+    fn retirement_plan_validation_rejects_bad_numeric_assumptions() {
+        let mut plan = valid_retirement_plan();
+        plan.investment.monthly_contribution = -1.0;
+        assert!(validate_retirement_plan(&plan)
+            .expect_err("negative contribution should be rejected")
+            .to_string()
+            .contains("Monthly contribution"));
+
+        let mut plan = valid_retirement_plan();
+        plan.investment.inflation_rate = f64::NAN;
+        assert!(validate_retirement_plan(&plan)
+            .expect_err("non-finite inflation should be rejected")
+            .to_string()
+            .contains("Inflation"));
+
+        let mut plan = valid_retirement_plan();
+        plan.expenses.items[0].inflation_rate = Some(-0.50);
+        assert!(validate_retirement_plan(&plan)
+            .expect_err("invalid expense inflation should be rejected")
+            .to_string()
+            .contains("Spending inflation"));
+
+        let mut plan = valid_retirement_plan();
+        plan.income_streams.push(RetirementIncomeStream {
+            id: "cpp".into(),
+            label: "CPP".into(),
+            stream_type: StreamKind::DefinedBenefit,
+            start_age: 65,
+            adjust_for_inflation: true,
+            annual_growth_rate: None,
+            monthly_amount: Some(-10.0),
+            linked_account_id: None,
+            current_value: None,
+            monthly_contribution: None,
+            accumulation_return: None,
+        });
+        assert!(validate_retirement_plan(&plan)
+            .expect_err("negative income should be rejected")
+            .to_string()
+            .contains("Income amount"));
+
+        let mut plan = valid_retirement_plan();
+        plan.tax = Some(TaxProfile {
+            taxable_withdrawal_rate: 0.15,
+            tax_deferred_withdrawal_rate: 0.30,
+            tax_free_withdrawal_rate: 0.0,
+            early_withdrawal_penalty_rate: Some(1.5),
+            early_withdrawal_penalty_age: Some(65),
+            country_code: Some("CA".into()),
+            withdrawal_buckets: TaxBucketBalances::default(),
+        });
+        assert!(validate_retirement_plan(&plan)
+            .expect_err("invalid tax penalty should be rejected")
+            .to_string()
+            .contains("Early withdrawal penalty"));
+    }
+
+    #[test]
+    fn retirement_goal_health_maps_overview_status() {
+        assert_eq!(
+            retirement_goal_health_from_overview_status("achieved"),
+            "on_track"
+        );
+        assert_eq!(
+            retirement_goal_health_from_overview_status("on_track"),
+            "on_track"
+        );
+        assert_eq!(
+            retirement_goal_health_from_overview_status("at_risk"),
+            "at_risk"
+        );
+        assert_eq!(
+            retirement_goal_health_from_overview_status("off_track"),
+            "off_track"
+        );
+        assert_eq!(
+            retirement_goal_health_from_overview_status("unknown"),
+            "not_applicable"
+        );
     }
 
     #[test]

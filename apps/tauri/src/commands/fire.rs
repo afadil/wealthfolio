@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rust_decimal::prelude::ToPrimitive;
 use tauri::State;
 
 use crate::context::ServiceContext;
@@ -18,11 +19,29 @@ use wealthfolio_core::portfolio::fire::{
 };
 
 const MAX_SIMS: u32 = 500_000;
+const DEFAULT_SIMS: u32 = 10_000;
+
+fn normalize_sim_count(n_sims: Option<u32>) -> u32 {
+    n_sims.unwrap_or(DEFAULT_SIMS).clamp(1, MAX_SIMS)
+}
 
 fn normalize_and_validate_plan(mut plan: RetirementPlan) -> Result<RetirementPlan, String> {
     normalize_retirement_plan_ages(&mut plan);
     validate_retirement_plan(&plan).map_err(|e| e.to_string())?;
     Ok(plan)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simulation_count_is_clamped_at_the_command_boundary() {
+        assert_eq!(normalize_sim_count(Some(0)), 1);
+        assert_eq!(normalize_sim_count(Some(42)), 42);
+        assert_eq!(normalize_sim_count(Some(MAX_SIMS + 1)), MAX_SIMS);
+        assert_eq!(normalize_sim_count(None), DEFAULT_SIMS);
+    }
 }
 
 async fn build_valuation_map(
@@ -40,8 +59,15 @@ async fn build_valuation_map(
 
     let mut map = std::collections::HashMap::new();
     for v in &valuations {
-        let value_in_base = v.total_value.to_string().parse::<f64>().unwrap_or(0.0)
-            * v.fx_rate_to_base.to_string().parse::<f64>().unwrap_or(1.0);
+        let total = v
+            .total_value
+            .to_f64()
+            .ok_or_else(|| format!("Invalid valuation total for account {}", v.account_id))?;
+        let fx = v
+            .fx_rate_to_base
+            .to_f64()
+            .ok_or_else(|| format!("Invalid FX rate for account {}", v.account_id))?;
+        let value_in_base = total * fx;
         map.insert(v.account_id.clone(), value_in_base);
     }
     Ok(map)
@@ -105,7 +131,7 @@ pub async fn run_retirement_monte_carlo(
     planner_mode: Option<RetirementTimingMode>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<MonteCarloResult, String> {
-    let n = n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let n = normalize_sim_count(n_sims);
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
     Ok(run_monte_carlo_with_mode_and_seed(
@@ -201,7 +227,7 @@ pub async fn run_retirement_strategy_comparison(
     planner_mode: Option<RetirementTimingMode>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<StrategyComparisonResult, String> {
-    let n = n_sims.unwrap_or(10_000).min(MAX_SIMS);
+    let n = normalize_sim_count(n_sims);
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
     Ok(run_strategy_comparison_with_mode(
