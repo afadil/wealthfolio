@@ -379,10 +379,8 @@ fn retirement_feasible_from_capital(
         retirement_age,
         plan.withdrawal.safe_withdrawal_rate,
     );
-    let use_constant_pct = matches!(
-        plan.withdrawal.strategy,
-        WithdrawalPolicy::ConstantPercentage
-    );
+    let mut target_withdrawal = plan.withdrawal.clone();
+    target_withdrawal.strategy = WithdrawalPolicy::ConstantDollar;
 
     let mut buckets = initial_withdrawal_buckets(&plan.tax, starting_capital.max(0.0));
     for y in 0..=(horizon as i32 - retirement_age as i32).max(0) as u32 {
@@ -399,8 +397,11 @@ fn retirement_feasible_from_capital(
             years_from_now,
             inflation,
         );
+        // Required capital is a target-sizing problem: can the portfolio fund
+        // the planned spending schedule? The selected withdrawal policy is a
+        // simulation policy and should not change the dashed "need" path.
         let outcome = apply_withdrawal_policy(
-            &plan.withdrawal,
+            &target_withdrawal,
             &grown_buckets,
             expenses,
             essential_expenses,
@@ -416,11 +417,7 @@ fn retirement_feasible_from_capital(
     }
 
     let ending_portfolio = buckets.total();
-    if use_constant_pct {
-        ending_portfolio > starting_capital * 0.05
-    } else {
-        ending_portfolio > 0.0
-    }
+    ending_portfolio > 0.0
 }
 
 /// Schedule-feasibility FI trigger computed by reusing the retirement ledger
@@ -643,6 +640,7 @@ mod tests {
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
             personal: PersonalProfile {
+                birth_year_month: None,
                 current_age: 35,
                 target_retirement_age: 55,
                 planning_horizon_age: 90,
@@ -650,23 +648,13 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
-                items: vec![],
-                living: ExpenseBucket {
+                items: vec![ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
                     end_age: None,
                     essential: None,
-                },
-                healthcare: ExpenseBucket {
-                    monthly_amount: 0.0,
-                    inflation_rate: None,
-                    start_age: None,
-                    end_age: None,
-                    essential: None,
-                },
-                housing: None,
-                discretionary: None,
+                }],
             },
             income_streams: vec![],
             investment: InvestmentAssumptions {
@@ -775,6 +763,32 @@ mod tests {
         assert!(
             low_return_target > high_return_target,
             "lower retirement return should require more capital: {low_return_target} <= {high_return_target}"
+        );
+    }
+
+    #[test]
+    fn required_capital_is_independent_of_withdrawal_strategy() {
+        let mut constant_dollar = base_plan();
+        constant_dollar.withdrawal.safe_withdrawal_rate = 0.035;
+
+        let mut constant_percentage = constant_dollar.clone();
+        constant_percentage.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
+
+        let mut guardrails = constant_dollar.clone();
+        guardrails.withdrawal.strategy = WithdrawalPolicy::Guardrails;
+
+        let age = constant_dollar.personal.target_retirement_age;
+        let constant_dollar_target = compute_required_capital(&constant_dollar, age);
+        let constant_percentage_target = compute_required_capital(&constant_percentage, age);
+        let guardrails_target = compute_required_capital(&guardrails, age);
+
+        assert!(
+            (constant_dollar_target - constant_percentage_target).abs() < 0.01,
+            "target sizing should not change for Constant %: {constant_dollar_target} vs {constant_percentage_target}"
+        );
+        assert!(
+            (constant_dollar_target - guardrails_target).abs() < 0.01,
+            "target sizing should not change for Guardrails: {constant_dollar_target} vs {guardrails_target}"
         );
     }
 
@@ -916,7 +930,7 @@ mod tests {
     fn expense_bucket_with_end_age() {
         let mut plan = base_plan();
         // Add housing that ends at age 60
-        plan.expenses.housing = Some(ExpenseBucket {
+        plan.expenses.items.push(ExpenseBucket {
             monthly_amount: 1_000.0,
             inflation_rate: None,
             start_age: None,
@@ -947,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    fn expense_items_override_legacy_buckets() {
+    fn expense_items_respect_age_windows_and_essential_flags() {
         let mut plan = base_plan();
         plan.expenses.items = vec![
             ExpenseBucket {
@@ -980,13 +994,13 @@ mod tests {
     #[test]
     fn healthcare_inflation_isolation() {
         let mut plan = base_plan();
-        plan.expenses.healthcare = ExpenseBucket {
+        plan.expenses.items.push(ExpenseBucket {
             monthly_amount: 500.0,
             inflation_rate: Some(0.08), // 8% healthcare inflation
             start_age: None,
             end_age: None,
             essential: None,
-        };
+        });
         plan.investment.inflation_rate = 0.02; // 2% general
 
         let (total_y0, _) = annual_expenses_at_year(&plan.expenses, 55, 0, 0.02);
@@ -1051,7 +1065,7 @@ mod tests {
     fn schedule_aware_target_excludes_ended_buckets() {
         let mut p = base_plan();
         // Housing ends at 60
-        p.expenses.housing = Some(ExpenseBucket {
+        p.expenses.items.push(ExpenseBucket {
             monthly_amount: 1_500.0,
             inflation_rate: None,
             start_age: None,
@@ -1113,7 +1127,7 @@ mod tests {
     #[test]
     fn housing_bucket_ends_at_specified_age() {
         let mut plan = base_plan();
-        plan.expenses.housing = Some(ExpenseBucket {
+        plan.expenses.items.push(ExpenseBucket {
             monthly_amount: 1500.0,
             inflation_rate: None,
             start_age: None,
@@ -1180,7 +1194,7 @@ mod tests {
     #[test]
     fn fire_mode_does_not_force_retirement_when_underfunded() {
         let mut plan = base_plan();
-        plan.expenses.living.monthly_amount = 20_000.0;
+        plan.expenses.items[0].monthly_amount = 20_000.0;
         plan.investment.monthly_contribution = 0.0;
 
         let projection = project_retirement_with_mode(&plan, 10_000.0, RetirementTimingMode::Fire);
@@ -1201,7 +1215,7 @@ mod tests {
     #[test]
     fn traditional_mode_forces_retirement_at_target_age() {
         let mut plan = base_plan();
-        plan.expenses.living.monthly_amount = 20_000.0;
+        plan.expenses.items[0].monthly_amount = 20_000.0;
         plan.investment.monthly_contribution = 0.0;
 
         let projection =

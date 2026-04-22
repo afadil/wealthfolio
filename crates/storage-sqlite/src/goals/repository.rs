@@ -1,5 +1,5 @@
 use wealthfolio_core::goals::{
-    Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan, GoalRepositoryTrait,
+    Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, GoalRepositoryTrait, GoalSummaryUpdate,
     NewGoal, SaveGoalPlan,
 };
 use wealthfolio_core::Result;
@@ -127,13 +127,13 @@ impl GoalRepositoryTrait for GoalRepository {
             currency: goal_update.currency,
             start_date: goal_update.start_date,
             target_date: goal_update.target_date,
-            current_value_cached: goal_update.current_value_cached,
-            progress_cached: goal_update.progress_cached,
+            summary_current_value: goal_update.summary_current_value,
+            summary_progress: goal_update.summary_progress,
             projected_completion_date: goal_update.projected_completion_date,
             projected_value_at_target_date: goal_update.projected_value_at_target_date,
             created_at: goal_update.created_at,
             updated_at: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-            target_amount_cached: goal_update.target_amount_cached,
+            summary_target_amount: goal_update.summary_target_amount,
         };
 
         self.writer
@@ -329,12 +329,12 @@ impl GoalRepositoryTrait for GoalRepository {
             .await
     }
 
-    // --- Cached summary ---
+    // --- Goal summary ---
 
-    async fn update_goal_cached_fields(
+    async fn update_goal_summary_fields(
         &self,
         goal_id: &str,
-        update: GoalCachedUpdate,
+        update: GoalSummaryUpdate,
     ) -> Result<()> {
         let goal_id_owned = goal_id.to_string();
         self.writer
@@ -342,9 +342,9 @@ impl GoalRepositoryTrait for GoalRepository {
                 let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
                 diesel::update(goals::table.find(&goal_id_owned))
                     .set((
-                        goals::target_amount_cached.eq(update.target_amount_cached),
-                        goals::current_value_cached.eq(update.current_value_cached),
-                        goals::progress_cached.eq(update.progress_cached),
+                        goals::summary_target_amount.eq(update.summary_target_amount),
+                        goals::summary_current_value.eq(update.summary_current_value),
+                        goals::summary_progress.eq(update.summary_progress),
                         goals::projected_completion_date.eq(update.projected_completion_date),
                         goals::projected_value_at_target_date
                             .eq(update.projected_value_at_target_date),

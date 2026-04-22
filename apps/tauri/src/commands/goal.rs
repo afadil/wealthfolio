@@ -6,6 +6,7 @@ use tauri::State;
 use wealthfolio_core::goals::{
     Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan,
 };
+use wealthfolio_core::planning::retirement::RetirementPlan;
 use wealthfolio_core::planning::SaveUpOverview;
 use wealthfolio_core::portfolio::fire::RetirementOverview;
 
@@ -29,10 +30,11 @@ pub async fn get_goal(
 
 #[tauri::command]
 pub async fn create_goal(
-    goal: NewGoal,
+    mut goal: NewGoal,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Goal, String> {
     debug!("Creating new goal...");
+    goal.currency = Some(state.get_base_currency());
     state
         .goal_service()
         .create_goal(goal)
@@ -42,10 +44,11 @@ pub async fn create_goal(
 
 #[tauri::command]
 pub async fn update_goal(
-    goal: Goal,
+    mut goal: Goal,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<Goal, String> {
     debug!("Updating goal...");
+    goal.currency = Some(state.get_base_currency());
     state
         .goal_service()
         .update_goal(goal)
@@ -111,11 +114,12 @@ pub async fn get_goal_plan(
 
 #[tauri::command]
 pub async fn save_goal_plan(
-    plan: SaveGoalPlan,
+    mut plan: SaveGoalPlan,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<GoalPlan, String> {
     debug!("Saving goal plan for {}...", plan.goal_id);
     let goal_id = plan.goal_id.clone();
+    normalize_plan_currency_to_base(&mut plan, &state.get_base_currency());
     let result = state
         .goal_service()
         .save_goal_plan(plan)
@@ -126,6 +130,18 @@ pub async fn save_goal_plan(
     let _ = refresh_summary_internal(&state, &goal_id).await;
 
     Ok(result)
+}
+
+fn normalize_plan_currency_to_base(plan: &mut SaveGoalPlan, base_currency: &str) {
+    if plan.plan_kind != "retirement" {
+        return;
+    }
+    if let Ok(mut retirement_plan) = serde_json::from_str::<RetirementPlan>(&plan.settings_json) {
+        retirement_plan.currency = base_currency.to_string();
+        if let Ok(settings_json) = serde_json::to_string(&retirement_plan) {
+            plan.settings_json = settings_json;
+        }
+    }
 }
 
 #[tauri::command]

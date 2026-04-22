@@ -2,7 +2,7 @@
 
 use crate::errors::Result;
 use crate::goals::goals_model::{
-    AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
+    AccountValuationMap, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, GoalSummaryUpdate,
     NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
 };
 use crate::planning::SaveUpOverview;
@@ -37,11 +37,11 @@ pub trait GoalRepositoryTrait: Send + Sync {
     async fn save_goal_plan(&self, plan: SaveGoalPlan) -> Result<GoalPlan>;
     async fn delete_goal_plan(&self, goal_id: &str) -> Result<usize>;
 
-    // Cached summary
-    async fn update_goal_cached_fields(
+    // Goal summary
+    async fn update_goal_summary_fields(
         &self,
         goal_id: &str,
-        update: GoalCachedUpdate,
+        update: GoalSummaryUpdate,
     ) -> Result<()>;
 }
 

@@ -69,10 +69,9 @@ export const COMMANDS: CommandMap = {
   run_retirement_monte_carlo: { method: "POST", path: "/retirement/monte-carlo" },
   run_retirement_stress_tests: { method: "POST", path: "/retirement/stress-tests" },
   run_retirement_scenario_analysis: { method: "POST", path: "/retirement/scenario-analysis" },
-  run_retirement_sensitivity: { method: "POST", path: "/retirement/sensitivity-analysis" },
-  run_retirement_decision_sensitivity: {
+  run_retirement_decision_sensitivity_map: {
     method: "POST",
-    path: "/retirement/decision-sensitivity-analysis",
+    path: "/retirement/decision-sensitivity-map",
   },
   run_retirement_sorr: { method: "POST", path: "/retirement/sequence-of-returns" },
   run_retirement_strategy_comparison: { method: "POST", path: "/retirement/strategy-comparison" },
@@ -550,8 +549,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "run_retirement_monte_carlo":
     case "run_retirement_stress_tests":
     case "run_retirement_scenario_analysis":
-    case "run_retirement_sensitivity":
-    case "run_retirement_decision_sensitivity":
+    case "run_retirement_decision_sensitivity_map":
     case "run_retirement_sorr":
     case "run_retirement_strategy_comparison": {
       body = JSON.stringify(payload);

@@ -224,13 +224,13 @@ diesel::table! {
         currency -> Nullable<Text>,
         start_date -> Nullable<Text>,
         target_date -> Nullable<Text>,
-        current_value_cached -> Nullable<Double>,
-        progress_cached -> Nullable<Double>,
+        summary_current_value -> Nullable<Double>,
+        summary_progress -> Nullable<Double>,
         projected_completion_date -> Nullable<Text>,
         projected_value_at_target_date -> Nullable<Double>,
         created_at -> Text,
         updated_at -> Text,
-        target_amount_cached -> Nullable<Double>,
+        summary_target_amount -> Nullable<Double>,
     }
 }
 

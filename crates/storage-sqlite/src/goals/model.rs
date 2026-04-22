@@ -33,13 +33,13 @@ pub struct GoalDB {
     pub currency: Option<String>,
     pub start_date: Option<String>,
     pub target_date: Option<String>,
-    pub current_value_cached: Option<f64>,
-    pub progress_cached: Option<f64>,
+    pub summary_current_value: Option<f64>,
+    pub summary_progress: Option<f64>,
     pub projected_completion_date: Option<String>,
     pub projected_value_at_target_date: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
-    pub target_amount_cached: Option<f64>,
+    pub summary_target_amount: Option<f64>,
 }
 
 /// Database model for creating a new goal
@@ -142,13 +142,13 @@ impl From<GoalDB> for wealthfolio_core::goals::Goal {
             currency: db.currency,
             start_date: db.start_date,
             target_date: db.target_date,
-            current_value_cached: db.current_value_cached,
-            progress_cached: db.progress_cached,
+            summary_current_value: db.summary_current_value,
+            summary_progress: db.summary_progress,
             projected_completion_date: db.projected_completion_date,
             projected_value_at_target_date: db.projected_value_at_target_date,
             created_at: db.created_at,
             updated_at: db.updated_at,
-            target_amount_cached: db.target_amount_cached,
+            summary_target_amount: db.summary_target_amount,
         }
     }
 }

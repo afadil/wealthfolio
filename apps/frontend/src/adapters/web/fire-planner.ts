@@ -1,11 +1,11 @@
 import type {
-  DecisionSensitivityResult,
+  DecisionSensitivityMap,
+  DecisionSensitivityMatrix,
   FireProjection,
   MonteCarloResult,
   RetirementPlan,
   ScenarioResult,
   SorrScenario,
-  SensitivityResult,
   StressTestResult,
   StrategyComparisonResult,
 } from "@/features/goals/retirement-planner/types";
@@ -86,29 +86,17 @@ export const runRetirementSorr = async (
   });
 };
 
-export const runRetirementSensitivity = async (
+export const runRetirementDecisionSensitivityMap = async (
   plan: RetirementPlan,
   currentPortfolio: number,
+  map: DecisionSensitivityMap,
   plannerMode?: PlannerMode,
   goalId?: string,
-): Promise<SensitivityResult> => {
-  return invoke<SensitivityResult>("run_retirement_sensitivity", {
+): Promise<DecisionSensitivityMatrix> => {
+  return invoke<DecisionSensitivityMatrix>("run_retirement_decision_sensitivity_map", {
     plan,
     currentPortfolio,
-    plannerMode,
-    goalId,
-  });
-};
-
-export const runRetirementDecisionSensitivity = async (
-  plan: RetirementPlan,
-  currentPortfolio: number,
-  plannerMode?: PlannerMode,
-  goalId?: string,
-): Promise<DecisionSensitivityResult> => {
-  return invoke<DecisionSensitivityResult>("run_retirement_decision_sensitivity", {
-    plan,
-    currentPortfolio,
+    map,
     plannerMode,
     goalId,
   });

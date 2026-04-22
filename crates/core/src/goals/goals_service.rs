@@ -1,18 +1,18 @@
 use crate::accounts::{Account, AccountServiceTrait};
 use crate::errors::Result;
 use crate::goals::goals_model::{
-    AccountValuationMap, Goal, GoalCachedUpdate, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
+    AccountValuationMap, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, GoalSummaryUpdate,
     NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
 };
 use crate::goals::goals_traits::{GoalRepositoryTrait, GoalServiceTrait};
 use crate::planning::retirement::{
-    RetirementPlan, RetirementTimingMode, TaxBucketBalances, TaxProfile,
+    normalize_retirement_plan_ages, RetirementPlan, RetirementTimingMode, TaxBucketBalances,
+    TaxProfile,
 };
 use crate::planning::{SaveUpInput, SaveUpOverview};
-use crate::portfolio::fire::{
-    compute_required_capital, compute_retirement_overview_with_mode, RetirementOverview,
-};
+use crate::portfolio::fire::{compute_retirement_overview_with_mode, RetirementOverview};
 use async_trait::async_trait;
+use chrono::{Local, Months};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -75,6 +75,14 @@ fn build_retirement_seed_rules(
         .collect()
 }
 
+fn date_for_plan_age(plan: &RetirementPlan, age: u32) -> Option<String> {
+    let years = age.checked_sub(plan.personal.current_age)?;
+    let today = Local::now().date_naive();
+    today
+        .checked_add_months(Months::new(years.saturating_mul(12)))
+        .map(|date| date.format("%Y-%m-%d").to_string())
+}
+
 fn compute_summary_current_value(
     goal: &Goal,
     funding_rules: &[GoalFundingRule],
@@ -84,7 +92,7 @@ fn compute_summary_current_value(
         goal.status_lifecycle.as_str(),
         GOAL_LIFECYCLE_ACHIEVED | GOAL_LIFECYCLE_ARCHIVED
     ) {
-        goal.current_value_cached
+        goal.summary_current_value
             .unwrap_or_else(|| compute_goal_value_from_shares(funding_rules, valuations))
     } else {
         compute_goal_value_from_shares(funding_rules, valuations)
@@ -271,6 +279,7 @@ impl<T: GoalRepositoryTrait> GoalService<T> {
             RetirementTimingMode::from_str(stored_plan.planner_mode.as_deref().unwrap_or("fire"));
 
         let mut retirement_plan: RetirementPlan = serde_json::from_str(&stored_plan.settings_json)?;
+        normalize_retirement_plan_ages(&mut retirement_plan);
         validate_retirement_plan(&retirement_plan)?;
 
         let current_portfolio = compute_goal_value_from_shares(&funding_rules, valuation_map);
@@ -432,14 +441,17 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         }
         for rule in &rules {
             let total = account_totals.entry(rule.account_id.clone()).or_default();
-            *total += rule.share_percent;
-            if *total > 100.0 {
+            let used_elsewhere = *total;
+            let combined = used_elsewhere + rule.share_percent;
+            if combined > 100.0 {
+                let max_available = (100.0 - used_elsewhere).max(0.0);
                 return Err(crate::errors::ValidationError::InvalidInput(format!(
-                    "Total shares for account '{}' would exceed 100%",
-                    rule.account_id
+                    "Account '{}' is overallocated: requested {:.1}%, used elsewhere {:.1}%, max available {:.1}%",
+                    rule.account_id, rule.share_percent, used_elsewhere, max_available
                 ))
                 .into());
             }
+            *total = combined;
         }
 
         self.goal_repo.save_goal_funding(goal_id, rules).await
@@ -449,7 +461,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         self.goal_repo.load_goal_plan(goal_id)
     }
 
-    async fn save_goal_plan(&self, plan: SaveGoalPlan) -> Result<GoalPlan> {
+    async fn save_goal_plan(&self, mut plan: SaveGoalPlan) -> Result<GoalPlan> {
         let goal = self.goal_repo.load_goal(&plan.goal_id)?;
         let valid = match goal.goal_type.as_str() {
             "retirement" => plan.plan_kind == "retirement",
@@ -469,13 +481,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             .into());
         }
         if plan.plan_kind == "retirement" {
-            let retirement_plan: RetirementPlan = serde_json::from_str(&plan.settings_json)
+            let mut retirement_plan: RetirementPlan = serde_json::from_str(&plan.settings_json)
                 .map_err(|e| {
                     crate::errors::ValidationError::InvalidInput(format!(
                         "Invalid retirement plan JSON: {}",
                         e
                     ))
                 })?;
+            normalize_retirement_plan_ages(&mut retirement_plan);
             validate_retirement_plan(&retirement_plan)?;
 
             // Reject linking a DC stream to an account that has participating shares
@@ -492,7 +505,9 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                     }
                 }
             }
+            plan.settings_json = serde_json::to_string(&retirement_plan)?;
         }
+
         self.goal_repo.save_goal_plan(plan).await
     }
 
@@ -511,16 +526,41 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
 
         let current_value = compute_summary_current_value(&goal, &rules, valuations);
 
-        // Determine target
-        let target = if is_retirement {
+        let retirement_summary = if is_retirement {
             self.prepare_retirement_input(goal_id, valuations)
                 .ok()
                 .map(|prepared| {
-                    compute_required_capital(&prepared.plan, prepared.plan.personal.current_age)
+                    let overview = compute_retirement_overview_with_mode(
+                        &prepared.plan,
+                        prepared.current_portfolio,
+                        prepared.planner_mode,
+                    );
+                    let completion_age = match prepared.planner_mode {
+                        RetirementTimingMode::Fire => overview
+                            .fi_age
+                            .or(overview.suggested_goal_age_if_unchanged)
+                            .unwrap_or(prepared.plan.personal.target_retirement_age),
+                        RetirementTimingMode::Traditional => {
+                            prepared.plan.personal.target_retirement_age
+                        }
+                    };
+                    (
+                        overview.required_capital_at_goal_age,
+                        date_for_plan_age(&prepared.plan, completion_age),
+                    )
                 })
-                .or(goal.target_amount_cached)
         } else {
-            goal.target_amount.or(goal.target_amount_cached)
+            None
+        };
+
+        // Determine target
+        let target = if is_retirement {
+            retirement_summary
+                .as_ref()
+                .map(|(target, _)| *target)
+                .or(goal.summary_target_amount)
+        } else {
+            goal.target_amount.or(goal.summary_target_amount)
         };
 
         let progress = match target {
@@ -547,17 +587,19 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             }
         };
 
-        let update = GoalCachedUpdate {
-            target_amount_cached: target,
-            current_value_cached: Some(current_value),
-            progress_cached: progress,
-            projected_completion_date: goal.projected_completion_date.clone(),
+        let update = GoalSummaryUpdate {
+            summary_target_amount: target,
+            summary_current_value: Some(current_value),
+            summary_progress: progress,
+            projected_completion_date: retirement_summary
+                .and_then(|(_, date)| date)
+                .or(goal.projected_completion_date.clone()),
             projected_value_at_target_date: goal.projected_value_at_target_date,
             status_health: health,
         };
 
         self.goal_repo
-            .update_goal_cached_fields(goal_id, update)
+            .update_goal_summary_fields(goal_id, update)
             .await?;
         self.goal_repo.load_goal(goal_id)
     }
@@ -652,7 +694,7 @@ mod tests {
         }
     }
 
-    fn test_goal(status_lifecycle: &str, current_value_cached: Option<f64>) -> Goal {
+    fn test_goal(status_lifecycle: &str, summary_current_value: Option<f64>) -> Goal {
         Goal {
             id: "goal-1".into(),
             goal_type: "custom_save_up".into(),
@@ -666,13 +708,13 @@ mod tests {
             currency: Some("USD".into()),
             start_date: None,
             target_date: None,
-            current_value_cached,
-            progress_cached: None,
+            summary_current_value,
+            summary_progress: None,
             projected_completion_date: None,
             projected_value_at_target_date: None,
             created_at: String::new(),
             updated_at: String::new(),
-            target_amount_cached: None,
+            summary_target_amount: None,
         }
     }
 
@@ -794,7 +836,7 @@ mod tests {
     }
 
     #[test]
-    fn achieved_summary_value_uses_cached_value() {
+    fn achieved_summary_value_uses_persisted_summary_value() {
         let goal = test_goal("achieved", Some(42_000.0));
         let rules = vec![share_rule("goal-1", "acct-1", 100.0)];
         let mut vals = HashMap::new();

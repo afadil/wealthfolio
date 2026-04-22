@@ -20,13 +20,13 @@ pub struct Goal {
     pub currency: Option<String>,
     pub start_date: Option<String>,
     pub target_date: Option<String>,
-    pub current_value_cached: Option<f64>,
-    pub progress_cached: Option<f64>,
+    pub summary_current_value: Option<f64>,
+    pub summary_progress: Option<f64>,
     pub projected_completion_date: Option<String>,
     pub projected_value_at_target_date: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
-    pub target_amount_cached: Option<f64>,
+    pub summary_target_amount: Option<f64>,
 }
 
 /// Input model for creating a new goal
@@ -71,12 +71,12 @@ pub struct GoalFundingRuleInput {
     pub tax_bucket: Option<String>,
 }
 
-/// Cached field updates written back to goal root after summary computation
+/// Summary fields written back to goal root after summary computation.
 #[derive(Debug, Clone)]
-pub struct GoalCachedUpdate {
-    pub target_amount_cached: Option<f64>,
-    pub current_value_cached: Option<f64>,
-    pub progress_cached: Option<f64>,
+pub struct GoalSummaryUpdate {
+    pub summary_target_amount: Option<f64>,
+    pub summary_current_value: Option<f64>,
+    pub summary_progress: Option<f64>,
     pub projected_completion_date: Option<String>,
     pub projected_value_at_target_date: Option<f64>,
     pub status_health: String,

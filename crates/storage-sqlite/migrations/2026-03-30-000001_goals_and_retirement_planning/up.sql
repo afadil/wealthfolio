@@ -10,11 +10,11 @@ ALTER TABLE goals ADD COLUMN cover_image_key TEXT;
 ALTER TABLE goals ADD COLUMN currency TEXT;
 ALTER TABLE goals ADD COLUMN start_date TEXT;
 ALTER TABLE goals ADD COLUMN target_date TEXT;
-ALTER TABLE goals ADD COLUMN current_value_cached REAL;
-ALTER TABLE goals ADD COLUMN progress_cached REAL;
+ALTER TABLE goals ADD COLUMN summary_current_value REAL;
+ALTER TABLE goals ADD COLUMN summary_progress REAL;
 ALTER TABLE goals ADD COLUMN projected_completion_date TEXT;
 ALTER TABLE goals ADD COLUMN projected_value_at_target_date REAL;
-ALTER TABLE goals ADD COLUMN target_amount_cached REAL;
+ALTER TABLE goals ADD COLUMN summary_target_amount REAL;
 ALTER TABLE goals ADD COLUMN created_at TEXT NOT NULL DEFAULT '';
 ALTER TABLE goals ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
 
@@ -27,8 +27,8 @@ UPDATE goals SET
 UPDATE goals SET status_lifecycle = 'achieved' WHERE is_achieved = 1;
 ALTER TABLE goals DROP COLUMN is_achieved;
 
--- Backfill target_amount_cached from explicit target_amount for existing goals
-UPDATE goals SET target_amount_cached = target_amount WHERE target_amount > 0;
+-- Backfill summary_target_amount from explicit target_amount for existing goals
+UPDATE goals SET summary_target_amount = target_amount WHERE target_amount > 0;
 
 -- Goal plans table (1:1 with goals for complex goal types)
 CREATE TABLE goal_plans (

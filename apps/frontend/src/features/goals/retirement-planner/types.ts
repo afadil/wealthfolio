@@ -98,15 +98,7 @@ export interface SorrScenario {
   failureAge?: number | null;
 }
 
-export interface SensitivityResult {
-  contribution: SensitivityMatrix;
-  swr: SensitivitySWRMatrix;
-}
-
-export interface DecisionSensitivityResult {
-  contributionReturn: DecisionSensitivityMatrix;
-  retirementAgeSpending: DecisionSensitivityMatrix;
-}
+export type DecisionSensitivityMap = "contribution-return" | "retirement-age-spending";
 
 export interface DecisionSensitivityMatrix {
   rowLabel: string;
@@ -172,18 +164,6 @@ export interface StressTestResult {
   severity: StressSeverity;
 }
 
-export interface SensitivityMatrix {
-  contributionRows: number[];
-  returnColumns: number[];
-  fireAges: (number | null)[][];
-}
-
-export interface SensitivitySWRMatrix {
-  swrRows: number[];
-  returnColumns: number[];
-  fireAges: (number | null)[][];
-}
-
 // ─── Retirement Plan Types ──────────────────────────────────────────────────
 
 export interface RetirementPlan {
@@ -198,6 +178,7 @@ export interface RetirementPlan {
 }
 
 export interface PersonalProfile {
+  birthYearMonth?: string;
   currentAge: number;
   targetRetirementAge: number;
   planningHorizonAge: number;
@@ -207,11 +188,6 @@ export interface PersonalProfile {
 
 export interface ExpenseBudget {
   items: ExpenseItem[];
-  /** Legacy fields accepted during plan normalization. Prefer `items`. */
-  living?: ExpenseBucket;
-  healthcare?: ExpenseBucket;
-  housing?: ExpenseBucket;
-  discretionary?: ExpenseBucket;
 }
 
 export interface ExpenseItem {
@@ -223,8 +199,6 @@ export interface ExpenseItem {
   endAge?: number;
   essential?: boolean;
 }
-
-export type ExpenseBucket = ExpenseItem;
 
 export interface RetirementIncomeStream {
   id: string;

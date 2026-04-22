@@ -1,3 +1,4 @@
+use chrono::{Datelike, Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 use crate::portfolio::fire::GlidepathSettings;
@@ -18,26 +19,6 @@ fn default_annual_volatility() -> f64 {
     0.12
 }
 
-fn default_living_expense() -> ExpenseBucket {
-    ExpenseBucket {
-        monthly_amount: 3_000.0,
-        inflation_rate: None,
-        start_age: None,
-        end_age: None,
-        essential: Some(true),
-    }
-}
-
-fn default_healthcare_expense() -> ExpenseBucket {
-    ExpenseBucket {
-        monthly_amount: 0.0,
-        inflation_rate: None,
-        start_age: None,
-        end_age: None,
-        essential: Some(true),
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RetirementPlan {
@@ -53,6 +34,8 @@ pub struct RetirementPlan {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonalProfile {
+    #[serde(default)]
+    pub birth_year_month: Option<String>,
     pub current_age: u32,
     pub target_retirement_age: u32,
     pub planning_horizon_age: u32,
@@ -60,19 +43,54 @@ pub struct PersonalProfile {
     pub salary_growth_rate: Option<f64>,
 }
 
+pub fn age_from_birth_year_month(birth_year_month: &str, as_of: NaiveDate) -> Option<u32> {
+    let (year, month) = birth_year_month.split_once('-')?;
+    let birth_year = year.parse::<i32>().ok()?;
+    let birth_month = month.parse::<u32>().ok()?;
+    if !(1..=12).contains(&birth_month) || birth_year > as_of.year() {
+        return None;
+    }
+
+    let mut age = as_of.year() - birth_year;
+    if as_of.month() < birth_month {
+        age -= 1;
+    }
+    u32::try_from(age).ok()
+}
+
+pub fn normalize_retirement_plan_ages(plan: &mut RetirementPlan) {
+    if let Some(age) = plan
+        .personal
+        .birth_year_month
+        .as_deref()
+        .and_then(|birth_year_month| {
+            age_from_birth_year_month(birth_year_month, Local::now().date_naive())
+        })
+    {
+        plan.personal.current_age = age;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::age_from_birth_year_month;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn derives_age_from_birth_year_month() {
+        let as_of = NaiveDate::from_ymd_opt(2026, 4, 21).unwrap();
+
+        assert_eq!(age_from_birth_year_month("1981-04", as_of), Some(45));
+        assert_eq!(age_from_birth_year_month("1981-05", as_of), Some(44));
+        assert_eq!(age_from_birth_year_month("1981-13", as_of), None);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseBudget {
     #[serde(default)]
     pub items: Vec<ExpenseBucket>,
-    #[serde(default = "default_living_expense")]
-    pub living: ExpenseBucket,
-    #[serde(default = "default_healthcare_expense")]
-    pub healthcare: ExpenseBucket,
-    #[serde(default)]
-    pub housing: Option<ExpenseBucket>,
-    #[serde(default)]
-    pub discretionary: Option<ExpenseBucket>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -86,28 +104,11 @@ pub struct ExpenseBucket {
 }
 
 impl ExpenseBudget {
-    /// Returns all buckets with their essential flag.
-    /// Living and healthcare default to essential=true; housing and discretionary default to false.
     pub fn all_buckets(&self) -> Vec<(&ExpenseBucket, bool)> {
-        if !self.items.is_empty() {
-            return self
-                .items
-                .iter()
-                .map(|bucket| (bucket, bucket.essential.unwrap_or(true)))
-                .collect();
-        }
-
-        let mut out = vec![
-            (&self.living, self.living.essential.unwrap_or(true)),
-            (&self.healthcare, self.healthcare.essential.unwrap_or(true)),
-        ];
-        if let Some(ref h) = self.housing {
-            out.push((h, h.essential.unwrap_or(false)));
-        }
-        if let Some(ref d) = self.discretionary {
-            out.push((d, d.essential.unwrap_or(false)));
-        }
-        out
+        self.items
+            .iter()
+            .map(|bucket| (bucket, bucket.essential.unwrap_or(true)))
+            .collect()
     }
 }
 

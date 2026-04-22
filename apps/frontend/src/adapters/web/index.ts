@@ -385,11 +385,10 @@ export {
 // FIRE Planner (desktop-only — stubs throw at runtime)
 export {
   calculateRetirementProjection,
-  runRetirementDecisionSensitivity,
+  runRetirementDecisionSensitivityMap,
   runRetirementMonteCarlo,
   runRetirementScenarioAnalysis,
   runRetirementSorr,
-  runRetirementSensitivity,
   runRetirementStressTests,
   runRetirementStrategyComparison,
 } from "./fire-planner";

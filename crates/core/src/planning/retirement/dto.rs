@@ -163,11 +163,11 @@ pub struct DecisionSensitivityMatrix {
     pub baseline_column: Option<usize>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DecisionSensitivityResult {
-    pub contribution_return: DecisionSensitivityMatrix,
-    pub retirement_age_spending: DecisionSensitivityMatrix,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DecisionSensitivityMap {
+    ContributionReturn,
+    RetirementAgeSpending,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,6 +271,9 @@ pub struct StressTestResult {
 pub struct RetirementOverview {
     pub analysis_mode: String,
     pub status: String, // "on_track", "at_risk", "off_track", "achieved"
+    /// Mode-neutral readiness label for retirement planning UIs.
+    /// Values: "on_track", "shortfall", "depleted", "overfunded".
+    pub success_status: String,
     pub desired_fire_age: u32,
     pub fi_age: Option<u32>,
     pub retirement_start_age: Option<u32>,
@@ -287,6 +290,8 @@ pub struct RetirementOverview {
     pub required_capital_at_goal_age: f64,
     pub shortfall_at_goal_age: f64,
     pub surplus_at_goal_age: f64,
+    pub funded_through_age: Option<u32>,
+    pub failure_age: Option<u32>,
     pub required_additional_monthly_contribution: f64,
     pub suggested_goal_age_if_unchanged: Option<u32>,
     pub coast_amount_today: f64,
@@ -330,14 +335,8 @@ pub struct RetirementTrajectoryPoint {
 #[serde(rename_all = "camelCase")]
 pub struct BudgetBreakdown {
     pub total_monthly_budget: f64,
-    pub monthly_living_expenses: f64,
-    pub monthly_healthcare: f64,
     pub monthly_portfolio_withdrawal: f64,
     pub income_streams: Vec<BudgetStreamItem>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub monthly_housing: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub monthly_discretionary: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effective_tax_rate: Option<f64>,
 }
@@ -399,35 +398,6 @@ fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> Budge
         .map(|(bucket, _)| bucket.monthly_amount)
         .sum::<f64>();
 
-    let legacy_bucket_amount = |label: &str| -> Option<f64> {
-        if !plan.expenses.items.is_empty() {
-            return None;
-        }
-        match label {
-            "living" if active(&plan.expenses.living) => Some(plan.expenses.living.monthly_amount),
-            "healthcare" if active(&plan.expenses.healthcare) => {
-                Some(plan.expenses.healthcare.monthly_amount)
-            }
-            "housing" => plan
-                .expenses
-                .housing
-                .as_ref()
-                .filter(|bucket| active(bucket))
-                .map(|bucket| bucket.monthly_amount),
-            "discretionary" => plan
-                .expenses
-                .discretionary
-                .as_ref()
-                .filter(|bucket| active(bucket))
-                .map(|bucket| bucket.monthly_amount),
-            _ => None,
-        }
-    };
-    let monthly_living = legacy_bucket_amount("living").unwrap_or(0.0);
-    let monthly_healthcare = legacy_bucket_amount("healthcare").unwrap_or(0.0);
-    let monthly_housing = legacy_bucket_amount("housing");
-    let monthly_discretionary = legacy_bucket_amount("discretionary");
-
     let resolved = resolve_plan_dc_payouts(
         &plan.income_streams,
         plan.personal.current_age,
@@ -471,12 +441,8 @@ fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> Budge
 
     BudgetBreakdown {
         total_monthly_budget,
-        monthly_living_expenses: monthly_living,
-        monthly_healthcare,
         monthly_portfolio_withdrawal,
         income_streams,
-        monthly_housing,
-        monthly_discretionary,
         effective_tax_rate,
     }
 }
@@ -752,6 +718,17 @@ pub fn compute_retirement_overview_with_mode(
     let funded_at_goal_age = portfolio_at_goal >= required_capital;
     let shortfall = (required_capital - portfolio_at_goal).max(0.0);
     let surplus = (portfolio_at_goal - required_capital).max(0.0);
+    let failure_age = projection
+        .year_by_year
+        .iter()
+        .find(|snap| {
+            snap.phase == "fire"
+                && (snap.annual_shortfall.unwrap_or(0.0) > 0.0 || snap.portfolio_value <= 0.0)
+        })
+        .map(|snap| snap.age);
+    let funded_through_age = failure_age
+        .map(|age| age.saturating_sub(1))
+        .or(Some(plan.personal.planning_horizon_age));
 
     let required_additional = if shortfall > 0.0 {
         solve_required_additional_monthly(plan, current_portfolio, required_capital)
@@ -777,6 +754,15 @@ pub fn compute_retirement_overview_with_mode(
         "at_risk"
     } else {
         "off_track"
+    };
+    let success_status = if failure_age.is_some() {
+        "depleted"
+    } else if shortfall > 0.0 {
+        "shortfall"
+    } else if required_capital > 0.0 && surplus >= required_capital * 0.1 {
+        "overfunded"
+    } else {
+        "on_track"
     };
 
     let progress = if net_target_today > 0.0 {
@@ -804,6 +790,7 @@ pub fn compute_retirement_overview_with_mode(
     RetirementOverview {
         analysis_mode: mode.as_str().to_string(),
         status: status.to_string(),
+        success_status: success_status.to_string(),
         desired_fire_age: plan.personal.target_retirement_age,
         fi_age,
         retirement_start_age,
@@ -819,6 +806,8 @@ pub fn compute_retirement_overview_with_mode(
         required_capital_at_goal_age: required_capital,
         shortfall_at_goal_age: shortfall,
         surplus_at_goal_age: surplus,
+        funded_through_age,
+        failure_age,
         required_additional_monthly_contribution: required_additional,
         suggested_goal_age_if_unchanged: suggested_age,
         coast_amount_today: coast,
@@ -846,6 +835,7 @@ mod tests {
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
             personal: PersonalProfile {
+                birth_year_month: None,
                 current_age: 35,
                 target_retirement_age: 55,
                 planning_horizon_age: 90,
@@ -853,23 +843,13 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
-                items: vec![],
-                living: ExpenseBucket {
+                items: vec![ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
                     end_age: None,
                     essential: None,
-                },
-                healthcare: ExpenseBucket {
-                    monthly_amount: 0.0,
-                    inflation_rate: None,
-                    start_age: None,
-                    end_age: None,
-                    essential: None,
-                },
-                housing: None,
-                discretionary: None,
+                }],
             },
             income_streams: vec![],
             investment: InvestmentAssumptions {
@@ -941,7 +921,7 @@ mod tests {
     fn overview_never_reaches_fi() {
         // Very high expenses, tiny contribution -> never FI
         let mut p = base_plan();
-        p.expenses.living.monthly_amount = 50_000.0;
+        p.expenses.items[0].monthly_amount = 50_000.0;
         p.investment.monthly_contribution = 100.0;
         let overview = compute_retirement_overview(&p, 1_000.0, "fire");
 
@@ -1074,6 +1054,40 @@ mod tests {
             at_goal,
             overview.required_capital_at_goal_age,
             required_today,
+        );
+    }
+
+    #[test]
+    fn traditional_overview_reports_depletion_window() {
+        let mut p = base_plan();
+        p.investment.monthly_contribution = 0.0;
+        p.expenses.items[0].monthly_amount = 20_000.0;
+
+        let overview = compute_retirement_overview(&p, 0.0, "traditional");
+
+        assert_eq!(overview.analysis_mode, "traditional");
+        assert_eq!(overview.success_status, "depleted");
+        assert_eq!(overview.failure_age, overview.retirement_start_age);
+        assert_eq!(
+            overview.funded_through_age,
+            overview.failure_age.map(|age| age.saturating_sub(1))
+        );
+    }
+
+    #[test]
+    fn traditional_overview_reports_funded_through_horizon_when_sustainable() {
+        let p = base_plan();
+        let overview = compute_retirement_overview(&p, 5_000_000.0, "traditional");
+
+        assert_eq!(overview.analysis_mode, "traditional");
+        assert!(matches!(
+            overview.success_status.as_str(),
+            "on_track" | "overfunded"
+        ));
+        assert_eq!(overview.failure_age, None);
+        assert_eq!(
+            overview.funded_through_age,
+            Some(p.personal.planning_horizon_age)
         );
     }
 

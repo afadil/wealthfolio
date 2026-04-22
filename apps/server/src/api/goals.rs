@@ -17,11 +17,12 @@ use wealthfolio_core::{
         validate_retirement_plan, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal,
         SaveGoalPlan,
     },
-    planning::retirement::{RetirementPlan, RetirementTimingMode},
+    planning::retirement::{normalize_retirement_plan_ages, RetirementPlan, RetirementTimingMode},
     planning::SaveUpOverview,
     portfolio::fire::{
-        self, DecisionSensitivityResult, MonteCarloResult, RetirementOverview, ScenarioResult,
-        SensitivityResult, SorrScenario, StrategyComparisonResult, StressTestResult,
+        self, DecisionSensitivityMap, DecisionSensitivityMatrix, MonteCarloResult,
+        RetirementOverview, ScenarioResult, SorrScenario, StrategyComparisonResult,
+        StressTestResult,
     },
 };
 
@@ -40,8 +41,9 @@ async fn get_goal(
 
 async fn create_goal(
     State(state): State<Arc<AppState>>,
-    Json(goal): Json<NewGoal>,
+    Json(mut goal): Json<NewGoal>,
 ) -> ApiResult<Json<Goal>> {
+    goal.currency = Some(state.base_currency.read().unwrap().clone());
     let g = state.goal_service.create_goal(goal).await?;
     trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
@@ -49,8 +51,9 @@ async fn create_goal(
 
 async fn update_goal(
     State(state): State<Arc<AppState>>,
-    Json(goal): Json<Goal>,
+    Json(mut goal): Json<Goal>,
 ) -> ApiResult<Json<Goal>> {
+    goal.currency = Some(state.base_currency.read().unwrap().clone());
     let g = state.goal_service.update_goal(goal).await?;
     trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
@@ -79,6 +82,12 @@ async fn save_goal_funding(
     Json(rules): Json<Vec<GoalFundingRuleInput>>,
 ) -> ApiResult<Json<Vec<GoalFundingRule>>> {
     let result = state.goal_service.save_goal_funding(&id, rules).await?;
+    if let Ok(valuation_map) = build_valuation_map(&state).await {
+        let _ = state
+            .goal_service
+            .refresh_goal_summary(&id, &valuation_map)
+            .await;
+    }
     Ok(Json(result))
 }
 
@@ -92,10 +101,31 @@ async fn get_goal_plan(
 
 async fn save_goal_plan(
     State(state): State<Arc<AppState>>,
-    Json(plan): Json<SaveGoalPlan>,
+    Json(mut plan): Json<SaveGoalPlan>,
 ) -> ApiResult<Json<GoalPlan>> {
+    let goal_id = plan.goal_id.clone();
+    let base_currency = state.base_currency.read().unwrap().clone();
+    normalize_plan_currency_to_base(&mut plan, &base_currency);
     let result = state.goal_service.save_goal_plan(plan).await?;
+    if let Ok(valuation_map) = build_valuation_map(&state).await {
+        let _ = state
+            .goal_service
+            .refresh_goal_summary(&goal_id, &valuation_map)
+            .await;
+    }
     Ok(Json(result))
+}
+
+fn normalize_plan_currency_to_base(plan: &mut SaveGoalPlan, base_currency: &str) {
+    if plan.plan_kind != "retirement" {
+        return;
+    }
+    if let Ok(mut retirement_plan) = serde_json::from_str::<RetirementPlan>(&plan.settings_json) {
+        retirement_plan.currency = base_currency.to_string();
+        if let Ok(settings_json) = serde_json::to_string(&retirement_plan) {
+            plan.settings_json = settings_json;
+        }
+    }
 }
 
 async fn delete_goal_plan(
@@ -162,6 +192,16 @@ struct RetirementSimulationRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RetirementDecisionSensitivityMapRequest {
+    plan: RetirementPlan,
+    current_portfolio: f64,
+    map: DecisionSensitivityMap,
+    goal_id: Option<String>,
+    planner_mode: Option<RetirementTimingMode>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RetirementMonteCarloRequest {
     plan: RetirementPlan,
     current_portfolio: f64,
@@ -209,6 +249,8 @@ async fn resolve_retirement_inputs(
             prepared.planner_mode,
         ))
     } else {
+        let mut plan = plan;
+        normalize_retirement_plan_ages(&mut plan);
         validate_retirement_plan(&plan)?;
         Ok((
             plan,
@@ -289,10 +331,10 @@ async fn retirement_scenario_analysis(
     Ok(Json(result))
 }
 
-async fn retirement_sensitivity_analysis(
+async fn retirement_decision_sensitivity_map(
     State(state): State<Arc<AppState>>,
-    Json(req): Json<RetirementSimulationRequest>,
-) -> ApiResult<Json<SensitivityResult>> {
+    Json(req): Json<RetirementDecisionSensitivityMapRequest>,
+) -> ApiResult<Json<DecisionSensitivityMatrix>> {
     let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
         &state,
         &req.goal_id,
@@ -301,24 +343,12 @@ async fn retirement_sensitivity_analysis(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_sensitivity_analysis_with_mode(&plan, current_portfolio, planner_mode);
-    Ok(Json(result))
-}
-
-async fn retirement_decision_sensitivity_analysis(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<RetirementSimulationRequest>,
-) -> ApiResult<Json<DecisionSensitivityResult>> {
-    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
-        &state,
-        &req.goal_id,
-        req.planner_mode,
-        req.plan,
-        req.current_portfolio,
-    )
-    .await?;
-    let result =
-        fire::run_decision_sensitivity_analysis_with_mode(&plan, current_portfolio, planner_mode);
+    let result = fire::run_decision_sensitivity_matrix_with_mode(
+        &plan,
+        current_portfolio,
+        planner_mode,
+        req.map,
+    );
     Ok(Json(result))
 }
 
@@ -334,8 +364,10 @@ async fn retirement_sequence_of_returns(
             .await?
             .plan
     } else {
-        validate_retirement_plan(&req.plan)?;
-        req.plan
+        let mut plan = req.plan;
+        normalize_retirement_plan_ages(&mut plan);
+        validate_retirement_plan(&plan)?;
+        plan
     };
     let result = fire::run_sorr(&plan, req.portfolio_at_fire, req.retirement_start_age);
     Ok(Json(result))
@@ -398,12 +430,8 @@ pub fn router() -> Router<Arc<AppState>> {
             axum::routing::post(retirement_scenario_analysis),
         )
         .route(
-            "/retirement/sensitivity-analysis",
-            axum::routing::post(retirement_sensitivity_analysis),
-        )
-        .route(
-            "/retirement/decision-sensitivity-analysis",
-            axum::routing::post(retirement_decision_sensitivity_analysis),
+            "/retirement/decision-sensitivity-map",
+            axum::routing::post(retirement_decision_sensitivity_map),
         )
         .route(
             "/retirement/sequence-of-returns",

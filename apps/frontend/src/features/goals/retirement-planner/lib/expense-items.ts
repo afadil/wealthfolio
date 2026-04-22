@@ -1,11 +1,21 @@
 import type { ExpenseBudget, ExpenseItem } from "../types";
 
-const LEGACY_LABELS = {
-  living: "Living",
-  healthcare: "Healthcare",
-  housing: "Housing",
-  discretionary: "Discretionary",
-} as const;
+const DEFAULT_ITEM_LABELS = ["Living", "Healthcare", "Housing", "Travel", "Other spending"];
+
+function fallbackItemLabel(index: number) {
+  return DEFAULT_ITEM_LABELS[index] ?? `Spending ${index + 1}`;
+}
+
+function cleanItemLabel(label: string | undefined, index: number) {
+  if (!label || /^Spending\s+\d+$/i.test(label.trim())) {
+    return fallbackItemLabel(index);
+  }
+  return label;
+}
+
+function normalizeOptionalAge(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
 
 export function createExpenseItem(
   label: string,
@@ -21,52 +31,43 @@ export function createExpenseItem(
   };
 }
 
-function normalizeItem(raw: Partial<ExpenseItem>, fallbackLabel: string, fallbackId: string) {
+export function defaultExpenseItems(): ExpenseItem[] {
+  return [
+    createExpenseItem("Living", 3000, { id: "living", essential: true }),
+    createExpenseItem("Healthcare", 300, { id: "healthcare", essential: true }),
+  ];
+}
+
+function normalizeItem(
+  raw: Partial<ExpenseItem>,
+  fallbackLabel: string,
+  fallbackId: string,
+  index = 0,
+) {
   return {
     id: raw.id || fallbackId,
-    label: raw.label || fallbackLabel,
+    label: cleanItemLabel(raw.label || fallbackLabel, index),
     monthlyAmount: raw.monthlyAmount ?? 0,
-    inflationRate: raw.inflationRate,
-    startAge: raw.startAge,
-    endAge: raw.endAge,
+    inflationRate:
+      typeof raw.inflationRate === "number" && Number.isFinite(raw.inflationRate)
+        ? raw.inflationRate
+        : undefined,
+    startAge: normalizeOptionalAge(raw.startAge),
+    endAge: normalizeOptionalAge(raw.endAge),
     essential: raw.essential,
   };
 }
 
 export function normalizeExpenseBudget(raw: Partial<ExpenseBudget> | undefined): ExpenseBudget {
-  if (raw?.items?.length) {
+  if (Array.isArray(raw?.items)) {
     return {
       items: raw.items.map((item, index) =>
-        normalizeItem(item, item.label || `Spending ${index + 1}`, item.id || `expense-${index}`),
+        normalizeItem(item, fallbackItemLabel(index), item.id || `expense-${index}`, index),
       ),
     };
   }
 
-  const items: ExpenseItem[] = [
-    normalizeItem(raw?.living ?? {}, LEGACY_LABELS.living, "living"),
-    normalizeItem(raw?.healthcare ?? {}, LEGACY_LABELS.healthcare, "healthcare"),
-  ];
-
-  if (raw?.housing) {
-    items.push(
-      normalizeItem(
-        { ...raw.housing, essential: raw.housing.essential ?? false },
-        LEGACY_LABELS.housing,
-        "housing",
-      ),
-    );
-  }
-  if (raw?.discretionary) {
-    items.push(
-      normalizeItem(
-        { ...raw.discretionary, essential: raw.discretionary.essential ?? false },
-        LEGACY_LABELS.discretionary,
-        "discretionary",
-      ),
-    );
-  }
-
-  return { items };
+  return { items: defaultExpenseItems() };
 }
 
 export function expenseItems(expenses: ExpenseBudget): ExpenseItem[] {
@@ -85,8 +86,10 @@ export function isExpenseActiveAtAge(item: ExpenseItem, age: number) {
 }
 
 export function expenseAgeRangeLabel(item: ExpenseItem, horizonAge: number) {
-  const start = item.startAge === undefined ? "Retirement" : `Age ${item.startAge}`;
-  const end = item.endAge === undefined ? horizonAge : item.endAge;
+  const startAge = normalizeOptionalAge(item.startAge);
+  const endAge = normalizeOptionalAge(item.endAge);
+  const start = startAge === undefined ? "Retirement" : `Age ${startAge}`;
+  const end = endAge === undefined ? horizonAge : endAge;
   return `${start} → ${end}`;
 }
 

@@ -4,22 +4,25 @@ use tauri::State;
 
 use crate::context::ServiceContext;
 use wealthfolio_core::goals::validate_retirement_plan;
-use wealthfolio_core::planning::retirement::{RetirementPlan, RetirementTimingMode};
-use wealthfolio_core::portfolio::fire::{
-    project_retirement_with_mode, run_decision_sensitivity_analysis_with_mode,
-    run_monte_carlo_with_mode_and_seed, run_scenario_analysis_with_mode,
-    run_sensitivity_analysis_with_mode, run_sorr, run_strategy_comparison_with_mode,
-    run_stress_tests_with_mode,
+use wealthfolio_core::planning::retirement::{
+    normalize_retirement_plan_ages, RetirementPlan, RetirementTimingMode,
 };
 use wealthfolio_core::portfolio::fire::{
-    DecisionSensitivityResult, FireProjection, MonteCarloResult, ScenarioResult, SensitivityResult,
-    SorrScenario, StrategyComparisonResult, StressTestResult,
+    project_retirement_with_mode, run_decision_sensitivity_matrix_with_mode,
+    run_monte_carlo_with_mode_and_seed, run_scenario_analysis_with_mode, run_sorr,
+    run_strategy_comparison_with_mode, run_stress_tests_with_mode,
+};
+use wealthfolio_core::portfolio::fire::{
+    DecisionSensitivityMap, DecisionSensitivityMatrix, FireProjection, MonteCarloResult,
+    ScenarioResult, SorrScenario, StrategyComparisonResult, StressTestResult,
 };
 
 const MAX_SIMS: u32 = 500_000;
 
-fn validate_plan(plan: &RetirementPlan) -> Result<(), String> {
-    validate_retirement_plan(plan).map_err(|e| e.to_string())
+fn normalize_and_validate_plan(mut plan: RetirementPlan) -> Result<RetirementPlan, String> {
+    normalize_retirement_plan_ages(&mut plan);
+    validate_retirement_plan(&plan).map_err(|e| e.to_string())?;
+    Ok(plan)
 }
 
 async fn build_valuation_map(
@@ -64,7 +67,7 @@ async fn resolve_retirement_inputs(
             prepared.planner_mode,
         ))
     } else {
-        validate_plan(&plan)?;
+        let plan = normalize_and_validate_plan(plan)?;
         Ok((
             plan,
             current_portfolio,
@@ -165,43 +168,27 @@ pub async fn run_retirement_sorr(
             .map_err(|e| e.to_string())?
             .plan
     } else {
-        validate_plan(&plan)?;
-        plan
+        normalize_and_validate_plan(plan)?
     };
     Ok(run_sorr(&plan, portfolio_at_fire, retirement_start_age))
 }
 
 #[tauri::command]
-pub async fn run_retirement_sensitivity(
+pub async fn run_retirement_decision_sensitivity_map(
     plan: RetirementPlan,
     current_portfolio: f64,
+    map: DecisionSensitivityMap,
     goal_id: Option<String>,
     planner_mode: Option<RetirementTimingMode>,
     state: State<'_, Arc<ServiceContext>>,
-) -> Result<SensitivityResult, String> {
+) -> Result<DecisionSensitivityMatrix, String> {
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_sensitivity_analysis_with_mode(
+    Ok(run_decision_sensitivity_matrix_with_mode(
         &plan,
         current_portfolio,
         planner_mode,
-    ))
-}
-
-#[tauri::command]
-pub async fn run_retirement_decision_sensitivity(
-    plan: RetirementPlan,
-    current_portfolio: f64,
-    goal_id: Option<String>,
-    planner_mode: Option<RetirementTimingMode>,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<DecisionSensitivityResult, String> {
-    let (plan, current_portfolio, planner_mode) =
-        resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_decision_sensitivity_analysis_with_mode(
-        &plan,
-        current_portfolio,
-        planner_mode,
+        map,
     ))
 }
 

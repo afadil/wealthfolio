@@ -97,14 +97,14 @@ impl<E: AiEnvironment + 'static> Tool for GetGoalsTool<E> {
 
         let original_count = goals.len();
 
-        // Convert to DTOs using cached summary fields
+        // Convert to DTOs using persisted summary fields
         let goals_dto: Vec<GoalDto> = goals
             .into_iter()
             .take(MAX_GOALS)
             .map(|g| {
-                let target = g.target_amount_cached.or(g.target_amount).unwrap_or(0.0);
-                let current_amount = g.current_value_cached.unwrap_or(0.0);
-                let progress_percent = g.progress_cached.unwrap_or(0.0) * 100.0;
+                let target = g.summary_target_amount.or(g.target_amount).unwrap_or(0.0);
+                let current_amount = g.summary_current_value.unwrap_or(0.0);
+                let progress_percent = g.summary_progress.unwrap_or(0.0) * 100.0;
 
                 GoalDto {
                     id: g.id,

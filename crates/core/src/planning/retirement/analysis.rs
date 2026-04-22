@@ -597,20 +597,8 @@ fn apply_save_less_stress(plan: &mut RetirementPlan) {
 }
 
 fn scale_expenses(expenses: &mut ExpenseBudget, factor: f64) {
-    if !expenses.items.is_empty() {
-        for item in &mut expenses.items {
-            item.monthly_amount *= factor;
-        }
-        return;
-    }
-
-    expenses.living.monthly_amount *= factor;
-    expenses.healthcare.monthly_amount *= factor;
-    if let Some(housing) = &mut expenses.housing {
-        housing.monthly_amount *= factor;
-    }
-    if let Some(discretionary) = &mut expenses.discretionary {
-        discretionary.monthly_amount *= factor;
+    for item in &mut expenses.items {
+        item.monthly_amount *= factor;
     }
 }
 
@@ -827,25 +815,19 @@ pub fn run_sensitivity_analysis_with_mode(
     }
 }
 
-pub fn run_decision_sensitivity_analysis(
-    plan: &RetirementPlan,
-    current_portfolio: f64,
-) -> DecisionSensitivityResult {
-    run_decision_sensitivity_analysis_with_mode(plan, current_portfolio, RetirementTimingMode::Fire)
-}
-
-pub fn run_decision_sensitivity_analysis_with_mode(
+pub fn run_decision_sensitivity_matrix_with_mode(
     plan: &RetirementPlan,
     current_portfolio: f64,
     mode: RetirementTimingMode,
-) -> DecisionSensitivityResult {
-    DecisionSensitivityResult {
-        contribution_return: build_contribution_return_sensitivity(plan, current_portfolio, mode),
-        retirement_age_spending: build_retirement_age_spending_sensitivity(
-            plan,
-            current_portfolio,
-            mode,
-        ),
+    map: DecisionSensitivityMap,
+) -> DecisionSensitivityMatrix {
+    match map {
+        DecisionSensitivityMap::ContributionReturn => {
+            build_contribution_return_sensitivity(plan, current_portfolio, mode)
+        }
+        DecisionSensitivityMap::RetirementAgeSpending => {
+            build_retirement_age_spending_sensitivity(plan, current_portfolio, mode)
+        }
     }
 }
 
@@ -866,10 +848,10 @@ fn build_contribution_return_sensitivity(
         .position(|value| approx_eq(*value, base_contribution, 0.01));
 
     let cells = return_values
-        .iter()
+        .par_iter()
         .map(|&net_return| {
             contribution_values
-                .iter()
+                .par_iter()
                 .map(|&contribution| {
                     let mut adjusted = plan.clone();
                     adjusted.investment.monthly_contribution = contribution;
@@ -916,10 +898,10 @@ fn build_retirement_age_spending_sensitivity(
         .position(|value| *value as u32 == base_retirement_age);
 
     let cells = spending_values
-        .iter()
+        .par_iter()
         .map(|&monthly_spending| {
             retirement_age_values
-                .iter()
+                .par_iter()
                 .map(|&retirement_age| {
                     let mut adjusted = plan.clone();
                     adjusted.personal.target_retirement_age = retirement_age as u32;
@@ -1081,14 +1063,17 @@ fn set_total_monthly_expense(expenses: &mut ExpenseBudget, base_total: f64, targ
         return;
     }
 
-    if !expenses.items.is_empty() {
-        if let Some(first) = expenses.items.first_mut() {
-            first.monthly_amount = target_total;
-        }
-        return;
+    if let Some(first) = expenses.items.first_mut() {
+        first.monthly_amount = target_total;
+    } else {
+        expenses.items.push(ExpenseBucket {
+            monthly_amount: target_total,
+            inflation_rate: None,
+            start_age: None,
+            end_age: None,
+            essential: Some(true),
+        });
     }
-
-    expenses.living.monthly_amount = target_total;
 }
 
 fn round_money_axis(value: f64) -> f64 {
@@ -1153,6 +1138,7 @@ mod tests {
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
             personal: PersonalProfile {
+                birth_year_month: None,
                 current_age: 35,
                 target_retirement_age: 55,
                 planning_horizon_age: 90,
@@ -1160,23 +1146,13 @@ mod tests {
                 salary_growth_rate: None,
             },
             expenses: ExpenseBudget {
-                items: vec![],
-                living: ExpenseBucket {
+                items: vec![ExpenseBucket {
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
                     end_age: None,
                     essential: None,
-                },
-                healthcare: ExpenseBucket {
-                    monthly_amount: 0.0,
-                    inflation_rate: None,
-                    start_age: None,
-                    end_age: None,
-                    essential: None,
-                },
-                housing: None,
-                discretionary: None,
+                }],
             },
             income_streams: vec![],
             investment: InvestmentAssumptions {
@@ -1262,21 +1238,27 @@ mod tests {
     #[test]
     fn decision_sensitivity_returns_two_outcome_grids() {
         let p = base_plan();
-        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+        let contribution_return = run_decision_sensitivity_matrix_with_mode(
+            &p,
+            100_000.0,
+            RetirementTimingMode::Fire,
+            DecisionSensitivityMap::ContributionReturn,
+        );
+        let retirement_age_spending = run_decision_sensitivity_matrix_with_mode(
+            &p,
+            100_000.0,
+            RetirementTimingMode::Fire,
+            DecisionSensitivityMap::RetirementAgeSpending,
+        );
 
-        assert_eq!(result.contribution_return.row_values.len(), 5);
-        assert_eq!(result.contribution_return.column_values.len(), 5);
-        assert_eq!(result.contribution_return.cells.len(), 5);
-        assert!(result
-            .contribution_return
-            .cells
-            .iter()
-            .all(|row| row.len() == 5));
-        assert_eq!(result.retirement_age_spending.row_values.len(), 5);
-        assert_eq!(result.retirement_age_spending.column_values.len(), 5);
-        assert_eq!(result.retirement_age_spending.cells.len(), 5);
-        assert!(result
-            .retirement_age_spending
+        assert_eq!(contribution_return.row_values.len(), 5);
+        assert_eq!(contribution_return.column_values.len(), 5);
+        assert_eq!(contribution_return.cells.len(), 5);
+        assert!(contribution_return.cells.iter().all(|row| row.len() == 5));
+        assert_eq!(retirement_age_spending.row_values.len(), 5);
+        assert_eq!(retirement_age_spending.column_values.len(), 5);
+        assert_eq!(retirement_age_spending.cells.len(), 5);
+        assert!(retirement_age_spending
             .cells
             .iter()
             .all(|row| row.len() == 5));
@@ -1285,18 +1267,34 @@ mod tests {
     #[test]
     fn decision_sensitivity_highlights_baseline_cell() {
         let p = base_plan();
-        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+        let contribution_return = run_decision_sensitivity_matrix_with_mode(
+            &p,
+            100_000.0,
+            RetirementTimingMode::Fire,
+            DecisionSensitivityMap::ContributionReturn,
+        );
+        let retirement_age_spending = run_decision_sensitivity_matrix_with_mode(
+            &p,
+            100_000.0,
+            RetirementTimingMode::Fire,
+            DecisionSensitivityMap::RetirementAgeSpending,
+        );
 
-        assert_eq!(result.contribution_return.baseline_row, Some(2));
-        assert_eq!(result.contribution_return.baseline_column, Some(2));
-        assert_eq!(result.retirement_age_spending.baseline_row, Some(2));
-        assert_eq!(result.retirement_age_spending.baseline_column, Some(2));
+        assert_eq!(contribution_return.baseline_row, Some(2));
+        assert_eq!(contribution_return.baseline_column, Some(2));
+        assert_eq!(retirement_age_spending.baseline_row, Some(2));
+        assert_eq!(retirement_age_spending.baseline_column, Some(2));
     }
 
     #[test]
     fn decision_sensitivity_baseline_matches_overview() {
         let p = base_plan();
-        let result = run_decision_sensitivity_analysis(&p, 100_000.0);
+        let contribution_return = run_decision_sensitivity_matrix_with_mode(
+            &p,
+            100_000.0,
+            RetirementTimingMode::Fire,
+            DecisionSensitivityMap::ContributionReturn,
+        );
         let overview =
             compute_retirement_overview_with_mode(&p, 100_000.0, RetirementTimingMode::Fire);
         let expected_horizon = overview
@@ -1305,9 +1303,8 @@ mod tests {
             .map(|point| point.portfolio_end)
             .unwrap_or(0.0)
             / inflation_factor_to_age(&p, p.personal.planning_horizon_age);
-        let cell = &result.contribution_return.cells
-            [result.contribution_return.baseline_row.unwrap()]
-            [result.contribution_return.baseline_column.unwrap()];
+        let cell = &contribution_return.cells[contribution_return.baseline_row.unwrap()]
+            [contribution_return.baseline_column.unwrap()];
 
         assert_eq!(cell.fi_age, overview.fi_age);
         assert!((cell.portfolio_at_horizon - expected_horizon).abs() < 0.01);
@@ -1376,8 +1373,9 @@ mod tests {
         let mut actual = p.clone();
         apply_spending_shock_stress(&mut actual);
         let mut expected = p.clone();
-        expected.expenses.living.monthly_amount *= 1.10;
-        expected.expenses.healthcare.monthly_amount *= 1.10;
+        for item in &mut expected.expenses.items {
+            item.monthly_amount *= 1.10;
+        }
         assert_eq!(actual, expected);
 
         let mut actual = p.clone();
@@ -1443,7 +1441,7 @@ mod tests {
     #[test]
     fn mc_underfunded_plan_has_no_median_fire_age() {
         let mut plan = base_plan();
-        plan.expenses.living.monthly_amount = 50_000.0; // Very high expenses
+        plan.expenses.items[0].monthly_amount = 50_000.0; // Very high expenses
         plan.investment.monthly_contribution = 100.0; // Tiny contributions
         let result = run_monte_carlo(&plan, 1_000.0, 100);
         // FI target = 50000*12/0.04 = 15M — unreachable with tiny contributions.

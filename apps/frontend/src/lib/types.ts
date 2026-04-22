@@ -732,13 +732,13 @@ export interface Goal {
   currency?: string;
   startDate?: string;
   targetDate?: string;
-  currentValueCached?: number;
-  progressCached?: number;
+  summaryCurrentValue?: number;
+  summaryProgress?: number;
   projectedCompletionDate?: string;
   projectedValueAtTargetDate?: number;
   createdAt: string;
   updatedAt: string;
-  targetAmountCached?: number;
+  summaryTargetAmount?: number;
 }
 
 export interface NewGoal {
@@ -1994,6 +1994,7 @@ export interface TaxBucketBalances {
 export interface RetirementOverview {
   analysisMode: string;
   status: string;
+  successStatus: "on_track" | "shortfall" | "depleted" | "overfunded" | string;
   desiredFireAge: number;
   fiAge: number | null;
   retirementStartAge: number | null;
@@ -2009,6 +2010,8 @@ export interface RetirementOverview {
   requiredCapitalAtGoalAge: number;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
+  fundedThroughAge: number | null;
+  failureAge: number | null;
   requiredAdditionalMonthlyContribution: number;
   suggestedGoalAgeIfUnchanged: number | null;
   coastAmountToday: number;
@@ -2042,12 +2045,8 @@ export interface RetirementTrajectoryPoint {
 
 export interface BudgetBreakdown {
   totalMonthlyBudget: number;
-  monthlyLivingExpenses: number;
-  monthlyHealthcare: number;
   monthlyPortfolioWithdrawal: number;
   incomeStreams: BudgetStreamItem[];
-  monthlyHousing?: number;
-  monthlyDiscretionary?: number;
   effectiveTaxRate?: number;
 }
 
