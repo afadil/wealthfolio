@@ -869,7 +869,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         _asset_cache: &mut HashMap<String, (String, bool, Decimal)>,
-        _cost_basis_method: CostBasisMethod,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<()> {
         use crate::activities::ACTIVITY_SUBTYPE_OPTION_EXPIRY;
 
@@ -878,7 +878,7 @@ impl HoldingsCalculator {
                 let asset_id = activity.asset_id.as_deref().unwrap_or("");
                 if let Some(position) = state.positions.get_mut(asset_id) {
                     let qty = activity.qty();
-                    let reduction = position.reduce_lots_fifo(qty)?;
+                    let reduction = self.reduce_position_lots(position, qty, cost_basis_method)?;
                     debug!(
                         "OPTION_EXPIRY: removed qty={} cost_basis={} from {} (activity {})",
                         reduction.quantity_reduced,

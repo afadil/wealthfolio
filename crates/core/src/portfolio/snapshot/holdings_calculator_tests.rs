@@ -5363,4 +5363,312 @@ mod tests {
         // Multiplier should be 100
         assert_eq!(pos_b.contract_multiplier, dec!(100));
     }
+
+    // --- Cost basis method tests ---
+
+    #[test]
+    fn test_option_expiry_respects_lifo_cost_basis_method() {
+        use crate::activities::ACTIVITY_SUBTYPE_OPTION_EXPIRY;
+
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let target_date_str = "2024-01-10";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+
+        // Build a snapshot with 2 lots:
+        //   lot A: qty=5, cost@10 each, acquired 2024-01-01 (older)
+        //   lot B: qty=5, cost@20 each, acquired 2024-01-05 (newer)
+        let lot_a_date = Utc.from_utc_datetime(
+            &NaiveDate::from_str("2024-01-01")
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        );
+        let lot_b_date = Utc.from_utc_datetime(
+            &NaiveDate::from_str("2024-01-05")
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        );
+        let initial_position = Position {
+            id: "XYZ_acc_1".to_string(),
+            account_id: "acc_1".to_string(),
+            asset_id: "XYZ".to_string(),
+            quantity: dec!(10),
+            average_cost: dec!(15),
+            total_cost_basis: dec!(150),
+            currency: "USD".to_string(),
+            inception_date: lot_a_date,
+            lots: VecDeque::from(vec![
+                Lot {
+                    id: "lot_a".to_string(),
+                    position_id: "XYZ_acc_1".to_string(),
+                    acquisition_date: lot_a_date,
+                    quantity: dec!(5),
+                    cost_basis: dec!(50),
+                    acquisition_price: dec!(10),
+                    acquisition_fees: dec!(0),
+                    fx_rate_to_position: None,
+                },
+                Lot {
+                    id: "lot_b".to_string(),
+                    position_id: "XYZ_acc_1".to_string(),
+                    acquisition_date: lot_b_date,
+                    quantity: dec!(5),
+                    cost_basis: dec!(100),
+                    acquisition_price: dec!(20),
+                    acquisition_fees: dec!(0),
+                    fx_rate_to_position: None,
+                },
+            ]),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+            is_alternative: false,
+            contract_multiplier: Decimal::ONE,
+        };
+        let mut previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-01-09");
+        previous_snapshot
+            .positions
+            .insert("XYZ".to_string(), initial_position);
+
+        // OPTION_EXPIRY activity for qty=5
+        let expiry_activity = Activity {
+            id: "act_expiry_1".to_string(),
+            account_id: "acc_1".to_string(),
+            asset_id: Some("XYZ".to_string()),
+            activity_type: "ADJUSTMENT".to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY.to_string()),
+            status: ActivityStatus::Posted,
+            activity_date: Utc.from_utc_datetime(
+                &NaiveDate::from_str(target_date_str)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
+            ),
+            settlement_date: None,
+            quantity: Some(dec!(5)),
+            unit_price: Some(dec!(0)),
+            amount: None,
+            fee: Some(dec!(0)),
+            currency: "USD".to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let result = calculator.calculate_next_holdings(
+            &previous_snapshot,
+            &[expiry_activity],
+            target_date,
+            CostBasisMethod::Lifo,
+        );
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+
+        let position = next_state
+            .positions
+            .get("XYZ")
+            .expect("XYZ position should exist");
+        // LIFO removes from the newest lot (lot B: qty=5 @20).
+        // Remaining: lot A only → qty=5, total_cost_basis=50, average_cost=10
+        assert_eq!(position.quantity, dec!(5));
+        assert_eq!(position.total_cost_basis, dec!(50));
+        assert_eq!(position.average_cost, dec!(10));
+        // Verify only lot_a remains
+        assert_eq!(position.lots.len(), 1);
+        assert_eq!(position.lots[0].id, "lot_a");
+    }
+
+    #[test]
+    fn test_lifo_4step_sequence() {
+        // Use separate dates for each activity so LIFO lot ordering is deterministic.
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        // Step 1: BUY 10 @ $10 on 2024-02-01
+        let snap0 = create_initial_snapshot("acc_1", "USD", "2024-01-31");
+        let buy1 = create_default_activity(
+            "b1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(10),
+            dec!(0),
+            "USD",
+            "2024-02-01",
+        );
+        let snap1 = calculator
+            .calculate_next_holdings(
+                &snap0,
+                &[buy1],
+                NaiveDate::from_str("2024-02-01").unwrap(),
+                CostBasisMethod::Lifo,
+            )
+            .unwrap()
+            .snapshot;
+
+        // Step 2: BUY 10 @ $20 on 2024-02-02
+        let buy2 = create_default_activity(
+            "b2",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(20),
+            dec!(0),
+            "USD",
+            "2024-02-02",
+        );
+        let snap2 = calculator
+            .calculate_next_holdings(
+                &snap1,
+                &[buy2],
+                NaiveDate::from_str("2024-02-02").unwrap(),
+                CostBasisMethod::Lifo,
+            )
+            .unwrap()
+            .snapshot;
+
+        // Step 3: SELL 5 @ $25 on 2024-02-03 — LIFO removes 5 from newest lot (lot@20)
+        let sell = create_default_activity(
+            "s1",
+            ActivityType::Sell,
+            "AAPL",
+            dec!(5),
+            dec!(25),
+            dec!(0),
+            "USD",
+            "2024-02-03",
+        );
+        let snap3 = calculator
+            .calculate_next_holdings(
+                &snap2,
+                &[sell],
+                NaiveDate::from_str("2024-02-03").unwrap(),
+                CostBasisMethod::Lifo,
+            )
+            .unwrap()
+            .snapshot;
+
+        // Step 4: BUY 10 @ $30 on 2024-02-04
+        let buy3 = create_default_activity(
+            "b3",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(30),
+            dec!(0),
+            "USD",
+            "2024-02-04",
+        );
+        let snap4 = calculator
+            .calculate_next_holdings(
+                &snap3,
+                &[buy3],
+                NaiveDate::from_str("2024-02-04").unwrap(),
+                CostBasisMethod::Lifo,
+            )
+            .unwrap()
+            .snapshot;
+
+        let position = snap4.positions.get("AAPL").expect("AAPL should exist");
+
+        // After all steps with LIFO:
+        //   buy1 (2024-02-01): qty=10, cost=100, avg=10
+        //   buy2 (2024-02-02): qty=20, cost=300, avg=15
+        //   sell5 LIFO removes 5 from newest lot (lot@20): qty=15, cost=200, avg=200/15=13.33...
+        //   buy3 (2024-02-04): qty=25, cost=200+300=500, avg=500/25=20.00
+        assert_eq!(position.quantity, dec!(25));
+        assert_eq!(position.average_cost, dec!(20));
+        assert_eq!(position.total_cost_basis, dec!(500));
+    }
+
+    #[test]
+    fn test_wac_4step_sequence() {
+        // WAC preserves average cost on sell, so same-date activities work fine.
+        let mock_fx_service = Arc::new(MockFxService::new());
+        let base_currency = Arc::new(RwLock::new("USD".to_string()));
+        let calculator = create_calculator(mock_fx_service, base_currency);
+
+        let date_str = "2024-02-01";
+        let target_date = NaiveDate::from_str(date_str).unwrap();
+        let previous_snapshot = create_initial_snapshot("acc_1", "USD", "2024-01-31");
+
+        // Step 1: BUY 10 @ $10
+        let buy1 = create_default_activity(
+            "b1",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(10),
+            dec!(0),
+            "USD",
+            date_str,
+        );
+        // Step 2: BUY 10 @ $20
+        let buy2 = create_default_activity(
+            "b2",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(20),
+            dec!(0),
+            "USD",
+            date_str,
+        );
+        // Step 3: SELL 5 @ $25 (WAC: proportional reduction, avg preserved at 15)
+        let sell = create_default_activity(
+            "s1",
+            ActivityType::Sell,
+            "AAPL",
+            dec!(5),
+            dec!(25),
+            dec!(0),
+            "USD",
+            date_str,
+        );
+        // Step 4: BUY 10 @ $30
+        let buy3 = create_default_activity(
+            "b3",
+            ActivityType::Buy,
+            "AAPL",
+            dec!(10),
+            dec!(30),
+            dec!(0),
+            "USD",
+            date_str,
+        );
+
+        let result = calculator.calculate_next_holdings(
+            &previous_snapshot,
+            &[buy1, buy2, sell, buy3],
+            target_date,
+            CostBasisMethod::Wac,
+        );
+        assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
+        let next_state = result.unwrap().snapshot;
+        let position = next_state.positions.get("AAPL").expect("AAPL should exist");
+
+        // After all steps with WAC:
+        //   buy1: qty=10, cost=100, avg=10
+        //   buy2: qty=20, cost=300, avg=15
+        //   sell5 WAC (avg preserved at 15): qty=15, cost=300-5*15=225, avg=15
+        //   buy3: qty=25, cost=225+300=525, avg=525/25=21.00
+        assert_eq!(position.quantity, dec!(25));
+        assert_eq!(position.average_cost, dec!(21));
+        assert_eq!(position.total_cost_basis, dec!(525));
+    }
 }
