@@ -1,0 +1,1 @@
+ALTER TABLE accounts ADD COLUMN cost_basis_method TEXT NOT NULL DEFAULT 'FIFO';

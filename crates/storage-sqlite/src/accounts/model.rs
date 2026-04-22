@@ -4,7 +4,9 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount, TrackingMode};
+use wealthfolio_core::accounts::{
+    Account, AccountUpdate, CostBasisMethod, NewAccount, TrackingMode,
+};
 
 /// Database model for accounts
 #[derive(
@@ -41,6 +43,7 @@ pub struct AccountDB {
     pub provider_account_id: Option<String>,
     pub is_archived: bool,
     pub tracking_mode: String,
+    pub cost_basis_method: String,
 }
 
 // Conversion implementations
@@ -50,6 +53,11 @@ impl From<AccountDB> for Account {
             "TRANSACTIONS" => TrackingMode::Transactions,
             "HOLDINGS" => TrackingMode::Holdings,
             _ => TrackingMode::NotSet,
+        };
+        let cost_basis_method = match db.cost_basis_method.as_str() {
+            "LIFO" => CostBasisMethod::Lifo,
+            "WAC" => CostBasisMethod::Wac,
+            _ => CostBasisMethod::Fifo,
         };
         Self {
             id: db.id,
@@ -68,6 +76,7 @@ impl From<AccountDB> for Account {
             provider_account_id: db.provider_account_id,
             is_archived: db.is_archived,
             tracking_mode,
+            cost_basis_method,
         }
     }
 }
@@ -79,6 +88,12 @@ impl From<NewAccount> for AccountDB {
             TrackingMode::Transactions => "TRANSACTIONS",
             TrackingMode::Holdings => "HOLDINGS",
             TrackingMode::NotSet => "NOT_SET",
+        }
+        .to_string();
+        let cost_basis_method = match domain.cost_basis_method {
+            CostBasisMethod::Lifo => "LIFO",
+            CostBasisMethod::Wac => "WAC",
+            CostBasisMethod::Fifo => "FIFO",
         }
         .to_string();
         Self {
@@ -98,6 +113,7 @@ impl From<NewAccount> for AccountDB {
             provider_account_id: domain.provider_account_id,
             is_archived: domain.is_archived,
             tracking_mode,
+            cost_basis_method,
         }
     }
 }
@@ -112,6 +128,15 @@ impl From<AccountUpdate> for AccountDB {
                 TrackingMode::NotSet => "NOT_SET",
             })
             .unwrap_or("NOT_SET")
+            .to_string();
+        let cost_basis_method = domain
+            .cost_basis_method
+            .map(|m| match m {
+                CostBasisMethod::Lifo => "LIFO",
+                CostBasisMethod::Wac => "WAC",
+                CostBasisMethod::Fifo => "FIFO",
+            })
+            .unwrap_or("FIFO")
             .to_string();
         Self {
             id: domain.id.unwrap_or_default(),
@@ -130,6 +155,7 @@ impl From<AccountUpdate> for AccountDB {
             provider_account_id: domain.provider_account_id,
             is_archived: domain.is_archived.unwrap_or(false),
             tracking_mode,
+            cost_basis_method,
         }
     }
 }

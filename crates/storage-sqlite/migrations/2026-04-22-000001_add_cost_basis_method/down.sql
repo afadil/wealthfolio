@@ -1,0 +1,2 @@
+-- SQLite does not support DROP COLUMN on older versions; migration is irreversible.
+-- To undo: recreate the table without cost_basis_method.

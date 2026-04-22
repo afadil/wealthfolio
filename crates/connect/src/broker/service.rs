@@ -238,6 +238,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 provider_account_id: Some(provider_account_id.clone()),
                 is_archived: false,
                 tracking_mode: TrackingMode::Holdings,
+                cost_basis_method: wealthfolio_core::accounts::CostBasisMethod::Fifo,
             };
 
             // Create the account via AccountService (handles FX rate registration)

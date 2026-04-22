@@ -18,6 +18,19 @@ pub enum TrackingMode {
     NotSet,
 }
 
+/// Cost basis method for calculating average cost and realized gains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CostBasisMethod {
+    /// First In, First Out — default, US IRS standard.
+    #[default]
+    Fifo,
+    /// Last In, First Out — required in Italy (regime dichiarativo, art. 67 TUIR).
+    Lifo,
+    /// Weighted Average Cost — required in Italy (risparmio amministrato, D.P.R. 461/1997).
+    Wac,
+}
+
 /// Domain model representing an account in the system.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +57,8 @@ pub struct Account {
     pub is_archived: bool,
     /// Tracking mode for the account
     pub tracking_mode: TrackingMode,
+    #[serde(default)]
+    pub cost_basis_method: CostBasisMethod,
 }
 
 /// Input model for creating a new account.
@@ -67,6 +82,8 @@ pub struct NewAccount {
     pub is_archived: bool,
     #[serde(default)]
     pub tracking_mode: TrackingMode,
+    #[serde(default)]
+    pub cost_basis_method: CostBasisMethod,
 }
 
 impl NewAccount {
@@ -103,6 +120,7 @@ pub struct AccountUpdate {
     pub provider_account_id: Option<String>,
     pub is_archived: Option<bool>,
     pub tracking_mode: Option<TrackingMode>,
+    pub cost_basis_method: Option<CostBasisMethod>,
 }
 
 impl AccountUpdate {
