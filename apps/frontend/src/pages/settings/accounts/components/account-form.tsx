@@ -353,6 +353,24 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             render={({ field }) => (
               <FormItem className="space-y-2">
                 <FormLabel>Cost Basis Method</FormLabel>
+                <Alert
+                  variant="default"
+                  className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
+                >
+                  <Icons.AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    The cost basis method determines how your average book cost and capital gains
+                    are calculated. The right choice depends on your country and broker.{" "}
+                    <a
+                      href="https://wealthfolio.app/docs/concepts/cost-basis-methods"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-foreground underline"
+                    >
+                      Learn more
+                    </a>
+                  </AlertDescription>
+                </Alert>
                 <FormControl>
                   <RadioGroup
                     onValueChange={field.onChange}
@@ -367,9 +385,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       <RadioGroupItem value="FIFO" className="mt-0.5" />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">FIFO</span>
-                        <span className="text-muted-foreground text-xs">
-                          First In, First Out — US/global default
-                        </span>
+                        <span className="text-muted-foreground text-xs">First In, First Out</span>
                       </div>
                     </label>
                     <label
@@ -380,9 +396,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       <RadioGroupItem value="LIFO" className="mt-0.5" />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">LIFO</span>
-                        <span className="text-muted-foreground text-xs">
-                          Last In, First Out — IT regime dichiarativo
-                        </span>
+                        <span className="text-muted-foreground text-xs">Last In, First Out</span>
                       </div>
                     </label>
                     <label
@@ -393,30 +407,11 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                       <RadioGroupItem value="WAC" className="mt-0.5" />
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">WAC</span>
-                        <span className="text-muted-foreground text-xs">
-                          Weighted Average Cost — IT risparmio amministrato
-                        </span>
+                        <span className="text-muted-foreground text-xs">Weighted Average Cost</span>
                       </div>
                     </label>
                   </RadioGroup>
                 </FormControl>
-                <Alert
-                  variant="default"
-                  className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
-                >
-                  <Icons.AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    The cost basis method determines how gains are calculated when you sell.{" "}
-                    <a
-                      href="https://wealthfolio.app/docs/concepts/cost-basis-methods"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-foreground underline"
-                    >
-                      Learn more
-                    </a>
-                  </AlertDescription>
-                </Alert>
                 <FormMessage />
               </FormItem>
             )}
