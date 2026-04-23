@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::engine::{
-    annual_expenses_at_year, end_of_year_value_of_monthly_contributions, plan_accumulation_return,
-    plan_income_at_age, plan_retirement_return, project_retirement,
+    annual_expenses_at_year, bounded_inflation_factor, end_of_year_value_of_monthly_contributions,
+    plan_accumulation_return, plan_income_at_age, plan_retirement_return, project_retirement,
     project_retirement_with_mode_cached, required_capital_for, resolve_plan_dc_payouts,
     RequiredCapitalCache,
 };
@@ -10,6 +10,9 @@ use super::model::{
     RetirementPlan, RetirementStartReason, RetirementTimingMode, TaxBucketBalances,
 };
 use super::withdrawal::compute_gross_withdrawal;
+
+const MATERIAL_SHORTFALL_RATE: f64 = 0.001;
+const MIN_MATERIAL_SHORTFALL: f64 = 1.0;
 
 // ─── Output types ────────────────────────────────────────────────────────────
 
@@ -132,17 +135,8 @@ pub struct SensitivityMatrix {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SensitivitySwrMatrix {
-    pub swr_rows: Vec<f64>,
-    pub return_columns: Vec<f64>,
-    pub fire_ages: Vec<Vec<Option<u32>>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct SensitivityResult {
     pub contribution: SensitivityMatrix,
-    pub swr: SensitivitySwrMatrix,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,14 +168,6 @@ pub struct DecisionSensitivityMatrix {
 pub enum DecisionSensitivityMap {
     ContributionReturn,
     RetirementAgeSpending,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StrategyComparisonResult {
-    pub planned_spending: MonteCarloResult,
-    pub constant_percentage: MonteCarloResult,
-    pub guardrails: MonteCarloResult,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -310,8 +296,6 @@ pub struct RetirementOverview {
     pub budget_breakdown: BudgetBreakdown,
     pub target_reconciliation: TargetReconciliation,
     pub trajectory: Vec<RetirementTrajectoryPoint>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub withdrawal_policy: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -387,10 +371,6 @@ pub struct TargetReconciliation {
 
 // ─── Overview builders ──────────────────────────────────────────────────────
 
-fn bounded_inflation_factor(rate: f64, years: u32) -> f64 {
-    (1.0_f64 + rate).powi(years as i32).clamp(0.01, f64::MAX)
-}
-
 /// Plan-aware nominal monthly budget breakdown at the given retirement age.
 fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> BudgetBreakdown {
     let years_from_now = (retirement_age as i32 - plan.personal.current_age as i32).max(0) as u32;
@@ -406,7 +386,6 @@ fn compute_budget_breakdown(plan: &RetirementPlan, retirement_age: u32) -> Budge
         &plan.income_streams,
         plan.personal.current_age,
         retirement_age,
-        plan.withdrawal.safe_withdrawal_rate,
         plan_accumulation_return(plan),
     );
 
@@ -488,7 +467,6 @@ fn compute_target_reconciliation(
         &plan.income_streams,
         plan.personal.current_age,
         retirement_age,
-        plan.withdrawal.safe_withdrawal_rate,
         plan_accumulation_return(plan),
     );
     let annual_income_nominal = plan_income_at_age(
@@ -694,6 +672,19 @@ fn find_fi_age_accumulation_only(
     None
 }
 
+fn has_material_spending_shortfall(snap: &YearlySnapshot) -> bool {
+    if snap.phase != "fire" {
+        return false;
+    }
+    let shortfall = snap.annual_shortfall.unwrap_or(0.0);
+    if shortfall <= 0.0 {
+        return false;
+    }
+    let spending_gap = (snap.planned_expenses.unwrap_or(0.0) - snap.annual_income).max(0.0);
+    let tolerance = (spending_gap * MATERIAL_SHORTFALL_RATE).max(MIN_MATERIAL_SHORTFALL);
+    shortfall > tolerance
+}
+
 pub fn compute_retirement_overview(
     plan: &RetirementPlan,
     current_portfolio: f64,
@@ -712,14 +703,6 @@ pub fn compute_retirement_overview_with_mode(
     mode: RetirementTimingMode,
 ) -> RetirementOverview {
     let mut required_capital_cache = RequiredCapitalCache::new();
-    let gross_target: f64 = plan
-        .expenses
-        .all_buckets()
-        .iter()
-        .map(|(b, _)| b.monthly_amount)
-        .sum::<f64>()
-        * 12.0
-        / plan.withdrawal.safe_withdrawal_rate;
 
     // Schedule-based targets
     let net_target_today =
@@ -785,7 +768,7 @@ pub fn compute_retirement_overview_with_mode(
     let spending_shortfall_age = projection
         .year_by_year
         .iter()
-        .find(|snap| snap.phase == "fire" && snap.annual_shortfall.unwrap_or(0.0) > 0.0)
+        .find(|snap| has_material_spending_shortfall(snap))
         .map(|snap| snap.age);
     let first_unfunded_age = match (failure_age, spending_shortfall_age) {
         (Some(depletion), Some(shortfall)) => Some(depletion.min(shortfall)),
@@ -880,7 +863,7 @@ pub fn compute_retirement_overview_with_mode(
         portfolio_now: current_portfolio,
         portfolio_at_retirement_start,
         net_fire_target: net_target_today_value,
-        gross_fire_target: gross_target,
+        gross_fire_target: required_capital_value,
         portfolio_at_goal_age: portfolio_at_goal,
         required_capital_reachable,
         required_capital_at_goal_age: required_capital_value,
@@ -898,11 +881,6 @@ pub fn compute_retirement_overview_with_mode(
         budget_breakdown: budget,
         target_reconciliation,
         trajectory,
-        withdrawal_policy: Some(match plan.withdrawal.strategy {
-            super::model::WithdrawalPolicy::PlannedSpending => "planned-spending".to_string(),
-            super::model::WithdrawalPolicy::Guardrails => "guardrails".to_string(),
-            super::model::WithdrawalPolicy::ConstantPercentage => "constant-percentage".to_string(),
-        }),
     }
 }
 
@@ -940,11 +918,6 @@ mod tests {
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-            },
-            withdrawal: WithdrawalConfig {
-                safe_withdrawal_rate: 0.04,
-                strategy: WithdrawalPolicy::PlannedSpending,
-                guardrails: None,
             },
             tax: None,
             currency: "EUR".to_string(),
@@ -1045,17 +1018,6 @@ mod tests {
     }
 
     #[test]
-    fn constant_percentage_uses_plain_policy_label() {
-        let mut plan = base_plan();
-        plan.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
-        let overview = compute_retirement_overview(&plan, 100_000.0, "fire");
-        assert_eq!(
-            overview.withdrawal_policy,
-            Some("constant-percentage".to_string()),
-        );
-    }
-
-    #[test]
     fn budget_breakdown_uses_same_age_and_units_for_expenses_and_income() {
         let mut plan = base_plan();
         plan.personal.current_age = 35;
@@ -1085,29 +1047,32 @@ mod tests {
     }
 
     #[test]
-    fn constant_percentage_shortfall_is_not_reported_as_depletion() {
-        let mut plan = base_plan();
-        plan.personal.current_age = 65;
-        plan.personal.target_retirement_age = 65;
-        plan.personal.planning_horizon_age = 66;
-        plan.investment.retirement_annual_return = 0.0;
-        plan.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
-        plan.expenses.items[0].monthly_amount = 10_000.0;
+    fn tiny_spending_residual_is_not_reported_as_shortfall() {
+        let snap = YearlySnapshot {
+            age: 65,
+            year: 2046,
+            phase: "fire".to_string(),
+            portfolio_value: 1_000_000.0,
+            portfolio_end_value: 990_000.0,
+            annual_contribution: 0.0,
+            annual_withdrawal: 59_950.0,
+            annual_income: 12_000.0,
+            net_withdrawal_from_portfolio: 47_950.0,
+            pension_assets: 0.0,
+            annual_taxes: Some(0.0),
+            gross_withdrawal: Some(47_950.0),
+            planned_expenses: Some(60_000.0),
+            funded_expenses: Some(59_950.0),
+            annual_shortfall: Some(40.0),
+        };
 
-        let overview = compute_retirement_overview(&plan, 1_000_000.0, "traditional");
+        assert!(!has_material_spending_shortfall(&snap));
 
-        assert_eq!(overview.success_status, "shortfall");
-        assert_eq!(overview.failure_age, None);
-        assert_eq!(
-            overview.spending_shortfall_age,
-            overview.retirement_start_age
-        );
-        assert_eq!(
-            overview.funded_through_age,
-            overview
-                .spending_shortfall_age
-                .map(|age| age.saturating_sub(1))
-        );
+        let material = YearlySnapshot {
+            annual_shortfall: Some(500.0),
+            ..snap
+        };
+        assert!(has_material_spending_shortfall(&material));
     }
 
     #[test]
@@ -1166,7 +1131,7 @@ mod tests {
             .unwrap_or(0.0);
 
         assert!(
-            portfolio_at_goal >= required_capital * 0.999,
+            portfolio_at_goal >= required_capital * super::super::model::FUNDING_TOLERANCE,
             "solver returned {}, but projected only {} toward {}",
             additional,
             portfolio_at_goal,

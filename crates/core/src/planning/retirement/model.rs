@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::portfolio::fire::GlidepathSettings;
 
+/// Default annual draw estimate for defined-contribution income streams that
+/// have fund details but no explicit monthly payout.
+pub const DEFAULT_DC_PAYOUT_ESTIMATE_RATE: f64 = 0.035;
+
+pub(crate) const FUNDING_TOLERANCE: f64 = 0.999;
+
 fn default_pre_retirement_annual_return() -> f64 {
     0.0577
 }
@@ -26,7 +32,6 @@ pub struct RetirementPlan {
     pub expenses: ExpenseBudget,
     pub income_streams: Vec<RetirementIncomeStream>,
     pub investment: InvestmentAssumptions,
-    pub withdrawal: WithdrawalConfig,
     pub tax: Option<TaxProfile>,
     pub currency: String,
 }
@@ -73,7 +78,7 @@ pub fn normalize_retirement_plan_ages(plan: &mut RetirementPlan) {
 
 #[cfg(test)]
 mod tests {
-    use super::age_from_birth_year_month;
+    use super::{age_from_birth_year_month, RetirementPlan};
     use chrono::NaiveDate;
 
     #[test]
@@ -83,6 +88,43 @@ mod tests {
         assert_eq!(age_from_birth_year_month("1981-04", as_of), Some(45));
         assert_eq!(age_from_birth_year_month("1981-05", as_of), Some(44));
         assert_eq!(age_from_birth_year_month("1981-13", as_of), None);
+    }
+
+    #[test]
+    fn old_withdrawal_rule_json_is_ignored() {
+        let raw = r#"{
+            "personal": {
+                "currentAge": 45,
+                "targetRetirementAge": 55,
+                "planningHorizonAge": 90
+            },
+            "expenses": { "items": [{ "monthlyAmount": 6000.0 }] },
+            "incomeStreams": [],
+            "investment": {
+                "preRetirementAnnualReturn": 0.057,
+                "retirementAnnualReturn": 0.034,
+                "annualInvestmentFeeRate": 0.006,
+                "annualVolatility": 0.12,
+                "inflationRate": 0.02,
+                "monthlyContribution": 3000.0,
+                "contributionGrowthRate": 0.02,
+                "glidePath": null
+            },
+            "withdrawal": {
+                "safeWithdrawalRate": 0.04,
+                "strategy": "guardrails",
+                "guardrails": { "ceilingRate": 0.06 }
+            },
+            "tax": null,
+            "currency": "CAD"
+        }"#;
+
+        let plan: RetirementPlan = serde_json::from_str(raw).expect("old JSON should parse");
+        let serialized = serde_json::to_string(&plan).expect("plan should serialize");
+
+        assert_eq!(plan.currency, "CAD");
+        assert!(!serialized.contains("withdrawal"));
+        assert!(!serialized.contains("safeWithdrawalRate"));
     }
 }
 
@@ -155,32 +197,6 @@ pub struct InvestmentAssumptions {
     pub monthly_contribution: f64,
     pub contribution_growth_rate: f64,
     pub glide_path: Option<GlidepathSettings>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct GuardrailsConfig {
-    /// Cut spending when gross_withdrawal / portfolio exceeds this rate.
-    pub ceiling_rate: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct WithdrawalConfig {
-    pub safe_withdrawal_rate: f64,
-    pub strategy: WithdrawalPolicy,
-    pub guardrails: Option<GuardrailsConfig>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-pub enum WithdrawalPolicy {
-    #[default]
-    #[serde(rename = "planned-spending")]
-    PlannedSpending,
-    #[serde(rename = "constant-percentage")]
-    ConstantPercentage,
-    #[serde(rename = "guardrails")]
-    Guardrails,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]

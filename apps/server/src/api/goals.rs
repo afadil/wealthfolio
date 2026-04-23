@@ -24,8 +24,7 @@ use wealthfolio_core::{
     planning::SaveUpOverview,
     portfolio::fire::{
         self, DecisionSensitivityMap, DecisionSensitivityMatrix, MonteCarloResult,
-        RetirementOverview, ScenarioResult, SorrScenario, StrategyComparisonResult,
-        StressTestResult,
+        RetirementOverview, ScenarioResult, SorrScenario, StressTestResult,
     },
 };
 
@@ -249,16 +248,6 @@ struct RetirementSorrRequest {
     goal_id: Option<String>,
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RetirementStrategyComparisonRequest {
-    plan: RetirementPlan,
-    current_portfolio: f64,
-    n_sims: Option<u32>,
-    goal_id: Option<String>,
-    planner_mode: Option<RetirementTimingMode>,
-}
-
 async fn resolve_retirement_inputs(
     state: &Arc<AppState>,
     goal_id: &Option<String>,
@@ -402,27 +391,6 @@ async fn retirement_sequence_of_returns(
     Ok(Json(result))
 }
 
-async fn retirement_strategy_comparison(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<RetirementStrategyComparisonRequest>,
-) -> ApiResult<Json<StrategyComparisonResult>> {
-    let n = normalize_sim_count(req.n_sims);
-    let (plan, current_portfolio, planner_mode) = resolve_retirement_inputs(
-        &state,
-        &req.goal_id,
-        req.planner_mode,
-        req.plan,
-        req.current_portfolio,
-    )
-    .await?;
-    Ok(Json(fire::run_strategy_comparison_with_mode(
-        &plan,
-        current_portfolio,
-        n,
-        planner_mode,
-    )))
-}
-
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/goals", get(get_goals).post(create_goal).put(update_goal))
@@ -465,9 +433,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .route(
             "/retirement/sequence-of-returns",
             axum::routing::post(retirement_sequence_of_returns),
-        )
-        .route(
-            "/retirement/strategy-comparison",
-            axum::routing::post(retirement_strategy_comparison),
         )
 }

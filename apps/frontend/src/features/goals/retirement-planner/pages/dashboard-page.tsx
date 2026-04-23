@@ -36,13 +36,16 @@ import {
   totalMonthlyExpenseAtAge,
 } from "../lib/expense-items";
 import {
+  deriveRetirementReadiness,
   resolveCoverageAnnualNominalValues,
   resolveFundedProgress,
+  resolvePortfolioDrawRate,
 } from "../lib/dashboard-math";
+import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "../lib/constants";
 import {
   ageFromBirthYearMonth,
   inferBirthYearMonthFromAge,
-  normalizeRetirementPlan,
+  normalizeDashboardRetirementPlan,
 } from "../lib/plan-adapter";
 import type {
   ExpenseItem,
@@ -50,7 +53,6 @@ import type {
   RetirementIncomeStream,
   RetirementPlan,
   TaxProfile,
-  WithdrawalConfig,
 } from "../types";
 
 type PlannerMode = "fire" | "traditional";
@@ -200,19 +202,16 @@ interface ChartPoint {
   netChange: number;
 }
 
-const CHART_COLORS = {
-  portfolio: { fill: "hsl(38, 75%, 50%)", stroke: "hsl(38, 75%, 50%)" },
-};
+const PROJECTED_CHART_COLORS = {
+  onTrack: { fill: "hsl(92, 24%, 70%)", stroke: "hsl(91, 43%, 29%)" },
+  offTrack: { fill: "hsl(38, 75%, 50%)", stroke: "hsl(38, 75%, 50%)" },
+} as const;
 
-interface ChartCalloutLabelProps {
-  viewBox?: {
-    x?: number;
-    y?: number;
-  };
-  amount: string;
-  fill: string;
-  dy?: number;
-}
+const CHART_COLORS = {
+  muted: "var(--muted-foreground)",
+  foreground: "var(--foreground)",
+  reference: "color-mix(in srgb, var(--muted-foreground) 58%, transparent)",
+};
 
 interface RetirementAxisTickProps {
   x?: number | string;
@@ -237,7 +236,7 @@ function RetirementAxisTick({
   if (value === retirementLabel) {
     return (
       <g transform={`translate(${tickX},${tickY})`}>
-        <text textAnchor="middle" fill="hsl(var(--foreground))">
+        <text textAnchor="middle" fill={CHART_COLORS.foreground}>
           <tspan x={0} dy={16} fontSize={12} fontWeight={500}>
             {value}
           </tspan>
@@ -251,17 +250,28 @@ function RetirementAxisTick({
 
   return (
     <g transform={`translate(${tickX},${tickY})`}>
-      <text textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={11}>
+      <text textAnchor="middle" fill={CHART_COLORS.muted} fontSize={11}>
         {value.replace(/^Age\s+/, "")}
       </text>
     </g>
   );
 }
 
-function ChartCalloutLabel({ viewBox, amount, fill, dy = 0 }: ChartCalloutLabelProps) {
+interface ChartCalloutLabelProps {
+  viewBox?: {
+    x?: number;
+    y?: number;
+  };
+  amount: string;
+  fill: string;
+  dx?: number;
+  dy?: number;
+}
+
+function ChartCalloutLabel({ viewBox, amount, fill, dx = 10, dy = -5 }: ChartCalloutLabelProps) {
   const x = typeof viewBox?.x === "number" ? viewBox.x : 0;
   const y = typeof viewBox?.y === "number" ? viewBox.y : 0;
-  const labelX = x + 12;
+  const labelX = x + dx;
   const labelY = y + dy;
 
   return (
@@ -285,7 +295,7 @@ const INCOME_STREAM_COLORS = [
 
 const COVERAGE_COLORS = {
   income: "var(--fi-stream-1)",
-  portfolio: CHART_COLORS.portfolio.stroke,
+  portfolio: PROJECTED_CHART_COLORS.offTrack.stroke,
   shortfall: "hsl(8, 67%, 48%)",
   planned: "#888",
 };
@@ -312,11 +322,11 @@ function projectedDcMonthlyPayout(
   stream: RetirementIncomeStream,
   currentAge: number,
   retirementAge: number,
-  safeWithdrawalRate: number,
   defaultAccumulationReturn: number,
 ) {
   if (stream.startAge <= currentAge) {
-    const fallback = Math.max(0, stream.currentValue ?? 0) * safeWithdrawalRate / 12;
+    const fallback =
+      (Math.max(0, stream.currentValue ?? 0) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
     return Math.max(0, stream.monthlyAmount ?? fallback);
   }
   const totalYears = Math.max(0, stream.startAge - currentAge);
@@ -337,7 +347,7 @@ function projectedDcMonthlyPayout(
       ? (annualContributionEndValue * (Math.pow(1 + r, contribYears) - 1)) / r
       : monthly * 12 * contribYears;
   const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
-  return ((fvLump + fvAnnuity) * safeWithdrawalRate) / 12;
+  return ((fvLump + fvAnnuity) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
 }
 
 function projectedAnnualIncomeNominalAtAge(
@@ -356,7 +366,6 @@ function projectedAnnualIncomeNominalAtAge(
             stream,
             plan.personal.currentAge,
             retirementAge,
-            plan.withdrawal.safeWithdrawalRate,
             plan.investment.preRetirementAnnualReturn,
           )
         : (stream.monthlyAmount ?? 0);
@@ -378,7 +387,6 @@ function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: RetirementIncom
       stream,
       plan.personal.currentAge,
       plan.personal.targetRetirementAge,
-      plan.withdrawal.safeWithdrawalRate,
       plan.investment.preRetirementAnnualReturn,
     );
   }
@@ -410,12 +418,14 @@ function RetirementChartTooltip({
   payload,
   currency,
   valueMode,
+  projectedStroke,
 }: {
   active?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any[];
   currency: string;
   valueMode: ChartValueMode;
+  projectedStroke: string;
 }) {
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload as ChartPoint | undefined;
@@ -431,7 +441,7 @@ function RetirementChartTooltip({
         <div className="flex items-center space-x-1.5">
           <span
             className="block h-2 w-2 rounded-full"
-            style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
+            style={{ backgroundColor: projectedStroke }}
           />
           <span className="text-muted-foreground text-xs">Start portfolio:</span>
         </div>
@@ -609,6 +619,7 @@ function RetirementChart({
   projectedFireAge,
   valueMode,
   plannerMode,
+  projectedIsOnTrack,
 }: {
   data: ChartPoint[];
   currency: string;
@@ -616,6 +627,7 @@ function RetirementChart({
   projectedFireAge?: number | null;
   valueMode: ChartValueMode;
   plannerMode: PlannerMode;
+  projectedIsOnTrack: boolean;
 }) {
   if (data.length < 2) return null;
 
@@ -630,6 +642,9 @@ function RetirementChart({
     retirementPoint && retirementPoint.portfolio > 0
       ? fmtCompact(retirementPoint.portfolio, currency)
       : null;
+  const projectedPalette = projectedIsOnTrack
+    ? PROJECTED_CHART_COLORS.onTrack
+    : PROJECTED_CHART_COLORS.offTrack;
   const retirementTargetValue =
     retirementPoint && typeof retirementPoint.target === "number" ? retirementPoint.target : null;
   const retirementTargetValueLabel =
@@ -637,10 +652,19 @@ function RetirementChart({
       ? fmtCompact(retirementTargetValue, currency)
       : null;
   const retirementIndex = data.findIndex((point) => point.age === retirementAge);
-  const calloutEndLabel =
+  const calloutElbowLabel =
     retirementIndex >= 0
       ? data[Math.min(retirementIndex + 1, data.length - 1)]?.label
       : retirementLabel;
+  const calloutEndLabel =
+    retirementIndex >= 0
+      ? data[Math.min(retirementIndex + 2, data.length - 1)]?.label
+      : retirementLabel;
+  const canDrawCallouts =
+    Boolean(calloutElbowLabel) &&
+    Boolean(calloutEndLabel) &&
+    calloutElbowLabel !== retirementLabel &&
+    calloutEndLabel !== calloutElbowLabel;
   const axisTicks = useMemo(() => {
     const interval = Math.max(1, Math.floor(data.length / 6));
     const ticks = new Set<string>();
@@ -651,6 +675,34 @@ function RetirementChart({
     ticks.add(data[data.length - 1]?.label);
     return data.map((point) => point.label).filter((label) => ticks.has(label));
   }, [data, retirementLabel]);
+  const chartMaxValue = Math.max(
+    ...data.map((point) => Math.max(point.portfolio, point.target ?? 0)),
+  );
+  const calloutValuesAreClose =
+    retirementPoint &&
+    retirementTargetValue != null &&
+    chartMaxValue > 0 &&
+    Math.abs(retirementTargetValue - retirementPoint.portfolio) / chartMaxValue < 0.08;
+  const highCalloutLift = chartMaxValue * 0.19;
+  const lowCalloutLift = chartMaxValue * (calloutValuesAreClose ? 0.055 : 0.11);
+  const targetCalloutValue =
+    retirementTargetValue != null
+      ? retirementTargetValue +
+        (calloutValuesAreClose && retirementPoint
+          ? retirementTargetValue >= retirementPoint.portfolio
+            ? highCalloutLift
+            : lowCalloutLift
+          : lowCalloutLift)
+      : null;
+  const portfolioCalloutValue =
+    retirementPoint != null
+      ? retirementPoint.portfolio +
+        (calloutValuesAreClose
+          ? retirementPoint.portfolio > (retirementTargetValue ?? 0)
+            ? highCalloutLift
+            : lowCalloutLift
+          : lowCalloutLift)
+      : null;
   // Offset labels vertically when ages are close to avoid overlap
   const agesClose = showProjectedFiLine && Math.abs((projectedFireAge ?? 0) - retirementAge) <= 3;
 
@@ -660,9 +712,9 @@ function RetirementChart({
         <AreaChart data={data} margin={{ top: 24, right: 12, left: -12, bottom: 38 }}>
           <defs>
             <linearGradient id="retirementPortfolio" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHART_COLORS.portfolio.fill} stopOpacity={0.3} />
-              <stop offset="60%" stopColor={CHART_COLORS.portfolio.fill} stopOpacity={0.15} />
-              <stop offset="100%" stopColor={CHART_COLORS.portfolio.fill} stopOpacity={0} />
+              <stop offset="5%" stopColor={projectedPalette.fill} stopOpacity={0.3} />
+              <stop offset="60%" stopColor={projectedPalette.fill} stopOpacity={0.15} />
+              <stop offset="100%" stopColor={projectedPalette.fill} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
@@ -681,22 +733,28 @@ function RetirementChart({
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10 }}
+            tick={{ fontSize: 10, fill: CHART_COLORS.muted }}
             tickFormatter={(v: number) => fmtCompact(v, currency)}
             width={48}
             axisLine={false}
             tickLine={false}
-            domain={[0, "auto"]}
+            domain={[0, (dataMax: number) => Math.max(1, dataMax * 1.22)]}
           />
           <RTooltip
-            content={<RetirementChartTooltip currency={currency} valueMode={valueMode} />}
+            content={
+              <RetirementChartTooltip
+                currency={currency}
+                valueMode={valueMode}
+                projectedStroke={projectedPalette.stroke}
+              />
+            }
           />
 
           {/* Projected FI age vertical line — render FIRST so retirement line draws on top */}
           {showProjectedFiLine && (
             <ReferenceLine
               x={projectedFiLabel}
-              stroke="var(--color-green-400)"
+              stroke="var(--success)"
               strokeWidth={1}
               strokeDasharray="4 3"
               strokeOpacity={0.8}
@@ -704,7 +762,7 @@ function RetirementChart({
                 value: `FI · ${projectedFireAge}`,
                 position: "top",
                 fontSize: 10,
-                fill: "var(--color-green-400)",
+                fill: "var(--success)",
                 dy: agesClose ? -12 : 0,
               }}
             />
@@ -713,7 +771,7 @@ function RetirementChart({
           {/* Retirement age vertical line */}
           <ReferenceLine
             x={retirementLabel}
-            stroke="#888"
+            stroke={CHART_COLORS.reference}
             strokeWidth={1}
             strokeDasharray="4 3"
             strokeOpacity={0.5}
@@ -723,8 +781,8 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="target"
-            name="What you'll need"
-            stroke="#888"
+            name="Required"
+            stroke={CHART_COLORS.reference}
             strokeWidth={1.5}
             strokeDasharray="6 4"
             fill="none"
@@ -736,8 +794,8 @@ function RetirementChart({
           <Area
             type="linear"
             dataKey="portfolio"
-            name="What you'll have"
-            stroke={CHART_COLORS.portfolio.stroke}
+            name="Projected"
+            stroke={projectedPalette.stroke}
             strokeWidth={1.5}
             fill="url(#retirementPortfolio)"
             fillOpacity={1}
@@ -745,47 +803,71 @@ function RetirementChart({
             animationEasing="ease-out"
           />
 
-          {retirementPoint &&
+          {canDrawCallouts &&
+            retirementPoint &&
             retirementTargetValue != null &&
-            retirementTargetValueLabel &&
-            calloutEndLabel && (
-            <ReferenceLine
-              segment={[
-                { x: retirementLabel, y: retirementTargetValue },
-                { x: calloutEndLabel, y: retirementTargetValue },
-              ]}
-              stroke="#888"
-              strokeOpacity={0.55}
-              strokeWidth={1}
-              label={(props) => (
-                <ChartCalloutLabel
-                  {...props}
-                  amount={retirementTargetValueLabel}
-                  fill="#555"
-                  dy={-6}
+            targetCalloutValue != null &&
+            retirementTargetValueLabel && (
+              <>
+                <ReferenceLine
+                  segment={[
+                    { x: retirementLabel, y: retirementTargetValue },
+                    { x: calloutElbowLabel, y: targetCalloutValue },
+                  ]}
+                  stroke={CHART_COLORS.reference}
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
                 />
-              )}
-            />
-          )}
-          {retirementPoint && retirementPortfolioValueLabel && calloutEndLabel && (
-            <ReferenceLine
-              segment={[
-                { x: retirementLabel, y: retirementPoint.portfolio },
-                { x: calloutEndLabel, y: retirementPoint.portfolio },
-              ]}
-              stroke={CHART_COLORS.portfolio.stroke}
-              strokeOpacity={0.55}
-              strokeWidth={1}
-              label={(props) => (
-                <ChartCalloutLabel
-                  {...props}
-                  amount={retirementPortfolioValueLabel}
-                  fill="#222"
-                  dy={-6}
+                <ReferenceLine
+                  segment={[
+                    { x: calloutElbowLabel, y: targetCalloutValue },
+                    { x: calloutEndLabel, y: targetCalloutValue },
+                  ]}
+                  stroke={CHART_COLORS.reference}
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
+                  label={(props) => (
+                    <ChartCalloutLabel
+                      {...props}
+                      amount={retirementTargetValueLabel}
+                      fill={CHART_COLORS.muted}
+                    />
+                  )}
                 />
-              )}
-            />
-          )}
+              </>
+            )}
+          {canDrawCallouts &&
+            retirementPoint &&
+            portfolioCalloutValue != null &&
+            retirementPortfolioValueLabel && (
+              <>
+                <ReferenceLine
+                  segment={[
+                    { x: retirementLabel, y: retirementPoint.portfolio },
+                    { x: calloutElbowLabel, y: portfolioCalloutValue },
+                  ]}
+                  stroke={projectedPalette.stroke}
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
+                />
+                <ReferenceLine
+                  segment={[
+                    { x: calloutElbowLabel, y: portfolioCalloutValue },
+                    { x: calloutEndLabel, y: portfolioCalloutValue },
+                  ]}
+                  stroke={projectedPalette.stroke}
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
+                  label={(props) => (
+                    <ChartCalloutLabel
+                      {...props}
+                      amount={retirementPortfolioValueLabel}
+                      fill={CHART_COLORS.foreground}
+                    />
+                  )}
+                />
+              </>
+            )}
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -1249,7 +1331,7 @@ function SidebarConfigurator({
   }, []);
 
   const saveDraft = useCallback(() => {
-    onSavePlan?.(normalizeRetirementPlan(draft), draftMode);
+    onSavePlan?.(normalizeDashboardRetirementPlan(draft), draftMode);
     setDirty(false);
     setEditingSection(null);
     setExpandedExpenseId(null);
@@ -1275,9 +1357,6 @@ function SidebarConfigurator({
     key: K,
     val: InvestmentAssumptions[K],
   ) => update((d) => ({ ...d, investment: { ...d.investment, [key]: val } }));
-
-  const setWithdrawal = <K extends keyof WithdrawalConfig>(key: K, val: WithdrawalConfig[K]) =>
-    update((d) => ({ ...d, withdrawal: { ...d.withdrawal, [key]: val } }));
 
   const setPlannerModeDraft = (mode: PlannerMode) => {
     setDraftMode(mode);
@@ -1380,17 +1459,6 @@ function SidebarConfigurator({
     /\b(cpp|qpp|oas)\b/i.test(stream.label),
   );
 
-  const strategyLabels: Record<string, string> = {
-    "planned-spending": "Planned spending",
-    "constant-percentage": "Constant %",
-    guardrails: "Guardrails",
-  };
-  const withdrawalRateHint =
-    draft.withdrawal.strategy === "constant-percentage"
-      ? "Each year, withdrawals are capped at this share of the portfolio. If that is not enough to cover planned spending, the plan shows a funding gap."
-      : draft.withdrawal.strategy === "guardrails"
-        ? "Sets the starting withdrawal level. Guardrails can reduce flexible spending when the plan would draw too much from the portfolio."
-        : "Used to size the retirement target. Yearly withdrawals follow the spending plan you entered.";
   const birthYearMonth =
     draft.personal.birthYearMonth ?? inferBirthYearMonthFromAge(draft.personal.currentAge);
   const maxBirthYearMonth = inferBirthYearMonthFromAge(0);
@@ -1417,7 +1485,7 @@ function SidebarConfigurator({
     <div className="space-y-4">
       {/* ── Plan ── */}
       <SidebarCard
-        kicker="Levers"
+        kicker="Plan"
         title="Plan inputs"
         editing={editingSection === "plan"}
         onEdit={() => setEditingSection("plan")}
@@ -1426,9 +1494,7 @@ function SidebarConfigurator({
         dirty={dirty}
         readContent={
           <div className="divide-border divide-y">
-            <ConfigRow label="Planner type">
-              {draftMode === "fire" ? "FIRE" : "Traditional"}
-            </ConfigRow>
+            <ConfigRow label="Plan type">{draftMode === "fire" ? "FIRE" : "Traditional"}</ConfigRow>
             <ConfigRow label="Current age">{draft.personal.currentAge}</ConfigRow>
             <ConfigRow label={L.targetAge}>{draft.personal.targetRetirementAge}</ConfigRow>
             <ConfigRow label={L.horizonAge}>{draft.personal.planningHorizonAge}</ConfigRow>
@@ -1442,10 +1508,10 @@ function SidebarConfigurator({
             <div className="space-y-3 py-4 first:pt-0">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold">Planner type</p>
+                  <p className="text-sm font-semibold">Plan type</p>
                   <p className="text-muted-foreground mt-1 max-w-[260px] text-xs leading-snug">
-                    Switch how the retirement age is interpreted. Existing accounts, spending,
-                    income, taxes, and assumptions are kept.
+                    Choose whether your target age is a traditional retirement date or the age you
+                    want to reach financial independence.
                   </p>
                 </div>
                 <AnimatedToggleGroup<PlannerMode>
@@ -1476,7 +1542,7 @@ function SidebarConfigurator({
                     Birth month
                   </div>
                   <div className="text-muted-foreground mt-1 max-w-[240px] text-xs leading-tight">
-                    Used to keep your current age current over time.
+                    Keeps your age updated automatically.
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -1497,8 +1563,8 @@ function SidebarConfigurator({
               label={draftMode === "fire" ? "Desired retirement age" : "Retirement age"}
               hint={
                 draftMode === "fire"
-                  ? "Desired age to be financially independent"
-                  : "Target age to stop working"
+                  ? "Age you want to become financially independent."
+                  : "Age you want to retire."
               }
               value={draft.personal.targetRetirementAge}
               onChange={(v) => {
@@ -1521,7 +1587,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label={L.horizonAge}
-              hint="Last age the plan should fund"
+              hint="Age the plan should cover through."
               value={draft.personal.planningHorizonAge}
               onChange={(v) =>
                 setPersonal(
@@ -1536,6 +1602,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label="Monthly contribution"
+              hint="How much you add each month until retirement."
               kind="money"
               value={draft.investment.monthlyContribution}
               onChange={(v) => setInvestment("monthlyContribution", v)}
@@ -1547,6 +1614,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label="Return before retirement"
+              hint="Expected yearly return while you are saving."
               value={draft.investment.preRetirementAnnualReturn}
               onChange={(v) => setInvestment("preRetirementAnnualReturn", v)}
               min={0}
@@ -1557,6 +1625,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label="Return during retirement"
+              hint="Expected yearly return after withdrawals begin."
               value={draft.investment.retirementAnnualReturn}
               onChange={(v) => setInvestment("retirementAnnualReturn", v)}
               min={0}
@@ -1567,6 +1636,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label="Annual investment fee"
+              hint="Estimated yearly portfolio fees."
               value={draft.investment.annualInvestmentFeeRate}
               onChange={(v) => setInvestment("annualInvestmentFeeRate", v)}
               min={0}
@@ -1577,6 +1647,7 @@ function SidebarConfigurator({
             />
             <LeverRow
               label="Inflation"
+              hint="Expected yearly increase in prices."
               value={draft.investment.inflationRate}
               onChange={(v) => setInvestment("inflationRate", v)}
               min={0}
@@ -1736,7 +1807,7 @@ function SidebarConfigurator({
                               Spending type
                             </div>
                             <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
-                              Guardrails protect must-have spending before flexible spending.
+                              Must-have spending is protected before flexible spending.
                             </div>
                           </div>
                           <AnimatedToggleGroup<"essential" | "flexible">
@@ -1875,10 +1946,10 @@ function SidebarConfigurator({
                 s.streamType === "dc"
                   ? "Balance-derived payout"
                   : s.annualGrowthRate !== undefined
-                  ? `${(s.annualGrowthRate * 100).toFixed(1)}% growth`
-                  : s.adjustForInflation
-                    ? "Inflation indexed"
-                    : "Fixed nominal";
+                    ? `${(s.annualGrowthRate * 100).toFixed(1)}% growth`
+                    : s.adjustForInflation
+                      ? "Inflation indexed"
+                      : "Fixed nominal";
               const meta = [
                 `Age ${s.startAge} → ${draft.personal.planningHorizonAge}`,
                 growthMeta,
@@ -1955,7 +2026,9 @@ function SidebarConfigurator({
                               streamType: value,
                               currentValue: value === "dc" ? (s.currentValue ?? 0) : s.currentValue,
                               monthlyContribution:
-                                value === "dc" ? (s.monthlyContribution ?? 0) : s.monthlyContribution,
+                                value === "dc"
+                                  ? (s.monthlyContribution ?? 0)
+                                  : s.monthlyContribution,
                               accumulationReturn:
                                 value === "dc"
                                   ? (s.accumulationReturn ??
@@ -2031,6 +2104,11 @@ function SidebarConfigurator({
                                 format={(v) => String(Math.round(v))}
                               />
                             )}
+                            <p className="text-muted-foreground px-1 text-[11px] leading-relaxed">
+                              Estimated payout uses{" "}
+                              {(DEFAULT_DC_PAYOUT_ESTIMATE_RATE * 100).toFixed(1)}%/yr of the
+                              projected fund balance unless you enter a monthly payout.
+                            </p>
                           </>
                         )}
                         <LeverRow
@@ -2166,7 +2244,7 @@ function SidebarConfigurator({
               label={
                 <InfoLabel label="Annual volatility">
                   How much yearly returns can vary around the expected return. Higher volatility
-                  widens the Monte Carlo outcome range.
+                  widens the market-path outcome range.
                 </InfoLabel>
               }
             >
@@ -2176,31 +2254,6 @@ function SidebarConfigurator({
             {draft.investment.contributionGrowthRate > 0 && (
               <ConfigRow label="Contribution growth per year">
                 {formatPercent(draft.investment.contributionGrowthRate)}
-              </ConfigRow>
-            )}
-            <ConfigRow
-              label={
-                <InfoLabel label="Withdrawal strategy">
-                  Choose how money is taken from your portfolio in retirement. Planned spending
-                  funds your spending plan, Constant % takes a fixed portfolio share, and
-                  Guardrails can reduce flexible spending when withdrawals are too high.
-                </InfoLabel>
-              }
-            >
-              {strategyLabels[draft.withdrawal.strategy] ?? draft.withdrawal.strategy}
-            </ConfigRow>
-            <ConfigRow
-              label={
-                <InfoLabel label="Target withdrawal rate">
-                  {withdrawalRateHint}
-                </InfoLabel>
-              }
-            >
-              {formatPercent(draft.withdrawal.safeWithdrawalRate)}
-            </ConfigRow>
-            {draft.withdrawal.strategy === "guardrails" && (
-              <ConfigRow label="Guardrail ceiling">
-                {formatPercent(draft.withdrawal.guardrails?.ceilingRate ?? 0.06)}
               </ConfigRow>
             )}
           </div>
@@ -2241,7 +2294,7 @@ function SidebarConfigurator({
               label={
                 <InfoLabel label="Annual volatility">
                   How much yearly returns can vary around the expected return. Higher volatility
-                  widens the Monte Carlo outcome range.
+                  widens the market-path outcome range.
                 </InfoLabel>
               }
               value={draft.investment.annualVolatility}
@@ -2272,73 +2325,6 @@ function SidebarConfigurator({
               suffix="%"
               format={(v) => (v * 100).toFixed(1)}
             />
-            <div className="space-y-2 py-4 first:pt-1 last:pb-1">
-              <div>
-                <div className="text-foreground text-sm font-semibold leading-tight">
-                  <InfoLabel label="Withdrawal strategy">
-                    Choose how money is taken from your portfolio in retirement. Planned spending
-                    funds your spending plan, Constant % takes a fixed portfolio share, and
-                    Guardrails can reduce flexible spending when withdrawals are too high.
-                  </InfoLabel>
-                </div>
-                <div className="text-muted-foreground mt-1 text-xs leading-tight">
-                  Controls how retirement spending is withdrawn from the portfolio.
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {(["planned-spending", "constant-percentage", "guardrails"] as const).map((s) => (
-                  <label
-                    key={s}
-                    className={`flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${draft.withdrawal.strategy === s ? "border-foreground/30 bg-muted/50" : "border-transparent"}`}
-                  >
-                    <input
-                      type="radio"
-                      name="strategy"
-                      checked={draft.withdrawal.strategy === s}
-                      onChange={() => setWithdrawal("strategy", s)}
-                      className="accent-foreground h-3 w-3"
-                    />
-                    {strategyLabels[s]}
-                  </label>
-                ))}
-              </div>
-              <div className="divide-border divide-y pt-2">
-                <LeverRow
-                  label={
-                    <InfoLabel label="Target withdrawal rate">
-                      {withdrawalRateHint}
-                    </InfoLabel>
-                  }
-                  hint={withdrawalRateHint}
-                  value={draft.withdrawal.safeWithdrawalRate}
-                  onChange={(v) => setWithdrawal("safeWithdrawalRate", v)}
-                  min={0.02}
-                  max={0.06}
-                  step={0.001}
-                  suffix="%"
-                  format={(v) => (v * 100).toFixed(1)}
-                />
-              </div>
-              {draft.withdrawal.strategy === "guardrails" && (
-                <div className="divide-border divide-y pt-2">
-                  <LeverRow
-                    label="Ceiling rate"
-                    hint="Reduce flexible spending above this withdrawal rate"
-                    value={draft.withdrawal.guardrails?.ceilingRate ?? 0.06}
-                    onChange={(v) =>
-                      setWithdrawal("guardrails", {
-                        ceilingRate: v,
-                      })
-                    }
-                    min={0.02}
-                    max={0.12}
-                    step={0.001}
-                    suffix="%"
-                    format={(v) => (v * 100).toFixed(1)}
-                  />
-                </div>
-              )}
-            </div>
           </div>
         }
       />
@@ -2595,12 +2581,10 @@ export default function DashboardPage({
   isLoading,
   plannerMode = "fire",
   onSavePlan,
-  onNavigateToTab: _onNavigateToTab,
   retirementOverview,
   goalId,
   dcLinkedAccountIds,
 }: Props) {
-  void _onNavigateToTab; // kept in Props for tab navigation; unused in new sidebar
   const L = modeLabel(plannerMode);
   const isTraditionalMode = plannerMode === "traditional";
   const { totalValue, error } = portfolioData;
@@ -2678,6 +2662,7 @@ export default function DashboardPage({
     annualSpendingNominal: coverageAnnualSpendingNominal,
     annualIncomeNominal: coverageAnnualIncomeNominal,
     annualPortfolioGapNominal: coverageAnnualPortfolioGapNominal,
+    annualGrossWithdrawalNominal: coverageAnnualGrossWithdrawalNominal,
     annualEstimatedTaxesNominal: coverageAnnualEstimatedTaxesNominal,
   } = resolveCoverageAnnualNominalValues({
     snapshot: coverageSnapshot,
@@ -2741,14 +2726,22 @@ export default function DashboardPage({
     coverageAnnualSpending > 0
       ? Math.min(100, Math.max(0, (coverageShortfallAnnual / coverageAnnualSpending) * 100))
       : 0;
+  const coveragePortfolioValueAtAge = coverageSnapshot?.portfolioStart ?? 0;
+  const coveragePortfolioDrawRate = resolvePortfolioDrawRate({
+    requiredCapitalReachable,
+    portfolioValueAtAge: coveragePortfolioValueAtAge,
+    grossWithdrawalAtAge: coverageAnnualGrossWithdrawalNominal,
+    annualIncomeAtAge: coverageAnnualIncomeNominal,
+    annualSpendingAtAge: coverageAnnualSpendingNominal,
+    portfolioEndAtAge: coverageSnapshot?.portfolioEnd,
+  });
   const nextIncomeStartAge =
     coverageIncomeStreams
       .filter((stream) => stream.startAge > fireAgeForBudget)
-      .reduce<number | null>(
-        (earliest, stream) =>
-          earliest === null ? stream.startAge : Math.min(earliest, stream.startAge),
-        null,
-      ) ?? null;
+      .reduce<
+        number | null
+      >((earliest, stream) => (earliest === null ? stream.startAge : Math.min(earliest, stream.startAge)), null) ??
+    null;
 
   const hasPensionFunds = plan.incomeStreams.some(
     (s) => (s.currentValue ?? 0) > 0 || (s.monthlyContribution ?? 0) > 0,
@@ -2763,7 +2756,8 @@ export default function DashboardPage({
       portfolio: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
       portfolioStart: scaleForModeAtAge(Math.max(0, pt.portfolioStart), pt.age),
       portfolioEnd: scaleForModeAtAge(Math.max(0, pt.portfolioEnd), pt.age),
-      target: pt.requiredCapital == null ? undefined : scaleForModeAtAge(pt.requiredCapital, pt.age),
+      target:
+        pt.requiredCapital == null ? undefined : scaleForModeAtAge(pt.requiredCapital, pt.age),
       withdrawal: scaleForModeAtAge(pt.netWithdrawalFromPortfolio, pt.age),
       phase: pt.phase,
       annualContribution: scaleForModeAtAge(pt.annualContribution, pt.age),
@@ -2849,74 +2843,21 @@ export default function DashboardPage({
   const firstUnfundedAge = retirementOverview
     ? [retirementOverview.failureAge, spendingShortfallAge]
         .filter((age): age is number => typeof age === "number")
-        .reduce<number | null>((earliest, age) => (earliest == null ? age : Math.min(earliest, age)), null)
+        .reduce<
+          number | null
+        >((earliest, age) => (earliest == null ? age : Math.min(earliest, age)), null)
     : null;
-  const heroHealth = isTraditionalMode
-    ? !requiredCapitalReachable
-      ? "off_track"
-      : traditionalStatus === "on_track" || traditionalStatus === "overfunded"
-      ? "on_track"
-      : traditionalStatus === "shortfall"
-        ? "at_risk"
-        : "off_track"
-    : !requiredCapitalReachable
-      ? "off_track"
-      : isFinanciallyIndependent ||
-        (effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge)
-      ? "on_track"
-      : effectiveFiAge != null && effectiveFiAge <= plan.personal.targetRetirementAge + 3
-        ? "at_risk"
-        : "off_track";
-  const heroGuidance = isTraditionalMode
-    ? !requiredCapitalReachable
-      ? "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon."
-      : traditionalStatus === "shortfall"
-      ? spendingShortfallAge != null
-        ? `Projected spending gap starts at age ${spendingShortfallAge}. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
-        : `Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.`
-      : traditionalStatus === "depleted"
-        ? `Projected portfolio depletion at age ${retirementOverview?.failureAge ?? firstUnfundedAge ?? plan.personal.planningHorizonAge}. Reduce spending, retire later, or add retirement income.`
-        : null
-    : !requiredCapitalReachable
-      ? "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon."
-      : isFinanciallyIndependent
-      ? "You have reached financial independence with the current assumptions."
-      : yearsFromDesired != null && yearsFromDesired > 0
-        ? `${yearsFromDesired} year${yearsFromDesired !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`
-        : effectiveFiAge == null && retireTodayTarget > 0
-          ? `Not reachable by age ${plan.personal.planningHorizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`
-          : null;
-  const statusCallout =
-    heroHealth === "on_track" ? (
-      <Card className="border-green-600/20 bg-green-50/60 dark:bg-green-950/20">
-        <CardContent className="flex gap-2.5 py-4">
-          <Icons.CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-          <div>
-            <div className="text-foreground mb-1 text-sm font-semibold">You're on track.</div>
-            <div className="text-muted-foreground text-xs leading-relaxed">
-              Stress-test with a market drawdown or inflation shock in{" "}
-              <span className="font-medium">What If</span>.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    ) : heroGuidance ? (
-      <Card
-        className={`${
-          heroHealth === "at_risk"
-            ? "border-amber-500/30 bg-amber-50/60 dark:bg-amber-950/20"
-            : "border-red-500/30 bg-red-50/60 dark:bg-red-950/20"
-        }`}
-      >
-        <CardContent className="py-4">
-          <div className="text-muted-foreground mb-1 text-[10px] font-semibold uppercase tracking-wider">
-            Close the gap
-          </div>
-          <div className="text-foreground text-sm font-semibold">What could help</div>
-          <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">{heroGuidance}</p>
-        </CardContent>
-      </Card>
-    ) : null;
+  const readiness = deriveRetirementReadiness({
+    overview: retirementOverview,
+    plannerMode,
+    isFinanciallyIndependent,
+    effectiveFiAge,
+    desiredAge: plan.personal.targetRetirementAge,
+    horizonAge: plan.personal.planningHorizonAge,
+  });
+  const heroHealth =
+    readiness.tone === "good" ? "on_track" : readiness.tone === "watch" ? "at_risk" : "off_track";
+  const heroGuidance = readiness.body;
 
   if (isLoading || !retirementOverview) {
     return (
@@ -3038,7 +2979,7 @@ export default function DashboardPage({
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="ml-auto flex items-center gap-2">
                       <ValueModeToggle value={chartValueMode} onChange={setChartValueMode} />
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -3052,12 +2993,12 @@ export default function DashboardPage({
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs text-xs">
                           <div className="font-semibold">Today's value</div>
-                          <p className="mt-1 text-muted-foreground">
+                          <p className="text-muted-foreground mt-1">
                             Converts future dollars back into today's purchasing power, so amounts
                             feel comparable to your current budget.
                           </p>
                           <div className="mt-3 font-semibold">Nominal</div>
-                          <p className="mt-1 text-muted-foreground">
+                          <p className="text-muted-foreground mt-1">
                             Shows the future dollar amount after inflation. This is the amount you
                             would see in that future year.
                           </p>
@@ -3069,7 +3010,9 @@ export default function DashboardPage({
                   {/* Sentence-style verdict */}
                   <h1 className="max-w-[95%] font-serif text-2xl font-normal leading-[1.15] tracking-tight">
                     {isTraditionalMode ? (
-                      traditionalStatus === "shortfall" && spendingShortfallAge != null && goalShortfall <= 0 ? (
+                      traditionalStatus === "shortfall" &&
+                      spendingShortfallAge != null &&
+                      goalShortfall <= 0 ? (
                         <>
                           Spending gap starts at{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
@@ -3093,7 +3036,7 @@ export default function DashboardPage({
                         </>
                       ) : traditionalStatus === "depleted" ? (
                         <>
-                          Portfolio depletes at{" "}
+                          Portfolio runs short during{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
                             age {retirementOverview.failureAge ?? firstUnfundedAge}
                           </span>
@@ -3229,21 +3172,21 @@ export default function DashboardPage({
                       goalShortfall > 0 &&
                       yearsFromDesired != null &&
                       yearsFromDesired > 0 && (
-                      <>
-                        {" "}
-                        You're short{" "}
-                        <ValueModeTooltip
-                          valueMode={chartValueMode}
-                          currency={currency}
-                          todayValue={goalShortfallToday}
-                          nominalValue={goalShortfallNominal}
-                        >
-                          <span className="font-medium tabular-nums text-amber-600">
-                            {fmtCompact(goalShortfall, currency)}
-                          </span>
-                        </ValueModeTooltip>{" "}
-                        at age {plan.personal.targetRetirementAge}.
-                      </>
+                        <>
+                          {" "}
+                          You're short{" "}
+                          <ValueModeTooltip
+                            valueMode={chartValueMode}
+                            currency={currency}
+                            todayValue={goalShortfallToday}
+                            nominalValue={goalShortfallNominal}
+                          >
+                            <span className="font-medium tabular-nums text-amber-600">
+                              {fmtCompact(goalShortfall, currency)}
+                            </span>
+                          </ValueModeTooltip>{" "}
+                          at age {plan.personal.targetRetirementAge}.
+                        </>
                       )}
                   </p>
 
@@ -3267,8 +3210,9 @@ export default function DashboardPage({
                             </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs text-xs">
-                            Capital needed at your {isTraditionalMode ? "retirement" : "desired retirement"} age
-                            after expenses, income, taxes, retirement returns, and fees. Shown in{" "}
+                            Capital needed at your{" "}
+                            {isTraditionalMode ? "retirement" : "desired retirement"} age after
+                            expenses, income, taxes, retirement returns, and fees. Shown in{" "}
                             {valueModeLabel}.
                           </TooltipContent>
                         </Tooltip>
@@ -3320,18 +3264,18 @@ export default function DashboardPage({
                     heroGuidance &&
                     !isFinanciallyIndependent &&
                     yearsFromDesired == null && (
-                    <p
-                      className={`mt-4 border-t pt-4 text-xs ${
-                        heroHealth === "on_track"
-                          ? "text-green-700 dark:text-green-300"
-                          : heroHealth === "at_risk"
-                            ? "text-amber-700 dark:text-amber-300"
-                            : "text-red-600 dark:text-red-300"
-                      }`}
-                    >
-                      {heroGuidance}
-                    </p>
-                  )}
+                      <p
+                        className={`mt-4 border-t pt-4 text-xs ${
+                          heroHealth === "on_track"
+                            ? "text-green-700 dark:text-green-300"
+                            : heroHealth === "at_risk"
+                              ? "text-amber-700 dark:text-amber-300"
+                              : "text-red-600 dark:text-red-300"
+                        }`}
+                      >
+                        {heroGuidance}
+                      </p>
+                    )}
                 </CardContent>
               </Card>
             );
@@ -3361,8 +3305,8 @@ export default function DashboardPage({
                         </TooltipTrigger>
                         <TooltipContent className="max-w-sm text-xs">
                           {isTraditionalMode
-                            ? "The retirement marker shows when withdrawals start. \"What you'll need\" is the minimum balance needed at each age to still fund planned retirement spending through life expectancy."
-                            : "The FI marker shows the first sustainable age. \"What you'll need\" is the minimum balance needed at each age after crediting your remaining planned contributions. It only starts at today's portfolio if you are exactly on track. \"What you'll have\" is the projected portfolio path."}
+                            ? 'The retirement marker shows when withdrawals start. "What you\'ll need" is the minimum balance needed at each age to still fund planned retirement spending through life expectancy.'
+                            : 'The FI marker shows the first sustainable age. "What you\'ll need" is the minimum balance needed at each age after crediting your remaining planned contributions. It only starts at today\'s portfolio if you are exactly on track. "What you\'ll have" is the projected portfolio path.'}
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -3370,10 +3314,12 @@ export default function DashboardPage({
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     <span className="flex items-center gap-1.5">
                       <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: CHART_COLORS.portfolio.stroke }}
+                        className="block h-0 w-4 border-b-[2px]"
+                        style={{ borderColor: readiness.tone === "good"
+                          ? PROJECTED_CHART_COLORS.onTrack.stroke
+                          : PROJECTED_CHART_COLORS.offTrack.stroke }}
                       />
-                      What you'll have
+                      Projected
                     </span>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -3384,13 +3330,13 @@ export default function DashboardPage({
                               y1="2"
                               x2="23"
                               y2="2"
-                              stroke="#888"
+                              stroke={CHART_COLORS.reference}
                               strokeWidth="1.5"
                               strokeDasharray="6 4"
                               strokeLinecap="round"
                             />
                           </svg>
-                          What you'll need
+                          Required
                         </span>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
@@ -3410,6 +3356,7 @@ export default function DashboardPage({
                   projectedFireAge={effectiveFiAge}
                   valueMode={chartValueMode}
                   plannerMode={plannerMode}
+                  projectedIsOnTrack={readiness.tone === "good"}
                 />
               </CardContent>
             </Card>
@@ -3441,8 +3388,8 @@ export default function DashboardPage({
                     key: "fi",
                     label: "FI",
                     value: targetAtGoalDisplay,
-                    hint: "Full expenses at your SWR",
-                    tip: "Capital that funds your planned expenses at your safe withdrawal rate, for the full retirement horizon.",
+                    hint: "Full planned spending",
+                    tip: "Capital that funds your planned retirement spending through the full retirement horizon.",
                   },
                   {
                     key: "fat",
@@ -3522,7 +3469,10 @@ export default function DashboardPage({
                         spending and funding. Future items stay visible and are counted when active.
                       </>
                     ) : (
-                      <>How income and portfolio withdrawals cover planned spending through retirement.</>
+                      <>
+                        How income and portfolio withdrawals cover planned spending through
+                        retirement.
+                      </>
                     )}
                   </p>
                   {coverageView === "over-time" && (
@@ -3553,7 +3503,7 @@ export default function DashboardPage({
                 ]}
                 size="xs"
                 rounded="md"
-                className="mt-4 w-fit bg-muted/30 border sm:absolute sm:right-5 sm:top-5 sm:mt-0"
+                className="bg-muted/30 mt-4 w-fit border sm:absolute sm:right-5 sm:top-5 sm:mt-0"
               />
             </CardHeader>
             <CardContent className="space-y-3.5">
@@ -3731,8 +3681,31 @@ export default function DashboardPage({
                         {(coveragePortfolioAppliedMonthly > 0 ||
                           coverageShortfallMonthly > 0 ||
                           coverageEstimatedTaxesMonthly > 0) && (
-                          <div className="text-muted-foreground border-border mt-2 border-t pt-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
-                            Funding at age {fireAgeForBudget}
+                          <div className="border-border mt-2 flex items-center justify-between gap-3 border-t pt-2">
+                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.14em]">
+                              Funding at age {fireAgeForBudget}
+                            </div>
+                            {coveragePortfolioDrawRate != null && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors"
+                                  >
+                                    Draw on portfolio:{" "}
+                                    <span className="text-foreground tabular-nums">
+                                      {(coveragePortfolioDrawRate * 100).toFixed(1)}%/yr
+                                    </span>
+                                    <Icons.Info className="size-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs text-xs">
+                                  Gross portfolio withdrawal at this age, including estimated
+                                  withdrawal taxes, divided by projected portfolio value.
+                                  Informational only - it does not set your spending.
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                         )}
                         {coveragePortfolioAppliedMonthly > 0 && (
@@ -3959,8 +3932,8 @@ export default function DashboardPage({
                   <CardTitle className="text-sm">Year-by-Year Snapshot</CardTitle>
                   {hasPensionFunds && (
                     <p className="text-muted-foreground mt-1 text-xs">
-                      Pension fund balances grow with contributions until retirement, then on
-                      investment return only.
+                      Pension fund balances are shown until payout starts. After that, the stream
+                      appears as retirement income.
                     </p>
                   )}
                 </div>
@@ -4084,8 +4057,6 @@ export default function DashboardPage({
               </CardContent>
             </Card>
           )}
-
-          {statusCallout}
         </div>
 
         {/* ── Sidebar ── */}

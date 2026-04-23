@@ -123,12 +123,6 @@ export interface DecisionSensitivityCell {
   portfolioAtHorizon: number;
 }
 
-export interface StrategyComparisonResult {
-  plannedSpending: MonteCarloResult;
-  constantPercentage: MonteCarloResult;
-  guardrails: MonteCarloResult;
-}
-
 export type StressTestId =
   | "return-drag"
   | "inflation-shock"
@@ -176,7 +170,6 @@ export interface RetirementPlan {
   expenses: ExpenseBudget;
   incomeStreams: RetirementIncomeStream[];
   investment: InvestmentAssumptions;
-  withdrawal: WithdrawalConfig;
   tax?: TaxProfile;
   currency: string;
 }
@@ -227,16 +220,6 @@ export interface InvestmentAssumptions {
   monthlyContribution: number;
   contributionGrowthRate: number;
   glidePath?: GlidepathSettings;
-}
-
-export interface GuardrailsConfig {
-  ceilingRate: number;
-}
-
-export interface WithdrawalConfig {
-  safeWithdrawalRate: number;
-  strategy: "planned-spending" | "constant-percentage" | "guardrails";
-  guardrails?: GuardrailsConfig;
 }
 
 export interface TaxProfile {

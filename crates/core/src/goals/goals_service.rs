@@ -185,13 +185,6 @@ pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
     if let Some(value) = p.salary_growth_rate {
         validate_finite_range("Salary growth", value, -0.50, 0.50)?;
     }
-    let w = &plan.withdrawal;
-    if !w.safe_withdrawal_rate.is_finite()
-        || w.safe_withdrawal_rate <= 0.0
-        || w.safe_withdrawal_rate > 0.20
-    {
-        return invalid_input("SWR must be between 0% and 20%");
-    }
     for (bucket, _) in plan.expenses.all_buckets() {
         validate_non_negative_amount("Retirement spending", bucket.monthly_amount)?;
         if let Some(rate) = bucket.inflation_rate {
@@ -254,12 +247,6 @@ pub fn validate_retirement_plan(plan: &RetirementPlan) -> Result<()> {
         }
         if let Some(value) = stream.accumulation_return {
             validate_finite_range("Defined-contribution return", value, -0.20, 0.30)?;
-        }
-    }
-    if let Some(ref g) = w.guardrails {
-        validate_finite_range("Guardrail ceiling", g.ceiling_rate, 0.0, 1.0)?;
-        if g.ceiling_rate < w.safe_withdrawal_rate {
-            return invalid_input("Guardrail ceiling must be at or above the withdrawal rate");
         }
     }
     if let Some(ref tax) = plan.tax {
@@ -843,11 +830,6 @@ mod tests {
                 monthly_contribution: 1_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-            },
-            withdrawal: WithdrawalConfig {
-                safe_withdrawal_rate: 0.035,
-                strategy: WithdrawalPolicy::PlannedSpending,
-                guardrails: None,
             },
             tax: None,
             currency: "USD".into(),

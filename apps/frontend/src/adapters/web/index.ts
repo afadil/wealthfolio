@@ -390,7 +390,6 @@ export {
   runRetirementScenarioAnalysis,
   runRetirementSorr,
   runRetirementStressTests,
-  runRetirementStrategyComparison,
 } from "./fire-planner";
 
 // Crypto Commands (web stubs - not available in web mode)

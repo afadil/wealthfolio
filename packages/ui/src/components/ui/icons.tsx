@@ -92,12 +92,12 @@ import {
   PanelLeft,
   PanelLeftOpen,
   PauseCircle,
-  PlayCircle,
   Pencil,
   Percent,
   PieChart,
   Pin,
   PinOff,
+  PlayCircle,
   Plus,
   PlusCircle,
   Presentation,
@@ -128,31 +128,31 @@ import {
   TrendingDown,
   TrendingUp,
   Type,
-  Wand2,
   Undo2,
   Upload,
   User,
   Users,
   Wallet,
+  Wand2,
   X,
   XCircle,
 } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
-import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
 import { CarProfileIcon } from "@phosphor-icons/react/dist/csr/CarProfile";
 import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
 import { CoinsIcon } from "@phosphor-icons/react/dist/csr/Coins";
 import { CreditCardIcon } from "@phosphor-icons/react/dist/csr/CreditCard";
 import { CubeIcon } from "@phosphor-icons/react/dist/csr/Cube";
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
-import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
 import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
 import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
 import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
 import { HouseIcon } from "@phosphor-icons/react/dist/csr/House";
+import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
 import { SparkleIcon } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/csr/UploadSimple";
@@ -343,8 +343,8 @@ const IconsInternal = {
       viewBox="0 0 256 256"
       {...props}
     >
-      <path d="M176,128a48,48,0,1,1-48-48A48,48,0,0,1,176,128Z" opacity="0.2"></path>
-      <path d="M221.87,83.16A104.1,104.1,0,1,1,195.67,49l22.67-22.68a8,8,0,0,1,11.32,11.32l-96,96a8,8,0,0,1-11.32-11.32l27.72-27.72a40,40,0,1,0,17.87,31.09,8,8,0,1,1,16-.9,56,56,0,1,1-22.38-41.65L184.3,60.39a87.88,87.88,0,1,0,23.13,29.67,8,8,0,0,1,14.44-6.9Z"></path>
+      <path d="M160,128a32,32,0,1,1-32-32A32,32,0,0,1,160,128Z" opacity="0.2"></path>
+      <path d="M232,120h-8.34A96.14,96.14,0,0,0,136,32.34V24a8,8,0,0,0-16,0v8.34A96.14,96.14,0,0,0,32.34,120H24a8,8,0,0,0,0,16h8.34A96.14,96.14,0,0,0,120,223.66V232a8,8,0,0,0,16,0v-8.34A96.14,96.14,0,0,0,223.66,136H232a8,8,0,0,0,0-16Zm-96,87.6V200a8,8,0,0,0-16,0v7.6A80.15,80.15,0,0,1,48.4,136H56a8,8,0,0,0,0-16H48.4A80.15,80.15,0,0,1,120,48.4V56a8,8,0,0,0,16,0V48.4A80.15,80.15,0,0,1,207.6,120H200a8,8,0,0,0,0,16h7.6A80.15,80.15,0,0,1,136,207.6ZM128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Z"></path>
     </svg>
   ),
 

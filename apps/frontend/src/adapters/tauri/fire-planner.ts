@@ -8,11 +8,8 @@ import type {
   ScenarioResult,
   SorrScenario,
   StressTestResult,
-  StrategyComparisonResult,
 } from "@/features/goals/retirement-planner/types";
 import type { PlannerMode } from "@/lib/types";
-
-export type { StrategyComparisonResult };
 
 export const calculateRetirementProjection = async (
   plan: RetirementPlan,
@@ -99,22 +96,6 @@ export const runRetirementDecisionSensitivityMap = async (
     plan,
     currentPortfolio,
     map,
-    plannerMode,
-    goalId,
-  });
-};
-
-export const runRetirementStrategyComparison = async (
-  plan: RetirementPlan,
-  currentPortfolio: number,
-  nSims = 5_000,
-  plannerMode?: PlannerMode,
-  goalId?: string,
-): Promise<StrategyComparisonResult> => {
-  return invoke<StrategyComparisonResult>("run_retirement_strategy_comparison", {
-    plan,
-    currentPortfolio,
-    nSims,
     plannerMode,
     goalId,
   });

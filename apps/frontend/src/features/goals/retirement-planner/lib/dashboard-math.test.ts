@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { resolveCoverageAnnualNominalValues, resolveFundedProgress } from "./dashboard-math";
+import {
+  deriveRetirementReadiness,
+  resolveCoverageAnnualNominalValues,
+  resolveFundedProgress,
+  resolvePortfolioDrawRate,
+} from "./dashboard-math";
 
 describe("retirement dashboard math", () => {
   it("does not inflate backend nominal budget fallback values again", () => {
@@ -44,5 +49,97 @@ describe("retirement dashboard math", () => {
     expect(resolveFundedProgress(undefined, 500_000, 1_000_000)).toBe(0.5);
     expect(resolveFundedProgress(1.2, 500_000, 1_000_000)).toBe(1);
     expect(resolveFundedProgress(-0.2, 500_000, 1_000_000)).toBe(0);
+  });
+
+  it("derives deterministic readiness without conflating spending gaps and depletion", () => {
+    expect(
+      deriveRetirementReadiness({
+        overview: { requiredCapitalReachable: false },
+        plannerMode: "traditional",
+        isFinanciallyIndependent: false,
+        effectiveFiAge: null,
+        desiredAge: 65,
+        horizonAge: 90,
+      }),
+    ).toMatchObject({ tone: "bad", problem: "unreachable-target" });
+
+    expect(
+      deriveRetirementReadiness({
+        overview: { requiredCapitalReachable: true, spendingShortfallAge: 78 },
+        plannerMode: "traditional",
+        isFinanciallyIndependent: false,
+        effectiveFiAge: null,
+        desiredAge: 65,
+        horizonAge: 90,
+      }),
+    ).toMatchObject({ tone: "watch", problem: "spending-gap" });
+
+    expect(
+      deriveRetirementReadiness({
+        overview: { requiredCapitalReachable: true, failureAge: 83 },
+        plannerMode: "traditional",
+        isFinanciallyIndependent: false,
+        effectiveFiAge: null,
+        desiredAge: 65,
+        horizonAge: 90,
+      }),
+    ).toMatchObject({ tone: "bad", problem: "portfolio-depletion" });
+
+    expect(
+      deriveRetirementReadiness({
+        overview: { requiredCapitalReachable: true, spendingShortfallAge: 78, failureAge: 83 },
+        plannerMode: "traditional",
+        isFinanciallyIndependent: false,
+        effectiveFiAge: null,
+        desiredAge: 65,
+        horizonAge: 90,
+      }),
+    ).toMatchObject({ tone: "bad", problem: "portfolio-depletion" });
+  });
+
+  it("shows portfolio draw rate only when meaningful", () => {
+    expect(
+      resolvePortfolioDrawRate({
+        requiredCapitalReachable: true,
+        portfolioValueAtAge: 1_000_000,
+        grossWithdrawalAtAge: 45_000,
+        annualIncomeAtAge: 12_000,
+        annualSpendingAtAge: 60_000,
+        portfolioEndAtAge: 990_000,
+      }),
+    ).toBe(0.045);
+
+    expect(
+      resolvePortfolioDrawRate({
+        requiredCapitalReachable: false,
+        portfolioValueAtAge: 1_000_000,
+        grossWithdrawalAtAge: 45_000,
+        annualIncomeAtAge: 12_000,
+        annualSpendingAtAge: 60_000,
+        portfolioEndAtAge: 990_000,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolvePortfolioDrawRate({
+        requiredCapitalReachable: true,
+        portfolioValueAtAge: 1_000_000,
+        grossWithdrawalAtAge: 2_000,
+        annualIncomeAtAge: 57_000,
+        annualSpendingAtAge: 60_000,
+        portfolioEndAtAge: 990_000,
+      }),
+    ).toBeNull();
+
+    expect(
+      resolvePortfolioDrawRate({
+        requiredCapitalReachable: true,
+        portfolioValueAtAge: 1_000_000,
+        grossWithdrawalAtAge: 45_000,
+        annualIncomeAtAge: 12_000,
+        annualSpendingAtAge: 60_000,
+        portfolioEndAtAge: 0,
+      }),
+    ).toBeNull();
   });
 });

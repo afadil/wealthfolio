@@ -74,7 +74,6 @@ export const COMMANDS: CommandMap = {
     path: "/retirement/decision-sensitivity-map",
   },
   run_retirement_sorr: { method: "POST", path: "/retirement/sequence-of-returns" },
-  run_retirement_strategy_comparison: { method: "POST", path: "/retirement/strategy-comparison" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -550,8 +549,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "run_retirement_stress_tests":
     case "run_retirement_scenario_analysis":
     case "run_retirement_decision_sensitivity_map":
-    case "run_retirement_sorr":
-    case "run_retirement_strategy_comparison": {
+    case "run_retirement_sorr": {
       body = JSON.stringify(payload);
       break;
     }

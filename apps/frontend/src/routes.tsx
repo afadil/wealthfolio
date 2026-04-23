@@ -39,6 +39,7 @@ import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-se
 import GoalsDashboardPage from "./pages/goals/goals-dashboard-page";
 import GoalNewPage from "./pages/goals/goal-new-page";
 import GoalDetailPage from "./pages/goals/goal-detail-page";
+import GoalRetirementGuidePage from "./pages/goals/goal-retirement-guide-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -95,6 +96,7 @@ export function AppRoutes() {
           <Route path="connect" element={<ConnectPage />} />
           <Route path="goals" element={<GoalsDashboardPage />} />
           <Route path="goals/new" element={<GoalNewPage />} />
+          <Route path="goals/:goalId/guide" element={<GoalRetirementGuidePage />} />
           <Route path="goals/:goalId" element={<GoalDetailPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (

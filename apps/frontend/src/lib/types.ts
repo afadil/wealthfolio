@@ -2023,7 +2023,6 @@ export interface RetirementOverview {
   budgetBreakdown: BudgetBreakdown;
   targetReconciliation: TargetReconciliation;
   trajectory: RetirementTrajectoryPoint[];
-  withdrawalPolicy?: string;
 }
 
 export interface RetirementTrajectoryPoint {

@@ -1,6 +1,4 @@
-use super::model::{
-    GuardrailsConfig, TaxBucketBalances, TaxProfile, WithdrawalConfig, WithdrawalPolicy,
-};
+use super::model::{TaxBucketBalances, TaxProfile};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TaxBucketKind {
@@ -102,59 +100,16 @@ pub(crate) fn compute_gross_withdrawal(
     (gross, gross - spending_gap)
 }
 
-/// Apply the withdrawal policy for one year.
-pub(crate) fn apply_withdrawal_policy(
-    config: &WithdrawalConfig,
+/// Fund the planned annual spending gap for one year.
+pub(crate) fn apply_planned_spending_withdrawal(
     available_buckets: &TaxBucketBalances,
     total_expenses: f64,
-    essential_expenses: f64,
     income: f64,
     tax: &Option<TaxProfile>,
     age: u32,
 ) -> WithdrawalOutcome {
-    let available_total = available_buckets.total();
-    match config.strategy {
-        WithdrawalPolicy::ConstantPercentage => {
-            let gross_target = config.safe_withdrawal_rate * available_total;
-            withdraw_for_gross_target(gross_target, *available_buckets, tax, age)
-        }
-        WithdrawalPolicy::PlannedSpending => {
-            let spending_gap = (total_expenses - income).max(0.0);
-            withdraw_for_net_target(spending_gap, *available_buckets, tax, age)
-        }
-        WithdrawalPolicy::Guardrails => {
-            let default_guardrails = GuardrailsConfig {
-                ceiling_rate: config.safe_withdrawal_rate * 1.5,
-            };
-            let guardrails = config.guardrails.as_ref().unwrap_or(&default_guardrails);
-
-            let spending_gap = (total_expenses - income).max(0.0);
-            let target = withdraw_for_net_target(spending_gap, *available_buckets, tax, age);
-            if available_total <= 0.0 {
-                return target;
-            }
-
-            let ratio = target.gross_withdrawal / available_total;
-            if ratio > guardrails.ceiling_rate {
-                let essential_gap = (essential_expenses - income).max(0.0);
-                let essential =
-                    withdraw_for_net_target(essential_gap, *available_buckets, tax, age);
-                let ceiling = withdraw_for_gross_target(
-                    available_total * guardrails.ceiling_rate,
-                    *available_buckets,
-                    tax,
-                    age,
-                );
-                if ceiling.spending_funded < essential_gap * 0.999 {
-                    essential
-                } else {
-                    ceiling
-                }
-            } else {
-                target
-            }
-        }
-    }
+    let spending_gap = (total_expenses - income).max(0.0);
+    withdraw_for_net_target(spending_gap, *available_buckets, tax, age)
 }
 
 fn withdraw_for_net_target(
@@ -201,59 +156,6 @@ fn withdraw_for_net_target(
         spending_funded += net_from_bucket;
         tax_amount += gross_from_bucket - net_from_bucket;
         remaining_net -= net_from_bucket;
-    }
-
-    WithdrawalOutcome {
-        remaining_buckets: remaining,
-        gross_withdrawal,
-        spending_funded,
-        tax_amount,
-    }
-}
-
-fn withdraw_for_gross_target(
-    gross_target: f64,
-    buckets: TaxBucketBalances,
-    tax: &Option<TaxProfile>,
-    age: u32,
-) -> WithdrawalOutcome {
-    if gross_target <= 0.0 || buckets.total() <= 0.0 {
-        return WithdrawalOutcome {
-            remaining_buckets: buckets,
-            gross_withdrawal: 0.0,
-            spending_funded: 0.0,
-            tax_amount: 0.0,
-        };
-    }
-
-    let mut remaining = buckets;
-    let mut remaining_gross = gross_target;
-    let mut gross_withdrawal = 0.0;
-    let mut spending_funded = 0.0;
-    let mut tax_amount = 0.0;
-
-    for kind in [
-        TaxBucketKind::Taxable,
-        TaxBucketKind::TaxDeferred,
-        TaxBucketKind::TaxFree,
-    ] {
-        if remaining_gross <= 0.0 {
-            break;
-        }
-        let available_gross = bucket_balance(remaining, kind);
-        if available_gross <= 0.0 {
-            continue;
-        }
-        let gross_from_bucket = available_gross.min(remaining_gross);
-        let rate = effective_tax_rate_for_kind(tax, kind, age);
-        let tax_from_bucket = gross_from_bucket * rate;
-        let net_from_bucket = gross_from_bucket - tax_from_bucket;
-
-        set_bucket_balance(&mut remaining, kind, available_gross - gross_from_bucket);
-        gross_withdrawal += gross_from_bucket;
-        spending_funded += net_from_bucket;
-        tax_amount += tax_from_bucket;
-        remaining_gross -= gross_from_bucket;
     }
 
     WithdrawalOutcome {
@@ -375,20 +277,13 @@ mod tests {
 
     #[test]
     fn planned_spending_returns_correct_tuple() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::PlannedSpending,
-            guardrails: None,
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
+        let outcome = apply_planned_spending_withdrawal(
             &TaxBucketBalances {
                 taxable: 50_000.0,
                 tax_deferred: 50_000.0,
                 tax_free: 0.0,
             },
             70_000.0,
-            40_000.0,
             10_000.0,
             &tax_with_buckets(),
             65,
@@ -404,156 +299,6 @@ mod tests {
             outcome.spending_funded
         );
         assert!((outcome.tax_amount - 18_571.43).abs() < 0.1);
-    }
-
-    #[test]
-    fn constant_percentage_uses_gross_target() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::ConstantPercentage,
-            guardrails: None,
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
-            &TaxBucketBalances {
-                taxable: 1_000_000.0,
-                tax_deferred: 0.0,
-                tax_free: 0.0,
-            },
-            50_000.0,
-            40_000.0,
-            0.0,
-            &Some(TaxProfile {
-                taxable_withdrawal_rate: 0.20,
-                tax_deferred_withdrawal_rate: 0.0,
-                tax_free_withdrawal_rate: 0.0,
-                early_withdrawal_penalty_rate: None,
-                early_withdrawal_penalty_age: None,
-                country_code: None,
-                withdrawal_buckets: TaxBucketBalances {
-                    taxable: 1_000_000.0,
-                    tax_deferred: 0.0,
-                    tax_free: 0.0,
-                },
-            }),
-            65,
-        );
-        assert!((outcome.gross_withdrawal - 40_000.0).abs() < 0.01);
-        assert!((outcome.spending_funded - 32_000.0).abs() < 0.01);
-        assert!((outcome.tax_amount - 8_000.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn guardrails_ceiling_cuts_spending() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
-            &TaxBucketBalances {
-                taxable: 500_000.0,
-                tax_deferred: 0.0,
-                tax_free: 0.0,
-            },
-            50_000.0,
-            30_000.0,
-            0.0,
-            &None,
-            65,
-        );
-        assert!((outcome.gross_withdrawal - 30_000.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn guardrails_do_not_create_unplanned_spending() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
-            &TaxBucketBalances {
-                taxable: 1_000_000.0,
-                tax_deferred: 0.0,
-                tax_free: 0.0,
-            },
-            10_000.0,
-            10_000.0,
-            0.0,
-            &None,
-            65,
-        );
-        assert!((outcome.gross_withdrawal - 10_000.0).abs() < 0.01);
-        assert!((outcome.spending_funded - 10_000.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn guardrails_ceiling_protects_basics() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.02 }),
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
-            &TaxBucketBalances {
-                taxable: 500_000.0,
-                tax_deferred: 0.0,
-                tax_free: 0.0,
-            },
-            50_000.0,
-            40_000.0,
-            0.0,
-            &None,
-            65,
-        );
-        assert!(outcome.gross_withdrawal >= 39_999.0);
-    }
-
-    #[test]
-    fn guardrails_tax_consistent_with_bucket_withdrawal() {
-        let config = WithdrawalConfig {
-            safe_withdrawal_rate: 0.04,
-            strategy: WithdrawalPolicy::Guardrails,
-            guardrails: Some(GuardrailsConfig { ceiling_rate: 0.06 }),
-        };
-        let outcome = apply_withdrawal_policy(
-            &config,
-            &TaxBucketBalances {
-                taxable: 1_000_000.0,
-                tax_deferred: 0.0,
-                tax_free: 0.0,
-            },
-            50_000.0,
-            40_000.0,
-            10_000.0,
-            &Some(TaxProfile {
-                taxable_withdrawal_rate: 0.20,
-                tax_deferred_withdrawal_rate: 0.0,
-                tax_free_withdrawal_rate: 0.0,
-                early_withdrawal_penalty_rate: None,
-                early_withdrawal_penalty_age: None,
-                country_code: None,
-                withdrawal_buckets: TaxBucketBalances {
-                    taxable: 1_000_000.0,
-                    tax_deferred: 0.0,
-                    tax_free: 0.0,
-                },
-            }),
-            65,
-        );
-        assert!(
-            (outcome.tax_amount - outcome.gross_withdrawal * 0.20).abs() < 0.01,
-            "tax = {}",
-            outcome.tax_amount
-        );
-        assert!(
-            (outcome.spending_funded - (outcome.gross_withdrawal - outcome.tax_amount)).abs()
-                < 0.01
-        );
     }
 
     #[test]

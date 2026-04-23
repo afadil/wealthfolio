@@ -8,10 +8,8 @@ use super::dto::*;
 use super::engine::*;
 use super::model::*;
 use super::withdrawal::{
-    add_contribution, apply_growth, apply_withdrawal_policy, initial_withdrawal_buckets,
+    add_contribution, apply_growth, apply_planned_spending_withdrawal, initial_withdrawal_buckets,
 };
-
-const FUNDING_TOLERANCE: f64 = 0.999;
 
 // ─── Monte Carlo ─────────────────────────────────────────────────────────────
 
@@ -50,18 +48,16 @@ pub fn run_monte_carlo_with_mode_and_seed(
         .personal
         .salary_growth_rate
         .unwrap_or(plan.investment.contribution_growth_rate);
-    let swr = plan.withdrawal.safe_withdrawal_rate;
     let accumulation_mean = plan_accumulation_return(plan);
     let retirement_mean = plan_retirement_return(plan);
     let std_dev = plan.investment.annual_volatility;
     let annual_fee_rate = plan.investment.annual_investment_fee_rate;
     let base_seed =
-        seed.unwrap_or_else(|| strategy_comparison_seed(plan, current_portfolio, n_sims, mode));
+        seed.unwrap_or_else(|| retirement_plan_seed(plan, current_portfolio, n_sims, mode));
 
     // Clone fields needed inside the parallel closure
     let expenses_clone = plan.expenses.clone();
     let streams_clone = plan.income_streams.clone();
-    let withdrawal_clone = plan.withdrawal.clone();
     let tax_clone = plan.tax.clone();
     let glide_path = plan.investment.glide_path.clone();
 
@@ -77,7 +73,6 @@ pub fn run_monte_carlo_with_mode_and_seed(
                 &plan.income_streams,
                 current_age,
                 current_age + i as u32,
-                swr,
                 plan_accumulation_return(plan),
             )
         })
@@ -151,11 +146,9 @@ pub fn run_monte_carlo_with_mode_and_seed(
                         inflation_rate,
                         Some(cumulative_inflation),
                     );
-                    let outcome = apply_withdrawal_policy(
-                        &withdrawal_clone,
+                    let outcome = apply_planned_spending_withdrawal(
                         &grown_buckets,
                         total_expenses,
-                        essential_expenses,
                         income,
                         &tax_clone,
                         age,
@@ -183,7 +176,7 @@ pub fn run_monte_carlo_with_mode_and_seed(
             }
 
             // Success: essential spending funded, portfolio survives, and FIRE plans reach FI.
-            // Use the same definition for every withdrawal strategy so comparisons are apples-to-apples.
+            // Keep the definition aligned across market-path runs and the deterministic planner.
             let ending_portfolio = buckets.total();
             let portfolio_survived = ending_portfolio > 0.0;
             let survived = essential_funded_every_year
@@ -260,7 +253,7 @@ fn splitmix64(mut x: u64) -> u64 {
     z ^ (z >> 31)
 }
 
-fn strategy_comparison_seed(
+fn retirement_plan_seed(
     plan: &RetirementPlan,
     current_portfolio: f64,
     n_sims: u32,
@@ -632,7 +625,6 @@ pub fn run_sorr(
         &plan.income_streams,
         plan.personal.current_age,
         retirement_start_age,
-        plan.withdrawal.safe_withdrawal_rate,
         plan_accumulation_return(plan),
     );
     let r = plan_retirement_return(plan);
@@ -643,7 +635,7 @@ pub fn run_sorr(
     let inflation = plan.investment.inflation_rate;
 
     let scenarios: Vec<(&str, Vec<f64>)> = vec![
-        ("Base (constant)", vec![r; years]),
+        ("Base case", vec![r; years]),
         ("Crash Year 1 (-30%)", {
             let mut v = vec![-0.3_f64];
             v.extend(vec![r + 0.01; years - 1]);
@@ -701,11 +693,9 @@ pub fn run_sorr(
                     returns[i]
                 };
                 let grown_buckets = apply_growth(buckets, effective_return);
-                let outcome = apply_withdrawal_policy(
-                    &plan.withdrawal,
+                let outcome = apply_planned_spending_withdrawal(
                     &grown_buckets,
                     total_expenses,
-                    essential_expenses,
                     income,
                     &plan.tax,
                     age,
@@ -763,7 +753,6 @@ pub fn run_sensitivity_analysis_with_mode(
 ) -> SensitivityResult {
     let contribution_multipliers = [0.5_f64, 0.75, 1.0, 1.25, 1.5];
     let return_values = [0.04_f64, 0.05, 0.06, 0.07, 0.08, 0.09];
-    let swr_values = [0.03_f64, 0.035, 0.04, 0.045, 0.05];
 
     let contribution_base = plan.investment.monthly_contribution;
     let contribution_rows: Vec<f64> = contribution_multipliers
@@ -789,34 +778,11 @@ pub fn run_sensitivity_analysis_with_mode(
         })
         .collect();
 
-    let fire_ages_by_swr: Vec<Vec<Option<u32>>> = swr_values
-        .iter()
-        .map(|&swr| {
-            return_values
-                .iter()
-                .map(|&ret| {
-                    let mut adjusted = plan.clone();
-                    adjusted.withdrawal.safe_withdrawal_rate = swr;
-                    adjusted.investment.pre_retirement_annual_return =
-                        ret + adjusted.investment.annual_investment_fee_rate;
-                    adjusted.investment.retirement_annual_return =
-                        ret + adjusted.investment.annual_investment_fee_rate;
-                    project_retirement_with_mode(&adjusted, current_portfolio, mode).fire_age
-                })
-                .collect()
-        })
-        .collect();
-
     SensitivityResult {
         contribution: SensitivityMatrix {
             contribution_rows,
             return_columns: return_values.to_vec(),
             fire_ages,
-        },
-        swr: SensitivitySwrMatrix {
-            swr_rows: swr_values.to_vec(),
-            return_columns: return_values.to_vec(),
-            fire_ages: fire_ages_by_swr,
         },
     }
 }
@@ -869,7 +835,7 @@ fn build_contribution_return_sensitivity(
         .collect();
 
     DecisionSensitivityMatrix {
-        row_label: "Expected return".to_string(),
+        row_label: "After-fee return".to_string(),
         column_label: "Monthly contribution".to_string(),
         row_labels: return_values
             .iter()
@@ -964,10 +930,8 @@ fn decision_cell_from_plan(
 }
 
 fn inflation_factor_to_age(plan: &RetirementPlan, age: u32) -> f64 {
-    let years = (age as i32 - plan.personal.current_age as i32).max(0);
-    (1.0_f64 + plan.investment.inflation_rate)
-        .powi(years)
-        .clamp(0.01, f64::MAX)
+    let years = (age as i32 - plan.personal.current_age as i32).max(0) as u32;
+    bounded_inflation_factor(plan.investment.inflation_rate, years)
 }
 
 fn apply_return_delta(plan: &mut RetirementPlan, delta: f64) {
@@ -1109,59 +1073,6 @@ fn approx_eq(left: f64, right: f64, epsilon: f64) -> bool {
     (left - right).abs() <= epsilon
 }
 
-// ─── Strategy Comparison ─────────────────────────────────────────────────────
-
-pub fn run_strategy_comparison(
-    plan: &RetirementPlan,
-    current_portfolio: f64,
-    n_sims: u32,
-) -> StrategyComparisonResult {
-    run_strategy_comparison_with_mode(plan, current_portfolio, n_sims, RetirementTimingMode::Fire)
-}
-
-pub fn run_strategy_comparison_with_mode(
-    plan: &RetirementPlan,
-    current_portfolio: f64,
-    n_sims: u32,
-    mode: RetirementTimingMode,
-) -> StrategyComparisonResult {
-    let mut plan_planned = plan.clone();
-    plan_planned.withdrawal.strategy = WithdrawalPolicy::PlannedSpending;
-    let mut plan_cp = plan.clone();
-    plan_cp.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
-    let mut plan_gr = plan.clone();
-    plan_gr.withdrawal.strategy = WithdrawalPolicy::Guardrails;
-    let seed = Some(strategy_comparison_seed(
-        plan,
-        current_portfolio,
-        n_sims,
-        mode,
-    ));
-    StrategyComparisonResult {
-        planned_spending: run_monte_carlo_with_mode_and_seed(
-            &plan_planned,
-            current_portfolio,
-            n_sims,
-            mode,
-            seed,
-        ),
-        constant_percentage: run_monte_carlo_with_mode_and_seed(
-            &plan_cp,
-            current_portfolio,
-            n_sims,
-            mode,
-            seed,
-        ),
-        guardrails: run_monte_carlo_with_mode_and_seed(
-            &plan_gr,
-            current_portfolio,
-            n_sims,
-            mode,
-            seed,
-        ),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1194,11 +1105,6 @@ mod tests {
                 monthly_contribution: 2_000.0,
                 contribution_growth_rate: 0.0,
                 glide_path: None,
-            },
-            withdrawal: WithdrawalConfig {
-                safe_withdrawal_rate: 0.04,
-                strategy: WithdrawalPolicy::PlannedSpending,
-                guardrails: None,
             },
             tax: None,
             currency: "EUR".to_string(),
@@ -1283,37 +1189,11 @@ mod tests {
     }
 
     #[test]
-    fn strategy_comparison_uses_stable_common_random_numbers() {
-        let p = base_plan();
-        let a = run_strategy_comparison_with_mode(
-            &p,
-            100_000.0,
-            100,
-            RetirementTimingMode::Traditional,
-        );
-        let b = run_strategy_comparison_with_mode(
-            &p,
-            100_000.0,
-            100,
-            RetirementTimingMode::Traditional,
-        );
-
-        assert_eq!(
-            a.planned_spending.percentiles.p50,
-            b.planned_spending.percentiles.p50
-        );
-        assert_eq!(
-            a.constant_percentage.percentiles.p50,
-            b.constant_percentage.percentiles.p50
-        );
-        assert_eq!(a.guardrails.percentiles.p50, b.guardrails.percentiles.p50);
-    }
-
-    #[test]
     fn sorr_produces_five_scenarios() {
         let p = base_plan();
         let scenarios = run_sorr(&p, 900_000.0, p.personal.target_retirement_age);
         assert_eq!(scenarios.len(), 5);
+        assert_eq!(scenarios[0].label, "Base case");
         // Base scenario should survive with a healthy portfolio
         assert!(scenarios[0].survived);
     }
@@ -1325,7 +1205,6 @@ mod tests {
         assert_eq!(result.contribution.contribution_rows.len(), 5);
         assert_eq!(result.contribution.return_columns.len(), 6);
         assert_eq!(result.contribution.fire_ages.len(), 5);
-        assert_eq!(result.swr.swr_rows.len(), 5);
     }
 
     #[test]

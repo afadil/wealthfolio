@@ -57,6 +57,10 @@ export function normalizeRetirementPlan(plan: RetirementPlan): RetirementPlan {
   };
 }
 
+export function normalizeDashboardRetirementPlan(plan: RetirementPlan): RetirementPlan {
+  return normalizeRetirementPlan(plan);
+}
+
 export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
   version: "v3",
   personal: {
@@ -78,10 +82,6 @@ export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
     monthlyContribution: 1000,
     contributionGrowthRate: 0.02,
   },
-  withdrawal: {
-    safeWithdrawalRate: 0.035,
-    strategy: "planned-spending",
-  },
   tax: {
     taxableWithdrawalRate: 0.15,
     taxDeferredWithdrawalRate: 0.25,
@@ -95,6 +95,7 @@ export const DEFAULT_RETIREMENT_PLAN: RetirementPlan = {
 export function parseSettingsJson(json: string): RetirementPlan {
   try {
     const raw = JSON.parse(json);
+    const { withdrawal: _legacyWithdrawal, ...rawWithoutWithdrawal } = raw ?? {};
     const rawInvestment = raw.investment ?? {};
     const {
       expectedAnnualReturn,
@@ -103,17 +104,9 @@ export function parseSettingsJson(json: string): RetirementPlan {
       ...investmentWithoutLegacy
     } = rawInvestment;
     void targetAllocations;
-    const rawWithdrawal = raw.withdrawal ?? {};
-    const guardrails = rawWithdrawal.guardrails
-      ? {
-          ceilingRate:
-            rawWithdrawal.guardrails.ceilingRate ??
-            DEFAULT_RETIREMENT_PLAN.withdrawal.guardrails?.ceilingRate,
-        }
-      : rawWithdrawal.guardrails;
     return {
       ...DEFAULT_RETIREMENT_PLAN,
-      ...raw,
+      ...rawWithoutWithdrawal,
       version: "v3",
       personal: normalizePersonalProfile(raw.personal),
       expenses: normalizeExpenseBudget(raw.expenses ?? DEFAULT_RETIREMENT_PLAN.expenses),
@@ -135,12 +128,6 @@ export function parseSettingsJson(json: string): RetirementPlan {
           rawInvestment.annualVolatility ??
           expectedReturnStdDev ??
           DEFAULT_RETIREMENT_PLAN.investment.annualVolatility,
-      },
-      withdrawal: {
-        ...DEFAULT_RETIREMENT_PLAN.withdrawal,
-        ...rawWithdrawal,
-        strategy: rawWithdrawal.strategy ?? DEFAULT_RETIREMENT_PLAN.withdrawal.strategy,
-        guardrails,
       },
       tax: raw.tax ?? DEFAULT_RETIREMENT_PLAN.tax,
     };

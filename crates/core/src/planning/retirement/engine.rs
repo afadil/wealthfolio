@@ -6,7 +6,7 @@ use rand_distr::{Distribution, Normal};
 
 use super::model::*;
 use super::withdrawal::{
-    add_contribution, apply_growth, apply_withdrawal_policy, initial_withdrawal_buckets,
+    add_contribution, apply_growth, apply_planned_spending_withdrawal, initial_withdrawal_buckets,
 };
 use crate::portfolio::fire::GlidepathSettings;
 
@@ -18,6 +18,11 @@ const MIN_RETURN_STD_DEV: f64 = 1e-9;
 const DEFAULT_INFLATION_STD_DEV: f64 = 0.015;
 const RETURN_INFLATION_CORRELATION: f64 = -0.25;
 const DEFAULT_BOND_VOLATILITY_RATIO: f64 = 0.35;
+const REQUIRED_CAPITAL_SEED_MULTIPLE: f64 = 30.0;
+
+pub(crate) fn bounded_inflation_factor(rate: f64, years: u32) -> f64 {
+    (1.0_f64 + rate).powi(years as i32).clamp(0.01, f64::MAX)
+}
 
 // ─── Stochastic helpers ─────────────────────────────────────────────────────
 
@@ -268,7 +273,6 @@ pub(crate) fn resolve_plan_dc_payouts(
     streams: &[RetirementIncomeStream],
     current_age: u32,
     retirement_age: u32,
-    swr: f64,
     default_accumulation_return: f64,
 ) -> HashMap<String, f64> {
     streams
@@ -276,7 +280,9 @@ pub(crate) fn resolve_plan_dc_payouts(
         .filter(|s| s.stream_type == StreamKind::DefinedContribution)
         .map(|s| {
             if s.start_age <= current_age {
-                let fallback = s.current_value.unwrap_or(0.0).max(0.0) * swr / 12.0;
+                let fallback = s.current_value.unwrap_or(0.0).max(0.0)
+                    * DEFAULT_DC_PAYOUT_ESTIMATE_RATE
+                    / 12.0;
                 return (s.id.clone(), s.monthly_amount.unwrap_or(fallback).max(0.0));
             }
             let total_years = (s.start_age as i32 - current_age as i32).max(0) as u32;
@@ -298,7 +304,7 @@ pub(crate) fn resolve_plan_dc_payouts(
                 monthly_contrib * 12.0 * contrib_years as f64
             };
             let fv_annuity = fv_annuity_at_stop * (1.0 + r).powi(growth_only_years as i32);
-            let monthly_payout = (fv_lump + fv_annuity) * swr / 12.0;
+            let monthly_payout = (fv_lump + fv_annuity) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE / 12.0;
             (s.id.clone(), monthly_payout)
         })
         .collect()
@@ -332,7 +338,7 @@ pub(crate) fn plan_income_at_age(
         .sum()
 }
 
-/// Advance pension fund balances for plan income streams.
+/// Advance pre-payout pension fund balances for plan income streams.
 pub(crate) fn step_plan_pension_funds(
     streams: &[RetirementIncomeStream],
     balances: &mut HashMap<String, f64>,
@@ -397,42 +403,30 @@ pub(crate) fn plan_blended_return(
     stock_pct * retirement_return + bond_pct * bond_return
 }
 
-/// Net FIRE target from a `RetirementPlan` at a given candidate retirement age.
-///
-/// Schedule-aware: only expense buckets active at `retirement_age` are included
-/// in the perpetual spending target.
-pub fn plan_net_fire_target(plan: &RetirementPlan, retirement_age: u32) -> f64 {
+fn initial_required_capital_upper_bound(plan: &RetirementPlan, retirement_age: u32) -> f64 {
+    let years_from_now = (retirement_age as i32 - plan.personal.current_age as i32).max(0) as u32;
     let resolved = resolve_plan_dc_payouts(
         &plan.income_streams,
         plan.personal.current_age,
         retirement_age,
-        plan.withdrawal.safe_withdrawal_rate,
         plan_accumulation_return(plan),
     );
-    let income_at_fire_age: f64 = plan
-        .income_streams
-        .iter()
-        .filter(|s| s.start_age <= retirement_age)
-        .map(|s| {
-            resolved
-                .get(&s.id)
-                .copied()
-                .unwrap_or(s.monthly_amount.unwrap_or(0.0))
-        })
-        .sum();
-
-    let total_monthly: f64 = plan
-        .expenses
-        .all_buckets()
-        .iter()
-        .filter(|(b, _)| {
-            b.start_age.map_or(true, |s| s <= retirement_age)
-                && b.end_age.map_or(true, |e| e > retirement_age)
-        })
-        .map(|(b, _)| b.monthly_amount)
-        .sum();
-    let net_monthly = (total_monthly - income_at_fire_age).max(0.0);
-    (net_monthly * 12.0) / plan.withdrawal.safe_withdrawal_rate
+    let (annual_expenses, _) = annual_expenses_at_year(
+        &plan.expenses,
+        retirement_age,
+        years_from_now,
+        plan.investment.inflation_rate,
+    );
+    let annual_income = plan_income_at_age(
+        &plan.income_streams,
+        &resolved,
+        retirement_age,
+        years_from_now,
+        plan.investment.inflation_rate,
+    );
+    // Loose starting bound for binary search only. The final required capital
+    // comes from the year-by-year feasibility ledger plus the doubling loop.
+    (annual_expenses - annual_income).max(0.0) * REQUIRED_CAPITAL_SEED_MULTIPLE
 }
 
 fn retirement_feasible_from_capital(
@@ -448,11 +442,8 @@ fn retirement_feasible_from_capital(
         &plan.income_streams,
         current_age,
         retirement_age,
-        plan.withdrawal.safe_withdrawal_rate,
         plan_accumulation_return(plan),
     );
-    let mut target_withdrawal = plan.withdrawal.clone();
-    target_withdrawal.strategy = WithdrawalPolicy::PlannedSpending;
 
     let mut buckets = initial_withdrawal_buckets(&plan.tax, starting_capital.max(0.0));
     for y in 0..=(horizon as i32 - retirement_age as i32).max(0) as u32 {
@@ -460,8 +451,7 @@ fn retirement_feasible_from_capital(
         let years_from_now = years_to_retirement + y;
         let annual_return = plan_blended_return(plan, years_from_now, true, retirement_age);
         let grown_buckets = apply_growth(buckets, annual_return);
-        let (expenses, essential_expenses) =
-            annual_expenses_at_year(&plan.expenses, age, years_from_now, inflation);
+        let (expenses, _) = annual_expenses_at_year(&plan.expenses, age, years_from_now, inflation);
         let income = plan_income_at_age(
             &plan.income_streams,
             &resolved_payouts,
@@ -470,19 +460,11 @@ fn retirement_feasible_from_capital(
             inflation,
         );
         // Required capital is a target-sizing problem: can the portfolio fund
-        // the planned spending schedule? The selected withdrawal policy is a
-        // simulation policy and should not change the dashed "need" path.
-        let outcome = apply_withdrawal_policy(
-            &target_withdrawal,
-            &grown_buckets,
-            expenses,
-            essential_expenses,
-            income,
-            &plan.tax,
-            age,
-        );
+        // the planned spending schedule? This drives the dashed "need" path.
+        let outcome =
+            apply_planned_spending_withdrawal(&grown_buckets, expenses, income, &plan.tax, age);
         let spending_gap = (expenses - income).max(0.0);
-        if outcome.spending_funded < spending_gap * 0.999 {
+        if outcome.spending_funded < spending_gap * FUNDING_TOLERANCE {
             return false;
         }
         buckets = outcome.remaining_buckets;
@@ -503,7 +485,7 @@ pub fn try_compute_required_capital(plan: &RetirementPlan, retirement_age: u32) 
         return Some(0.0);
     }
 
-    let mut hi = plan_net_fire_target(plan, retirement_age).max(1.0);
+    let mut hi = initial_required_capital_upper_bound(plan, retirement_age).max(1.0);
     for _ in 0..MAX_REQUIRED_CAPITAL_DOUBLING_STEPS {
         if retirement_feasible_from_capital(plan, retirement_age, hi) {
             break;
@@ -647,7 +629,20 @@ pub(crate) fn project_retirement_with_mode_cached(
         let year = start_year + i;
         let portfolio = buckets.total();
 
-        let pension_assets: f64 = pension_balances.values().sum();
+        let pension_assets: f64 = plan
+            .income_streams
+            .iter()
+            .filter(|stream| {
+                let has_accumulation = stream.current_value.unwrap_or(0.0) > 0.0
+                    || stream.monthly_contribution.unwrap_or(0.0) > 0.0;
+                has_accumulation && age < stream.start_age
+            })
+            .map(|stream| {
+                *pension_balances
+                    .get(&stream.id)
+                    .unwrap_or(&stream.current_value.unwrap_or(0.0))
+            })
+            .sum();
 
         if !in_fire {
             let required = required_capital_for(plan, age, required_capital_cache);
@@ -674,7 +669,6 @@ pub(crate) fn project_retirement_with_mode_cached(
                     &plan.income_streams,
                     current_age,
                     age,
-                    plan.withdrawal.safe_withdrawal_rate,
                     plan_accumulation_return(plan),
                 ));
             }
@@ -684,16 +678,13 @@ pub(crate) fn project_retirement_with_mode_cached(
 
         if in_fire {
             let payouts = resolved_payouts.as_ref().unwrap();
-            let (total_expenses, essential_expenses) =
-                annual_expenses_at_year(&plan.expenses, age, i, inflation);
+            let (total_expenses, _) = annual_expenses_at_year(&plan.expenses, age, i, inflation);
             let income = plan_income_at_age(&plan.income_streams, payouts, age, i, inflation);
 
             let grown_buckets = apply_growth(buckets, r);
-            let outcome = apply_withdrawal_policy(
-                &plan.withdrawal,
+            let outcome = apply_planned_spending_withdrawal(
                 &grown_buckets,
                 total_expenses,
-                essential_expenses,
                 income,
                 &plan.tax,
                 age,
@@ -803,11 +794,6 @@ mod tests {
                 contribution_growth_rate: 0.0,
                 glide_path: None,
             },
-            withdrawal: WithdrawalConfig {
-                safe_withdrawal_rate: 0.04,
-                strategy: WithdrawalPolicy::PlannedSpending,
-                guardrails: None,
-            },
             tax: None,
             currency: "EUR".to_string(),
         }
@@ -827,63 +813,6 @@ mod tests {
         assert!(
             value > 12_000.0,
             "monthly deposits should not be treated as one year-end lump sum"
-        );
-    }
-
-    #[test]
-    fn net_fire_target_no_streams() {
-        let p = base_plan();
-        // 3000 * 12 / 0.04 = 900_000
-        assert_eq!(
-            plan_net_fire_target(&p, p.personal.target_retirement_age),
-            900_000.0
-        );
-    }
-
-    #[test]
-    fn net_fire_target_with_early_stream() {
-        let mut p = base_plan();
-        // 1,200/mo pension starting at 55 (= FIRE age)
-        p.income_streams.push(RetirementIncomeStream {
-            id: "pension".into(),
-            label: "Pension".into(),
-            stream_type: StreamKind::DefinedBenefit,
-            start_age: 55,
-            adjust_for_inflation: false,
-            annual_growth_rate: None,
-            monthly_amount: Some(1_200.0),
-            linked_account_id: None,
-            current_value: None,
-            monthly_contribution: None,
-            accumulation_return: None,
-        });
-        // net monthly = 3000 - 1200 = 1800; target = 1800 * 12 / 0.04 = 540_000
-        assert_eq!(
-            plan_net_fire_target(&p, p.personal.target_retirement_age),
-            540_000.0
-        );
-    }
-
-    #[test]
-    fn net_fire_target_deferred_stream_not_subtracted() {
-        let mut p = base_plan();
-        // Pension starts at 67, FIRE at 55 -> should NOT reduce net target
-        p.income_streams.push(RetirementIncomeStream {
-            id: "inps".into(),
-            label: "INPS".into(),
-            stream_type: StreamKind::DefinedBenefit,
-            start_age: 67,
-            adjust_for_inflation: true,
-            annual_growth_rate: None,
-            monthly_amount: Some(1_000.0),
-            linked_account_id: None,
-            current_value: None,
-            monthly_contribution: None,
-            accumulation_return: None,
-        });
-        assert_eq!(
-            plan_net_fire_target(&p, p.personal.target_retirement_age),
-            900_000.0
         );
     }
 
@@ -918,35 +847,6 @@ mod tests {
         assert!(
             low_return_target > high_return_target,
             "lower retirement return should require more capital: {low_return_target} <= {high_return_target}"
-        );
-    }
-
-    #[test]
-    fn required_capital_is_independent_of_withdrawal_strategy() {
-        let mut planned_spending = base_plan();
-        planned_spending.withdrawal.safe_withdrawal_rate = 0.035;
-
-        let mut constant_percentage = planned_spending.clone();
-        constant_percentage.withdrawal.strategy = WithdrawalPolicy::ConstantPercentage;
-
-        let mut guardrails = planned_spending.clone();
-        guardrails.withdrawal.strategy = WithdrawalPolicy::Guardrails;
-
-        let age = planned_spending.personal.target_retirement_age;
-        let planned_spending_target =
-            compute_required_capital(&planned_spending, age).expect("target should be reachable");
-        let constant_percentage_target = compute_required_capital(&constant_percentage, age)
-            .expect("target should be reachable");
-        let guardrails_target =
-            compute_required_capital(&guardrails, age).expect("target should be reachable");
-
-        assert!(
-            (planned_spending_target - constant_percentage_target).abs() < 0.01,
-            "target sizing should not change for Constant %: {planned_spending_target} vs {constant_percentage_target}"
-        );
-        assert!(
-            (planned_spending_target - guardrails_target).abs() < 0.01,
-            "target sizing should not change for Guardrails: {planned_spending_target} vs {guardrails_target}"
         );
     }
 
@@ -1039,19 +939,13 @@ mod tests {
             monthly_contribution: None,
             accumulation_return: None,
         });
-        // At age 50: pension not available -> full target
-        let target_at_50 = plan_net_fire_target(&p, 50);
-        // At age 60: pension available -> reduced target
-        let target_at_60 = plan_net_fire_target(&p, 60);
+        let target_at_50 = compute_required_capital(&p, 50).expect("target should be reachable");
+        let target_at_60 = compute_required_capital(&p, 60).expect("target should be reachable");
         assert!(
             target_at_50 > target_at_60,
             "target at 50 ({}) should be larger than at 60 ({}) because pension is not yet available",
             target_at_50, target_at_60,
         );
-        // At 50, no income streams -> full gross target
-        assert_eq!(target_at_50, 900_000.0);
-        // At 60, 1200/mo pension -> net monthly = 3000 - 1200 = 1800 -> 540_000
-        assert_eq!(target_at_60, 540_000.0);
     }
 
     #[test]
@@ -1071,9 +965,9 @@ mod tests {
             accumulation_return: Some(0.04),
         };
         // Retiring at 50: contributions stop at 50, 15 years of growth-only until 65
-        let payouts_at_50 = resolve_plan_dc_payouts(&[dc.clone()], 35, 50, 0.04, 0.04);
+        let payouts_at_50 = resolve_plan_dc_payouts(&[dc.clone()], 35, 50, 0.04);
         // Retiring at 55: contributions until 55, 10 years of growth-only until 65
-        let payouts_at_55 = resolve_plan_dc_payouts(&[dc], 35, 55, 0.04, 0.04);
+        let payouts_at_55 = resolve_plan_dc_payouts(&[dc], 35, 55, 0.04);
         let payout_50 = payouts_at_50.get("dc").unwrap();
         let payout_55 = payouts_at_55.get("dc").unwrap();
         // Longer contribution period -> higher payout
@@ -1101,10 +995,34 @@ mod tests {
             accumulation_return: None,
         };
 
-        let low = resolve_plan_dc_payouts(&[dc.clone()], 45, 65, 0.04, 0.02);
-        let high = resolve_plan_dc_payouts(&[dc], 45, 65, 0.04, 0.06);
+        let low = resolve_plan_dc_payouts(&[dc.clone()], 45, 65, 0.02);
+        let high = resolve_plan_dc_payouts(&[dc], 45, 65, 0.06);
 
         assert!(high.get("dc").unwrap() > low.get("dc").unwrap());
+    }
+
+    #[test]
+    fn dc_payout_without_monthly_amount_uses_estimate_rate() {
+        let dc = RetirementIncomeStream {
+            id: "dc".into(),
+            label: "RRSP".into(),
+            stream_type: StreamKind::DefinedContribution,
+            start_age: 65,
+            adjust_for_inflation: false,
+            annual_growth_rate: None,
+            monthly_amount: None,
+            linked_account_id: None,
+            current_value: Some(120_000.0),
+            monthly_contribution: None,
+            accumulation_return: Some(0.0),
+        };
+
+        let payouts = resolve_plan_dc_payouts(&[dc], 65, 65, 0.04);
+
+        assert!(
+            (payouts.get("dc").copied().unwrap() - 350.0).abs() < 0.01,
+            "120k fund should estimate 3.5%/yr / 12 as monthly payout"
+        );
     }
 
     #[test]
@@ -1123,9 +1041,46 @@ mod tests {
             accumulation_return: Some(0.04),
         };
 
-        let payouts = resolve_plan_dc_payouts(&[dc], 65, 65, 0.04, 0.04);
+        let payouts = resolve_plan_dc_payouts(&[dc], 65, 65, 0.04);
 
         assert_eq!(payouts.get("dc").copied(), Some(1_250.0));
+    }
+
+    #[test]
+    fn pension_assets_stop_showing_once_dc_payout_starts() {
+        let mut plan = base_plan();
+        plan.personal.current_age = 63;
+        plan.personal.target_retirement_age = 65;
+        plan.personal.planning_horizon_age = 68;
+        plan.investment.monthly_contribution = 0.0;
+        plan.income_streams.push(RetirementIncomeStream {
+            id: "dc".into(),
+            label: "RRSP".into(),
+            stream_type: StreamKind::DefinedContribution,
+            start_age: 65,
+            adjust_for_inflation: false,
+            annual_growth_rate: None,
+            monthly_amount: None,
+            linked_account_id: None,
+            current_value: Some(100_000.0),
+            monthly_contribution: Some(500.0),
+            accumulation_return: Some(0.04),
+        });
+
+        let projection = project_retirement(&plan, 500_000.0);
+        let age_64 = projection
+            .year_by_year
+            .iter()
+            .find(|snapshot| snapshot.age == 64)
+            .expect("age 64 snapshot should exist");
+        let age_65 = projection
+            .year_by_year
+            .iter()
+            .find(|snapshot| snapshot.age == 65)
+            .expect("age 65 snapshot should exist");
+
+        assert!(age_64.pension_assets > 0.0);
+        assert_eq!(age_65.pension_assets, 0.0);
     }
 
     #[test]
@@ -1147,13 +1102,10 @@ mod tests {
             monthly_contribution: None,
             accumulation_return: None,
         });
-        // At target age 60, net target = (3000-2000)*12/0.04 = 300_000
-        let target_at_60 = plan_net_fire_target(&p, 60);
-        assert_eq!(target_at_60, 300_000.0);
-        // At age 35 (current), net target = 3000*12/0.04 = 900_000 (no pension yet)
-        let target_at_35 = plan_net_fire_target(&p, 35);
-        assert_eq!(target_at_35, 900_000.0);
-        // With 500k portfolio: should NOT reach FI at 35 (needs 900k), but would at 60 (needs 300k)
+        let target_at_60 = compute_required_capital(&p, 60).expect("target should be reachable");
+        let target_at_35 = compute_required_capital(&p, 35).expect("target should be reachable");
+        assert!(target_at_35 > target_at_60);
+        // With 500k portfolio: should NOT reach FI at 35, but should eventually reach FI.
         let proj = project_retirement(&p, 500_000.0);
         assert!(proj.fire_age.is_some(), "should eventually reach FIRE");
         assert!(
@@ -1308,10 +1260,8 @@ mod tests {
             end_age: Some(60),
             essential: None,
         });
-        // At age 55: housing active -> included in target
-        let target_55 = plan_net_fire_target(&p, 55);
-        // At age 65: housing ended -> excluded from target
-        let target_65 = plan_net_fire_target(&p, 65);
+        let target_55 = compute_required_capital(&p, 55).expect("target should be reachable");
+        let target_65 = compute_required_capital(&p, 65).expect("target should be reachable");
         // Target at 55 should be higher because housing is active
         assert!(
             target_55 > target_65,
@@ -1319,10 +1269,6 @@ mod tests {
             target_55,
             target_65,
         );
-        // At 55: (3000 + 1500) * 12 / 0.04 = 1_350_000
-        assert_eq!(target_55, 1_350_000.0);
-        // At 65: 3000 * 12 / 0.04 = 900_000
-        assert_eq!(target_65, 900_000.0);
     }
 
     #[test]

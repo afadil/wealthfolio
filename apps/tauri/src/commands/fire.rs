@@ -11,11 +11,11 @@ use wealthfolio_core::planning::retirement::{
 use wealthfolio_core::portfolio::fire::{
     project_retirement_with_mode, run_decision_sensitivity_matrix_with_mode,
     run_monte_carlo_with_mode_and_seed, run_scenario_analysis_with_mode, run_sorr,
-    run_strategy_comparison_with_mode, run_stress_tests_with_mode,
+    run_stress_tests_with_mode,
 };
 use wealthfolio_core::portfolio::fire::{
     DecisionSensitivityMap, DecisionSensitivityMatrix, FireProjection, MonteCarloResult,
-    ScenarioResult, SorrScenario, StrategyComparisonResult, StressTestResult,
+    ScenarioResult, SorrScenario, StressTestResult,
 };
 
 const MAX_SIMS: u32 = 500_000;
@@ -215,25 +215,5 @@ pub async fn run_retirement_decision_sensitivity_map(
         current_portfolio,
         planner_mode,
         map,
-    ))
-}
-
-#[tauri::command]
-pub async fn run_retirement_strategy_comparison(
-    plan: RetirementPlan,
-    current_portfolio: f64,
-    n_sims: Option<u32>,
-    goal_id: Option<String>,
-    planner_mode: Option<RetirementTimingMode>,
-    state: State<'_, Arc<ServiceContext>>,
-) -> Result<StrategyComparisonResult, String> {
-    let n = normalize_sim_count(n_sims);
-    let (plan, current_portfolio, planner_mode) =
-        resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_strategy_comparison_with_mode(
-        &plan,
-        current_portfolio,
-        n,
-        planner_mode,
     ))
 }

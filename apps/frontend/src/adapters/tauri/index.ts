@@ -211,5 +211,4 @@ export {
   runRetirementScenarioAnalysis,
   runRetirementSorr,
   runRetirementStressTests,
-  runRetirementStrategyComparison,
 } from "./fire-planner";
