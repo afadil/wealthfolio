@@ -938,9 +938,9 @@ function ProjectionTooltip({
 }
 
 const COLORS = {
-  optimistic: { fill: "hsl(38, 75%, 50%)", opacity: 0.1, stroke: "hsl(38, 75%, 50%)" },
-  nominal: { fill: "hsl(38, 75%, 50%)", opacity: 0.2, stroke: "hsl(38, 75%, 50%)" },
-  pessimistic: { fill: "hsl(38, 60%, 60%)", opacity: 0.12, stroke: "hsl(38, 60%, 55%)" },
+  optimistic: { fill: "hsl(92, 24%, 70%)", opacity: 0.1, stroke: "hsl(91, 38%, 36%)" },
+  nominal: { fill: "hsl(92, 24%, 70%)", opacity: 0.2, stroke: "hsl(91, 43%, 29%)" },
+  pessimistic: { fill: "hsl(92, 18%, 74%)", opacity: 0.12, stroke: "hsl(91, 24%, 46%)" },
   target: "hsl(var(--muted-foreground))",
 };
 
