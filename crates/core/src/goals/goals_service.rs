@@ -412,6 +412,22 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             .into());
         }
         validate_goal_lifecycle(&updated_goal_data.status_lifecycle)?;
+        if updated_goal_data.goal_type == "retirement"
+            && updated_goal_data.status_lifecycle != GOAL_LIFECYCLE_ARCHIVED
+        {
+            let goals = self.goal_repo.load_goals()?;
+            let existing_retirement = goals.iter().any(|g| {
+                g.id != updated_goal_data.id
+                    && g.goal_type == "retirement"
+                    && g.status_lifecycle != GOAL_LIFECYCLE_ARCHIVED
+            });
+            if existing_retirement {
+                return Err(crate::errors::ValidationError::InvalidInput(
+                    "Only one active retirement goal is allowed".to_string(),
+                )
+                .into());
+            }
+        }
         self.goal_repo.update_goal(updated_goal_data).await
     }
 
@@ -583,8 +599,13 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         let is_retirement = goal.goal_type == "retirement";
 
         let current_value = compute_summary_current_value(&goal, &rules, valuations);
+        let has_retirement_plan = if is_retirement {
+            self.goal_repo.load_goal_plan(goal_id)?.is_some()
+        } else {
+            false
+        };
 
-        let retirement_summary = if is_retirement {
+        let retirement_summary = if has_retirement_plan {
             let prepared = self.prepare_retirement_input(goal_id, valuations)?;
             let overview = compute_retirement_overview_with_mode(
                 &prepared.plan,
@@ -614,10 +635,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
 
         // Determine target
         let target = if is_retirement {
-            retirement_summary
-                .as_ref()
-                .and_then(|(target, _, _, _)| *target)
-                .or(goal.summary_target_amount)
+            if has_retirement_plan {
+                retirement_summary
+                    .as_ref()
+                    .and_then(|(target, _, _, _)| *target)
+                    .or(goal.summary_target_amount)
+            } else {
+                None
+            }
         } else {
             goal.target_amount.or(goal.summary_target_amount)
         };
@@ -627,10 +652,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             _ => None,
         };
 
-        let projected_value_at_target_date = retirement_summary
-            .as_ref()
-            .map(|(_, _, projected, _)| *projected)
-            .or(goal.projected_value_at_target_date);
+        let projected_value_at_target_date = if is_retirement && !has_retirement_plan {
+            None
+        } else {
+            retirement_summary
+                .as_ref()
+                .map(|(_, _, projected, _)| *projected)
+                .or(goal.projected_value_at_target_date)
+        };
 
         let health = if goal.status_lifecycle == GOAL_LIFECYCLE_ACHIEVED {
             "on_track".to_string()
@@ -660,10 +689,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             summary_target_amount: target,
             summary_current_value: Some(current_value),
             summary_progress: progress,
-            projected_completion_date: retirement_summary
-                .as_ref()
-                .and_then(|(_, date, _, _)| date.clone())
-                .or(goal.projected_completion_date.clone()),
+            projected_completion_date: if is_retirement && !has_retirement_plan {
+                None
+            } else {
+                retirement_summary
+                    .as_ref()
+                    .and_then(|(_, date, _, _)| date.clone())
+                    .or(goal.projected_completion_date.clone())
+            },
             projected_value_at_target_date,
             status_health: health,
         };
@@ -740,9 +773,13 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::accounts::{AccountUpdate, NewAccount};
     use crate::goals::goals_model::GoalFundingRule;
+    use crate::goals::{GoalRepositoryTrait, GoalServiceTrait};
     use crate::planning::retirement::*;
+    use async_trait::async_trait;
     use chrono::NaiveDateTime;
+    use std::sync::Mutex;
 
     fn test_account(id: &str, account_type: &str) -> Account {
         Account {
@@ -833,6 +870,321 @@ mod tests {
             },
             tax: None,
             currency: "USD".into(),
+        }
+    }
+
+    fn retirement_goal(id: &str, status_lifecycle: &str) -> Goal {
+        Goal {
+            id: id.into(),
+            goal_type: "retirement".into(),
+            title: "Retirement".into(),
+            description: None,
+            target_amount: None,
+            status_lifecycle: status_lifecycle.into(),
+            status_health: "not_applicable".into(),
+            priority: 0,
+            cover_image_key: None,
+            currency: Some("USD".into()),
+            start_date: None,
+            target_date: None,
+            summary_current_value: None,
+            summary_progress: None,
+            projected_completion_date: None,
+            projected_value_at_target_date: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+            summary_target_amount: None,
+        }
+    }
+
+    fn not_found(id: &str) -> crate::errors::Error {
+        crate::errors::DatabaseError::NotFound(id.to_string()).into()
+    }
+
+    #[derive(Default)]
+    struct MockGoalRepository {
+        goals: Mutex<HashMap<String, Goal>>,
+        funding_rules: Mutex<HashMap<String, Vec<GoalFundingRule>>>,
+        plans: Mutex<HashMap<String, GoalPlan>>,
+    }
+
+    impl MockGoalRepository {
+        fn new(goals: Vec<Goal>) -> Self {
+            Self {
+                goals: Mutex::new(goals.into_iter().map(|g| (g.id.clone(), g)).collect()),
+                funding_rules: Mutex::new(HashMap::new()),
+                plans: Mutex::new(HashMap::new()),
+            }
+        }
+
+        fn set_funding_rules(&self, goal_id: &str, rules: Vec<GoalFundingRule>) {
+            self.funding_rules
+                .lock()
+                .unwrap()
+                .insert(goal_id.to_string(), rules);
+        }
+    }
+
+    #[async_trait]
+    impl GoalRepositoryTrait for MockGoalRepository {
+        fn load_goals(&self) -> Result<Vec<Goal>> {
+            Ok(self.goals.lock().unwrap().values().cloned().collect())
+        }
+
+        fn load_goal(&self, goal_id: &str) -> Result<Goal> {
+            self.goals
+                .lock()
+                .unwrap()
+                .get(goal_id)
+                .cloned()
+                .ok_or_else(|| not_found(goal_id))
+        }
+
+        async fn insert_new_goal(&self, new_goal: NewGoal) -> Result<Goal> {
+            let goal = Goal {
+                id: new_goal.id.unwrap_or_else(|| "new-goal".to_string()),
+                goal_type: new_goal.goal_type,
+                title: new_goal.title,
+                description: new_goal.description,
+                target_amount: new_goal.target_amount,
+                status_lifecycle: new_goal
+                    .status_lifecycle
+                    .unwrap_or_else(|| GOAL_LIFECYCLE_ACTIVE.to_string()),
+                status_health: new_goal
+                    .status_health
+                    .unwrap_or_else(|| "not_applicable".to_string()),
+                priority: new_goal.priority.unwrap_or(0),
+                cover_image_key: new_goal.cover_image_key,
+                currency: new_goal.currency,
+                start_date: new_goal.start_date,
+                target_date: new_goal.target_date,
+                summary_current_value: None,
+                summary_progress: None,
+                projected_completion_date: None,
+                projected_value_at_target_date: None,
+                created_at: new_goal.created_at.unwrap_or_default(),
+                updated_at: new_goal.updated_at.unwrap_or_default(),
+                summary_target_amount: None,
+            };
+            self.goals
+                .lock()
+                .unwrap()
+                .insert(goal.id.clone(), goal.clone());
+            Ok(goal)
+        }
+
+        async fn insert_goal_with_funding(
+            &self,
+            new_goal: NewGoal,
+            funding_rules: Vec<GoalFundingRuleInput>,
+        ) -> Result<Goal> {
+            let goal = self.insert_new_goal(new_goal).await?;
+            self.save_goal_funding(&goal.id, funding_rules).await?;
+            Ok(goal)
+        }
+
+        async fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
+            self.goals
+                .lock()
+                .unwrap()
+                .insert(goal_update.id.clone(), goal_update.clone());
+            Ok(goal_update)
+        }
+
+        async fn delete_goal(&self, goal_id_to_delete: String) -> Result<usize> {
+            Ok(self
+                .goals
+                .lock()
+                .unwrap()
+                .remove(&goal_id_to_delete)
+                .map(|_| 1)
+                .unwrap_or(0))
+        }
+
+        fn load_funding_rules(&self, goal_id: &str) -> Result<Vec<GoalFundingRule>> {
+            Ok(self
+                .funding_rules
+                .lock()
+                .unwrap()
+                .get(goal_id)
+                .cloned()
+                .unwrap_or_default())
+        }
+
+        fn load_participating_funding_rules(&self) -> Result<Vec<GoalFundingRule>> {
+            let goals = self.goals.lock().unwrap();
+            let funding_rules = self.funding_rules.lock().unwrap();
+            Ok(funding_rules
+                .iter()
+                .filter(|(goal_id, _)| {
+                    goals
+                        .get(*goal_id)
+                        .map(|g| g.status_lifecycle == GOAL_LIFECYCLE_ACTIVE)
+                        .unwrap_or(false)
+                })
+                .flat_map(|(_, rules)| rules.clone())
+                .collect())
+        }
+
+        async fn save_goal_funding(
+            &self,
+            goal_id: &str,
+            rules: Vec<GoalFundingRuleInput>,
+        ) -> Result<Vec<GoalFundingRule>> {
+            let saved: Vec<GoalFundingRule> = rules
+                .into_iter()
+                .enumerate()
+                .map(|(idx, rule)| GoalFundingRule {
+                    id: format!("{goal_id}-{idx}"),
+                    goal_id: goal_id.to_string(),
+                    account_id: rule.account_id,
+                    share_percent: rule.share_percent,
+                    tax_bucket: rule.tax_bucket,
+                    created_at: String::new(),
+                    updated_at: String::new(),
+                })
+                .collect();
+            self.set_funding_rules(goal_id, saved.clone());
+            Ok(saved)
+        }
+
+        fn load_goal_plan(&self, goal_id: &str) -> Result<Option<GoalPlan>> {
+            Ok(self.plans.lock().unwrap().get(goal_id).cloned())
+        }
+
+        async fn save_goal_plan(&self, plan: SaveGoalPlan) -> Result<GoalPlan> {
+            let saved = GoalPlan {
+                goal_id: plan.goal_id,
+                plan_kind: plan.plan_kind,
+                planner_mode: plan.planner_mode,
+                settings_json: plan.settings_json,
+                summary_json: plan.summary_json.unwrap_or_else(|| "{}".to_string()),
+                version: 1,
+                created_at: String::new(),
+                updated_at: String::new(),
+            };
+            self.plans
+                .lock()
+                .unwrap()
+                .insert(saved.goal_id.clone(), saved.clone());
+            Ok(saved)
+        }
+
+        async fn delete_goal_plan(&self, goal_id: &str) -> Result<usize> {
+            Ok(self
+                .plans
+                .lock()
+                .unwrap()
+                .remove(goal_id)
+                .map(|_| 1)
+                .unwrap_or(0))
+        }
+
+        async fn update_goal_summary_fields(
+            &self,
+            goal_id: &str,
+            update: GoalSummaryUpdate,
+        ) -> Result<()> {
+            let mut goals = self.goals.lock().unwrap();
+            let goal = goals.get_mut(goal_id).ok_or_else(|| not_found(goal_id))?;
+            goal.summary_target_amount = update.summary_target_amount;
+            goal.summary_current_value = update.summary_current_value;
+            goal.summary_progress = update.summary_progress;
+            goal.projected_completion_date = update.projected_completion_date;
+            goal.projected_value_at_target_date = update.projected_value_at_target_date;
+            goal.status_health = update.status_health;
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct MockAccountService {
+        accounts: Mutex<Vec<Account>>,
+    }
+
+    #[async_trait]
+    impl AccountServiceTrait for MockAccountService {
+        async fn create_account(&self, _new_account: NewAccount) -> Result<Account> {
+            unimplemented!("not needed in goals service tests")
+        }
+
+        async fn update_account(&self, _account_update: AccountUpdate) -> Result<Account> {
+            unimplemented!("not needed in goals service tests")
+        }
+
+        async fn delete_account(&self, _account_id: &str) -> Result<()> {
+            unimplemented!("not needed in goals service tests")
+        }
+
+        fn get_account(&self, account_id: &str) -> Result<Account> {
+            self.accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|account| account.id == account_id)
+                .cloned()
+                .ok_or_else(|| not_found(account_id))
+        }
+
+        fn list_accounts(
+            &self,
+            _is_active_filter: Option<bool>,
+            _is_archived_filter: Option<bool>,
+            _account_ids: Option<&[String]>,
+        ) -> Result<Vec<Account>> {
+            Ok(self.accounts.lock().unwrap().clone())
+        }
+
+        fn get_all_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self.accounts.lock().unwrap().clone())
+        }
+
+        fn get_active_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self
+                .accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|account| account.is_active)
+                .cloned()
+                .collect())
+        }
+
+        fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>> {
+            Ok(self
+                .accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|account| account_ids.contains(&account.id))
+                .cloned()
+                .collect())
+        }
+
+        fn get_non_archived_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self
+                .accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|account| !account.is_archived)
+                .cloned()
+                .collect())
+        }
+
+        fn get_active_non_archived_accounts(&self) -> Result<Vec<Account>> {
+            Ok(self
+                .accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|account| account.is_active && !account.is_archived)
+                .cloned()
+                .collect())
+        }
+
+        fn get_base_currency(&self) -> Option<String> {
+            Some("USD".to_string())
         }
     }
 
@@ -1031,6 +1383,56 @@ mod tests {
         assert_eq!(shares_by_account.get("acct-3"), Some(&20.0));
         assert!(!shares_by_account.contains_key("acct-2"));
         assert!(!shares_by_account.contains_key("acct-4"));
+    }
+
+    #[tokio::test]
+    async fn update_goal_rejects_unarchiving_retirement_when_another_exists() {
+        let archived_goal = retirement_goal("old-retirement", GOAL_LIFECYCLE_ARCHIVED);
+        let active_goal = retirement_goal("new-retirement", GOAL_LIFECYCLE_ACTIVE);
+        let repo = Arc::new(MockGoalRepository::new(vec![
+            archived_goal.clone(),
+            active_goal,
+        ]));
+        let service = GoalService::new(repo, Arc::new(MockAccountService::default()));
+
+        let mut updated = archived_goal;
+        updated.status_lifecycle = GOAL_LIFECYCLE_ACTIVE.to_string();
+
+        let err = service
+            .update_goal(updated)
+            .await
+            .expect_err("unarchiving a second retirement goal should fail");
+
+        assert!(err
+            .to_string()
+            .contains("Only one active retirement goal is allowed"));
+    }
+
+    #[tokio::test]
+    async fn refresh_retirement_summary_without_plan_updates_current_value_only() {
+        let mut goal = retirement_goal("goal-1", GOAL_LIFECYCLE_ACTIVE);
+        goal.summary_target_amount = Some(500_000.0);
+        goal.summary_progress = Some(0.2);
+        goal.projected_completion_date = Some("2045-01-01".to_string());
+        goal.projected_value_at_target_date = Some(750_000.0);
+        goal.status_health = "on_track".to_string();
+
+        let repo = Arc::new(MockGoalRepository::new(vec![goal]));
+        repo.set_funding_rules("goal-1", vec![share_rule("goal-1", "acct-1", 50.0)]);
+        let service = GoalService::new(repo, Arc::new(MockAccountService::default()));
+        let valuations = HashMap::from([("acct-1".to_string(), 80_000.0)]);
+
+        let refreshed = service
+            .refresh_goal_summary("goal-1", &valuations)
+            .await
+            .expect("refresh should not require a saved retirement plan");
+
+        assert_eq!(refreshed.summary_current_value, Some(40_000.0));
+        assert_eq!(refreshed.summary_target_amount, None);
+        assert_eq!(refreshed.summary_progress, None);
+        assert_eq!(refreshed.projected_completion_date, None);
+        assert_eq!(refreshed.projected_value_at_target_date, None);
+        assert_eq!(refreshed.status_health, "not_applicable");
     }
 
     #[test]

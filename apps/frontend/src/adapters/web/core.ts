@@ -61,9 +61,19 @@ export const COMMANDS: CommandMap = {
   get_income_summary: { method: "GET", path: "/income/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
+  get_goal: { method: "GET", path: "/goals" },
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
+  get_goal_funding: { method: "GET", path: "/goals" },
+  save_goal_funding: { method: "PUT", path: "/goals" },
+  get_goal_plan: { method: "GET", path: "/goals" },
+  save_goal_plan: { method: "POST", path: "/goals/plan" },
+  delete_goal_plan: { method: "DELETE", path: "/goals" },
+  refresh_goal_summary: { method: "POST", path: "/goals" },
+  refresh_all_goal_summaries: { method: "POST", path: "/goals/refresh-summaries" },
+  get_retirement_overview: { method: "GET", path: "/goals" },
+  get_save_up_overview: { method: "GET", path: "/goals" },
   // Retirement plan simulations
   calculate_retirement_projection: { method: "POST", path: "/retirement/projection" },
   run_retirement_monte_carlo: { method: "POST", path: "/retirement/monte-carlo" },
@@ -538,9 +548,47 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       }
       break;
     }
+    case "get_goal":
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
+      break;
+    }
+    case "get_goal_funding": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      break;
+    }
+    case "save_goal_funding": {
+      const { goalId, rules } = payload as { goalId: string; rules: unknown[] };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      body = JSON.stringify(rules);
+      break;
+    }
+    case "get_goal_plan":
+    case "delete_goal_plan": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/plan`;
+      break;
+    }
+    case "save_goal_plan": {
+      const { plan } = payload as { plan: Record<string, unknown> };
+      body = JSON.stringify(plan);
+      break;
+    }
+    case "refresh_goal_summary": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/refresh-summary`;
+      break;
+    }
+    case "get_retirement_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/retirement-overview`;
+      break;
+    }
+    case "get_save_up_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/save-up-overview`;
       break;
     }
     // Retirement plan simulation commands

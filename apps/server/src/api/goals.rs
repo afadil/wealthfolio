@@ -9,7 +9,7 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use rust_decimal::prelude::ToPrimitive;
@@ -136,6 +136,39 @@ async fn delete_goal_plan(
 ) -> ApiResult<StatusCode> {
     let _ = state.goal_service.delete_goal_plan(&id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn refresh_goal_summary(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Goal>> {
+    let valuation_map = build_valuation_map(&state).await?;
+    let goal = state
+        .goal_service
+        .refresh_goal_summary(&id, &valuation_map)
+        .await?;
+    Ok(Json(goal))
+}
+
+async fn refresh_all_goal_summaries(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<Goal>>> {
+    let goals = state.goal_service.get_goals()?;
+    let valuation_map = build_valuation_map(&state).await?;
+    let mut refreshed = Vec::new();
+
+    for goal in goals.iter().filter(|g| g.status_lifecycle == "active") {
+        match state
+            .goal_service
+            .refresh_goal_summary(&goal.id, &valuation_map)
+            .await
+        {
+            Ok(updated) => refreshed.push(updated),
+            Err(err) => tracing::debug!("Failed to refresh goal {}: {}", goal.id, err),
+        }
+    }
+
+    Ok(Json(refreshed))
 }
 
 /// Build account_id → base-currency value map from latest valuations.
@@ -403,12 +436,14 @@ pub fn router() -> Router<Arc<AppState>> {
             "/goals/{id}/plan",
             get(get_goal_plan).delete(delete_goal_plan),
         )
+        .route("/goals/{id}/refresh-summary", post(refresh_goal_summary))
+        .route("/goals/refresh-summaries", post(refresh_all_goal_summaries))
         .route(
             "/goals/{id}/retirement-overview",
             get(get_retirement_overview),
         )
         .route("/goals/{id}/save-up-overview", get(get_save_up_overview))
-        .route("/goals/plan", axum::routing::post(save_goal_plan))
+        .route("/goals/plan", post(save_goal_plan))
         // RetirementPlan-based simulation endpoints
         .route(
             "/retirement/projection",
