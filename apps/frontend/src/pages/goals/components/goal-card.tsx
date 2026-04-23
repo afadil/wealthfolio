@@ -7,10 +7,10 @@ import { Link } from "react-router-dom";
 const DEFAULT_QUOTES: Record<string, string> = {
   car: "for the road ahead",
   home: "a place to come home to",
-  education: "what they will become",
+  education: "for learning ahead",
   retirement: "the long slow afternoon",
   wedding: "the day to remember",
-  custom_save_up: "a quiet placeholder",
+  custom_save_up: "a little by a little",
 };
 
 function coverImageSrc(goalType: string): string {
