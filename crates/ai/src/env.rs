@@ -96,7 +96,7 @@ pub mod test_env {
         errors::DatabaseError,
         goals::{
             AccountValuationMap, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
-            GoalServiceTrait, NewGoal, SaveGoalPlan,
+            GoalServiceTrait, NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
         },
         health::{
             checks::{
@@ -106,7 +106,9 @@ pub mod test_env {
             FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
         },
         holdings::{Holding, HoldingsServiceTrait},
+        planning::SaveUpOverview,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
+        portfolio::fire::RetirementOverview,
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
@@ -619,6 +621,37 @@ pub mod test_env {
             _valuations: &AccountValuationMap,
         ) -> CoreResult<Goal> {
             unimplemented!("MockGoalService::refresh_goal_summary")
+        }
+
+        async fn compute_retirement_overview(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<RetirementOverview> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::compute_retirement_overview is not implemented".to_string(),
+            ))
+        }
+
+        async fn prepare_retirement_simulation_input(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<PreparedRetirementSimulationInput> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::prepare_retirement_simulation_input is not implemented"
+                    .to_string(),
+            ))
+        }
+
+        async fn compute_save_up_overview(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<SaveUpOverview> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::compute_save_up_overview is not implemented".to_string(),
+            ))
         }
     }
 
