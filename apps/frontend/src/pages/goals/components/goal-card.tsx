@@ -1,134 +1,244 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { Goal } from "@/lib/types";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Progress } from "@wealthfolio/ui/components/ui/progress";
+import { Card, cn, formatAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 
-/** Cover image by convention: /goals/{goalType}.png */
+const DEFAULT_QUOTES: Record<string, string> = {
+  car: "for the road ahead",
+  home: "a place to come home to",
+  education: "what they will become",
+  retirement: "the long slow afternoon",
+  wedding: "the day to remember",
+  custom_save_up: "a quiet placeholder",
+};
+
 function coverImageSrc(goalType: string): string {
   return `/goals/${goalType}.png`;
 }
 
-const GOAL_TYPE_ICONS: Record<string, React.ReactNode> = {
-  retirement: <Icons.Target className="h-8 w-8" />,
-  education: <Icons.Briefcase className="h-8 w-8" />,
-  home: <Icons.Home className="h-8 w-8" />,
-  car: <Icons.Car className="h-8 w-8" />,
-  wedding: <Icons.Star className="h-8 w-8" />,
-  custom_save_up: <Icons.Wallet className="h-8 w-8" />,
-};
+function formatTimeLeft(targetDate?: string): string {
+  if (!targetDate) return "NO DEADLINE";
+  const target = new Date(targetDate);
+  const now = new Date();
+  if (!Number.isFinite(target.getTime())) return "NO DEADLINE";
+  if (target.getTime() <= now.getTime()) return "DUE";
+  let months =
+    (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+  if (target.getDate() < now.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years === 0) return `${remMonths}M LEFT`;
+  if (remMonths === 0) return `${years} YR${years === 1 ? "" : "S"} LEFT`;
+  return `${years}Y ${remMonths}M LEFT`;
+}
 
-const GOAL_TYPE_LABELS: Record<string, string> = {
-  retirement: "Retirement",
-  education: "Education",
-  home: "Home Purchase",
-  car: "Car Purchase",
-  wedding: "Wedding",
-  custom_save_up: "Savings Goal",
-};
+function formatTargetDate(targetDate?: string): string | null {
+  if (!targetDate) return null;
+  const d = new Date(targetDate);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d
+    .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    .toUpperCase();
+}
 
-const HEALTH_CONFIG: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" | "warning" }
-> = {
-  on_track: { label: "On Track", variant: "default" },
-  at_risk: { label: "At Risk", variant: "warning" },
-  off_track: { label: "Off Track", variant: "destructive" },
-  not_applicable: { label: "", variant: "outline" },
-};
+function formatCompact(value: number, currency: string): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    return formatAmount(Math.round((value / 1_000_000) * 100) / 100, currency).replace(
+      /([\d.]+)/,
+      (m) => `${Number(m).toFixed(2)}M`,
+    );
+  }
+  if (abs >= 1000) {
+    return formatAmount(Math.round((value / 1000) * 10) / 10, currency).replace(
+      /([\d.]+)/,
+      (m) => `${Number(m).toFixed(1)}K`,
+    );
+  }
+  return formatAmount(Math.round(value), currency);
+}
+
+function ProgressBar({ progress, fillClass }: { progress: number; fillClass: string }) {
+  const pct = Math.max(0, Math.min(1, progress));
+  return (
+    <div className="bg-muted/60 relative h-[5px] w-full overflow-hidden">
+      <div className={cn("h-full", fillClass)} style={{ width: `${pct * 100}%` }} />
+      <div className="pointer-events-none absolute inset-0 flex">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <div key={i} className="border-card flex-1 border-r last:border-r-0" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function GoalCard({ goal }: { goal: Goal }) {
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
-  const progress = goal.summaryProgress ?? 0;
-  const health = HEALTH_CONFIG[goal.statusHealth] ?? HEALTH_CONFIG.not_applicable;
-  const typeLabel = GOAL_TYPE_LABELS[goal.goalType] ?? "Goal";
-  const coverImage = coverImageSrc(goal.coverImageKey ?? goal.goalType);
-  const icon = GOAL_TYPE_ICONS[goal.goalType] ?? GOAL_TYPE_ICONS.custom_save_up;
-  const target = goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
-  const current = goal.summaryCurrentValue ?? 0;
+
   const currency = settings?.baseCurrency ?? goal.currency ?? "USD";
+  const current = goal.summaryCurrentValue ?? 0;
+  const target = goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
+  const progress = goal.summaryProgress ?? 0;
+  const rawQuote = goal.description?.trim() || DEFAULT_QUOTES[goal.goalType] || "";
+  const quote = rawQuote.length > 58 ? `${rawQuote.slice(0, 55).trimEnd()}…` : rawQuote;
+  const coverImage = coverImageSrc(goal.coverImageKey ?? goal.goalType);
+
+  const isOnTrack = goal.statusHealth === "on_track";
+  const isAtRisk = goal.statusHealth === "at_risk";
+  const isOffTrack = goal.statusHealth === "off_track";
   const isAchieved = goal.statusLifecycle === "achieved";
-  const displayDate = goal.targetDate ?? goal.projectedCompletionDate;
+
+  // Three health states drive the accent color:
+  //   positive  → success (green)
+  //   negative  → destructive (red)
+  //   unknown   → neutral (muted) — e.g. "not_applicable" from the backend
+  //               (no target set, no projection yet, brand-new goal)
+  const isPositive = isOnTrack || isAchieved;
+  const isNegative = isOffTrack || isAtRisk;
+  const accentClass = isPositive
+    ? "text-success"
+    : isNegative
+      ? "text-destructive"
+      : "text-muted-foreground";
+  const progressBarClass = isPositive
+    ? "bg-success"
+    : isNegative
+      ? "bg-destructive"
+      : "bg-muted-foreground/50";
+
+  // Only render the status pill for attention-worthy states.
+  let pill: { label: string; className: string } | null = null;
+  if (isAchieved) {
+    pill = {
+      label: "ACHIEVED",
+      className: "bg-success text-success-foreground",
+    };
+  } else if (isOffTrack) {
+    pill = {
+      label: "OFF TRACK",
+      className: "bg-destructive text-destructive-foreground",
+    };
+  } else if (isAtRisk) {
+    pill = {
+      label: "AT RISK",
+      className: "bg-destructive text-destructive-foreground",
+    };
+  }
+
+  const deadline = goal.targetDate ?? goal.projectedCompletionDate;
+  const targetDateStr = formatTargetDate(deadline);
+  const timeLeftStr = formatTimeLeft(deadline);
+
+  const remaining = Math.max(0, target - current);
+  const hasRemaining = target > 0 && remaining > 0;
+
+  const currentDisplay = isBalanceHidden ? "••••" : formatAmount(current, currency);
+  const targetDisplay = isBalanceHidden
+    ? "••••"
+    : target > 0
+      ? formatAmount(target, currency)
+      : "—";
+  const remainingDisplay = isBalanceHidden
+    ? "••••"
+    : hasRemaining
+      ? formatCompact(remaining, currency)
+      : "—";
+
+  const progressPct = (progress * 100).toFixed(1);
 
   return (
     <Link to={`/goals/${goal.id}`} className="group block">
-      <div className="border-border/60 bg-card hover:border-border shadow-xs relative overflow-hidden rounded-xl border transition-all hover:shadow-md">
-        {/* Cover area */}
-        <div className="relative h-36 overflow-hidden sm:h-40">
+      <Card className="overflow-hidden p-0 transition-shadow hover:shadow-md">
+        {/* Top cover image panel */}
+        <div className="bg-secondary/50 relative h-[156px] overflow-hidden">
           <img
             src={coverImage}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.06] dark:brightness-[0.78] dark:contrast-[1.08] dark:saturate-[0.9]"
+            style={{ objectPosition: "70% 50%" }}
             onError={(e) => {
-              // Fallback: hide broken image, show icon placeholder instead
-              e.currentTarget.parentElement!.classList.add("goal-cover-fallback");
               e.currentTarget.style.display = "none";
             }}
           />
-          {/* Fallback icon (visible only when image fails via .goal-cover-fallback) */}
-          <div className="bg-secondary/50 hidden h-full w-full items-center justify-center [.goal-cover-fallback>&]:flex">
-            <div className="text-muted-foreground/20 scale-150">{icon}</div>
-          </div>
 
-          {/* Bottom gradient for text legibility */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 via-40% to-transparent" />
+          {/* Dark-mode blend: softens bright image bg against the dark card */}
+          <div className="pointer-events-none absolute inset-0 hidden bg-black/30 mix-blend-multiply dark:block" />
 
-          {/* Title overlaid on image */}
-          <div className="absolute bottom-3 left-4 right-4">
-            <h3 className="truncate text-base font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
-              {goal.title}
-            </h3>
-            <p className="flex items-center gap-1.5 text-[11px] text-white/80 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]">
-              {typeLabel}
-              {displayDate && <> &middot; {new Date(displayDate).toLocaleDateString()}</>}
-            </p>
-          </div>
+          {/* Bottom gradient — quote legibility in both themes */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 via-black/20 via-60% to-transparent" />
 
-          {/* Status badges */}
-          <div className="absolute left-3 top-3 flex gap-1.5">
-            {isAchieved && (
-              <Badge className="border-0 bg-green-600/90 text-[10px] text-white backdrop-blur-sm">
-                Achieved
-              </Badge>
-            )}
-            {!isAchieved && health.label && (
-              <Badge variant={health.variant} className="border-0 text-[10px] backdrop-blur-sm">
-                {health.label}
-              </Badge>
-            )}
-          </div>
-        </div>
+          {/* Top-left status pill — only for attention-worthy states */}
+          {pill && (
+            <div
+              className={cn(
+                "absolute left-3 top-3 inline-flex h-5 items-center px-2 text-[9px] font-medium leading-none tracking-[0.14em] shadow-sm",
+                pill.className,
+              )}
+            >
+              {pill.label}
+            </div>
+          )}
 
-        {/* Content */}
-        <div className="space-y-2.5 px-4 pb-4 pt-3">
-          {/* Amounts row */}
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-base font-bold tabular-nums">
-              <AmountDisplay value={current} currency={currency} isHidden={isBalanceHidden} />
-            </span>
-            {target > 0 && (
-              <span className="text-muted-foreground text-[11px]">
-                of <AmountDisplay value={target} currency={currency} isHidden={isBalanceHidden} />
-              </span>
-            )}
-          </div>
-
-          {/* Progress */}
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-muted-foreground text-[11px]">Progress</span>
-              <span className="text-[11px] font-medium tabular-nums">
-                {formatPercent(progress)}
+          {/* Bottom-left italic quote */}
+          {quote && (
+            <div className="absolute bottom-2.5 left-3 right-3">
+              <span className="line-clamp-1 block font-serif text-[11px] italic text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                &ldquo;{quote}&rdquo;
               </span>
             </div>
-            <Progress value={Math.min(progress * 100, 100)} className="[&>div]:bg-success h-1.5" />
+          )}
+        </div>
+
+        {/* Bottom panel */}
+        <div className="px-4 pb-0 pt-3">
+          {/* Title + % */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-serif text-[19px] leading-tight">{goal.title}</h3>
+              <p className="text-muted-foreground mt-0.5 text-[9px] tracking-[0.15em]">
+                {targetDateStr ? `${targetDateStr} · ${timeLeftStr}` : timeLeftStr}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className={cn("font-serif text-[20px] leading-none", accentClass)}>
+                {progressPct}
+                <span className="text-[11px]">%</span>
+              </div>
+              <div className="text-muted-foreground mt-0.5 text-[9px] tracking-[0.15em]">
+                COMPLETE
+              </div>
+            </div>
+          </div>
+
+          {/* Amounts row: saved · remaining */}
+          <div className="mt-2.5 flex items-end justify-between gap-3">
+            <div>
+              <div className="font-serif text-[14px] font-semibold tabular-nums">
+                {currentDisplay}
+              </div>
+              <div className="text-muted-foreground mt-0.5 text-[10px]">
+                saved of <span className="tabular-nums">{targetDisplay}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-serif text-[14px] font-semibold tabular-nums">
+                {remainingDisplay}
+              </div>
+              <div className="text-muted-foreground mt-0.5 text-[10px]">
+                {hasRemaining ? "remaining" : "target met"}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="-mx-4 mt-2.5">
+            <ProgressBar progress={progress} fillClass={progressBarClass} />
           </div>
         </div>
-      </div>
+      </Card>
     </Link>
   );
 }

@@ -1,13 +1,77 @@
-import { Button, Page, PageContent, PageHeader, Skeleton } from "@wealthfolio/ui";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { useSettingsContext } from "@/lib/settings-provider";
+import type { Goal } from "@/lib/types";
+import {
+  Button,
+  Page,
+  PageContent,
+  PageHeader,
+  Skeleton,
+  formatAmount,
+  formatPercent,
+} from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Link } from "react-router-dom";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { GoalCard } from "./components/goal-card";
 import { useGoals } from "./hooks/use-goals";
 
-function GoalGrid({ goals }: { goals: ReturnType<typeof useGoals>["active"] }) {
+function compactCurrency(value: number, currency: string): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) {
+    return formatAmount(value, currency).replace(
+      /([\d.,]+)/,
+      () => `${(value / 1_000_000).toFixed(2)}M`,
+    );
+  }
+  if (abs >= 1_000) {
+    return formatAmount(value, currency).replace(
+      /([\d.,]+)/,
+      () => `${(value / 1_000).toFixed(1)}K`,
+    );
+  }
+  return formatAmount(Math.round(value), currency);
+}
+
+function StatBlock({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="flex items-baseline gap-2.5">
+      <span className="text-muted-foreground text-[10px] tracking-[0.15em]">{label}</span>
+      <span className="text-foreground font-serif text-[15px] font-semibold tabular-nums">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SummaryStats({ goals }: { goals: Goal[] }) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  const { settings } = useSettingsContext();
+  const currency = settings?.baseCurrency ?? goals[0]?.currency ?? "USD";
+
+  const saved = goals.reduce((s, g) => s + (g.summaryCurrentValue ?? 0), 0);
+  const target = goals.reduce((s, g) => s + (g.summaryTargetAmount ?? g.targetAmount ?? 0), 0);
+  const overall = target > 0 ? saved / target : 0;
+  const onTrackCount = goals.filter(
+    (g) => g.statusHealth === "on_track" || g.statusLifecycle === "achieved",
+  ).length;
+
+  const savedDisplay = isBalanceHidden ? "••••" : compactCurrency(saved, currency);
+  const targetDisplay = isBalanceHidden ? "••••" : compactCurrency(target, currency);
+
+  return (
+    <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+      <StatBlock label="SAVED" value={savedDisplay} />
+      <StatBlock label="TARGET" value={targetDisplay} />
+      <StatBlock label="OVERALL" value={formatPercent(overall)} />
+      <StatBlock label="ON TRACK" value={`${onTrackCount}/${goals.length}`} />
+    </div>
+  );
+}
+
+function GoalGrid({ goals }: { goals: Goal[] }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {goals.map((goal) => (
         <GoalCard key={goal.id} goal={goal} />
       ))}
@@ -24,7 +88,7 @@ export default function GoalsDashboardPage() {
       <Page>
         <PageHeader heading="Goals" text="Track and plan your financial goals" />
         <PageContent>
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-64 w-full rounded-xl" />
             ))}
@@ -34,14 +98,11 @@ export default function GoalsDashboardPage() {
     );
   }
 
-  // Merge all non-archived goals into one flat list
-  // Sort: priority DESC → nearest targetDate ASC (undated last) → createdAt ASC
+  // Merge all non-archived goals into one flat list, sorted by target amount DESC.
   const allActive = [...atRisk, ...active, ...achieved].sort((a, b) => {
-    const pDiff = (b.priority ?? 0) - (a.priority ?? 0);
-    if (pDiff !== 0) return pDiff;
-    const aDate = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
-    const bDate = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
-    if (aDate !== bDate) return aDate - bDate;
+    const aTarget = a.summaryTargetAmount ?? a.targetAmount ?? 0;
+    const bTarget = b.summaryTargetAmount ?? b.targetAmount ?? 0;
+    if (aTarget !== bTarget) return bTarget - aTarget;
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
   const hasGoals = allActive.length > 0 || archived.length > 0;
@@ -82,7 +143,12 @@ export default function GoalsDashboardPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            {allActive.length > 0 && <GoalGrid goals={allActive} />}
+            {allActive.length > 0 && (
+              <div>
+                <SummaryStats goals={allActive} />
+                <GoalGrid goals={allActive} />
+              </div>
+            )}
 
             {archived.length > 0 && (
               <section>
