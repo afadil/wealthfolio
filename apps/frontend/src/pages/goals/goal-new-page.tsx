@@ -28,8 +28,9 @@ import {
   inferBirthYearMonthFromAge,
 } from "@/features/goals/retirement-planner/lib/plan-adapter";
 
-const DEFAULT_RETIREMENT_CURRENT_AGE = 45;
-const DEFAULT_RETIREMENT_TARGET_AGE = 65;
+const DEFAULT_RETIREMENT_CURRENT_AGE = 30;
+const DEFAULT_TRADITIONAL_RETIREMENT_AGE = 65;
+const DEFAULT_FIRE_INDEPENDENCE_AGE = 50;
 const DEFAULT_RETIREMENT_BIRTH_YEAR_MONTH = inferBirthYearMonthFromAge(
   DEFAULT_RETIREMENT_CURRENT_AGE,
 );
@@ -110,7 +111,9 @@ export default function GoalNewPage() {
   const [retirementBirthYearMonth, setRetirementBirthYearMonth] = useState(
     DEFAULT_RETIREMENT_BIRTH_YEAR_MONTH,
   );
-  const [retirementTargetAge, setRetirementTargetAge] = useState(DEFAULT_RETIREMENT_TARGET_AGE);
+  const [retirementTargetAge, setRetirementTargetAge] = useState(
+    DEFAULT_TRADITIONAL_RETIREMENT_AGE,
+  );
 
   const retirementExists = hasRetirementGoal(goals);
   const template = GOAL_TEMPLATES.find((t) => t.type === selectedType);
@@ -129,6 +132,13 @@ export default function GoalNewPage() {
       ? "The age you would like work to become optional"
       : "The age you expect to stop working";
 
+  const setPlannerModeWithDefaultAge = (mode: PlannerMode) => {
+    const defaultAge =
+      mode === "fire" ? DEFAULT_FIRE_INDEPENDENCE_AGE : DEFAULT_TRADITIONAL_RETIREMENT_AGE;
+    setPlannerMode(mode);
+    setRetirementTargetAge(Math.max(retirementCurrentAge + 1, defaultAge));
+  };
+
   const handleSelectType = (type: GoalType) => {
     if (type === "retirement" && retirementExists) {
       toast.error(
@@ -145,7 +155,7 @@ export default function GoalNewPage() {
     setTargetAmount(nextTemplate.defaultTarget);
     setTargetDate("");
     setRetirementBirthYearMonth(DEFAULT_RETIREMENT_BIRTH_YEAR_MONTH);
-    setRetirementTargetAge(DEFAULT_RETIREMENT_TARGET_AGE);
+    setRetirementTargetAge(DEFAULT_TRADITIONAL_RETIREMENT_AGE);
   };
 
   const handleCreate = () => {
@@ -297,7 +307,7 @@ export default function GoalNewPage() {
                               ? "border-primary bg-primary/5"
                               : "border-border/60 hover:border-muted-foreground/60"
                           }`}
-                          onClick={() => setPlannerMode("traditional")}
+                          onClick={() => setPlannerModeWithDefaultAge("traditional")}
                         >
                           <p className="text-sm font-medium">Traditional</p>
                           <p className="text-muted-foreground text-xs">
@@ -311,7 +321,7 @@ export default function GoalNewPage() {
                               ? "border-primary bg-primary/5"
                               : "border-border/60 hover:border-muted-foreground/60"
                           }`}
-                          onClick={() => setPlannerMode("fire")}
+                          onClick={() => setPlannerModeWithDefaultAge("fire")}
                         >
                           <p className="text-sm font-medium">FIRE</p>
                           <p className="text-muted-foreground text-xs">
@@ -410,7 +420,7 @@ export default function GoalNewPage() {
                   setTargetDate("");
                   setPlannerMode("traditional");
                   setRetirementBirthYearMonth(DEFAULT_RETIREMENT_BIRTH_YEAR_MONTH);
-                  setRetirementTargetAge(DEFAULT_RETIREMENT_TARGET_AGE);
+                  setRetirementTargetAge(DEFAULT_TRADITIONAL_RETIREMENT_AGE);
                 }}
               >
                 Back
