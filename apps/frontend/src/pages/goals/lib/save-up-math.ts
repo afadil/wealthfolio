@@ -243,9 +243,15 @@ export function generateProjectionSeries(input: SaveUpInput): ProjectionPoint[] 
     }
   }
 
-  for (const [date, vals] of series) {
-    points.push({ date, ...vals, target: targetAmount });
-  }
+  // Required path: linear interpolation from currentAmount → targetAmount over the horizon.
+  // At each month, this is the balance needed to be "on schedule" to hit the target.
+  const orderedDates = Array.from(series.keys());
+  const span = Math.max(1, orderedDates.length - 1);
+  orderedDates.forEach((date, i) => {
+    const vals = series.get(date)!;
+    const required = currentAmount + (targetAmount - currentAmount) * (i / span);
+    points.push({ date, ...vals, target: required });
+  });
 
   return points;
 }
