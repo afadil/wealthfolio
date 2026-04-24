@@ -50,13 +50,14 @@ export default function GuidePage({ country }: { country?: string }) {
             today's money; inflation is handled by the plan assumptions.
           </Step>
           <Step n={3} title="Add retirement income">
-            In Retirement Income, add monthly income streams such as CPP, OAS, pension, part-time
-            work, or annuity income. Use Add pension fund only when the planner should estimate a
-            payout from a fund balance at 3.5%/yr unless you enter a monthly payout yourself.
+            In Retirement Income, add monthly income streams such as public pensions (e.g. CPP/OAS
+            in Canada, Social Security in the US), workplace pensions, part-time work, or annuity
+            income. Use Add pension fund only when the planner should estimate a payout from a fund
+            balance at 3.5%/yr unless you enter a monthly payout yourself.
           </Step>
           <Step n={4} title="Check assumptions, taxes, and account shares">
-            Review projected returns, fees, volatility, inflation, withdrawal tax rates, tax buckets,
-            and which accounts fund the goal.
+            Review projected returns, fees, volatility, inflation, withdrawal tax rates, tax
+            buckets, and which accounts fund the goal.
           </Step>
           <Step n={5} title="Read Overview, then open What If">
             Overview answers whether the base plan works and shows the trajectory, spending
@@ -80,8 +81,8 @@ export default function GuidePage({ country }: { country?: string }) {
           </Term>
           <Term t="Portfolio trajectory">
             The solid line shows what you are projected to have. The dashed line shows what the plan
-            is estimated to need over time. Use Today's value to read everything in today's money, or
-            Nominal to include future inflation.
+            is estimated to need over time. Use Today's value to read everything in today's money,
+            or Nominal to include future inflation.
           </Term>
           <Term t="Retirement spending coverage">
             Your planned monthly retirement spending broken down by funding source. Income streams
@@ -103,11 +104,11 @@ export default function GuidePage({ country }: { country?: string }) {
       <Section title="Understanding What If">
         <div className="space-y-4">
           <Term t="Market paths">
-            Tests the same plan across many possible market paths using your return, volatility,
-            and inflation assumptions. The shaded range shows bad-to-good outcomes; the line shows
-            the middle path. Money lasts means the plan covers essential spending and still has
-            money left through the planning horizon. In FIRE mode, the plan also needs to reach
-            financial independence first.
+            Tests the same plan across many possible market paths using your return, volatility, and
+            inflation assumptions. The shaded range shows bad-to-good outcomes; the line shows the
+            middle path. Money lasts means the plan covers essential spending and still has money
+            left through the planning horizon. In FIRE mode, the plan also needs to reach financial
+            independence first.
           </Term>
           <Term t="Base case">
             Shows the same deterministic base plan as Overview, then points to the largest stress
@@ -124,8 +125,8 @@ export default function GuidePage({ country }: { country?: string }) {
           </Term>
           <Term t="Early market crash paths">
             Compares a few crash-timing paths near retirement. A crash in the first retirement year
-            can hurt more than the same crash later because withdrawals happen while the portfolio is
-            down.
+            can hurt more than the same crash later because withdrawals happen while the portfolio
+            is down.
           </Term>
         </div>
       </Section>
@@ -172,7 +173,7 @@ export default function GuidePage({ country }: { country?: string }) {
               assumptions, fee drag, and monthly contribution here. It is the primary accumulation
               engine of your retirement plan.
             </Term>
-          <Term t="Fondo pensione integrativo (supplementary pension fund)">
+            <Term t="Fondo pensione integrativo (supplementary pension fund)">
               Use Add pension fund. Enter the current fund balance, monthly contribution, expected
               fund return, and payout start age. The planner estimates the future balance and, if
               you do not enter a monthly payout, estimates payout as 3.5%/yr of that projected

@@ -9,24 +9,39 @@ import {
   CardHeader,
   CardTitle,
   formatAmount,
+  formatCompactAmount,
   formatPercent,
   Input,
   MoneyInput,
-  Skeleton,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Area,
-  AreaChart,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip as RTooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  CHART_COLORS,
+  PROJECTED_CHART_COLORS,
+  RetirementChart,
+  type ChartPoint,
+} from "../components/retirement-portfolio-chart";
+import {
+  COVERAGE_COLORS,
+  RetirementCoverageChart,
+  type CoverageProjectionPoint,
+} from "../components/retirement-coverage-chart";
+import { RetirementDashboardSkeleton } from "../components/retirement-dashboard-skeleton";
+import { RetirementSnapshotTable } from "../components/retirement-snapshot-table";
+import {
+  ValueModeToggle,
+  ValueModeTooltip,
+  type ChartValueMode,
+} from "../components/value-mode-toggle";
+import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "../lib/constants";
+import {
+  deriveRetirementReadiness,
+  resolveCoverageAnnualNominalValues,
+  resolveFundedProgress,
+  resolvePortfolioDrawRate,
+} from "../lib/dashboard-math";
 import {
   activeExpenseItems,
   createExpenseItem,
@@ -35,13 +50,6 @@ import {
   isExpenseActiveAtAge,
   totalMonthlyExpenseAtAge,
 } from "../lib/expense-items";
-import {
-  deriveRetirementReadiness,
-  resolveCoverageAnnualNominalValues,
-  resolveFundedProgress,
-  resolvePortfolioDrawRate,
-} from "../lib/dashboard-math";
-import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "../lib/constants";
 import {
   ageFromBirthYearMonth,
   inferBirthYearMonthFromAge,
@@ -88,21 +96,6 @@ function modeLabel(mode: PlannerMode) {
   };
 }
 
-function fmtCompact(value: number, currency: string) {
-  const abs = Math.abs(value);
-  const maximumFractionDigits = abs >= 1_000_000 ? 2 : abs >= 100_000 ? 0 : abs >= 1_000 ? 1 : 0;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currency || "USD",
-      notation: "compact",
-      maximumFractionDigits,
-    }).format(value);
-  } catch {
-    return formatAmount(value, currency);
-  }
-}
-
 function currencySymbol(currency: string) {
   try {
     return (
@@ -124,164 +117,9 @@ function boundedInflationFactor(rate: number, years: number) {
   return Math.max(0.01, Math.pow(1 + rate, Math.max(0, years)));
 }
 
-type ChartValueMode = "real" | "nominal";
 type CoverageView = "at-retirement" | "over-time";
 
-function ValueModeToggle({
-  value,
-  onChange,
-}: {
-  value: ChartValueMode;
-  onChange: (value: ChartValueMode) => void;
-}) {
-  return (
-    <AnimatedToggleGroup<ChartValueMode>
-      value={value}
-      onValueChange={onChange}
-      items={[
-        { value: "real", label: "Today's value" },
-        { value: "nominal", label: "Nominal" },
-      ]}
-      size="xs"
-      rounded="md"
-      className="bg-muted/30 border max-sm:[&_button]:px-2 max-sm:[&_button]:text-[11px]"
-    />
-  );
-}
-
-function ValueModeTooltip({
-  valueMode,
-  currency,
-  todayValue,
-  nominalValue,
-  children,
-}: {
-  valueMode: ChartValueMode;
-  currency: string;
-  todayValue: number;
-  nominalValue: number;
-  children: React.ReactNode;
-}) {
-  const showingLabel = valueMode === "real" ? "Today's value" : "Nominal";
-  const alternateLabel = valueMode === "real" ? "Nominal" : "Today's value";
-  const alternateValue = valueMode === "real" ? nominalValue : todayValue;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-help underline decoration-dotted underline-offset-2">
-          {children}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs">
-        <div className="text-[10px] font-semibold uppercase tracking-wider">
-          Showing {showingLabel}
-        </div>
-        <div className="mt-1 tabular-nums">
-          {alternateLabel}: {fmtCompact(alternateValue, currency)}
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 // ─── Chart types & helpers ───────────────────────────────────────
-
-interface ChartPoint {
-  label: string; // category axis for reliable ReferenceLine
-  age: number;
-  portfolio: number; // start-of-age value used for visual comparison to required capital
-  portfolioStart: number;
-  portfolioEnd: number;
-  target: number | undefined;
-  withdrawal: number; // annual withdrawal (0 during accumulation)
-  phase: string;
-  annualContribution: number;
-  annualIncome: number;
-  annualExpenses: number;
-  netChange: number;
-}
-
-const PROJECTED_CHART_COLORS = {
-  onTrack: { fill: "hsl(92, 24%, 70%)", stroke: "hsl(91, 43%, 29%)" },
-  offTrack: { fill: "hsl(38, 75%, 50%)", stroke: "hsl(38, 75%, 50%)" },
-} as const;
-
-const CHART_COLORS = {
-  muted: "var(--muted-foreground)",
-  foreground: "var(--foreground)",
-  reference: "color-mix(in srgb, var(--muted-foreground) 58%, transparent)",
-};
-
-interface RetirementAxisTickProps {
-  x?: number | string;
-  y?: number | string;
-  payload?: {
-    value?: string;
-  };
-  retirementLabel: string;
-  eventLabel: string;
-}
-
-function RetirementAxisTick({
-  x = 0,
-  y = 0,
-  payload,
-  retirementLabel,
-  eventLabel,
-}: RetirementAxisTickProps) {
-  const value = payload?.value ?? "";
-  const tickX = typeof x === "number" ? x : Number(x) || 0;
-  const tickY = typeof y === "number" ? y : Number(y) || 0;
-  if (value === retirementLabel) {
-    return (
-      <g transform={`translate(${tickX},${tickY})`}>
-        <text textAnchor="middle" fill={CHART_COLORS.foreground}>
-          <tspan x={0} dy={16} fontSize={12} fontWeight={500}>
-            {value}
-          </tspan>
-          <tspan x={0} dy={18} fontSize={12} fontWeight={700}>
-            {eventLabel}
-          </tspan>
-        </text>
-      </g>
-    );
-  }
-
-  return (
-    <g transform={`translate(${tickX},${tickY})`}>
-      <text textAnchor="middle" fill={CHART_COLORS.muted} fontSize={11}>
-        {value.replace(/^Age\s+/, "")}
-      </text>
-    </g>
-  );
-}
-
-interface ChartCalloutLabelProps {
-  viewBox?: {
-    x?: number;
-    y?: number;
-  };
-  amount: string;
-  fill: string;
-  dx?: number;
-  dy?: number;
-}
-
-function ChartCalloutLabel({ viewBox, amount, fill, dx = 10, dy = -5 }: ChartCalloutLabelProps) {
-  const x = typeof viewBox?.x === "number" ? viewBox.x : 0;
-  const y = typeof viewBox?.y === "number" ? viewBox.y : 0;
-  const labelX = x + dx;
-  const labelY = y + dy;
-
-  return (
-    <text x={labelX} y={labelY} textAnchor="start" fill={fill}>
-      <tspan x={labelX} dy={0} fontSize={12} fontWeight={700}>
-        {amount}
-      </tspan>
-    </text>
-  );
-}
 
 // Warm olive palette for income streams (coverage bar + row dots).
 // Values come from --fi-stream-N CSS variables which swap between light/dark themes.
@@ -292,23 +130,6 @@ const INCOME_STREAM_COLORS = [
   "var(--fi-stream-4)",
   "var(--fi-stream-5)",
 ];
-
-const COVERAGE_COLORS = {
-  income: "var(--fi-stream-1)",
-  portfolio: PROJECTED_CHART_COLORS.offTrack.stroke,
-  shortfall: "hsl(8, 67%, 48%)",
-  planned: "#888",
-};
-
-interface CoverageProjectionPoint {
-  label: string;
-  age: number;
-  plannedSpending: number;
-  retirementIncome: number;
-  portfolioWithdrawal: number;
-  shortfall: number;
-  taxes: number;
-}
 
 function projectedAnnualExpenseNominalAtAge(plan: RetirementPlan, age: number) {
   const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
@@ -410,467 +231,6 @@ function coverageTimingLabel(
   if (startAge !== undefined && age < startAge) return `Starts at ${startAge}`;
   if (endAge !== undefined && age >= endAge) return `Ended at ${endAge}`;
   return "Not active";
-}
-
-function RetirementChartTooltip({
-  active,
-  payload,
-  currency,
-  valueMode,
-  projectedStroke,
-}: {
-  active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
-  currency: string;
-  valueMode: ChartValueMode;
-  projectedStroke: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0]?.payload as ChartPoint | undefined;
-  if (!point) return null;
-  const valueLabel = valueMode === "real" ? "today's money" : "nominal money";
-
-  return (
-    <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2.5 shadow-md">
-      <p className="text-muted-foreground text-xs font-medium">
-        Age {point.age} · {point.phase === "fire" ? "Retirement" : "Accumulation"} · {valueLabel}
-      </p>
-      <div className="flex items-center justify-between space-x-4">
-        <div className="flex items-center space-x-1.5">
-          <span
-            className="block h-2 w-2 rounded-full"
-            style={{ backgroundColor: projectedStroke }}
-          />
-          <span className="text-muted-foreground text-xs">Start portfolio:</span>
-        </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.portfolioStart, currency)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between space-x-4">
-        <span className="text-muted-foreground text-xs">End portfolio:</span>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.portfolioEnd, currency)}
-        </span>
-      </div>
-      {point.target != null && (
-        <div className="flex items-center justify-between space-x-4">
-          <div className="flex items-center space-x-1.5">
-            <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
-            <span className="text-muted-foreground text-xs">What you'll need:</span>
-          </div>
-          <span className="text-xs font-semibold tabular-nums">
-            {fmtCompact(point.target, currency)}
-          </span>
-        </div>
-      )}
-      {point.annualContribution > 0 && (
-        <div className="flex items-center justify-between space-x-4">
-          <span className="text-muted-foreground text-xs">Contribution/yr:</span>
-          <span className="text-xs font-semibold tabular-nums">
-            {fmtCompact(point.annualContribution, currency)}
-          </span>
-        </div>
-      )}
-      {point.annualIncome > 0 && (
-        <div className="flex items-center justify-between space-x-4">
-          <span className="text-muted-foreground text-xs">Income/yr:</span>
-          <span className="text-xs font-semibold tabular-nums">
-            {fmtCompact(point.annualIncome, currency)}
-          </span>
-        </div>
-      )}
-      <div className="flex items-center justify-between space-x-4">
-        <span className="text-muted-foreground text-xs">Planned spending/yr:</span>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.annualExpenses, currency)}
-        </span>
-      </div>
-      {point.withdrawal > 0 && (
-        <div className="flex items-center justify-between space-x-4">
-          <div className="flex items-center space-x-1.5">
-            <span className="text-destructive block h-2 w-2 rounded-full" />
-            <span className="text-muted-foreground text-xs">Portfolio withdrawal/yr:</span>
-          </div>
-          <span className="text-destructive text-xs font-semibold tabular-nums">
-            -{fmtCompact(point.withdrawal, currency)}
-          </span>
-        </div>
-      )}
-      <div className="flex items-center justify-between space-x-4 border-t pt-1">
-        <span className="text-muted-foreground text-xs">Net portfolio change:</span>
-        <span
-          className={`text-xs font-semibold tabular-nums ${
-            point.netChange >= 0 ? "text-green-600" : "text-red-500"
-          }`}
-        >
-          {point.netChange >= 0 ? "+" : "-"}
-          {fmtCompact(Math.abs(point.netChange), currency)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function CoverageProjectionTooltip({
-  active,
-  payload,
-  currency,
-  valueMode,
-}: {
-  active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
-  currency: string;
-  valueMode: ChartValueMode;
-}) {
-  if (!active || !payload?.length) return null;
-  const point = payload[0]?.payload as CoverageProjectionPoint | undefined;
-  if (!point) return null;
-  const valueLabel = valueMode === "real" ? "today's money" : "nominal money";
-  const funded = point.retirementIncome + point.portfolioWithdrawal;
-  const coveragePct =
-    point.plannedSpending > 0 ? Math.min(100, (funded / point.plannedSpending) * 100) : 0;
-
-  return (
-    <div className="bg-popover grid grid-cols-1 gap-1.5 rounded-md border p-2.5 shadow-md">
-      <p className="text-muted-foreground text-xs font-medium">
-        Age {point.age} · {valueLabel}
-      </p>
-      <div className="flex items-center justify-between gap-5">
-        <div className="flex items-center gap-1.5">
-          <span className="block h-0 w-3 border-b border-dashed border-[#888]" />
-          <span className="text-muted-foreground text-xs">Planned spending/yr:</span>
-        </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.plannedSpending, currency)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-5">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COVERAGE_COLORS.income }}
-          />
-          <span className="text-muted-foreground text-xs">Retirement income used/yr:</span>
-        </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.retirementIncome, currency)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-5">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COVERAGE_COLORS.portfolio }}
-          />
-          <span className="text-muted-foreground text-xs">Portfolio withdrawal used/yr:</span>
-        </div>
-        <span className="text-xs font-semibold tabular-nums">
-          {fmtCompact(point.portfolioWithdrawal, currency)}
-        </span>
-      </div>
-      {point.shortfall > 0 && (
-        <div className="flex items-center justify-between gap-5">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="block h-2 w-2 rounded-sm"
-              style={{ backgroundColor: COVERAGE_COLORS.shortfall }}
-            />
-            <span className="text-muted-foreground text-xs">Unfunded spending/yr:</span>
-          </div>
-          <span className="text-xs font-semibold tabular-nums text-red-500">
-            {fmtCompact(point.shortfall, currency)}
-          </span>
-        </div>
-      )}
-      {point.taxes > 0 && (
-        <div className="flex items-center justify-between gap-5">
-          <span className="text-muted-foreground text-xs">Withdrawal taxes/yr:</span>
-          <span className="text-xs font-semibold tabular-nums">
-            +{fmtCompact(point.taxes, currency)}
-          </span>
-        </div>
-      )}
-      <div className="flex items-center justify-between gap-5 border-t pt-1">
-        <span className="text-muted-foreground text-xs">Spending covered:</span>
-        <span
-          className={`text-xs font-semibold tabular-nums ${
-            coveragePct >= 100
-              ? "text-green-600"
-              : coveragePct >= 75
-                ? "text-amber-600"
-                : "text-red-500"
-          }`}
-        >
-          {coveragePct.toFixed(0)}%
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function RetirementChart({
-  data,
-  currency,
-  retirementAge,
-  projectedFireAge,
-  valueMode,
-  plannerMode,
-  projectedIsOnTrack,
-}: {
-  data: ChartPoint[];
-  currency: string;
-  retirementAge: number;
-  projectedFireAge?: number | null;
-  valueMode: ChartValueMode;
-  plannerMode: PlannerMode;
-  projectedIsOnTrack: boolean;
-}) {
-  if (data.length < 2) return null;
-
-  const retirementLabel = `Age ${retirementAge}`;
-  const isFireMode = plannerMode === "fire";
-  const eventLabel = isFireMode ? "Goal" : "Retirement";
-  const showProjectedFiLine =
-    isFireMode && projectedFireAge != null && projectedFireAge !== retirementAge;
-  const projectedFiLabel = showProjectedFiLine ? `Age ${projectedFireAge}` : "";
-  const retirementPoint = data.find((point) => point.age === retirementAge);
-  const retirementPortfolioValueLabel =
-    retirementPoint && retirementPoint.portfolio > 0
-      ? fmtCompact(retirementPoint.portfolio, currency)
-      : null;
-  const projectedPalette = projectedIsOnTrack
-    ? PROJECTED_CHART_COLORS.onTrack
-    : PROJECTED_CHART_COLORS.offTrack;
-  const retirementTargetValue =
-    retirementPoint && typeof retirementPoint.target === "number" ? retirementPoint.target : null;
-  const retirementTargetValueLabel =
-    retirementTargetValue != null && retirementTargetValue > 0
-      ? fmtCompact(retirementTargetValue, currency)
-      : null;
-  const retirementIndex = data.findIndex((point) => point.age === retirementAge);
-  const calloutElbowLabel =
-    retirementIndex >= 0
-      ? data[Math.min(retirementIndex + 1, data.length - 1)]?.label
-      : retirementLabel;
-  const calloutEndLabel =
-    retirementIndex >= 0
-      ? data[Math.min(retirementIndex + 2, data.length - 1)]?.label
-      : retirementLabel;
-  const canDrawCallouts =
-    Boolean(calloutElbowLabel) &&
-    Boolean(calloutEndLabel) &&
-    calloutElbowLabel !== retirementLabel &&
-    calloutEndLabel !== calloutElbowLabel;
-  const axisTicks = useMemo(() => {
-    const interval = Math.max(1, Math.floor(data.length / 6));
-    const ticks = new Set<string>();
-    data.forEach((point, index) => {
-      if (index % interval === 0) ticks.add(point.label);
-    });
-    ticks.add(retirementLabel);
-    ticks.add(data[data.length - 1]?.label);
-    return data.map((point) => point.label).filter((label) => ticks.has(label));
-  }, [data, retirementLabel]);
-  const chartMaxValue = Math.max(
-    ...data.map((point) => Math.max(point.portfolio, point.target ?? 0)),
-  );
-  const calloutValuesAreClose =
-    retirementPoint &&
-    retirementTargetValue != null &&
-    chartMaxValue > 0 &&
-    Math.abs(retirementTargetValue - retirementPoint.portfolio) / chartMaxValue < 0.08;
-  const highCalloutLift = chartMaxValue * 0.19;
-  const lowCalloutLift = chartMaxValue * (calloutValuesAreClose ? 0.055 : 0.11);
-  const targetCalloutValue =
-    retirementTargetValue != null
-      ? retirementTargetValue +
-        (calloutValuesAreClose && retirementPoint
-          ? retirementTargetValue >= retirementPoint.portfolio
-            ? highCalloutLift
-            : lowCalloutLift
-          : lowCalloutLift)
-      : null;
-  const portfolioCalloutValue =
-    retirementPoint != null
-      ? retirementPoint.portfolio +
-        (calloutValuesAreClose
-          ? retirementPoint.portfolio > (retirementTargetValue ?? 0)
-            ? highCalloutLift
-            : lowCalloutLift
-          : lowCalloutLift)
-      : null;
-  // Offset labels vertically when ages are close to avoid overlap
-  const agesClose = showProjectedFiLine && Math.abs((projectedFireAge ?? 0) - retirementAge) <= 3;
-
-  return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={320}>
-        <AreaChart data={data} margin={{ top: 24, right: 12, left: -12, bottom: 38 }}>
-          <defs>
-            <linearGradient id="retirementPortfolio" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={projectedPalette.fill} stopOpacity={0.3} />
-              <stop offset="60%" stopColor={projectedPalette.fill} stopOpacity={0.15} />
-              <stop offset="100%" stopColor={projectedPalette.fill} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <XAxis
-            dataKey="label"
-            tick={(props) => (
-              <RetirementAxisTick
-                {...props}
-                retirementLabel={retirementLabel}
-                eventLabel={eventLabel}
-              />
-            )}
-            tickFormatter={(label: string) => label.replace(/^Age\s+/, "")}
-            ticks={axisTicks}
-            interval={0}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 10, fill: CHART_COLORS.muted }}
-            tickFormatter={(v: number) => fmtCompact(v, currency)}
-            width={48}
-            axisLine={false}
-            tickLine={false}
-            domain={[0, (dataMax: number) => Math.max(1, dataMax * 1.22)]}
-          />
-          <RTooltip
-            content={
-              <RetirementChartTooltip
-                currency={currency}
-                valueMode={valueMode}
-                projectedStroke={projectedPalette.stroke}
-              />
-            }
-          />
-
-          {/* Projected FI age vertical line — render FIRST so retirement line draws on top */}
-          {showProjectedFiLine && (
-            <ReferenceLine
-              x={projectedFiLabel}
-              stroke="var(--success)"
-              strokeWidth={1}
-              strokeDasharray="4 3"
-              strokeOpacity={0.8}
-              label={{
-                value: `FI · ${projectedFireAge}`,
-                position: "top",
-                fontSize: 10,
-                fill: "var(--success)",
-                dy: agesClose ? -12 : 0,
-              }}
-            />
-          )}
-
-          {/* Retirement age vertical line */}
-          <ReferenceLine
-            x={retirementLabel}
-            stroke={CHART_COLORS.reference}
-            strokeWidth={1}
-            strokeDasharray="4 3"
-            strokeOpacity={0.5}
-          />
-
-          {/* Target — dashed line (no fill, just stroke) */}
-          <Area
-            type="linear"
-            dataKey="target"
-            name="Required"
-            stroke={CHART_COLORS.reference}
-            strokeWidth={1.5}
-            strokeDasharray="6 4"
-            fill="none"
-            activeDot={false}
-            animationDuration={300}
-          />
-
-          {/* Portfolio — filled golden area */}
-          <Area
-            type="linear"
-            dataKey="portfolio"
-            name="Projected"
-            stroke={projectedPalette.stroke}
-            strokeWidth={1.5}
-            fill="url(#retirementPortfolio)"
-            fillOpacity={1}
-            animationDuration={300}
-            animationEasing="ease-out"
-          />
-
-          {canDrawCallouts &&
-            retirementPoint &&
-            retirementTargetValue != null &&
-            targetCalloutValue != null &&
-            retirementTargetValueLabel && (
-              <>
-                <ReferenceLine
-                  segment={[
-                    { x: retirementLabel, y: retirementTargetValue },
-                    { x: calloutElbowLabel, y: targetCalloutValue },
-                  ]}
-                  stroke={CHART_COLORS.reference}
-                  strokeOpacity={0.55}
-                  strokeWidth={1}
-                />
-                <ReferenceLine
-                  segment={[
-                    { x: calloutElbowLabel, y: targetCalloutValue },
-                    { x: calloutEndLabel, y: targetCalloutValue },
-                  ]}
-                  stroke={CHART_COLORS.reference}
-                  strokeOpacity={0.55}
-                  strokeWidth={1}
-                  label={(props) => (
-                    <ChartCalloutLabel
-                      {...props}
-                      amount={retirementTargetValueLabel}
-                      fill={CHART_COLORS.muted}
-                    />
-                  )}
-                />
-              </>
-            )}
-          {canDrawCallouts &&
-            retirementPoint &&
-            portfolioCalloutValue != null &&
-            retirementPortfolioValueLabel && (
-              <>
-                <ReferenceLine
-                  segment={[
-                    { x: retirementLabel, y: retirementPoint.portfolio },
-                    { x: calloutElbowLabel, y: portfolioCalloutValue },
-                  ]}
-                  stroke={projectedPalette.stroke}
-                  strokeOpacity={0.55}
-                  strokeWidth={1}
-                />
-                <ReferenceLine
-                  segment={[
-                    { x: calloutElbowLabel, y: portfolioCalloutValue },
-                    { x: calloutEndLabel, y: portfolioCalloutValue },
-                  ]}
-                  stroke={projectedPalette.stroke}
-                  strokeOpacity={0.55}
-                  strokeWidth={1}
-                  label={(props) => (
-                    <ChartCalloutLabel
-                      {...props}
-                      amount={retirementPortfolioValueLabel}
-                      fill={CHART_COLORS.foreground}
-                    />
-                  )}
-                />
-              </>
-            )}
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
 }
 
 // ─── Sidebar cards ──────────────────────────────────────────────
@@ -1454,9 +814,6 @@ function SidebarConfigurator({
     (draft.tax?.taxableWithdrawalRate ?? 0) === 0 &&
     (draft.tax?.taxDeferredWithdrawalRate ?? 0) === 0 &&
     (draft.tax?.taxFreeWithdrawalRate ?? 0) === 0;
-  const hasCanadianPublicBenefit = draft.incomeStreams.some((stream) =>
-    /\b(cpp|qpp|oas)\b/i.test(stream.label),
-  );
 
   const birthYearMonth =
     draft.personal.birthYearMonth ?? inferBirthYearMonthFromAge(draft.personal.currentAge);
@@ -1919,19 +1276,13 @@ function SidebarConfigurator({
                   currency={currency}
                 />
               </div>
-              {!hasCanadianPublicBenefit && (
-                <p className="text-muted-foreground rounded-md border border-dashed px-2.5 py-2 text-xs leading-relaxed">
-                  Bank calculators often include CPP/QPP and OAS automatically. Add those streams
-                  here if you want comparable Canadian results.
-                </p>
-              )}
             </div>
           ) : (
             <div className="space-y-2">
               <p className="text-muted-foreground text-xs">No retirement income configured</p>
               <p className="text-muted-foreground rounded-md border border-dashed px-2.5 py-2 text-xs leading-relaxed">
-                Bank calculators often include CPP/QPP and OAS automatically. This plan only uses
-                income streams you add here.
+                Public pensions (e.g. CPP/OAS in Canada, Social Security in the US) aren't included
+                automatically. Add them here if you want them in the projection.
               </p>
             </div>
           )
@@ -2008,8 +1359,8 @@ function SidebarConfigurator({
                         <div className="min-w-0">
                           <div className="text-foreground text-xs font-semibold">Income type</div>
                           <div className="text-muted-foreground mt-0.5 text-[11px] leading-tight">
-                            Use income for pensions paid monthly. Use fund for RRSP/RRIF/DC-style
-                            balances that convert to an estimated payout.
+                            Use income for pensions paid monthly. Use fund for balances that convert
+                            to an estimated payout (e.g. RRSP/RRIF in Canada, 401(k)/IRA in the US).
                           </div>
                         </div>
                         <AnimatedToggleGroup<"db" | "dc">
@@ -2194,21 +1545,6 @@ function SidebarConfigurator({
             >
               <Icons.Plus className="h-3 w-3" /> Add pension fund
             </button>
-            {!hasCanadianPublicBenefit && (
-              <button
-                className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-1.5 text-xs transition-colors"
-                onClick={() =>
-                  addStream({
-                    label: "OAS estimate",
-                    startAge: 65,
-                    monthlyAmount: 0,
-                    adjustForInflation: true,
-                  })
-                }
-              >
-                <Icons.Plus className="h-3 w-3" /> Add OAS placeholder
-              </button>
-            )}
           </div>
         }
       />
@@ -2531,7 +1867,7 @@ function SidebarConfigurator({
                   Extra penalty applied to tax-deferred withdrawals before the cutoff age.
                 </InfoLabel>
               }
-              hint="Set to 0% for Canada-style RRSP modeling unless you intentionally want a penalty."
+              hint="Leave at 0% unless your jurisdiction applies an early-withdrawal penalty (e.g. US 10% before 59½). Canadian RRSPs don't use a separate penalty."
               value={draft.tax?.earlyWithdrawalPenaltyRate ?? 0}
               onChange={(v) => setTax("earlyWithdrawalPenaltyRate", v)}
               min={0}
@@ -2826,12 +2162,10 @@ export default function DashboardPage({
   const allSnapshots: RetirementTrajectoryPoint[] = useMemo(() => {
     return retirementOverview?.trajectory ?? [];
   }, [retirementOverview?.trajectory]);
-
-  // Pagination for year-by-year table
-  const PAGE_SIZE = 10;
-  const [tablePage, setTablePage] = useState(0);
-  const totalPages = Math.ceil(allSnapshots.length / PAGE_SIZE);
-  const pagedSnapshots = allSnapshots.slice(tablePage * PAGE_SIZE, (tablePage + 1) * PAGE_SIZE);
+  const incomeStartAges = useMemo(
+    () => new Set(plan.incomeStreams.map((s) => s.startAge)),
+    [plan.incomeStreams],
+  );
 
   const isFinanciallyIndependent =
     !isTraditionalMode && portfolioNow >= retireTodayTarget && retireTodayTarget > 0;
@@ -2859,13 +2193,7 @@ export default function DashboardPage({
   const heroGuidance = readiness.body;
 
   if (isLoading || !retirementOverview) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-48 w-full rounded-lg" />
-        <Skeleton className="h-72 w-full rounded-lg" />
-        <Skeleton className="h-48 w-full rounded-lg" />
-      </div>
-    );
+    return <RetirementDashboardSkeleton />;
   }
 
   if (error) {
@@ -2890,12 +2218,6 @@ export default function DashboardPage({
                 : heroHealth === "at_risk"
                   ? "text-amber-600"
                   : "text-red-500";
-            const stripeAccent =
-              heroHealth === "on_track"
-                ? "bg-green-600"
-                : heroHealth === "at_risk"
-                  ? "bg-amber-500"
-                  : "bg-red-500";
             const goalShortfallNominal =
               targetReconciliation?.shortfallNominal ?? retirementOverview.shortfallAtGoalAge;
             const goalShortfallToday =
@@ -2915,7 +2237,7 @@ export default function DashboardPage({
               retirementOverview.portfolioAtGoalAge;
             const portfolioAtTarget =
               chartValueMode === "nominal" ? portfolioAtTargetNominal : portfolioAtTargetToday;
-            const monthlyContribLabel = `${fmtCompact(plan.investment.monthlyContribution, currency)}/mo`;
+            const monthlyContribLabel = `${formatCompactAmount(plan.investment.monthlyContribution, currency)}/mo`;
             const annualBudgetToday =
               targetReconciliation?.plannedAnnualExpensesTodayValue ?? totalBudget * 12;
             const annualBudgetNominal =
@@ -2923,7 +2245,7 @@ export default function DashboardPage({
               totalBudget * 12 * inflationFactorToGoal;
             const annualBudget =
               chartValueMode === "nominal" ? annualBudgetNominal : annualBudgetToday;
-            const annualBudgetLabel = fmtCompact(annualBudget, currency);
+            const annualBudgetLabel = formatCompactAmount(annualBudget, currency);
             const coastPct =
               targetAtGoalDisplay > 0
                 ? Math.min(100, (coastAmountDisplay / targetAtGoalDisplay) * 100)
@@ -2938,8 +2260,7 @@ export default function DashboardPage({
                     : "On track";
 
             return (
-              <Card className="relative overflow-hidden">
-                <div className={`absolute bottom-0 left-0 top-0 w-[3px] ${stripeAccent}`} />
+              <Card className="overflow-hidden">
                 <CardContent className="px-7 py-6">
                   <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-3">
@@ -3026,7 +2347,7 @@ export default function DashboardPage({
                         <>
                           At age {plan.personal.targetRetirementAge}, you're short{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
-                            {fmtCompact(goalShortfall, currency)}
+                            {formatCompactAmount(goalShortfall, currency)}
                           </span>
                           <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
                             {" "}
@@ -3048,7 +2369,7 @@ export default function DashboardPage({
                         <>
                           You're projected to retire at age {plan.personal.targetRetirementAge} with{" "}
                           <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
-                            {fmtCompact(goalSurplus, currency)}
+                            {formatCompactAmount(goalSurplus, currency)}
                           </span>
                           <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
                             {" "}
@@ -3136,7 +2457,7 @@ export default function DashboardPage({
                           nominalValue={portfolioAtTargetNominal}
                         >
                           <span className="text-foreground tabular-nums">
-                            {fmtCompact(portfolioAtTarget, currency)}
+                            {formatCompactAmount(portfolioAtTarget, currency)}
                           </span>
                         </ValueModeTooltip>{" "}
                         vs. required capital of{" "}
@@ -3147,7 +2468,7 @@ export default function DashboardPage({
                           nominalValue={targetNominalAtGoal}
                         >
                           <span className="text-foreground tabular-nums">
-                            {fmtCompact(targetAtGoalDisplay, currency)}
+                            {formatCompactAmount(targetAtGoalDisplay, currency)}
                           </span>
                         </ValueModeTooltip>{" "}
                         at age {plan.personal.targetRetirementAge}.
@@ -3181,7 +2502,7 @@ export default function DashboardPage({
                             nominalValue={goalShortfallNominal}
                           >
                             <span className="font-medium tabular-nums text-amber-600">
-                              {fmtCompact(goalShortfall, currency)}
+                              {formatCompactAmount(goalShortfall, currency)}
                             </span>
                           </ValueModeTooltip>{" "}
                           at age {plan.personal.targetRetirementAge}.
@@ -3197,7 +2518,7 @@ export default function DashboardPage({
                           Portfolio today
                         </span>
                         <span className="text-sm font-semibold tabular-nums">
-                          {fmtCompact(portfolioNow, currency)}
+                          {formatCompactAmount(portfolioNow, currency)}
                         </span>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
@@ -3223,7 +2544,7 @@ export default function DashboardPage({
                             nominalValue={targetNominalAtGoal}
                           >
                             <span className="text-sm font-semibold tabular-nums">
-                              {fmtCompact(targetAtGoalDisplay, currency)}
+                              {formatCompactAmount(targetAtGoalDisplay, currency)}
                             </span>
                           </ValueModeTooltip>
                         ) : (
@@ -3253,7 +2574,7 @@ export default function DashboardPage({
                       <span className="tabular-nums">{(progress * 100).toFixed(1)}% funded</span>
                       {!isTraditionalMode && (
                         <span className="tabular-nums">
-                          ▲ {L.coast} {fmtCompact(coastAmountDisplay, currency)}
+                          ▲ {L.coast} {formatCompactAmount(coastAmountDisplay, currency)}
                         </span>
                       )}
                     </div>
@@ -3431,7 +2752,7 @@ export default function DashboardPage({
                         )}
                       </div>
                       <div className="text-[17px] font-semibold tabular-nums tracking-tight">
-                        {fmtCompact(m.value, currency)}
+                        {formatCompactAmount(m.value, currency)}
                       </div>
                       <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
                         <div
@@ -3466,7 +2787,7 @@ export default function DashboardPage({
                       <>
                         Snapshot at age {fireAgeForBudget}: planned{" "}
                         <span className="text-foreground tabular-nums">
-                          {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                          {formatCompactAmount(coverageSpendingMonthly, currency)}/mo
                         </span>{" "}
                         spending and funding. Future items stay visible and are counted when active.
                       </>
@@ -3514,7 +2835,7 @@ export default function DashboardPage({
                   <div className="text-foreground/90 text-[13px]">
                     At age {fireAgeForBudget} —{" "}
                     <span className="text-foreground font-semibold tabular-nums">
-                      {fmtCompact(coverageSpendingMonthly, currency)}/mo
+                      {formatCompactAmount(coverageSpendingMonthly, currency)}/mo
                     </span>{" "}
                     planned spending
                   </div>
@@ -3611,7 +2932,7 @@ export default function DashboardPage({
                                 </span>
                               </span>
                               <span className="text-foreground shrink-0 tabular-nums">
-                                {fmtCompact(r.monthlyAmount, currency)}/mo
+                                {formatCompactAmount(r.monthlyAmount, currency)}/mo
                               </span>
                             </div>
                           );
@@ -3670,7 +2991,7 @@ export default function DashboardPage({
                                 </span>
                               </span>
                               <span className="text-foreground shrink-0 tabular-nums">
-                                {fmtCompact(monthlyAmount, currency)}/mo{" "}
+                                {formatCompactAmount(monthlyAmount, currency)}/mo{" "}
                                 {isActive && matchedBudgetStream ? (
                                   <span className="text-muted-foreground ml-1 text-[11px]">
                                     {(matchedBudgetStream.percentageOfBudget * 100).toFixed(0)}%
@@ -3719,7 +3040,7 @@ export default function DashboardPage({
                               </span>
                             </span>
                             <span className="text-foreground shrink-0 tabular-nums">
-                              {fmtCompact(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
+                              {formatCompactAmount(coveragePortfolioAppliedMonthly, currency)}/mo{" "}
                               <span className="text-muted-foreground ml-1 text-[11px]">
                                 {coveragePortfolioPct.toFixed(0)}%
                               </span>
@@ -3735,7 +3056,7 @@ export default function DashboardPage({
                               </span>
                             </span>
                             <span className="text-foreground shrink-0 tabular-nums">
-                              {fmtCompact(coverageShortfallMonthly, currency)}/mo{" "}
+                              {formatCompactAmount(coverageShortfallMonthly, currency)}/mo{" "}
                               <span className="text-muted-foreground ml-1 text-[11px]">
                                 {coverageShortfallPct.toFixed(0)}%
                               </span>
@@ -3746,7 +3067,7 @@ export default function DashboardPage({
                           <div className="text-muted-foreground flex items-center justify-between gap-3 pt-1 text-[11px] italic">
                             <span>Withdrawal taxes</span>
                             <span className="tabular-nums">
-                              +{fmtCompact(coverageEstimatedTaxesMonthly, currency)}/mo
+                              +{formatCompactAmount(coverageEstimatedTaxesMonthly, currency)}/mo
                             </span>
                           </div>
                         )}
@@ -3794,126 +3115,14 @@ export default function DashboardPage({
                     </span>
                   </div>
 
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart
-                      data={coverageProjectionData}
-                      margin={{ top: 16, right: 28, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient id="coverageIncome" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={COVERAGE_COLORS.income} stopOpacity={0.38} />
-                          <stop
-                            offset="100%"
-                            stopColor={COVERAGE_COLORS.income}
-                            stopOpacity={0.08}
-                          />
-                        </linearGradient>
-                        <linearGradient id="coveragePortfolio" x1="0" y1="0" x2="0" y2="1">
-                          <stop
-                            offset="5%"
-                            stopColor={COVERAGE_COLORS.portfolio}
-                            stopOpacity={0.32}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={COVERAGE_COLORS.portfolio}
-                            stopOpacity={0.08}
-                          />
-                        </linearGradient>
-                        <linearGradient id="coverageShortfall" x1="0" y1="0" x2="0" y2="1">
-                          <stop
-                            offset="5%"
-                            stopColor={COVERAGE_COLORS.shortfall}
-                            stopOpacity={0.5}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor={COVERAGE_COLORS.shortfall}
-                            stopOpacity={0.18}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <XAxis
-                        dataKey="age"
-                        type="number"
-                        domain={["dataMin", "dataMax"]}
-                        ticks={coverageProjectionTicks}
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(age: number) => String(Math.round(age))}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDataOverflow={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10 }}
-                        tickFormatter={(v: number) => fmtCompact(v, currency)}
-                        width={60}
-                        axisLine={false}
-                        tickLine={false}
-                        domain={[0, "auto"]}
-                      />
-                      <RTooltip
-                        content={
-                          <CoverageProjectionTooltip
-                            currency={currency}
-                            valueMode={chartValueMode}
-                          />
-                        }
-                      />
-                      <ReferenceLine
-                        x={fireAgeForBudget}
-                        stroke="#888"
-                        strokeWidth={1}
-                        strokeDasharray="4 3"
-                        strokeOpacity={0.5}
-                        label={{
-                          value: `${L.prefix} · ${fireAgeForBudget}`,
-                          position: "top",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          fill: "#888",
-                        }}
-                      />
-                      <Area
-                        type="linear"
-                        dataKey="retirementIncome"
-                        stackId="coverage"
-                        stroke={COVERAGE_COLORS.income}
-                        strokeWidth={0}
-                        fill="url(#coverageIncome)"
-                        animationDuration={300}
-                      />
-                      <Area
-                        type="linear"
-                        dataKey="portfolioWithdrawal"
-                        stackId="coverage"
-                        stroke={COVERAGE_COLORS.portfolio}
-                        strokeWidth={0}
-                        fill="url(#coveragePortfolio)"
-                        animationDuration={300}
-                      />
-                      <Area
-                        type="linear"
-                        dataKey="shortfall"
-                        stackId="coverage"
-                        stroke={COVERAGE_COLORS.shortfall}
-                        strokeWidth={1.2}
-                        strokeOpacity={0.8}
-                        fill="url(#coverageShortfall)"
-                        animationDuration={300}
-                      />
-                      <Line
-                        type="linear"
-                        dataKey="plannedSpending"
-                        stroke={COVERAGE_COLORS.planned}
-                        strokeWidth={1.5}
-                        strokeDasharray="6 4"
-                        dot={false}
-                        activeDot={false}
-                        animationDuration={300}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <RetirementCoverageChart
+                    data={coverageProjectionData}
+                    ticks={coverageProjectionTicks}
+                    currency={currency}
+                    valueMode={chartValueMode}
+                    fireAgeForBudget={fireAgeForBudget}
+                    referenceLabelPrefix={L.prefix}
+                  />
                 </div>
               ) : (
                 <div className="text-muted-foreground rounded-md border border-dashed py-8 text-center text-sm">
@@ -3924,141 +3133,15 @@ export default function DashboardPage({
           </Card>
 
           {/* Year-by-Year Snapshot — in main column with pagination */}
-          {allSnapshots.length > 0 && (
-            <Card>
-              <CardHeader className="flex-row items-start justify-between pb-3">
-                <div>
-                  <div className="text-muted-foreground mb-0.5 text-[10px] font-semibold uppercase tracking-wider">
-                    Table
-                  </div>
-                  <CardTitle className="text-sm">Year-by-Year Snapshot</CardTitle>
-                  {hasPensionFunds && (
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      Pension fund balances are shown until payout starts. After that, the stream
-                      appears as retirement income.
-                    </p>
-                  )}
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-muted-foreground text-xs">
-                      {tablePage + 1} / {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setTablePage((p) => Math.max(0, p - 1))}
-                      disabled={tablePage === 0}
-                    >
-                      <Icons.ChevronLeft className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setTablePage((p) => Math.min(totalPages - 1, p + 1))}
-                      disabled={tablePage >= totalPages - 1}
-                    >
-                      <Icons.ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-muted-foreground border-b">
-                      <th className="pb-2 text-left">Age</th>
-                      <th className="pb-2 text-left">Year</th>
-                      <th className="pb-2 text-left">Phase</th>
-                      <th className="pb-2 text-right">End Portfolio</th>
-                      {hasPensionFunds && <th className="pb-2 text-right">Pension Fund</th>}
-                      <th className="pb-2 text-right">Contribution/yr</th>
-                      <th className="pb-2 text-right">Retirement income/yr</th>
-                      <th className="pb-2 text-right">Planned spending/yr</th>
-                      <th className="pb-2 text-right">Portfolio withdrawal/yr</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagedSnapshots.map((snap) => {
-                      const isFire = snap.phase === "fire";
-                      const isFireRow = snap.age === fiAge;
-                      const isIncomeRow = plan.incomeStreams.some((s) => s.startAge === snap.age);
-                      return (
-                        <tr
-                          key={snap.age}
-                          className={`border-b last:border-0 ${
-                            isFireRow
-                              ? "bg-green-50 font-semibold dark:bg-green-950/20"
-                              : isIncomeRow
-                                ? "bg-blue-50 dark:bg-blue-950/20"
-                                : ""
-                          }`}
-                        >
-                          <td className="py-1.5">{snap.age}</td>
-                          <td className="py-1.5">{snap.year}</td>
-                          <td className="py-1.5">
-                            <Badge variant={isFire ? "default" : "secondary"} className="text-xs">
-                              {isFire ? L.prefix : "Acc."}
-                            </Badge>
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {formatAmount(scaleForModeAtAge(snap.portfolioEnd, snap.age), currency)}
-                          </td>
-                          {hasPensionFunds && (
-                            <td className="py-1.5 text-right">
-                              {snap.pensionAssets > 0
-                                ? formatAmount(
-                                    scaleForModeAtAge(snap.pensionAssets, snap.age),
-                                    currency,
-                                  )
-                                : "—"}
-                            </td>
-                          )}
-                          <td className="py-1.5 text-right">
-                            {snap.annualContribution > 0
-                              ? formatAmount(
-                                  scaleForModeAtAge(snap.annualContribution, snap.age),
-                                  currency,
-                                )
-                              : "—"}
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {snap.annualIncome > 0
-                              ? formatAmount(
-                                  scaleForModeAtAge(snap.annualIncome, snap.age),
-                                  currency,
-                                )
-                              : "—"}
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {(snap.plannedExpenses ?? snap.annualExpenses) > 0
-                              ? formatAmount(
-                                  scaleForModeAtAge(
-                                    snap.plannedExpenses ?? snap.annualExpenses,
-                                    snap.age,
-                                  ),
-                                  currency,
-                                )
-                              : "—"}
-                          </td>
-                          <td className="py-1.5 text-right">
-                            {snap.netWithdrawalFromPortfolio > 0
-                              ? formatAmount(
-                                  scaleForModeAtAge(snap.netWithdrawalFromPortfolio, snap.age),
-                                  currency,
-                                )
-                              : "—"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          )}
+          <RetirementSnapshotTable
+            snapshots={allSnapshots}
+            hasPensionFunds={hasPensionFunds}
+            incomeStartAges={incomeStartAges}
+            fiAge={fiAge}
+            phaseLabel={L.prefix}
+            currency={currency}
+            scaleForModeAtAge={scaleForModeAtAge}
+          />
 
           <Card className="bg-muted/30 border-dashed">
             <CardContent className="text-muted-foreground flex gap-3 py-5 text-xs leading-relaxed">

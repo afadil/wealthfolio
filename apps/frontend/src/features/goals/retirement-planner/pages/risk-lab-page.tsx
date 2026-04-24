@@ -16,6 +16,7 @@ import {
   CardTitle,
   Skeleton,
   formatAmount,
+  formatCompactAmount,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
@@ -72,21 +73,6 @@ const CHART = {
 
 function fmt(value: number, currency: string) {
   return formatAmount(value, currency);
-}
-
-function fmtCompact(value: number, currency: string) {
-  const abs = Math.abs(value);
-  const maximumFractionDigits = abs >= 1_000_000 ? 2 : abs >= 100_000 ? 0 : abs >= 1_000 ? 1 : 0;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      notation: "compact",
-      maximumFractionDigits,
-    }).format(value);
-  } catch {
-    return formatAmount(value, currency);
-  }
 }
 
 function pct(value: number) {
@@ -170,7 +156,7 @@ function InlineAmountTooltip({
             tone === "shortfall" ? "text-amber-600" : "text-foreground",
           )}
         >
-          {fmtCompact(value, currency)}
+          {formatCompactAmount(value, currency)}
         </span>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs text-xs">
@@ -358,15 +344,15 @@ function PlanResilienceHero({
   const gapLabel =
     !overview || !hasGap
       ? isTraditional && surplus > 0
-        ? fmtCompact(surplus, currency)
+        ? formatCompactAmount(surplus, currency)
         : "None"
-      : fmtCompact(overview.shortfallAtGoalAge, currency);
+      : formatCompactAmount(overview.shortfallAtGoalAge, currency);
   const gapDetail =
     !overview || !hasGap
       ? isTraditional && surplus > 0
         ? "surplus"
         : "funded"
-      : `${fmtCompact(overview.shortfallAtGoalAge, currency)} gap`;
+      : `${formatCompactAmount(overview.shortfallAtGoalAge, currency)} gap`;
   const fiDetail = fiAge
     ? fiAge <= desiredAge
       ? "on target"
@@ -419,7 +405,7 @@ function PlanResilienceHero({
           {isTraditional ? (
             <HeroMetric
               label="Projected balance"
-              value={overview ? fmtCompact(overview.portfolioAtGoalAge, currency) : "—"}
+              value={overview ? formatCompactAmount(overview.portfolioAtGoalAge, currency) : "—"}
               detail={`at age ${desiredAge}`}
               tone={isBaselineHealthy ? "good" : "bad"}
             />
@@ -453,7 +439,7 @@ function compactDelta(value: number, currency: string) {
   if (Math.abs(value) < 1) return "—";
   const direction = value > 0 ? "↑" : "↓";
   const sign = value > 0 ? "+" : "-";
-  return `${direction}${sign}${fmtCompact(Math.abs(value), currency)}`;
+  return `${direction}${sign}${formatCompactAmount(Math.abs(value), currency)}`;
 }
 
 function fiAgeDeltaLabel(stress: StressTestResult) {
@@ -681,13 +667,13 @@ function StressTestsSection({
                     <StressMetric
                       label="Extra gap"
                       value={compactDelta(stress.delta.shortfallAtGoalAge, currency)}
-                      from={fmtCompact(stress.baseline.shortfallAtGoalAge, currency)}
+                      from={formatCompactAmount(stress.baseline.shortfallAtGoalAge, currency)}
                       tone={impactTextClass(stress.delta.shortfallAtGoalAge)}
                     />
                     <StressMetric
                       label="Money left"
                       value={compactDelta(stress.delta.portfolioAtHorizon, currency)}
-                      from={fmtCompact(stress.baseline.portfolioAtHorizon, currency)}
+                      from={formatCompactAmount(stress.baseline.portfolioAtHorizon, currency)}
                       tone={impactTextClass(stress.delta.portfolioAtHorizon, false)}
                     />
                   </div>
@@ -818,7 +804,7 @@ function MonteCarloFanChart({
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
-          tickFormatter={(value) => fmtCompact(Number(value), currency)}
+          tickFormatter={(value) => formatCompactAmount(Number(value), currency)}
         />
         <Tooltip content={<MonteCarloTooltip currency={currency} />} />
         <Area
@@ -893,14 +879,14 @@ function MonteCarloDistributionSection({
     <Card className="overflow-hidden">
       <CardHeader className="border-b p-0">
         <div className="flex flex-col gap-5 p-5 md:flex-row md:items-start md:justify-between md:p-6">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-muted-foreground/60 text-[10px] font-normal uppercase leading-none tracking-[0.24em]">
               Market paths
             </p>
             <CardTitle className="mt-2 font-serif text-[23px] font-normal leading-[1.05] tracking-[-0.02em]">
               How often could the money last?
             </CardTitle>
-            <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+            <p className="text-muted-foreground mt-4 max-w-[900px] text-sm leading-relaxed">
               We test the same plan across many possible market paths. The shaded range shows
               bad-to-good outcomes; the line shows the middle path. {moneyLastsCopy}
             </p>
@@ -991,18 +977,18 @@ function MonteCarloDistributionSection({
               />
               <SimulationMetric
                 label="Bad path"
-                value={fmtCompact(result.finalPortfolioAtHorizon.p10, plan.currency)}
+                value={formatCompactAmount(result.finalPortfolioAtHorizon.p10, plan.currency)}
                 detail={`age ${plan.personal.planningHorizonAge}`}
                 tone={result.finalPortfolioAtHorizon.p10 > 0 ? "default" : "bad"}
               />
               <SimulationMetric
                 label="Middle path"
-                value={fmtCompact(result.finalPortfolioAtHorizon.p50, plan.currency)}
+                value={formatCompactAmount(result.finalPortfolioAtHorizon.p50, plan.currency)}
                 detail={`age ${plan.personal.planningHorizonAge}`}
               />
               <SimulationMetric
                 label="Good path"
-                value={fmtCompact(result.finalPortfolioAtHorizon.p90, plan.currency)}
+                value={formatCompactAmount(result.finalPortfolioAtHorizon.p90, plan.currency)}
                 detail={`age ${plan.personal.planningHorizonAge}`}
                 tone="good"
               />
@@ -1053,7 +1039,7 @@ function MonteCarloDistributionSection({
 }
 
 function axisMoney(value: number, currency: string) {
-  return fmtCompact(value, currency).replace(".0", "");
+  return formatCompactAmount(value, currency).replace(".0", "");
 }
 
 function SensitivityMatrixCard({
@@ -1191,12 +1177,12 @@ function sensitivityCellStyle({
 
 function decisionCellLabel(cell: DecisionSensitivityCell, currency: string) {
   if (cell.shortfallAtGoalAge > 1) {
-    return `Gap ${fmtCompact(cell.shortfallAtGoalAge, currency)}`;
+    return `Gap ${formatCompactAmount(cell.shortfallAtGoalAge, currency)}`;
   }
   if (cell.portfolioAtHorizon <= 0) {
     return "Runs short";
   }
-  return fmtCompact(cell.portfolioAtHorizon, currency);
+  return formatCompactAmount(cell.portfolioAtHorizon, currency);
 }
 
 function DecisionHeatmap({
@@ -1560,7 +1546,7 @@ function SorrChart({
           axisLine={false}
           tickLine={false}
           tick={{ fill: CHART.muted, fontSize: 12 }}
-          tickFormatter={(value) => fmtCompact(Number(value), currency)}
+          tickFormatter={(value) => formatCompactAmount(Number(value), currency)}
         />
         <Tooltip
           content={<SorrTooltip currency={currency} />}
@@ -1660,7 +1646,7 @@ function AdvancedSection({
                   <span className="text-muted-foreground truncate">{scenario.label}</span>
                   <span className="font-medium">
                     {scenario.survived
-                      ? fmtCompact(scenario.finalValue, plan.currency)
+                      ? formatCompactAmount(scenario.finalValue, plan.currency)
                       : scenario.failureAge
                         ? `Runs short ${scenario.failureAge}`
                         : `Gap ${scenario.spendingShortfallAge ?? "?"}`}
