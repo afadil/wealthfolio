@@ -156,10 +156,10 @@ export function CategorySidePanel({
           if (eligibleTotal > 0) {
             // Distribute proportionally based on current values
             const currentValue = getSavedPercent(assetId);
-            return Math.round((currentValue / eligibleTotal) * remaining * 100) / 100;
+            return (currentValue / eligibleTotal) * remaining;
           } else {
             // Distribute equally if no current values
-            return Math.round((remaining / eligibleHoldings.length) * 100) / 100;
+            return remaining / eligibleHoldings.length;
           }
         }
 
@@ -496,7 +496,7 @@ export function CategorySidePanel({
           {hasUnsavedChanges && (
             <div className="space-y-2">
               {/* Validation message */}
-              {totalPercent !== 100 && (
+              {Math.abs(totalPercent - 100) > 0.005 && (
                 <div
                   className={`rounded-md p-3 text-sm ${
                     totalPercent > 100
@@ -551,77 +551,104 @@ export function CategorySidePanel({
             <div className="space-y-4">
               <h3 className="text-sm font-medium">Holdings by Type</h3>
 
-              {groupedHoldings.map((group) => (
-                <Collapsible
-                  key={group.type}
-                  open={!collapsedGroups.has(group.type)}
-                  onOpenChange={() => toggleGroup(group.type)}
-                >
-                  <div className="space-y-2">
-                    {/* Group header */}
-                    <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between rounded-md p-2">
-                      <div className="flex items-center gap-2">
-                        <Icons.ChevronRight
-                          className={`h-4 w-4 transition-transform ${
-                            !collapsedGroups.has(group.type) ? "rotate-90" : ""
-                          }`}
-                        />
-                        <span className="font-medium capitalize">{group.type}</span>
-                      </div>
-                      <span className="text-muted-foreground text-sm">
-                        {baseCurrency} {group.totalValue.toFixed(2)}
-                      </span>
-                    </CollapsibleTrigger>
-
-                    {/* Progress bar for group showing % of category */}
-                    {(() => {
-                      const isExpanded = !collapsedGroups.has(group.type);
-                      return (
-                        <div
-                          className={`space-y-1 transition-opacity ${isExpanded ? "opacity-30" : "opacity-100"}`}
-                        >
-                          <div
-                            className="h-4 w-full overflow-hidden rounded"
-                            style={{ backgroundColor: `${categoryColor}20` }}
-                          >
-                            <div
-                              className="h-full"
-                              style={{
-                                width: `${Math.min(group.percentOfCategory, 100)}%`,
-                                backgroundColor: categoryColor,
-                              }}
+              {(() => {
+                const sortedByWeight = [...groupedHoldings].sort(
+                  (a, b) => b.percentOfCategory - a.percentOfCategory,
+                );
+                const alphaByRank = ["FF", "BB", "77", "44"];
+                const rankMap = new Map(
+                  sortedByWeight.map((g, i) => [
+                    g.type,
+                    alphaByRank[Math.min(i, alphaByRank.length - 1)],
+                  ]),
+                );
+                return groupedHoldings.map((group) => {
+                  const fillColor = `${categoryColor}${rankMap.get(group.type) ?? "FF"}`;
+                  return (
+                    <Collapsible
+                      key={group.type}
+                      open={!collapsedGroups.has(group.type)}
+                      onOpenChange={() => toggleGroup(group.type)}
+                    >
+                      <div className="space-y-2">
+                        {/* Group header */}
+                        <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between rounded-md p-2">
+                          <div className="flex items-center gap-2">
+                            <Icons.ChevronRight
+                              className={`h-4 w-4 transition-transform ${
+                                !collapsedGroups.has(group.type) ? "rotate-90" : ""
+                              }`}
                             />
+                            <span className="font-medium capitalize">{group.type}</span>
                           </div>
-                          <div className="text-muted-foreground text-xs">
-                            {group.percentOfCategory.toFixed(1)}% of {categoryName}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                          <span className="text-muted-foreground text-sm">
+                            {baseCurrency} {group.totalValue.toFixed(2)}
+                          </span>
+                        </CollapsibleTrigger>
 
-                    <CollapsibleContent className="space-y-4">
-                      {group.holdings.map((holding) => (
-                        <HoldingTargetRow
-                          key={holding.symbol}
-                          holding={holding}
-                          targetPercent={getDisplayPercent(holding.symbol)}
-                          isLocked={getIsLocked(holding.symbol)}
-                          isAutoDistributed={isAutoBalanced(holding.symbol)}
-                          categoryColor={categoryColor}
-                          categoryPercent={categoryPercent}
-                          baseCurrency={baseCurrency}
-                          totalValue={totalValue}
-                          onEditChange={handleEditChange}
-                          onToggleLock={handleToggleLock}
-                          onDelete={handleDelete}
-                          onNavigate={handleNavigateToHolding}
-                          getCascadedPercent={getCascadedPercent}
-                        />
-                      ))}
-                    </CollapsibleContent>
-                  </div>
-                </Collapsible>
-              ))}
+                        {/* Progress bar for group showing % of category */}
+                        {(() => {
+                          const isExpanded = !collapsedGroups.has(group.type);
+                          return (
+                            <div
+                              className={`space-y-1 transition-opacity ${isExpanded ? "opacity-30" : "opacity-100"}`}
+                            >
+                              <div
+                                className="h-4 w-full overflow-hidden rounded"
+                                style={{ backgroundColor: `${categoryColor}20` }}
+                              >
+                                <div
+                                  className="h-full"
+                                  style={{
+                                    width: `${Math.min(group.percentOfCategory, 100)}%`,
+                                    backgroundColor: fillColor,
+                                  }}
+                                />
+                              </div>
+                              <div className="text-muted-foreground text-xs">
+                                {group.percentOfCategory.toFixed(1)}% of {categoryName}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        <CollapsibleContent className="space-y-4">
+                          {(() => {
+                            const sortedHoldings = [...group.holdings].sort(
+                              (a, b) => b.marketValue - a.marketValue,
+                            );
+                            const holdingAlphaByRank = ["CC", "88", "55", "33"];
+                            const holdingRankMap = new Map(
+                              sortedHoldings.map((h, i) => [
+                                h.symbol,
+                                holdingAlphaByRank[Math.min(i, holdingAlphaByRank.length - 1)],
+                              ]),
+                            );
+                            return group.holdings.map((holding) => (
+                              <HoldingTargetRow
+                                key={holding.symbol}
+                                holding={holding}
+                                targetPercent={getDisplayPercent(holding.symbol)}
+                                isLocked={getIsLocked(holding.symbol)}
+                                isAutoDistributed={isAutoBalanced(holding.symbol)}
+                                categoryColor={`${categoryColor}${holdingRankMap.get(holding.symbol) ?? "CC"}`}
+                                categoryPercent={categoryPercent}
+                                baseCurrency={baseCurrency}
+                                totalValue={totalValue}
+                                onEditChange={handleEditChange}
+                                onToggleLock={handleToggleLock}
+                                onDelete={handleDelete}
+                                onNavigate={handleNavigateToHolding}
+                                getCascadedPercent={getCascadedPercent}
+                              />
+                            ));
+                          })()}
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>

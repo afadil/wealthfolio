@@ -118,7 +118,12 @@ export function HoldingTargetRow({
               max="100"
               step="0.1"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || /^\d{0,3}(\.\d{0,2})?$/.test(val)) {
+                  setInputValue(val);
+                }
+              }}
               onKeyDown={handleKeyDown}
               onBlur={handleSave}
               disabled={isLocked}
