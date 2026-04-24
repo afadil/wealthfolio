@@ -1,7 +1,7 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { Goal } from "@/lib/types";
-import { Card, cn, formatAmount } from "@wealthfolio/ui";
+import { Card, cn, formatAmount, formatCompactAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 
 const DEFAULT_QUOTES: Record<string, string> = {
@@ -41,23 +41,6 @@ function formatTargetDate(targetDate?: string): string | null {
   return d
     .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     .toUpperCase();
-}
-
-function formatCompact(value: number, currency: string): string {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) {
-    return formatAmount(Math.round((value / 1_000_000) * 100) / 100, currency).replace(
-      /([\d.]+)/,
-      (m) => `${Number(m).toFixed(2)}M`,
-    );
-  }
-  if (abs >= 1000) {
-    return formatAmount(Math.round((value / 1000) * 10) / 10, currency).replace(
-      /([\d.]+)/,
-      (m) => `${Number(m).toFixed(1)}K`,
-    );
-  }
-  return formatAmount(Math.round(value), currency);
 }
 
 function ProgressBar({ progress, fillClass }: { progress: number; fillClass: string }) {
@@ -144,7 +127,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
   const remainingDisplay = isBalanceHidden
     ? "••••"
     : hasRemaining
-      ? formatCompact(remaining, currency)
+      ? formatCompactAmount(remaining, currency)
       : "—";
 
   const progressPct = (progress * 100).toFixed(1);

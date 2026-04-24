@@ -7,7 +7,7 @@ import {
   PageContent,
   PageHeader,
   Skeleton,
-  formatAmount,
+  formatCompactAmount,
   formatPercent,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -15,23 +15,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { GoalCard } from "./components/goal-card";
 import { useGoals } from "./hooks/use-goals";
-
-function compactCurrency(value: number, currency: string): string {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) {
-    return formatAmount(value, currency).replace(
-      /([\d.,]+)/,
-      () => `${(value / 1_000_000).toFixed(2)}M`,
-    );
-  }
-  if (abs >= 1_000) {
-    return formatAmount(value, currency).replace(
-      /([\d.,]+)/,
-      () => `${(value / 1_000).toFixed(1)}K`,
-    );
-  }
-  return formatAmount(Math.round(value), currency);
-}
 
 function StatBlock({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -56,8 +39,8 @@ function SummaryStats({ goals }: { goals: Goal[] }) {
     (g) => g.statusHealth === "on_track" || g.statusLifecycle === "achieved",
   ).length;
 
-  const savedDisplay = isBalanceHidden ? "••••" : compactCurrency(saved, currency);
-  const targetDisplay = isBalanceHidden ? "••••" : compactCurrency(target, currency);
+  const savedDisplay = isBalanceHidden ? "••••" : formatCompactAmount(saved, currency);
+  const targetDisplay = isBalanceHidden ? "••••" : formatCompactAmount(target, currency);
 
   return (
     <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2">
