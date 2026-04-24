@@ -450,7 +450,7 @@ export function CategorySidePanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-4xl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {categoryColor && (
@@ -461,53 +461,34 @@ export function CategorySidePanel({
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
-          {/* Allocation Target Section (Read-only) */}
+          {/* Allocation Target Section (Read-only) — actual fills, target = notch */}
           <div className="rounded-lg border p-4">
-            <h3 className="mb-3 text-sm font-medium">Allocation Target</h3>
-            <div className="space-y-2">
-              {/* Target bar */}
-              <div className="flex items-center gap-2">
-                <div
-                  className="relative h-6 flex-1 overflow-hidden rounded"
-                  style={{ backgroundColor: `${categoryColor}20` }}
-                >
-                  <div
-                    className="absolute inset-y-0 left-0 rounded opacity-50 dark:opacity-70"
-                    style={{
-                      width: `${Math.min(categoryPercent, 100)}%`,
-                      backgroundColor: categoryColor,
-                    }}
-                  />
-                  <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium">
-                    Target
-                  </span>
-                </div>
-                <span className="w-16 text-right text-sm font-semibold">
-                  {categoryPercent.toFixed(1)}%
-                </span>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium">Allocation Target</h3>
+              <div className="text-muted-foreground flex items-center gap-3 text-xs tabular-nums">
+                <span>{actualPercent.toFixed(1)}% actual</span>
+                <span>/ {categoryPercent.toFixed(1)}% target</span>
               </div>
-
-              {/* Actual bar */}
-              <div className="flex items-center gap-2">
+            </div>
+            <div
+              className="relative h-4 overflow-hidden rounded"
+              style={{ backgroundColor: `${categoryColor}20` }}
+            >
+              {/* Actual fill */}
+              <div
+                className="absolute left-0 top-0 h-full transition-all"
+                style={{
+                  width: `${Math.min(actualPercent, 100)}%`,
+                  backgroundColor: categoryColor,
+                }}
+              />
+              {/* Target notch */}
+              {categoryPercent > 0 && (
                 <div
-                  className="relative h-6 flex-1 overflow-hidden rounded"
-                  style={{ backgroundColor: `${categoryColor}20` }}
-                >
-                  <div
-                    className="absolute inset-y-0 left-0 rounded"
-                    style={{
-                      width: `${Math.min(actualPercent, 100)}%`,
-                      backgroundColor: categoryColor,
-                    }}
-                  />
-                  <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium">
-                    Actual
-                  </span>
-                </div>
-                <span className="w-16 text-right text-sm font-semibold">
-                  {actualPercent.toFixed(1)}%
-                </span>
-              </div>
+                  className="bg-foreground absolute top-0 h-full w-0.5"
+                  style={{ left: `${Math.min(categoryPercent, 100)}%` }}
+                />
+              )}
             </div>
           </div>
 
@@ -593,23 +574,30 @@ export function CategorySidePanel({
                     </CollapsibleTrigger>
 
                     {/* Progress bar for group showing % of category */}
-                    <div className="space-y-1">
-                      <div
-                        className="h-2 w-full rounded"
-                        style={{ backgroundColor: `${categoryColor}20` }}
-                      >
+                    {(() => {
+                      const isExpanded = !collapsedGroups.has(group.type);
+                      return (
                         <div
-                          className="h-full rounded"
-                          style={{
-                            width: `${Math.min(group.percentOfCategory, 100)}%`,
-                            backgroundColor: categoryColor,
-                          }}
-                        />
-                      </div>
-                      <div className="text-muted-foreground text-xs">
-                        {group.percentOfCategory.toFixed(1)}% of {categoryName}
-                      </div>
-                    </div>
+                          className={`space-y-1 transition-opacity ${isExpanded ? "opacity-30" : "opacity-100"}`}
+                        >
+                          <div
+                            className="h-4 w-full overflow-hidden rounded"
+                            style={{ backgroundColor: `${categoryColor}20` }}
+                          >
+                            <div
+                              className="h-full"
+                              style={{
+                                width: `${Math.min(group.percentOfCategory, 100)}%`,
+                                backgroundColor: categoryColor,
+                              }}
+                            />
+                          </div>
+                          <div className="text-muted-foreground text-xs">
+                            {group.percentOfCategory.toFixed(1)}% of {categoryName}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <CollapsibleContent className="space-y-4">
                       {group.holdings.map((holding) => (

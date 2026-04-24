@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 import { ChartContainer } from "@wealthfolio/ui/components/ui/chart";
@@ -17,6 +17,8 @@ interface AllocationDonutProps {
   currentData: AllocationDataItem[];
   totalValue?: number;
   currency?: string;
+  hoveredId?: string | null;
+  onHover?: (id: string | null) => void;
   onCategoryClick?: (categoryId: string) => void;
   className?: string;
 }
@@ -26,17 +28,17 @@ export function AllocationDonut({
   currentData,
   totalValue = 0,
   currency = "USD",
+  hoveredId = null,
+  onHover,
   onCategoryClick,
   className,
 }: AllocationDonutProps) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-
   const handleMouseEnter = (_: React.MouseEvent, index: number) => {
-    setHoverIndex(index);
+    onHover?.(currentData[index]?.id ?? null);
   };
 
   const handleMouseLeave = () => {
-    setHoverIndex(null);
+    onHover?.(null);
   };
 
   const handleClick = (_: unknown, index: number) => {
@@ -46,7 +48,8 @@ export function AllocationDonut({
   };
 
   // Center label shows hovered category info
-  const activeItem = hoverIndex !== null ? currentData[hoverIndex] : null;
+  const activeItem =
+    hoveredId !== null ? (currentData.find((d) => d.id === hoveredId) ?? null) : null;
   const totalCurrent = useMemo(
     () => currentData.reduce((sum, d) => sum + d.value, 0),
     [currentData],
@@ -98,10 +101,10 @@ export function AllocationDonut({
             dataKey="value"
             cx="50%"
             cy="50%"
-            innerRadius="50%"
-            outerRadius="75%"
-            paddingAngle={2}
-            cornerRadius={4}
+            innerRadius="65%"
+            outerRadius="82%"
+            paddingAngle={1}
+            cornerRadius={6}
             startAngle={90}
             endAngle={-270}
             isAnimationActive={false}
@@ -112,7 +115,7 @@ export function AllocationDonut({
               <Cell
                 key={`current-${index}`}
                 fill={item.color}
-                opacity={hoverIndex !== null && hoverIndex !== index ? 0.4 : 1}
+                opacity={hoveredId !== null && hoveredId !== item.id ? 0.4 : 1}
                 style={{ cursor: onCategoryClick ? "pointer" : "default" }}
               />
             ))}

@@ -16,6 +16,7 @@ import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/types";
 
 import { AllocationDonut } from "./allocation-donut";
+import { HealthStrip } from "./health-strip";
 import { TargetList } from "./target-list";
 import { CategorySidePanel } from "./category-side-panel";
 import { useTargetMutations } from "../use-target-mutations";
@@ -52,6 +53,9 @@ export function AllocationsOverview({
 
   // Get target allocations to find the real allocation IDs
   const { allocations: targetAllocations } = useTargetAllocations(activeTarget?.id);
+
+  // Hover sync between donut and bullet rows
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Side panel state
   const [sidePanelOpen, setSidePanelOpen] = useState(false);
@@ -270,28 +274,36 @@ export function AllocationsOverview({
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[9fr_11fr]">
-          {/* Left: Pie chart — stretches to match right column */}
-          <Card className="flex flex-col overflow-hidden">
-            <CardHeader className="shrink-0 pb-4">
-              <CardTitle className="text-sm font-medium uppercase tracking-wider">
-                Current Allocation
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 items-center justify-center p-4">
-              <AllocationDonut
-                targetData={targetData}
-                currentData={currentData}
-                totalValue={totalPortfolioValue}
-                currency={baseCurrency}
-                onCategoryClick={handleDonutClick}
-                className="h-160 w-160"
-              />
-            </CardContent>
-          </Card>
+        <>
+          <HealthStrip
+            deviations={deviations}
+            currency={baseCurrency}
+            totalValue={totalPortfolioValue}
+          />
 
-          {/* Right: Target Status + Target vs Actual */}
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+            {/* Left: Donut */}
+            <Card className="flex flex-col overflow-hidden">
+              <CardHeader className="shrink-0 pb-4">
+                <CardTitle className="text-sm font-medium uppercase tracking-wider">
+                  Current Allocation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex min-h-0 flex-1 items-center justify-center p-4">
+                <AllocationDonut
+                  targetData={targetData}
+                  currentData={currentData}
+                  totalValue={totalPortfolioValue}
+                  currency={baseCurrency}
+                  hoveredId={hoveredId}
+                  onHover={setHoveredId}
+                  onCategoryClick={handleDonutClick}
+                  className="h-160 w-160"
+                />
+              </CardContent>
+            </Card>
+
+            {/* Right: Bullet target list */}
             <TargetList
               deviations={deviations}
               targetId={activeTarget?.id}
@@ -299,10 +311,12 @@ export function AllocationsOverview({
               onDeleteAllocation={handleDeleteAllocation}
               onToggleLock={handleToggleLock}
               isSaving={batchSaveAllocationsMutation.isPending}
+              hoveredId={hoveredId}
+              onHover={setHoveredId}
               onCategoryClick={handleCategoryClick}
             />
           </div>
-        </div>
+        </>
       )}
 
       {/* Category Side Panel for Holdings */}

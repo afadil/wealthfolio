@@ -148,26 +148,26 @@ export function HoldingTargetRow({
         )}
       </div>
 
-      {/* Visual progress bar */}
+      {/* Visual progress bar — actual fills, target = notch */}
       <div
         className="relative h-3 flex-1 overflow-hidden rounded"
         style={{ backgroundColor: `${categoryColor}20` }}
       >
-        {/* Target bar */}
+        {/* Actual fill */}
         <div
           className="absolute left-0 top-0 h-full transition-all"
           style={{
-            width: `${Math.min(targetPercent, 100)}%`,
+            width: `${Math.min(currentPercent, 100)}%`,
             backgroundColor: categoryColor,
-            opacity: isAutoDistributed ? 0.4 : 0.6,
           }}
         />
 
-        {/* Current indicator (line) */}
+        {/* Target notch */}
         <div
           className="bg-foreground absolute top-0 h-full w-0.5"
           style={{
-            left: `${Math.min(currentPercent, 100)}%`,
+            left: `${Math.min(targetPercent, 100)}%`,
+            opacity: isAutoDistributed ? 0.4 : 1,
           }}
         />
       </div>

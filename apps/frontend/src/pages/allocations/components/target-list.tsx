@@ -13,6 +13,8 @@ interface TargetListProps {
   onDeleteAllocation: (allocationId: string) => void;
   onToggleLock: (allocation: NewTargetAllocation) => void;
   isSaving: boolean;
+  hoveredId?: string | null;
+  onHover?: (id: string | null) => void;
   onCategoryClick?: (
     categoryId: string,
     categoryName: string,
@@ -36,6 +38,8 @@ export function TargetList({
   onDeleteAllocation,
   onToggleLock,
   isSaving,
+  hoveredId = null,
+  onHover,
   onCategoryClick,
 }: TargetListProps) {
   const { allocations } = useTargetAllocations(targetId);
@@ -399,236 +403,295 @@ export function TargetList({
   }
 
   return (
-    <>
-      {/* Target Status card */}
-      <Card>
-        <CardHeader className="pb-2">
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium uppercase tracking-wider">
-            Target Status
+            Allocation Targets
           </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-muted-foreground text-xs">Allocated</span>
-              <p
-                className={cn(
-                  "text-2xl font-bold",
-                  actualTotalTarget > 100 && "text-red-600 dark:text-red-400",
-                )}
-              >
-                {actualTotalTarget.toFixed(1)}%
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="text-muted-foreground text-xs">Remaining</span>
-              <p
-                className={cn(
-                  "text-2xl font-bold",
-                  actualRemainingValue < 0
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-green-600 dark:text-green-400",
-                )}
-              >
-                {actualRemainingValue.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Target vs Actual card */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium uppercase tracking-wider">
-              Target vs Actual
-            </CardTitle>
-            {(allocations.length > 0 || hasPendingEdits) && (
-              <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs">
-                <Icons.Trash className="mr-1.5 h-3 w-3" />
-                Clear All
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {deviations.map((d) => {
-            const displayPercent = getDisplayPercent(d.categoryId);
-            const isLocked = getIsLocked(d.categoryId);
-            const drift = d.currentPercent - displayPercent;
-            const isEditing = editingCategoryId === d.categoryId;
-
-            return (
-              <div key={d.categoryId} className="space-y-3 py-3">
-                {/* Header: name + holdings button + delete */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: d.color }} />
-                    <span className="font-medium">{d.categoryName}</span>
-                    {onCategoryClick &&
-                      d.categoryId !== "CASH" &&
-                      d.categoryId !== "CASH_BANK_DEPOSITS" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs"
-                          onClick={() => {
-                            const savedAllocation = getSavedAllocation(d.categoryId);
-                            onCategoryClick(
-                              d.categoryId,
-                              d.categoryName,
-                              d.color,
-                              displayPercent,
-                              d.currentPercent,
-                              savedAllocation?.id,
-                            );
-                          }}
-                          title="View and edit holdings"
-                        >
-                          <Icons.ChevronRight className="h-3 w-3" />
-                          Holdings
-                        </Button>
-                      )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleDelete(d.categoryId)}
-                    title="Remove target"
-                  >
-                    <Icons.Trash className="h-3 w-3" />
-                  </Button>
-                </div>
-
-                {/* Stats: Target, Actual, Drift */}
-                <div className="grid grid-cols-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground text-xs">Target</span>
-                    <p className="font-semibold">{displayPercent.toFixed(2)}%</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground text-xs">Actual</span>
-                    <p className="font-semibold">{d.currentPercent.toFixed(2)}%</p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-muted-foreground text-xs">Drift</span>
-                    <p
-                      className={cn(
-                        "font-semibold",
-                        drift > 0.5 && "text-green-600 dark:text-green-400",
-                        drift < -0.5 && "text-red-600 dark:text-red-400",
-                      )}
-                    >
-                      {drift > 0 ? "+" : ""}
-                      {drift.toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-
-                {/* Target bar with click-to-edit + lock */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded opacity-50 dark:opacity-70"
-                        style={{
-                          width: `${Math.min(displayPercent, 100)}%`,
-                          backgroundColor: d.color,
-                        }}
-                      />
-                      <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium">
-                        Target
-                      </span>
-                    </div>
-                    {/* Click-to-edit target value */}
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={editValue}
-                        onChange={(e) => handleEditChange(e.target.value)}
-                        onBlur={() => handleEditCommit(d.categoryId)}
-                        onKeyDown={(e) => handleEditKeyDown(e, d.categoryId)}
-                        autoFocus
-                        className="border-primary bg-background text-foreground h-7 w-16 rounded border px-2 text-right text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    ) : (
-                      <span
-                        onClick={() => handleStartEdit(d.categoryId)}
-                        className={cn(
-                          "w-16 text-right text-sm font-semibold transition-colors",
-                          isLocked
-                            ? "cursor-not-allowed opacity-50"
-                            : "hover:text-primary cursor-pointer",
-                          isAutoBalanced(d.categoryId) &&
-                            "text-muted-foreground font-normal italic",
-                        )}
-                      >
-                        {displayPercent.toFixed(2)}%
-                      </span>
-                    )}
-                    {/* Lock toggle */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleLock(d.categoryId)}
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors",
-                        isLocked
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                      title={isLocked ? "Unlock" : "Lock"}
-                    >
-                      {isLocked ? (
-                        <Icons.Lock className="h-3.5 w-3.5" />
-                      ) : (
-                        <Icons.LockOpen className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Actual bar (read-only, partial fill) */}
-                  <div className="flex items-center gap-2">
-                    <div className="bg-muted relative h-7 flex-1 overflow-hidden rounded">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded"
-                        style={{
-                          width: `${Math.min(d.currentPercent, 100)}%`,
-                          backgroundColor: d.color,
-                        }}
-                      />
-                      <span className="relative z-10 flex h-full items-center px-2 text-xs font-medium">
-                        Actual
-                      </span>
-                    </div>
-                    <span className="w-16 text-right text-sm">{d.currentPercent.toFixed(2)}%</span>
-                    {/* Spacer to align with lock button */}
-                    <div className="w-7 shrink-0" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Save button */}
-          {hasPendingEdits && (
-            <Button className="w-full" onClick={handleSaveAll} disabled={isSaving || !isValid}>
-              <Icons.Check className="mr-2 h-4 w-4" />
-              {isSaving ? "Saving..." : "Save All Targets"}
+          {(allocations.length > 0 || hasPendingEdits) && (
+            <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs">
+              <Icons.Trash className="mr-1.5 h-3 w-3" />
+              Clear All
             </Button>
           )}
-          {/* Validation error message */}
-          {!isValid && error && (
-            <p className="mt-2 text-center text-sm font-medium text-red-600 dark:text-red-400">
-              {error}
-            </p>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pb-4 pl-6 pr-4">
+        {/* Column headers */}
+        <div className="mb-1 grid grid-cols-[150px_1fr_64px_48px_52px] gap-3 px-0">
+          <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+            Class
+          </p>
+          <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
+            Actual · notch = target
+          </p>
+          <p className="text-muted-foreground text-right text-[10px] font-semibold uppercase tracking-wider">
+            Weight
+          </p>
+          <p className="text-muted-foreground text-right text-[10px] font-semibold uppercase tracking-wider">
+            Drift
+          </p>
+          <div />
+        </div>
+
+        {/* Rows */}
+        {deviations.map((d) => {
+          const displayPercent = getDisplayPercent(d.categoryId);
+          const isLocked = getIsLocked(d.categoryId);
+          const isEditing = editingCategoryId === d.categoryId;
+          const drift = d.currentPercent - displayPercent;
+          const absDrift = Math.abs(drift);
+          const isRowHovered = hoveredId === d.categoryId;
+          const isOtherHovered = hoveredId !== null && !isRowHovered;
+
+          const driftColor =
+            absDrift < 1
+              ? "text-green-600 dark:text-green-400"
+              : absDrift < 5
+                ? "text-yellow-600 dark:text-yellow-500"
+                : "text-red-600 dark:text-red-400";
+
+          const driftBg =
+            absDrift < 1
+              ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900"
+              : absDrift < 5
+                ? "bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-900"
+                : "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900";
+
+          const driftLabel = absDrift < 1 ? "✓" : `${drift > 0 ? "+" : ""}${drift.toFixed(1)}%`;
+
+          return (
+            <div
+              key={d.categoryId}
+              className={cn(
+                "group grid grid-cols-[150px_1fr_64px_48px_52px] items-center gap-3 border-t py-5 transition-all",
+                isOtherHovered && "opacity-40",
+                isRowHovered && "bg-black/[.03] dark:bg-white/[.03]",
+              )}
+              onMouseEnter={() => onHover?.(d.categoryId)}
+              onMouseLeave={() => onHover?.(null)}
+            >
+              {/* Col 1 — Class label */}
+              <div className="flex min-w-0 items-center gap-2 pl-2">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ backgroundColor: d.color }}
+                />
+                <div className="min-w-0">
+                  <button
+                    className={cn(
+                      "block truncate text-left text-sm font-semibold leading-tight",
+                      onCategoryClick &&
+                        d.categoryId !== "CASH" &&
+                        d.categoryId !== "CASH_BANK_DEPOSITS" &&
+                        "hover:text-primary cursor-pointer",
+                    )}
+                    onClick={() => {
+                      if (
+                        onCategoryClick &&
+                        d.categoryId !== "CASH" &&
+                        d.categoryId !== "CASH_BANK_DEPOSITS"
+                      ) {
+                        const savedAllocation = getSavedAllocation(d.categoryId);
+                        onCategoryClick(
+                          d.categoryId,
+                          d.categoryName,
+                          d.color,
+                          displayPercent,
+                          d.currentPercent,
+                          savedAllocation?.id,
+                        );
+                      }
+                    }}
+                    title={
+                      onCategoryClick &&
+                      d.categoryId !== "CASH" &&
+                      d.categoryId !== "CASH_BANK_DEPOSITS"
+                        ? "View holdings"
+                        : undefined
+                    }
+                  >
+                    {d.categoryName}
+                  </button>
+                </div>
+              </div>
+
+              {/* Col 2 — Bullet bar */}
+              <button
+                className={cn(
+                  "relative h-9 w-full",
+                  onCategoryClick &&
+                    d.categoryId !== "CASH" &&
+                    d.categoryId !== "CASH_BANK_DEPOSITS" &&
+                    "cursor-pointer",
+                )}
+                onClick={() => {
+                  if (
+                    onCategoryClick &&
+                    d.categoryId !== "CASH" &&
+                    d.categoryId !== "CASH_BANK_DEPOSITS"
+                  ) {
+                    const savedAllocation = getSavedAllocation(d.categoryId);
+                    onCategoryClick(
+                      d.categoryId,
+                      d.categoryName,
+                      d.color,
+                      displayPercent,
+                      d.currentPercent,
+                      savedAllocation?.id,
+                    );
+                  }
+                }}
+                title={
+                  onCategoryClick &&
+                  d.categoryId !== "CASH" &&
+                  d.categoryId !== "CASH_BANK_DEPOSITS"
+                    ? "View holdings"
+                    : undefined
+                }
+              >
+                {/* Track + fill + notch — clipped by container */}
+                <div className="bg-muted absolute inset-y-0 left-0 right-0 my-auto h-4 overflow-hidden rounded">
+                  {/* Actual fill */}
+                  <div
+                    className="absolute left-0 top-0 h-full transition-all"
+                    style={{
+                      width: `${Math.min(d.currentPercent, 100)}%`,
+                      backgroundColor: d.color,
+                    }}
+                  />
+                  {/* Target notch */}
+                  {displayPercent > 0 && (
+                    <div
+                      className="bg-foreground absolute top-0 h-full w-0.5"
+                      style={{ left: `${Math.min(displayPercent, 100)}%` }}
+                    />
+                  )}
+                </div>
+              </button>
+
+              {/* Col 3 — Weight */}
+              <div className="text-right">
+                <p className="text-sm font-bold tabular-nums">{d.currentPercent.toFixed(1)}%</p>
+                {/* Target — click to edit */}
+                {isEditing ? (
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={editValue}
+                    onChange={(e) => handleEditChange(e.target.value)}
+                    onBlur={() => handleEditCommit(d.categoryId)}
+                    onKeyDown={(e) => handleEditKeyDown(e, d.categoryId)}
+                    autoFocus
+                    className="border-primary bg-background text-foreground mt-0.5 h-5 w-full rounded border px-1 text-right text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                ) : (
+                  <button
+                    onClick={() => handleStartEdit(d.categoryId)}
+                    disabled={isLocked}
+                    className={cn(
+                      "text-muted-foreground mt-0.5 block w-full text-right text-xs tabular-nums transition-colors",
+                      isLocked
+                        ? "cursor-not-allowed opacity-40"
+                        : isAutoBalanced(d.categoryId)
+                          ? "cursor-pointer italic"
+                          : "hover:text-foreground cursor-pointer",
+                    )}
+                    title={isLocked ? "Locked" : "Click to set target"}
+                  >
+                    {displayPercent > 0 ? `/ ${displayPercent.toFixed(1)}%` : "set target"}
+                  </button>
+                )}
+              </div>
+
+              {/* Col 4 — Drift badge */}
+              <div className="flex justify-end">
+                <span
+                  className={cn(
+                    "inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+                    driftColor,
+                    driftBg,
+                  )}
+                >
+                  {driftLabel}
+                </span>
+              </div>
+
+              {/* Col 5 — Lock + Delete (visible on hover, lock always shown when locked) */}
+              <div className="flex items-center justify-end gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleLock(d.categoryId)}
+                  className={cn(
+                    "h-6 w-6 items-center justify-center rounded transition-colors",
+                    isLocked
+                      ? "text-foreground flex"
+                      : "text-muted-foreground hover:text-foreground hidden group-hover:flex",
+                  )}
+                  title={isLocked ? "Unlock" : "Lock"}
+                >
+                  {isLocked ? (
+                    <Icons.Lock className="h-3 w-3" />
+                  ) : (
+                    <Icons.LockOpen className="h-3 w-3" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(d.categoryId)}
+                  className="text-muted-foreground hidden h-6 w-6 items-center justify-center rounded transition-colors hover:text-red-500 group-hover:flex"
+                  title="Remove target"
+                >
+                  <Icons.Trash className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Footer */}
+        <div className="mt-3 flex items-center justify-between border-t pt-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "text-muted-foreground text-xs tabular-nums",
+                actualTotalTarget > 100 && "text-red-600 dark:text-red-400",
+              )}
+            >
+              {actualTotalTarget.toFixed(1)}% allocated
+            </span>
+            {actualRemainingValue !== 0 && (
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  actualRemainingValue < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-muted-foreground",
+                )}
+              >
+                {actualRemainingValue > 0 ? "+" : ""}
+                {actualRemainingValue.toFixed(1)}% remaining
+              </span>
+            )}
+          </div>
+          {hasPendingEdits && (
+            <Button size="sm" onClick={handleSaveAll} disabled={isSaving || !isValid}>
+              <Icons.Check className="mr-1.5 h-3.5 w-3.5" />
+              {isSaving ? "Saving..." : "Save Targets"}
+            </Button>
           )}
-        </CardContent>
-      </Card>
-    </>
+        </div>
+
+        {!isValid && error && (
+          <p className="mt-2 text-center text-sm font-medium text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
