@@ -1,18 +1,11 @@
 import { getGoals } from "@/adapters";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { Goal } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
+import { cn, formatCompactAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
 
 const MAX_DISPLAYED_GOALS = 5;
@@ -29,6 +22,10 @@ function goalTarget(goal: Goal) {
 }
 
 function sortDashboardGoals(a: Goal, b: Goal) {
+  const aRetirement = a.goalType === "retirement" ? 0 : 1;
+  const bRetirement = b.goalType === "retirement" ? 0 : 1;
+  if (aRetirement !== bRetirement) return aRetirement - bRetirement;
+
   const dateDiff = goalTime(a) - goalTime(b);
   if (dateDiff !== 0) return dateDiff;
 
@@ -45,6 +42,23 @@ function statusDotClass(status: Goal["statusHealth"]) {
   return "bg-muted-foreground/35";
 }
 
+function formatTimeRemaining(targetDate?: string): string {
+  if (!targetDate) return "NO DEADLINE";
+  const target = new Date(targetDate);
+  const now = new Date();
+  if (!Number.isFinite(target.getTime())) return "NO DEADLINE";
+  if (target.getTime() <= now.getTime()) return "DUE";
+  let months =
+    (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+  if (target.getDate() < now.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years === 0) return `${Math.max(1, remMonths)}M`;
+  if (remMonths === 0) return `${years} YR${years === 1 ? "" : "S"}`;
+  return `${years}Y ${remMonths}M`;
+}
+
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
@@ -55,23 +69,24 @@ export function SavingGoals() {
 
   if (isLoading) {
     return (
-      <Card className="w-full border-0 bg-transparent shadow-none">
-        <CardHeader className="py-2">
-          <CardTitle className="text-md">Goals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Card className="w-full shadow-sm">
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-2.5 w-full" />
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-2.5 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+      <div className="pb-4">
+        <div className="flex items-center justify-between py-2">
+          <h2 className="text-md font-semibold">Goals</h2>
+        </div>
+        <Card className="shadow-xs w-full">
+          <CardContent className="px-5 py-6">
+            <div className="space-y-6">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-[2px] w-2/3" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -125,48 +140,72 @@ export function SavingGoals() {
         </Link>
       </div>
       <Card className="shadow-xs w-full">
-        <CardContent className="bg-transparent px-4 pb-2 pt-6">
+        <CardContent className="px-4 pb-2 pt-4">
           {visibleGoals.map((goal) => {
             const progress = goal.summaryProgress ?? 0;
+            const pct = Math.max(0, Math.min(1, progress));
             const currentValue = goal.summaryCurrentValue ?? 0;
             const target = goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
             const currency = goal.currency ?? "USD";
+            const deadline = goal.targetDate ?? goal.projectedCompletionDate;
+            const timeStr = formatTimeRemaining(deadline);
+            const pctDisplay = Math.round(pct * 100);
+
+            const currentDisplay = isBalanceHidden
+              ? "••••"
+              : formatCompactAmount(currentValue, currency);
+            const targetDisplay = isBalanceHidden
+              ? "••••"
+              : target > 0
+                ? formatCompactAmount(target, currency)
+                : "—";
 
             return (
-              <Link key={goal.id} to={`/goals/${goal.id}`} className="block">
-                <div className="mb-4 cursor-pointer items-center">
-                  <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
-                    <span
-                      className={`mr-2 h-2 w-2 shrink-0 rounded-full ${statusDotClass(goal.statusHealth)}`}
-                    />
-                    {goal.title}
-                    {progress >= 1 ? (
-                      <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
-                    ) : null}
-                  </CardDescription>
-
-                  <Progress
-                    value={Math.min(progress * 100, 100)}
-                    className="[&>div]:bg-success h-2.5 w-full"
-                  />
-
-                  <div className="text-muted-foreground mt-1 flex justify-between text-xs">
-                    <span>
-                      <AmountDisplay
-                        value={currentValue}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
+              <Link
+                key={goal.id}
+                to={`/goals/${goal.id}`}
+                className="border-border hover:bg-muted/30 group block border-b py-3 transition-colors last:border-0"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    {/* Title row with status dot */}
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold leading-tight">{goal.title}</h3>
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full",
+                          statusDotClass(goal.statusHealth),
+                        )}
                       />
-                    </span>
-                    <span>
-                      {formatPercent(progress)} of{" "}
-                      <AmountDisplay
-                        value={target}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
-                      />
-                    </span>
+                      {progress >= 1 ? (
+                        <Icons.CheckCircle className="text-success h-3.5 w-3.5 shrink-0" />
+                      ) : null}
+                    </div>
+
+                    {/* Amounts directly under title */}
+                    <div className="text-muted-foreground mt-0.5 text-[11px] tabular-nums">
+                      {currentDisplay} / {targetDisplay}
+                    </div>
                   </div>
+
+                  {/* Right: big % + time */}
+                  <div className="shrink-0 text-right">
+                    <div className="text-base font-semibold tabular-nums leading-none">
+                      {pctDisplay}
+                      <span className="text-[9px] font-medium">%</span>
+                    </div>
+                    <div className="text-muted-foreground mt-1 text-[10px] tracking-[0.1em]">
+                      {timeStr}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full-width progress bar at row bottom */}
+                <div className="bg-muted/60 relative mt-2.5 h-1.5 w-full overflow-hidden rounded-full">
+                  <div
+                    className="bg-success h-full rounded-full transition-all"
+                    style={{ width: `${pct * 100}%` }}
+                  />
                 </div>
               </Link>
             );
@@ -174,7 +213,7 @@ export function SavingGoals() {
           {hiddenGoalsCount > 0 && (
             <Link
               to="/goals"
-              className="border-border text-muted-foreground hover:bg-muted/50 flex items-center justify-between border-t py-3 text-sm transition-colors"
+              className="text-muted-foreground hover:text-foreground flex items-center justify-between pt-3 text-xs transition-colors"
             >
               <span>
                 +{hiddenGoalsCount} more {hiddenGoalsCount === 1 ? "goal" : "goals"}
