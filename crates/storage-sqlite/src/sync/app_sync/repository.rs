@@ -239,6 +239,8 @@ enum PayloadColumnResolution {
 /// Old devices may still send payloads with the pre-rename column names.
 fn apply_column_rename(table: &str, column: &str) -> Option<&'static str> {
     match (table, column) {
+        ("goals", "is_achieved") => Some("status_lifecycle"),
+        ("goals_allocation", "percent_allocation") => Some("share_percent"),
         ("import_account_templates", "import_type") => Some("context_kind"),
         _ => None,
     }
@@ -248,6 +250,7 @@ fn apply_column_rename(table: &str, column: &str) -> Option<&'static str> {
 /// Old payloads may send pre-rename enum values (e.g., "ACTIVITY" → "CSV_ACTIVITY").
 fn apply_value_migration(table: &str, column: &str, value: serde_json::Value) -> serde_json::Value {
     match (table, column) {
+        ("goals", "status_lifecycle") => migrate_legacy_goal_lifecycle_value(value),
         ("import_account_templates", "context_kind") => {
             if let Some(s) = value.as_str() {
                 let migrated = wealthfolio_core::activities::normalize_context_kind_value(s);
@@ -258,6 +261,27 @@ fn apply_value_migration(table: &str, column: &str, value: serde_json::Value) ->
             value
         }
         _ => value,
+    }
+}
+
+fn migrate_legacy_goal_lifecycle_value(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Bool(true) => serde_json::Value::String("achieved".to_string()),
+        serde_json::Value::Bool(false) | serde_json::Value::Null => {
+            serde_json::Value::String("active".to_string())
+        }
+        serde_json::Value::Number(n) if n.as_i64() == Some(1) || n.as_f64() == Some(1.0) => {
+            serde_json::Value::String("achieved".to_string())
+        }
+        serde_json::Value::Number(n) if n.as_i64() == Some(0) || n.as_f64() == Some(0.0) => {
+            serde_json::Value::String("active".to_string())
+        }
+        serde_json::Value::String(s) => match s.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" => serde_json::Value::String("achieved".to_string()),
+            "false" | "0" => serde_json::Value::String("active".to_string()),
+            _ => serde_json::Value::String(s),
+        },
+        value => value,
     }
 }
 
@@ -321,6 +345,7 @@ fn normalize_payload_fields(
             PayloadColumnResolution::Readonly => continue,
         };
 
+        let value = apply_value_migration(table_name, &column, value);
         if let Some(existing_value) = seen_columns.get(&column) {
             if existing_value != &value {
                 return Err(Error::Database(DatabaseError::Internal(format!(
@@ -331,7 +356,6 @@ fn normalize_payload_fields(
             continue;
         }
 
-        let value = apply_value_migration(table_name, &column, value);
         seen_columns.insert(column.clone(), value.clone());
         normalized_fields.push((column, value));
     }
@@ -2058,9 +2082,9 @@ mod tests {
 
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::schema::{
-        accounts, assets, goals, import_account_templates, import_templates, platforms,
-        sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox, taxonomies,
-        taxonomy_categories,
+        accounts, assets, goals, goals_allocation, import_account_templates, import_templates,
+        platforms, sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox,
+        taxonomies, taxonomy_categories,
     };
 
     fn setup_db() -> (
@@ -2886,6 +2910,198 @@ mod tests {
             .expect("goal row");
         assert_eq!(target_amount_value, 50000.0);
         assert_eq!(status_lifecycle_value, "achieved");
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_legacy_goal_is_achieved_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-legacy-achieved".to_string(),
+                SyncOperation::Create,
+                "evt-goal-legacy-achieved".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-legacy-achieved",
+                    "title": "Legacy Goal",
+                    "description": "Created before goals refactor",
+                    "targetAmount": 10000.0,
+                    "isAchieved": true
+                }),
+            )
+            .await
+            .expect("apply legacy goal create");
+        assert!(applied, "expected legacy goal create to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let (target_amount_value, status_lifecycle_value): (f64, String) = goals::table
+            .filter(goals::id.eq("goal-legacy-achieved"))
+            .select((goals::target_amount, goals::status_lifecycle))
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(target_amount_value, 10000.0);
+        assert_eq!(status_lifecycle_value, "achieved");
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_equivalent_legacy_and_current_goal_lifecycle_aliases() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-equivalent-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-equivalent-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-equivalent-lifecycle",
+                    "title": "Equivalent Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": " TRUE ",
+                    "statusLifecycle": "achieved"
+                }),
+            )
+            .await
+            .expect("apply equivalent lifecycle aliases");
+        assert!(applied, "expected equivalent lifecycle aliases to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let status_lifecycle_value: String = goals::table
+            .filter(goals::id.eq("goal-equivalent-lifecycle"))
+            .select(goals::status_lifecycle)
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(status_lifecycle_value, "achieved");
+    }
+
+    #[tokio::test]
+    async fn replay_rejects_conflicting_legacy_goal_lifecycle_aliases() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool, writer);
+
+        let result = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-conflicting-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-conflicting-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-conflicting-lifecycle",
+                    "title": "Conflicting Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": true,
+                    "statusLifecycle": "active"
+                }),
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "expected conflicting lifecycle aliases to be rejected"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("multiple values"),
+            "error should mention conflicting alias values: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_maps_legacy_null_goal_lifecycle_to_active() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-null-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-null-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-null-lifecycle",
+                    "title": "Null Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": null
+                }),
+            )
+            .await
+            .expect("apply null legacy lifecycle");
+        assert!(applied, "expected null legacy lifecycle to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let status_lifecycle_value: String = goals::table
+            .filter(goals::id.eq("goal-null-lifecycle"))
+            .select(goals::status_lifecycle)
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(status_lifecycle_value, "active");
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_legacy_goals_allocation_percent_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-legacy-allocation").expect("insert account");
+        drop(conn);
+
+        let goal_created = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-legacy-allocation".to_string(),
+                SyncOperation::Create,
+                "evt-goal-for-legacy-allocation".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-legacy-allocation",
+                    "title": "Legacy Allocation Goal",
+                    "targetAmount": 25000.0,
+                    "statusLifecycle": "active"
+                }),
+            )
+            .await
+            .expect("apply goal create");
+        assert!(goal_created, "expected goal create to apply");
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::GoalsAllocation,
+                "allocation-legacy-percent".to_string(),
+                SyncOperation::Create,
+                "evt-allocation-legacy-percent".to_string(),
+                "2026-03-30T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({
+                    "id": "allocation-legacy-percent",
+                    "goalId": "goal-legacy-allocation",
+                    "accountId": "acc-legacy-allocation",
+                    "percentAllocation": 33.5
+                }),
+            )
+            .await
+            .expect("apply legacy allocation create");
+        assert!(applied, "expected legacy allocation create to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let share_percent_value: f64 = goals_allocation::table
+            .filter(goals_allocation::id.eq("allocation-legacy-percent"))
+            .select(goals_allocation::share_percent)
+            .first(&mut conn)
+            .expect("goals allocation row");
+        assert_eq!(share_percent_value, 33.5);
     }
 
     #[tokio::test]
