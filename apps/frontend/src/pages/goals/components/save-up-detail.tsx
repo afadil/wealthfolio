@@ -6,7 +6,6 @@ import {
   Button,
   DatePickerInput,
   formatAmount,
-  formatPercent,
   MoneyInput,
 } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -15,6 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
+  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -204,7 +204,27 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
     projection,
   });
   const projectedGap = projection ? projection.projectedValue - targetAmount : null;
+  const monthlyDifference = projection ? projection.requiredMonthly - monthlyContribution : null;
+  const monthlyDifferenceLabel =
+    monthlyDifference === null || Math.abs(monthlyDifference) < 0.5
+      ? "Monthly difference"
+      : monthlyDifference > 0
+        ? "Monthly gap"
+        : "Monthly cushion";
+  const monthlyDifferenceClass =
+    monthlyDifference === null || Math.abs(monthlyDifference) < 0.5
+      ? "text-foreground font-semibold"
+      : monthlyDifference > 0
+        ? "text-destructive font-semibold"
+        : "text-success font-semibold";
+  const gapMetricLabel =
+    projectedGap === null ? "Remaining" : projectedGap >= 0 ? "Surplus" : "Gap";
+  const gapMetricValue = projectedGap === null ? remainingNow : Math.abs(projectedGap);
   const targetDateLabel = formatGoalDate(targetDate);
+  const savingsMilestones = useMemo(
+    () => buildSavingsMilestones(chartData, targetAmount),
+    [chartData, targetAmount],
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -240,34 +260,33 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
                       isHidden={isBalanceHidden}
                       className="text-foreground font-semibold"
                     />
-                    /mo contribution, this plan projects{" "}
-                    {projection ? (
-                      <AmountDisplay
-                        value={projection.projectedValue}
-                        currency={currency}
-                        isHidden={isBalanceHidden}
-                        className="text-foreground font-semibold underline decoration-dotted underline-offset-4"
-                      />
+                    /mo contribution,{" "}
+                    {projection && targetDateLabel && projectedGap !== null ? (
+                      projectedGap >= 0 ? (
+                        <>
+                          this plan is projected to be{" "}
+                          <AmountDisplay
+                            value={projectedGap}
+                            currency={currency}
+                            isHidden={isBalanceHidden}
+                            className="text-success font-semibold"
+                          />{" "}
+                          above target by {targetDateLabel}.
+                        </>
+                      ) : (
+                        <>
+                          this plan is projected to be{" "}
+                          <AmountDisplay
+                            value={Math.abs(projectedGap)}
+                            currency={currency}
+                            isHidden={isBalanceHidden}
+                            className="text-destructive font-semibold"
+                          />{" "}
+                          short by {targetDateLabel}.
+                        </>
+                      )
                     ) : (
-                      <span className="text-foreground font-semibold">no projection</span>
-                    )}
-                    {targetDateLabel ? ` by ${targetDateLabel}.` : "."}
-                    {targetAmount > 0 && projectedGap !== null && (
-                      <>
-                        {" "}
-                        {projectedGap >= 0 ? "Projected surplus: " : "Projected gap: "}
-                        <AmountDisplay
-                          value={Math.abs(projectedGap)}
-                          currency={currency}
-                          isHidden={isBalanceHidden}
-                          className={
-                            projectedGap >= 0
-                              ? "text-success font-semibold"
-                              : "text-destructive font-semibold"
-                          }
-                        />
-                        .
-                      </>
+                      "set a target amount and date to see the projected gap."
                     )}
                   </p>
                   <div className="bg-muted mt-5 h-2 overflow-hidden rounded-full">
@@ -298,19 +317,31 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
                   "Not set"
                 )}
               </HeroMetric>
-              <HeroMetric label="Remaining">
+              <HeroMetric label={gapMetricLabel}>
                 <AmountDisplay
-                  value={remainingNow}
+                  value={gapMetricValue}
                   currency={currency}
                   isHidden={isBalanceHidden}
                 />
               </HeroMetric>
-              <HeroMetric label="Progress">
-                <span className={status.textClass}>{formatPercent(displayProgress)}</span>
-              </HeroMetric>
+              <HeroMetric label="Target date">{targetDateLabel ?? "Not set"}</HeroMetric>
             </div>
           </CardContent>
         </Card>
+
+        {projection && monthlyDifference !== null && (
+          <MonthlyPlanCallout
+            status={status}
+            currentMonthly={monthlyContribution}
+            neededMonthly={projection.requiredMonthly}
+            monthlyDifference={monthlyDifference}
+            monthlyDifferenceLabel={monthlyDifferenceLabel}
+            monthlyDifferenceClass={monthlyDifferenceClass}
+            completionDate={projection.projectedCompletionDate}
+            currency={currency}
+            isHidden={isBalanceHidden}
+          />
+        )}
 
         {/* Projection chart */}
         {chartData.length > 2 && (
@@ -325,24 +356,24 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
               <div className="text-muted-foreground flex flex-wrap justify-end gap-x-4 gap-y-1 text-xs">
                 <span className="flex items-center gap-1.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: COLORS.optimistic.stroke }}
-                  />
-                  Optimistic ({((annualReturn + 0.02) * 100).toFixed(0)}%)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="inline-block h-[2px] w-5"
                     style={{ backgroundColor: COLORS.nominal.stroke }}
                   />
-                  Nominal ({(annualReturn * 100).toFixed(0)}%)
+                  Projected
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: COLORS.pessimistic.stroke }}
+                    className="inline-block h-0 w-5 border-t border-dashed"
+                    style={{ borderColor: COLORS.target }}
                   />
-                  Pessimistic ({(Math.max(0, annualReturn - 0.02) * 100).toFixed(0)}%)
+                  Target
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-0 w-5 border-t border-dashed"
+                    style={{ borderColor: COLORS.range.stroke }}
+                  />
+                  Range
                 </span>
               </div>
             </CardHeader>
@@ -350,6 +381,14 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
               <ProjectionChart data={chartData} currency={currency} isHidden={isBalanceHidden} />
             </CardContent>
           </Card>
+        )}
+
+        {savingsMilestones.length > 0 && (
+          <SavingsMilestones
+            milestones={savingsMilestones}
+            currency={currency}
+            isHidden={isBalanceHidden}
+          />
         )}
 
         {!plan && !projection && (
@@ -441,63 +480,6 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
             </>
           }
         />
-
-        {/* Projections */}
-        {projection && (
-          <Card>
-            <CardHeader className="flex-row items-center justify-between pb-3">
-              <div>
-                <div className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-[0.15em]">
-                  Projection
-                </div>
-                <CardTitle className="text-md leading-none tracking-tight">
-                  Savings Forecast
-                </CardTitle>
-              </div>
-              <span
-                className={`rounded-full px-2 py-1 text-[10px] font-semibold ${status.badgeClass}`}
-              >
-                {status.label}
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="divide-border divide-y">
-                <SidebarRow label="Projected at target">
-                  <AmountDisplay
-                    value={projection.projectedValue}
-                    currency={currency}
-                    isHidden={isBalanceHidden}
-                  />
-                </SidebarRow>
-
-                {/* Projected amount against the user-authored target. */}
-                <div className="py-2.5">
-                  <span className="text-muted-foreground text-xs">Projected vs target</span>
-                  <div className="mt-2 space-y-1.5">
-                    <ProjectionBar
-                      projected={projection.projectedValue}
-                      target={targetAmount}
-                      currency={currency}
-                      isHidden={isBalanceHidden}
-                    />
-                  </div>
-                </div>
-
-                <SidebarRow label="Required monthly">
-                  <AmountDisplay
-                    value={projection.requiredMonthly}
-                    currency={currency}
-                    isHidden={isBalanceHidden}
-                  />
-                  <span className="text-muted-foreground font-normal">/mo</span>
-                </SidebarRow>
-                <SidebarRow label="Estimated completion">
-                  {formatGoalDate(projection.projectedCompletionDate) ?? "Not reached"}
-                </SidebarRow>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Funding */}
         <GoalFundingEditor goalId={goal.id} goalType={goal.goalType} />
@@ -619,6 +601,82 @@ function HeroMetric({ label, children }: { label: string; children: React.ReactN
         {label}
       </div>
       <div className="mt-2 truncate text-lg font-semibold tabular-nums">{children}</div>
+    </div>
+  );
+}
+
+function MonthlyPlanCallout({
+  status,
+  currentMonthly,
+  neededMonthly,
+  monthlyDifference,
+  monthlyDifferenceLabel,
+  monthlyDifferenceClass,
+  completionDate,
+  currency,
+  isHidden,
+}: {
+  status: SaveUpStatus;
+  currentMonthly: number;
+  neededMonthly: number;
+  monthlyDifference: number;
+  monthlyDifferenceLabel: string;
+  monthlyDifferenceClass: string;
+  completionDate: string | null;
+  currency: string;
+  isHidden: boolean;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <div className="text-muted-foreground mb-1 font-mono text-xs font-semibold uppercase tracking-[0.18em]">
+              Action
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-semibold leading-tight">Monthly plan</h3>
+              <span
+                className={`rounded-full px-2 py-1 text-[10px] font-semibold ${status.badgeClass}`}
+              >
+                {status.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid flex-1 grid-cols-2 gap-3 md:max-w-3xl md:grid-cols-4">
+            <CalloutMetric label="Current">
+              <AmountDisplay value={currentMonthly} currency={currency} isHidden={isHidden} />
+              <span className="text-muted-foreground font-normal">/mo</span>
+            </CalloutMetric>
+            <CalloutMetric label="Needed">
+              <AmountDisplay value={neededMonthly} currency={currency} isHidden={isHidden} />
+              <span className="text-muted-foreground font-normal">/mo</span>
+            </CalloutMetric>
+            <CalloutMetric label={monthlyDifferenceLabel}>
+              <AmountDisplay
+                value={Math.abs(monthlyDifference)}
+                currency={currency}
+                isHidden={isHidden}
+                className={monthlyDifferenceClass}
+              />
+              <span className="text-muted-foreground font-normal">/mo</span>
+            </CalloutMetric>
+            <CalloutMetric label="Finish">
+              {formatGoalDate(completionDate) ?? "Not reached"}
+            </CalloutMetric>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CalloutMetric({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border-border/70 bg-muted/20 rounded-lg border px-3 py-2.5">
+      <div className="text-muted-foreground text-[11px]">{label}</div>
+      <div className="mt-1 text-sm font-semibold tabular-nums">{children}</div>
     </div>
   );
 }
@@ -854,35 +912,81 @@ function DateRow({
   );
 }
 
-function ProjectionBar({
-  projected,
-  target,
+interface SavingsMilestone {
+  label: string;
+  amount: number;
+  dateLabel: string;
+  reached: boolean;
+}
+
+function buildSavingsMilestones(data: ProjectionPoint[], targetAmount: number): SavingsMilestone[] {
+  if (targetAmount <= 0 || data.length === 0) return [];
+
+  const firstDate = data[0]?.date;
+  return [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const amount = targetAmount * ratio;
+    const point = data.find((item) => item.nominal >= amount);
+
+    return {
+      label: `${Math.round(ratio * 100)}%`,
+      amount,
+      dateLabel: point
+        ? point.date === firstDate
+          ? "Now"
+          : formatGoalDate(point.date) ?? "-"
+        : "Not reached",
+      reached: Boolean(point),
+    };
+  });
+}
+
+function SavingsMilestones({
+  milestones,
   currency,
   isHidden,
 }: {
-  projected: number;
-  target: number;
+  milestones: SavingsMilestone[];
   currency: string;
   isHidden: boolean;
 }) {
-  const pct = target > 0 ? Math.min(100, (projected / target) * 100) : 0;
-  const onTrack = projected >= target;
-
   return (
-    <div className="mt-2 space-y-2">
-      <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
-        <div
-          className={`h-full rounded-full ${onTrack ? "bg-success" : "bg-yellow-600"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <div className="text-muted-foreground flex justify-between text-[11px]">
-        <span>Projected</span>
-        <span className="font-medium tabular-nums">
-          <AmountDisplay value={projected} currency={currency} isHidden={isHidden} />
-        </span>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <div className="text-muted-foreground mb-1 font-mono text-xs font-semibold uppercase tracking-[0.18em]">
+          Checkpoints
+        </div>
+        <CardTitle className="text-lg leading-tight">Milestones</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {milestones.map((milestone) => (
+            <div
+              key={milestone.label}
+              className="border-border/70 bg-muted/20 rounded-lg border p-3"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground font-mono text-[11px] font-semibold uppercase tracking-[0.16em]">
+                  {milestone.label}
+                </span>
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    milestone.reached ? "bg-success" : "bg-muted-foreground/30"
+                  }`}
+                />
+              </div>
+              <div className="mt-2 text-sm font-semibold tabular-nums">
+                <AmountDisplay
+                  value={milestone.amount}
+                  currency={currency}
+                  isHidden={isHidden}
+                />
+              </div>
+              <div className="text-muted-foreground mt-1 text-xs">{milestone.dateLabel}</div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -916,9 +1020,10 @@ function ProjectionTooltip({
   const fmt = (v: number) => (isHidden ? "***" : formatAmount(v, currency, false));
 
   const rows = [
-    { label: "Optimistic", value: point.optimistic, color: COLORS.optimistic.stroke },
-    { label: "Nominal", value: point.nominal, color: COLORS.nominal.stroke },
-    { label: "Pessimistic", value: point.pessimistic, color: COLORS.pessimistic.stroke },
+    { label: "Projected", value: point.nominal, color: COLORS.nominal.stroke },
+    { label: "Target", value: point.target, color: COLORS.target },
+    { label: "High range", value: point.optimistic, color: COLORS.range.stroke },
+    { label: "Low range", value: point.pessimistic, color: COLORS.range.stroke },
   ];
 
   return (
@@ -938,9 +1043,8 @@ function ProjectionTooltip({
 }
 
 const COLORS = {
-  optimistic: { fill: "hsl(92, 24%, 70%)", opacity: 0.1, stroke: "hsl(91, 38%, 36%)" },
-  nominal: { fill: "hsl(92, 24%, 70%)", opacity: 0.2, stroke: "hsl(91, 43%, 29%)" },
-  pessimistic: { fill: "hsl(92, 18%, 74%)", opacity: 0.12, stroke: "hsl(91, 24%, 46%)" },
+  nominal: { fill: "hsl(92, 24%, 70%)", opacity: 0.2, stroke: "var(--success)" },
+  range: { stroke: "hsl(91, 24%, 46%)" },
   target: "hsl(var(--muted-foreground))",
 };
 
@@ -959,19 +1063,10 @@ function ProjectionChart({
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id="projOptimistic" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={COLORS.optimistic.fill} stopOpacity={0.08} />
-            <stop offset="95%" stopColor={COLORS.optimistic.fill} stopOpacity={0} />
-          </linearGradient>
           <linearGradient id="projNominal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={COLORS.nominal.fill} stopOpacity={0.2} />
-            <stop offset="70%" stopColor={COLORS.nominal.fill} stopOpacity={0.12} />
+            <stop offset="5%" stopColor={COLORS.nominal.fill} stopOpacity={0.28} />
+            <stop offset="70%" stopColor={COLORS.nominal.fill} stopOpacity={0.14} />
             <stop offset="100%" stopColor={COLORS.nominal.fill} stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="projPessimistic" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={COLORS.pessimistic.fill} stopOpacity={0.25} />
-            <stop offset="70%" stopColor={COLORS.pessimistic.fill} stopOpacity={0.15} />
-            <stop offset="100%" stopColor={COLORS.pessimistic.fill} stopOpacity={0} />
           </linearGradient>
         </defs>
         <XAxis
@@ -984,14 +1079,27 @@ function ProjectionChart({
         />
         <YAxis hide domain={[(min: number) => min * 0.95, "auto"]} />
         <Tooltip content={<ProjectionTooltip currency={currency} isHidden={isHidden} />} />
-        <Area
+        <Line
           type="monotone"
           dataKey="optimistic"
-          stroke={COLORS.optimistic.stroke}
+          stroke={COLORS.range.stroke}
           strokeWidth={1}
-          strokeOpacity={0.6}
-          fill="url(#projOptimistic)"
-          fillOpacity={1}
+          strokeOpacity={0.5}
+          strokeDasharray="4 3"
+          dot={false}
+          activeDot={false}
+          animationDuration={300}
+          animationEasing="ease-out"
+        />
+        <Line
+          type="monotone"
+          dataKey="pessimistic"
+          stroke={COLORS.range.stroke}
+          strokeWidth={1}
+          strokeOpacity={0.5}
+          strokeDasharray="4 3"
+          dot={false}
+          activeDot={false}
           animationDuration={300}
           animationEasing="ease-out"
         />
@@ -999,19 +1107,8 @@ function ProjectionChart({
           type="monotone"
           dataKey="nominal"
           stroke={COLORS.nominal.stroke}
-          strokeWidth={1.5}
+          strokeWidth={2.25}
           fill="url(#projNominal)"
-          fillOpacity={1}
-          animationDuration={300}
-          animationEasing="ease-out"
-        />
-        <Area
-          type="monotone"
-          dataKey="pessimistic"
-          stroke={COLORS.pessimistic.stroke}
-          strokeWidth={1}
-          strokeOpacity={0.6}
-          fill="url(#projPessimistic)"
           fillOpacity={1}
           animationDuration={300}
           animationEasing="ease-out"

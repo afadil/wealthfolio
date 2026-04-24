@@ -2,6 +2,7 @@ import type { Goal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button, Input, Label } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Dialog,
   DialogContent,
@@ -26,22 +27,30 @@ const GOAL_TYPE_LABELS: Record<Goal["goalType"], string> = {
 const LIFECYCLE_OPTIONS: {
   value: Goal["statusLifecycle"];
   label: string;
+  hint: string;
   description: string;
+  icon: typeof Icons.Target;
 }[] = [
   {
     value: "active",
     label: "Active",
-    description: "Show in active planning and progress.",
+    hint: "Still in progress",
+    description: "Shows in planning, progress, and active goal lists.",
+    icon: Icons.Target,
   },
   {
     value: "achieved",
-    label: "Achieved",
-    description: "Mark complete and release its account shares.",
+    label: "Completed",
+    hint: "Goal is done",
+    description: "Marks the goal complete and releases its assigned account shares.",
+    icon: Icons.CheckCircle,
   },
   {
     value: "archived",
+    hint: "Hide from active goals",
     label: "Archived",
-    description: "Hide from active goals without deleting history.",
+    description: "Keeps the goal for reference, but removes it from active planning.",
+    icon: Icons.FileArchive,
   },
 ];
 
@@ -95,7 +104,8 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
           <DialogHeader>
             <DialogTitle>Edit goal</DialogTitle>
             <DialogDescription>
-              Update the goal name, notes, and lifecycle.{" "}
+              Update the goal name, notes, and status. Completed means the goal is done.
+              Archived means you want to hide it from active goals without deleting it.{" "}
               {isRetirement
                 ? "Retirement assumptions, spending, taxes, and account shares stay in the planner."
                 : "Target amount, target date, and funding stay in the goal plan."}
@@ -139,10 +149,15 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Lifecycle</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <Label>Goal status</Label>
+              <p className="text-muted-foreground text-xs">
+                Choose what should happen next: keep working on it, mark it done, or hide it from
+                active planning.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
                 {LIFECYCLE_OPTIONS.map((option) => {
                   const selected = lifecycle === option.value;
+                  const Icon = option.icon;
 
                   return (
                     <button
@@ -151,15 +166,29 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
                       aria-pressed={selected}
                       onClick={() => setLifecycle(option.value)}
                       className={cn(
-                        "rounded-xl border p-3 text-left transition-colors",
+                        "rounded-xl border p-4 text-left transition-colors",
                         "focus-visible:ring-ring focus:outline-none focus-visible:ring-2",
                         selected
                           ? "border-primary bg-primary/5"
                           : "border-border/70 bg-card hover:bg-accent",
                       )}
                     >
+                      <span className="mb-3 flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "bg-muted inline-flex h-8 w-8 items-center justify-center rounded-full",
+                            option.value === "achieved" && "text-green-600",
+                            option.value === "active" && "text-primary",
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wider">
+                          {option.hint}
+                        </span>
+                      </span>
                       <span className="block text-sm font-medium">{option.label}</span>
-                      <span className="text-muted-foreground mt-1 block text-xs leading-relaxed">
+                      <span className="text-muted-foreground mt-1.5 block text-xs leading-relaxed">
                         {option.description}
                       </span>
                     </button>

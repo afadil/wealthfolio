@@ -2,6 +2,7 @@ import type { Goal, GoalType, PlannerMode } from "@/lib/types";
 import { useSettingsContext } from "@/lib/settings-provider";
 import {
   Button,
+  DatePickerInput,
   Input,
   Label,
   MoneyInput,
@@ -380,11 +381,12 @@ export default function GoalNewPage() {
 
                       <div className="space-y-2">
                         <Label htmlFor="goal-target-date">Target date</Label>
-                        <Input
+                        <DatePickerInput
                           id="goal-target-date"
-                          type="date"
                           value={targetDate}
-                          onChange={(event) => setTargetDate(event.target.value)}
+                          onChange={(date) =>
+                            setTargetDate(date ? date.toISOString().split("T")[0] : "")
+                          }
                         />
                       </div>
 
