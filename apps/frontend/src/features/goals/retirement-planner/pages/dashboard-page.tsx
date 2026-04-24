@@ -325,8 +325,7 @@ function projectedDcMonthlyPayout(
   defaultAccumulationReturn: number,
 ) {
   if (stream.startAge <= currentAge) {
-    const fallback =
-      (Math.max(0, stream.currentValue ?? 0) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
+    const fallback = (Math.max(0, stream.currentValue ?? 0) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
     return Math.max(0, stream.monthlyAmount ?? fallback);
   }
   const totalYears = Math.max(0, stream.startAge - currentAge);
@@ -3315,9 +3314,12 @@ export default function DashboardPage({
                     <span className="flex items-center gap-1.5">
                       <span
                         className="block h-0 w-4 border-b-[2px]"
-                        style={{ borderColor: readiness.tone === "good"
-                          ? PROJECTED_CHART_COLORS.onTrack.stroke
-                          : PROJECTED_CHART_COLORS.offTrack.stroke }}
+                        style={{
+                          borderColor:
+                            readiness.tone === "good"
+                              ? PROJECTED_CHART_COLORS.onTrack.stroke
+                              : PROJECTED_CHART_COLORS.offTrack.stroke,
+                        }}
                       />
                       Projected
                     </span>
@@ -4057,6 +4059,23 @@ export default function DashboardPage({
               </CardContent>
             </Card>
           )}
+
+          <Card className="bg-muted/30 border-dashed">
+            <CardContent className="text-muted-foreground flex gap-3 py-5 text-xs leading-relaxed">
+              <Icons.Info className="mt-0.5 size-4 shrink-0" />
+              <div className="space-y-1.5">
+                <p className="text-foreground font-medium">One thing to keep in mind</p>
+                <p>
+                  This is not financial advice. Treat these numbers as a sketch, not a forecast.
+                  Everything here is a simulation built on the inputs you entered: returns,
+                  inflation, contributions, taxes, and how long you expect to live. Real markets
+                  don&apos;t move in straight lines, tax rules shift, and government programs get
+                  rewritten. Use this to stress-test ideas and spot gaps, then talk to a qualified
+                  professional before making decisions that are hard to undo.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* ── Sidebar ── */}
