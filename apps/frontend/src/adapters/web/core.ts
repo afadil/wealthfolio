@@ -14,6 +14,16 @@ export const API_PREFIX = "/api/v1";
 export const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
 export const AI_CHAT_STREAM_ENDPOINT = `${API_PREFIX}/ai/chat/stream`;
 
+const DEFAULT_INVOKE_TIMEOUT_MS = 300_000;
+
+// Commands that legitimately do batched network I/O over many symbols (Yahoo
+// Finance lookups during CSV import). Larger imports — especially Options —
+// can exceed the default 5-minute safety net. See issue #884.
+const INVOKE_TIMEOUT_OVERRIDES_MS: Record<string, number> = {
+  preview_import_assets: 600_000,
+  check_activities_import: 600_000,
+};
+
 type CommandMap = Record<string, { method: string; path: string }>;
 
 export const COMMANDS: CommandMap = {
@@ -1352,7 +1362,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     headers,
     body,
     credentials: "same-origin",
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(INVOKE_TIMEOUT_OVERRIDES_MS[command] ?? DEFAULT_INVOKE_TIMEOUT_MS),
   });
 
   // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.

@@ -26,17 +26,26 @@ export const logger: Logger = {
   },
 };
 
-const INVOKE_TIMEOUT_MS = 120_000;
+const DEFAULT_INVOKE_TIMEOUT_MS = 120_000;
+
+// Commands that legitimately do batched network I/O over many symbols (Yahoo
+// Finance lookups during CSV import). Larger imports — especially Options —
+// can exceed the default 2-minute safety net. See issue #884.
+const INVOKE_TIMEOUT_OVERRIDES_MS: Record<string, number> = {
+  preview_import_assets: 600_000,
+  check_activities_import: 600_000,
+};
 
 /**
  * Invoke a Tauri command (internal - use typed adapter functions instead)
  */
 export const invoke = async <T>(command: string, payload?: Record<string, unknown>): Promise<T> => {
+  const timeoutMs = INVOKE_TIMEOUT_OVERRIDES_MS[command] ?? DEFAULT_INVOKE_TIMEOUT_MS;
   try {
     const result = await Promise.race([
       tauriInvoke<T>(command, payload),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Command "${command}" timed out`)), INVOKE_TIMEOUT_MS),
+        setTimeout(() => reject(new Error(`Command "${command}" timed out`)), timeoutMs),
       ),
     ]);
     return result;
