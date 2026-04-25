@@ -285,6 +285,7 @@ pub fn run() {
             commands::activity::update_activity,
             commands::activity::save_activities,
             commands::activity::delete_activity,
+            commands::activity::link_transfer_activities,
             commands::activity::check_activities_import,
             commands::activity::preview_import_assets,
             commands::activity::import_activities,

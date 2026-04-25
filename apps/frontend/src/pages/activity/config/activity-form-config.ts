@@ -357,6 +357,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
         amount: absNum(activity?.amount),
         assetId: activity?.assetSymbol ?? activity?.assetId ?? null,
         quantity: absNum(activity?.quantity) ?? null,
+        unitPrice: absNum(activity?.unitPrice) ?? null,
         comment: activity?.comment ?? null,
         // Advanced options
         currency: activity?.currency,

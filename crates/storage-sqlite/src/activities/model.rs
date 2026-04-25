@@ -141,6 +141,8 @@ pub struct ActivityDetailsDB {
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub source_record_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub source_group_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub idempotency_key: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub import_run_id: Option<String>,
@@ -306,6 +308,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             instrument_type: db.instrument_type,
             source_system: db.source_system,
             source_record_id: db.source_record_id,
+            source_group_id: db.source_group_id,
             idempotency_key: db.idempotency_key,
             import_run_id: db.import_run_id,
             is_user_modified: db.is_user_modified != 0,

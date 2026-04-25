@@ -703,6 +703,14 @@ mod tests {
             unimplemented!()
         }
 
+        async fn link_transfer_activities(
+            &self,
+            _activity_a_id: String,
+            _activity_b_id: String,
+        ) -> Result<(Activity, Activity)> {
+            unimplemented!()
+        }
+
         async fn bulk_mutate_activities(
             &self,
             creates: Vec<NewActivity>,

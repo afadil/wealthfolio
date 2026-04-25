@@ -532,6 +532,7 @@ pub struct ActivityDetails {
     // Sync/source metadata
     pub source_system: Option<String>,
     pub source_record_id: Option<String>,
+    pub source_group_id: Option<String>,
     pub idempotency_key: Option<String>,
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,

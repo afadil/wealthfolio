@@ -70,6 +70,14 @@ interface ActivityDataGridToolbarProps {
   onSave: () => void;
   /** Handler for canceling/discarding changes */
   onCancel: () => void;
+  /** Handler invoked when user clicks "Link as internal pair" */
+  onLinkSelected?: () => void;
+  /** Whether the current selection is a valid TRANSFER_IN/TRANSFER_OUT pair */
+  canLinkSelected?: boolean;
+  /** Reason the current selection cannot be linked (used as button tooltip) */
+  linkDisabledReason?: string;
+  /** Whether a link operation is in progress */
+  isLinking?: boolean;
 }
 
 /**
@@ -88,6 +96,10 @@ export function ActivityDataGridToolbar({
   onApproveSelected,
   onSave,
   onCancel,
+  onLinkSelected,
+  canLinkSelected,
+  linkDisabledReason,
+  isLinking,
 }: ActivityDataGridToolbarProps) {
   // Prevent mousedown from bubbling to document, which would clear DataGrid selection
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -200,6 +212,24 @@ export function ActivityDataGridToolbar({
               >
                 <Icons.CheckCircle className="h-3.5 w-3.5" />
                 <span>Approve {selectedPendingCount}</span>
+              </Button>
+            )}
+            {selectedRowCount === 2 && onLinkSelected && (
+              <Button
+                onClick={onLinkSelected}
+                size="xs"
+                variant="outline"
+                className="shrink-0 rounded-md text-xs"
+                title={canLinkSelected ? "Link as internal transfer" : linkDisabledReason}
+                aria-label="Link as internal transfer"
+                disabled={!canLinkSelected || isLinking || isSaving}
+              >
+                {isLinking ? (
+                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icons.Link className="h-3.5 w-3.5" />
+                )}
+                <span>Link</span>
               </Button>
             )}
             <Button

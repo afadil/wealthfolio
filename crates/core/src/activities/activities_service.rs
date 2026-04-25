@@ -2761,6 +2761,37 @@ impl ActivityServiceTrait for ActivityService {
         Ok(deleted)
     }
 
+    async fn link_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)> {
+        let (transfer_in, transfer_out) = self
+            .activity_repository
+            .link_transfer_activities(activity_a_id, activity_b_id)
+            .await?;
+
+        let mut account_ids: HashSet<String> = HashSet::new();
+        let mut asset_ids: HashSet<String> = HashSet::new();
+        let mut currencies: HashSet<String> = HashSet::new();
+        for activity in [&transfer_in, &transfer_out] {
+            account_ids.insert(activity.account_id.clone());
+            if let Some(ref asset_id) = activity.asset_id {
+                asset_ids.insert(asset_id.clone());
+            }
+            currencies.insert(activity.currency.clone());
+        }
+        let earliest_at = transfer_in.activity_date.min(transfer_out.activity_date);
+        self.emit_activities_changed(
+            account_ids.into_iter().collect(),
+            asset_ids.into_iter().collect(),
+            currencies.into_iter().collect(),
+            Some(earliest_at),
+        );
+
+        Ok((transfer_in, transfer_out))
+    }
+
     async fn bulk_mutate_activities(
         &self,
         request: ActivityBulkMutationRequest,
