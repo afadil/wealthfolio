@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::accounts::TrackingMode;
+use crate::accounts::{CostBasisMethod, TrackingMode};
 
 /// Domain events emitted by core services after successful mutations.
 ///
@@ -60,6 +60,14 @@ pub enum DomainEvent {
         new_mode: TrackingMode,
         /// Whether this is a connected (broker-linked) account
         is_connected: bool,
+    },
+
+    /// Account cost basis method was changed.
+    /// Triggers a full portfolio recalculation for the affected account.
+    CostBasisMethodChanged {
+        account_id: String,
+        old_method: CostBasisMethod,
+        new_method: CostBasisMethod,
     },
 
     /// Manual snapshot was saved (manual entry, CSV import, broker import).
@@ -145,6 +153,19 @@ impl DomainEvent {
             old_mode,
             new_mode,
             is_connected,
+        }
+    }
+
+    /// Creates a CostBasisMethodChanged event.
+    pub fn cost_basis_method_changed(
+        account_id: String,
+        old_method: CostBasisMethod,
+        new_method: CostBasisMethod,
+    ) -> Self {
+        Self::CostBasisMethodChanged {
+            account_id,
+            old_method,
+            new_method,
         }
     }
 

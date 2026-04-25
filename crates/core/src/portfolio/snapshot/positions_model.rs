@@ -544,6 +544,232 @@ impl Position {
         })
     }
 
+    /// Reduces position quantity using LIFO lot relief.
+    /// Returns a `FifoReductionResult` containing the quantity reduced, cost basis removed,
+    /// and the individual lots that were removed.
+    pub fn reduce_lots_lifo(
+        &mut self,
+        quantity_to_reduce_input: Decimal,
+    ) -> Result<FifoReductionResult> {
+        if !quantity_to_reduce_input.is_sign_positive() {
+            return Err(CalculatorError::InvalidActivity(
+                "Quantity to reduce must be positive".to_string(),
+            )
+            .into());
+        }
+
+        let available_quantity: Decimal = self.lots.iter().map(|lot| lot.quantity).sum();
+
+        if !is_quantity_significant(&available_quantity) || available_quantity <= Decimal::ZERO {
+            warn!("Attempting to reduce position {} which has zero/insignificant quantity {}. Skipping reduction.", self.id, available_quantity);
+            return Ok(FifoReductionResult {
+                quantity_reduced: Decimal::ZERO,
+                cost_basis_removed: Decimal::ZERO,
+                removed_lots: Vec::new(),
+            });
+        }
+
+        let mut quantity_to_reduce = quantity_to_reduce_input;
+        if available_quantity < quantity_to_reduce {
+            warn!(
+                "Reduce quantity {} exceeds available {} for position {}. Reducing by available amount.",
+                quantity_to_reduce, available_quantity, self.id
+            );
+            quantity_to_reduce = available_quantity;
+        }
+
+        // Convert to Vec, sort descending by date (LIFO), operate, convert back later
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        vec_lots.sort_by_key(|b| std::cmp::Reverse(b.acquisition_date));
+
+        let mut lot_indices_to_remove = Vec::new();
+        let mut lot_updates = Vec::new();
+        let mut actual_quantity_reduced = Decimal::ZERO;
+        let mut cost_basis_of_sold_lots_asset_currency = Decimal::ZERO;
+        let mut removed_lots: Vec<Lot> = Vec::new();
+
+        for (index, lot) in vec_lots.iter().enumerate() {
+            if quantity_to_reduce <= Decimal::ZERO {
+                break;
+            }
+            if lot.quantity <= Decimal::ZERO {
+                continue;
+            }
+
+            let qty_from_this_lot = std::cmp::min(lot.quantity, quantity_to_reduce);
+
+            let cost_basis_removed = if lot.quantity.is_zero() {
+                Decimal::ZERO
+            } else {
+                lot.cost_basis * qty_from_this_lot / lot.quantity
+            };
+
+            let fees_removed = if lot.quantity.is_zero() {
+                Decimal::ZERO
+            } else {
+                lot.acquisition_fees * qty_from_this_lot / lot.quantity
+            };
+
+            removed_lots.push(Lot {
+                id: lot.id.clone(),
+                position_id: lot.position_id.clone(),
+                acquisition_date: lot.acquisition_date,
+                quantity: qty_from_this_lot,
+                cost_basis: cost_basis_removed,
+                acquisition_price: lot.acquisition_price,
+                acquisition_fees: fees_removed,
+                fx_rate_to_position: lot.fx_rate_to_position,
+            });
+
+            actual_quantity_reduced += qty_from_this_lot;
+            cost_basis_of_sold_lots_asset_currency += cost_basis_removed;
+            quantity_to_reduce -= qty_from_this_lot;
+
+            let remaining_lot_qty = lot.quantity - qty_from_this_lot;
+
+            if remaining_lot_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_lot_qty) {
+                lot_indices_to_remove.push(index);
+            } else {
+                let remaining_lot_basis = lot.cost_basis - cost_basis_removed;
+                let remaining_fees = lot.acquisition_fees - fees_removed;
+                lot_updates.push((
+                    index,
+                    remaining_lot_qty,
+                    remaining_lot_basis,
+                    remaining_fees,
+                ));
+            }
+        }
+
+        for (index, new_quantity, new_cost_basis, new_fees) in lot_updates {
+            if let Some(lot) = vec_lots.get_mut(index) {
+                lot.quantity = new_quantity;
+                lot.cost_basis = new_cost_basis;
+                lot.acquisition_fees = new_fees;
+            } else {
+                error!(
+                    "Failed to get mutable lot at index {} for position {} during update",
+                    index, self.id
+                );
+            }
+        }
+
+        let mut i = 0;
+        vec_lots.retain(|_| {
+            let keep = !lot_indices_to_remove.contains(&i);
+            i += 1;
+            keep
+        });
+
+        self.lots = vec_lots.into();
+        self.recalculate_aggregates();
+
+        Ok(FifoReductionResult {
+            quantity_reduced: actual_quantity_reduced,
+            cost_basis_removed: cost_basis_of_sold_lots_asset_currency,
+            removed_lots,
+        })
+    }
+
+    /// Reduces position quantity using WAC (Weighted Average Cost) lot relief.
+    /// Each lot is reduced proportionally. Average cost is unchanged after the sell.
+    /// Returns a `FifoReductionResult` for consistency with FIFO/LIFO methods.
+    pub fn reduce_lots_wac(
+        &mut self,
+        quantity_to_reduce_input: Decimal,
+    ) -> Result<FifoReductionResult> {
+        if !quantity_to_reduce_input.is_sign_positive() {
+            return Err(CalculatorError::InvalidActivity(
+                "Quantity to reduce must be positive".to_string(),
+            )
+            .into());
+        }
+
+        let available_quantity: Decimal = self.lots.iter().map(|lot| lot.quantity).sum();
+
+        if !is_quantity_significant(&available_quantity) || available_quantity <= Decimal::ZERO {
+            warn!(
+                "Attempting to reduce position {} with zero/insignificant quantity. Skipping.",
+                self.id
+            );
+            return Ok(FifoReductionResult {
+                quantity_reduced: Decimal::ZERO,
+                cost_basis_removed: Decimal::ZERO,
+                removed_lots: Vec::new(),
+            });
+        }
+
+        let mut quantity_to_reduce = quantity_to_reduce_input;
+        if available_quantity < quantity_to_reduce {
+            warn!(
+                "Reduce quantity {} exceeds available {} for position {}. Clamping.",
+                quantity_to_reduce, available_quantity, self.id
+            );
+            quantity_to_reduce = available_quantity;
+        }
+
+        let cost_basis_removed_total = quantity_to_reduce * self.average_cost;
+        let reduction_ratio = quantity_to_reduce / available_quantity;
+
+        let mut vec_lots: Vec<_> = self.lots.drain(..).collect();
+        let mut removed_lots: Vec<Lot> = Vec::new();
+        let mut lot_indices_to_remove = Vec::new();
+        let mut lot_updates = Vec::new();
+
+        for (index, lot) in vec_lots.iter().enumerate() {
+            let qty_removed = lot.quantity * reduction_ratio;
+            let basis_removed = lot.cost_basis * reduction_ratio;
+            let fees_removed = lot.acquisition_fees * reduction_ratio;
+
+            removed_lots.push(Lot {
+                id: lot.id.clone(),
+                position_id: lot.position_id.clone(),
+                acquisition_date: lot.acquisition_date,
+                quantity: qty_removed,
+                cost_basis: basis_removed,
+                acquisition_price: lot.acquisition_price,
+                acquisition_fees: fees_removed,
+                fx_rate_to_position: lot.fx_rate_to_position,
+            });
+
+            let remaining_qty = lot.quantity - qty_removed;
+            if remaining_qty <= Decimal::ZERO || !is_quantity_significant(&remaining_qty) {
+                lot_indices_to_remove.push(index);
+            } else {
+                lot_updates.push((
+                    index,
+                    remaining_qty,
+                    lot.cost_basis - basis_removed,
+                    lot.acquisition_fees - fees_removed,
+                ));
+            }
+        }
+
+        for (index, new_qty, new_basis, new_fees) in lot_updates {
+            if let Some(lot) = vec_lots.get_mut(index) {
+                lot.quantity = new_qty;
+                lot.cost_basis = new_basis;
+                lot.acquisition_fees = new_fees;
+            }
+        }
+
+        let mut i = 0;
+        vec_lots.retain(|_| {
+            let keep = !lot_indices_to_remove.contains(&i);
+            i += 1;
+            keep
+        });
+
+        self.lots = vec_lots.into();
+        self.recalculate_aggregates();
+
+        Ok(FifoReductionResult {
+            quantity_reduced: quantity_to_reduce,
+            cost_basis_removed: cost_basis_removed_total,
+            removed_lots,
+        })
+    }
+
     /// Applies stock split.
     pub fn apply_split(&mut self, split_ratio: Decimal, activity_id: &str) -> Result<()> {
         if !split_ratio.is_sign_positive() {
@@ -571,5 +797,205 @@ impl Position {
         }
         self.recalculate_aggregates();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    mod lot_reduction_tests {
+        use super::super::*;
+        use chrono::TimeZone;
+        use rust_decimal_macros::dec;
+
+        fn make_position_with_lots() -> Position {
+            let old_date = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+            let new_date = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+            let mut pos = Position::new(
+                "ACC1".to_string(),
+                "AAPL".to_string(),
+                "USD".to_string(),
+                old_date,
+            );
+            // Old lot: 10 shares @ $10 each
+            pos.lots.push_back(Lot {
+                id: "lot-old".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: old_date,
+                quantity: dec!(10),
+                cost_basis: dec!(100),
+                acquisition_price: dec!(10),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            // New lot: 10 shares @ $20 each
+            pos.lots.push_back(Lot {
+                id: "lot-new".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: new_date,
+                quantity: dec!(10),
+                cost_basis: dec!(200),
+                acquisition_price: dec!(20),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            pos
+        }
+
+        #[test]
+        fn test_lifo_sells_newest_lot_first() {
+            let mut pos = make_position_with_lots();
+            let result = pos.reduce_lots_lifo(dec!(5)).unwrap();
+            assert_eq!(result.quantity_reduced, dec!(5));
+            assert_eq!(result.cost_basis_removed, dec!(100)); // 5 * $20
+            assert_eq!(pos.lots.len(), 2);
+            assert_eq!(pos.quantity, dec!(15));
+            let expected_avg = dec!(200) / dec!(15);
+            assert_eq!(pos.average_cost, expected_avg);
+        }
+
+        #[test]
+        fn test_lifo_full_consumption_of_newest_then_partial_older() {
+            let mut pos = make_position_with_lots();
+            let result = pos.reduce_lots_lifo(dec!(15)).unwrap();
+            assert_eq!(result.quantity_reduced, dec!(15));
+            assert_eq!(result.cost_basis_removed, dec!(250)); // 10*$20 + 5*$10
+            assert_eq!(pos.quantity, dec!(5));
+            assert_eq!(pos.total_cost_basis, dec!(50));
+            assert_eq!(pos.average_cost, dec!(10));
+        }
+
+        #[test]
+        fn test_lifo_removed_lots_have_newest_acquisition_dates() {
+            let mut pos = make_position_with_lots();
+            let new_date = Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap();
+            let result = pos.reduce_lots_lifo(dec!(5)).unwrap();
+            assert_eq!(result.removed_lots.len(), 1);
+            assert_eq!(result.removed_lots[0].acquisition_date, new_date);
+        }
+
+        #[test]
+        fn test_wac_sell_does_not_change_average_cost() {
+            let mut pos = make_position_with_lots();
+            assert_eq!(pos.average_cost, dec!(15));
+            let result = pos.reduce_lots_wac(dec!(5)).unwrap();
+            assert_eq!(pos.average_cost, dec!(15));
+            assert_eq!(result.quantity_reduced, dec!(5));
+            assert_eq!(result.cost_basis_removed, dec!(75)); // 5 * $15
+            assert_eq!(pos.quantity, dec!(15));
+            assert_eq!(pos.total_cost_basis, dec!(225));
+        }
+
+        #[test]
+        fn test_wac_lots_reduced_proportionally() {
+            let mut pos = make_position_with_lots();
+            pos.reduce_lots_wac(dec!(10)).unwrap();
+            for lot in &pos.lots {
+                assert_eq!(lot.quantity, dec!(5));
+            }
+        }
+
+        #[test]
+        fn test_wac_four_step_example_from_issue() {
+            let t1 = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+            let t2 = Utc.with_ymd_and_hms(2024, 2, 1, 0, 0, 0).unwrap();
+            let t4 = Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap();
+
+            let mut pos =
+                Position::new("ACC1".to_string(), "ETF".to_string(), "EUR".to_string(), t1);
+
+            pos.lots.push_back(Lot {
+                id: "l1".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t1,
+                quantity: dec!(10),
+                cost_basis: dec!(100),
+                acquisition_price: dec!(10),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            pos.lots.push_back(Lot {
+                id: "l2".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t2,
+                quantity: dec!(10),
+                cost_basis: dec!(200),
+                acquisition_price: dec!(20),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            assert_eq!(pos.average_cost, dec!(15));
+
+            pos.reduce_lots_wac(dec!(5)).unwrap();
+            assert_eq!(pos.average_cost, dec!(15));
+            assert_eq!(pos.quantity, dec!(15));
+
+            pos.lots.push_back(Lot {
+                id: "l3".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t4,
+                quantity: dec!(10),
+                cost_basis: dec!(300),
+                acquisition_price: dec!(30),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            // WAC = (15*15 + 10*30) / 25 = 525/25 = 21.00
+            assert_eq!(pos.average_cost, dec!(21));
+        }
+
+        #[test]
+        fn test_lifo_four_step_example_from_issue() {
+            let t1 = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+            let t2 = Utc.with_ymd_and_hms(2024, 2, 1, 0, 0, 0).unwrap();
+            let t4 = Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap();
+
+            let mut pos =
+                Position::new("ACC1".to_string(), "ETF".to_string(), "EUR".to_string(), t1);
+
+            pos.lots.push_back(Lot {
+                id: "l1".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t1,
+                quantity: dec!(10),
+                cost_basis: dec!(100),
+                acquisition_price: dec!(10),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            pos.lots.push_back(Lot {
+                id: "l2".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t2,
+                quantity: dec!(10),
+                cost_basis: dec!(200),
+                acquisition_price: dec!(20),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+
+            pos.reduce_lots_lifo(dec!(5)).unwrap();
+            assert_eq!(pos.quantity, dec!(15));
+            assert_eq!(pos.total_cost_basis, dec!(200));
+
+            pos.lots.push_back(Lot {
+                id: "l3".to_string(),
+                position_id: pos.id.clone(),
+                acquisition_date: t4,
+                quantity: dec!(10),
+                cost_basis: dec!(300),
+                acquisition_price: dec!(30),
+                acquisition_fees: dec!(0),
+                fx_rate_to_position: None,
+            });
+            pos.recalculate_aggregates();
+            // avg = (200 + 300) / 25 = 20.00
+            assert_eq!(pos.average_cost, dec!(20));
+        }
     }
 }

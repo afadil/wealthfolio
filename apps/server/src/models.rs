@@ -15,6 +15,7 @@ pub struct Account {
     pub is_active: bool,
     pub is_archived: bool,
     pub tracking_mode: String,
+    pub cost_basis_method: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
     pub platform_id: Option<String>,
@@ -32,6 +33,12 @@ impl From<core_accounts::Account> for Account {
             core_accounts::TrackingMode::NotSet => "NOT_SET",
         }
         .to_string();
+        let cost_basis_method = match a.cost_basis_method {
+            core_accounts::CostBasisMethod::Lifo => "LIFO",
+            core_accounts::CostBasisMethod::Wac => "WAC",
+            core_accounts::CostBasisMethod::Fifo => "FIFO",
+        }
+        .to_string();
         Self {
             id: a.id,
             name: a.name,
@@ -42,6 +49,7 @@ impl From<core_accounts::Account> for Account {
             is_active: a.is_active,
             is_archived: a.is_archived,
             tracking_mode,
+            cost_basis_method,
             created_at: a.created_at,
             updated_at: a.updated_at,
             platform_id: a.platform_id,
@@ -68,6 +76,8 @@ pub struct NewAccount {
     pub is_archived: bool,
     #[serde(default = "default_tracking_mode")]
     pub tracking_mode: String,
+    #[serde(default = "default_cost_basis_method")]
+    pub cost_basis_method: String,
     pub platform_id: Option<String>,
     pub account_number: Option<String>,
     pub meta: Option<String>,
@@ -79,11 +89,23 @@ fn default_tracking_mode() -> String {
     "NOT_SET".to_string()
 }
 
+fn default_cost_basis_method() -> String {
+    "FIFO".to_string()
+}
+
 fn parse_tracking_mode(s: &str) -> core_accounts::TrackingMode {
     match s {
         "TRANSACTIONS" => core_accounts::TrackingMode::Transactions,
         "HOLDINGS" => core_accounts::TrackingMode::Holdings,
         _ => core_accounts::TrackingMode::NotSet,
+    }
+}
+
+fn parse_cost_basis_method(s: &str) -> core_accounts::CostBasisMethod {
+    match s {
+        "LIFO" => core_accounts::CostBasisMethod::Lifo,
+        "WAC" => core_accounts::CostBasisMethod::Wac,
+        _ => core_accounts::CostBasisMethod::Fifo,
     }
 }
 
@@ -99,6 +121,7 @@ impl From<NewAccount> for core_accounts::NewAccount {
             is_active: a.is_active,
             is_archived: a.is_archived,
             tracking_mode: parse_tracking_mode(&a.tracking_mode),
+            cost_basis_method: parse_cost_basis_method(&a.cost_basis_method),
             platform_id: a.platform_id,
             account_number: a.account_number,
             meta: a.meta,
@@ -119,6 +142,7 @@ pub struct AccountUpdate {
     pub is_active: bool,
     pub is_archived: Option<bool>,
     pub tracking_mode: Option<String>,
+    pub cost_basis_method: Option<String>,
     pub platform_id: Option<String>,
     pub account_number: Option<String>,
     pub meta: Option<String>,
@@ -137,6 +161,7 @@ impl From<AccountUpdate> for core_accounts::AccountUpdate {
             is_active: a.is_active,
             is_archived: a.is_archived,
             tracking_mode: a.tracking_mode.map(|s| parse_tracking_mode(&s)),
+            cost_basis_method: a.cost_basis_method.map(|s| parse_cost_basis_method(&s)),
             platform_id: a.platform_id,
             account_number: a.account_number,
             meta: a.meta,

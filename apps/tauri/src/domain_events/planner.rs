@@ -100,6 +100,10 @@ pub fn plan_portfolio_job(
                     has_recalc_events = true;
                 }
             }
+            DomainEvent::CostBasisMethodChanged { account_id, .. } => {
+                account_ids.insert(account_id.clone());
+                has_recalc_events = true;
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+use crate::accounts::CostBasisMethod;
 use crate::activities::{Activity, ActivityType};
 use crate::assets::AssetRepositoryTrait;
 use crate::errors::{CalculatorError, Error, Result};
@@ -93,6 +94,7 @@ impl HoldingsCalculator {
         previous_snapshot: &AccountStateSnapshot,
         activities_today: &[Activity], // Assumes these are for the *target* date and already split-adjusted
         target_date: NaiveDate,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<HoldingsCalculationResult> {
         debug!(
             "Calculating holdings for account {} on date {}",
@@ -134,6 +136,7 @@ impl HoldingsCalculator {
                 &mut next_state,
                 &account_currency,
                 &mut asset_cache,
+                cost_basis_method,
             ) {
                 Ok(_) => {} // Activity processed successfully
                 Err(e) => {
@@ -212,6 +215,7 @@ impl HoldingsCalculator {
         state: &mut AccountStateSnapshot,
         account_currency: &str,
         asset_cache: &mut HashMap<String, (String, bool, Decimal)>,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<()> {
         let activity_type = ActivityType::from_str(&activity.activity_type).map_err(|_| {
             CalculatorError::UnsupportedActivityType(activity.activity_type.clone())
@@ -221,7 +225,13 @@ impl HoldingsCalculator {
         // NOTE: Removed precomputation of amount_acct/fee_acct - handlers convert when needed
         match activity_type {
             ActivityType::Buy => self.handle_buy(activity, state, account_currency, asset_cache),
-            ActivityType::Sell => self.handle_sell(activity, state, account_currency, asset_cache),
+            ActivityType::Sell => self.handle_sell(
+                activity,
+                state,
+                account_currency,
+                asset_cache,
+                cost_basis_method,
+            ),
             ActivityType::Deposit => self.handle_deposit(activity, state, account_currency),
             ActivityType::Withdrawal => self.handle_withdrawal(activity, state, account_currency),
             ActivityType::Dividend | ActivityType::Interest | ActivityType::Credit => {
@@ -233,13 +243,19 @@ impl HoldingsCalculator {
             ActivityType::TransferIn => {
                 self.handle_transfer_in(activity, state, account_currency, asset_cache)
             }
-            ActivityType::TransferOut => {
-                self.handle_transfer_out(activity, state, account_currency, asset_cache)
-            }
+            ActivityType::TransferOut => self.handle_transfer_out(
+                activity,
+                state,
+                account_currency,
+                asset_cache,
+                cost_basis_method,
+            ),
             // Split activities are NO-OPs here: the snapshot service retroactively
             // adjusts historical activity quantities/prices before the calculator runs.
             ActivityType::Split => Ok(()),
-            ActivityType::Adjustment => self.handle_adjustment(activity, state, asset_cache),
+            ActivityType::Adjustment => {
+                self.handle_adjustment(activity, state, asset_cache, cost_basis_method)
+            }
             ActivityType::Unknown => {
                 warn!(
                     "Unknown activity type for activity {}. Skipping.",
@@ -326,6 +342,20 @@ impl HoldingsCalculator {
         Ok(())
     }
 
+    /// Dispatches lot reduction to the appropriate method based on `cost_basis_method`.
+    fn reduce_position_lots(
+        &self,
+        position: &mut Position,
+        quantity: Decimal,
+        method: CostBasisMethod,
+    ) -> Result<super::FifoReductionResult> {
+        match method {
+            CostBasisMethod::Fifo => position.reduce_lots_fifo(quantity),
+            CostBasisMethod::Lifo => position.reduce_lots_lifo(quantity),
+            CostBasisMethod::Wac => position.reduce_lots_wac(quantity),
+        }
+    }
+
     /// Handle SELL activity.
     /// Books cash inflow in account currency when fx_rate is provided,
     /// otherwise in activity currency.
@@ -335,6 +365,7 @@ impl HoldingsCalculator {
         state: &mut AccountStateSnapshot,
         account_currency: &str,
         asset_cache: &mut HashMap<String, (String, bool, Decimal)>,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let asset_id = activity.asset_id.as_deref().unwrap_or("");
@@ -361,7 +392,8 @@ impl HoldingsCalculator {
         }
 
         if let Some(position) = state.positions.get_mut(asset_id) {
-            let _reduction = position.reduce_lots_fifo(activity.qty())?;
+            let _reduction =
+                self.reduce_position_lots(position, activity.qty(), cost_basis_method)?;
         } else {
             warn!(
                 "Attempted to Sell non-existent/zero position {} via activity {}. Applying cash effect only.",
@@ -721,6 +753,7 @@ impl HoldingsCalculator {
         state: &mut AccountStateSnapshot,
         account_currency: &str,
         _asset_cache: &mut HashMap<String, (String, bool, Decimal)>,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<()> {
         let activity_currency = &activity.currency;
         let activity_date = self.activity_local_date(activity);
@@ -775,7 +808,8 @@ impl HoldingsCalculator {
                     );
                 }
 
-                let reduction = position.reduce_lots_fifo(activity.qty())?;
+                let reduction =
+                    self.reduce_position_lots(position, activity.qty(), cost_basis_method)?;
                 let cost_basis_removed = reduction.cost_basis_removed;
 
                 // Cache removed lots for paired TRANSFER_IN (lot-level transfer)
@@ -835,6 +869,7 @@ impl HoldingsCalculator {
         activity: &Activity,
         state: &mut AccountStateSnapshot,
         _asset_cache: &mut HashMap<String, (String, bool, Decimal)>,
+        cost_basis_method: CostBasisMethod,
     ) -> Result<()> {
         use crate::activities::ACTIVITY_SUBTYPE_OPTION_EXPIRY;
 
@@ -843,7 +878,7 @@ impl HoldingsCalculator {
                 let asset_id = activity.asset_id.as_deref().unwrap_or("");
                 if let Some(position) = state.positions.get_mut(asset_id) {
                     let qty = activity.qty();
-                    let reduction = position.reduce_lots_fifo(qty)?;
+                    let reduction = self.reduce_position_lots(position, qty, cost_basis_method)?;
                     debug!(
                         "OPTION_EXPIRY: removed qty={} cost_basis={} from {} (activity {})",
                         reduction.quantity_reduced,

@@ -94,6 +94,7 @@ export function NewAccountsFoundModal({
           isActive: acc.isActive,
           isArchived: acc.isArchived,
           trackingMode: setup.trackingMode,
+          costBasisMethod: acc.costBasisMethod ?? "FIFO",
         });
       }
 

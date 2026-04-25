@@ -53,6 +53,7 @@ function createPortfolioAccount(baseCurrency: string): UIAccount {
     isActive: true,
     isArchived: false,
     trackingMode: "NOT_SET",
+    costBasisMethod: "FIFO" as const,
     isDefault: false,
     balance: 0,
     createdAt: new Date(),

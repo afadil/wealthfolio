@@ -67,6 +67,14 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   const initialTrackingMode = defaultValues?.trackingMode;
   const needsSetup = initialTrackingMode === "NOT_SET" || initialTrackingMode === undefined;
 
+  // Track initial cost basis method to detect changes
+  const initialCostBasisMethod = defaultValues?.costBasisMethod;
+
+  // State for cost basis method switch confirmation dialog
+  const [showCostBasisConfirmation, setShowCostBasisConfirmation] = useState(false);
+  const [pendingCostBasisFormData, setPendingCostBasisFormData] =
+    useState<AccountFormOutput | null>(null);
+
   // State for mode switch confirmation dialog
   const [showModeConfirmation, setShowModeConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<AccountFormOutput | null>(null);
@@ -77,6 +85,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
       ...defaultValues,
       // Don't default to any mode if account needs setup (must come after spread)
       trackingMode: needsSetup ? undefined : defaultValues?.trackingMode,
+      costBasisMethod: defaultValues?.costBasisMethod ?? "FIFO",
     },
   });
 
@@ -86,19 +95,20 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
   // Returns a promise when updating so it can be chained with other operations
   const doSubmit = useCallback(
     (data: AccountFormOutput, options?: { async?: boolean }) => {
-      const { id, trackingMode, ...rest } = data;
+      const { id, trackingMode, costBasisMethod, ...rest } = data;
 
       if (id) {
         if (options?.async) {
           return updateAccountMutation.mutateAsync({
             id,
             trackingMode,
+            costBasisMethod,
             ...rest,
           });
         }
-        return updateAccountMutation.mutate({ id, trackingMode, ...rest });
+        return updateAccountMutation.mutate({ id, trackingMode, costBasisMethod, ...rest });
       }
-      return createAccountMutation.mutate({ trackingMode, ...rest });
+      return createAccountMutation.mutate({ trackingMode, costBasisMethod, ...rest });
     },
     [createAccountMutation, updateAccountMutation],
   );
@@ -113,6 +123,18 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
       // Show confirmation dialog
       setPendingFormData(data);
       setShowModeConfirmation(true);
+      return;
+    }
+
+    // Check if cost basis method changed on an existing account
+    const isCostBasisMethodChanged =
+      isExistingAccount &&
+      initialCostBasisMethod !== undefined &&
+      initialCostBasisMethod !== data.costBasisMethod;
+
+    if (isCostBasisMethodChanged) {
+      setPendingCostBasisFormData(data);
+      setShowCostBasisConfirmation(true);
       return;
     }
 
@@ -138,6 +160,24 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
     setPendingFormData(null);
     // Revert the tracking mode in the form
     form.setValue("trackingMode", initialTrackingMode);
+  };
+
+  const handleConfirmCostBasisSwitch = async () => {
+    setShowCostBasisConfirmation(false);
+    if (pendingCostBasisFormData) {
+      try {
+        await doSubmit(pendingCostBasisFormData, { async: true });
+      } finally {
+        setPendingCostBasisFormData(null);
+      }
+    }
+  };
+
+  const handleCancelCostBasisSwitch = () => {
+    setShowCostBasisConfirmation(false);
+    setPendingCostBasisFormData(null);
+    // Revert the cost basis method in the form
+    form.setValue("costBasisMethod", initialCostBasisMethod ?? "FIFO");
   };
 
   return (
@@ -309,6 +349,76 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
 
           <FormField
             control={form.control}
+            name="costBasisMethod"
+            render={({ field }) => (
+              <FormItem className="space-y-2">
+                <FormLabel>Cost Basis Method</FormLabel>
+                <Alert
+                  variant="default"
+                  className="px-3 py-2.5 [&>svg]:left-3 [&>svg]:top-2.5 [&>svg~*]:pl-6"
+                >
+                  <Icons.AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    The cost basis method determines how your average book cost and capital gains
+                    are calculated. The right choice depends on your country and broker.{" "}
+                    <a
+                      href="https://wealthfolio.app/docs/concepts/cost-basis-methods"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-foreground underline"
+                    >
+                      Learn more
+                    </a>
+                  </AlertDescription>
+                </Alert>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  >
+                    <label
+                      className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
+                        field.value === "FIFO" ? "border-primary bg-primary/5" : "border-muted"
+                      }`}
+                    >
+                      <RadioGroupItem value="FIFO" className="mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">FIFO</span>
+                        <span className="text-muted-foreground text-xs">First In, First Out</span>
+                      </div>
+                    </label>
+                    <label
+                      className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
+                        field.value === "LIFO" ? "border-primary bg-primary/5" : "border-muted"
+                      }`}
+                    >
+                      <RadioGroupItem value="LIFO" className="mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">LIFO</span>
+                        <span className="text-muted-foreground text-xs">Last In, First Out</span>
+                      </div>
+                    </label>
+                    <label
+                      className={`hover:bg-accent relative flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${
+                        field.value === "WAC" ? "border-primary bg-primary/5" : "border-muted"
+                      }`}
+                    >
+                      <RadioGroupItem value="WAC" className="mt-0.5" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">WAC</span>
+                        <span className="text-muted-foreground text-xs">Weighted Average Cost</span>
+                      </div>
+                    </label>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="isActive"
             render={({ field }) => (
               <FormItem className="flex items-center space-x-3 space-y-0 rounded-lg border p-3">
@@ -415,6 +525,34 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           <AlertDialogFooter className="bg-muted/30 border-t px-5 py-3">
             <AlertDialogCancel onClick={handleCancelModeSwitch}>Keep Holdings</AlertDialogCancel>
             <Button onClick={handleConfirmModeSwitch}>Switch to Transactions</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cost Basis Method Change Confirmation Dialog */}
+      <AlertDialog open={showCostBasisConfirmation} onOpenChange={setShowCostBasisConfirmation}>
+        <AlertDialogContent className="max-w-105 gap-0 overflow-hidden p-0">
+          <div className="px-5 pb-4 pt-5">
+            <AlertDialogHeader className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100/30 dark:bg-orange-100/20">
+                  <Icons.ArrowRightLeft className="h-4 w-4 text-orange-500 dark:text-orange-300" />
+                </div>
+                <AlertDialogTitle className="text-base font-semibold">
+                  Change cost basis method
+                </AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                Changing the cost basis method will trigger a full recalculation of all holdings for
+                this account. Your average cost and capital gains history will be updated to reflect
+                the new method.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          </div>
+
+          <AlertDialogFooter className="bg-muted/30 border-t px-5 py-3">
+            <AlertDialogCancel onClick={handleCancelCostBasisSwitch}>Cancel</AlertDialogCancel>
+            <Button onClick={handleConfirmCostBasisSwitch}>Confirm Change</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
