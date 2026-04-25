@@ -319,6 +319,82 @@ pub fn run_scenario_analysis_with_mode(
 
 // ─── Stress Tests ───────────────────────────────────────────────────────────
 
+struct RiskLabPlanOutcome {
+    fi_age: Option<u32>,
+    retirement_start_age: Option<u32>,
+    funded_at_goal_age: bool,
+    shortfall_at_goal_age: f64,
+    portfolio_at_horizon: f64,
+    portfolio_at_retirement_start: f64,
+    required_capital_at_goal_age: f64,
+    failure_age: Option<u32>,
+    spending_shortfall_age: Option<u32>,
+}
+
+fn risk_lab_plan_outcome(
+    plan: &RetirementPlan,
+    current_portfolio: f64,
+    mode: RetirementTimingMode,
+) -> RiskLabPlanOutcome {
+    let mut required_capital_cache = RequiredCapitalCache::new();
+    let required_capital = required_capital_for(
+        plan,
+        plan.personal.target_retirement_age,
+        &mut required_capital_cache,
+    );
+    let required_capital_value = required_capital.unwrap_or(0.0);
+    let projection = project_retirement_with_mode_cached(
+        plan,
+        current_portfolio,
+        mode,
+        &mut required_capital_cache,
+    );
+    let portfolio_at_goal = projection
+        .year_by_year
+        .iter()
+        .find(|snap| snap.age == plan.personal.target_retirement_age)
+        .map(|snap| snap.portfolio_value)
+        .unwrap_or(0.0);
+    let portfolio_at_retirement_start = projection
+        .retirement_start_age
+        .and_then(|age| {
+            projection
+                .year_by_year
+                .iter()
+                .find(|snap| snap.age == age)
+                .map(|snap| snap.portfolio_value)
+        })
+        .unwrap_or(0.0);
+    let failure_age = projection
+        .year_by_year
+        .iter()
+        .find(|snap| snap.phase == "fire" && snap.portfolio_value <= 0.0)
+        .map(|snap| snap.age);
+    let spending_shortfall_age = projection
+        .year_by_year
+        .iter()
+        .find(|snap| has_material_spending_shortfall(snap))
+        .map(|snap| snap.age);
+
+    RiskLabPlanOutcome {
+        fi_age: projection.fire_age,
+        retirement_start_age: projection.retirement_start_age,
+        funded_at_goal_age: required_capital.is_some_and(|target| portfolio_at_goal >= target),
+        shortfall_at_goal_age: required_capital
+            .map(|target| (target - portfolio_at_goal).max(0.0))
+            .unwrap_or(0.0),
+        portfolio_at_horizon: projection
+            .year_by_year
+            .last()
+            .map(|snap| snap.portfolio_end_value)
+            .unwrap_or(0.0),
+        portfolio_at_retirement_start,
+        required_capital_at_goal_age: required_capital_value,
+        failure_age,
+        spending_shortfall_age,
+    }
+}
+
 pub fn run_stress_tests(plan: &RetirementPlan, current_portfolio: f64) -> Vec<StressTestResult> {
     run_stress_tests_with_mode(plan, current_portfolio, RetirementTimingMode::Fire)
 }
@@ -328,73 +404,75 @@ pub fn run_stress_tests_with_mode(
     current_portfolio: f64,
     mode: RetirementTimingMode,
 ) -> Vec<StressTestResult> {
-    let baseline_overview = compute_retirement_overview_with_mode(plan, current_portfolio, mode);
-    let baseline = stress_outcome_from_overview(&baseline_overview);
-    let severity_base = baseline_overview.required_capital_at_goal_age.max(1.0);
+    let baseline_outcome = risk_lab_plan_outcome(plan, current_portfolio, mode);
+    let baseline = stress_outcome_from_plan_outcome(&baseline_outcome);
+    let severity_base = baseline_outcome.required_capital_at_goal_age.max(1.0);
 
-    let mut specs = vec![
-        build_plan_stress(
+    // The 6 stress scenarios are independent, so run them across the rayon
+    // pool instead of sequentially: this is ~N× faster on multi-core machines
+    // and noticeably shortens the "What could break this plan?" spinner.
+    type PlanMutator = fn(&mut RetirementPlan);
+    let plan_stresses: [(StressTestId, &str, &str, StressCategory, PlanMutator); 5] = [
+        (
             StressTestId::ReturnDrag,
             "Lower returns",
             "Pre-retirement and retirement returns are 2 percentage points lower.",
             StressCategory::Market,
-            plan,
-            current_portfolio,
-            mode,
-            &baseline,
-            severity_base,
             apply_return_drag_stress,
         ),
-        build_plan_stress(
+        (
             StressTestId::InflationShock,
             "Inflation shock",
             "General inflation is 1.5 percentage points higher.",
             StressCategory::Inflation,
-            plan,
-            current_portfolio,
-            mode,
-            &baseline,
-            severity_base,
             apply_inflation_shock_stress,
         ),
-        build_plan_stress(
+        (
             StressTestId::SpendingShock,
             "Higher spending",
             "All retirement spending lines are 10% higher.",
             StressCategory::Spending,
-            plan,
-            current_portfolio,
-            mode,
-            &baseline,
-            severity_base,
             apply_spending_shock_stress,
         ),
-        build_plan_stress(
+        (
             StressTestId::RetireEarlier,
             "Retire 2 years earlier",
             "Desired retirement age is moved two years earlier.",
             StressCategory::Timing,
-            plan,
-            current_portfolio,
-            mode,
-            &baseline,
-            severity_base,
             apply_retire_earlier_stress,
         ),
-        build_plan_stress(
+        (
             StressTestId::SaveLess,
             "Save less",
             "Monthly contributions are 25% lower.",
             StressCategory::Saving,
-            plan,
-            current_portfolio,
-            mode,
-            &baseline,
-            severity_base,
             apply_save_less_stress,
         ),
-        build_early_crash_stress(plan, &baseline_overview, &baseline, severity_base),
     ];
+
+    let (mut specs, early_crash) = rayon::join(
+        || {
+            plan_stresses
+                .par_iter()
+                .map(|(id, label, description, category, mutate)| {
+                    build_plan_stress(
+                        id.clone(),
+                        label,
+                        description,
+                        category.clone(),
+                        plan,
+                        current_portfolio,
+                        mode,
+                        &baseline,
+                        severity_base,
+                        *mutate,
+                    )
+                })
+                .collect::<Vec<_>>()
+        },
+        || build_early_crash_stress(plan, &baseline_outcome, &baseline, severity_base),
+    );
+    specs.push(early_crash);
 
     specs.sort_by(|a, b| {
         severity_rank(&b.severity)
@@ -426,8 +504,8 @@ where
 {
     let mut stressed_plan = plan.clone();
     mutate(&mut stressed_plan);
-    let overview = compute_retirement_overview_with_mode(&stressed_plan, current_portfolio, mode);
-    let stressed = stress_outcome_from_overview(&overview);
+    let outcome = risk_lab_plan_outcome(&stressed_plan, current_portfolio, mode);
+    let stressed = stress_outcome_from_plan_outcome(&outcome);
     build_stress_result(
         id,
         label,
@@ -441,11 +519,11 @@ where
 
 fn build_early_crash_stress(
     plan: &RetirementPlan,
-    baseline_overview: &RetirementOverview,
+    baseline_outcome: &RiskLabPlanOutcome,
     baseline: &StressOutcome,
     severity_base: f64,
 ) -> StressTestResult {
-    let Some(retirement_age) = baseline_overview.retirement_start_age else {
+    let Some(retirement_age) = baseline_outcome.retirement_start_age else {
         return build_stress_result(
             StressTestId::EarlyCrash,
             "Retire into a crash",
@@ -457,7 +535,7 @@ fn build_early_crash_stress(
         );
     };
 
-    let portfolio_at_start = baseline_overview.portfolio_at_retirement_start.max(0.0);
+    let portfolio_at_start = baseline_outcome.portfolio_at_retirement_start.max(0.0);
     let crash = run_sorr(plan, portfolio_at_start, retirement_age)
         .into_iter()
         .find(|s| s.label == "Crash Year 1 (-30%)");
@@ -531,20 +609,15 @@ fn build_stress_result(
     }
 }
 
-fn stress_outcome_from_overview(overview: &RetirementOverview) -> StressOutcome {
-    let portfolio_at_horizon = overview
-        .trajectory
-        .last()
-        .map(|pt| pt.portfolio_end)
-        .unwrap_or(0.0);
+fn stress_outcome_from_plan_outcome(outcome: &RiskLabPlanOutcome) -> StressOutcome {
     StressOutcome {
-        fi_age: overview.fi_age,
-        retirement_start_age: overview.retirement_start_age,
-        funded_at_goal_age: overview.funded_at_goal_age,
-        shortfall_at_goal_age: overview.shortfall_at_goal_age,
-        portfolio_at_horizon,
-        failure_age: overview.failure_age,
-        spending_shortfall_age: overview.spending_shortfall_age,
+        fi_age: outcome.fi_age,
+        retirement_start_age: outcome.retirement_start_age,
+        funded_at_goal_age: outcome.funded_at_goal_age,
+        shortfall_at_goal_age: outcome.shortfall_at_goal_age,
+        portfolio_at_horizon: outcome.portfolio_at_horizon,
+        failure_age: outcome.failure_age,
+        spending_shortfall_age: outcome.spending_shortfall_age,
     }
 }
 
@@ -912,20 +985,15 @@ fn decision_cell_from_plan(
     current_portfolio: f64,
     mode: RetirementTimingMode,
 ) -> DecisionSensitivityCell {
-    let overview = compute_retirement_overview_with_mode(plan, current_portfolio, mode);
-    let target_factor = inflation_factor_to_age(plan, overview.desired_fire_age);
+    let outcome = risk_lab_plan_outcome(plan, current_portfolio, mode);
+    let target_factor = inflation_factor_to_age(plan, plan.personal.target_retirement_age);
     let horizon_factor = inflation_factor_to_age(plan, plan.personal.planning_horizon_age);
     DecisionSensitivityCell {
-        fi_age: overview.fi_age,
-        retirement_start_age: overview.retirement_start_age,
-        funded_at_goal_age: overview.funded_at_goal_age,
-        shortfall_at_goal_age: overview.shortfall_at_goal_age / target_factor,
-        portfolio_at_horizon: overview
-            .trajectory
-            .last()
-            .map(|point| point.portfolio_end)
-            .unwrap_or(0.0)
-            / horizon_factor,
+        fi_age: outcome.fi_age,
+        retirement_start_age: outcome.retirement_start_age,
+        funded_at_goal_age: outcome.funded_at_goal_age,
+        shortfall_at_goal_age: outcome.shortfall_at_goal_age / target_factor,
+        portfolio_at_horizon: outcome.portfolio_at_horizon / horizon_factor,
     }
 }
 

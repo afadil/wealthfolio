@@ -672,7 +672,7 @@ fn find_fi_age_accumulation_only(
     None
 }
 
-fn has_material_spending_shortfall(snap: &YearlySnapshot) -> bool {
+pub(crate) fn has_material_spending_shortfall(snap: &YearlySnapshot) -> bool {
     if snap.phase != "fire" {
         return false;
     }

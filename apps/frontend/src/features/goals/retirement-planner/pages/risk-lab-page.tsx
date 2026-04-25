@@ -14,18 +14,18 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Skeleton,
   formatAmount,
   formatCompactAmount,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { RiskLabSkeleton, StressCardSkeleton } from "../components/risk-lab-skeleton";
 import {
   TooltipContent,
   TooltipTrigger,
   Tooltip as UiTooltip,
 } from "@wealthfolio/ui/components/ui/tooltip";
 import type { CSSProperties } from "react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -118,7 +118,11 @@ function stableSeed(parts: unknown[]) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : error ? String(error) : null;
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (typeof error === "number" || typeof error === "boolean") return String(error);
+  return "An unknown error occurred.";
 }
 
 function topStress(stresses?: StressTestResult[]) {
@@ -595,10 +599,16 @@ function StressTestsSection({
       {message && <p className="text-destructive py-2 text-sm">{message}</p>}
 
       {loading && (
-        <div className="grid gap-3 lg:grid-cols-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-40 rounded-xl" />
-          ))}
+        <div className="space-y-3">
+          <p className="text-muted-foreground flex items-center gap-2 text-xs">
+            <Icons.Spinner className="size-3 animate-spin" />
+            Running 6 stress scenarios against your plan…
+          </p>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <StressCardSkeleton key={index} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -694,7 +704,7 @@ function MonteCarloTooltip({
   currency,
 }: {
   active?: boolean;
-  payload?: Array<{ payload?: MonteCarloChartPoint }>;
+  payload?: { payload?: MonteCarloChartPoint }[];
   label?: string | number;
   currency: string;
 }) {
@@ -899,7 +909,7 @@ function MonteCarloDistributionSection({
                 loading={running && activeSims === 10_000}
                 loadingText="Running…"
               >
-                Refresh 10k
+                Run 10k paths
               </RefreshActionButton>
               <RefreshActionButton
                 onClick={() => onRun(100_000)}
@@ -1003,10 +1013,7 @@ function MonteCarloDistributionSection({
               />
               <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-5 text-sm">
                 <span className="flex items-center gap-2">
-                  <span
-                    className="size-3 rounded-sm"
-                    style={{ backgroundColor: CHART.fan }}
-                  />
+                  <span className="size-3 rounded-sm" style={{ backgroundColor: CHART.fan }} />
                   Bad-good range
                 </span>
                 <span className="flex items-center gap-2">
@@ -1045,22 +1052,21 @@ function axisMoney(value: number, currency: string) {
 function SensitivityMatrixCard({
   title,
   subtitle,
-  axisLabel,
   children,
 }: {
   title: string;
   subtitle: string;
-  axisLabel: string;
   children: React.ReactNode;
 }) {
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-start justify-between gap-4 border-b px-5 py-4">
-        <div>
-          <CardTitle className="text-base">{title}</CardTitle>
-          <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>
+      <CardHeader className="border-b px-4 py-3 sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-1.5">
+          <CardTitle className="text-[15px] leading-tight sm:text-base">{title}</CardTitle>
+          <p className="text-muted-foreground max-w-[34rem] text-xs leading-snug sm:text-sm">
+            {subtitle}
+          </p>
         </div>
-        <p className="text-muted-foreground whitespace-nowrap pt-1 text-sm">{axisLabel}</p>
       </CardHeader>
       {children}
     </Card>
@@ -1177,7 +1183,7 @@ function sensitivityCellStyle({
 
 function decisionCellLabel(cell: DecisionSensitivityCell, currency: string) {
   if (cell.shortfallAtGoalAge > 1) {
-    return `Gap ${formatCompactAmount(cell.shortfallAtGoalAge, currency)}`;
+    return `-${formatCompactAmount(cell.shortfallAtGoalAge, currency)}`;
   }
   if (cell.portfolioAtHorizon <= 0) {
     return "Runs short";
@@ -1204,16 +1210,16 @@ function DecisionHeatmap({
   const baseline = matrixBaselineCell(matrix);
 
   return (
-    <div className="overflow-x-auto px-5 pb-5 pt-6">
-      <table className="w-full min-w-[560px] border-separate border-spacing-[3px] text-sm">
+    <div className="overflow-x-auto px-3 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
+      <table className="w-full min-w-[480px] table-fixed border-separate border-spacing-[2px] text-xs sm:min-w-[540px] sm:border-spacing-[3px] sm:text-sm">
         <thead>
           <tr>
-            <th className="w-24" />
+            <th className="w-14 sm:w-16" />
             {matrix.columnValues.map((value, column) => (
               <th
                 key={`${value}-${column}`}
                 className={cn(
-                  "text-muted-foreground px-2 pb-2.5 text-center text-[13px] font-semibold tabular-nums",
+                  "text-muted-foreground px-1 pb-2 text-center text-[11px] font-semibold tabular-nums sm:px-2 sm:pb-2.5 sm:text-[13px]",
                   column === matrix.baselineColumn && "text-foreground",
                 )}
               >
@@ -1231,6 +1237,7 @@ function DecisionHeatmap({
                 )}
               </th>
             ))}
+            <th className="w-3 sm:w-4" />
           </tr>
         </thead>
         <tbody>
@@ -1238,7 +1245,7 @@ function DecisionHeatmap({
             <tr key={`${rowValue}-${row}`}>
               <td
                 className={cn(
-                  "text-muted-foreground pr-3 text-right text-[13px] font-semibold tabular-nums",
+                  "text-muted-foreground pr-2 text-right text-[11px] font-semibold tabular-nums sm:pr-3 sm:text-[13px]",
                   row === matrix.baselineRow && "text-foreground",
                 )}
               >
@@ -1254,7 +1261,7 @@ function DecisionHeatmap({
                       <TooltipTrigger asChild>
                         <div
                           className={cn(
-                            "rounded-[6px] px-3 py-[13px] text-center text-[13px] font-semibold tabular-nums transition-shadow",
+                            "flex h-12 items-center justify-center rounded-[6px] px-2 text-center text-xs font-semibold leading-none tabular-nums transition-shadow sm:h-[52px] sm:px-3 sm:text-[13px]",
                             active && "ring-2 ring-[hsl(91,34%,29%)] ring-offset-0",
                           )}
                           style={sensitivityCellStyle({ cell, baseline, range, active })}
@@ -1298,7 +1305,7 @@ function DecisionHeatmap({
                           </span>
                           <span className="text-muted-foreground">{ageMetricLabel}</span>
                           <span className="text-right">{cell.fiAge ?? "Not reached"}</span>
-                          <span className="text-muted-foreground">Gap at retirement</span>
+                          <span className="text-muted-foreground">Shortfall at retirement</span>
                           <span className="text-right">
                             {fmt(cell.shortfallAtGoalAge, currency)}
                           </span>
@@ -1308,9 +1315,31 @@ function DecisionHeatmap({
                   </td>
                 );
               })}
+              {row === 0 && (
+                <td rowSpan={matrix.rowValues.length} className="w-3 p-0 align-middle sm:w-4">
+                  <span
+                    className="text-muted-foreground/80 mx-auto block whitespace-nowrap text-center text-[11px] font-normal leading-none sm:text-xs"
+                    style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                  >
+                    {matrix.rowLabel}
+                  </span>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr>
+            <th className="w-14 sm:w-16" />
+            <th
+              colSpan={matrix.columnValues.length}
+              className="text-muted-foreground/80 px-1 pt-1.5 text-center text-[11px] font-normal leading-none sm:text-xs"
+            >
+              {matrix.columnLabel}
+            </th>
+            <th className="w-3 sm:w-4" />
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -1353,18 +1382,16 @@ function WhatMovesThePlanSection({
           </h2>
           <p className="text-muted-foreground mt-2 max-w-4xl text-sm leading-relaxed xl:whitespace-nowrap">
             Shows how savings, returns, retirement age, and spending change the outcome. Green =
-            more money left; red = gap or runs short.
+            more money left; red = shortfall or runs short.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {showMaps && (
-            <RefreshActionButton onClick={onRun} disabled={loading} loading={loading} />
-          )}
+          {showMaps && <RefreshActionButton onClick={onRun} disabled={loading} loading={loading} />}
         </div>
       </div>
 
       {message && <p className="text-destructive text-sm">{message}</p>}
-      {!showMaps && !message && (
+      {!showMaps && (
         <div className="bg-muted/10 rounded-xl border border-dashed p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -1387,7 +1414,6 @@ function WhatMovesThePlanSection({
             <SensitivityMatrixCard
               title="Contribution × Return"
               subtitle="Money left at the end, in today's dollars"
-              axisLabel="After-fee return ↑ / Monthly contribution ↔"
             >
               <DecisionHeatmap
                 matrix={contributionReturn}
@@ -1408,7 +1434,6 @@ function WhatMovesThePlanSection({
             <SensitivityMatrixCard
               title={`${isFireMode ? "Desired age" : "Retirement age"} × Spending`}
               subtitle="Money left at the end, in today's dollars"
-              axisLabel={`Monthly spending ↑ / ${isFireMode ? "Desired age" : "Retirement age"} ↔`}
             >
               <DecisionHeatmap
                 matrix={retirementAgeSpending}
@@ -1468,11 +1493,11 @@ function SorrTooltip({
   currency,
 }: {
   active?: boolean;
-  payload?: Array<{
+  payload?: {
     name?: string | number;
     value?: number | string;
     color?: string;
-  }>;
+  }[];
   label?: string | number;
   currency: string;
 }) {
@@ -1510,13 +1535,6 @@ function SorrChart({
   currency: string;
   retirementStartAge: number;
 }) {
-  const colors = [
-    "hsl(91,34%,29%)",
-    "hsl(8,55%,45%)",
-    "hsl(38,65%,43%)",
-    "hsl(191,24%,42%)",
-    "hsl(50,4%,45%)",
-  ];
   const maxLen = Math.max(...scenarios.map((scenario) => scenario.portfolioPath.length));
   const data = Array.from({ length: maxLen }, (_, index) => {
     const entry: Record<string, number> = { age: retirementStartAge + index };
@@ -1527,7 +1545,7 @@ function SorrChart({
   });
 
   return (
-    <ResponsiveContainer width="100%" height={170}>
+    <ResponsiveContainer width="100%" height={210}>
       <LineChart data={data} margin={{ top: 12, right: 18, left: 18, bottom: 10 }}>
         <CartesianGrid
           vertical={false}
@@ -1556,7 +1574,7 @@ function SorrChart({
           <Line
             key={scenario.label}
             dataKey={scenario.label}
-            stroke={colors[index % colors.length]}
+            stroke={SORR_COLORS[index % SORR_COLORS.length]}
             dot={false}
             activeDot={{ r: 4, stroke: "hsl(var(--card))", strokeWidth: 2 }}
             strokeWidth={index === 0 ? 2.2 : 1.5}
@@ -1566,6 +1584,35 @@ function SorrChart({
       </LineChart>
     </ResponsiveContainer>
   );
+}
+
+const SORR_COLORS = [
+  "hsl(91,34%,29%)",
+  "hsl(8,55%,45%)",
+  "hsl(38,65%,43%)",
+  "hsl(191,24%,42%)",
+  "hsl(50,4%,45%)",
+];
+
+function sorrRiskAge(scenario: SorrScenario) {
+  return scenario.failureAge ?? scenario.spendingShortfallAge ?? null;
+}
+
+function sorrOutcomeText(scenario: SorrScenario, currency: string) {
+  if (scenario.survived) {
+    return formatCompactAmount(scenario.finalValue, currency);
+  }
+
+  const riskAge = sorrRiskAge(scenario);
+  return riskAge ? `Runs short ${riskAge}` : "Runs short";
+}
+
+function worstSorrScenario(scenarios: SorrScenario[]) {
+  return [...scenarios].sort((a, b) => {
+    const aRiskAge = sorrRiskAge(a) ?? Number.POSITIVE_INFINITY;
+    const bRiskAge = sorrRiskAge(b) ?? Number.POSITIVE_INFINITY;
+    return aRiskAge - bRiskAge || a.finalValue - b.finalValue;
+  })[0];
 }
 
 function AdvancedSection({
@@ -1585,13 +1632,17 @@ function AdvancedSection({
 }) {
   const retirementStartAge = overview?.retirementStartAge ?? plan.personal.targetRetirementAge;
   const canRunSorr = (overview?.portfolioAtRetirementStart ?? 0) > 0;
+  const baseCase = sorrResult?.find((scenario) => scenario.label === "Base case");
+  const hardestPath = sorrResult ? worstSorrScenario(sorrResult) : undefined;
+  const hardestPathRiskAge = hardestPath ? sorrRiskAge(hardestPath) : null;
+  const survivingPaths = sorrResult?.filter((scenario) => scenario.survived).length ?? 0;
 
   return (
     <details className="bg-card group overflow-hidden rounded-xl border">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <Icons.ChevronDown className="text-muted-foreground mt-3 size-3.5 transition-transform group-open:rotate-180" />
-          <div>
+          <div className="min-w-0">
             <p className="text-muted-foreground/60 text-[10px] font-normal uppercase leading-none tracking-[0.24em]">
               Advanced checks
             </p>
@@ -1600,74 +1651,127 @@ function AdvancedSection({
             </h2>
           </div>
         </div>
+        {canRunSorr && (
+          <div
+            className="shrink-0"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <RefreshActionButton
+              onClick={onRunSorr}
+              disabled={sorrRunning}
+              loading={sorrRunning}
+              loadingText="Running…"
+            >
+              {sorrResult ? "Refresh" : "Run paths"}
+            </RefreshActionButton>
+          </div>
+        )}
       </summary>
       <div className="border-t p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold">Early market crash paths</h3>
-            <p className="text-muted-foreground mt-2 max-w-[720px] text-sm leading-relaxed">
-              Five crash-timing paths through your retirement window. Early losses matter more
-              than late ones.
-            </p>
-          </div>
-          <RefreshActionButton
-            onClick={onRunSorr}
-            disabled={sorrRunning || !canRunSorr}
-            loading={sorrRunning}
-            loadingText="Running…"
-          >
-            {sorrResult ? "Refresh" : "Run paths"}
-          </RefreshActionButton>
-        </div>
-
-        {!canRunSorr && (
-          <p className="text-muted-foreground mt-4 text-sm">
-            This check needs a positive projected portfolio at retirement start.
-          </p>
-        )}
         {errorMessage(sorrError) && (
-          <p className="text-destructive mt-4 text-sm">{errorMessage(sorrError)}</p>
+          <p className="text-destructive mb-4 text-sm">{errorMessage(sorrError)}</p>
         )}
         {sorrResult ? (
           <>
-            <div className="mt-2">
+            <p className="text-muted-foreground mb-3 text-sm">
+              Tests five crash-timing paths through retirement.
+            </p>
+            <div className="grid gap-3 border-y bg-muted/10 px-4 py-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
+                  Earliest shortfall
+                </p>
+                <p className="mt-1 font-semibold tabular-nums">
+                  {hardestPath && hardestPathRiskAge
+                    ? `${hardestPath.label} @ ${hardestPathRiskAge}`
+                    : "None"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
+                  Paths survive
+                </p>
+                <p className="mt-1 font-semibold tabular-nums">
+                  {survivingPaths}/{sorrResult.length}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
+                  Base case
+                </p>
+                <p className="mt-1 font-semibold tabular-nums">
+                  {baseCase ? sorrOutcomeText(baseCase, plan.currency) : "—"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
               <SorrChart
                 scenarios={sorrResult}
                 currency={plan.currency}
                 retirementStartAge={retirementStartAge}
               />
             </div>
-            <div className="mt-3 grid gap-x-4 gap-y-1.5 text-xs sm:grid-cols-2">
-              {sorrResult.map((scenario) => (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              {sorrResult.map((scenario, index) => (
                 <div
                   key={scenario.label}
-                  className="flex items-center justify-between gap-3 tabular-nums"
+                  className="bg-background/70 flex min-w-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs tabular-nums"
                 >
-                  <span className="text-muted-foreground truncate">{scenario.label}</span>
-                  <span className="font-medium">
-                    {scenario.survived
-                      ? formatCompactAmount(scenario.finalValue, plan.currency)
-                      : scenario.failureAge
-                        ? `Runs short ${scenario.failureAge}`
-                        : `Gap ${scenario.spendingShortfallAge ?? "?"}`}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: SORR_COLORS[index % SORR_COLORS.length] }}
+                    />
+                    <span className="text-muted-foreground truncate">{scenario.label}</span>
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-semibold",
+                      scenario.survived ? "text-[hsl(102,32%,39%)]" : "text-destructive",
+                    )}
+                  >
+                    {sorrOutcomeText(scenario, plan.currency)}
                   </span>
                 </div>
               ))}
             </div>
           </>
         ) : (
-          canRunSorr && (
-            <div className="text-muted-foreground mt-6 rounded-lg border border-dashed p-6 text-center text-sm">
-              Run paths to see how crash timing changes your retirement path.
+          <div className="bg-muted/10 rounded-xl border border-dashed px-5 py-6">
+            <div className="flex flex-col gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
+              <div>
+                <p className="text-sm font-semibold">
+                  {canRunSorr ? "Check crash timing risk." : "Crash paths unavailable."}
+                </p>
+                <p className="text-muted-foreground mt-1 max-w-2xl text-sm leading-relaxed">
+                  {canRunSorr
+                    ? "Run the five paths to see which sequence would put the plan under pressure first."
+                    : "This check needs a positive projected portfolio at retirement start."}
+                </p>
+              </div>
+              {canRunSorr && (
+                <Button size="sm" onClick={onRunSorr} disabled={sorrRunning} className="shrink-0">
+                  {sorrRunning ? (
+                    <Icons.Spinner className="mr-2 size-3.5 animate-spin" />
+                  ) : (
+                    <Icons.RefreshCw className="mr-2 size-3.5" />
+                  )}
+                  {sorrRunning ? "Running…" : "Run paths"}
+                </Button>
+              )}
             </div>
-          )
+          </div>
         )}
       </div>
     </details>
   );
 }
 
-export default function RiskLabPage({
+function useRiskLabQueries({
   plan,
   totalValue,
   isLoading,
@@ -1680,12 +1784,14 @@ export default function RiskLabPage({
   const retirementStartAge =
     retirementOverview?.retirementStartAge ?? plan.personal.targetRetirementAge;
   const planKey = useMemo(() => JSON.stringify(plan), [plan]);
-  const [monteCarloSims, setMonteCarloSims] = useState(10_000);
+  const canRunRiskLab = !isLoading && (!goalId || Boolean(retirementOverview));
+  const [monteCarloSims, setMonteCarloSims] = useState(5_000);
+  const autoMapsKeyRef = useRef<string | null>(null);
 
   const stressQuery = useQuery({
-    queryKey: ["retirement-risk-lab-stress", goalId, plannerMode, planKey, portfolioNow],
+    queryKey: ["retirement-risk-lab-stress", goalId, plannerMode, planKey, plan, portfolioNow],
     queryFn: () => runRetirementStressTests(plan, portfolioNow, plannerMode, goalId),
-    enabled: !isLoading,
+    enabled: canRunRiskLab,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1696,6 +1802,7 @@ export default function RiskLabPage({
       goalId,
       plannerMode,
       planKey,
+      plan,
       portfolioNow,
     ],
     queryFn: () =>
@@ -1706,7 +1813,7 @@ export default function RiskLabPage({
         plannerMode,
         goalId,
       ),
-    enabled: !isLoading,
+    enabled: false,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1717,6 +1824,7 @@ export default function RiskLabPage({
       goalId,
       plannerMode,
       planKey,
+      plan,
       portfolioNow,
     ],
     queryFn: () =>
@@ -1727,7 +1835,7 @@ export default function RiskLabPage({
         plannerMode,
         goalId,
       ),
-    enabled: !isLoading,
+    enabled: false,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1737,6 +1845,7 @@ export default function RiskLabPage({
       goalId,
       plannerMode,
       planKey,
+      plan,
       portfolioNow,
       monteCarloSims,
     ],
@@ -1749,7 +1858,7 @@ export default function RiskLabPage({
         goalId,
         stableSeed([planKey, portfolioNow, plannerMode, goalId, monteCarloSims]),
       ),
-    enabled: !isLoading,
+    enabled: canRunRiskLab,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -1758,29 +1867,116 @@ export default function RiskLabPage({
       "retirement-risk-lab-early-crash-paths",
       goalId,
       planKey,
+      plan,
       portfolioAtRetirementStart,
       retirementStartAge,
     ],
     queryFn: () => runRetirementSorr(plan, portfolioAtRetirementStart, retirementStartAge, goalId),
-    enabled: !isLoading && portfolioAtRetirementStart > 0,
+    enabled: false,
     staleTime: 5 * 60 * 1000,
   });
+  const refetchMonteCarlo = monteCarlo.refetch;
+  const refetchContributionSensitivity = contributionSensitivityQuery.refetch;
+  const refetchSpendingSensitivity = spendingSensitivityQuery.refetch;
+  const refetchSorr = sorr.refetch;
 
-  const runMonteCarlo = (nSims: number) => {
-    if (nSims === monteCarloSims) {
-      void monteCarlo.refetch();
-      return;
-    }
-    setMonteCarloSims(nSims);
+  const runMonteCarlo = useCallback(
+    (nSims: number) => {
+      if (!canRunRiskLab) return;
+      if (nSims === monteCarloSims) {
+        void refetchMonteCarlo();
+        return;
+      }
+      setMonteCarloSims(nSims);
+    },
+    [canRunRiskLab, monteCarloSims, refetchMonteCarlo],
+  );
+
+  const runSensitivityMaps = useCallback(() => {
+    if (!canRunRiskLab) return;
+    void refetchContributionSensitivity();
+    void refetchSpendingSensitivity();
+  }, [canRunRiskLab, refetchContributionSensitivity, refetchSpendingSensitivity]);
+
+  const runSorr = useCallback(() => {
+    if (!canRunRiskLab || portfolioAtRetirementStart <= 0) return;
+    void refetchSorr();
+  }, [canRunRiskLab, portfolioAtRetirementStart, refetchSorr]);
+
+  const autoMapsKey = useMemo(
+    () => JSON.stringify([goalId, plannerMode, planKey, portfolioNow]),
+    [goalId, plannerMode, planKey, portfolioNow],
+  );
+  const mapsAlreadyStarted =
+    Boolean(contributionSensitivityQuery.data) ||
+    Boolean(spendingSensitivityQuery.data) ||
+    contributionSensitivityQuery.isFetching ||
+    spendingSensitivityQuery.isFetching ||
+    Boolean(contributionSensitivityQuery.error) ||
+    Boolean(spendingSensitivityQuery.error);
+  const readyToBuildMaps =
+    canRunRiskLab &&
+    stressQuery.isSuccess &&
+    monteCarlo.isSuccess &&
+    !stressQuery.isFetching &&
+    !monteCarlo.isFetching &&
+    !mapsAlreadyStarted;
+
+  useEffect(() => {
+    if (!readyToBuildMaps || autoMapsKeyRef.current === autoMapsKey) return;
+
+    const timeout = setTimeout(() => {
+      autoMapsKeyRef.current = autoMapsKey;
+      runSensitivityMaps();
+    }, 600);
+
+    return () => clearTimeout(timeout);
+  }, [autoMapsKey, readyToBuildMaps, runSensitivityMaps]);
+
+  return {
+    canRunRiskLab,
+    stressQuery,
+    contributionSensitivityQuery,
+    spendingSensitivityQuery,
+    monteCarlo,
+    sorr,
+    monteCarloSims,
+    runMonteCarlo,
+    runSensitivityMaps,
+    runSorr,
   };
+}
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+export default function RiskLabPage({
+  plan,
+  totalValue,
+  isLoading,
+  retirementOverview,
+  plannerMode,
+  goalId,
+}: Props) {
+  const {
+    canRunRiskLab,
+    stressQuery,
+    contributionSensitivityQuery,
+    spendingSensitivityQuery,
+    monteCarlo,
+    sorr,
+    monteCarloSims,
+    runMonteCarlo,
+    runSensitivityMaps,
+    runSorr,
+  } = useRiskLabQueries({
+    plan,
+    totalValue,
+    isLoading,
+    retirementOverview,
+    plannerMode,
+    goalId,
+  });
+
+  if (!canRunRiskLab) {
+    return <RiskLabSkeleton />;
   }
 
   return (
@@ -1822,23 +2018,18 @@ export default function RiskLabPage({
         contributionLoading={contributionSensitivityQuery.isFetching}
         spendingLoading={spendingSensitivityQuery.isFetching}
         error={contributionSensitivityQuery.error ?? spendingSensitivityQuery.error}
-        onRun={() => {
-          void contributionSensitivityQuery.refetch();
-          void spendingSensitivityQuery.refetch();
-        }}
+        onRun={runSensitivityMaps}
         plan={plan}
         plannerMode={plannerMode}
       />
 
-        <AdvancedSection
-          plan={plan}
-          overview={retirementOverview}
-          sorrResult={sorr.data}
-          sorrRunning={sorr.isFetching}
-          sorrError={sorr.error}
-        onRunSorr={() => {
-          void sorr.refetch();
-        }}
+      <AdvancedSection
+        plan={plan}
+        overview={retirementOverview}
+        sorrResult={sorr.data}
+        sorrRunning={sorr.isFetching}
+        sorrError={sorr.error}
+        onRunSorr={runSorr}
       />
     </div>
   );

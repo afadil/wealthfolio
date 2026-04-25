@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::Datelike;
 use rand::Rng;
-use rand_distr::{Distribution, Normal};
+use rand_distr::{Distribution, StandardNormal};
 
 use super::model::*;
 use super::withdrawal::{
@@ -37,7 +37,7 @@ pub(crate) fn sample_return<R: Rng>(rng: &mut R, mean: f64, std: f64) -> f64 {
         return mean;
     }
 
-    let z = Normal::new(0.0, 1.0).unwrap().sample(rng);
+    let z: f64 = StandardNormal.sample(rng);
     sample_return_from_standard(mean, std, z)
 }
 
@@ -47,9 +47,8 @@ pub(crate) fn sample_return_and_inflation<R: Rng>(
     return_std: f64,
     inflation_mean: f64,
 ) -> (f64, f64) {
-    let standard = Normal::new(0.0, 1.0).unwrap();
-    let z_return = standard.sample(rng);
-    let z_other = standard.sample(rng);
+    let z_return: f64 = StandardNormal.sample(rng);
+    let z_other: f64 = StandardNormal.sample(rng);
     let corr = RETURN_INFLATION_CORRELATION.clamp(-0.99, 0.99);
     let z_inflation = corr * z_return + (1.0 - corr * corr).sqrt() * z_other;
     (
