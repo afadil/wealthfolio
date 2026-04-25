@@ -474,6 +474,12 @@ export function ActivityDataGrid({
         reason: "Save new activities before linking",
       } as const;
     }
+    if (dirtyTransactionIds.has(first.id) || dirtyTransactionIds.has(second.id)) {
+      return {
+        canLink: false,
+        reason: "Save or discard pending edits on the selected rows before linking",
+      } as const;
+    }
     const types = new Set([first.activityType, second.activityType]);
     if (
       !types.has(ActivityType.TRANSFER_IN) ||
@@ -500,7 +506,7 @@ export function ActivityDataGrid({
       } as const;
     }
     return { canLink: true, transferIn, transferOut } as const;
-  }, [selectedRows]);
+  }, [selectedRows, dirtyTransactionIds]);
 
   const linkWarnings = useMemo(() => {
     if (!linkValidation.canLink) return [] as string[];
