@@ -28,6 +28,8 @@ code. It's a framework for stitching together a few common rules with
 clear composition semantics, with the user able to inspect, edit, and
 extend the active rule chain.
 
+![Tax engine architecture](wealthfolio-tax-engine.svg)
+
 ## 2. Goals and non-goals
 
 The product framing is **decision-support estimation**, not tax
