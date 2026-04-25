@@ -1994,7 +1994,7 @@ export interface TaxBucketBalances {
 export interface RetirementOverview {
   analysisMode: string;
   status: string;
-  successStatus: "on_track" | "shortfall" | "depleted" | "overfunded" | string;
+  successStatus: string;
   desiredFireAge: number;
   fiAge: number | null;
   retirementStartAge: number | null;

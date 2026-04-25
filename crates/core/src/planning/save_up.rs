@@ -287,9 +287,7 @@ pub fn compute_save_up_overview(input: &SaveUpInput) -> SaveUpOverview {
     let target_date = input.target_date.as_deref().and_then(parse_date);
 
     let progress = if input.target_amount > 0.0 {
-        (input.current_value / input.target_amount)
-            .min(1.0)
-            .max(0.0)
+        (input.current_value / input.target_amount).clamp(0.0, 1.0)
     } else {
         0.0
     };

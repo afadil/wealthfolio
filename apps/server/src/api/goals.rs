@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::{
-    api::shared::trigger_lightweight_portfolio_update,
     error::{ApiError, ApiResult},
     main_lib::AppState,
 };
@@ -47,7 +46,6 @@ async fn create_goal(
 ) -> ApiResult<Json<Goal>> {
     goal.currency = Some(state.base_currency.read().unwrap().clone());
     let g = state.goal_service.create_goal(goal).await?;
-    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
 }
 
@@ -57,7 +55,6 @@ async fn update_goal(
 ) -> ApiResult<Json<Goal>> {
     goal.currency = Some(state.base_currency.read().unwrap().clone());
     let g = state.goal_service.update_goal(goal).await?;
-    trigger_lightweight_portfolio_update(state.clone());
     Ok(Json(g))
 }
 
@@ -66,7 +63,6 @@ async fn delete_goal(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     let _ = state.goal_service.delete_goal(id).await?;
-    trigger_lightweight_portfolio_update(state);
     Ok(StatusCode::NO_CONTENT)
 }
 

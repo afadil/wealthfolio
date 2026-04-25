@@ -805,7 +805,7 @@ pub fn compute_retirement_overview_with_mode(
         "achieved"
     } else if funded_at_goal_age {
         "on_track"
-    } else if effective_fi_age.map_or(false, |a| a <= plan.personal.target_retirement_age + 3) {
+    } else if effective_fi_age.is_some_and(|a| a <= plan.personal.target_retirement_age + 3) {
         "at_risk"
     } else {
         "off_track"

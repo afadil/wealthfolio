@@ -79,6 +79,7 @@ fn sample_inflation_from_standard(mean: f64, std: f64, z: f64) -> f64 {
 }
 
 /// MC-closure-safe version of blended return params that works with owned primitives.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn blended_return_params_mc(
     accumulation_mean: f64,
     retirement_mean: f64,
@@ -964,7 +965,7 @@ mod tests {
             accumulation_return: Some(0.04),
         };
         // Retiring at 50: contributions stop at 50, 15 years of growth-only until 65
-        let payouts_at_50 = resolve_plan_dc_payouts(&[dc.clone()], 35, 50, 0.04);
+        let payouts_at_50 = resolve_plan_dc_payouts(std::slice::from_ref(&dc), 35, 50, 0.04);
         // Retiring at 55: contributions until 55, 10 years of growth-only until 65
         let payouts_at_55 = resolve_plan_dc_payouts(&[dc], 35, 55, 0.04);
         let payout_50 = payouts_at_50.get("dc").unwrap();
@@ -994,7 +995,7 @@ mod tests {
             accumulation_return: None,
         };
 
-        let low = resolve_plan_dc_payouts(&[dc.clone()], 45, 65, 0.02);
+        let low = resolve_plan_dc_payouts(std::slice::from_ref(&dc), 45, 65, 0.02);
         let high = resolve_plan_dc_payouts(&[dc], 45, 65, 0.06);
 
         assert!(high.get("dc").unwrap() > low.get("dc").unwrap());

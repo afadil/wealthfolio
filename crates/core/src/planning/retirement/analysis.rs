@@ -487,6 +487,7 @@ pub fn run_stress_tests_with_mode(
     specs
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_plan_stress<F>(
     id: StressTestId,
     label: &str,
@@ -547,7 +548,7 @@ fn build_early_crash_stress(
             funded_at_goal_age: baseline.funded_at_goal_age,
             shortfall_at_goal_age: baseline.shortfall_at_goal_age,
             portfolio_at_horizon: scenario.final_value,
-            failure_age: scenario.failure_age.or_else(|| {
+            failure_age: scenario.failure_age.or({
                 if scenario.survived {
                     None
                 } else {
@@ -631,11 +632,11 @@ fn classify_stress(
     if stressed.failure_age.is_some()
         || stressed.spending_shortfall_age.is_some()
         || (baseline.fi_age.is_some() && stressed.fi_age.is_none())
-        || delta.fi_age_years.map_or(false, |years| years >= 3)
+        || delta.fi_age_years.is_some_and(|years| years >= 3)
         || shortfall_increase >= severity_base * 0.15
     {
         StressSeverity::High
-    } else if delta.fi_age_years.map_or(false, |years| years >= 1)
+    } else if delta.fi_age_years.is_some_and(|years| years >= 1)
         || shortfall_increase >= severity_base * 0.05
     {
         StressSeverity::Medium
@@ -740,6 +741,7 @@ pub fn run_sorr(
             let mut essential_funded_every_year = true;
             let mut failure_age = None;
 
+            #[allow(clippy::needless_range_loop)]
             for i in 0..years {
                 path.push(buckets.total().max(0.0));
                 let age = retirement_start_age + i as u32;
@@ -1088,8 +1090,8 @@ fn active_monthly_expense_today(plan: &RetirementPlan, age: u32) -> f64 {
         .all_buckets()
         .into_iter()
         .filter(|(bucket, _)| {
-            bucket.start_age.map_or(true, |start| age >= start)
-                && bucket.end_age.map_or(true, |end| age < end)
+            bucket.start_age.is_none_or(|start| age >= start)
+                && bucket.end_age.is_none_or(|end| age < end)
         })
         .map(|(bucket, _)| bucket.monthly_amount)
         .sum()
