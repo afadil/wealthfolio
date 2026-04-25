@@ -22,6 +22,7 @@ import {
   apiKindToAlternativeAssetKind,
 } from "@/lib/constants";
 import { Account, HoldingType, AlternativeAssetHolding, AlternativeAssetKind } from "@/lib/types";
+import { isExpiredOptionSymbol } from "@/lib/occ-symbol";
 import { canAddHoldings } from "@/lib/activity-restrictions";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { HoldingsMobileFilterSheet } from "./components/holdings-mobile-filter-sheet";
@@ -83,6 +84,7 @@ export const HoldingsPage = () => {
     "holdings-show-total-return",
     true,
   );
+  const [hideExpired, setHideExpired] = usePersistentState<boolean>("holdings-hide-expired", true);
 
   // Alternative asset action state
   const [editAsset, setEditAsset] = useState<AssetDetailsSheetAsset | null>(null);
@@ -333,6 +335,11 @@ export const HoldingsPage = () => {
 
   // Combined loading state
   const isDataLoading = isLoading || isAccountsLoading || isAlternativeHoldingsLoading;
+
+  const hasAnyExpiredHolding = useMemo(
+    () => (nonCashHoldings ?? []).some((h) => isExpiredOptionSymbol(h.instrument?.symbol ?? h.id)),
+    [nonCashHoldings],
+  );
 
   // Empty state checks
   const hasNoInvestments = !isDataLoading && (!nonCashHoldings || nonCashHoldings.length === 0);
@@ -662,6 +669,9 @@ export const HoldingsPage = () => {
         showTotalReturn={showTotalReturn}
         setShowTotalReturn={setShowTotalReturn}
         typeOptions={availableTypeOptions}
+        hideExpired={hideExpired}
+        setHideExpired={setHideExpired}
+        showExpiredToggle={hasAnyExpiredHolding}
       />
 
       {/* Alternative Asset Quick Add Modal */}
