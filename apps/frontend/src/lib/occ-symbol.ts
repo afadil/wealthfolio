@@ -115,6 +115,16 @@ export function normalizeOptionSymbol(symbol: string): string | null {
 }
 
 /**
+ * Returns true if the symbol parses as an OCC option whose expiration date is in the past.
+ */
+export function isExpiredOptionSymbol(symbol: string): boolean {
+  const parsed = parseOccSymbol(symbol);
+  if (!parsed) return false;
+  const today = new Date().toISOString().split("T")[0];
+  return parsed.expiration < today;
+}
+
+/**
  * Heuristic check if a symbol looks like an OCC option symbol.
  * Does not fully validate — use parseOccSymbol for that.
  */
