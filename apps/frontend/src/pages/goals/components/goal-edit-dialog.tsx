@@ -104,8 +104,8 @@ export function GoalEditDialog({ goal, open, onClose }: Props) {
           <DialogHeader>
             <DialogTitle>Edit goal</DialogTitle>
             <DialogDescription>
-              Update the goal name, notes, and status. Completed means the goal is done.
-              Archived means you want to hide it from active goals without deleting it.{" "}
+              Update the goal name, notes, and status. Completed means the goal is done. Archived
+              means you want to hide it from active goals without deleting it.{" "}
               {isRetirement
                 ? "Retirement assumptions, spending, taxes, and account shares stay in the planner."
                 : "Target amount, target date, and funding stay in the goal plan."}

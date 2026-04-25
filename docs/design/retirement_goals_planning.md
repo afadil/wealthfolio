@@ -1,8 +1,10 @@
 # Goals Planning Master Plan
 
 ## Summary
+
 - Make `Goals` the main planning product in the app.
-- Keep the **current Goals dashboard visual design**. It is already the right direction.
+- Keep the **current Goals dashboard visual design**. It is already the right
+  direction.
 - Use one unified model:
   - `Goal` = user-facing object
   - `GoalPlan` = typed planning settings
@@ -11,17 +13,22 @@
 - Support two goal families in v1:
   - `save_up` goals: home, education, wedding, car, emergency fund, custom
   - `retirement` goal: one active long-term goal per portfolio/household
-- Inside the retirement goal, support **analysis modes**, not separate competing goals:
+- Inside the retirement goal, support **analysis modes**, not separate competing
+  goals:
   - `FIRE` first
   - `Traditional retirement` later
-- Make the backend core the single source of truth for all planning calculations for both desktop and web.
-- Reuse and evolve the current Rust FIRE engine; remove frontend TypeScript as a second calculator owner.
+- Make the backend core the single source of truth for all planning calculations
+  for both desktop and web.
+- Reuse and evolve the current Rust FIRE engine; remove frontend TypeScript as a
+  second calculator owner.
 
 ## Product Model
+
 - `Goals` page is the top-level planning home.
 - Each goal is a card on the dashboard and a detail page when opened.
 - There is **one active retirement goal** per planning context.
-- FIRE and Traditional do **not** exist as separate goal cards against the same portfolio.
+- FIRE and Traditional do **not** exist as separate goal cards against the same
+  portfolio.
 - FIRE and Traditional are **modes/scenarios inside the retirement goal**.
 - In v1:
   - expose `FIRE` as the only polished/active retirement mode
@@ -35,6 +42,7 @@
   - `custom_save_up`
 
 ## Goals Dashboard Spec
+
 - Keep the current card-grid design and overall aesthetics.
 - Sections:
   - `Active Goals`
@@ -50,6 +58,7 @@
 - Do **not** sort by amount.
 
 ### Goal Card Content
+
 - Cover image / visual
 - Goal title
 - Goal type label and target date if relevant
@@ -64,12 +73,14 @@
 - Progress bar
 
 ### Dashboard Responsibilities
+
 - Read-only summary surface
 - Fast scan of all goals
 - No detailed planning controls
 - Numbers must come from backend-derived goal summaries only
 
 ## Shared Goal Detail Shell
+
 - Keep one shared shell for all goal types:
   - header with back button
   - title
@@ -84,6 +95,7 @@
   - `Allocation`
 
 ### Detail Shell Behavior
+
 - `Overview` is read-first
 - `Plan` is edit-first
 - `Funding` is capital attribution
@@ -91,6 +103,7 @@
 - `Allocation` is target mix / drift
 
 ## Retirement Goal UX
+
 - The goal is called `Retirement`.
 - The page header should say:
   - title = user goal title, default `Retirement`
@@ -102,16 +115,19 @@
   - `FIRE` is the first analysis mode of that goal
 
 ### FIRE Mode Semantics
+
 - Primary question:
   - “At what age do I become financially independent?”
 - Primary output:
   - `Projected FI age`
 - Secondary comparison:
   - `Desired FIRE age`
-- Only show status such as `On track`, `2 years late`, `3 years early` if a desired FIRE age exists.
+- Only show status such as `On track`, `2 years late`, `3 years early` if a
+  desired FIRE age exists.
 - Do not let desired FIRE age replace the main FI-age result.
 
 ### Traditional Mode Semantics
+
 - Primary question:
   - “Is retirement at age X sustainable?”
 - Primary output:
@@ -123,6 +139,7 @@
   - scenarios are mode-specific
 
 ## Retirement Overview Spec
+
 - Layout:
   - main column + sticky right rail on desktop
   - stacked on mobile
@@ -139,6 +156,7 @@
   4. `Funding Scope`
 
 ### Alert Banner
+
 - Show only for important states:
   - FI already reached
   - underfunded by desired FIRE age
@@ -147,6 +165,7 @@
 - Copy should be short and actionable.
 
 ### Hero Summary Card
+
 - Headline:
   - `Projected FI age`
 - Supporting line:
@@ -160,6 +179,7 @@
   - thin progress bar below
 
 ### Forecast Card
+
 - Small summary card in the rail
 - States:
   - `You can retire now`
@@ -172,6 +192,7 @@
   - move desired FIRE age to `Z`
 
 ### Core Assumptions Card
+
 - Yes: keep assumptions in the right rail with a toggle edit mode.
 - Default:
   - read-only summary rows
@@ -194,18 +215,21 @@
 - Do **not** put all assumptions here.
 
 ### Coast FIRE Card
+
 - Amount needed today
 - Current gap/surplus
 - Reached badge
 - One explanatory line only
 
 ### Funding Scope Card
+
 - Included account count
 - Linked income stream count
 - Current funded capital
 - Link to `Funding`
 
 ## FIRE Chart Spec
+
 - Use the current dashboard’s visual tone, but improve the chart semantics.
 - The chart should resemble the reference aesthetically:
   - one large clean hero chart
@@ -216,12 +240,14 @@
   - lots of whitespace
 
 ### Chart Rules
+
 - Do **not** force a triangle or automatic post-retirement decline.
 - If the model produces a rising path after FIRE, show it.
 - If the model produces a declining path after FIRE, show it.
 - The chart must reflect the backend model, not an illustrative template.
 
 ### Chart Semantics
+
 - X-axis:
   - age
 - Default Y-axis:
@@ -240,6 +266,7 @@
   - `linear`, not `monotone`
 
 ### Chart Tooltip
+
 - age
 - phase
 - portfolio start
@@ -251,6 +278,7 @@
 - required capital
 
 ### Chart Callouts
+
 - Direct labels such as:
   - `What you'll have`
   - `What you'll need`
@@ -260,6 +288,7 @@
   - horizon if helpful
 
 ## Retirement Plan Tab Spec
+
 - Replace the current long form with grouped sections:
   - `Core`
   - `Income Streams`
@@ -275,12 +304,16 @@
   - salary/contribution growth
   - DC accumulation return
   - other technical controls
-- Keep auto-detect from portfolio as a compact helper card, not the dominant first block.
+- Keep auto-detect from portfolio as a compact helper card, not the dominant
+  first block.
 
 ## Save-Up Goal UX
-- Save-up goals use the same detail shell and overview pattern, but with simpler outputs.
+
+- Save-up goals use the same detail shell and overview pattern, but with simpler
+  outputs.
 
 ### Save-Up Overview
+
 - Main column:
   - hero progress card
   - projected savings chart
@@ -302,12 +335,14 @@
   - expected return
 
 ### Save-Up Chart
+
 - Gold area/line for projected savings
 - Optional optimistic / nominal / pessimistic overlays
 - Target reference line
 - Much simpler than retirement/FIRE charting
 
 ## Funding Model
+
 - Keep a dedicated goal funding layer.
 - Save-up goals:
   - explicit account reservations
@@ -317,9 +352,11 @@
   - same dollar cannot count twice
   - linked DC stream accounts cannot also count as portfolio capital
 - Funding is edited only in the `Funding` tab.
-- Dashboard and detail summaries consume backend-derived outputs based on funding + latest valuations.
+- Dashboard and detail summaries consume backend-derived outputs based on
+  funding + latest valuations.
 
 ## Architecture Direction
+
 - Backend core becomes the only calculation owner.
 - Reuse and evolve the current Rust FIRE engine as the foundation.
 - Move toward a dedicated planning module structure in core, for example:
@@ -348,6 +385,7 @@
   - summary recomputation
 
 ## Data Model Direction
+
 - `goals`
   - root user-facing entity
 - `goal_plans`
@@ -358,6 +396,7 @@
   - backend-derived cached fields on goal + optional detail summary JSON
 
 ### Goal Types
+
 - `retirement`
 - `home`
 - `education`
@@ -367,6 +406,7 @@
 - `custom_save_up`
 
 ### Retirement Plan Settings
+
 - `analysisMode`
 - `currentAge`
 - `desiredFireAge`
@@ -384,6 +424,7 @@
 - `glidePath`
 
 ### Save-Up Plan Settings
+
 - `targetAmount`
 - `targetDate`
 - `monthlyContribution`
@@ -391,9 +432,11 @@
 - optional save-up specific planning fields if needed later
 
 ## API / DTO Direction
+
 - Frontend must consume backend planning DTOs only.
 
 ### Retirement DTOs
+
 - `RetirementOverview`
 - `RetirementTrajectoryPoint`
 - `RetirementScenarios`
@@ -417,6 +460,7 @@
   - `trajectory`
 
 ### Save-Up DTOs
+
 - `SaveUpOverview`
 - `SaveUpTrajectoryPoint`
 - key fields:
@@ -428,6 +472,7 @@
   - `trajectory`
 
 ### Operations
+
 - load goal overview
 - load goal scenarios
 - save plan settings
@@ -436,6 +481,7 @@
 - desktop and web must expose the same conceptual planning operations
 
 ## Implementation Steps
+
 - **Step 1: Lock product semantics**
   - keep one active retirement goal rule
   - keep FIRE as the only exposed retirement mode in v1
@@ -465,7 +511,8 @@
   - wire save/cancel/advanced settings navigation
   - deliverable: overview editing workflow
 - **Step 7: Plan tab redesign**
-  - restructure to `Core`, `Income Streams`, `Investment Assumptions`, `Advanced`
+  - restructure to `Core`, `Income Streams`, `Investment Assumptions`,
+    `Advanced`
   - collapse advanced section by default
   - deliverable: cleaner editing workspace
 - **Step 8: Funding hardening**
@@ -484,9 +531,11 @@
 - **Step 11: Traditional mode architecture completion**
   - implement mode-specific copy, KPIs, chart semantics, scenarios
   - keep hidden until fully coherent
-  - deliverable: second retirement analysis mode without separate goal duplication
+  - deliverable: second retirement analysis mode without separate goal
+    duplication
 
 ## Acceptance Criteria
+
 - Goals dashboard keeps the current design and card layout.
 - Active goals are sorted by priority, then target date.
 - Health is shown as a card badge, not a separate section.
@@ -497,22 +546,28 @@
 - Retirement Overview uses backend trajectory and required-capital series.
 - Overview quick edit is limited to core assumptions.
 - Advanced settings live in Plan.
-- Save-up and retirement detail pages share one shell but different calculation models.
+- Save-up and retirement detail pages share one shell but different calculation
+  models.
 - Dashboard and detail summaries always agree.
 
 ## Test Plan
+
 - Dashboard ordering and grouping are correct.
 - One active retirement goal rule is enforced.
 - Backend overview/scenario DTOs are consistent between desktop and web.
 - No frontend page derives business metrics locally after migration.
-- Retirement chart uses backend-provided end-of-year values and actual phase markers.
+- Retirement chart uses backend-provided end-of-year values and actual phase
+  markers.
 - Rising or falling post-FIRE paths render honestly.
 - Quick edit updates overview outputs consistently.
 - Funding changes update summaries consistently across dashboard and detail.
-- Save-up goals compute projected value, completion date, and required monthly correctly.
-- Traditional mode remains hidden until all mode-specific behaviors are complete.
+- Save-up goals compute projected value, completion date, and required monthly
+  correctly.
+- Traditional mode remains hidden until all mode-specific behaviors are
+  complete.
 
 ## Assumptions and Defaults
+
 - Goals remains the product home.
 - Current dashboard design is retained.
 - One retirement goal per planning context.

@@ -13,9 +13,7 @@ export function usePortfolioData(accountIds?: string[]) {
   const allActiveAccounts = accounts.filter((a) => a.isActive && !a.isArchived);
 
   const activeAccountIds = (
-    accountIds !== undefined
-      ? allActiveAccounts.filter((a) => accountIds.includes(a.id))
-      : []
+    accountIds !== undefined ? allActiveAccounts.filter((a) => accountIds.includes(a.id)) : []
   ).map((a) => a.id);
 
   const valuationsQuery = useQuery({

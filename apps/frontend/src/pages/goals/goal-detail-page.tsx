@@ -262,18 +262,19 @@ export default function GoalDetailPage() {
       />
     </div>
   ) : null;
-  const retirementGuideAction = hasRetirementTabs && goalId ? (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="h-9 w-9 rounded-full"
-      aria-label="Open retirement guide"
-      onClick={() => navigate(`/goals/${goalId}/guide`)}
-    >
-      <Icons.HelpCircle className="size-4" />
-    </Button>
-  ) : null;
+  const retirementGuideAction =
+    hasRetirementTabs && goalId ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 rounded-full"
+        aria-label="Open retirement guide"
+        onClick={() => navigate(`/goals/${goalId}/guide`)}
+      >
+        <Icons.HelpCircle className="size-4" />
+      </Button>
+    ) : null;
   const mobileRetirementTabs = hasRetirementTabs ? (
     <div className="mb-4 overflow-x-auto pb-1 md:hidden">
       <AnimatedToggleGroup

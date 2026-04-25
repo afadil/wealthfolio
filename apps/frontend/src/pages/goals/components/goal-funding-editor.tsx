@@ -224,10 +224,7 @@ export function GoalFundingEditor({
     () => goals.filter((goal) => goal.statusLifecycle === "active"),
     [goals],
   );
-  const currentGoal = useMemo(
-    () => goals.find((goal) => goal.id === goalId),
-    [goalId, goals],
-  );
+  const currentGoal = useMemo(() => goals.find((goal) => goal.id === goalId), [goalId, goals]);
   const otherGoals = useMemo(
     () => participatingGoals.filter((goal) => goal.id !== goalId),
     [goalId, participatingGoals],
@@ -403,250 +400,255 @@ export function GoalFundingEditor({
   return (
     <>
       <Card>
-      <CardHeader className="flex-row items-start justify-between pb-4">
-        <CardTitle className="text-md leading-none tracking-tight">Account Shares</CardTitle>
-        {isEditing ? (
-          <div className="flex gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setDetailsOpen(true)}
-            >
-              Details
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="h-7 text-xs"
-              onClick={handleSave}
-              disabled={saveFundingMutation.isPending || !dirty || hasInvalidAllocations}
-            >
-              {saveFundingMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 transition-colors"
-            >
-              Details
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              aria-label="Edit Account Shares"
-              className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 text-sm transition-colors"
-            >
-              <Icons.Pencil className="h-3.5 w-3.5" />
-              Edit
-            </button>
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isEditing ? (
-          /* ── Edit mode ── */
-          <div className="space-y-3">
-            {!isRetirement && (
-              <p className="text-muted-foreground text-[10px]">
-                This share stays reserved while the goal is active. It is released when the goal is
-                achieved or archived.
-              </p>
-            )}
+        <CardHeader className="flex-row items-start justify-between pb-4">
+          <CardTitle className="text-md leading-none tracking-tight">Account Shares</CardTitle>
+          {isEditing ? (
+            <div className="flex gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setDetailsOpen(true)}
+              >
+                Details
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={handleSave}
+                disabled={saveFundingMutation.isPending || !dirty || hasInvalidAllocations}
+              >
+                {saveFundingMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(true)}
+                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 transition-colors"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                aria-label="Edit Account Shares"
+                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1.5 text-sm transition-colors"
+              >
+                <Icons.Pencil className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {isEditing ? (
+            /* ── Edit mode ── */
+            <div className="space-y-3">
+              {!isRetirement && (
+                <p className="text-muted-foreground text-[10px]">
+                  This share stays reserved while the goal is active. It is released when the goal
+                  is achieved or archived.
+                </p>
+              )}
 
-            {includedAccounts.length > 0 && (
-              <div className="space-y-1">
-                {includedAccounts.map((a) => {
-                  const isDcLinked = dcLinkedSet.has(a.id);
-                  const tb = taxBuckets.get(a.id);
-                  const percent = sharePercents.get(a.id) ?? 100;
-                  const allocation = allocationByAccountId.get(a.id);
-                  const overBy = allocation?.overBy ?? 0;
-                  const maxForThisGoal = allocation?.maxForThisGoal ?? 100;
-                  const otherTotal = allocation?.otherTotal ?? 0;
-                  const hasOverage = overBy > SHARE_EPSILON;
+              {includedAccounts.length > 0 && (
+                <div className="space-y-1">
+                  {includedAccounts.map((a) => {
+                    const isDcLinked = dcLinkedSet.has(a.id);
+                    const tb = taxBuckets.get(a.id);
+                    const percent = sharePercents.get(a.id) ?? 100;
+                    const allocation = allocationByAccountId.get(a.id);
+                    const overBy = allocation?.overBy ?? 0;
+                    const maxForThisGoal = allocation?.maxForThisGoal ?? 100;
+                    const otherTotal = allocation?.otherTotal ?? 0;
+                    const hasOverage = overBy > SHARE_EPSILON;
 
-                  return (
-                    <div
-                      key={a.id}
-                      className={`rounded-lg px-3 py-2.5 ${
-                        hasOverage
-                          ? "bg-destructive/5 ring-destructive/30 ring-1"
-                          : "bg-muted/30"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                          {a.name}
-                        </span>
-
-                        {/* Tax bucket pill (retirement only) */}
-                        {isRetirement && !isDcLinked && (
-                          <button
-                            onClick={() => cycleTaxBucket(a.id)}
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                              tb ? (TAX_BUCKET_COLORS[tb] ?? "") : "bg-muted text-muted-foreground"
-                            }`}
-                            title="Click to change tax bucket"
-                          >
-                            {tb ? TAX_BUCKET_LABELS[tb] : "Set type"}
-                          </button>
-                        )}
-
-                        {!isDcLinked && allocation && (
-                          <span
-                            className={`w-16 shrink-0 text-right text-[11px] font-medium tabular-nums ${allocationLabelClass(allocation)}`}
-                          >
-                            {allocationLabel(allocation)}
+                    return (
+                      <div
+                        key={a.id}
+                        className={`rounded-lg px-3 py-2.5 ${
+                          hasOverage ? "bg-destructive/5 ring-destructive/30 ring-1" : "bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                            {a.name}
                           </span>
-                        )}
 
-                        {/* Share % input */}
-                        {!isDcLinked && (
-                          <SharePercentInput
-                            value={percent}
-                            onChange={(value) => updateSharePercent(a.id, value)}
-                          />
-                        )}
-
-                        {/* DC linked badge */}
-                        {isDcLinked && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
-                                <Icons.ShieldCheck className="h-3 w-3" /> Pension
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs">
-                              Linked to pension income stream
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-
-                        {/* Remove button */}
-                        {!isDcLinked && (
-                          <button
-                            onClick={() => removeAccount(a.id)}
-                            className="text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 transition-colors"
-                            aria-label={`Remove ${a.name}`}
-                          >
-                            <Icons.X className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-
-                      {allocation && !isDcLinked && (
-                        <div className="mt-2">
-                          {(otherTotal > SHARE_EPSILON || hasOverage) && (
-                            <div className="text-muted-foreground flex items-center justify-between gap-3 text-[10px]">
-                              <span className="truncate">
-                                {otherTotal > SHARE_EPSILON
-                                  ? `${formatShare(otherTotal)}% used by other active goals`
-                                  : `${formatShare(allocation.left)}% still unassigned`}
-                              </span>
-                              {hasOverage && (
-                                <button
-                                  type="button"
-                                  className="text-destructive shrink-0 font-medium underline underline-offset-2"
-                                  onClick={() => updateSharePercent(a.id, maxForThisGoal)}
-                                >
-                                  Use max {formatShare(maxForThisGoal)}%
-                                </button>
-                              )}
-                            </div>
+                          {/* Tax bucket pill (retirement only) */}
+                          {isRetirement && !isDcLinked && (
+                            <button
+                              onClick={() => cycleTaxBucket(a.id)}
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                                tb
+                                  ? (TAX_BUCKET_COLORS[tb] ?? "")
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                              title="Click to change tax bucket"
+                            >
+                              {tb ? TAX_BUCKET_LABELS[tb] : "Set type"}
+                            </button>
                           )}
-                          {hasOverage && (
-                            <p className="text-destructive mt-1 text-[10px]">
-                              This account is overallocated by {formatShare(overBy)}%.
-                            </p>
+
+                          {!isDcLinked && allocation && (
+                            <span
+                              className={`w-16 shrink-0 text-right text-[11px] font-medium tabular-nums ${allocationLabelClass(allocation)}`}
+                            >
+                              {allocationLabel(allocation)}
+                            </span>
+                          )}
+
+                          {/* Share % input */}
+                          {!isDcLinked && (
+                            <SharePercentInput
+                              value={percent}
+                              onChange={(value) => updateSharePercent(a.id, value)}
+                            />
+                          )}
+
+                          {/* DC linked badge */}
+                          {isDcLinked && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <span className="text-muted-foreground flex items-center gap-0.5 text-[10px]">
+                                  <Icons.ShieldCheck className="h-3 w-3" /> Pension
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">
+                                Linked to pension income stream
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Remove button */}
+                          {!isDcLinked && (
+                            <button
+                              onClick={() => removeAccount(a.id)}
+                              className="text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 transition-colors"
+                              aria-label={`Remove ${a.name}`}
+                            >
+                              <Icons.X className="h-3.5 w-3.5" />
+                            </button>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
 
-            {/* Available accounts to add */}
-            {availableAccounts.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-muted-foreground px-1 text-[10px] uppercase tracking-wider">
-                  Add accounts
-                </p>
-                {availableAccounts.map((a) => (
+                        {allocation && !isDcLinked && (
+                          <div className="mt-2">
+                            {(otherTotal > SHARE_EPSILON || hasOverage) && (
+                              <div className="text-muted-foreground flex items-center justify-between gap-3 text-[10px]">
+                                <span className="truncate">
+                                  {otherTotal > SHARE_EPSILON
+                                    ? `${formatShare(otherTotal)}% used by other active goals`
+                                    : `${formatShare(allocation.left)}% still unassigned`}
+                                </span>
+                                {hasOverage && (
+                                  <button
+                                    type="button"
+                                    className="text-destructive shrink-0 font-medium underline underline-offset-2"
+                                    onClick={() => updateSharePercent(a.id, maxForThisGoal)}
+                                  >
+                                    Use max {formatShare(maxForThisGoal)}%
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {hasOverage && (
+                              <p className="text-destructive mt-1 text-[10px]">
+                                This account is overallocated by {formatShare(overBy)}%.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Available accounts to add */}
+              {availableAccounts.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-muted-foreground px-1 text-[10px] uppercase tracking-wider">
+                    Add accounts
+                  </p>
+                  {availableAccounts.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => addAccount(a.id)}
+                      className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
+                    >
+                      <Icons.Plus className="text-muted-foreground h-3 w-3 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
+                      <span className="text-muted-foreground text-[10px]">{a.accountType}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {activeAccounts.length === 0 && (
+                <p className="text-muted-foreground text-xs">No active accounts found.</p>
+              )}
+
+              {hasInvalidAllocations && (
+                <div className="text-destructive bg-destructive/5 rounded-lg px-3 py-2 text-[11px]">
+                  {invalidAllocationRows.length} account
+                  {invalidAllocationRows.length === 1 ? "" : "s"} exceed available share. Use the
+                  highlighted max value before saving.
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Read mode ── */
+            <div>
+              {includedAccounts.length === 0 ? (
+                <p className="text-muted-foreground py-2 text-xs">
+                  No accounts assigned.{" "}
                   <button
-                    key={a.id}
-                    onClick={() => addAccount(a.id)}
-                    className="hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors"
+                    className="text-foreground underline underline-offset-2"
+                    onClick={() => setEditing(true)}
                   >
-                    <Icons.Plus className="text-muted-foreground h-3 w-3 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-xs">{a.name}</span>
-                    <span className="text-muted-foreground text-[10px]">{a.accountType}</span>
+                    Add accounts
                   </button>
-                ))}
-              </div>
-            )}
-
-            {activeAccounts.length === 0 && (
-              <p className="text-muted-foreground text-xs">No active accounts found.</p>
-            )}
-
-            {hasInvalidAllocations && (
-              <div className="text-destructive bg-destructive/5 rounded-lg px-3 py-2 text-[11px]">
-                {invalidAllocationRows.length} account
-                {invalidAllocationRows.length === 1 ? "" : "s"} exceed available share. Use the
-                highlighted max value before saving.
-              </div>
-            )}
-          </div>
-        ) : (
-          /* ── Read mode ── */
-          <div>
-            {includedAccounts.length === 0 ? (
-              <p className="text-muted-foreground py-2 text-xs">
-                No accounts assigned.{" "}
-                <button
-                  className="text-foreground underline underline-offset-2"
-                  onClick={() => setEditing(true)}
-                >
-                  Add accounts
-                </button>
-              </p>
-            ) : (
-              <div className="divide-border divide-y">
-                {includedAccounts.map((a, i) => {
-                  const percent = sharePercents.get(a.id) ?? 0;
-                  const tb = taxBuckets.get(a.id);
-                  const tbLabel = tb ? TAX_BUCKET_LABELS[tb] : null;
-                  return (
-                    <div key={a.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded"
-                        style={{ backgroundColor: INDICATOR_COLORS[i % INDICATOR_COLORS.length] }}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">{a.name}</span>
-                      {isRetirement && tbLabel && (
+                </p>
+              ) : (
+                <div className="divide-border divide-y">
+                  {includedAccounts.map((a, i) => {
+                    const percent = sharePercents.get(a.id) ?? 0;
+                    const tb = taxBuckets.get(a.id);
+                    const tbLabel = tb ? TAX_BUCKET_LABELS[tb] : null;
+                    return (
+                      <div
+                        key={a.id}
+                        className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
+                      >
                         <span
-                          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb ? (TAX_BUCKET_COLORS[tb] ?? "") : ""}`}
-                        >
-                          {tbLabel}
+                          className="h-3 w-3 shrink-0 rounded"
+                          style={{ backgroundColor: INDICATOR_COLORS[i % INDICATOR_COLORS.length] }}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                          {a.name}
                         </span>
-                      )}
-                      <span className="text-sm font-semibold tabular-nums">{percent}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
+                        {isRetirement && tbLabel && (
+                          <span
+                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${tb ? (TAX_BUCKET_COLORS[tb] ?? "") : ""}`}
+                          >
+                            {tbLabel}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold tabular-nums">{percent}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
       </Card>
       <AllocationDetailsSheet
         open={detailsOpen}
@@ -669,7 +671,7 @@ function AllocationDetailsSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rows: AccountAllocationRow[];
-  goalColumns: Array<{ id: string; title: string }>;
+  goalColumns: { id: string; title: string }[];
   currentGoalId: string;
 }) {
   return (
@@ -714,7 +716,9 @@ function AllocationDetailsSheet({
                       <tr key={row.account.id}>
                         <td className="border-border border-b py-3 pr-4">
                           <div className="font-medium">{row.account.name}</div>
-                          <div className="text-muted-foreground text-xs">{row.account.accountType}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {row.account.accountType}
+                          </div>
                         </td>
                         {goalColumns.map((goal) => (
                           <td
@@ -747,11 +751,7 @@ function AllocationDetailsSheet({
   );
 }
 
-function shareForGoal(
-  row: AccountAllocationRow,
-  goalId: string,
-  currentGoalId: string,
-): number {
+function shareForGoal(row: AccountAllocationRow, goalId: string, currentGoalId: string): number {
   if (goalId === currentGoalId) return row.thisShare;
   return row.otherAllocations
     .filter((allocation) => allocation.goalId === goalId)

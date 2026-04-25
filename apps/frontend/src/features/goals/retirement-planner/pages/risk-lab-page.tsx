@@ -1261,7 +1261,7 @@ function DecisionHeatmap({
                       <TooltipTrigger asChild>
                         <div
                           className={cn(
-                            "flex h-12 items-center justify-center rounded-[6px] px-2 text-center text-xs font-semibold leading-none tabular-nums transition-shadow sm:h-[52px] sm:px-3 sm:text-[13px]",
+                            "flex h-12 items-center justify-center rounded-[6px] px-2 text-center text-xs font-semibold tabular-nums leading-none transition-shadow sm:h-[52px] sm:px-3 sm:text-[13px]",
                             active && "ring-2 ring-[hsl(91,34%,29%)] ring-offset-0",
                           )}
                           style={sensitivityCellStyle({ cell, baseline, range, active })}
@@ -1679,7 +1679,7 @@ function AdvancedSection({
             <p className="text-muted-foreground mb-3 text-sm">
               Tests five crash-timing paths through retirement.
             </p>
-            <div className="grid gap-3 border-y bg-muted/10 px-4 py-3 text-sm sm:grid-cols-3">
+            <div className="bg-muted/10 grid gap-3 border-y px-4 py-3 text-sm sm:grid-cols-3">
               <div>
                 <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-[0.16em]">
                   Earliest shortfall
