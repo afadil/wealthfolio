@@ -8,6 +8,9 @@ import { DataGrid, useDataGrid, type SymbolSearchResult } from "@wealthfolio/ui"
 import { useCallback, useMemo, useRef, useState } from "react";
 import { resolveSymbolQuote } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
+import { ActivityType } from "@/lib/constants";
+import { LinkTransferModal } from "../link-transfer-modal";
+import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
@@ -456,6 +459,88 @@ export function ActivityDataGrid({
     [selectedRows],
   );
 
+  // Link state: validate that the 2-row selection is a valid TRANSFER_IN/TRANSFER_OUT pair
+  const { linkTransferActivitiesMutation } = useActivityMutations();
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+
+  const linkValidation = useMemo(() => {
+    if (selectedRows.length !== 2) {
+      return { canLink: false, reason: "" } as const;
+    }
+    const [first, second] = selectedRows.map((row) => row.original);
+    if (first.isNew || second.isNew) {
+      return {
+        canLink: false,
+        reason: "Save new activities before linking",
+      } as const;
+    }
+    const types = new Set([first.activityType, second.activityType]);
+    if (
+      !types.has(ActivityType.TRANSFER_IN) ||
+      !types.has(ActivityType.TRANSFER_OUT) ||
+      types.size !== 2
+    ) {
+      return {
+        canLink: false,
+        reason: "Select one TRANSFER_IN and one TRANSFER_OUT activity",
+      } as const;
+    }
+    if (first.sourceGroupId || second.sourceGroupId) {
+      return {
+        canLink: false,
+        reason: "One of the selected activities is already linked",
+      } as const;
+    }
+    const transferIn = first.activityType === ActivityType.TRANSFER_IN ? first : second;
+    const transferOut = first.activityType === ActivityType.TRANSFER_OUT ? first : second;
+    if (transferIn.accountId === transferOut.accountId) {
+      return {
+        canLink: false,
+        reason: "Both legs share the same account",
+      } as const;
+    }
+    return { canLink: true, transferIn, transferOut } as const;
+  }, [selectedRows]);
+
+  const linkWarnings = useMemo(() => {
+    if (!linkValidation.canLink) return [] as string[];
+    const { transferIn, transferOut } = linkValidation;
+    const warnings: string[] = [];
+    if (transferIn.currency !== transferOut.currency) {
+      warnings.push(
+        `Currencies differ (${transferOut.currency} → ${transferIn.currency}). The pair will still be linked.`,
+      );
+    }
+    const inAmount = Number(transferIn.amount ?? transferIn.unitPrice ?? 0);
+    const outAmount = Number(transferOut.amount ?? transferOut.unitPrice ?? 0);
+    if (Number.isFinite(inAmount) && Number.isFinite(outAmount) && inAmount && outAmount) {
+      const diff = Math.abs(inAmount - outAmount) / Math.max(inAmount, outAmount);
+      if (diff > 0.01) {
+        warnings.push("Amounts differ by more than 1%.");
+      }
+    }
+    const inDate = new Date(transferIn.date).getTime();
+    const outDate = new Date(transferOut.date).getTime();
+    if (Number.isFinite(inDate) && Number.isFinite(outDate)) {
+      const dayDiff = Math.abs(inDate - outDate) / (1000 * 60 * 60 * 24);
+      if (dayDiff > 7) {
+        warnings.push(`Dates differ by ${Math.round(dayDiff)} days.`);
+      }
+    }
+    return warnings;
+  }, [linkValidation]);
+
+  const handleLinkConfirm = useCallback(async () => {
+    if (!linkValidation.canLink) return;
+    await linkTransferActivitiesMutation.mutateAsync({
+      activityAId: linkValidation.transferIn.id,
+      activityBId: linkValidation.transferOut.id,
+    });
+    setLinkDialogOpen(false);
+    dataGrid.table.resetRowSelection();
+    onRefetch();
+  }, [linkValidation, linkTransferActivitiesMutation, dataGrid.table, onRefetch]);
+
   // Delete selected rows handler
   const deleteSelectedRows = useCallback(() => {
     const selected = dataGrid.table.getSelectedRowModel().rows;
@@ -545,6 +630,10 @@ export function ActivityDataGrid({
         onApproveSelected={approveSelectedRows}
         onSave={handleSaveChanges}
         onCancel={handleCancelChanges}
+        onLinkSelected={() => setLinkDialogOpen(true)}
+        canLinkSelected={linkValidation.canLink}
+        linkDisabledReason={linkValidation.canLink ? undefined : linkValidation.reason}
+        isLinking={linkTransferActivitiesMutation.isPending}
       />
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -571,6 +660,16 @@ export function ActivityDataGrid({
         onAssetCreated={handleCustomAssetCreated}
         defaultSymbol={customAssetDialog.symbol}
         defaultCurrency={dialogDefaultCurrency}
+      />
+
+      <LinkTransferModal
+        isOpen={linkDialogOpen}
+        isLinking={linkTransferActivitiesMutation.isPending}
+        activityIn={linkValidation.canLink ? linkValidation.transferIn : undefined}
+        activityOut={linkValidation.canLink ? linkValidation.transferOut : undefined}
+        warnings={linkWarnings}
+        onConfirm={handleLinkConfirm}
+        onCancel={() => setLinkDialogOpen(false)}
       />
     </div>
   );

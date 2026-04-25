@@ -138,6 +138,25 @@ async fn delete_activity(
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LinkTransferActivitiesBody {
+    activity_a_id: String,
+    activity_b_id: String,
+}
+
+async fn link_transfer_activities(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkTransferActivitiesBody>,
+) -> ApiResult<Json<(Activity, Activity)>> {
+    let pair = state
+        .activity_service
+        .link_transfer_activities(body.activity_a_id, body.activity_b_id)
+        .await?;
+    // Domain events handle portfolio recalculation
+    Ok(Json(pair))
+}
+
+#[derive(serde::Deserialize)]
 struct ImportCheckBody {
     activities: Vec<ActivityImport>,
 }
@@ -360,6 +379,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities", post(create_activity).put(update_activity))
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))
+        .route("/activities/link", post(link_transfer_activities))
         .route("/activities/import/check", post(check_activities_import))
         .route(
             "/activities/import/assets/preview",

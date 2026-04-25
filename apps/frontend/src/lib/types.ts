@@ -188,6 +188,7 @@ export interface ActivityDetails {
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;
+  sourceGroupId?: string;
   idempotencyKey?: string;
   importRunId?: string;
   isUserModified?: boolean;

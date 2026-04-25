@@ -40,6 +40,14 @@ pub trait ActivityRepositoryTrait: Send + Sync {
     async fn create_activity(&self, new_activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
+    /// Pairs two existing transfer activities by writing a shared `source_group_id`
+    /// and clearing `metadata.flow.is_external` on both. Order of `activity_a_id` /
+    /// `activity_b_id` is irrelevant; the impl resolves which is IN vs OUT.
+    async fn link_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)>;
     async fn bulk_mutate_activities(
         &self,
         creates: Vec<NewActivity>,
@@ -166,6 +174,11 @@ pub trait ActivityServiceTrait: Send + Sync {
     async fn create_activity(&self, activity: NewActivity) -> Result<Activity>;
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
+    async fn link_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)>;
     async fn bulk_mutate_activities(
         &self,
         request: ActivityBulkMutationRequest,

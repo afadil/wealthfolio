@@ -252,6 +252,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 activities::is_user_modified,
                 activities::source_system,
                 activities::source_record_id,
+                activities::source_group_id,
                 activities::idempotency_key,
                 activities::import_run_id,
                 activities::created_at,
@@ -403,6 +404,78 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     .map_err(StorageError::from)?;
                 tx.delete::<ActivityDB>(activity_id.clone());
                 Ok(activity.into())
+            })
+            .await
+    }
+
+    async fn link_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)> {
+        use wealthfolio_core::activities::{ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT};
+
+        if activity_a_id == activity_b_id {
+            return Err(Error::from(ActivityError::InvalidData(
+                "Cannot link an activity to itself".to_string(),
+            )));
+        }
+
+        self.writer
+            .exec_tx(move |tx| -> Result<(Activity, Activity)> {
+                let a = activities::table
+                    .select(ActivityDB::as_select())
+                    .find(&activity_a_id)
+                    .first::<ActivityDB>(tx.conn())
+                    .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
+                let b = activities::table
+                    .select(ActivityDB::as_select())
+                    .find(&activity_b_id)
+                    .first::<ActivityDB>(tx.conn())
+                    .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
+
+                let (mut transfer_in, mut transfer_out) =
+                    match (a.activity_type.as_str(), b.activity_type.as_str()) {
+                        (ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT) => (a, b),
+                        (ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_TRANSFER_IN) => (b, a),
+                        _ => {
+                            return Err(Error::from(ActivityError::InvalidData(
+                                "Linking requires one TRANSFER_IN and one TRANSFER_OUT activity"
+                                    .to_string(),
+                            )));
+                        }
+                    };
+
+                if transfer_in.source_group_id.is_some() || transfer_out.source_group_id.is_some() {
+                    return Err(Error::from(ActivityError::InvalidData(
+                        "One or both activities are already linked to another transfer".to_string(),
+                    )));
+                }
+
+                let group_id = Uuid::new_v4().to_string();
+                let now = chrono::Utc::now().to_rfc3339();
+                let internal_metadata = Some(r#"{"flow":{"is_external":false}}"#.to_string());
+
+                transfer_in.source_group_id = Some(group_id.clone());
+                transfer_in.metadata = internal_metadata.clone();
+                transfer_in.updated_at = now.clone();
+                transfer_out.source_group_id = Some(group_id);
+                transfer_out.metadata = internal_metadata;
+                transfer_out.updated_at = now;
+
+                let updated_in = diesel::update(activities::table.find(&transfer_in.id))
+                    .set(&transfer_in)
+                    .get_result::<ActivityDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+                let updated_out = diesel::update(activities::table.find(&transfer_out.id))
+                    .set(&transfer_out)
+                    .get_result::<ActivityDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                tx.update(&transfer_in)?;
+                tx.update(&transfer_out)?;
+
+                Ok((Activity::from(updated_in), Activity::from(updated_out)))
             })
             .await
     }
