@@ -84,9 +84,8 @@ export default function GoalDetailPage() {
   const baseCurrency = settings?.baseCurrency ?? goal?.currency ?? "USD";
 
   // Fetch backend-computed retirement overview when a retirement plan exists
-  const { data: retirementOverview } = useRetirementOverview(
-    isRetirement && plan ? goalId : undefined,
-  );
+  const retirementOverviewQuery = useRetirementOverview(isRetirement && plan ? goalId : undefined);
+  const { data: retirementOverview } = retirementOverviewQuery;
 
   // Fetch backend-computed save-up overview when this is a save-up goal
   const { data: saveUpOverview } = useSaveUpOverview(isSaveUp ? goalId : undefined);
@@ -352,6 +351,8 @@ export default function GoalDetailPage() {
                 goalId={goalId!}
                 dcLinkedAccountIds={dcLinkedAccountIds}
                 retirementOverview={retirementOverview}
+                retirementOverviewError={retirementOverviewQuery.error}
+                retirementOverviewIsFetching={retirementOverviewQuery.isFetching}
               />
             </>
           ) : (
@@ -395,6 +396,8 @@ function RetirementDetail({
   goalId,
   dcLinkedAccountIds,
   retirementOverview,
+  retirementOverviewError,
+  retirementOverviewIsFetching,
 }: {
   onTabChange: (tab: string) => void;
   plan: RetirementPlan;
@@ -404,6 +407,8 @@ function RetirementDetail({
   goalId: string;
   dcLinkedAccountIds: string[];
   retirementOverview?: RetirementOverview;
+  retirementOverviewError?: Error | null;
+  retirementOverviewIsFetching?: boolean;
 }) {
   return (
     <>
@@ -416,6 +421,8 @@ function RetirementDetail({
           onSavePlan={onSavePlan}
           onNavigateToTab={onTabChange}
           retirementOverview={retirementOverview}
+          retirementOverviewError={retirementOverviewError}
+          retirementOverviewIsFetching={retirementOverviewIsFetching}
           goalId={goalId}
           dcLinkedAccountIds={dcLinkedAccountIds}
         />

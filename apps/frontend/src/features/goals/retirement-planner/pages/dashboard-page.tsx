@@ -13,6 +13,7 @@ import {
   formatPercent,
   Input,
   MoneyInput,
+  Skeleton,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -28,7 +29,6 @@ import {
   RetirementCoverageChart,
   type CoverageProjectionPoint,
 } from "../components/retirement-coverage-chart";
-import { RetirementDashboardSkeleton } from "../components/retirement-dashboard-skeleton";
 import { RetirementSnapshotTable } from "../components/retirement-snapshot-table";
 import {
   ValueModeToggle,
@@ -78,6 +78,8 @@ interface Props {
   onSavePlan?: (plan: RetirementPlan, plannerMode?: PlannerMode) => void;
   onNavigateToTab?: (tab: string) => void;
   retirementOverview?: RetirementOverview;
+  retirementOverviewError?: Error | null;
+  retirementOverviewIsFetching?: boolean;
   goalId?: string;
   dcLinkedAccountIds?: string[];
 }
@@ -1908,15 +1910,110 @@ function SidebarConfigurator({
   );
 }
 
+function RetirementAnalysisPendingColumn({ error }: { error: Error | null }) {
+  if (error) {
+    return (
+      <div className="space-y-6 lg:col-span-2">
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="text-destructive flex gap-3 py-5 text-sm">
+            <Icons.AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            <div>
+              <p className="font-medium">Failed to load retirement projection.</p>
+              <p className="mt-1 text-xs">{error.message}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 lg:col-span-2">
+      <Card className="overflow-hidden">
+        <CardContent className="px-7 py-6">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="bg-muted/60 flex size-8 shrink-0 items-center justify-center rounded-full">
+              <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Calculating retirement projection</p>
+              <p className="text-muted-foreground mt-1 max-w-xl text-sm leading-relaxed">
+                Plan inputs are available now. Projection, coverage, and timeline widgets will load
+                here when the calculation finishes.
+              </p>
+            </div>
+          </div>
+          <Skeleton className="mb-3 h-8 w-[82%] rounded-md" />
+          <Skeleton className="mb-6 h-8 w-[58%] rounded-md" />
+          <Skeleton className="mb-5 h-3 w-full rounded-full" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <Skeleton className="h-3 w-16 rounded" />
+                <Skeleton className="h-5 w-20 rounded" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-40 rounded" />
+              <Skeleton className="h-4 w-32 rounded" />
+            </div>
+            <Skeleton className="h-8 w-40 rounded-md" />
+          </div>
+        </CardHeader>
+        <CardContent className="px-2 sm:px-6">
+          <Skeleton className="h-64 w-full rounded-md" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-32 rounded" />
+            <Skeleton className="h-4 w-48 rounded" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 px-2 sm:px-6">
+          <Skeleton className="h-48 w-full rounded-md" />
+          <Skeleton className="h-3 w-full rounded-full" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <Skeleton className="h-4 w-40 rounded" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3">
+              <Skeleton className="h-3 w-10 rounded" />
+              <Skeleton className="h-3 flex-1 rounded" />
+              <Skeleton className="h-3 w-16 rounded" />
+              <Skeleton className="h-3 w-16 rounded" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────
 
 export default function DashboardPage({
   plan,
   portfolioData,
-  isLoading,
   plannerMode = "fire",
   onSavePlan,
   retirementOverview,
+  retirementOverviewError,
+  retirementOverviewIsFetching,
   goalId,
   dcLinkedAccountIds,
 }: Props) {
@@ -2192,8 +2289,25 @@ export default function DashboardPage({
     readiness.tone === "good" ? "on_track" : readiness.tone === "watch" ? "at_risk" : "off_track";
   const heroGuidance = readiness.body;
 
-  if (isLoading || !retirementOverview) {
-    return <RetirementDashboardSkeleton />;
+  if (!retirementOverview) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <RetirementAnalysisPendingColumn error={retirementOverviewError ?? error} />
+          <div className="space-y-4 lg:col-span-1 lg:self-start">
+            <SidebarConfigurator
+              plan={plan}
+              currency={currency}
+              plannerMode={plannerMode}
+              onSavePlan={onSavePlan}
+              retirementOverview={retirementOverview}
+              goalId={goalId}
+              dcLinkedAccountIds={dcLinkedAccountIds}
+            />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -2206,6 +2320,13 @@ export default function DashboardPage({
 
   return (
     <div className="space-y-6">
+      {retirementOverviewIsFetching && (
+        <div className="bg-muted/20 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
+          <Icons.Spinner className="size-3.5 animate-spin" />
+          Recalculating retirement projection…
+        </div>
+      )}
+
       {/* Two-column layout: main + sidebar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Main column ── */}
