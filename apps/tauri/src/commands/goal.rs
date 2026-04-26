@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
-use log::debug;
+use log::{debug, warn};
 use rust_decimal::prelude::ToPrimitive;
 use tauri::State;
 use wealthfolio_core::goals::{
     Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan,
 };
-use wealthfolio_core::planning::retirement::RetirementPlan;
-use wealthfolio_core::planning::SaveUpOverview;
+use wealthfolio_core::planning::{
+    compute_save_up_overview, validate_save_up_input, SaveUpInput, SaveUpOverview,
+};
 use wealthfolio_core::portfolio::fire::RetirementOverview;
 
 #[tauri::command]
@@ -96,7 +97,7 @@ pub async fn save_goal_funding(
         .map_err(|e| e.to_string())?;
 
     // Auto-refresh summary after funding change
-    let _ = refresh_summary_internal(&state, &goal_id).await;
+    refresh_summary_after_save(&state, &goal_id).await;
 
     Ok(result)
 }
@@ -128,18 +129,29 @@ pub async fn save_goal_plan(
         .map_err(|e| e.to_string())?;
 
     // Auto-refresh summary after plan change
-    let _ = refresh_summary_internal(&state, &goal_id).await;
+    refresh_summary_after_save(&state, &goal_id).await;
 
     Ok(result)
+}
+
+async fn refresh_summary_after_save(state: &State<'_, Arc<ServiceContext>>, goal_id: &str) {
+    if let Err(err) = refresh_summary_internal(state, goal_id).await {
+        warn!("Failed to refresh goal summary after save for {goal_id}: {err}");
+    }
 }
 
 fn normalize_plan_currency_to_base(plan: &mut SaveGoalPlan, base_currency: &str) {
     if plan.plan_kind != "retirement" {
         return;
     }
-    if let Ok(mut retirement_plan) = serde_json::from_str::<RetirementPlan>(&plan.settings_json) {
-        retirement_plan.currency = base_currency.to_string();
-        if let Ok(settings_json) = serde_json::to_string(&retirement_plan) {
+    if let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(&plan.settings_json) {
+        if let Some(object) = settings.as_object_mut() {
+            object.insert(
+                "currency".to_string(),
+                serde_json::Value::String(base_currency.to_string()),
+            );
+        }
+        if let Ok(settings_json) = serde_json::to_string(&settings) {
             plan.settings_json = settings_json;
         }
     }
@@ -222,6 +234,12 @@ pub async fn get_save_up_overview(
         .compute_save_up_overview(&goal_id, &valuation_map)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn preview_save_up_overview(input: SaveUpInput) -> Result<SaveUpOverview, String> {
+    validate_save_up_input(&input).map_err(|e| e.to_string())?;
+    Ok(compute_save_up_overview(&input))
 }
 
 /// Internal helper: fetch valuations and refresh goal summary.

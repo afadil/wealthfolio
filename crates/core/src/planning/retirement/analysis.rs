@@ -703,34 +703,39 @@ pub fn run_sorr(
     );
     let r = plan_retirement_return(plan);
     let years =
-        (plan.personal.planning_horizon_age as i32 - retirement_start_age as i32).max(10) as usize;
+        (plan.personal.planning_horizon_age as i32 - retirement_start_age as i32).max(0) as usize;
+    if years == 0 {
+        return vec![];
+    }
     let years_to_fire =
         (retirement_start_age as i32 - plan.personal.current_age as i32).max(0) as u32;
     let inflation = plan.investment.inflation_rate;
 
+    let mut crash_year_1 = vec![r; years];
+    crash_year_1[0] = -0.3;
+
+    let mut crash_year_5 = vec![r; years];
+    if years >= 5 {
+        crash_year_5[4] = -0.3;
+    }
+
+    let mut double_crash = vec![r; years];
+    double_crash[0] = -0.25;
+    if years >= 5 {
+        double_crash[4] = -0.2;
+    }
+
+    let mut lost_decade = vec![r; years];
+    for year_return in lost_decade.iter_mut().take(10) {
+        *year_return = 0.0;
+    }
+
     let scenarios: Vec<(&str, Vec<f64>)> = vec![
         ("Base case", vec![r; years]),
-        ("Crash Year 1 (-30%)", {
-            let mut v = vec![-0.3_f64];
-            v.extend(vec![r + 0.01; years - 1]);
-            v
-        }),
-        ("Crash Year 5 (-30%)", {
-            let mut v = vec![r; 4];
-            v.push(-0.3);
-            v.extend(vec![r + 0.01; years - 5]);
-            v
-        }),
-        ("Double Crash", {
-            let mut v = vec![-0.25_f64, r, r, r, -0.2];
-            v.extend(vec![r; years - 5]);
-            v
-        }),
-        ("Lost Decade", {
-            let mut v = vec![0.0_f64; 10];
-            v.extend(vec![r + 0.02; years - 10]);
-            v
-        }),
+        ("Crash Year 1 (-30%)", crash_year_1),
+        ("Crash Year 5 (-30%)", crash_year_5),
+        ("Double Crash", double_crash),
+        ("Lost Decade", lost_decade),
     ];
 
     scenarios
@@ -756,8 +761,7 @@ pub fn run_sorr(
                     inflation,
                 );
                 // Use scenario returns[i] but blend with glide path for the base-return component.
-                // For non-base scenarios the shock return overrides the actual return for that year;
-                // in subsequent years the scenario return already embeds the recovery premium.
+                // For non-base scenarios the shock return overrides the actual return for that year.
                 let glide_mean =
                     plan_blended_return(plan, years_from_now, true, retirement_start_age);
                 let effective_return = if (returns[i] - r).abs() < 1e-9 {
@@ -1107,6 +1111,8 @@ fn set_total_monthly_expense(expenses: &mut ExpenseBudget, base_total: f64, targ
         first.monthly_amount = target_total;
     } else {
         expenses.items.push(ExpenseBucket {
+            id: None,
+            label: None,
             monthly_amount: target_total,
             inflation_rate: None,
             start_age: None,
@@ -1148,6 +1154,7 @@ mod tests {
     use super::*;
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
+            version: None,
             personal: PersonalProfile {
                 birth_year_month: None,
                 current_age: 35,
@@ -1158,6 +1165,8 @@ mod tests {
             },
             expenses: ExpenseBudget {
                 items: vec![ExpenseBucket {
+                    id: None,
+                    label: None,
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
@@ -1498,6 +1507,51 @@ mod tests {
             sorr_50[0].portfolio_path.len(),
             sorr_55[0].portfolio_path.len(),
         );
+    }
+
+    #[test]
+    fn sorr_does_not_extend_past_planning_horizon() {
+        let mut p = base_plan();
+        p.personal.target_retirement_age = 89;
+        p.personal.planning_horizon_age = 90;
+
+        let scenarios = run_sorr(&p, 900_000.0, 89);
+
+        assert_eq!(scenarios.len(), 5);
+        assert!(scenarios.iter().all(|scenario| scenario.returns.len() == 1));
+        assert!(scenarios
+            .iter()
+            .all(|scenario| scenario.portfolio_path.len() == 2));
+    }
+
+    #[test]
+    fn sorr_returns_empty_when_retirement_starts_at_horizon() {
+        let mut p = base_plan();
+        p.personal.target_retirement_age = 90;
+        p.personal.planning_horizon_age = 90;
+
+        let scenarios = run_sorr(&p, 900_000.0, 90);
+
+        assert!(scenarios.is_empty());
+    }
+
+    #[test]
+    fn sorr_does_not_add_recovery_premium_after_stress_years() {
+        let p = base_plan();
+        let normal_return = plan_retirement_return(&p);
+
+        let scenarios = run_sorr(&p, 900_000.0, p.personal.target_retirement_age);
+
+        assert!(scenarios[1].returns.iter().skip(1).all(|value| approx_eq(
+            *value,
+            normal_return,
+            0.000_001
+        )));
+        assert!(scenarios[4].returns.iter().skip(10).all(|value| approx_eq(
+            *value,
+            normal_return,
+            0.000_001
+        )));
     }
 
     #[test]

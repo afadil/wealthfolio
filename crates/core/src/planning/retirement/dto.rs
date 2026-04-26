@@ -891,6 +891,7 @@ mod tests {
 
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
+            version: None,
             personal: PersonalProfile {
                 birth_year_month: None,
                 current_age: 35,
@@ -901,6 +902,8 @@ mod tests {
             },
             expenses: ExpenseBudget {
                 items: vec![ExpenseBucket {
+                    id: None,
+                    label: None,
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,

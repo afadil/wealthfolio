@@ -20,7 +20,7 @@ use wealthfolio_core::{
         SaveGoalPlan,
     },
     planning::retirement::{normalize_retirement_plan_ages, RetirementPlan, RetirementTimingMode},
-    planning::SaveUpOverview,
+    planning::{compute_save_up_overview, validate_save_up_input, SaveUpInput, SaveUpOverview},
     portfolio::fire::{
         self, DecisionSensitivityMap, DecisionSensitivityMatrix, MonteCarloResult,
         RetirementOverview, ScenarioResult, SorrScenario, StressTestResult,
@@ -80,12 +80,7 @@ async fn save_goal_funding(
     Json(rules): Json<Vec<GoalFundingRuleInput>>,
 ) -> ApiResult<Json<Vec<GoalFundingRule>>> {
     let result = state.goal_service.save_goal_funding(&id, rules).await?;
-    if let Ok(valuation_map) = build_valuation_map(&state).await {
-        let _ = state
-            .goal_service
-            .refresh_goal_summary(&id, &valuation_map)
-            .await;
-    }
+    refresh_goal_summary_after_save(&state, &id).await;
     Ok(Json(result))
 }
 
@@ -105,22 +100,39 @@ async fn save_goal_plan(
     let base_currency = state.base_currency.read().unwrap().clone();
     normalize_plan_currency_to_base(&mut plan, &base_currency);
     let result = state.goal_service.save_goal_plan(plan).await?;
-    if let Ok(valuation_map) = build_valuation_map(&state).await {
-        let _ = state
-            .goal_service
-            .refresh_goal_summary(&goal_id, &valuation_map)
-            .await;
-    }
+    refresh_goal_summary_after_save(&state, &goal_id).await;
     Ok(Json(result))
+}
+
+async fn refresh_goal_summary_after_save(state: &Arc<AppState>, goal_id: &str) {
+    match build_valuation_map(state).await {
+        Ok(valuation_map) => {
+            if let Err(err) = state
+                .goal_service
+                .refresh_goal_summary(goal_id, &valuation_map)
+                .await
+            {
+                tracing::warn!("Failed to refresh goal summary after save for {goal_id}: {err}");
+            }
+        }
+        Err(err) => {
+            tracing::warn!("Failed to build valuation map after saving goal {goal_id}: {err}");
+        }
+    }
 }
 
 fn normalize_plan_currency_to_base(plan: &mut SaveGoalPlan, base_currency: &str) {
     if plan.plan_kind != "retirement" {
         return;
     }
-    if let Ok(mut retirement_plan) = serde_json::from_str::<RetirementPlan>(&plan.settings_json) {
-        retirement_plan.currency = base_currency.to_string();
-        if let Ok(settings_json) = serde_json::to_string(&retirement_plan) {
+    if let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(&plan.settings_json) {
+        if let Some(object) = settings.as_object_mut() {
+            object.insert(
+                "currency".to_string(),
+                serde_json::Value::String(base_currency.to_string()),
+            );
+        }
+        if let Ok(settings_json) = serde_json::to_string(&settings) {
             plan.settings_json = settings_json;
         }
     }
@@ -216,6 +228,13 @@ async fn get_save_up_overview(
     Ok(Json(overview))
 }
 
+async fn preview_save_up_overview(
+    Json(input): Json<SaveUpInput>,
+) -> ApiResult<Json<SaveUpOverview>> {
+    validate_save_up_input(&input)?;
+    Ok(Json(compute_save_up_overview(&input)))
+}
+
 // ─── RetirementPlan-based Simulation Endpoints ───────────────────────────────
 
 const MAX_SIMS: u32 = 500_000;
@@ -307,6 +326,17 @@ async fn resolve_retirement_inputs(
     }
 }
 
+async fn run_retirement_blocking<T, F>(task: F) -> ApiResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    tokio::task::spawn_blocking(task).await.map_err(|err| {
+        tracing::error!("Retirement calculation task failed: {err}");
+        ApiError::Internal(format!("Retirement calculation task failed: {err}"))
+    })
+}
+
 async fn retirement_projection(
     State(state): State<Arc<AppState>>,
     Json(req): Json<RetirementSimulationRequest>,
@@ -336,13 +366,16 @@ async fn retirement_monte_carlo(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_monte_carlo_with_mode_and_seed(
-        &plan,
-        current_portfolio,
-        n,
-        planner_mode,
-        req.seed,
-    );
+    let result = run_retirement_blocking(move || {
+        fire::run_monte_carlo_with_mode_and_seed(
+            &plan,
+            current_portfolio,
+            n,
+            planner_mode,
+            req.seed,
+        )
+    })
+    .await?;
     Ok(Json(result))
 }
 
@@ -358,7 +391,10 @@ async fn retirement_stress_tests(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_stress_tests_with_mode(&plan, current_portfolio, planner_mode);
+    let result = run_retirement_blocking(move || {
+        fire::run_stress_tests_with_mode(&plan, current_portfolio, planner_mode)
+    })
+    .await?;
     Ok(Json(result))
 }
 
@@ -374,7 +410,10 @@ async fn retirement_scenario_analysis(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_scenario_analysis_with_mode(&plan, current_portfolio, planner_mode);
+    let result = run_retirement_blocking(move || {
+        fire::run_scenario_analysis_with_mode(&plan, current_portfolio, planner_mode)
+    })
+    .await?;
     Ok(Json(result))
 }
 
@@ -390,12 +429,15 @@ async fn retirement_decision_sensitivity_map(
         req.current_portfolio,
     )
     .await?;
-    let result = fire::run_decision_sensitivity_matrix_with_mode(
-        &plan,
-        current_portfolio,
-        planner_mode,
-        req.map,
-    );
+    let result = run_retirement_blocking(move || {
+        fire::run_decision_sensitivity_matrix_with_mode(
+            &plan,
+            current_portfolio,
+            planner_mode,
+            req.map,
+        )
+    })
+    .await?;
     Ok(Json(result))
 }
 
@@ -416,7 +458,10 @@ async fn retirement_sequence_of_returns(
         validate_retirement_plan(&plan)?;
         plan
     };
-    let result = fire::run_sorr(&plan, req.portfolio_at_fire, req.retirement_start_age);
+    let result = run_retirement_blocking(move || {
+        fire::run_sorr(&plan, req.portfolio_at_fire, req.retirement_start_age)
+    })
+    .await?;
     Ok(Json(result))
 }
 
@@ -435,34 +480,35 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/goals/{id}/refresh-summary", post(refresh_goal_summary))
         .route("/goals/refresh-summaries", post(refresh_all_goal_summaries))
         .route(
-            "/goals/{id}/retirement-overview",
+            "/goals/{id}/retirement/overview",
             get(get_retirement_overview),
         )
-        .route("/goals/{id}/save-up-overview", get(get_save_up_overview))
+        .route("/goals/{id}/save-up/overview", get(get_save_up_overview))
+        .route("/goals/save-up/preview", post(preview_save_up_overview))
         .route("/goals/plan", post(save_goal_plan))
         // RetirementPlan-based simulation endpoints
         .route(
-            "/retirement/projection",
+            "/goals/retirement/projection",
             axum::routing::post(retirement_projection),
         )
         .route(
-            "/retirement/monte-carlo",
+            "/goals/retirement/monte-carlo",
             axum::routing::post(retirement_monte_carlo),
         )
         .route(
-            "/retirement/stress-tests",
+            "/goals/retirement/stress-tests",
             axum::routing::post(retirement_stress_tests),
         )
         .route(
-            "/retirement/scenario-analysis",
+            "/goals/retirement/scenario-analysis",
             axum::routing::post(retirement_scenario_analysis),
         )
         .route(
-            "/retirement/decision-sensitivity-map",
+            "/goals/retirement/decision-sensitivity-map",
             axum::routing::post(retirement_decision_sensitivity_map),
         )
         .route(
-            "/retirement/sequence-of-returns",
+            "/goals/retirement/sequence-of-returns",
             axum::routing::post(retirement_sequence_of_returns),
         )
 }

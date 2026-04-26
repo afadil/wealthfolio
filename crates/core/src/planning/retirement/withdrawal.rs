@@ -34,7 +34,10 @@ pub(crate) fn initial_withdrawal_buckets(
 }
 
 pub(crate) fn apply_growth(buckets: TaxBucketBalances, annual_return: f64) -> TaxBucketBalances {
-    let growth = (1.0 + annual_return).max(0.0);
+    let growth = 1.0 + annual_return;
+    if !growth.is_finite() || growth <= 0.0 {
+        return TaxBucketBalances::default();
+    }
     TaxBucketBalances {
         taxable: buckets.taxable * growth,
         tax_deferred: buckets.tax_deferred * growth,
@@ -248,6 +251,22 @@ mod tests {
         // stop at today's finite bucket balances.
         assert!((gross - 80_000.0).abs() < 0.1, "gross = {}", gross);
         assert!((tax_amt - 20_000.0).abs() < 0.1, "tax = {}", tax_amt);
+    }
+
+    #[test]
+    fn apply_growth_depletes_on_invalid_tail_returns() {
+        let buckets = TaxBucketBalances {
+            taxable: 100.0,
+            tax_deferred: 200.0,
+            tax_free: 300.0,
+        };
+
+        assert_eq!(apply_growth(buckets, -1.0), TaxBucketBalances::default());
+        assert_eq!(apply_growth(buckets, -1.25), TaxBucketBalances::default());
+        assert_eq!(
+            apply_growth(buckets, f64::NAN),
+            TaxBucketBalances::default()
+        );
     }
 
     #[test]

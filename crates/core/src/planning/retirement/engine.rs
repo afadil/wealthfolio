@@ -766,6 +766,7 @@ mod tests {
 
     fn base_plan() -> RetirementPlan {
         RetirementPlan {
+            version: None,
             personal: PersonalProfile {
                 birth_year_month: None,
                 current_age: 35,
@@ -776,6 +777,8 @@ mod tests {
             },
             expenses: ExpenseBudget {
                 items: vec![ExpenseBucket {
+                    id: None,
+                    label: None,
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
@@ -1119,6 +1122,8 @@ mod tests {
         let mut plan = base_plan();
         // Add housing that ends at age 60
         plan.expenses.items.push(ExpenseBucket {
+            id: None,
+            label: None,
             monthly_amount: 1_000.0,
             inflation_rate: None,
             start_age: None,
@@ -1153,6 +1158,8 @@ mod tests {
         let mut plan = base_plan();
         plan.expenses.items = vec![
             ExpenseBucket {
+                id: None,
+                label: None,
                 monthly_amount: 1_000.0,
                 inflation_rate: None,
                 start_age: None,
@@ -1160,6 +1167,8 @@ mod tests {
                 essential: Some(true),
             },
             ExpenseBucket {
+                id: None,
+                label: None,
                 monthly_amount: 500.0,
                 inflation_rate: None,
                 start_age: Some(70),
@@ -1183,6 +1192,8 @@ mod tests {
     fn healthcare_inflation_isolation() {
         let mut plan = base_plan();
         plan.expenses.items.push(ExpenseBucket {
+            id: None,
+            label: None,
             monthly_amount: 500.0,
             inflation_rate: Some(0.08), // 8% healthcare inflation
             start_age: None,
@@ -1254,6 +1265,8 @@ mod tests {
         let mut p = base_plan();
         // Housing ends at 60
         p.expenses.items.push(ExpenseBucket {
+            id: None,
+            label: None,
             monthly_amount: 1_500.0,
             inflation_rate: None,
             start_age: None,
@@ -1310,6 +1323,8 @@ mod tests {
     fn housing_bucket_ends_at_specified_age() {
         let mut plan = base_plan();
         plan.expenses.items.push(ExpenseBucket {
+            id: None,
+            label: None,
             monthly_amount: 1500.0,
             inflation_rate: None,
             start_age: None,

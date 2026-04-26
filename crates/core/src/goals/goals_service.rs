@@ -9,7 +9,7 @@ use crate::planning::retirement::{
     normalize_retirement_plan_ages, RetirementPlan, RetirementTimingMode, TaxBucketBalances,
     TaxProfile,
 };
-use crate::planning::{SaveUpInput, SaveUpOverview};
+use crate::planning::{validate_save_up_input, SaveUpInput, SaveUpOverview};
 use crate::portfolio::fire::{compute_retirement_overview_with_mode, RetirementOverview};
 use async_trait::async_trait;
 use chrono::{Local, Months};
@@ -147,6 +147,58 @@ fn validate_goal_lifecycle(status_lifecycle: &str) -> Result<()> {
     }
 }
 
+fn validate_goal_funding_capacity(
+    goal_id: &str,
+    rules: &[GoalFundingRuleInput],
+    participating_rules: &[GoalFundingRule],
+) -> Result<()> {
+    let mut account_totals: HashMap<String, f64> = HashMap::new();
+    for r in participating_rules {
+        if r.goal_id != goal_id {
+            *account_totals.entry(r.account_id.clone()).or_default() += r.share_percent;
+        }
+    }
+
+    for rule in rules {
+        let total = account_totals.entry(rule.account_id.clone()).or_default();
+        let used_elsewhere = *total;
+        let combined = used_elsewhere + rule.share_percent;
+        if combined > 100.0 {
+            let max_available = (100.0 - used_elsewhere).max(0.0);
+            return Err(crate::errors::ValidationError::InvalidInput(format!(
+                "Account '{}' is overallocated: requested {:.1}%, used elsewhere {:.1}%, max available {:.1}%",
+                rule.account_id, rule.share_percent, used_elsewhere, max_available
+            ))
+            .into());
+        }
+        *total = combined;
+    }
+
+    Ok(())
+}
+
+fn funding_rules_as_input(rules: Vec<GoalFundingRule>) -> Vec<GoalFundingRuleInput> {
+    rules
+        .into_iter()
+        .map(|rule| GoalFundingRuleInput {
+            account_id: rule.account_id,
+            share_percent: rule.share_percent,
+            tax_bucket: rule.tax_bucket,
+        })
+        .collect()
+}
+
+fn is_supported_tax_bucket(tax_bucket: Option<&str>) -> bool {
+    matches!(
+        tax_bucket,
+        None | Some("taxable")
+            | Some("tax_deferred")
+            | Some("tax-deferred")
+            | Some("tax_free")
+            | Some("tax-free")
+    )
+}
+
 fn compute_tax_bucket_balances(
     funding_rules: &[GoalFundingRule],
     valuations: &AccountValuationMap,
@@ -154,14 +206,18 @@ fn compute_tax_bucket_balances(
     let mut balances = TaxBucketBalances::default();
     for rule in funding_rules {
         if let Some(&value) = valuations.get(&rule.account_id) {
-            let share_value = value * rule.share_percent / 100.0;
-            if share_value <= 0.0 {
-                continue;
-            }
+            let share_value = (value * rule.share_percent / 100.0).max(0.0);
             match rule.tax_bucket.as_deref() {
                 Some("tax_deferred") | Some("tax-deferred") => balances.tax_deferred += share_value,
                 Some("tax_free") | Some("tax-free") => balances.tax_free += share_value,
-                _ => balances.taxable += share_value,
+                Some("taxable") | None => balances.taxable += share_value,
+                Some(unknown) => {
+                    log::warn!(
+                        "Unknown goal funding tax bucket '{unknown}' for rule {}; treating as taxable",
+                        rule.id
+                    );
+                    balances.taxable += share_value;
+                }
             }
         }
     }
@@ -428,6 +484,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                 .into());
             }
         }
+        if existing.status_lifecycle != GOAL_LIFECYCLE_ACTIVE
+            && updated_goal_data.status_lifecycle == GOAL_LIFECYCLE_ACTIVE
+        {
+            let rules =
+                funding_rules_as_input(self.goal_repo.load_funding_rules(&updated_goal_data.id)?);
+            let participating_rules = self.goal_repo.load_participating_funding_rules()?;
+            validate_goal_funding_capacity(&updated_goal_data.id, &rules, &participating_rules)?;
+        }
         self.goal_repo.update_goal(updated_goal_data).await
     }
 
@@ -468,6 +532,17 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                 .into());
             }
         }
+        if is_retirement {
+            for rule in &rules {
+                if !is_supported_tax_bucket(rule.tax_bucket.as_deref()) {
+                    return Err(crate::errors::ValidationError::InvalidInput(format!(
+                        "Unsupported tax bucket '{}'",
+                        rule.tax_bucket.as_deref().unwrap_or_default()
+                    ))
+                    .into());
+                }
+            }
+        }
 
         // Clear tax_bucket for non-retirement goals
         let rules: Vec<GoalFundingRuleInput> = if is_retirement {
@@ -505,28 +580,8 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             }
         }
 
-        // Validate per-account share sum <= 100% across all participating goals
         let participating_rules = self.goal_repo.load_participating_funding_rules()?;
-        let mut account_totals: HashMap<String, f64> = HashMap::new();
-        for r in &participating_rules {
-            if r.goal_id != goal_id {
-                *account_totals.entry(r.account_id.clone()).or_default() += r.share_percent;
-            }
-        }
-        for rule in &rules {
-            let total = account_totals.entry(rule.account_id.clone()).or_default();
-            let used_elsewhere = *total;
-            let combined = used_elsewhere + rule.share_percent;
-            if combined > 100.0 {
-                let max_available = (100.0 - used_elsewhere).max(0.0);
-                return Err(crate::errors::ValidationError::InvalidInput(format!(
-                    "Account '{}' is overallocated: requested {:.1}%, used elsewhere {:.1}%, max available {:.1}%",
-                    rule.account_id, rule.share_percent, used_elsewhere, max_available
-                ))
-                .into());
-            }
-            *total = combined;
-        }
+        validate_goal_funding_capacity(goal_id, &rules, &participating_rules)?;
 
         self.goal_repo.save_goal_funding(goal_id, rules).await
     }
@@ -555,7 +610,14 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             .into());
         }
         if plan.plan_kind == "retirement" {
-            let mut retirement_plan: RetirementPlan = serde_json::from_str(&plan.settings_json)
+            let mut settings_json: serde_json::Value = serde_json::from_str(&plan.settings_json)
+                .map_err(|e| {
+                    crate::errors::ValidationError::InvalidInput(format!(
+                        "Invalid retirement plan JSON: {}",
+                        e
+                    ))
+                })?;
+            let mut retirement_plan: RetirementPlan = serde_json::from_value(settings_json.clone())
                 .map_err(|e| {
                     crate::errors::ValidationError::InvalidInput(format!(
                         "Invalid retirement plan JSON: {}",
@@ -579,7 +641,16 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
                     }
                 }
             }
-            plan.settings_json = serde_json::to_string(&retirement_plan)?;
+            if let Some(personal) = settings_json
+                .get_mut("personal")
+                .and_then(|value| value.as_object_mut())
+            {
+                personal.insert(
+                    "currentAge".to_string(),
+                    serde_json::Value::from(retirement_plan.personal.current_age),
+                );
+            }
+            plan.settings_json = serde_json::to_string(&settings_json)?;
         }
 
         self.goal_repo.save_goal_plan(plan).await
@@ -759,6 +830,8 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
         };
 
         let input = SaveUpInput {
+            // Save-up plans do not carry a separate currency. The web and Tauri goal write paths
+            // force goal amounts to the configured base currency, matching valuation_map values.
             current_value,
             target_amount: goal.target_amount.unwrap_or(0.0),
             target_date: goal.target_date.clone(),
@@ -766,6 +839,7 @@ impl<T: GoalRepositoryTrait + Send + Sync> GoalServiceTrait for GoalService<T> {
             expected_annual_return: expected_return,
         };
 
+        validate_save_up_input(&input)?;
         Ok(crate::planning::compute_save_up_overview(&input))
     }
 }
@@ -840,6 +914,7 @@ mod tests {
 
     fn valid_retirement_plan() -> RetirementPlan {
         RetirementPlan {
+            version: None,
             personal: PersonalProfile {
                 birth_year_month: None,
                 current_age: 45,
@@ -850,6 +925,8 @@ mod tests {
             },
             expenses: ExpenseBudget {
                 items: vec![ExpenseBucket {
+                    id: None,
+                    label: None,
                     monthly_amount: 3_000.0,
                     inflation_rate: None,
                     start_age: None,
@@ -1229,6 +1306,22 @@ mod tests {
     }
 
     #[test]
+    fn share_value_includes_negative_account_values() {
+        let rules = vec![
+            share_rule("g1", "acct-1", 100.0),
+            share_rule("g1", "acct-2", 100.0),
+        ];
+        let vals = HashMap::from([
+            ("acct-1".to_string(), -20_000.0),
+            ("acct-2".to_string(), 70_000.0),
+        ]);
+
+        let v = compute_goal_value_from_shares(&rules, &vals);
+
+        assert!((v - 50_000.0).abs() < 0.01, "value: {}", v);
+    }
+
+    #[test]
     fn tax_bucket_balances_from_shares() {
         let rules = vec![
             GoalFundingRule {
@@ -1257,7 +1350,14 @@ mod tests {
 
     #[test]
     fn tax_bucket_defaults_to_taxable() {
-        let rules = vec![share_rule("g1", "acct-1", 100.0)];
+        let rules = vec![
+            share_rule("g1", "acct-1", 50.0),
+            GoalFundingRule {
+                id: "unknown-bucket".into(),
+                tax_bucket: Some("tax_deffered".into()),
+                ..share_rule("g1", "acct-1", 50.0)
+            },
+        ];
         let mut vals = HashMap::new();
         vals.insert("acct-1".into(), 50_000.0);
 
@@ -1265,6 +1365,30 @@ mod tests {
         assert!((b.taxable - 50_000.0).abs() < 0.01);
         assert!((b.tax_deferred).abs() < 0.01);
         assert!((b.tax_free).abs() < 0.01);
+    }
+
+    #[test]
+    fn tax_bucket_balances_use_non_negative_bucket_weights() {
+        let rules = vec![
+            GoalFundingRule {
+                tax_bucket: Some("taxable".into()),
+                ..share_rule("g1", "acct-1", 100.0)
+            },
+            GoalFundingRule {
+                tax_bucket: Some("tax_deferred".into()),
+                ..share_rule("g1", "acct-2", 100.0)
+            },
+        ];
+        let vals = HashMap::from([
+            ("acct-1".to_string(), -20_000.0),
+            ("acct-2".to_string(), 70_000.0),
+        ]);
+
+        let b = compute_tax_bucket_balances(&rules, &vals);
+
+        assert!((b.taxable).abs() < 0.01);
+        assert!((b.tax_deferred - 70_000.0).abs() < 0.01);
+        assert!((b.total() - 70_000.0).abs() < 0.01);
     }
 
     #[test]
@@ -1333,6 +1457,40 @@ mod tests {
             .expect_err("invalid tax penalty should be rejected")
             .to_string()
             .contains("Early withdrawal penalty"));
+    }
+
+    #[tokio::test]
+    async fn save_goal_plan_preserves_unknown_frontend_fields() {
+        let goal = retirement_goal("goal-1", GOAL_LIFECYCLE_ACTIVE);
+        let repo = Arc::new(MockGoalRepository::new(vec![goal]));
+        let service = GoalService::new(repo.clone(), Arc::new(MockAccountService::default()));
+        let mut plan = valid_retirement_plan();
+        plan.personal.birth_year_month = None;
+        let mut settings = serde_json::to_value(&plan).unwrap();
+        let object = settings.as_object_mut().unwrap();
+        object.insert(
+            "version".to_string(),
+            serde_json::Value::String("v3".into()),
+        );
+        settings["expenses"]["items"][0]["id"] = serde_json::Value::String("expense-1".into());
+        settings["expenses"]["items"][0]["label"] = serde_json::Value::String("Core".into());
+
+        service
+            .save_goal_plan(SaveGoalPlan {
+                goal_id: "goal-1".into(),
+                plan_kind: "retirement".into(),
+                planner_mode: Some("fire".into()),
+                settings_json: serde_json::to_string(&settings).unwrap(),
+                summary_json: None,
+            })
+            .await
+            .unwrap();
+
+        let saved = repo.load_goal_plan("goal-1").unwrap().unwrap();
+        let saved_settings: serde_json::Value = serde_json::from_str(&saved.settings_json).unwrap();
+        assert_eq!(saved_settings["version"], "v3");
+        assert_eq!(saved_settings["expenses"]["items"][0]["id"], "expense-1");
+        assert_eq!(saved_settings["expenses"]["items"][0]["label"], "Core");
     }
 
     #[test]
@@ -1406,6 +1564,58 @@ mod tests {
         assert!(err
             .to_string()
             .contains("Only one active retirement goal is allowed"));
+    }
+
+    #[tokio::test]
+    async fn update_goal_rejects_reactivation_when_funding_would_overallocate_account() {
+        let mut inactive_goal = test_goal(GOAL_LIFECYCLE_ARCHIVED, None);
+        inactive_goal.id = "inactive-goal".into();
+        let mut active_goal = test_goal(GOAL_LIFECYCLE_ACTIVE, None);
+        active_goal.id = "active-goal".into();
+        let repo = Arc::new(MockGoalRepository::new(vec![
+            inactive_goal.clone(),
+            active_goal,
+        ]));
+        repo.set_funding_rules(
+            "inactive-goal",
+            vec![share_rule("inactive-goal", "acct-1", 50.0)],
+        );
+        repo.set_funding_rules(
+            "active-goal",
+            vec![share_rule("active-goal", "acct-1", 60.0)],
+        );
+        let service = GoalService::new(repo, Arc::new(MockAccountService::default()));
+
+        let mut updated = inactive_goal;
+        updated.status_lifecycle = GOAL_LIFECYCLE_ACTIVE.to_string();
+
+        let err = service
+            .update_goal(updated)
+            .await
+            .expect_err("reactivating overallocated funding should fail");
+
+        assert!(err.to_string().contains("overallocated"));
+    }
+
+    #[tokio::test]
+    async fn save_goal_funding_rejects_unknown_tax_bucket() {
+        let goal = retirement_goal("goal-1", GOAL_LIFECYCLE_ACTIVE);
+        let repo = Arc::new(MockGoalRepository::new(vec![goal]));
+        let service = GoalService::new(repo, Arc::new(MockAccountService::default()));
+
+        let err = service
+            .save_goal_funding(
+                "goal-1",
+                vec![GoalFundingRuleInput {
+                    account_id: "acct-1".into(),
+                    share_percent: 50.0,
+                    tax_bucket: Some("tax_deffered".into()),
+                }],
+            )
+            .await
+            .expect_err("unknown tax bucket should fail validation");
+
+        assert!(err.to_string().contains("Unsupported tax bucket"));
     }
 
     #[tokio::test]

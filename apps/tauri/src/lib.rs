@@ -321,6 +321,7 @@ pub fn run() {
             commands::goal::refresh_goal_summary,
             commands::goal::get_retirement_overview,
             commands::goal::get_save_up_overview,
+            commands::goal::preview_save_up_overview,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,

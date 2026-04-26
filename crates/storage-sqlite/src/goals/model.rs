@@ -65,11 +65,9 @@ pub struct NewGoalDB {
 
 /// Database model for goal funding rules (physical table: goals_allocation)
 #[derive(
-    Insertable,
     Queryable,
     Identifiable,
     Associations,
-    AsChangeset,
     Selectable,
     PartialEq,
     Serialize,
@@ -92,19 +90,21 @@ pub struct GoalsAllocationDB {
     pub updated_at: String,
 }
 
+/// Database write model for goal funding rules.
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = crate::schema::goals_allocation)]
+pub struct NewGoalsAllocationDB {
+    pub id: String,
+    pub goal_id: String,
+    pub account_id: String,
+    pub share_percent: f64,
+    pub tax_bucket: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// Database model for goal plans
-#[derive(
-    Queryable,
-    Identifiable,
-    Insertable,
-    AsChangeset,
-    Selectable,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-)]
+#[derive(Queryable, Identifiable, Selectable, PartialEq, Serialize, Deserialize, Debug, Clone)]
 #[diesel(table_name = crate::schema::goal_plans)]
 #[diesel(primary_key(goal_id))]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -120,7 +120,50 @@ pub struct GoalPlanDB {
     pub updated_at: String,
 }
 
+/// Database write model for goal plans.
+#[derive(Insertable, AsChangeset, Debug, Clone)]
+#[diesel(table_name = crate::schema::goal_plans)]
+pub struct NewGoalPlanDB {
+    pub goal_id: String,
+    pub plan_kind: String,
+    pub planner_mode: Option<String>,
+    pub settings_json: String,
+    pub summary_json: String,
+    pub version: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 // --- Conversions ---
+
+impl From<NewGoalsAllocationDB> for GoalsAllocationDB {
+    fn from(db: NewGoalsAllocationDB) -> Self {
+        Self {
+            id: db.id,
+            goal_id: db.goal_id,
+            account_id: db.account_id,
+            share_percent: db.share_percent,
+            tax_bucket: db.tax_bucket,
+            created_at: db.created_at,
+            updated_at: db.updated_at,
+        }
+    }
+}
+
+impl From<NewGoalPlanDB> for GoalPlanDB {
+    fn from(db: NewGoalPlanDB) -> Self {
+        Self {
+            goal_id: db.goal_id,
+            plan_kind: db.plan_kind,
+            planner_mode: db.planner_mode,
+            settings_json: db.settings_json,
+            summary_json: db.summary_json,
+            version: db.version,
+            created_at: db.created_at,
+            updated_at: db.updated_at,
+        }
+    }
+}
 
 impl From<GoalDB> for wealthfolio_core::goals::Goal {
     fn from(db: GoalDB) -> Self {

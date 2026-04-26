@@ -4,7 +4,9 @@ use wealthfolio_core::goals::{
 };
 use wealthfolio_core::Result;
 
-use super::model::{GoalDB, GoalPlanDB, GoalsAllocationDB, NewGoalDB};
+use super::model::{
+    GoalDB, GoalPlanDB, GoalsAllocationDB, NewGoalDB, NewGoalPlanDB, NewGoalsAllocationDB,
+};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{goal_plans, goals, goals_allocation};
@@ -13,8 +15,72 @@ use diesel::prelude::*;
 use diesel::r2d2::{self, Pool};
 use diesel::SqliteConnection;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
+use wealthfolio_core::errors::ValidationError;
+
+fn validate_goal_funding_capacity(
+    conn: &mut SqliteConnection,
+    goal_id: &str,
+    rules: &[GoalFundingRuleInput],
+) -> Result<()> {
+    let participating = goals_allocation::table
+        .inner_join(goals::table.on(goals::id.eq(goals_allocation::goal_id)))
+        .filter(goals::status_lifecycle.eq("active"))
+        .filter(goals_allocation::goal_id.ne(goal_id))
+        .select(GoalsAllocationDB::as_select())
+        .load::<GoalsAllocationDB>(conn)
+        .map_err(StorageError::from)?;
+
+    let mut account_totals: HashMap<String, f64> = HashMap::new();
+    for existing in participating {
+        *account_totals.entry(existing.account_id).or_default() += existing.share_percent;
+    }
+
+    for rule in rules {
+        if !rule.share_percent.is_finite() || !(0.0..=100.0).contains(&rule.share_percent) {
+            return Err(ValidationError::InvalidInput(
+                "share_percent must be between 0 and 100".to_string(),
+            )
+            .into());
+        }
+
+        let used_elsewhere = account_totals.get(&rule.account_id).copied().unwrap_or(0.0);
+        let combined = used_elsewhere + rule.share_percent;
+        if combined > 100.0 {
+            let max_available = (100.0 - used_elsewhere).max(0.0);
+            return Err(ValidationError::InvalidInput(format!(
+                "Account '{}' is overallocated: requested {:.1}%, used elsewhere {:.1}%, max available {:.1}%",
+                rule.account_id, rule.share_percent, used_elsewhere, max_available
+            ))
+            .into());
+        }
+        *account_totals.entry(rule.account_id.clone()).or_default() = combined;
+    }
+
+    Ok(())
+}
+
+fn load_goal_funding_inputs(
+    conn: &mut SqliteConnection,
+    goal_id: &str,
+) -> Result<Vec<GoalFundingRuleInput>> {
+    let rules = goals_allocation::table
+        .filter(goals_allocation::goal_id.eq(goal_id))
+        .select(GoalsAllocationDB::as_select())
+        .load::<GoalsAllocationDB>(conn)
+        .map_err(StorageError::from)?;
+
+    Ok(rules
+        .into_iter()
+        .map(|rule| GoalFundingRuleInput {
+            account_id: rule.account_id,
+            share_percent: rule.share_percent,
+            tax_bucket: rule.tax_bucket,
+        })
+        .collect())
+}
 
 pub struct GoalRepository {
     pool: Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
@@ -90,8 +156,12 @@ impl GoalRepositoryTrait for GoalRepository {
                 let goal = Goal::from(result_db);
                 tx.insert(&payload_db)?;
 
+                if goal.status_lifecycle == "active" {
+                    validate_goal_funding_capacity(tx.conn(), &goal.id, &funding_rules)?;
+                }
+
                 for rule in funding_rules {
-                    let db = GoalsAllocationDB {
+                    let db = NewGoalsAllocationDB {
                         id: Uuid::new_v4().to_string(),
                         goal_id: goal.id.clone(),
                         account_id: rule.account_id,
@@ -104,7 +174,8 @@ impl GoalRepositoryTrait for GoalRepository {
                         .values(&db)
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    tx.insert(&db)?;
+                    let payload_db = GoalsAllocationDB::from(db);
+                    tx.insert(&payload_db)?;
                 }
 
                 Ok(goal)
@@ -114,6 +185,7 @@ impl GoalRepositoryTrait for GoalRepository {
 
     async fn update_goal(&self, goal_update: Goal) -> Result<Goal> {
         let goal_id_owned = goal_update.id.clone();
+        let next_status_lifecycle = goal_update.status_lifecycle.clone();
         let goal_db = GoalDB {
             id: goal_update.id,
             goal_type: goal_update.goal_type,
@@ -138,6 +210,17 @@ impl GoalRepositoryTrait for GoalRepository {
 
         self.writer
             .exec_tx(move |tx| -> Result<Goal> {
+                let current_status_lifecycle = goals::table
+                    .find(&goal_id_owned)
+                    .select(goals::status_lifecycle)
+                    .first::<String>(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                if current_status_lifecycle != "active" && next_status_lifecycle == "active" {
+                    let rules = load_goal_funding_inputs(tx.conn(), &goal_id_owned)?;
+                    validate_goal_funding_capacity(tx.conn(), &goal_id_owned, &rules)?;
+                }
+
                 diesel::update(goals::table.find(goal_id_owned.clone()))
                     .set(&goal_db)
                     .execute(tx.conn())
@@ -204,6 +287,8 @@ impl GoalRepositoryTrait for GoalRepository {
             .exec_tx(move |tx| -> Result<Vec<GoalFundingRule>> {
                 let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
+                validate_goal_funding_capacity(tx.conn(), &goal_id_owned, &rules)?;
+
                 // Load existing rules to track deletes for sync
                 let existing = goals_allocation::table
                     .filter(goals_allocation::goal_id.eq(&goal_id_owned))
@@ -226,7 +311,7 @@ impl GoalRepositoryTrait for GoalRepository {
                 // Insert new rules
                 let mut result = Vec::new();
                 for rule in rules {
-                    let db = GoalsAllocationDB {
+                    let db = NewGoalsAllocationDB {
                         id: Uuid::new_v4().to_string(),
                         goal_id: goal_id_owned.clone(),
                         account_id: rule.account_id,
@@ -239,8 +324,9 @@ impl GoalRepositoryTrait for GoalRepository {
                         .values(&db)
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    tx.insert(&db)?;
-                    result.push(GoalFundingRule::from(db));
+                    let payload_db = GoalsAllocationDB::from(db);
+                    tx.insert(&payload_db)?;
+                    result.push(GoalFundingRule::from(payload_db));
                 }
 
                 Ok(result)
@@ -277,7 +363,7 @@ impl GoalRepositoryTrait for GoalRepository {
                     .as_ref()
                     .map_or_else(|| now.clone(), |e| e.created_at.clone());
 
-                let plan_db = GoalPlanDB {
+                let plan_db = NewGoalPlanDB {
                     goal_id: plan.goal_id,
                     plan_kind: plan.plan_kind,
                     planner_mode: plan.planner_mode,

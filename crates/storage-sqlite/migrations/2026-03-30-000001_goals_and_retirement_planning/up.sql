@@ -51,7 +51,7 @@ CREATE TABLE goals_allocation_new (
     id TEXT NOT NULL PRIMARY KEY,
     goal_id TEXT NOT NULL,
     account_id TEXT NOT NULL,
-    share_percent REAL NOT NULL DEFAULT 0,
+    share_percent REAL NOT NULL DEFAULT 0 CHECK (share_percent >= 0 AND share_percent <= 100),
     tax_bucket TEXT,
     created_at TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT '',
@@ -60,10 +60,16 @@ CREATE TABLE goals_allocation_new (
 );
 
 INSERT INTO goals_allocation_new (id, goal_id, account_id, share_percent, created_at, updated_at)
-    SELECT id, goal_id, account_id, CAST(percent_allocation AS REAL),
+    SELECT MIN(id), goal_id, account_id,
+           CASE
+               WHEN SUM(CAST(percent_allocation AS REAL)) < 0 THEN 0
+               WHEN SUM(CAST(percent_allocation AS REAL)) > 100 THEN 100
+               ELSE SUM(CAST(percent_allocation AS REAL))
+           END,
            strftime('%Y-%m-%dT%H:%M:%SZ', 'now'),
            strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-    FROM goals_allocation;
+    FROM goals_allocation
+    GROUP BY goal_id, account_id;
 
 DROP TABLE goals_allocation;
 ALTER TABLE goals_allocation_new RENAME TO goals_allocation;

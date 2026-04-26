@@ -2,11 +2,17 @@
 //!
 //! Daily compounding for growth using actual calendar day counts,
 //! monthly contributions at end of month, annualReturn as decimal (0.07 = 7%).
-//!
-//! Ported from the frontend `save-up-math.ts`.
 
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
+
+use crate::errors::{Result, ValidationError};
+
+const MAX_SAVE_UP_AMOUNT: f64 = 1_000_000_000_000.0;
+const MAX_SAVE_UP_MONTHLY_CONTRIBUTION: f64 = 1_000_000_000.0;
+const MIN_SAVE_UP_ANNUAL_RETURN: f64 = -0.20;
+const MAX_SAVE_UP_ANNUAL_RETURN: f64 = 0.50;
+const MAX_SAVE_UP_HORIZON_MONTHS: i32 = 1200;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -81,6 +87,65 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
 fn months_between(start: NaiveDate, end: NaiveDate) -> i32 {
     let m = (end.year() - start.year()) * 12 + (end.month() as i32 - start.month() as i32);
     m.max(0)
+}
+
+fn invalid_save_up_input(message: impl Into<String>) -> crate::errors::Error {
+    ValidationError::InvalidInput(message.into()).into()
+}
+
+fn validate_finite_amount(label: &str, value: f64, min: f64, max: f64) -> Result<()> {
+    if value.is_finite() && value >= min && value <= max {
+        Ok(())
+    } else {
+        Err(invalid_save_up_input(format!(
+            "{label} must be between {min:.0} and {max:.0}"
+        )))
+    }
+}
+
+pub fn validate_save_up_input(input: &SaveUpInput) -> Result<()> {
+    validate_finite_amount(
+        "Current value",
+        input.current_value,
+        -MAX_SAVE_UP_AMOUNT,
+        MAX_SAVE_UP_AMOUNT,
+    )?;
+    validate_finite_amount(
+        "Target amount",
+        input.target_amount,
+        0.0,
+        MAX_SAVE_UP_AMOUNT,
+    )?;
+    validate_finite_amount(
+        "Monthly contribution",
+        input.monthly_contribution,
+        0.0,
+        MAX_SAVE_UP_MONTHLY_CONTRIBUTION,
+    )?;
+
+    if !input.expected_annual_return.is_finite()
+        || input.expected_annual_return < MIN_SAVE_UP_ANNUAL_RETURN
+        || input.expected_annual_return > MAX_SAVE_UP_ANNUAL_RETURN
+    {
+        return Err(invalid_save_up_input(format!(
+            "Expected annual return must be between {:.0}% and {:.0}%",
+            MIN_SAVE_UP_ANNUAL_RETURN * 100.0,
+            MAX_SAVE_UP_ANNUAL_RETURN * 100.0
+        )));
+    }
+
+    if let Some(target_date) = input.target_date.as_deref() {
+        let parsed = parse_date(target_date)
+            .ok_or_else(|| invalid_save_up_input("Target date must use YYYY-MM-DD"))?;
+        let now = chrono::Local::now().date_naive();
+        if months_between(now, parsed) > MAX_SAVE_UP_HORIZON_MONTHS {
+            return Err(invalid_save_up_input(
+                "Target date must be within 100 years",
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Advance a NaiveDate by one month (same day, clamped).
@@ -320,7 +385,7 @@ pub fn compute_save_up_overview(input: &SaveUpInput) -> SaveUpOverview {
             "off_track".to_string()
         };
 
-        let months = months_between(now, td);
+        let months = months_between(now, td).min(MAX_SAVE_UP_HORIZON_MONTHS);
         let traj = generate_projection_series(input, months);
 
         (projected, required, h, traj)
@@ -333,7 +398,7 @@ pub fn compute_save_up_overview(input: &SaveUpInput) -> SaveUpOverview {
     let projected_completion_date = if input.target_amount > 0.0 {
         let search_months = if let Some(td) = target_date {
             let m = months_between(now, td);
-            (m * 3).max(120)
+            (m * 3).clamp(120, MAX_SAVE_UP_HORIZON_MONTHS)
         } else {
             600 // 50 years
         };
@@ -492,6 +557,55 @@ mod tests {
         let overview = compute_save_up_overview(&input);
         assert_eq!(overview.health, "not_applicable");
         assert_eq!(overview.progress, 0.0);
+    }
+
+    #[test]
+    fn validate_save_up_input_rejects_unbounded_preview_work() {
+        let target_date = chrono::Local::now()
+            .date_naive()
+            .checked_add_months(chrono::Months::new((MAX_SAVE_UP_HORIZON_MONTHS + 1) as u32))
+            .unwrap()
+            .format("%Y-%m-%d")
+            .to_string();
+        let input = SaveUpInput {
+            current_value: 1000.0,
+            target_amount: 50_000.0,
+            target_date: Some(target_date),
+            monthly_contribution: 100.0,
+            expected_annual_return: 0.07,
+        };
+
+        assert!(validate_save_up_input(&input)
+            .expect_err("distant target dates should be rejected")
+            .to_string()
+            .contains("within 100 years"));
+    }
+
+    #[test]
+    fn validate_save_up_input_rejects_invalid_amounts_and_returns() {
+        let input = SaveUpInput {
+            current_value: 1000.0,
+            target_amount: f64::INFINITY,
+            target_date: Some("2030-01-01".to_string()),
+            monthly_contribution: 100.0,
+            expected_annual_return: 0.07,
+        };
+        assert!(validate_save_up_input(&input)
+            .expect_err("non-finite target should be rejected")
+            .to_string()
+            .contains("Target amount"));
+
+        let input = SaveUpInput {
+            current_value: 1000.0,
+            target_amount: 50_000.0,
+            target_date: Some("2030-01-01".to_string()),
+            monthly_contribution: 100.0,
+            expected_annual_return: 2.0,
+        };
+        assert!(validate_save_up_input(&input)
+            .expect_err("unbounded returns should be rejected")
+            .to_string()
+            .contains("Expected annual return"));
     }
 
     #[test]

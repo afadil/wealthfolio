@@ -102,6 +102,17 @@ async fn resolve_retirement_inputs(
     }
 }
 
+async fn run_retirement_blocking<T, F>(task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    tokio::task::spawn_blocking(task).await.map_err(|err| {
+        log::error!("Retirement calculation task failed: {err}");
+        format!("Retirement calculation task failed: {err}")
+    })
+}
+
 // ─── RetirementPlan-based commands ───────────────────────────────────────────
 
 #[tauri::command]
@@ -134,13 +145,10 @@ pub async fn run_retirement_monte_carlo(
     let n = normalize_sim_count(n_sims);
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_monte_carlo_with_mode_and_seed(
-        &plan,
-        current_portfolio,
-        n,
-        planner_mode,
-        seed,
-    ))
+    run_retirement_blocking(move || {
+        run_monte_carlo_with_mode_and_seed(&plan, current_portfolio, n, planner_mode, seed)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -153,11 +161,10 @@ pub async fn run_retirement_stress_tests(
 ) -> Result<Vec<StressTestResult>, String> {
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_stress_tests_with_mode(
-        &plan,
-        current_portfolio,
-        planner_mode,
-    ))
+    run_retirement_blocking(move || {
+        run_stress_tests_with_mode(&plan, current_portfolio, planner_mode)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -170,11 +177,10 @@ pub async fn run_retirement_scenario_analysis(
 ) -> Result<Vec<ScenarioResult>, String> {
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_scenario_analysis_with_mode(
-        &plan,
-        current_portfolio,
-        planner_mode,
-    ))
+    run_retirement_blocking(move || {
+        run_scenario_analysis_with_mode(&plan, current_portfolio, planner_mode)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -196,7 +202,7 @@ pub async fn run_retirement_sorr(
     } else {
         normalize_and_validate_plan(plan)?
     };
-    Ok(run_sorr(&plan, portfolio_at_fire, retirement_start_age))
+    run_retirement_blocking(move || run_sorr(&plan, portfolio_at_fire, retirement_start_age)).await
 }
 
 #[tauri::command]
@@ -210,10 +216,8 @@ pub async fn run_retirement_decision_sensitivity_map(
 ) -> Result<DecisionSensitivityMatrix, String> {
     let (plan, current_portfolio, planner_mode) =
         resolve_retirement_inputs(&state, &goal_id, planner_mode, plan, current_portfolio).await?;
-    Ok(run_decision_sensitivity_matrix_with_mode(
-        &plan,
-        current_portfolio,
-        planner_mode,
-        map,
-    ))
+    run_retirement_blocking(move || {
+        run_decision_sensitivity_matrix_with_mode(&plan, current_portfolio, planner_mode, map)
+    })
+    .await
 }

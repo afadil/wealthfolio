@@ -28,6 +28,8 @@ fn default_annual_volatility() -> f64 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RetirementPlan {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub personal: PersonalProfile,
     pub expenses: ExpenseBudget,
     pub income_streams: Vec<RetirementIncomeStream>,
@@ -78,8 +80,8 @@ pub fn normalize_retirement_plan_ages(plan: &mut RetirementPlan) {
 
 #[cfg(test)]
 mod tests {
-    use super::{age_from_birth_year_month, RetirementPlan};
-    use chrono::NaiveDate;
+    use super::{age_from_birth_year_month, normalize_retirement_plan_ages, RetirementPlan};
+    use chrono::{Datelike, Local, NaiveDate};
 
     #[test]
     fn derives_age_from_birth_year_month() {
@@ -126,6 +128,44 @@ mod tests {
         assert!(!serialized.contains("withdrawal"));
         assert!(!serialized.contains("safeWithdrawalRate"));
     }
+
+    #[test]
+    fn age_normalization_only_updates_current_age() {
+        let today = Local::now().date_naive();
+        let birth_year_month = format!("{}-{:02}", today.year() - 40, today.month());
+        let raw = format!(
+            r#"{{
+                "personal": {{
+                    "birthYearMonth": "{birth_year_month}",
+                    "currentAge": 1,
+                    "targetRetirementAge": 55,
+                    "planningHorizonAge": 90
+                }},
+                "expenses": {{ "items": [{{ "id": "living", "label": "Living", "monthlyAmount": 6000.0 }}] }},
+                "incomeStreams": [],
+                "investment": {{
+                    "preRetirementAnnualReturn": 0.057,
+                    "retirementAnnualReturn": 0.034,
+                    "annualInvestmentFeeRate": 0.006,
+                    "annualVolatility": 0.12,
+                    "inflationRate": 0.02,
+                    "monthlyContribution": 3000.0,
+                    "contributionGrowthRate": 0.02,
+                    "glidePath": null
+                }},
+                "tax": null,
+                "currency": "CAD"
+            }}"#
+        );
+        let mut plan: RetirementPlan = serde_json::from_str(&raw).expect("plan should parse");
+        let mut expected = serde_json::to_value(&plan).expect("plan should serialize");
+        expected["personal"]["currentAge"] = serde_json::Value::from(40);
+
+        normalize_retirement_plan_ages(&mut plan);
+
+        let actual = serde_json::to_value(&plan).expect("plan should serialize");
+        assert_eq!(actual, expected);
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -138,6 +178,10 @@ pub struct ExpenseBudget {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseBucket {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     pub monthly_amount: f64,
     pub inflation_rate: Option<f64>,
     pub start_age: Option<u32>,
