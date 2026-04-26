@@ -810,6 +810,7 @@ export function useAlternativeAssetActions({
     metadata: Record<string, string>,
     name?: string,
     notes?: string | null,
+    accountId?: string | null,
   ) => {
     if (!holding) return;
     await updateMetadataMutation.mutateAsync({
@@ -817,6 +818,7 @@ export function useAlternativeAssetActions({
       metadata,
       name,
       notes,
+      accountId,
     });
   };
 
@@ -849,6 +851,7 @@ export function useAlternativeAssetActions({
         currency: holding.currency,
         metadata: holding.metadata,
         notes: holding.notes,
+        accountId: holding.accountId,
       }
     : null;
 

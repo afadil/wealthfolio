@@ -11,6 +11,7 @@ import type {
   ImportHoldingsCsvResult,
   CheckHoldingsImportResult,
   SnapshotInfo,
+  LotView,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -128,6 +129,10 @@ export const getHolding = async (accountId: string, assetId: string): Promise<Ho
 
 export const getAssetHoldings = async (assetId: string): Promise<Holding[]> => {
   return invoke<Holding[]>("get_asset_holdings", { assetId });
+};
+
+export const getAssetLots = async (assetId: string): Promise<LotView[]> => {
+  return invoke<LotView[]>("get_asset_lots", { assetId });
 };
 
 export const getPortfolioAllocations = async (accountId: string): Promise<PortfolioAllocations> => {

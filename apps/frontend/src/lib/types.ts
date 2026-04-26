@@ -537,6 +537,19 @@ export interface Lot {
   acquisitionFees: number;
 }
 
+export interface LotView {
+  id: string;
+  accountId: string;
+  acquisitionDate: string;
+  originalQuantity: number;
+  remainingQuantity: number;
+  costPerUnit: number;
+  totalCostBasis: number;
+  fees: number;
+  isClosed: boolean;
+  closeDate?: string;
+}
+
 export interface Position {
   id: string;
   accountId: string;
@@ -565,7 +578,7 @@ export interface Holding {
   assetKind?: AssetKind | null;
   quantity: number;
   openDate?: string | Date | null;
-  lots?: Lot[] | null;
+  lotDetails?: LotView[] | null;
   localCurrency: string;
   baseCurrency: string;
   fxRate?: number | null;
@@ -784,6 +797,7 @@ export interface AccountValuation {
   costBasis: number;
   netContribution: number;
   calculatedAt: string;
+  alternativeMarketValue: number;
 }
 
 export interface AccountSummaryView {
@@ -1092,6 +1106,8 @@ export interface CreateAlternativeAssetRequest {
   metadata?: Record<string, string>;
   /** For liabilities: optional ID of the financed asset (UI-only linking) */
   linkedAssetId?: string;
+  /** Optional link to the account this asset belongs to */
+  accountId?: string;
 }
 
 /**
@@ -1267,6 +1283,8 @@ export interface AlternativeAssetHolding {
   linkedAssetId?: string;
   /** Asset notes */
   notes?: string | null;
+  /** Optional linked account ID */
+  accountId?: string | null;
 }
 
 /**

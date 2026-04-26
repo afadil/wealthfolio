@@ -20,6 +20,7 @@ import {
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { useAccounts } from "@/hooks/use-accounts";
 
 import { METAL_TYPES, LIABILITY_TYPES, WEIGHT_UNITS } from "./alternative-asset-quick-add-schema";
 import { useAlternativeAssetMutations } from "../hooks/use-alternative-asset-mutations";
@@ -117,6 +118,7 @@ interface FormData {
   liabilityType?: string;
   hasMortgage?: boolean;
   linkedAssetId?: string;
+  accountId?: string;
 }
 
 interface AlternativeAssetQuickAddModalProps {
@@ -154,6 +156,15 @@ export function AlternativeAssetQuickAddModal({
 }: AlternativeAssetQuickAddModalProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
+  const { accounts } = useAccounts();
+  const accountOptions = useMemo(
+    () =>
+      (accounts ?? []).map((a) => ({
+        value: a.id,
+        label: a.name,
+      })),
+    [accounts],
+  );
 
   const [step, setStep] = useState<1 | 2>(1);
   const [hasMortgageChecked, setHasMortgageChecked] = useState(false);
@@ -273,6 +284,7 @@ export function AlternativeAssetQuickAddModal({
       purchaseDate: formData.purchaseDate ? formatDateToISO(formData.purchaseDate) : undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       linkedAssetId: formData.linkedAssetId || undefined,
+      accountId: formData.accountId || undefined,
     };
 
     setHasMortgageChecked(formData.hasMortgage ?? false);
@@ -604,6 +616,23 @@ export function AlternativeAssetQuickAddModal({
                       />
                     </div>
                   )}
+
+                {/* Account link - optional for all alternative asset types */}
+                {accountOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-foreground text-sm font-medium">
+                      Account (optional)
+                    </Label>
+                    <ResponsiveSelect
+                      value={formData.accountId}
+                      onValueChange={(v) => updateFormData("accountId", v)}
+                      options={accountOptions}
+                      placeholder="Select account (optional)"
+                      sheetTitle="Link to Account"
+                      sheetDescription="Associate this asset with an account"
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

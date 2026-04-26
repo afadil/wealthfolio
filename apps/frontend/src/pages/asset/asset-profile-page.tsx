@@ -1,4 +1,4 @@
-import { createActivity, getAssetHoldings, getHolding } from "@/adapters";
+import { createActivity, getAssetHoldings, getAssetLots, getHolding } from "@/adapters";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useHapticFeedback } from "@/hooks";
@@ -107,6 +107,7 @@ interface AssetDetailData {
     strike?: number | null;
     expiration?: string | null;
   } | null;
+  instrumentType?: string | null;
 }
 
 type AssetTab = "overview" | "lots" | "history";
@@ -171,6 +172,13 @@ export const AssetProfilePage = () => {
   } = useQuery<Holding | null, Error>({
     queryKey: [QueryKeys.HOLDING, PORTFOLIO_ACCOUNT_ID, assetId],
     queryFn: () => getHolding(PORTFOLIO_ACCOUNT_ID, assetId),
+    enabled: !!assetId,
+  });
+
+  // Fetch all lots (open + closed) for this asset, used when holding has no lotDetails
+  const { data: assetLots } = useQuery({
+    queryKey: [QueryKeys.HOLDING, "lots", assetId],
+    queryFn: () => getAssetLots(assetId),
     enabled: !!assetId,
   });
 
@@ -487,8 +495,9 @@ export const AssetProfilePage = () => {
       quote: quoteData?.quote ?? null,
       bondSpec: bondSpec ?? null,
       optionSpec: optionSpec ?? null,
+      instrumentType: assetProfile?.instrumentType ?? null,
     };
-  }, [holding, quote, bondSpec, optionSpec]);
+  }, [holding, quote, bondSpec, optionSpec, assetProfile]);
 
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
@@ -506,14 +515,17 @@ export const AssetProfilePage = () => {
       items.push({ value: "overview", label: "Overview" });
     }
 
-    if (holding?.lots && holding.lots.length > 0) {
+    if (
+      (holding?.lotDetails && holding.lotDetails.length > 0) ||
+      (assetLots && assetLots.length > 0)
+    ) {
       items.push({ value: "lots", label: "Lots" });
     }
 
     items.push({ value: "history", label: "Quotes" });
 
     return items;
-  }, [profile, holding, isAltAsset]);
+  }, [profile, holding, assetLots, isAltAsset]);
 
   // Build swipable tabs for mobile
   const swipableTabs = useMemo(() => {
@@ -610,25 +622,34 @@ export const AssetProfilePage = () => {
             )}
 
             {overviewSubTab === "holdings" && (
-              <AssetAccountHoldings assetId={assetId} baseCurrency={baseCurrency} />
+              <AssetAccountHoldings
+                assetId={assetId}
+                baseCurrency={baseCurrency}
+                instrumentType={assetProfile?.instrumentType}
+              />
             )}
 
             {overviewSubTab === "snapshots" && (
-              <AssetSnapshotHistory assetId={assetId} baseCurrency={baseCurrency} />
+              <AssetSnapshotHistory
+                assetId={assetId}
+                baseCurrency={baseCurrency}
+                instrumentType={assetProfile?.instrumentType}
+              />
             )}
           </div>
         ),
       });
     }
 
-    if (holding?.lots && holding.lots.length > 0 && profile) {
+    const lotsToShow = holding?.lotDetails ?? assetLots ?? [];
+    if (lotsToShow.length > 0 && profile) {
       tabs.push({
         name: "Lots",
         content: (
           <AssetLotsTable
-            lots={holding.lots}
+            lotDetails={lotsToShow}
             currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
-            marketPrice={Number(holding.price ?? profile.marketPrice)}
+            marketPrice={Number(holding?.price ?? profile.marketPrice)}
           />
         ),
       });
@@ -1227,25 +1248,35 @@ export const AssetProfilePage = () => {
                 )}
 
                 {overviewSubTab === "holdings" && (
-                  <AssetAccountHoldings assetId={assetId} baseCurrency={baseCurrency} />
+                  <AssetAccountHoldings
+                    assetId={assetId}
+                    baseCurrency={baseCurrency}
+                    instrumentType={assetProfile?.instrumentType}
+                  />
                 )}
 
                 {overviewSubTab === "snapshots" && (
-                  <AssetSnapshotHistory assetId={assetId} baseCurrency={baseCurrency} />
+                  <AssetSnapshotHistory
+                    assetId={assetId}
+                    baseCurrency={baseCurrency}
+                    instrumentType={assetProfile?.instrumentType}
+                  />
                 )}
               </TabsContent>
             )}
 
-            {/* Lots Content: Requires profile and holding with lots */}
-            {profile && holding?.lots && holding.lots.length > 0 && (
-              <TabsContent value="lots" className="pt-6">
-                <AssetLotsTable
-                  lots={holding.lots}
-                  currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
-                  marketPrice={Number(holding.price ?? profile.marketPrice)}
-                />
-              </TabsContent>
-            )}
+            {/* Lots Content: from holding lotDetails, or fallback to standalone lots query */}
+            {profile &&
+              ((holding?.lotDetails && holding.lotDetails.length > 0) ||
+                (assetLots && assetLots.length > 0)) && (
+                <TabsContent value="lots" className="pt-6">
+                  <AssetLotsTable
+                    lotDetails={holding?.lotDetails ?? assetLots ?? []}
+                    currency={symbolHolding?.currency ?? profile.currency ?? baseCurrency}
+                    marketPrice={Number(holding?.price ?? profile.marketPrice)}
+                  />
+                </TabsContent>
+              )}
 
             {/* History/Quotes Content: Requires quoteHistory */}
             <TabsContent value="history" className="space-y-16 pt-6">

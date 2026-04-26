@@ -19,6 +19,7 @@ function performanceToValuations(metrics: SimplePerformanceMetrics[]): AccountVa
       costBasis: 0,
       netContribution: pm.totalValue ?? 0,
       calculatedAt: new_date.toISOString(),
+      alternativeMarketValue: 0,
     };
   });
 }

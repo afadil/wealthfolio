@@ -381,54 +381,33 @@ async fn run_portfolio_calculation(
         }
     }
 
-    // Calculate total portfolio snapshots
-    let snapshot_service = context.snapshot_service();
-    if let Err(err) = snapshot_service
-        .recalculate_total_portfolio_snapshots(snapshot_mode)
-        .await
-    {
-        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
-        error!("{}", err_msg);
-        let _ = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg);
-        return;
-    }
-
-    // Update position status from TOTAL snapshot
-    if let Ok(Some(total_snapshot)) =
-        snapshot_service.get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
-            total_snapshot
-                .positions
-                .iter()
-                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
-                .collect();
-
-        let quote_service = context.quote_service();
-        if let Err(e) = quote_service
-            .update_position_status_from_holdings(&current_holdings)
-            .await
-        {
-            warn!(
-                "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
-                e
-            );
+    // Update position status from lots for quote sync planning
+    match context.lots_repository.get_open_position_quantities().await {
+        Ok(current_holdings) => {
+            let quote_service = context.quote_service();
+            if let Err(e) = quote_service
+                .update_position_status_from_holdings(&current_holdings)
+                .await
+            {
+                warn!(
+                    "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            warn!("Failed to read position quantities from lots: {}", e);
         }
     }
 
-    // Ensure TOTAL is included in valuation calculation
-    if !account_ids_vec
-        .iter()
-        .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        account_ids_vec.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-    }
+    // Remove TOTAL — portfolio valuations are aggregated separately.
+    account_ids_vec.retain(|id| id != PORTFOLIO_TOTAL_ACCOUNT_ID);
 
     // Calculate valuation history for each account
     let valuation_service = context.valuation_service();
-    for account_id in account_ids_vec {
+    for account_id in &account_ids_vec {
         if let Err(err) = valuation_service
-            .calculate_valuation_history(&account_id, valuation_mode.clone())
+            .calculate_valuation_history(account_id, valuation_mode.clone())
             .await
         {
             let err_msg = format!(
@@ -438,6 +417,14 @@ async fn run_portfolio_calculation(
             warn!("{}", err_msg);
             let _ = app_handle.emit(PORTFOLIO_UPDATE_ERROR, &err_msg);
         }
+    }
+
+    // Aggregate per-account valuations into portfolio-level rows.
+    if let Err(err) = valuation_service
+        .calculate_valuation_history(PORTFOLIO_TOTAL_ACCOUNT_ID, valuation_mode)
+        .await
+    {
+        warn!("Portfolio valuation aggregation failed: {}", err);
     }
 
     // Emit completion event

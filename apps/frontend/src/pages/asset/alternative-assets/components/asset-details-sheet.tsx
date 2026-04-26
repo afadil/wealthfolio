@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAccounts } from "@/hooks/use-accounts";
 import {
   Sheet,
   SheetContent,
@@ -58,6 +59,7 @@ export interface AssetDetailsSheetAsset {
   currency: string;
   metadata?: Record<string, unknown>;
   notes?: string | null;
+  accountId?: string | null;
 }
 
 /** Represents a liability that can be linked from a property */
@@ -80,6 +82,7 @@ interface AssetDetailsSheetProps {
     metadata: Record<string, string>,
     name?: string,
     notes?: string | null,
+    accountId?: string | null,
   ) => Promise<void>;
   /** Optional: For displaying linked asset name for liabilities */
   linkedAssetName?: string;
@@ -116,9 +119,19 @@ export function AssetDetailsSheet({
 }: AssetDetailsSheetProps) {
   // Use a fallback kind for the form when asset is null (form state won't be used anyway)
   const assetKind = asset?.kind ?? AlternativeAssetKind.OTHER;
+  const isLiability = assetKind === AlternativeAssetKind.LIABILITY;
   const assetName = asset?.name ?? "";
   const assetMetadata = asset?.metadata;
   const assetNotes = asset?.notes;
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(asset?.accountId ?? "");
+  const { accounts } = useAccounts();
+  const accountOptions: ResponsiveSelectOption[] = useMemo(
+    () => [
+      { value: "__none__", label: "None" },
+      ...(accounts ?? []).map((a) => ({ value: a.id, label: a.name })),
+    ],
+    [accounts],
+  );
 
   const form = useForm<AssetDetailsFormValues>({
     resolver: zodResolver(assetDetailsSchema) as Resolver<AssetDetailsFormValues>,
@@ -129,6 +142,7 @@ export function AssetDetailsSheet({
   useEffect(() => {
     if (open && asset) {
       form.reset(getDefaultDetailsFormValues(asset.kind, asset.name, asset.metadata, asset.notes));
+      setSelectedAccountId(asset.accountId ?? "");
     }
   }, [open, asset, form]);
 
@@ -154,8 +168,15 @@ export function AssetDetailsSheet({
       const metadata = formValuesToMetadata(values);
       // Only pass name if it changed
       const nameChanged = values.name !== asset.name ? values.name : undefined;
+      // Pass accountId: empty string to clear, value to set, undefined if unchanged
+      const accountIdValue =
+        selectedAccountId === "__none__"
+          ? ""
+          : selectedAccountId !== (asset.accountId ?? "")
+            ? selectedAccountId
+            : undefined;
       // Pass notes separately (it goes to asset.notes, not metadata)
-      await onSave(asset.id, metadata, nameChanged, values.notes);
+      await onSave(asset.id, metadata, nameChanged, values.notes, accountIdValue);
       toast({
         title: "Details saved successfully",
         variant: "success",
@@ -324,7 +345,10 @@ export function AssetDetailsSheet({
 
             {/* Notes Section */}
             <div className="space-y-4">
-              <SectionHeader title="Notes" description="Additional information about this asset" />
+              <SectionHeader
+                title="Notes"
+                description={`Additional information about this ${isLiability ? "liability" : "asset"}`}
+              />
 
               <FormField
                 control={form.control}
@@ -333,7 +357,7 @@ export function AssetDetailsSheet({
                   <FormItem>
                     <FormControl>
                       <Textarea
-                        placeholder="Add any notes about this asset..."
+                        placeholder={`Add any notes about this ${isLiability ? "liability" : "asset"}...`}
                         className="min-h-[100px] resize-none"
                         value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value || null)}
@@ -344,6 +368,24 @@ export function AssetDetailsSheet({
                 )}
               />
             </div>
+
+            {/* Account Link */}
+            {accountOptions.length > 1 && (
+              <div className="space-y-4">
+                <SectionHeader
+                  title="Account"
+                  description={`Associate this ${isLiability ? "liability" : "asset"} with an account`}
+                />
+                <ResponsiveSelect
+                  value={selectedAccountId || "__none__"}
+                  onValueChange={(v) => setSelectedAccountId(v === "__none__" ? "" : v)}
+                  options={accountOptions}
+                  placeholder="Select account (optional)"
+                  sheetTitle="Link to Account"
+                  sheetDescription="Associate this asset with an account"
+                />
+              </div>
+            )}
 
             <SheetFooter className="gap-2 pt-4">
               <Button

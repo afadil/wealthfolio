@@ -14,6 +14,7 @@ use wealthfolio_connect::{
     ImportRunRepositoryTrait, TokenLifecycleState,
 };
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
+use wealthfolio_core::lots::LotRepositoryTrait;
 use wealthfolio_core::{
     accounts::AccountService,
     activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
@@ -53,6 +54,7 @@ use wealthfolio_storage_sqlite::{
     goals::GoalRepository,
     health::HealthDismissalRepository,
     limits::ContributionLimitRepository,
+    lots::LotsRepository,
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
     portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
     settings::SettingsRepository,
@@ -76,6 +78,7 @@ pub struct AppState {
     pub timezone: Arc<RwLock<String>>,
     pub snapshot_service: Arc<dyn SnapshotServiceTrait + Send + Sync>,
     pub snapshot_repository: Arc<SnapshotRepository>,
+    pub lots_repository: Arc<dyn LotRepositoryTrait + Send + Sync>,
     pub performance_service:
         Arc<dyn wealthfolio_core::portfolio::performance::PerformanceServiceTrait + Send + Sync>,
     pub income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
@@ -103,6 +106,10 @@ pub struct AppState {
     pub health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
     pub token_lifecycle: Arc<TokenLifecycleState>,
     pub custom_provider_service: Arc<wealthfolio_core::custom_provider::CustomProviderService>,
+    /// Global mutex to prevent concurrent portfolio recalculations.
+    /// Both the API (`enqueue_portfolio_job`) and the queue worker acquire this
+    /// before running a portfolio job.
+    pub portfolio_job_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 pub fn init_tracing() {
@@ -228,6 +235,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )?
         .with_event_sink(domain_event_sink.clone()),
     );
+    let lots_repository = Arc::new(LotsRepository::new(pool.clone(), writer.clone()));
+
     let snapshot_service = Arc::new(
         SnapshotService::new_with_timezone(
             base_currency.clone(),
@@ -238,14 +247,20 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             asset_repository.clone(),
             fx_service.clone(),
         )
+        .with_lot_repository(lots_repository.clone())
         .with_event_sink(domain_event_sink.clone()),
     );
 
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
-    let valuation_service = Arc::new(ValuationService::new(
+    let valuation_service = Arc::new(ValuationService::new_with_timezone(
         base_currency.clone(),
+        timezone.clone(),
         valuation_repository.clone(),
         snapshot_service.clone(),
+        lots_repository.clone(),
+        asset_repository.clone(),
+        account_repo.clone(),
+        activity_repository.clone(),
         quote_service.clone(),
         fx_service.clone(),
     ));
@@ -256,6 +271,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             account_repo.clone(),
             asset_repository.clone(),
             snapshot_repository.clone(),
+            lots_repository.clone(),
+            activity_repository.clone(),
             quote_service.clone(),
             valuation_repository.clone(),
             fx_service.clone(),
@@ -273,6 +290,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        lots_repository.clone(),
+        activity_repository.clone(),
         timezone.clone(),
     ));
 
@@ -363,6 +382,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )
         .with_event_sink(domain_event_sink.clone())
         .with_snapshot_service(snapshot_service.clone())
+        .with_lot_repository(lots_repository.clone())
         .with_quote_store(market_data_repository.clone()),
     );
 
@@ -422,6 +442,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let token_lifecycle = Arc::new(TokenLifecycleState::new());
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
+    let portfolio_job_lock = Arc::new(tokio::sync::Mutex::new(()));
+
     domain_event_sink.start_worker(
         asset_service.clone(),
         connect_sync_service.clone(),
@@ -435,6 +457,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         timezone.clone(),
         secret_store.clone(),
         token_lifecycle.clone(),
+        lots_repository.clone(),
+        portfolio_job_lock.clone(),
     );
 
     let addon_service: Arc<dyn AddonServiceTrait + Send + Sync> = Arc::new(AddonService::new(
@@ -461,6 +485,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         timezone,
         snapshot_service,
         snapshot_repository,
+        lots_repository,
         performance_service,
         income_service,
         goal_service,
@@ -487,5 +512,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         health_service,
         token_lifecycle,
         custom_provider_service,
+        portfolio_job_lock,
     }))
 }

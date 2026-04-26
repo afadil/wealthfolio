@@ -42,6 +42,9 @@ pub struct QueueWorkerDeps {
     pub secret_store: Arc<dyn SecretStore>,
     /// Shared token lifecycle state; must be the same instance used by API handlers.
     pub token_lifecycle: Arc<TokenLifecycleState>,
+    pub lots_repository: Arc<dyn wealthfolio_core::lots::LotRepositoryTrait + Send + Sync>,
+    /// Global portfolio job lock — shared with API handlers to prevent concurrent recalcs.
+    pub portfolio_job_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// Runs the event queue worker.
@@ -267,6 +270,9 @@ async fn run_portfolio_job(
     use wealthfolio_core::accounts::AccountServiceTrait;
     use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 
+    // Acquire the global portfolio job lock to prevent concurrent recalculations.
+    let _lock = deps.portfolio_job_lock.lock().await;
+
     let event_bus = deps.event_bus.clone();
 
     // Only perform market sync if the mode requires it
@@ -356,55 +362,33 @@ async fn run_portfolio_job(
         }
     }
 
-    if let Err(err) = deps
-        .snapshot_service
-        .recalculate_total_portfolio_snapshots(config.snapshot_mode)
-        .await
-    {
-        let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", err);
-        tracing::error!("{}", err_msg);
-        event_bus.publish(ServerEvent::with_payload(
-            PORTFOLIO_UPDATE_ERROR,
-            json!(err_msg),
-        ));
-        return;
-    }
 
-    // Update position status from TOTAL snapshot
-    if let Ok(Some(total_snapshot)) = deps
-        .snapshot_service
-        .get_latest_holdings_snapshot(PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        let current_holdings: std::collections::HashMap<String, rust_decimal::Decimal> =
-            total_snapshot
-                .positions
-                .iter()
-                .map(|(asset_id, position)| (asset_id.clone(), position.quantity))
-                .collect();
-
-        if let Err(e) = deps
-            .quote_service
-            .update_position_status_from_holdings(&current_holdings)
-            .await
-        {
-            tracing::warn!(
-                "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
-                e
-            );
+    // Update position status from lots for quote sync planning
+    match deps.lots_repository.get_open_position_quantities().await {
+        Ok(current_holdings) => {
+            if let Err(e) = deps
+                .quote_service
+                .update_position_status_from_holdings(&current_holdings)
+                .await
+            {
+                tracing::warn!(
+                    "Failed to update position status from holdings: {}. Quote sync planning may be affected.",
+                    e
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to read position quantities from lots: {}", e);
         }
     }
 
-    if !account_ids
-        .iter()
-        .any(|id| id == PORTFOLIO_TOTAL_ACCOUNT_ID)
-    {
-        account_ids.push(PORTFOLIO_TOTAL_ACCOUNT_ID.to_string());
-    }
+    // Remove TOTAL from the account list — portfolio valuations are aggregated separately.
+    account_ids.retain(|id| id != PORTFOLIO_TOTAL_ACCOUNT_ID);
 
-    for account_id in account_ids {
+    for account_id in &account_ids {
         if let Err(err) = deps
             .valuation_service
-            .calculate_valuation_history(&account_id, config.valuation_mode.clone())
+            .calculate_valuation_history(account_id, config.valuation_mode.clone())
             .await
         {
             let err_msg = format!(
@@ -417,6 +401,15 @@ async fn run_portfolio_job(
                 json!(err_msg),
             ));
         }
+    }
+
+    // Aggregate per-account valuations into portfolio-level rows.
+    if let Err(err) = deps
+        .valuation_service
+        .calculate_valuation_history(PORTFOLIO_TOTAL_ACCOUNT_ID, config.valuation_mode)
+        .await
+    {
+        tracing::warn!("Portfolio valuation aggregation failed: {}", err);
     }
 
     event_bus.publish(ServerEvent::new(PORTFOLIO_UPDATE_COMPLETE));

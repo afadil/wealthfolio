@@ -135,6 +135,7 @@ export {
   checkHoldingsImport,
   deleteSnapshot,
   getAssetHoldings,
+  getAssetLots,
   getHistoricalValuations,
   getHolding,
   getHoldings,
