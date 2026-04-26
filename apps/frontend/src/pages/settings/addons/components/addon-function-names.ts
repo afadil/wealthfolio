@@ -69,6 +69,8 @@ export const FUNCTION_DISPLAY_NAMES: Record<string, string> = {
   "financial-planning.getAll": "View financial goals",
   "financial-planning.create": "Create new goals",
   "financial-planning.update": "Modify goals",
+  "financial-planning.getFunding": "View goal funding",
+  "financial-planning.saveFunding": "Update goal funding",
   "financial-planning.updateAllocations": "Update goal allocations",
   "financial-planning.getAllocations": "View goal allocations",
 

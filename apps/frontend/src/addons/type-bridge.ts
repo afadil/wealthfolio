@@ -22,6 +22,7 @@ import type {
   ExchangeRate,
   Goal,
   GoalFundingRule,
+  GoalFundingRuleInput,
   Holding,
   HoldingsSnapshotInput,
   ImportActivitiesResult,
@@ -39,7 +40,11 @@ import type {
   UpdateAssetProfile,
 } from "@/lib/types";
 import type { HoldingInput } from "@/adapters";
-import type { HostAPI as SDKHostAPI } from "@wealthfolio/addon-sdk";
+import type {
+  Goal as SDKGoal,
+  GoalAllocation as SDKGoalAllocation,
+  HostAPI as SDKHostAPI,
+} from "@wealthfolio/addon-sdk";
 
 /**
  * Internal HostAPI interface that matches the actual command function signatures
@@ -68,9 +73,9 @@ export interface InternalHostAPI {
   // Goals
   getGoals(): Promise<Goal[]>;
   createGoal(goal: unknown): Promise<Goal>;
-  updateGoal(goal: Goal): Promise<Goal>;
+  updateGoal(goal: unknown): Promise<Goal>;
   getGoalFunding(goalId: string): Promise<GoalFundingRule[]>;
-  saveGoalFunding(goalId: string, rules: GoalFundingRule[]): Promise<GoalFundingRule[]>;
+  saveGoalFunding(goalId: string, rules: GoalFundingRuleInput[]): Promise<GoalFundingRule[]>;
 
   // Market data
   searchTicker(query: string): Promise<SymbolSearchResult[]>;
@@ -214,6 +219,68 @@ export function createSDKHostAPIBridge(
     debug: (message: string) => internalAPI.logDebug(`[${prefix}] ${message}`),
   });
 
+  const toSDKGoal = (goal: Goal): SDKGoal => ({
+    id: goal.id,
+    title: goal.title,
+    description: goal.description,
+    targetAmount: goal.targetAmount ?? goal.summaryTargetAmount ?? 0,
+    statusLifecycle: goal.statusLifecycle,
+  });
+
+  const toSDKGoalAllocation = (rule: GoalFundingRule): SDKGoalAllocation => ({
+    id: rule.id,
+    goalId: rule.goalId,
+    accountId: rule.accountId,
+    sharePercent: rule.sharePercent,
+    taxBucket: rule.taxBucket,
+  });
+
+  const toGoalFundingRuleInput = (allocation: SDKGoalAllocation): GoalFundingRuleInput => {
+    if (!Number.isFinite(allocation.sharePercent)) {
+      throw new Error("Goal allocation sharePercent must be a number");
+    }
+    return {
+      accountId: allocation.accountId,
+      sharePercent: allocation.sharePercent,
+      taxBucket: allocation.taxBucket,
+    };
+  };
+
+  const getGoalAllocations = async (): Promise<SDKGoalAllocation[]> => {
+    const goals = await internalAPI.getGoals();
+    const allocations = await Promise.all(goals.map((goal) => internalAPI.getGoalFunding(goal.id)));
+    return allocations.flat().map(toSDKGoalAllocation);
+  };
+
+  const getGoalFunding = async (goalId: string): Promise<SDKGoalAllocation[]> => {
+    const rules = await internalAPI.getGoalFunding(goalId);
+    return rules.map(toSDKGoalAllocation);
+  };
+
+  const saveGoalFunding = async (
+    goalId: string,
+    allocations: SDKGoalAllocation[],
+  ): Promise<SDKGoalAllocation[]> => {
+    const rules = await internalAPI.saveGoalFunding(
+      goalId,
+      allocations.map(toGoalFundingRuleInput),
+    );
+    return rules.map(toSDKGoalAllocation);
+  };
+
+  const updateGoalAllocations = async (allocations: SDKGoalAllocation[]): Promise<void> => {
+    const byGoalId = new Map<string, GoalFundingRuleInput[]>();
+    for (const allocation of allocations) {
+      const rules = byGoalId.get(allocation.goalId) ?? [];
+      rules.push(toGoalFundingRuleInput(allocation));
+      byGoalId.set(allocation.goalId, rules);
+    }
+
+    await Promise.all(
+      Array.from(byGoalId, ([goalId, rules]) => internalAPI.saveGoalFunding(goalId, rules)),
+    );
+  };
+
   return {
     accounts: {
       getAll: internalAPI.getAccounts,
@@ -276,11 +343,13 @@ export function createSDKHostAPIBridge(
       calculateDeposits: internalAPI.calculateDepositsForLimit,
     },
     goals: {
-      getAll: internalAPI.getGoals as never,
-      create: internalAPI.createGoal as never,
-      update: internalAPI.updateGoal as never,
-      getFunding: internalAPI.getGoalFunding as never,
-      saveFunding: internalAPI.saveGoalFunding as never,
+      getAll: async () => (await internalAPI.getGoals()).map(toSDKGoal),
+      create: async (goal) => toSDKGoal(await internalAPI.createGoal(goal)),
+      update: async (goal) => toSDKGoal(await internalAPI.updateGoal(goal)),
+      getFunding: getGoalFunding,
+      saveFunding: saveGoalFunding,
+      getAllocations: getGoalAllocations,
+      updateAllocations: updateGoalAllocations,
     },
     settings: {
       get: internalAPI.getSettings,

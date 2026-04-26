@@ -434,12 +434,27 @@ export interface GoalsAPI {
   getFunding(goalId: string): Promise<GoalAllocation[]>;
 
   /**
+   * Get funding rules across all goals
+   * @deprecated Use getAll() and getFunding(goalId). This compatibility shim will be removed in a future major version.
+   * @returns Promise resolving to array of funding rules
+   */
+  getAllocations(): Promise<GoalAllocation[]>;
+
+  /**
    * Save funding rules for a goal
    * @param goalId Goal ID
    * @param rules Array of funding rule inputs
    * @returns Promise resolving to saved rules
    */
   saveFunding(goalId: string, rules: GoalAllocation[]): Promise<GoalAllocation[]>;
+
+  /**
+   * Save funding rules grouped by goalId
+   * @deprecated Use saveFunding(goalId, rules). This compatibility shim will be removed in a future major version.
+   * @param allocations Array of funding rules
+   * @returns Promise resolving when funding rules are saved
+   */
+  updateAllocations(allocations: GoalAllocation[]): Promise<void>;
 }
 
 /**
