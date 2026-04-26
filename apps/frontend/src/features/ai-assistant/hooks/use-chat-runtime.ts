@@ -633,6 +633,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
             threadId: threadIdRef.current ?? undefined,
             parentMessageId: editParentIdRef.current ?? undefined,
             attachments: attachmentPayloads.length > 0 ? attachmentPayloads : undefined,
+            locale: navigator.language,
           },
           signal,
         )) {

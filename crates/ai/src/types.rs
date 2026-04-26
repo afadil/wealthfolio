@@ -875,6 +875,10 @@ pub struct SendMessageRequest {
     /// File attachments (CSV, images, PDFs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
+    /// BCP 47 locale tag from the client (e.g. "fr-FR", "en-US").
+    /// When set, the assistant responds in that language.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locale: Option<String>,
 }
 
 /// A file attachment sent with a chat message.
