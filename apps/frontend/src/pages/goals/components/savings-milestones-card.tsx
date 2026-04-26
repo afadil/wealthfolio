@@ -1,7 +1,9 @@
+import type { SaveUpProjectionPointDTO } from "@/lib/types";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import type { ProjectionPoint } from "../lib/save-up-math";
+
+type ProjectionPoint = SaveUpProjectionPointDTO;
 
 export interface SavingsMilestone {
   ratio: number;

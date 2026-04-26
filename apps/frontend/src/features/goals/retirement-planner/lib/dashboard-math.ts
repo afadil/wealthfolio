@@ -1,3 +1,129 @@
+import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "./constants";
+import { activeExpenseItems } from "./expense-items";
+import type { RetirementIncomeStream, RetirementPlan } from "../types";
+
+export type PlannerMode = "fire" | "traditional";
+
+export function modeLabel(mode: PlannerMode) {
+  return {
+    target: mode === "fire" ? "FIRE Target" : "Retirement Target",
+    targetNet: mode === "fire" ? "FIRE Target (net)" : "Retirement Target (net)",
+    estAge: mode === "fire" ? "Projected FI Age" : "Target Retirement Age",
+    progress: mode === "fire" ? "FIRE Progress" : "Retirement Progress",
+    coast: "Coast FIRE",
+    budgetAt: "Retirement spending coverage",
+    prefix: mode === "fire" ? "FIRE" : "Retirement",
+    targetAge: mode === "fire" ? "Desired retirement age" : "Retirement age",
+    horizonAge: mode === "fire" ? "Plan through age" : "Life expectancy",
+  };
+}
+
+export function boundedInflationFactor(rate: number, years: number) {
+  return Math.max(0.01, Math.pow(1 + rate, Math.max(0, years)));
+}
+
+export function projectedAnnualExpenseNominalAtAge(plan: RetirementPlan, age: number) {
+  const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+  return activeExpenseItems(plan.expenses, age).reduce((sum, item) => {
+    const rate = item.inflationRate ?? plan.investment.inflationRate;
+    return sum + item.monthlyAmount * 12 * Math.pow(1 + rate, yearsFromNow);
+  }, 0);
+}
+
+function projectedDcMonthlyPayout(
+  stream: RetirementIncomeStream,
+  currentAge: number,
+  retirementAge: number,
+  defaultAccumulationReturn: number,
+) {
+  if (stream.startAge <= currentAge) {
+    const fallback = (Math.max(0, stream.currentValue ?? 0) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
+    return Math.max(0, stream.monthlyAmount ?? fallback);
+  }
+  const totalYears = Math.max(0, stream.startAge - currentAge);
+  const contribYears = Math.max(0, Math.min(stream.startAge, retirementAge) - currentAge);
+  const growthOnlyYears = totalYears - contribYears;
+  const r = stream.accumulationReturn ?? defaultAccumulationReturn;
+  const initial = stream.currentValue ?? 0;
+  const monthly = stream.monthlyContribution ?? 0;
+  const fvLump = initial * Math.pow(1 + r, totalYears);
+  const monthlyGrowth = Math.pow(Math.max(0.01, 1 + r), 1 / 12);
+  const monthlyReturn = monthlyGrowth - 1;
+  const annualContributionEndValue =
+    Math.abs(monthlyReturn) <= 1e-9
+      ? monthly * 12
+      : (monthly * (Math.pow(monthlyGrowth, 12) - 1)) / monthlyReturn;
+  const fvAnnuityAtStop =
+    r > 1e-9
+      ? (annualContributionEndValue * (Math.pow(1 + r, contribYears) - 1)) / r
+      : monthly * 12 * contribYears;
+  const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
+  return ((fvLump + fvAnnuity) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
+}
+
+export function projectedAnnualIncomeNominalAtAge(
+  plan: RetirementPlan,
+  age: number,
+  retirementAge: number,
+) {
+  const yearsFromNow = Math.max(0, age - plan.personal.currentAge);
+
+  return plan.incomeStreams.reduce((sum, stream) => {
+    if (age < stream.startAge) return sum;
+
+    const baseMonthly =
+      stream.streamType === "dc"
+        ? projectedDcMonthlyPayout(
+            stream,
+            plan.personal.currentAge,
+            retirementAge,
+            plan.investment.preRetirementAnnualReturn,
+          )
+        : (stream.monthlyAmount ?? 0);
+    const annual = baseMonthly * 12;
+
+    if (stream.annualGrowthRate !== undefined) {
+      return sum + annual * Math.pow(1 + stream.annualGrowthRate, yearsFromNow);
+    }
+    if (stream.adjustForInflation) {
+      return sum + annual * Math.pow(1 + plan.investment.inflationRate, yearsFromNow);
+    }
+    return sum + annual;
+  }, 0);
+}
+
+export function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: RetirementIncomeStream) {
+  if (stream.streamType === "dc") {
+    return projectedDcMonthlyPayout(
+      stream,
+      plan.personal.currentAge,
+      plan.personal.targetRetirementAge,
+      plan.investment.preRetirementAnnualReturn,
+    );
+  }
+  return stream.monthlyAmount ?? 0;
+}
+
+export function incomeAgeRangeLabel(stream: RetirementIncomeStream, horizonAge: number) {
+  return `Age ${stream.startAge} → ${horizonAge}`;
+}
+
+export function isIncomeActiveAtAge(stream: RetirementIncomeStream, age: number) {
+  return age >= stream.startAge;
+}
+
+export function coverageTimingLabel(
+  isActive: boolean,
+  startAge: number | undefined,
+  endAge: number | undefined,
+  age: number,
+) {
+  if (isActive) return null;
+  if (startAge !== undefined && age < startAge) return `Starts at ${startAge}`;
+  if (endAge !== undefined && age >= endAge) return `Ended at ${endAge}`;
+  return "Not active";
+}
+
 interface CoverageSnapshotLike {
   phase?: string;
   plannedExpenses?: number;

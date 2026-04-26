@@ -29,6 +29,7 @@ export const QueryKeys = {
   retirementOverview: (id: string) => [QueryKeys.RETIREMENT_OVERVIEW, id],
   SAVE_UP_OVERVIEW: "saveUpOverview",
   saveUpOverview: (id: string) => [QueryKeys.SAVE_UP_OVERVIEW, id],
+  SAVE_UP_PREVIEW: "saveUpPreview",
 
   // Settings related keys
   SETTINGS: "settings",

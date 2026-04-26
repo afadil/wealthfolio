@@ -1,3 +1,4 @@
+import type { SaveUpProjectionPointDTO } from "@/lib/types";
 import { formatCompactAmount } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import {
@@ -11,9 +12,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ProjectionPoint } from "../lib/save-up-math";
 
-// Keep in sync with the ±delta used by generateProjectionSeries in save-up-math.ts.
+type ProjectionPoint = SaveUpProjectionPointDTO;
+
+// Keep in sync with the +/- range used by crates/core/src/planning/save_up.rs.
 const RANGE_RATE_DELTA = 0.02;
 
 function formatRate(rate: number) {

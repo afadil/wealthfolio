@@ -106,6 +106,7 @@ export {
   getGoals,
   getRetirementOverview,
   getSaveUpOverview,
+  previewSaveUpOverview,
   refreshAllGoalSummaries,
   refreshGoalSummary,
   saveGoalFunding,

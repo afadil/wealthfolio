@@ -782,23 +782,27 @@ function MonteCarloFanChart({
   showMedianFiLine?: boolean;
   goalLabel?: string;
 }) {
-  const chartData = result.ageAxis.map((age, index) => {
-    const p10 = result.percentiles.p10[index] ?? 0;
-    const p25 = result.percentiles.p25[index] ?? p10;
-    const p50 = result.percentiles.p50[index] ?? p10;
-    const p75 = result.percentiles.p75[index] ?? p50;
-    const p90 = result.percentiles.p90[index] ?? p50;
-    return {
-      age,
-      p10,
-      p25,
-      p50,
-      p75,
-      p90,
-      p10Base: p10,
-      p10ToP90: Math.max(0, p90 - p10),
-    };
-  });
+  const chartData = useMemo(
+    () =>
+      result.ageAxis.map((age, index) => {
+        const p10 = result.percentiles.p10[index] ?? 0;
+        const p25 = result.percentiles.p25[index] ?? p10;
+        const p50 = result.percentiles.p50[index] ?? p10;
+        const p75 = result.percentiles.p75[index] ?? p50;
+        const p90 = result.percentiles.p90[index] ?? p50;
+        return {
+          age,
+          p10,
+          p25,
+          p50,
+          p75,
+          p90,
+          p10Base: p10,
+          p10ToP90: Math.max(0, p90 - p10),
+        };
+      }),
+    [result.ageAxis, result.percentiles],
+  );
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -1206,8 +1210,8 @@ function DecisionHeatmap({
   flatColumnHint?: string;
   ageMetricLabel: string;
 }) {
-  const range = matrixDeltaRange(matrix);
-  const baseline = matrixBaselineCell(matrix);
+  const range = useMemo(() => matrixDeltaRange(matrix), [matrix]);
+  const baseline = useMemo(() => matrixBaselineCell(matrix), [matrix]);
 
   return (
     <div className="overflow-x-auto px-3 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
@@ -1789,7 +1793,7 @@ function useRiskLabQueries({
   const autoMapsKeyRef = useRef<string | null>(null);
 
   const stressQuery = useQuery({
-    queryKey: ["retirement-risk-lab-stress", goalId, plannerMode, planKey, plan, portfolioNow],
+    queryKey: ["retirement-risk-lab-stress", goalId, plannerMode, planKey, portfolioNow],
     queryFn: () => runRetirementStressTests(plan, portfolioNow, plannerMode, goalId),
     enabled: canRunRiskLab,
     staleTime: 5 * 60 * 1000,
@@ -1802,7 +1806,6 @@ function useRiskLabQueries({
       goalId,
       plannerMode,
       planKey,
-      plan,
       portfolioNow,
     ],
     queryFn: () =>
@@ -1824,7 +1827,6 @@ function useRiskLabQueries({
       goalId,
       plannerMode,
       planKey,
-      plan,
       portfolioNow,
     ],
     queryFn: () =>
@@ -1845,7 +1847,6 @@ function useRiskLabQueries({
       goalId,
       plannerMode,
       planKey,
-      plan,
       portfolioNow,
       monteCarloSims,
     ],
@@ -1867,7 +1868,6 @@ function useRiskLabQueries({
       "retirement-risk-lab-early-crash-paths",
       goalId,
       planKey,
-      plan,
       portfolioAtRetirementStart,
       retirementStartAge,
     ],

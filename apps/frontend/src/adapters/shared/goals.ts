@@ -8,6 +8,7 @@ import type {
   RetirementOverview,
   SaveGoalPlan,
   SaveUpOverviewDTO,
+  SaveUpPreviewInputDTO,
 } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
@@ -137,6 +138,17 @@ export const getSaveUpOverview = async (goalId: string): Promise<SaveUpOverviewD
     return await invoke<SaveUpOverviewDTO>("get_save_up_overview", { goalId });
   } catch (error) {
     logger.error("Error fetching save-up overview.");
+    throw error;
+  }
+};
+
+export const previewSaveUpOverview = async (
+  input: SaveUpPreviewInputDTO,
+): Promise<SaveUpOverviewDTO> => {
+  try {
+    return await invoke<SaveUpOverviewDTO>("preview_save_up_overview", { input });
+  } catch (error) {
+    logger.error("Error previewing save-up overview.");
     throw error;
   }
 };

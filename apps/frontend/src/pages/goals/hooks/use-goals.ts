@@ -1,29 +1,14 @@
-import { getGoals, createGoal, updateGoal, deleteGoal, refreshAllGoalSummaries } from "@/adapters";
+import { createGoal, deleteGoal, getGoals, updateGoal } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Goal, NewGoal } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 export function useGoals() {
-  const queryClient = useQueryClient();
-  const hasRefreshed = useRef(false);
-
   const query = useQuery<Goal[], Error>({
     queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
   });
-
-  // Refresh summaries once on first load to ensure persisted summary fields are current.
-  // After this, the domain event pipeline keeps them up to date.
-  useEffect(() => {
-    if (query.data && query.data.length > 0 && !hasRefreshed.current) {
-      hasRefreshed.current = true;
-      refreshAllGoalSummaries().then(() => {
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.GOALS] });
-      });
-    }
-  }, [query.data, queryClient]);
 
   const nonArchived = query.data?.filter((g) => g.statusLifecycle === "active");
   const atRisk =

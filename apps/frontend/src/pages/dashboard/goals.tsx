@@ -3,6 +3,7 @@ import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { QueryKeys } from "@/lib/query-keys";
 import type { Goal } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { cn, formatCompactAmount } from "@wealthfolio/ui";
@@ -63,7 +64,7 @@ export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
   const { data: goals, isLoading } = useQuery<Goal[], Error>({
-    queryKey: ["goals"],
+    queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
   });
 

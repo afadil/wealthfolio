@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { getAccounts, getLatestValuations, getHoldings } from "@/adapters";
+import { QueryKeys } from "@/lib/query-keys";
 import type { Holding } from "@/lib/types";
 
 export function usePortfolioData(accountIds?: string[]) {
   const accountsQuery = useQuery({
-    queryKey: ["fire-planner-accounts"],
+    queryKey: [QueryKeys.ACCOUNTS],
     queryFn: () => getAccounts(),
     staleTime: 10 * 60 * 1000,
   });
@@ -17,14 +18,14 @@ export function usePortfolioData(accountIds?: string[]) {
   ).map((a) => a.id);
 
   const valuationsQuery = useQuery({
-    queryKey: ["fire-planner-valuations", activeAccountIds],
+    queryKey: [QueryKeys.latestValuations, activeAccountIds],
     queryFn: () => getLatestValuations(activeAccountIds),
     enabled: activeAccountIds.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
   const holdingsQuery = useQuery({
-    queryKey: ["fire-planner-holdings", activeAccountIds],
+    queryKey: [QueryKeys.HOLDINGS, activeAccountIds],
     queryFn: async (): Promise<Holding[]> => {
       if (activeAccountIds.length === 0) return [];
       const perAccount = await Promise.all(activeAccountIds.map((id) => getHoldings(id)));

@@ -352,7 +352,7 @@ export function AppLauncher() {
       },
       {
         title: "Manage Goals",
-        href: "/settings/goals",
+        href: "/goals",
         icon: <Icons.Goal className="size-6" />,
         keywords: ["goals", "manage", "edit", "settings"],
         label: "Manage Goals",

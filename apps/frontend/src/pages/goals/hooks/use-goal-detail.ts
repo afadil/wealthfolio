@@ -2,6 +2,7 @@ import {
   getGoal,
   getGoalFunding,
   getGoalPlan,
+  previewSaveUpOverview,
   getRetirementOverview,
   getSaveUpOverview,
   saveGoalFunding,
@@ -17,6 +18,7 @@ import type {
   RetirementOverview,
   SaveGoalPlan,
   SaveUpOverviewDTO,
+  SaveUpPreviewInputDTO,
 } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
@@ -105,5 +107,13 @@ export function useSaveUpOverview(goalId: string | undefined) {
     queryKey: QueryKeys.saveUpOverview(goalId ?? ""),
     queryFn: () => getSaveUpOverview(goalId!),
     enabled: !!goalId,
+  });
+}
+
+export function useSaveUpPreview(input: SaveUpPreviewInputDTO | null) {
+  return useQuery<SaveUpOverviewDTO, Error>({
+    queryKey: [QueryKeys.SAVE_UP_PREVIEW, input],
+    queryFn: () => previewSaveUpOverview(input!),
+    enabled: !!input,
   });
 }

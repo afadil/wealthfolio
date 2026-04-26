@@ -2086,11 +2086,19 @@ export interface SaveUpOverviewDTO {
   currentValue: number;
   targetAmount: number;
   progress: number;
-  health: string;
+  health: GoalHealth;
   projectedValueAtTargetDate: number;
   requiredMonthlyContribution: number;
   projectedCompletionDate: string | null;
   trajectory: SaveUpTrajectoryPointDTO[];
+}
+
+export interface SaveUpPreviewInputDTO {
+  currentValue: number;
+  targetAmount: number;
+  targetDate: string | null;
+  monthlyContribution: number;
+  expectedAnnualReturn: number;
 }
 
 export interface SaveUpTrajectoryPointDTO {
@@ -2099,4 +2107,8 @@ export interface SaveUpTrajectoryPointDTO {
   optimistic: number;
   pessimistic: number;
   target: number;
+}
+
+export interface SaveUpProjectionPointDTO extends SaveUpTrajectoryPointDTO {
+  range: [number, number];
 }

@@ -76,6 +76,7 @@ export default function GoalDetailPage() {
 
   const { goal, plan, fundingRules, isLoading, error } = useGoalDetail(goalId);
   const { savePlanMutation } = useGoalPlanMutations(goalId ?? "");
+  const { mutate: savePlan, isPending: planCreationPending } = savePlanMutation;
   const { deleteMutation } = useGoalMutations();
   const { settings } = useSettingsContext();
 
@@ -114,7 +115,6 @@ export default function GoalDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // On setup, auto-create the retirement plan
-  const planCreationPending = savePlanMutation.isPending;
   useEffect(() => {
     if (isSetup && goalId && !plan && !planCreationPending) {
       if (isRetirement || setupMode) {
@@ -141,7 +141,7 @@ export default function GoalDetailPage() {
             ),
           },
         };
-        savePlanMutation.mutate({
+        savePlan({
           goalId,
           planKind: "retirement",
           plannerMode: mode,
@@ -149,13 +149,24 @@ export default function GoalDetailPage() {
         });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSetup, goalId, plan, isRetirement, setupMode, planCreationPending]);
+  }, [
+    baseCurrency,
+    goalId,
+    isRetirement,
+    isSetup,
+    plan,
+    planCreationPending,
+    savePlan,
+    setupBirthYearMonth,
+    setupCurrentAge,
+    setupMode,
+    setupRetirementAge,
+  ]);
 
   const handleSaveRetirementPlan = useCallback(
     (updated: RetirementPlan, nextPlannerMode?: PlannerMode) => {
       if (!goalId) return;
-      savePlanMutation.mutate(
+      savePlan(
         {
           goalId,
           planKind: "retirement",
@@ -171,7 +182,7 @@ export default function GoalDetailPage() {
         },
       );
     },
-    [baseCurrency, goalId, plan?.plannerMode, savePlanMutation],
+    [baseCurrency, goalId, plan?.plannerMode, savePlan],
   );
 
   const [editOpen, setEditOpen] = useState(false);

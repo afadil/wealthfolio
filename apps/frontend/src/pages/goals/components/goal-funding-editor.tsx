@@ -213,12 +213,8 @@ export function GoalFundingEditor({
   }, [fundingRules]);
 
   useEffect(() => {
-    resetDraft();
-  }, [resetDraft]);
-
-  useEffect(() => {
-    if (editing === false && dirty) resetDraft();
-  }, [dirty, editing, resetDraft]);
+    if (!isEditing) resetDraft();
+  }, [isEditing, resetDraft]);
 
   const participatingGoals = useMemo(
     () => goals.filter((goal) => goal.statusLifecycle === "active"),
@@ -238,25 +234,21 @@ export function GoalFundingEditor({
     })),
   });
 
-  const otherFundingRules: OtherGoalFundingRule[] = useMemo(
-    () =>
-      otherFundingQueries.flatMap((query, index) => {
-        const goal = otherGoals[index];
-        return (query.data ?? []).map((rule) => ({
-          ...rule,
-          goalTitle: goal?.title ?? "Goal",
-        }));
-      }),
-    [otherFundingQueries, otherGoals],
-  );
+  const otherFundingRules: OtherGoalFundingRule[] = otherFundingQueries.flatMap((query, index) => {
+    const goal = otherGoals[index];
+    return (query.data ?? []).map((rule) => ({
+      ...rule,
+      goalTitle: goal?.title ?? "Goal",
+    }));
+  });
 
-  const otherShareByAccount = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const rule of otherFundingRules) {
-      totals.set(rule.accountId, (totals.get(rule.accountId) ?? 0) + rule.sharePercent);
-    }
-    return totals;
-  }, [otherFundingRules]);
+  const otherShareByAccount = new Map<string, number>();
+  for (const rule of otherFundingRules) {
+    otherShareByAccount.set(
+      rule.accountId,
+      (otherShareByAccount.get(rule.accountId) ?? 0) + rule.sharePercent,
+    );
+  }
 
   const allocationRows = useMemo<AccountAllocationRow[]>(() => {
     return activeAccounts
@@ -296,14 +288,11 @@ export function GoalFundingEditor({
   );
   const hasInvalidAllocations = invalidAllocationRows.length > 0;
 
-  const addAccount = useCallback(
-    (accountId: string) => {
-      const maxForThisGoal = Math.max(0, 100 - (otherShareByAccount.get(accountId) ?? 0));
-      setSharePercents((prev) => new Map(prev).set(accountId, Math.min(100, maxForThisGoal)));
-      setDirty(true);
-    },
-    [otherShareByAccount],
-  );
+  const addAccount = (accountId: string) => {
+    const maxForThisGoal = Math.max(0, 100 - (otherShareByAccount.get(accountId) ?? 0));
+    setSharePercents((prev) => new Map(prev).set(accountId, Math.min(100, maxForThisGoal)));
+    setDirty(true);
+  };
 
   const removeAccount = useCallback((accountId: string) => {
     setSharePercents((prev) => {
@@ -370,15 +359,11 @@ export function GoalFundingEditor({
     [activeAccounts, sharePercents],
   );
 
-  const availableAccounts = useMemo(
-    () =>
-      activeAccounts.filter(
-        (a) =>
-          !sharePercents.has(a.id) &&
-          !dcLinkedSet.has(a.id) &&
-          (otherShareByAccount.get(a.id) ?? 0) < 100 - SHARE_EPSILON,
-      ),
-    [activeAccounts, sharePercents, dcLinkedSet, otherShareByAccount],
+  const availableAccounts = activeAccounts.filter(
+    (a) =>
+      !sharePercents.has(a.id) &&
+      !dcLinkedSet.has(a.id) &&
+      (otherShareByAccount.get(a.id) ?? 0) < 100 - SHARE_EPSILON,
   );
 
   const allocationGoalColumns = useMemo(() => {

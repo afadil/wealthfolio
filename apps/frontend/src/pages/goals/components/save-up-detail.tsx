@@ -1,18 +1,18 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useSettingsContext } from "@/lib/settings-provider";
-import type { Goal, GoalPlan, SaveUpOverviewDTO } from "@/lib/types";
+import type {
+  Goal,
+  GoalPlan,
+  SaveUpOverviewDTO,
+  SaveUpPreviewInputDTO,
+  SaveUpProjectionPointDTO,
+} from "@/lib/types";
 import { AmountDisplay, Button, DatePickerInput, MoneyInput } from "@wealthfolio/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useGoalPlanMutations } from "../hooks/use-goal-detail";
+import { useGoalPlanMutations, useSaveUpPreview } from "../hooks/use-goal-detail";
 import { useGoalMutations } from "../hooks/use-goals";
-import {
-  generateProjectionSeries,
-  projectSaveUp,
-  type ProjectionPoint,
-  type SaveUpProjection,
-} from "../lib/save-up-math";
 import { GoalFundingEditor } from "./goal-funding-editor";
 import { SaveUpProjectionCard } from "./save-up-projection-card";
 import { buildSavingsMilestones, SavingsMilestonesCard } from "./savings-milestones-card";
@@ -29,10 +29,37 @@ interface SaveUpPlanSettings {
 function parseSaveUpSettings(plan: GoalPlan | null | undefined): SaveUpPlanSettings {
   if (!plan?.settingsJson || plan.planKind !== "save_up") return {};
   try {
-    return JSON.parse(plan.settingsJson);
+    const parsed: unknown = JSON.parse(plan.settingsJson);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const settings = parsed as Record<string, unknown>;
+    return {
+      targetDate: typeof settings.targetDate === "string" ? settings.targetDate : undefined,
+      targetAmount: typeof settings.targetAmount === "number" ? settings.targetAmount : undefined,
+      monthlyContribution:
+        typeof settings.monthlyContribution === "number" ? settings.monthlyContribution : undefined,
+      plannedMonthlyContribution:
+        typeof settings.plannedMonthlyContribution === "number"
+          ? settings.plannedMonthlyContribution
+          : undefined,
+      expectedAnnualReturn:
+        typeof settings.expectedAnnualReturn === "number"
+          ? settings.expectedAnnualReturn
+          : undefined,
+    };
   } catch {
     return {};
   }
+}
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timeout);
+  }, [delay, value]);
+
+  return debouncedValue;
 }
 
 interface Props {
@@ -63,7 +90,6 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
   const [annualReturn, setAnnualReturn] = useState(initialAnnualReturn);
 
   const [isEditingPlan, setIsEditingPlan] = useState(false);
-  const useBackendOverview = !isEditingPlan && !!overview;
   const displayProgress = targetAmount > 0 ? Math.min(currentValue / targetAmount, 1) : progress;
   const remainingNow = Math.max(targetAmount - currentValue, 0);
   const isPlanDirty =
@@ -88,69 +114,49 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistedPlanKey]);
 
-  const projection: SaveUpProjection | null = useMemo(() => {
-    // Use backend overview for saved state, but recompute locally while editing.
-    if (useBackendOverview && overview) {
-      return {
-        projectedValue: overview.projectedValueAtTargetDate,
-        requiredMonthly: overview.requiredMonthlyContribution,
-        projectedCompletionDate: overview.projectedCompletionDate,
-        health: overview.health as SaveUpProjection["health"],
-      };
-    }
-    if (!targetDate || !targetAmount) return null;
-    return projectSaveUp({
-      currentAmount: currentValue,
-      targetAmount,
-      targetDate,
-      monthlyContribution,
-      annualReturn,
-    });
-  }, [
-    useBackendOverview,
-    overview,
-    currentValue,
-    targetAmount,
-    targetDate,
-    monthlyContribution,
-    annualReturn,
-  ]);
+  const previewInput = useMemo<SaveUpPreviewInputDTO | null>(
+    () =>
+      isEditingPlan
+        ? {
+            currentValue,
+            targetAmount,
+            targetDate: targetDate || null,
+            monthlyContribution,
+            expectedAnnualReturn: annualReturn,
+          }
+        : null,
+    [annualReturn, currentValue, isEditingPlan, monthlyContribution, targetAmount, targetDate],
+  );
+  const debouncedPreviewInput = useDebouncedValue(previewInput, 250);
+  const previewQuery = useSaveUpPreview(debouncedPreviewInput);
+  const previewPending =
+    isEditingPlan &&
+    (previewInput !== debouncedPreviewInput || previewQuery.isFetching || previewQuery.isLoading);
+  const previewUnavailable = isEditingPlan && !!debouncedPreviewInput && previewQuery.isError;
+  const projection: SaveUpOverviewDTO | null = isEditingPlan
+    ? (previewQuery.data ?? null)
+    : (overview ?? null);
 
-  const chartData: ProjectionPoint[] = useMemo(() => {
-    const raw =
-      useBackendOverview && overview?.trajectory?.length
-        ? overview.trajectory
-        : !targetDate || !targetAmount
-          ? []
-          : generateProjectionSeries({
-              currentAmount: currentValue,
-              targetAmount,
-              targetDate,
-              monthlyContribution,
-              annualReturn,
-            });
-    // Replace the constant `target` field with a linearly-interpolated required
-    // path from the starting balance → target amount. Renders as a diagonal
-    // dashed line that shows where you'd need to be on each date to stay on plan.
-    if (raw.length === 0 || !targetAmount) return raw;
+  const savePending = savePlanMutation.isPending;
+  const actionPending = savePending || previewPending || previewUnavailable;
+  const actionPendingLabel = previewUnavailable
+    ? "Preview failed"
+    : previewPending
+      ? "Previewing..."
+      : "Saving...";
+
+  const chartData: SaveUpProjectionPointDTO[] = useMemo(() => {
+    const raw = projection?.trajectory ?? [];
+    if (raw.length === 0 || !targetAmount) return [];
+
     const start = raw[0]?.nominal ?? currentValue;
     const span = Math.max(1, raw.length - 1);
     return raw.map((p, i) => ({
       ...p,
       target: start + (targetAmount - start) * (i / span),
-      // Range band: [pessimistic, optimistic] — Recharts Area renders the band
-      // between the two values when dataKey yields a tuple.
       range: [p.pessimistic, p.optimistic] as [number, number],
     }));
-  }, [
-    useBackendOverview,
-    overview,
-    currentValue,
-    targetAmount,
-    targetDate,
-    monthlyContribution,
-    annualReturn,
-  ]);
+  }, [projection, currentValue, targetAmount]);
 
   const handleSave = useCallback(() => {
     const settings: SaveUpPlanSettings = {
@@ -173,7 +179,7 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
       targetDate: targetDate || undefined,
       summaryCurrentValue: currentValue,
       summaryProgress: prog,
-      projectedValueAtTargetDate: projection?.projectedValue,
+      projectedValueAtTargetDate: projection?.projectedValueAtTargetDate,
       projectedCompletionDate: projection?.projectedCompletionDate ?? undefined,
       statusHealth: projection?.health ?? "not_applicable",
     });
@@ -206,8 +212,10 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
     targetDate,
     projection,
   });
-  const projectedGap = projection ? projection.projectedValue - targetAmount : null;
-  const monthlyDifference = projection ? projection.requiredMonthly - monthlyContribution : null;
+  const projectedGap = projection ? projection.projectedValueAtTargetDate - targetAmount : null;
+  const monthlyDifference = projection
+    ? projection.requiredMonthlyContribution - monthlyContribution
+    : null;
   const monthlyDifferenceLabel =
     monthlyDifference === null || Math.abs(monthlyDifference) < 0.5
       ? "Monthly difference"
@@ -332,7 +340,7 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
         {projection && monthlyDifference !== null && (
           <MonthlyPlanCallout
             currentMonthly={monthlyContribution}
-            neededMonthly={projection.requiredMonthly}
+            neededMonthly={projection.requiredMonthlyContribution}
             monthlyDifference={monthlyDifference}
             monthlyDifferenceLabel={monthlyDifferenceLabel}
             monthlyDifferenceClass={monthlyDifferenceClass}
@@ -382,7 +390,8 @@ export default function SaveUpDetailPage({ goal, plan, overview }: Props) {
           onSave={handleSave}
           onCancel={handleCancelEdit}
           dirty={isPlanDirty}
-          pending={savePlanMutation.isPending}
+          pending={actionPending}
+          pendingLabel={actionPendingLabel}
           readContent={
             <div className="divide-border divide-y">
               <SidebarRow label="Target amount">
@@ -481,7 +490,7 @@ function getSaveUpStatus({
   currentValue: number;
   targetAmount: number;
   targetDate: string;
-  projection: SaveUpProjection | null;
+  projection: SaveUpOverviewDTO | null;
 }): SaveUpStatus {
   const dateLabel = formatGoalDate(targetDate) ?? "your target date";
 
@@ -654,6 +663,7 @@ function SidebarCard({
   onCancel,
   dirty,
   pending,
+  pendingLabel,
   readContent,
   editContent,
 }: {
@@ -665,6 +675,7 @@ function SidebarCard({
   onCancel: () => void;
   dirty: boolean;
   pending: boolean;
+  pendingLabel?: string;
   readContent: React.ReactNode;
   editContent: React.ReactNode;
 }) {
@@ -674,7 +685,7 @@ function SidebarCard({
         Cancel
       </Button>
       <Button size="sm" className="h-7 text-xs" onClick={onSave} disabled={!dirty || pending}>
-        {pending ? "Saving..." : "Save"}
+        {pending ? (pendingLabel ?? "Saving...") : "Save"}
       </Button>
     </div>
   );
