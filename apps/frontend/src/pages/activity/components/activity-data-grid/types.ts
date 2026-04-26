@@ -18,6 +18,8 @@ export interface LocalTransaction extends ActivityDetails {
   isExternal?: boolean;
   /** Original asset symbol from server - used to detect symbol changes for updates */
   _originalAssetSymbol?: string;
+  /** Original exchange MIC from server - used to detect exchange changes for updates */
+  _originalExchangeMic?: string;
   /** Original asset ID from server - sent for updates when symbol hasn't changed */
   _originalAssetId?: string;
 }
@@ -45,6 +47,7 @@ export function toLocalTransaction(activity: ActivityDetails): LocalTransaction 
     isExternal,
     // Capture original values for change detection during updates
     _originalAssetSymbol: activity.assetSymbol,
+    _originalExchangeMic: activity.exchangeMic,
     _originalAssetId: activity.assetId,
   };
 }

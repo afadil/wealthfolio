@@ -369,6 +369,8 @@ describe("activity-utils", () => {
           isNew: false,
           assetSymbol: "VWRPL.XC",
           _originalAssetSymbol: "VWRPL.XC",
+          exchangeMic: "XLON",
+          _originalExchangeMic: "XLON",
           _originalAssetId: "asset-1",
           pendingQuoteCcy: "GBP",
           pendingInstrumentType: "EQUITY",
@@ -394,6 +396,44 @@ describe("activity-utils", () => {
           instrumentType: "EQUITY",
         }),
       );
+    });
+
+    it("should re-resolve the asset when only exchange changes", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "existing-1",
+          isNew: false,
+          assetSymbol: "FBTC",
+          _originalAssetSymbol: "FBTC",
+          exchangeMic: "XTSE",
+          _originalExchangeMic: "XNEO",
+          _originalAssetId: "asset-fbtc-neo",
+          pendingQuoteCcy: "CAD",
+          pendingInstrumentType: "EQUITY",
+        }),
+      ];
+      const dirtyIds = new Set(["existing-1"]);
+
+      const result = buildSavePayload(
+        transactions,
+        dirtyIds,
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates).toHaveLength(1);
+      expect(result.updates[0].symbol).toEqual(
+        expect.objectContaining({
+          symbol: "FBTC",
+          exchangeMic: "XTSE",
+          quoteCcy: "CAD",
+          instrumentType: "EQUITY",
+        }),
+      );
+      expect(result.updates[0].symbol?.id).toBeUndefined();
     });
 
     it("should normalize optional symbol fields and avoid empty string payload values", () => {

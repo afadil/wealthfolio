@@ -21,9 +21,9 @@ use crate::activities::{
     ImportRun, ImportRunMode, ImportRunRepositoryTrait, ImportRunSummary, ImportRunType, ReviewMode,
 };
 use crate::assets::{
-    normalize_quote_ccy_code, parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix,
-    resolve_quote_ccy_precedence, symbol_resolution_candidates, AssetKind, AssetServiceTrait,
-    InstrumentType, QuoteCcyResolutionSource, QuoteMode,
+    canonicalize_market_identity, normalize_quote_ccy_code, parse_crypto_pair_symbol,
+    parse_symbol_with_exchange_suffix, resolve_quote_ccy_precedence, symbol_resolution_candidates,
+    AssetKind, AssetServiceTrait, InstrumentType, QuoteCcyResolutionSource, QuoteMode,
 };
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::currency::{get_normalization_rule, normalize_amount, resolve_currency};
@@ -1044,6 +1044,70 @@ impl ActivityService {
         (AssetKind::Investment, Some(InstrumentType::Equity))
     }
 
+    fn asset_matches_submitted_identity(
+        &self,
+        asset_id: &str,
+        submitted_symbol: Option<&str>,
+        submitted_exchange_mic: Option<&str>,
+        submitted_instrument_type: Option<&InstrumentType>,
+        submitted_quote_ccy: Option<&str>,
+    ) -> bool {
+        let has_explicit_identity = submitted_symbol
+            .map(str::trim)
+            .filter(|symbol| !symbol.is_empty())
+            .is_some()
+            || submitted_exchange_mic
+                .map(str::trim)
+                .filter(|mic| !mic.is_empty())
+                .is_some()
+            || submitted_instrument_type.is_some();
+
+        if !has_explicit_identity {
+            return true;
+        }
+
+        let Ok(existing_asset) = self.asset_service.get_asset_by_id(asset_id) else {
+            return false;
+        };
+
+        let submitted_identity = canonicalize_market_identity(
+            submitted_instrument_type.cloned(),
+            submitted_symbol,
+            submitted_exchange_mic,
+            submitted_quote_ccy,
+        );
+        let existing_identity = canonicalize_market_identity(
+            existing_asset.instrument_type.clone(),
+            existing_asset
+                .instrument_symbol
+                .as_deref()
+                .or(existing_asset.display_code.as_deref()),
+            existing_asset.instrument_exchange_mic.as_deref(),
+            Some(existing_asset.quote_ccy.as_str()),
+        );
+
+        if submitted_instrument_type.is_some()
+            && existing_asset.instrument_type.as_ref() != submitted_instrument_type
+        {
+            return false;
+        }
+
+        if submitted_identity.instrument_symbol != existing_identity.instrument_symbol {
+            return false;
+        }
+
+        match submitted_instrument_type {
+            Some(InstrumentType::Crypto | InstrumentType::Fx) => {
+                submitted_identity.quote_ccy == existing_identity.quote_ccy
+            }
+            Some(InstrumentType::Option) => true,
+            _ => {
+                submitted_identity.instrument_exchange_mic
+                    == existing_identity.instrument_exchange_mic
+            }
+        }
+    }
+
     /// Finds an existing asset by instrument fields, searching all assets.
     fn find_existing_asset_id(
         &self,
@@ -1225,6 +1289,25 @@ impl ActivityService {
         } else {
             Some(base_symbol.to_string())
         };
+
+        if let Some(symbol_id) = activity
+            .get_symbol_id()
+            .filter(|id| !id.trim().is_empty())
+            .map(str::to_string)
+        {
+            let should_keep_symbol_id = self.asset_matches_submitted_identity(
+                &symbol_id,
+                normalized_symbol_for_lookup.as_deref(),
+                exchange_mic.as_deref(),
+                effective_instrument_type.as_ref(),
+                quote_ccy_input.as_deref(),
+            );
+            if !should_keep_symbol_id {
+                if let Some(symbol_input) = activity.symbol.as_mut() {
+                    symbol_input.id = None;
+                }
+            }
+        }
 
         match symbol.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(raw_symbol) => {

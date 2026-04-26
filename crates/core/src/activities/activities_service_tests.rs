@@ -609,8 +609,13 @@ mod tests {
 
     #[async_trait]
     impl ActivityRepositoryTrait for MockActivityRepository {
-        fn get_activity(&self, _activity_id: &str) -> Result<Activity> {
-            unimplemented!()
+        fn get_activity(&self, activity_id: &str) -> Result<Activity> {
+            let stored = self.activities.lock().unwrap();
+            stored
+                .iter()
+                .find(|activity| activity.id == activity_id)
+                .cloned()
+                .ok_or_else(|| crate::errors::Error::Unexpected("Activity not found".to_string()))
         }
 
         fn get_activities(&self) -> Result<Vec<Activity>> {
@@ -695,8 +700,31 @@ mod tests {
             Ok(activity)
         }
 
-        async fn update_activity(&self, _activity_update: ActivityUpdate) -> Result<Activity> {
-            unimplemented!()
+        async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
+            let mut stored = self.activities.lock().unwrap();
+            let asset_id = activity_update.get_symbol_id().map(|s| s.to_string());
+            let activity = stored
+                .iter_mut()
+                .find(|activity| activity.id == activity_update.id)
+                .ok_or_else(|| crate::errors::Error::Unexpected("Activity not found".to_string()))?;
+
+            activity.account_id = activity_update.account_id;
+            activity.asset_id = asset_id;
+            activity.activity_type = activity_update.activity_type;
+            activity.subtype = activity_update.subtype;
+            activity.currency = activity_update.currency;
+            activity.quantity = activity_update.quantity.flatten();
+            activity.unit_price = activity_update.unit_price.flatten();
+            activity.amount = activity_update.amount.flatten();
+            activity.fee = activity_update.fee.flatten();
+            activity.fx_rate = activity_update.fx_rate.flatten();
+            activity.notes = activity_update.notes;
+            activity.metadata = activity_update
+                .metadata
+                .and_then(|raw| serde_json::from_str(&raw).ok());
+            activity.updated_at = Utc::now();
+
+            Ok(activity.clone())
         }
 
         async fn delete_activity(&self, _activity_id: String) -> Result<Activity> {
@@ -5151,5 +5179,102 @@ mod tests {
             Some("aapl-opt-uuid".to_string()),
             "OCC symbol should match existing option asset"
         );
+    }
+
+    #[tokio::test]
+    async fn test_update_activity_rebinds_asset_when_symbol_id_conflicts_with_exchange_change() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+
+        account_service.add_account(create_test_account("acc-1", "CAD"));
+
+        let neo_asset = create_test_asset_with_instrument(
+            "asset-fbtc-neo",
+            "FBTC",
+            Some("XNEO"),
+            Some(InstrumentType::Equity),
+            "CAD",
+        );
+        let tsx_asset = create_test_asset_with_instrument(
+            "asset-fbtc-tsx",
+            "FBTC",
+            Some("XTSE"),
+            Some(InstrumentType::Equity),
+            "CAD",
+        );
+        asset_service.add_asset(neo_asset.clone());
+        asset_service.add_asset(tsx_asset.clone());
+
+        activity_repository.activities.lock().unwrap().push(Activity {
+            id: "activity-1".to_string(),
+            account_id: "acc-1".to_string(),
+            asset_id: Some(neo_asset.id.clone()),
+            activity_type: "BUY".to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: ActivityStatus::Posted,
+            activity_date: Utc::now(),
+            settlement_date: None,
+            quantity: Some(dec!(1)),
+            unit_price: Some(dec!(10)),
+            amount: Some(dec!(10)),
+            fee: Some(dec!(0)),
+            currency: "CAD".to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            needs_review: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        });
+
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository,
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        );
+
+        let updated = activity_service
+            .update_activity(ActivityUpdate {
+                id: "activity-1".to_string(),
+                account_id: "acc-1".to_string(),
+                symbol: Some(SymbolInput {
+                    id: Some(neo_asset.id.clone()),
+                    symbol: Some("FBTC".to_string()),
+                    exchange_mic: Some("XTSE".to_string()),
+                    instrument_type: Some("EQUITY".to_string()),
+                    quote_ccy: Some("CAD".to_string()),
+                    quote_mode: Some("MARKET".to_string()),
+                    ..Default::default()
+                }),
+                activity_type: "BUY".to_string(),
+                subtype: None,
+                activity_date: "2026-04-25".to_string(),
+                quantity: Some(Some(dec!(1))),
+                unit_price: Some(Some(dec!(10))),
+                currency: "CAD".to_string(),
+                fee: Some(Some(dec!(0))),
+                amount: Some(Some(dec!(10))),
+                status: Some(ActivityStatus::Posted),
+                notes: None,
+                fx_rate: None,
+                metadata: None,
+            })
+            .await
+            .expect("update should succeed");
+
+        assert_eq!(updated.asset_id.as_deref(), Some(tsx_asset.id.as_str()));
     }
 }

@@ -513,10 +513,15 @@ export function buildSavePayload(
       if (!isCash) {
         const currentSymbol = (transaction.assetSymbol || "").trim().toUpperCase();
         const originalSymbol = (transaction._originalAssetSymbol || "").trim().toUpperCase();
+        const currentExchangeMic = normalizeOptionalString(transaction.exchangeMic)?.toUpperCase();
+        const originalExchangeMic =
+          normalizeOptionalString(transaction._originalExchangeMic)?.toUpperCase();
         const symbolChanged = currentSymbol !== originalSymbol;
+        const exchangeChanged = currentExchangeMic !== originalExchangeMic;
+        const assetIdentityChanged = symbolChanged || exchangeChanged;
 
-        if (symbolChanged && currentSymbol) {
-          // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
+        if (assetIdentityChanged && currentSymbol) {
+          // Asset identity changed: send symbol + exchangeMic for backend to re-resolve the asset
           const symbolInput = {
             symbol: currentSymbol,
             exchangeMic: normalizeOptionalString(transaction.exchangeMic),
@@ -530,7 +535,7 @@ export function buildSavePayload(
             ...symbolInput,
           };
         } else if (transaction._originalAssetId) {
-          // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
+          // Asset identity unchanged: send existing asset ID with quoteMode to allow mode updates
           updatePayload.symbol = {
             id: transaction._originalAssetId,
             quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
