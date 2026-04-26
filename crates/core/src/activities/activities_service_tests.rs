@@ -706,7 +706,9 @@ mod tests {
             let activity = stored
                 .iter_mut()
                 .find(|activity| activity.id == activity_update.id)
-                .ok_or_else(|| crate::errors::Error::Unexpected("Activity not found".to_string()))?;
+                .ok_or_else(|| {
+                    crate::errors::Error::Unexpected("Activity not found".to_string())
+                })?;
 
             activity.account_id = activity_update.account_id;
             activity.asset_id = asset_id;
@@ -5207,35 +5209,39 @@ mod tests {
         asset_service.add_asset(neo_asset.clone());
         asset_service.add_asset(tsx_asset.clone());
 
-        activity_repository.activities.lock().unwrap().push(Activity {
-            id: "activity-1".to_string(),
-            account_id: "acc-1".to_string(),
-            asset_id: Some(neo_asset.id.clone()),
-            activity_type: "BUY".to_string(),
-            activity_type_override: None,
-            source_type: None,
-            subtype: None,
-            status: ActivityStatus::Posted,
-            activity_date: Utc::now(),
-            settlement_date: None,
-            quantity: Some(dec!(1)),
-            unit_price: Some(dec!(10)),
-            amount: Some(dec!(10)),
-            fee: Some(dec!(0)),
-            currency: "CAD".to_string(),
-            fx_rate: None,
-            notes: None,
-            metadata: None,
-            source_system: None,
-            source_record_id: None,
-            source_group_id: None,
-            idempotency_key: None,
-            import_run_id: None,
-            is_user_modified: false,
-            needs_review: false,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        });
+        activity_repository
+            .activities
+            .lock()
+            .unwrap()
+            .push(Activity {
+                id: "activity-1".to_string(),
+                account_id: "acc-1".to_string(),
+                asset_id: Some(neo_asset.id.clone()),
+                activity_type: "BUY".to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: Utc::now(),
+                settlement_date: None,
+                quantity: Some(dec!(1)),
+                unit_price: Some(dec!(10)),
+                amount: Some(dec!(10)),
+                fee: Some(dec!(0)),
+                currency: "CAD".to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: None,
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            });
 
         let quote_service = Arc::new(MockQuoteService);
         let activity_service = ActivityService::new(

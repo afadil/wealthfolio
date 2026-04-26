@@ -514,8 +514,9 @@ export function buildSavePayload(
         const currentSymbol = (transaction.assetSymbol || "").trim().toUpperCase();
         const originalSymbol = (transaction._originalAssetSymbol || "").trim().toUpperCase();
         const currentExchangeMic = normalizeOptionalString(transaction.exchangeMic)?.toUpperCase();
-        const originalExchangeMic =
-          normalizeOptionalString(transaction._originalExchangeMic)?.toUpperCase();
+        const originalExchangeMic = normalizeOptionalString(
+          transaction._originalExchangeMic,
+        )?.toUpperCase();
         const symbolChanged = currentSymbol !== originalSymbol;
         const exchangeChanged = currentExchangeMic !== originalExchangeMic;
         const assetIdentityChanged = symbolChanged || exchangeChanged;
