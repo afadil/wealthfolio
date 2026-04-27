@@ -116,8 +116,8 @@ export default function GoalDetailPage() {
 
   // On setup, auto-create the retirement plan
   useEffect(() => {
-    if (isSetup && goalId && !plan && !planCreationPending) {
-      if (isRetirement || setupMode) {
+    if (isSetup && goalId && goal && !isLoading && !plan && !planCreationPending) {
+      if (isRetirement) {
         const mode = (setupMode ?? "traditional") as "fire" | "traditional";
         const currentAge =
           (setupBirthYearMonth ? ageFromBirthYearMonth(setupBirthYearMonth) : undefined) ??
@@ -151,9 +151,11 @@ export default function GoalDetailPage() {
     }
   }, [
     baseCurrency,
+    goal,
     goalId,
     isRetirement,
     isSetup,
+    isLoading,
     plan,
     planCreationPending,
     savePlan,
