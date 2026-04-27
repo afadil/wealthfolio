@@ -329,8 +329,9 @@ export function RebalancingTab({
       }
     }
 
-    // Add actual spending from recommendations
+    // Add actual spending from BUY recommendations only
     for (const rec of plan.recommendations) {
+      if (rec.action === "SELL") continue;
       const summary = summaries.get(rec.categoryId);
       if (summary) {
         summary.suggestedBuy += rec.totalAmount;
@@ -357,6 +358,7 @@ export function RebalancingTab({
     const groups = new Map<string, typeof plan.recommendations>();
 
     for (const rec of plan.recommendations) {
+      if (rec.action === "SELL") continue; // SELL recs shown separately
       if (!groups.has(rec.categoryId)) {
         groups.set(rec.categoryId, []);
       }
@@ -457,10 +459,18 @@ export function RebalancingTab({
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Rebalancing Suggestions</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Rebalancing Suggestions</h2>
+              {activeTarget?.rebalanceMode && (
+                <span className="text-muted-foreground bg-muted rounded-full px-2.5 py-0.5 text-xs">
+                  {activeTarget.rebalanceMode === "buy_only" ? "Buy only" : "Buy & Sell"}
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground text-sm">
-              Enter the cash amount you want to invest and get buy recommendations to reach your
-              target allocation.
+              {activeTarget?.rebalanceMode === "buy_and_sell"
+                ? "Enter new cash to invest. Overweight positions will be sold and proceeds redeployed."
+                : "Enter the cash amount you want to invest and get buy recommendations to reach your target allocation."}
             </p>
           </div>
           {deviationReport && (
@@ -477,7 +487,9 @@ export function RebalancingTab({
         <div className="border-border bg-card space-y-4 rounded-lg border p-4">
           <div>
             <label htmlFor="available-cash" className="mb-3 block text-sm font-semibold">
-              Available Cash to Invest
+              {activeTarget?.rebalanceMode === "buy_and_sell"
+                ? "Additional Cash to Invest"
+                : "Available Cash to Invest"}
             </label>
             <div className="flex gap-2">
               <span className="text-muted-foreground flex items-center text-sm">
@@ -515,8 +527,46 @@ export function RebalancingTab({
           </Button>
         </div>
 
-        {/* Results Section - Allocation Plan */}
-        {plan && plan.recommendations.length > 0 && (
+        {/* Sell Recommendations (buy_and_sell mode only) */}
+        {plan && plan.totalSellAmount > 0 && (
+          <div className="border-border bg-card space-y-3 rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold">Positions to Sell</h3>
+              <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                {formatAmount(plan.totalSellAmount, baseCurrency)} proceeds
+              </span>
+            </div>
+            <div className="space-y-1">
+              {plan.recommendations
+                .filter((r) => r.action === "SELL")
+                .map((rec, idx) => (
+                  <div
+                    key={`sell-${rec.assetId}-${idx}`}
+                    className="bg-muted/30 flex items-center justify-between rounded px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{rec.name || rec.symbol}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {rec.categoryName} ·{" "}
+                        {rec.shares > 0
+                          ? `${rec.shares.toFixed(0)} shares × ${formatAmount(rec.pricePerShare, baseCurrency)}`
+                          : "Category-level"}
+                      </p>
+                    </div>
+                    <span className="ml-4 shrink-0 font-semibold text-orange-600 dark:text-orange-400">
+                      −{formatAmount(rec.totalAmount, baseCurrency)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Proceeds will be redeployed into underweight positions below.
+            </p>
+          </div>
+        )}
+
+        {/* Results Section - Allocation Plan (BUY recommendations) */}
+        {plan && plan.recommendations.filter((r) => r.action !== "SELL").length > 0 && (
           <div className="border-border bg-card space-y-4 rounded-lg border p-4">
             {/* Allocation Plan Header with View Toggle */}
             <div className="flex items-center justify-between">

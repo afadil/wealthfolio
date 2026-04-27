@@ -7,11 +7,12 @@ interface HealthStripProps {
   deviations: AllocationDeviation[];
   currency: string;
   totalValue: number;
+  rebalanceMode?: "buy_only" | "buy_and_sell";
 }
 
 const BAND_THRESHOLD = 5;
 
-export function HealthStrip({ deviations, currency, totalValue }: HealthStripProps) {
+export function HealthStrip({ deviations, currency, totalValue, rebalanceMode }: HealthStripProps) {
   const { inBand, withTargets, buyPriority, takeProfits, toDeployAmount } = useMemo(() => {
     const withTargets = deviations.filter((d) => d.targetPercent > 0);
     const inBand = withTargets.filter((d) => Math.abs(d.deviationPercent) < BAND_THRESHOLD);
@@ -197,7 +198,11 @@ export function HealthStrip({ deviations, currency, totalValue }: HealthStripPro
                 maximumFractionDigits: 1,
               }).format(toDeployAmount)}
             </p>
-            <p className="text-muted-foreground mt-1 text-xs">to reach underweight targets</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {rebalanceMode === "buy_and_sell"
+                ? "new cash needed after sells"
+                : "to reach underweight targets"}
+            </p>
           </>
         ) : (
           <>

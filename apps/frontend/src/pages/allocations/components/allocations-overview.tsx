@@ -302,6 +302,7 @@ export function AllocationsOverview({
                 ? drilldownStripData.categoryValue
                 : totalPortfolioValue
             }
+            rebalanceMode={activeTarget?.rebalanceMode}
           />
 
           {drilldownCategory ? (

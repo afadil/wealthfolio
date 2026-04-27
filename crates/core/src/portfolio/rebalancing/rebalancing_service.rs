@@ -84,6 +84,98 @@ impl RebalancingServiceImpl {
         shortfalls
     }
 
+    /// Generate SELL recommendations for an overweight category (buy_and_sell mode only).
+    fn generate_sell_recommendations(
+        &self,
+        holdings: &[HoldingSummary],
+        holding_targets: &[HoldingTarget],
+        category_target_percent: Decimal,
+        new_total_value: Decimal,
+        category_id: &str,
+        category_name: &str,
+        category_sell_amount: Decimal,
+    ) -> Vec<TradeRecommendation> {
+        if holding_targets.is_empty() {
+            // No holding-level targets — sell category-level as one block
+            return vec![TradeRecommendation {
+                asset_id: category_id.to_string(),
+                symbol: category_id.to_string(),
+                name: Some(category_name.to_string()),
+                category_id: category_id.to_string(),
+                category_name: category_name.to_string(),
+                action: "SELL".to_string(),
+                shares: Decimal::ZERO,
+                price_per_share: Decimal::ZERO,
+                total_amount: category_sell_amount,
+                impact_percent: Decimal::ZERO,
+                current_percent_of_class: Decimal::ZERO,
+                target_percent_of_class: Decimal::ZERO,
+                residual_amount: Decimal::ZERO,
+            }];
+        }
+
+        let mut recommendations = Vec::new();
+
+        for target in holding_targets {
+            let holding = match holdings.iter().find(|h| h.id == target.asset_id) {
+                Some(h) => h,
+                None => continue,
+            };
+
+            let price = if holding.quantity > Decimal::ZERO {
+                holding.market_value / holding.quantity
+            } else {
+                continue;
+            };
+
+            if price <= Decimal::ZERO {
+                continue;
+            }
+
+            // Cascaded target value
+            let target_portfolio_percent =
+                (category_target_percent * Decimal::from(target.target_percent)) / dec!(10000);
+            let target_value = (target_portfolio_percent / dec!(100)) * new_total_value;
+            let excess = holding.market_value - target_value;
+
+            if excess <= Decimal::ZERO {
+                continue; // Not overweight at holding level
+            }
+
+            let shares_to_sell = (excess / price).floor();
+            if shares_to_sell < Decimal::ONE {
+                continue;
+            }
+
+            let total_amount = shares_to_sell * price;
+            let category_current_value: Decimal = holdings.iter().map(|h| h.market_value).sum();
+            let current_pct = if category_current_value > Decimal::ZERO {
+                (holding.market_value / category_current_value) * dec!(100)
+            } else {
+                Decimal::ZERO
+            };
+            let target_pct = Decimal::from(target.target_percent) / dec!(100);
+
+            recommendations.push(TradeRecommendation {
+                asset_id: target.asset_id.clone(),
+                symbol: holding.symbol.clone(),
+                name: holding.name.clone(),
+                category_id: category_id.to_string(),
+                category_name: category_name.to_string(),
+                action: "SELL".to_string(),
+                shares: shares_to_sell,
+                price_per_share: price,
+                total_amount,
+                impact_percent: current_pct - target_pct,
+                current_percent_of_class: current_pct,
+                target_percent_of_class: target_pct,
+                residual_amount: excess - total_amount,
+            });
+        }
+
+        recommendations
+    }
+
     /// Calculate per-holding shortfalls within a category (Step 3).
     /// Returns vec of HoldingShortfall with all necessary data for optimization.
     fn calculate_holding_shortfalls(
@@ -1031,6 +1123,120 @@ mod tests {
         // Must not overspend
         assert!(plan.total_allocated <= dec!(1000));
     }
+
+    /// buy_and_sell mode: overweight category should generate SELL recommendations.
+    #[tokio::test]
+    async fn test_buy_and_sell_generates_sell_for_overweight() {
+        // CASH is overweight: target 15%, currently 40% ($4000 of $10000)
+        // EQUITY is underweight: target 85%, currently 60% ($6000)
+        // No new cash — just rebalance by selling CASH and buying EQUITY
+        let total_value = dec!(10000);
+        let cash_holding = make_holding_summary("cash", "CASH", dec!(4000), dec!(4000));
+        let equity_holding = make_holding_summary("eq", "EQ", dec!(60), dec!(6000));
+
+        let mut target = make_target("t1", "acc1");
+        target.rebalance_mode = "buy_and_sell".to_string();
+
+        let alloc_cash = make_allocation("alloc_cash", "t1", "CASH", 1500); // 15%
+        let alloc_equity = make_allocation("alloc_eq", "t1", "EQUITY", 8500); // 85%
+
+        let dev_cash = make_deviation("CASH", dec!(15), dec!(40), dec!(4000), total_value);
+        let dev_equity = make_deviation("EQUITY", dec!(85), dec!(60), dec!(6000), total_value);
+
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![dev_cash, dev_equity],
+        };
+
+        // CASH holding has a holding target of 100% of CASH category
+        let holding_targets_cash = vec![make_holding_target("alloc_cash", "cash", 10000)];
+        // For simplicity mock returns the same holding_targets for all categories
+        // We wire both cash and equity holdings into the mock
+        let all_holdings = vec![cash_holding, equity_holding];
+
+        // Build a service where holding_targets always return cash's targets
+        // (simplified mock — sells CASH, buys EQ category-level since EQ has no holding targets)
+        let svc = make_service(
+            target,
+            vec![alloc_cash, alloc_equity],
+            deviation_report,
+            holding_targets_cash,
+            all_holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(0),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        // Should have at least one SELL recommendation
+        let sells: Vec<_> = plan
+            .recommendations
+            .iter()
+            .filter(|r| r.action == "SELL")
+            .collect();
+        assert!(
+            !sells.is_empty(),
+            "Expected SELL recommendations in buy_and_sell mode"
+        );
+        assert!(
+            plan.total_sell_amount > Decimal::ZERO,
+            "Expected positive sell proceeds"
+        );
+    }
+
+    /// buy_only mode: overweight category should NOT generate SELL recommendations.
+    #[tokio::test]
+    async fn test_buy_only_never_generates_sells() {
+        let total_value = dec!(10000);
+        // CASH overweight: target 10%, currently 40%
+        let holdings = vec![make_holding_summary("cash", "CASH", dec!(4000), dec!(4000))];
+        let target = make_target("t1", "acc1"); // buy_only by default
+
+        let alloc = make_allocation("alloc_cash", "t1", "CASH", 1000); // 10%
+        let deviation = make_deviation("CASH", dec!(10), dec!(40), dec!(4000), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        let holding_targets = vec![make_holding_target("alloc_cash", "cash", 10000)];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(500),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        let sells: Vec<_> = plan
+            .recommendations
+            .iter()
+            .filter(|r| r.action == "SELL")
+            .collect();
+        assert!(
+            sells.is_empty(),
+            "buy_only mode must not generate SELL recommendations"
+        );
+        assert_eq!(plan.total_sell_amount, Decimal::ZERO);
+    }
 }
 
 #[async_trait]
@@ -1064,25 +1270,24 @@ impl RebalancingService for RebalancingServiceImpl {
         // Calculate new total portfolio value (current + cash)
         let new_total_value = deviation_report.total_value + input.available_cash;
 
-        // Step 2: Calculate category-level shortfalls
+        // Step 2: Calculate signed category deltas (buy_and_sell: signed; buy_only: clamped >= 0)
         let category_shortfalls = self.calculate_category_shortfalls(
             &deviation_report,
             new_total_value,
             &target.rebalance_mode,
         );
 
-        let total_shortfall: Decimal = category_shortfalls.values().sum();
-
-        // Step 3: Scale shortfalls if cash is insufficient
-        let scale_factor = if total_shortfall > input.available_cash {
-            input.available_cash / total_shortfall
-        } else {
-            Decimal::ONE
-        };
-
-        let category_budgets: HashMap<String, Decimal> = category_shortfalls
+        // Separate buy (positive) and sell (negative) categories
+        let buy_shortfalls: HashMap<String, Decimal> = category_shortfalls
             .iter()
-            .map(|(cat_id, shortfall)| (cat_id.clone(), shortfall * scale_factor))
+            .filter(|(_, v)| **v > Decimal::ZERO)
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+
+        let sell_shortfalls: HashMap<String, Decimal> = category_shortfalls
+            .iter()
+            .filter(|(_, v)| **v < Decimal::ZERO)
+            .map(|(k, v)| (k.clone(), v.abs()))
             .collect();
 
         // Initialize plan
@@ -1094,18 +1299,78 @@ impl RebalancingService for RebalancingServiceImpl {
             input.available_cash,
         );
 
+        // Step 3: Generate SELL recommendations first (buy_and_sell mode only)
+        if target.rebalance_mode == "buy_and_sell" {
+            for (category_id, sell_amount) in &sell_shortfalls {
+                let holdings_data = self
+                    .allocation_service
+                    .get_holdings_by_allocation(
+                        &target.account_id,
+                        &input.base_currency,
+                        &target.taxonomy_id,
+                        category_id,
+                    )
+                    .await?;
+
+                let allocation = allocations.iter().find(|a| a.category_id == *category_id);
+                let holding_targets = match allocation {
+                    Some(a) => self
+                        .target_service
+                        .get_holding_targets_by_allocation(&a.id)?,
+                    None => vec![],
+                };
+
+                let category_target_percent = deviation_report
+                    .deviations
+                    .iter()
+                    .find(|d| d.category_id == *category_id)
+                    .map(|d| d.target_percent)
+                    .unwrap_or(Decimal::ZERO);
+
+                let sell_recs = self.generate_sell_recommendations(
+                    &holdings_data.holdings,
+                    &holding_targets,
+                    category_target_percent,
+                    new_total_value,
+                    category_id,
+                    &holdings_data.category_name,
+                    *sell_amount,
+                );
+
+                for rec in sell_recs {
+                    plan.add_sell_recommendation(rec);
+                }
+            }
+        }
+
+        // Step 4: Scale buy shortfalls against total buy budget (available_cash + sell proceeds)
+        let total_buy_budget = input.available_cash + plan.total_sell_amount;
+        let total_buy_shortfall: Decimal = buy_shortfalls.values().sum();
+
+        let scale_factor = if total_buy_budget <= Decimal::ZERO {
+            Decimal::ZERO
+        } else if total_buy_shortfall > total_buy_budget {
+            total_buy_budget / total_buy_shortfall
+        } else {
+            Decimal::ONE
+        };
+
+        let category_budgets: HashMap<String, Decimal> = buy_shortfalls
+            .iter()
+            .map(|(cat_id, shortfall)| (cat_id.clone(), shortfall * scale_factor))
+            .collect();
+
         // Add category budgets to plan
         for (category_id, budget) in &category_budgets {
             plan.add_category_budget(category_id.clone(), *budget);
         }
 
-        // Step 4: For each category with budget, calculate holding-level recommendations
+        // Step 5: Generate BUY recommendations
         for (category_id, budget) in category_budgets {
             if budget <= Decimal::ZERO {
                 continue;
             }
 
-            // Get holdings in this category
             let holdings_data = self
                 .allocation_service
                 .get_holdings_by_allocation(
@@ -1118,32 +1383,23 @@ impl RebalancingService for RebalancingServiceImpl {
 
             let holdings = &holdings_data.holdings;
 
-            // Get category target allocation
             let allocation = allocations.iter().find(|a| a.category_id == category_id);
-
             if allocation.is_none() {
                 continue;
             }
 
-            let allocation = allocation.unwrap();
-
-            // Get holding targets for this category
             let holding_targets = self
                 .target_service
-                .get_holding_targets_by_allocation(&allocation.id)?;
+                .get_holding_targets_by_allocation(&allocation.unwrap().id)?;
 
-            // Find the deviation for this category to get target percent
-            let deviation = deviation_report
+            let category_target_percent = deviation_report
                 .deviations
                 .iter()
-                .find(|d| d.category_id == category_id);
-
-            let category_target_percent =
-                deviation.map(|d| d.target_percent).unwrap_or(Decimal::ZERO);
+                .find(|d| d.category_id == category_id)
+                .map(|d| d.target_percent)
+                .unwrap_or(Decimal::ZERO);
 
             if holding_targets.is_empty() {
-                // No holding-level targets - create a category-level recommendation
-                // This allows categories like Cash to still get budget allocated
                 let recommendation = TradeRecommendation {
                     asset_id: category_id.clone(),
                     symbol: category_id.clone(),
@@ -1163,7 +1419,6 @@ impl RebalancingService for RebalancingServiceImpl {
                 continue;
             }
 
-            // Calculate holding-level shortfalls
             let holding_shortfalls = self.calculate_holding_shortfalls(
                 holdings,
                 &holding_targets,
@@ -1171,7 +1426,6 @@ impl RebalancingService for RebalancingServiceImpl {
                 new_total_value,
             );
 
-            // Optimize whole-share purchases
             let recommendations = self.optimize_whole_shares(
                 holdings,
                 &holding_targets,
@@ -1183,15 +1437,14 @@ impl RebalancingService for RebalancingServiceImpl {
                 new_total_value,
             );
 
-            // Add recommendations to plan
             for rec in recommendations {
                 plan.add_recommendation(rec);
             }
         }
 
-        // Calculate additional cash needed
-        let additional_needed = if total_shortfall > input.available_cash {
-            total_shortfall - input.available_cash
+        // Calculate additional cash needed (based on buy shortfall vs total buy budget)
+        let additional_needed = if total_buy_shortfall > total_buy_budget {
+            total_buy_shortfall - total_buy_budget
         } else {
             Decimal::ZERO
         };

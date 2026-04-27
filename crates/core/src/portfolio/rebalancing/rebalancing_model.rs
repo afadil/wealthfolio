@@ -1,6 +1,6 @@
 //! Rebalancing domain models.
 //!
-//! Data structures for the cash-first, buy-only rebalancing advisor.
+//! Data structures for the cash-first rebalancing advisor (buy-only or buy & sell).
 
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -31,9 +31,9 @@ pub struct TradeRecommendation {
     pub category_id: String,
     /// Category display name
     pub category_name: String,
-    /// Action type - always "BUY" (sell not supported)
+    /// Action type: "BUY" or "SELL"
     pub action: String,
-    /// Whole shares to buy
+    /// Whole shares to buy or sell
     pub shares: Decimal,
     /// Current market price per share
     pub price_per_share: Decimal,
@@ -79,9 +79,11 @@ pub struct RebalancingPlan {
     pub remaining_cash: Decimal,
     /// Additional cash needed to fully reach targets (if positive)
     pub additional_cash_needed: Decimal,
+    /// Total proceeds raised by sell recommendations (buy_and_sell mode only)
+    pub total_sell_amount: Decimal,
     /// Budgets allocated to each category
     pub category_budgets: Vec<CategoryBudget>,
-    /// List of trade recommendations
+    /// List of trade recommendations (BUY and SELL)
     pub recommendations: Vec<TradeRecommendation>,
 }
 
@@ -103,6 +105,7 @@ impl RebalancingPlan {
             total_allocated: Decimal::ZERO,
             remaining_cash: available_cash,
             additional_cash_needed: Decimal::ZERO,
+            total_sell_amount: Decimal::ZERO,
             category_budgets: Vec::new(),
             recommendations: Vec::new(),
         }
@@ -116,11 +119,18 @@ impl RebalancingPlan {
         });
     }
 
-    /// Adds a recommendation and updates totals.
+    /// Adds a BUY recommendation and updates buy totals.
     pub fn add_recommendation(&mut self, recommendation: TradeRecommendation) {
         self.total_allocated += recommendation.total_amount;
         self.recommendations.push(recommendation);
-        self.remaining_cash = self.available_cash - self.total_allocated;
+        self.remaining_cash = (self.available_cash + self.total_sell_amount) - self.total_allocated;
+    }
+
+    /// Adds a SELL recommendation and tracks proceeds.
+    pub fn add_sell_recommendation(&mut self, recommendation: TradeRecommendation) {
+        self.total_sell_amount += recommendation.total_amount;
+        self.recommendations.push(recommendation);
+        self.remaining_cash = (self.available_cash + self.total_sell_amount) - self.total_allocated;
     }
 
     /// Sets the additional cash needed to reach targets.
