@@ -21,7 +21,7 @@ import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { SettingsHeader } from "../settings/settings-header";
 import { AssetEditSheet } from "./asset-edit-sheet";
-import { ParsedAsset, toParsedAsset } from "./asset-utils";
+import { isExpiredOptionAsset, ParsedAsset, toParsedAsset } from "./asset-utils";
 import { AssetsTable } from "./assets-table";
 import { AssetsTableMobile } from "./assets-table-mobile";
 import { CreateSecurityDialog } from "./create-security-dialog";
@@ -48,7 +48,11 @@ export default function AssetsPage() {
   }, [holdings]);
 
   const parsedAssets = useMemo(() => assets.map(toParsedAsset), [assets]);
-  const assetIds = useMemo(() => parsedAssets.map((asset) => asset.id), [parsedAssets]);
+  const visibleAssets = useMemo(
+    () => parsedAssets.filter((asset) => !isExpiredOptionAsset(asset)),
+    [parsedAssets],
+  );
+  const assetIds = useMemo(() => visibleAssets.map((asset) => asset.id), [visibleAssets]);
   const { data: latestQuotes = {}, isLoading: isQuotesLoading } = useLatestQuotes(assetIds);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -77,7 +81,7 @@ export default function AssetsPage() {
       <div className="w-full">
         {isMobileViewport ? (
           <AssetsTableMobile
-            assets={parsedAssets}
+            assets={visibleAssets}
             latestQuotes={latestQuotes}
             heldAssetIds={heldAssetIds}
             isLoading={isLoading || isQuotesLoading}
@@ -90,7 +94,7 @@ export default function AssetsPage() {
           />
         ) : (
           <AssetsTable
-            assets={parsedAssets}
+            assets={visibleAssets}
             latestQuotes={latestQuotes}
             heldAssetIds={heldAssetIds}
             isLoading={isLoading || isQuotesLoading}

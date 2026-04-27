@@ -1,4 +1,6 @@
-use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
+use crate::assets::{
+    Asset, AssetClassificationService, AssetKind, AssetServiceTrait, InstrumentType,
+};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -6,6 +8,7 @@ use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrumen
 use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -46,9 +49,36 @@ pub struct HoldingsService {
 
 struct AssetInfo {
     instrument: Instrument,
+    instrument_symbol: Option<String>,
+    is_option: bool,
     kind: AssetKind,
     metadata: Option<Value>,
     purchase_price: Option<Decimal>,
+}
+
+fn is_expired_option(
+    is_option: bool,
+    metadata: Option<&Value>,
+    symbols: &[&str],
+    today: NaiveDate,
+) -> bool {
+    if !is_option {
+        return false;
+    }
+
+    let expiration = metadata
+        .and_then(|m| m.get("option"))
+        .and_then(|o| o.get("expiration"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .or_else(|| {
+            symbols.iter().find_map(|symbol| {
+                crate::utils::occ_symbol::parse_occ_symbol(symbol)
+                    .ok()
+                    .map(|parsed| parsed.expiration)
+            })
+        });
+    matches!(expiration, Some(exp) if exp < today)
 }
 
 impl HoldingsService {
@@ -94,6 +124,7 @@ impl HoldingsService {
         latest_snapshot: &snapshot::AccountStateSnapshot,
         base_currency: &str,
         lots_asset_id: Option<&str>,
+        skip_expired_options: bool,
     ) -> Vec<Holding> {
         let today = self.today_in_user_timezone();
         let snapshot_positions: Vec<snapshot::Position> = latest_snapshot
@@ -134,6 +165,8 @@ impl HoldingsService {
 
                         let asset_info = AssetInfo {
                             instrument,
+                            instrument_symbol: asset.instrument_symbol.clone(),
+                            is_option: asset.instrument_type == Some(InstrumentType::Option),
                             kind: asset.kind,
                             metadata,
                             purchase_price,
@@ -163,6 +196,24 @@ impl HoldingsService {
                 );
                 continue;
             };
+
+            if skip_expired_options
+                && is_expired_option(
+                    asset_info.is_option,
+                    asset_info.metadata.as_ref(),
+                    &[
+                        asset_info.instrument_symbol.as_deref().unwrap_or_default(),
+                        &asset_info.instrument.symbol,
+                    ],
+                    today,
+                )
+            {
+                debug!(
+                    "Skipping expired option holding {} for account {}.",
+                    snapshot_pos.asset_id, account_id
+                );
+                continue;
+            }
 
             let (holding_type, id_prefix) = if asset_info.kind.is_alternative() {
                 (HoldingType::AlternativeAsset, "ALT")
@@ -384,6 +435,111 @@ fn apply_portfolio_weights(account_id: &str, holdings: &mut [Holding]) {
     }
 }
 
+#[cfg(test)]
+mod expired_option_metadata_tests {
+    use super::is_expired_option;
+    use chrono::NaiveDate;
+    use serde_json::json;
+
+    #[test]
+    fn detects_expired_option_metadata() {
+        let metadata = json!({
+            "option": {
+                "expiration": "2026-03-06"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(true, Some(&metadata), &[""], today));
+    }
+
+    #[test]
+    fn detects_expired_occ_symbol_without_metadata() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(
+            true,
+            None,
+            &["TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn detects_expired_canonical_symbol_when_display_symbol_is_custom() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(
+            true,
+            None,
+            &["Custom Label", "TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn requires_option_instrument_type() {
+        let metadata = json!({
+            "option": {
+                "expiration": "2026-03-06"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(
+            false,
+            Some(&metadata),
+            &["TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn keeps_active_and_same_day_option_metadata() {
+        let same_day = json!({
+            "option": {
+                "expiration": "2026-04-27"
+            }
+        });
+        let future = json!({
+            "option": {
+                "expiration": "2026-05-15"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(true, Some(&same_day), &[""], today));
+        assert!(!is_expired_option(true, Some(&future), &[""], today));
+        assert!(!is_expired_option(
+            true,
+            None,
+            &["TSLA260427C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn ignores_non_option_or_invalid_metadata() {
+        let non_option = json!({ "bond": { "maturityDate": "2026-03-06" } });
+        let invalid_option = json!({ "option": { "expiration": "not-a-date" } });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(
+            true,
+            Some(&non_option),
+            &["AAPL"],
+            today
+        ));
+        assert!(!is_expired_option(
+            true,
+            Some(&invalid_option),
+            &["AAPL"],
+            today
+        ));
+        assert!(!is_expired_option(true, None, &["AAPL"], today));
+    }
+}
+
 #[async_trait]
 impl HoldingsServiceTrait for HoldingsService {
     async fn get_holdings(&self, account_id: &str, base_currency: &str) -> Result<Vec<Holding>> {
@@ -414,7 +570,13 @@ impl HoldingsServiceTrait for HoldingsService {
         };
 
         let mut holdings = self
-            .build_live_holdings_from_snapshot(account_id, &latest_snapshot, base_currency, None)
+            .build_live_holdings_from_snapshot(
+                account_id,
+                &latest_snapshot,
+                base_currency,
+                None,
+                true,
+            )
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)
             .await;
@@ -499,6 +661,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 &latest_snapshot,
                 base_currency,
                 Some(asset_id),
+                false,
             )
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)

@@ -30,9 +30,6 @@ interface HoldingsMobileFilterSheetProps {
   categoryFilter?: HoldingCategoryFilterId;
   setCategoryFilter?: (value: HoldingCategoryFilterId) => void;
   typeOptions?: { value: string; label: string }[];
-  hideExpired?: boolean;
-  setHideExpired?: (value: boolean) => void;
-  showExpiredToggle?: boolean;
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -51,9 +48,6 @@ export const HoldingsMobileFilterSheet = ({
   categoryFilter = "investments",
   setCategoryFilter,
   typeOptions,
-  hideExpired,
-  setHideExpired,
-  showExpiredToggle = false,
 }: HoldingsMobileFilterSheetProps) => {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -103,23 +97,6 @@ export const HoldingsMobileFilterSheet = ({
                 />
               </div>
 
-              {showExpiredToggle && setHideExpired && (
-                <div className="space-y-3">
-                  <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                    Expired Options
-                  </h4>
-                  <AnimatedToggleGroup<"hide" | "show">
-                    value={hideExpired ? "hide" : "show"}
-                    onValueChange={(value) => setHideExpired(value === "hide")}
-                    items={[
-                      { value: "hide", label: "Hide" },
-                      { value: "show", label: "Show" },
-                    ]}
-                    size="sm"
-                    className="inline-flex w-auto"
-                  />
-                </div>
-              )}
             </div>
 
             <Separator />
