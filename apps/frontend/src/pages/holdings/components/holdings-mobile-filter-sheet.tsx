@@ -96,7 +96,6 @@ export const HoldingsMobileFilterSheet = ({
                   className="inline-flex w-auto"
                 />
               </div>
-
             </div>
 
             <Separator />

@@ -2090,7 +2090,14 @@ mod tests {
             None,
             Some(r#"{"flow":{"is_external":true}}"#),
         );
-        insert_transfer_activity(&mut conn, "same-account-in", "acc-a", "TRANSFER_IN", None, None);
+        insert_transfer_activity(
+            &mut conn,
+            "same-account-in",
+            "acc-a",
+            "TRANSFER_IN",
+            None,
+            None,
+        );
 
         let same_account = repo
             .link_transfer_activities("same-account-in".to_string(), "transfer-out".to_string())
@@ -2108,8 +2115,8 @@ mod tests {
             .await
             .expect("link should succeed");
 
-        assert_eq!(transfer_in.is_user_modified, true);
-        assert_eq!(transfer_out.is_user_modified, true);
+        assert!(transfer_in.is_user_modified);
+        assert!(transfer_out.is_user_modified);
         assert!(transfer_in.source_group_id.is_some());
         assert_eq!(transfer_in.source_group_id, transfer_out.source_group_id);
         assert_eq!(
@@ -2168,8 +2175,8 @@ mod tests {
         assert_eq!(transfer_out.id, "transfer-out");
         assert_eq!(transfer_in.source_group_id, None);
         assert_eq!(transfer_out.source_group_id, None);
-        assert_eq!(transfer_in.is_user_modified, true);
-        assert_eq!(transfer_out.is_user_modified, true);
+        assert!(transfer_in.is_user_modified);
+        assert!(transfer_out.is_user_modified);
         assert_eq!(
             transfer_in.metadata.as_ref().and_then(|m| {
                 m.get("flow")
