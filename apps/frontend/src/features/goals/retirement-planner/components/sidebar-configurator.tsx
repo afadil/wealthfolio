@@ -1,5 +1,5 @@
 import type { RetirementOverview } from "@/lib/types";
-import { GoalFundingEditor } from "@/pages/goals/components/goal-funding-editor";
+import { GoalFundingEditor } from "@/features/goals/components/goal-funding-editor";
 import {
   AnimatedToggleGroup,
   Button,

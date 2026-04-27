@@ -36,10 +36,10 @@ import MarketDataImportPage from "./pages/settings/market-data/market-data-impor
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
-import GoalsDashboardPage from "./pages/goals/goals-dashboard-page";
-import GoalNewPage from "./pages/goals/goal-new-page";
-import GoalDetailPage from "./pages/goals/goal-detail-page";
-import GoalRetirementGuidePage from "./pages/goals/goal-retirement-guide-page";
+import GoalsDashboardPage from "@/features/goals/pages/goals-dashboard-page";
+import GoalNewPage from "@/features/goals/pages/goal-new-page";
+import GoalDetailPage from "@/features/goals/pages/goal-detail-page";
+import GoalRetirementGuidePage from "@/features/goals/pages/goal-retirement-guide-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<

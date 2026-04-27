@@ -21,8 +21,8 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCreateGoalFlow } from "./hooks/use-create-goal-flow";
-import { useGoals } from "./hooks/use-goals";
+import { useCreateGoalFlow } from "../hooks/use-create-goal-flow";
+import { useGoals } from "../hooks/use-goals";
 import { toast } from "sonner";
 import {
   DEFAULT_RETIREMENT_PLAN,

@@ -11,9 +11,9 @@ import { AmountDisplay, Button, DatePickerInput, MoneyInput } from "@wealthfolio
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useGoalPlanMutations, useSaveUpPreview } from "../hooks/use-goal-detail";
-import { useGoalMutations } from "../hooks/use-goals";
-import { GoalFundingEditor } from "./goal-funding-editor";
+import { GoalFundingEditor } from "../../components/goal-funding-editor";
+import { useGoalPlanMutations, useSaveUpPreview } from "../../hooks/use-goal-detail";
+import { useGoalMutations } from "../../hooks/use-goals";
 import { SaveUpProjectionCard } from "./save-up-projection-card";
 import { buildSavingsMilestones, SavingsMilestonesCard } from "./savings-milestones-card";
 

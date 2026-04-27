@@ -13,8 +13,8 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { GoalCard } from "./components/goal-card";
-import { useGoals } from "./hooks/use-goals";
+import { GoalCard } from "../components/goal-card";
+import { useGoals } from "../hooks/use-goals";
 
 function StatBlock({ label, value }: { label: string; value: React.ReactNode }) {
   return (

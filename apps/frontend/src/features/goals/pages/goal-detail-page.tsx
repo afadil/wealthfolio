@@ -26,8 +26,8 @@ import {
   useGoalPlanMutations,
   useRetirementOverview,
   useSaveUpOverview,
-} from "./hooks/use-goal-detail";
-import { useGoalMutations } from "./hooks/use-goals";
+} from "../hooks/use-goal-detail";
+import { useGoalMutations } from "../hooks/use-goals";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type { PlannerMode, RetirementOverview } from "@/lib/types";
 import type { RetirementPlan } from "@/features/goals/retirement-planner/types";
@@ -39,8 +39,8 @@ import {
 import { usePortfolioData } from "@/features/goals/retirement-planner/hooks/use-portfolio";
 import DashboardPage from "@/features/goals/retirement-planner/pages/dashboard-page";
 import RiskLabPage from "@/features/goals/retirement-planner/pages/risk-lab-page";
-import SaveUpDetailPage from "./components/save-up-detail";
-import { GoalEditDialog } from "./components/goal-edit-dialog";
+import SaveUpDetailPage from "../save-up/components/save-up-detail";
+import { GoalEditDialog } from "../components/goal-edit-dialog";
 
 const GOAL_TYPE_LABELS: Record<string, string> = {
   retirement: "Retirement",
