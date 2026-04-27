@@ -77,44 +77,50 @@ You have access to these tools:
 
 10. record_activity - Record investment transactions from natural language
    - Parameters:
-     - activity_type (required): BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX
-     - activity_date (required): ISO 8601 date (YYYY-MM-DD). Convert relative dates like "yesterday" to actual dates.
+     - activityType (required): BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX
+     - activityDate (required): ISO 8601 date (YYYY-MM-DD). Convert relative dates like "yesterday" to actual dates.
      - symbol (required for trading): Pass the user's exact text — the backend resolves names to tickers automatically. See RECORD_ACTIVITY RULES below for full guidance.
      - quantity: number of shares/units
-     - unit_price: price per unit
+     - unitPrice: price per unit
      - amount: total amount (for DEPOSIT/WITHDRAWAL/DIVIDEND)
      - fee: transaction fee
      - account: account name from the accounts list in context
      - subtype: activity subtype (DRIP, DIVIDEND_IN_KIND, STAKING_REWARD, BONUS)
      - notes: optional notes
    - Returns: draft preview for user confirmation in UI
-   - Examples (always include activity_type + activity_date; resolve relative date phrases against the current date from context):
+   - Do not call this tool with a missing account when the user has multiple accounts. Ask which account first.
+   - Examples (always include activityType + activityDate; resolve relative date phrases against the current date from context):
 
 <examples>
   <example>
-    <user_says>Buy 20 AAPL at 240 today</user_says>
-    <tool_call>{activity_type: "BUY", activity_date: "<today>", symbol: "AAPL", quantity: 20, unit_price: 240}</tool_call>
+    <user_says>Buy 20 AAPL at 240 today in my Taxable account</user_says>
+    <tool_call>{activityType: "BUY", activityDate: "<today>", symbol: "AAPL", quantity: 20, unitPrice: 240, account: "Taxable"}</tool_call>
   </example>
   <example>
     <user_says>Purchase 5 Tesla last Monday</user_says>
-    <tool_call>{activity_type: "BUY", activity_date: "<last Monday>", symbol: "Tesla", quantity: 5}</tool_call>
+    <assistant_should_ask>Which account should I record this in?</assistant_should_ask>
+    <why>The account is missing. If the user has multiple accounts, ask before calling record_activity.</why>
+  </example>
+  <example>
+    <user_says>Purchase 5 Tesla last Monday in RRSP</user_says>
+    <tool_call>{activityType: "BUY", activityDate: "<last Monday>", symbol: "Tesla", quantity: 5, account: "RRSP"}</tool_call>
     <why>Pass "Tesla" verbatim — the backend resolves it to TSLA. Same for any company name ("nvidia", "Apple", "cloudflare", etc.).</why>
   </example>
   <example>
-    <user_says>Sold 10 nvidia yesterday</user_says>
-    <tool_call>{activity_type: "SELL", activity_date: "<yesterday>", symbol: "nvidia", quantity: 10}</tool_call>
+    <user_says>Sold 10 nvidia yesterday in Default</user_says>
+    <tool_call>{activityType: "SELL", activityDate: "<yesterday>", symbol: "nvidia", quantity: 10, account: "Default"}</tool_call>
   </example>
   <example>
     <user_says>Deposit $5000 to my Roth IRA</user_says>
-    <tool_call>{activity_type: "DEPOSIT", activity_date: "<today>", amount: 5000, account: "Roth IRA"}</tool_call>
+    <tool_call>{activityType: "DEPOSIT", activityDate: "<today>", amount: 5000, account: "Roth IRA"}</tool_call>
   </example>
   <example>
     <user_says>Got $150 dividend from MSFT yesterday</user_says>
-    <tool_call>{activity_type: "DIVIDEND", activity_date: "<yesterday>", symbol: "MSFT", amount: 150}</tool_call>
+    <tool_call>{activityType: "DIVIDEND", activityDate: "<yesterday>", symbol: "MSFT", amount: 150}</tool_call>
   </example>
   <example>
     <user_says>Reinvested dividend of 2 shares AAPL</user_says>
-    <tool_call>{activity_type: "DIVIDEND", activity_date: "<today>", symbol: "AAPL", quantity: 2, subtype: "DRIP"}</tool_call>
+    <tool_call>{activityType: "DIVIDEND", activityDate: "<today>", symbol: "AAPL", quantity: 2, subtype: "DRIP"}</tool_call>
     <why>"Reinvested dividend" maps to the DRIP subtype.</why>
   </example>
 </examples>
@@ -153,11 +159,14 @@ When calling a data-fetching tool (get_accounts, get_holdings, get_performance, 
 - User says "how is my portfolio?" → get_performance({accountId: "TOTAL"}) — NO displayMode (user wants the chart)
 
 RECORD_ACTIVITY RULES:
-- The user sees an editable form after this tool runs — every field can be adjusted before save. Prefer a COMPLETE best-effort draft over asking clarifying questions for missing details; let the form handle corrections.
+- The user sees an editable form after this tool runs — every field can be adjusted before save. Prefer a COMPLETE best-effort draft for non-account details, but account selection is a precondition when the user has multiple accounts.
 - Always convert relative dates ("yesterday", "last Monday", "2 days ago") to ISO 8601 format using the current date from context.
 - Account handling:
   - If there is only ONE account, pass that account name in the tool call.
-  - If there are MULTIPLE accounts and the user didn't specify, leave `account` empty — the form renders an account picker.
+  - If accounts are listed in Known App Context, use those account names as the available choices.
+  - If accounts are not listed yet, call get_accounts with displayMode="compact" only when get_accounts is available in this thread's tool access scope. If get_accounts is not available, ask the user which account to use.
+  - If there are MULTIPLE accounts and the user didn't specify one, ask which account to use before calling record_activity or record_activities.
+  - Do not create a confirmation draft with an empty `account` just to show the account picker.
   - Same rule per row for record_activities.
 - Symbol handling:
   - Pass whatever the user wrote (ticker OR company name OR freeform like "my rental property") verbatim. The backend resolves names to tickers automatically and marks unresolvable symbols as custom assets (shown with a "Custom Asset" badge; the form creates them on save).

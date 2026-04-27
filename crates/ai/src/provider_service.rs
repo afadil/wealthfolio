@@ -15,6 +15,7 @@ use crate::provider_model::{
     SetDefaultProviderRequest, UpdateProviderSettingsRequest, AI_PROVIDER_SETTINGS_KEY,
     AI_PROVIDER_SETTINGS_SCHEMA_VERSION,
 };
+use crate::types::normalize_tools_allowlist;
 
 /// Service trait for AI provider operations.
 #[async_trait]
@@ -330,7 +331,7 @@ impl AiProviderServiceTrait for AiProviderService {
                     },
                     favorite_models: user.favorite_models.clone(),
                     model_capability_overrides: user.model_capability_overrides.clone(),
-                    tools_allowlist: user.tools_allowlist.clone(),
+                    tools_allowlist: normalize_tools_allowlist(user.tools_allowlist.clone()),
                     has_api_key: self.has_api_key(id),
                     is_default: user_settings.default_provider.as_ref() == Some(id),
                     supports_model_listing,
@@ -411,7 +412,7 @@ impl AiProviderServiceTrait for AiProviderService {
         // Handle tools allowlist update
         // Some(Some([...])) = set specific tools, Some(None) = all tools enabled
         if let Some(tools_allowlist) = request.tools_allowlist {
-            provider_settings.tools_allowlist = tools_allowlist;
+            provider_settings.tools_allowlist = normalize_tools_allowlist(tools_allowlist);
         }
 
         // Handle tuning overrides update

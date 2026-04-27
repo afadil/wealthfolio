@@ -28,6 +28,7 @@ pub const CHAT_CONFIG_SCHEMA_VERSION: u32 = 1;
 pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "get_holdings",
     "get_accounts",
+    "get_cash_balances",
     "get_performance",
     "search_activities",
     "get_valuation_history",
@@ -39,6 +40,57 @@ pub const DEFAULT_TOOLS_ALLOWLIST: &[&str] = &[
     "import_csv",
     "get_health_status",
 ];
+
+const LEGACY_VISIBLE_DATA_TOOLS: &[&str] = &[
+    "get_accounts",
+    "get_holdings",
+    "search_activities",
+    "get_performance",
+    "get_income",
+    "get_asset_allocation",
+    "get_valuation_history",
+    "get_goals",
+];
+
+/// Normalize persisted provider tool allowlists to match grouped UI access controls.
+///
+/// Older settings stored only the visible card tool IDs. For example, the
+/// Transactions card saved `search_activities` but omitted transaction draft
+/// and import tools. Keep those legacy settings working by expanding each
+/// group to the backend tools it represents.
+pub fn normalize_tools_allowlist(tools_allowlist: Option<Vec<String>>) -> Option<Vec<String>> {
+    let mut tools = tools_allowlist?;
+    if tools.is_empty() {
+        return Some(tools);
+    }
+
+    let has = |tools: &[String], tool: &str| tools.iter().any(|item| item == tool);
+
+    if has(&tools, "get_accounts") {
+        push_tool_once(&mut tools, "get_cash_balances");
+    }
+
+    if has(&tools, "search_activities") {
+        push_tool_once(&mut tools, "record_activity");
+        push_tool_once(&mut tools, "record_activities");
+        push_tool_once(&mut tools, "import_csv");
+    }
+
+    if LEGACY_VISIBLE_DATA_TOOLS
+        .iter()
+        .all(|tool| has(&tools, tool))
+    {
+        push_tool_once(&mut tools, "get_health_status");
+    }
+
+    Some(tools)
+}
+
+fn push_tool_once(tools: &mut Vec<String>, tool: &str) {
+    if !tools.iter().any(|item| item == tool) {
+        tools.push(tool.to_string());
+    }
+}
 
 /// Maximum size in bytes for persisted message content (256KB).
 pub const CHAT_MAX_CONTENT_SIZE_BYTES: usize = 256 * 1024;
@@ -1032,6 +1084,37 @@ mod tests {
         let tools = config.get_tools_allowlist();
         assert!(tools.contains(&"get_holdings".to_string()));
         assert!(tools.contains(&"get_accounts".to_string()));
+        assert!(tools.contains(&"get_cash_balances".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_tools_allowlist_expands_grouped_tools() {
+        let tools = normalize_tools_allowlist(Some(vec![
+            "get_accounts".to_string(),
+            "get_holdings".to_string(),
+            "search_activities".to_string(),
+            "get_performance".to_string(),
+            "get_income".to_string(),
+            "get_asset_allocation".to_string(),
+            "get_valuation_history".to_string(),
+            "get_goals".to_string(),
+        ]))
+        .unwrap();
+
+        assert!(tools.contains(&"get_cash_balances".to_string()));
+        assert!(tools.contains(&"record_activity".to_string()));
+        assert!(tools.contains(&"record_activities".to_string()));
+        assert!(tools.contains(&"import_csv".to_string()));
+        assert!(tools.contains(&"get_health_status".to_string()));
+    }
+
+    #[test]
+    fn test_normalize_tools_allowlist_preserves_empty_and_none() {
+        assert!(normalize_tools_allowlist(None).is_none());
+        assert_eq!(
+            normalize_tools_allowlist(Some(Vec::new())),
+            Some(Vec::new())
+        );
     }
 
     #[test]

@@ -84,7 +84,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivitiesTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Record multiple investment transactions from natural language. Returns a read-only batch draft preview for single confirmation.".to_string(),
+            description: "Record multiple investment transactions from natural language. Returns a read-only batch draft preview for single confirmation. If the user has multiple accounts and did not specify which account to use, ask which account before calling this tool.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -125,7 +125,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivitiesTool<E> {
                                 },
                                 "account": {
                                     "type": "string",
-                                    "description": "Account name or ID"
+                                    "description": "Account name or ID. Required before calling this tool when the user has multiple accounts. If the user did not specify an account for a row, ask which account first instead of calling this tool with an empty account."
                                 },
                                 "subtype": {
                                     "type": "string",

@@ -29,10 +29,13 @@ use rig::{
     tool::ToolDyn,
     OneOrMany,
 };
-use std::sync::Arc;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use wealthfolio_core::utils::time_utils::{parse_user_timezone, DEFAULT_VALUATION_TZ};
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
@@ -56,6 +59,536 @@ fn derive_initial_thread_title(first_user_message: &str) -> Option<String> {
         return None;
     }
     Some(truncate_to_title(trimmed, 50))
+}
+
+const ATTACHMENT_MARKER: &str = "\u{1F4CE} ";
+const REDACTED_CSV_CONTENT_PLACEHOLDER: &str =
+    "[redacted: CSV content kept only in session memory]";
+const MAX_SESSION_ATTACHMENT_CACHE_BYTES: usize = 100 * 1024 * 1024;
+const MAX_WORKING_CONTEXT_ACCOUNTS: usize = 20;
+const MAX_WORKING_CONTEXT_ATTACHMENTS: usize = 10;
+
+#[derive(Debug, Clone)]
+struct UserTimeContext {
+    timezone: String,
+    date: String,
+    weekday: String,
+    datetime: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct AttachmentLimits {
+    max_count: usize,
+    max_attachment_size_bytes: usize,
+    max_total_attachments_bytes: usize,
+    max_session_cache_bytes: usize,
+}
+
+impl Default for AttachmentLimits {
+    fn default() -> Self {
+        Self {
+            max_count: MAX_ATTACHMENTS_COUNT,
+            max_attachment_size_bytes: MAX_ATTACHMENT_SIZE_BYTES,
+            max_total_attachments_bytes: MAX_TOTAL_ATTACHMENTS_BYTES,
+            max_session_cache_bytes: MAX_SESSION_ATTACHMENT_CACHE_BYTES,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct AttachmentCacheKey {
+    name: String,
+    content_type: String,
+    data_sha256: [u8; 32],
+}
+
+#[derive(Debug, Clone)]
+struct CachedAttachment {
+    key: AttachmentCacheKey,
+    effective_size: usize,
+    attachment: MessageAttachment,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ThreadAttachmentCache {
+    attachments: Vec<CachedAttachment>,
+    total_size: usize,
+    last_access: u64,
+}
+
+#[derive(Debug, Default)]
+struct SessionAttachmentCacheState {
+    threads: HashMap<String, ThreadAttachmentCache>,
+    total_size: usize,
+    access_counter: u64,
+}
+
+/// Process-local attachment cache for the current app/server session.
+#[derive(Debug)]
+struct SessionAttachmentCache {
+    inner: Mutex<SessionAttachmentCacheState>,
+    limits: AttachmentLimits,
+}
+
+impl SessionAttachmentCache {
+    fn new() -> Self {
+        Self::with_limits(AttachmentLimits::default())
+    }
+
+    fn with_limits(limits: AttachmentLimits) -> Self {
+        Self {
+            inner: Mutex::new(SessionAttachmentCacheState::default()),
+            limits,
+        }
+    }
+
+    fn resolve_for_thread(
+        &self,
+        thread_id: &str,
+        incoming: &[MessageAttachment],
+    ) -> Result<Vec<MessageAttachment>, AiError> {
+        validate_attachments_with_limits(incoming, self.limits)?;
+
+        let mut state = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        state.access_counter = state.access_counter.saturating_add(1);
+        let last_access = state.access_counter;
+
+        if incoming.is_empty() {
+            return Ok(state
+                .threads
+                .get_mut(thread_id)
+                .map(|entry| {
+                    entry.last_access = last_access;
+                    entry
+                        .attachments
+                        .iter()
+                        .map(|cached| cached.attachment.clone())
+                        .collect()
+                })
+                .unwrap_or_default());
+        }
+
+        let mut next_cached = state
+            .threads
+            .get(thread_id)
+            .map(|entry| entry.attachments.clone())
+            .unwrap_or_default();
+        let mut keys: HashSet<AttachmentCacheKey> = next_cached
+            .iter()
+            .map(|cached| cached.key.clone())
+            .collect();
+
+        for attachment in incoming {
+            let key = attachment_cache_key(attachment);
+            if keys.insert(key.clone()) {
+                next_cached.push(CachedAttachment {
+                    key,
+                    effective_size: attachment_effective_size(attachment),
+                    attachment: attachment.clone(),
+                });
+            }
+        }
+
+        let next_attachments: Vec<MessageAttachment> = next_cached
+            .iter()
+            .map(|cached| cached.attachment.clone())
+            .collect();
+        let next_total = validate_attachments_with_limits(&next_attachments, self.limits)?;
+        let cached_total: usize = next_cached.iter().map(|cached| cached.effective_size).sum();
+        debug_assert_eq!(next_total, cached_total);
+
+        let old_total = state
+            .threads
+            .get(thread_id)
+            .map(|entry| entry.total_size)
+            .unwrap_or_default();
+        let entry = state.threads.entry(thread_id.to_string()).or_default();
+        entry.attachments = next_cached;
+        entry.total_size = cached_total;
+        entry.last_access = last_access;
+
+        state.total_size = state
+            .total_size
+            .saturating_sub(old_total)
+            .saturating_add(cached_total);
+        self.evict_if_needed(&mut state, thread_id);
+
+        Ok(state
+            .threads
+            .get(thread_id)
+            .map(|entry| {
+                entry
+                    .attachments
+                    .iter()
+                    .map(|cached| cached.attachment.clone())
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    fn clear_thread(&self, thread_id: &str) {
+        let mut state = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(entry) = state.threads.remove(thread_id) {
+            state.total_size = state.total_size.saturating_sub(entry.total_size);
+        }
+    }
+
+    fn evict_if_needed(&self, state: &mut SessionAttachmentCacheState, active_thread_id: &str) {
+        while state.total_size > self.limits.max_session_cache_bytes {
+            let Some(evict_thread_id) = state
+                .threads
+                .iter()
+                .filter(|(thread_id, _)| thread_id.as_str() != active_thread_id)
+                .min_by_key(|(_, entry)| entry.last_access)
+                .map(|(thread_id, _)| thread_id.clone())
+            else {
+                break;
+            };
+
+            if let Some(entry) = state.threads.remove(&evict_thread_id) {
+                state.total_size = state.total_size.saturating_sub(entry.total_size);
+            }
+        }
+    }
+}
+
+fn attachment_cache_key(attachment: &MessageAttachment) -> AttachmentCacheKey {
+    let mut hasher = Sha256::new();
+    hasher.update(attachment.data.as_bytes());
+    let digest = hasher.finalize();
+    let mut data_sha256 = [0_u8; 32];
+    data_sha256.copy_from_slice(&digest);
+
+    AttachmentCacheKey {
+        name: attachment.name.clone(),
+        content_type: attachment.content_type.clone(),
+        data_sha256,
+    }
+}
+
+fn attachment_effective_size(attachment: &MessageAttachment) -> usize {
+    let is_binary = attachment.content_type.starts_with("image/")
+        || attachment.content_type == "application/pdf";
+    if is_binary {
+        attachment.data.len() * 3 / 4
+    } else {
+        attachment.data.len()
+    }
+}
+
+fn validate_attachments(attachments: &[MessageAttachment]) -> Result<usize, AiError> {
+    validate_attachments_with_limits(attachments, AttachmentLimits::default())
+}
+
+fn validate_attachments_with_limits(
+    attachments: &[MessageAttachment],
+    limits: AttachmentLimits,
+) -> Result<usize, AiError> {
+    if attachments.len() > limits.max_count {
+        return Err(AiError::InvalidInput(format!(
+            "Too many attachments: {} (max {})",
+            attachments.len(),
+            limits.max_count
+        )));
+    }
+
+    let mut total_size: usize = 0;
+    for attachment in attachments {
+        let effective_size = attachment_effective_size(attachment);
+        if effective_size > limits.max_attachment_size_bytes {
+            return Err(AiError::InvalidInput(format!(
+                "Attachment '{}' too large (max {} MB)",
+                attachment.name,
+                limits.max_attachment_size_bytes / (1024 * 1024)
+            )));
+        }
+        total_size += effective_size;
+    }
+
+    if total_size > limits.max_total_attachments_bytes {
+        return Err(AiError::InvalidInput(format!(
+            "Total attachment size too large (max {} MB)",
+            limits.max_total_attachments_bytes / (1024 * 1024)
+        )));
+    }
+
+    Ok(total_size)
+}
+
+fn messages_have_attachment_markers(messages: &[ChatMessage]) -> bool {
+    messages.iter().any(|message| {
+        message.role == ChatMessageRole::User
+            && message
+                .content
+                .get_text_content()
+                .contains(ATTACHMENT_MARKER)
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkingContextAccount {
+    id: String,
+    name: String,
+    currency: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkingContextAttachment {
+    name: String,
+    content_type: String,
+    size_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkingContextImport {
+    rows: Option<usize>,
+    account_id: Option<String>,
+    confidence: Option<String>,
+    submitted: bool,
+    imported_count: Option<usize>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ChatWorkingContext {
+    accounts: Vec<WorkingContextAccount>,
+    attachments: Vec<WorkingContextAttachment>,
+    current_import: Option<WorkingContextImport>,
+}
+
+impl ChatWorkingContext {
+    fn from_messages_and_attachments(
+        messages: &[ChatMessage],
+        attachments: &[MessageAttachment],
+    ) -> Self {
+        let mut context = Self {
+            accounts: Vec::new(),
+            attachments: attachments
+                .iter()
+                .take(MAX_WORKING_CONTEXT_ATTACHMENTS)
+                .map(|attachment| WorkingContextAttachment {
+                    name: attachment.name.clone(),
+                    content_type: attachment.content_type.clone(),
+                    size_bytes: attachment_effective_size(attachment),
+                })
+                .collect(),
+            current_import: None,
+        };
+
+        for message in messages {
+            if message.role != ChatMessageRole::Assistant {
+                continue;
+            }
+
+            let mut tool_names_by_id: HashMap<&str, &str> = HashMap::new();
+            for part in &message.content.parts {
+                match part {
+                    ChatMessagePart::ToolCall {
+                        tool_call_id, name, ..
+                    } => {
+                        tool_names_by_id.insert(tool_call_id.as_str(), name.as_str());
+                    }
+                    ChatMessagePart::ToolResult {
+                        tool_call_id,
+                        success,
+                        data,
+                        ..
+                    } if *success => {
+                        if let Some(tool_name) = tool_names_by_id.get(tool_call_id.as_str()) {
+                            context.ingest_tool_result(tool_name, data);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        context
+    }
+
+    fn ingest_tool_result(&mut self, tool_name: &str, data: &serde_json::Value) {
+        match tool_name {
+            "get_accounts" => {
+                if let Some(accounts) = extract_accounts(data.get("accounts")) {
+                    self.accounts = accounts;
+                }
+            }
+            "import_csv" => {
+                if let Some(accounts) = extract_accounts(data.get("availableAccounts")) {
+                    self.accounts = accounts;
+                }
+                self.current_import = Some(WorkingContextImport {
+                    rows: json_usize(data, "totalRows"),
+                    account_id: json_string(data, "accountId"),
+                    confidence: json_string(data, "mappingConfidence"),
+                    submitted: json_bool(data, "submitted").unwrap_or(false),
+                    imported_count: json_usize(data, "importedCount"),
+                });
+            }
+            "record_activity" | "record_activities" => {}
+            _ => {}
+        }
+    }
+
+    fn render(&self) -> Option<String> {
+        if self.accounts.is_empty() && self.attachments.is_empty() && self.current_import.is_none()
+        {
+            return None;
+        }
+
+        let mut lines = vec![
+            "## Known App Context".to_string(),
+            "Use these compact facts for references. Do not call tools only to re-fetch information already listed here; call tools when fresh data is needed.".to_string(),
+        ];
+
+        if !self.accounts.is_empty() {
+            lines.push("Accounts:".to_string());
+            for account in self.accounts.iter().take(MAX_WORKING_CONTEXT_ACCOUNTS) {
+                lines.push(format!(
+                    "- {}: id={}, currency={}",
+                    account.name, account.id, account.currency
+                ));
+            }
+            if self.accounts.len() > MAX_WORKING_CONTEXT_ACCOUNTS {
+                lines.push(format!(
+                    "- ... {} more account(s) omitted",
+                    self.accounts.len() - MAX_WORKING_CONTEXT_ACCOUNTS
+                ));
+            }
+        }
+
+        if !self.attachments.is_empty() {
+            lines.push("Attachments available this session:".to_string());
+            for attachment in &self.attachments {
+                lines.push(format!(
+                    "- {} ({}, {})",
+                    attachment.name,
+                    attachment.content_type,
+                    format_bytes(attachment.size_bytes)
+                ));
+            }
+        }
+
+        if let Some(import) = &self.current_import {
+            lines.push("Current CSV import:".to_string());
+            if let Some(rows) = import.rows {
+                lines.push(format!("- rows prepared: {}", rows));
+            }
+            if let Some(account_id) = &import.account_id {
+                lines.push(format!("- target account id: {}", account_id));
+            }
+            if let Some(confidence) = &import.confidence {
+                lines.push(format!("- mapping confidence: {}", confidence));
+            }
+            if import.submitted {
+                lines.push(format!(
+                    "- status: imported {} activit{}",
+                    import.imported_count.unwrap_or(0),
+                    if import.imported_count == Some(1) {
+                        "y"
+                    } else {
+                        "ies"
+                    }
+                ));
+            } else {
+                lines.push("- status: prepared, not imported yet".to_string());
+            }
+        }
+
+        Some(lines.join("\n"))
+    }
+}
+
+fn extract_accounts(value: Option<&serde_json::Value>) -> Option<Vec<WorkingContextAccount>> {
+    let accounts = value?.as_array()?;
+    let extracted: Vec<WorkingContextAccount> = accounts
+        .iter()
+        .filter_map(|account| {
+            Some(WorkingContextAccount {
+                id: json_string(account, "id")?,
+                name: json_string(account, "name")?,
+                currency: json_string(account, "currency").unwrap_or_default(),
+            })
+        })
+        .collect();
+
+    if extracted.is_empty() {
+        None
+    } else {
+        Some(extracted)
+    }
+}
+
+fn json_string(value: &serde_json::Value, key: &str) -> Option<String> {
+    value.get(key)?.as_str().map(ToString::to_string)
+}
+
+fn json_usize(value: &serde_json::Value, key: &str) -> Option<usize> {
+    value
+        .get(key)?
+        .as_u64()
+        .and_then(|n| usize::try_from(n).ok())
+}
+
+fn json_bool(value: &serde_json::Value, key: &str) -> Option<bool> {
+    value.get(key)?.as_bool()
+}
+
+fn format_bytes(bytes: usize) -> String {
+    const KB: usize = 1024;
+    const MB: usize = 1024 * KB;
+
+    if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn user_time_context<E: AiEnvironment + ?Sized>(env: &E) -> UserTimeContext {
+    let configured_timezone = env
+        .settings_service()
+        .get_settings()
+        .map(|settings| settings.timezone)
+        .unwrap_or_default();
+    let configured_timezone = configured_timezone.trim();
+    let timezone = parse_user_timezone(configured_timezone).unwrap_or(DEFAULT_VALUATION_TZ);
+    let now = chrono::Utc::now().with_timezone(&timezone);
+
+    UserTimeContext {
+        timezone: timezone.name().to_string(),
+        date: now.format("%Y-%m-%d").to_string(),
+        weekday: now.format("%A").to_string(),
+        datetime: now.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+    }
+}
+
+fn redact_tool_arguments_for_persistence(
+    tool_name: &str,
+    args: &serde_json::Value,
+) -> serde_json::Value {
+    if tool_name != "import_csv" {
+        return args.clone();
+    }
+
+    let mut redacted = args.clone();
+    if let Some(arguments) = redacted.as_object_mut() {
+        if arguments.contains_key("csvContent") {
+            arguments.insert(
+                "csvContent".to_string(),
+                serde_json::Value::String(REDACTED_CSV_CONTENT_PLACEHOLDER.to_string()),
+            );
+        }
+        if arguments.contains_key("csv_content") {
+            arguments.insert(
+                "csv_content".to_string(),
+                serde_json::Value::String(REDACTED_CSV_CONTENT_PLACEHOLDER.to_string()),
+            );
+        }
+    }
+
+    redacted
 }
 
 // ============================================================================
@@ -89,6 +622,7 @@ impl Default for ChatConfig {
 /// Chat service for managing threads and streaming responses.
 pub struct ChatService<E: AiEnvironment + 'static> {
     env: Arc<E>,
+    session_attachments: Arc<SessionAttachmentCache>,
     #[allow(dead_code)]
     config: ChatConfig,
 }
@@ -96,7 +630,11 @@ pub struct ChatService<E: AiEnvironment + 'static> {
 impl<E: AiEnvironment + 'static> ChatService<E> {
     /// Create a new chat service.
     pub fn new(env: Arc<E>, config: ChatConfig) -> Self {
-        Self { env, config }
+        Self {
+            env,
+            session_attachments: Arc::new(SessionAttachmentCache::new()),
+            config,
+        }
     }
 
     /// Create a new chat thread and persist it to the repository.
@@ -168,7 +706,9 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
 
     /// Delete a thread and its messages from the repository.
     pub async fn delete_thread(&self, thread_id: &str) -> Result<(), AiError> {
-        self.env.chat_repository().delete_thread(thread_id).await
+        self.env.chat_repository().delete_thread(thread_id).await?;
+        self.session_attachments.clear_thread(thread_id);
+        Ok(())
     }
 
     /// Send a message and get a streaming response.
@@ -178,44 +718,9 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
     ) -> Result<BoxStream<'static, AiStreamEvent>, AiError> {
         let repo = self.env.chat_repository();
 
-        // Validate attachments
-        let attachments = request.attachments.clone().unwrap_or_default();
-        if !attachments.is_empty() {
-            if attachments.len() > MAX_ATTACHMENTS_COUNT {
-                return Err(AiError::InvalidInput(format!(
-                    "Too many attachments: {} (max {})",
-                    attachments.len(),
-                    MAX_ATTACHMENTS_COUNT
-                )));
-            }
-            let mut total_size: usize = 0;
-            for att in &attachments {
-                // For base64-encoded payloads (images/PDFs), estimate the
-                // decoded byte size (~75% of encoded length) so limits stay
-                // consistent with the frontend's raw file.size check.
-                let is_binary =
-                    att.content_type.starts_with("image/") || att.content_type == "application/pdf";
-                let effective_size = if is_binary {
-                    att.data.len() * 3 / 4
-                } else {
-                    att.data.len()
-                };
-                if effective_size > MAX_ATTACHMENT_SIZE_BYTES {
-                    return Err(AiError::InvalidInput(format!(
-                        "Attachment '{}' too large (max {} MB)",
-                        att.name,
-                        MAX_ATTACHMENT_SIZE_BYTES / (1024 * 1024)
-                    )));
-                }
-                total_size += effective_size;
-            }
-            if total_size > MAX_TOTAL_ATTACHMENTS_BYTES {
-                return Err(AiError::InvalidInput(format!(
-                    "Total attachment size too large (max {} MB)",
-                    MAX_TOTAL_ATTACHMENTS_BYTES / (1024 * 1024)
-                )));
-            }
-        }
+        // Validate attachments sent with this request before creating/persisting anything.
+        let incoming_attachments = request.attachments.clone().unwrap_or_default();
+        validate_attachments(&incoming_attachments)?;
 
         // Get or create thread
         let (thread, is_new_thread, initial_title) = match &request.thread_id {
@@ -278,9 +783,20 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
             skipped_empty,
         );
 
+        let effective_attachments = self
+            .session_attachments
+            .resolve_for_thread(&thread_id, &incoming_attachments)?;
+        let prior_attachment_content_unavailable = incoming_attachments.is_empty()
+            && effective_attachments.is_empty()
+            && messages_have_attachment_markers(&previous_messages);
+        let working_context = ChatWorkingContext::from_messages_and_attachments(
+            &previous_messages,
+            &effective_attachments,
+        );
+
         // Save user message with attachment placeholders (no binary data stored)
         let mut persist_text = request.content.clone();
-        for att in &attachments {
+        for att in &incoming_attachments {
             persist_text.push_str(&format!("\n\u{1F4CE} {}", att.name));
         }
         let user_message = ChatMessage::user(&thread_id, &persist_text);
@@ -326,7 +842,7 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 tx.clone(),
                 content,
                 history_messages,
-                attachments,
+                effective_attachments,
                 provider_id,
                 model_id,
                 thread_id_clone.clone(),
@@ -336,6 +852,8 @@ impl<E: AiEnvironment + 'static> ChatService<E> {
                 initial_title_clone,
                 is_new_thread_clone,
                 thinking_override,
+                prior_attachment_content_unavailable,
+                working_context,
             )
             .await
             {
@@ -569,6 +1087,8 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     initial_title: Option<String>,
     is_new_thread: bool,
     thinking_override: Option<bool>,
+    prior_attachment_content_unavailable: bool,
+    working_context: ChatWorkingContext,
 ) -> Result<(), AiError> {
     // Send system event first
     tx.send(AiStreamEvent::system(&thread_id, &run_id, &message_id))
@@ -602,19 +1122,36 @@ async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Build dynamic context
     let base_currency = env.base_currency();
-    let current_date = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let current_datetime = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
+    let user_time = user_time_context(env.as_ref());
 
     let dynamic_context = format!(
         "\n\n## Current Context\n\
-        - Current date: {}\n\
-        - Current datetime: {}\n\
-        - Base currency: {}",
-        current_date, current_datetime, base_currency
+        - User timezone: {}\n\
+        - Current date in user timezone: {}\n\
+        - Current weekday in user timezone: {}\n\
+        - Current datetime in user timezone: {}\n\
+        - Base currency: {}\n\
+        - When a tool requires a date, resolve relative phrases such as yesterday, today, \
+        tomorrow, last Friday, or next Monday against this current date before calling the tool.",
+        user_time.timezone, user_time.date, user_time.weekday, user_time.datetime, base_currency
     );
 
     // Build preamble with capability-specific instructions
     let mut preamble = format!("{}{}", base_preamble, dynamic_context);
+
+    if let Some(context) = working_context.render() {
+        preamble.push_str("\n\n");
+        preamble.push_str(&context);
+    }
+
+    if prior_attachment_content_unavailable {
+        preamble.push_str(
+            "\n\n## Attachment Availability\n\
+            Previous messages may show attachment filename markers, but those file contents are \
+            not available in the current app session. If the user refers to those files, ask them \
+            to reattach the file instead of inferring from the filename or prior chat history.",
+        );
+    }
 
     // Add tool limitation notice if model doesn't support tools
     if !capabilities.tools {
@@ -1568,11 +2105,12 @@ async fn stream_agent_response<M: CompletionModel + 'static, E: AiEnvironment + 
 
                 let args: serde_json::Value =
                     serde_json::from_str(&function.arguments.to_string()).unwrap_or_default();
+                let persisted_args = redact_tool_arguments_for_persistence(&function.name, &args);
 
                 content_parts.push(ChatMessagePart::ToolCall {
                     tool_call_id: id.clone(),
                     name: function.name.clone(),
-                    arguments: args.clone(),
+                    arguments: persisted_args,
                 });
 
                 tx.send(AiStreamEvent::tool_call(
@@ -1829,6 +2367,23 @@ mod tests {
     use super::*;
     use crate::env::test_env::MockEnvironment;
 
+    fn test_attachment(name: &str, data: &str) -> MessageAttachment {
+        MessageAttachment {
+            name: name.to_string(),
+            content_type: "text/csv".to_string(),
+            data: data.to_string(),
+        }
+    }
+
+    fn test_limits() -> AttachmentLimits {
+        AttachmentLimits {
+            max_count: 3,
+            max_attachment_size_bytes: 10,
+            max_total_attachments_bytes: 20,
+            max_session_cache_bytes: 100,
+        }
+    }
+
     #[tokio::test]
     async fn test_chat_service_create_thread() {
         let env = Arc::new(MockEnvironment::new());
@@ -1859,6 +2414,236 @@ mod tests {
         let tools = service.list_tools();
         assert!(tools.contains(&"get_accounts".to_string()));
         assert!(tools.contains(&"get_holdings".to_string()));
+    }
+
+    #[test]
+    fn test_chat_working_context_extracts_accounts_from_tool_result() {
+        let mut assistant = ChatMessage::assistant("thread-1");
+        assistant.content = ChatMessageContent::new(vec![
+            ChatMessagePart::ToolCall {
+                tool_call_id: "call-1".to_string(),
+                name: "get_accounts".to_string(),
+                arguments: serde_json::json!({ "displayMode": "compact" }),
+            },
+            ChatMessagePart::ToolResult {
+                tool_call_id: "call-1".to_string(),
+                success: true,
+                data: serde_json::json!({
+                    "accounts": [
+                        { "id": "acct-test", "name": "Test", "currency": "USD" },
+                        { "id": "acct-default", "name": "Default", "currency": "CAD" }
+                    ],
+                    "count": 2
+                }),
+                meta: HashMap::new(),
+                error: None,
+            },
+        ]);
+
+        let context = ChatWorkingContext::from_messages_and_attachments(&[assistant], &[]);
+
+        assert_eq!(context.accounts.len(), 2);
+        assert_eq!(context.accounts[0].name, "Test");
+        let rendered = context.render().unwrap();
+        assert!(rendered.contains("Test: id=acct-test, currency=USD"));
+        assert!(rendered.contains("Do not call tools only to re-fetch"));
+    }
+
+    #[test]
+    fn test_chat_working_context_summarizes_import_and_attachment_metadata() {
+        let mut assistant = ChatMessage::assistant("thread-1");
+        assistant.content = ChatMessageContent::new(vec![
+            ChatMessagePart::ToolCall {
+                tool_call_id: "call-1".to_string(),
+                name: "import_csv".to_string(),
+                arguments: serde_json::json!({ "accountId": "acct-test" }),
+            },
+            ChatMessagePart::ToolResult {
+                tool_call_id: "call-1".to_string(),
+                success: true,
+                data: serde_json::json!({
+                    "totalRows": 52,
+                    "accountId": "acct-test",
+                    "mappingConfidence": "HIGH",
+                    "availableAccounts": [
+                        { "id": "acct-test", "name": "Test", "currency": "USD" }
+                    ]
+                }),
+                meta: HashMap::new(),
+                error: None,
+            },
+        ]);
+        let attachment = test_attachment("activities.csv", "Date,Symbol\n2025-01-01,AAPL");
+
+        let context =
+            ChatWorkingContext::from_messages_and_attachments(&[assistant], &[attachment]);
+        let rendered = context.render().unwrap();
+
+        assert!(rendered.contains("Attachments available this session:"));
+        assert!(rendered.contains("activities.csv (text/csv"));
+        assert!(rendered.contains("Current CSV import:"));
+        assert!(rendered.contains("rows prepared: 52"));
+        assert!(rendered.contains("status: prepared, not imported yet"));
+        assert!(!rendered.contains("2025-01-01,AAPL"));
+    }
+
+    #[test]
+    fn test_redact_import_csv_tool_arguments_for_persistence() {
+        let args = serde_json::json!({
+            "csvContent": "Date,Symbol\n2025-01-01,AAPL",
+            "accountId": "acct-test"
+        });
+
+        let redacted = redact_tool_arguments_for_persistence("import_csv", &args);
+        let serialized = serde_json::to_string(&redacted).unwrap();
+
+        assert_eq!(redacted["accountId"], "acct-test");
+        assert_eq!(redacted["csvContent"], REDACTED_CSV_CONTENT_PLACEHOLDER);
+        assert!(!serialized.contains("2025-01-01,AAPL"));
+    }
+
+    #[test]
+    fn test_session_attachment_cache_stores_and_reuses_attachments() {
+        let cache = SessionAttachmentCache::with_limits(test_limits());
+        let incoming = vec![test_attachment("trades.csv", "a,b\n1,2")];
+
+        let stored = cache.resolve_for_thread("thread-1", &incoming).unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].name, "trades.csv");
+
+        let reused = cache.resolve_for_thread("thread-1", &[]).unwrap();
+        assert_eq!(reused.len(), stored.len());
+        assert_eq!(reused[0].name, stored[0].name);
+        assert_eq!(reused[0].data, stored[0].data);
+    }
+
+    #[test]
+    fn test_session_attachment_cache_appends_unique_and_skips_duplicates() {
+        let cache = SessionAttachmentCache::with_limits(test_limits());
+        let first = test_attachment("trades.csv", "a,b\n1,2");
+        let second = test_attachment("statement.csv", "c,d\n3,4");
+
+        cache
+            .resolve_for_thread("thread-1", std::slice::from_ref(&first))
+            .unwrap();
+        let with_duplicate = cache
+            .resolve_for_thread("thread-1", &[first.clone(), second.clone()])
+            .unwrap();
+
+        assert_eq!(with_duplicate.len(), 2);
+        assert_eq!(with_duplicate[0].name, first.name);
+        assert_eq!(with_duplicate[0].data, first.data);
+        assert_eq!(with_duplicate[1].name, second.name);
+        assert_eq!(with_duplicate[1].data, second.data);
+    }
+
+    #[test]
+    fn test_session_attachment_cache_enforces_limits() {
+        let cache = SessionAttachmentCache::with_limits(test_limits());
+
+        let too_large = vec![test_attachment("large.csv", "01234567890")];
+        assert!(matches!(
+            cache.resolve_for_thread("thread-1", &too_large),
+            Err(AiError::InvalidInput(_))
+        ));
+
+        let too_many = vec![
+            test_attachment("a.csv", "1"),
+            test_attachment("b.csv", "2"),
+            test_attachment("c.csv", "3"),
+            test_attachment("d.csv", "4"),
+        ];
+        assert!(matches!(
+            cache.resolve_for_thread("thread-1", &too_many),
+            Err(AiError::InvalidInput(_))
+        ));
+
+        cache
+            .resolve_for_thread("thread-1", &[test_attachment("a.csv", "1234567890")])
+            .unwrap();
+        assert!(matches!(
+            cache.resolve_for_thread("thread-1", &[test_attachment("b.csv", "12345678901")]),
+            Err(AiError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            cache.resolve_for_thread(
+                "thread-1",
+                &[
+                    test_attachment("b.csv", "1234567890"),
+                    test_attachment("c.csv", "x"),
+                ],
+            ),
+            Err(AiError::InvalidInput(_))
+        ));
+    }
+
+    #[test]
+    fn test_session_attachment_cache_evicts_least_recently_used_thread() {
+        let cache = SessionAttachmentCache::with_limits(AttachmentLimits {
+            max_session_cache_bytes: 15,
+            ..test_limits()
+        });
+
+        cache
+            .resolve_for_thread("thread-a", &[test_attachment("a.csv", "123456")])
+            .unwrap();
+        cache
+            .resolve_for_thread("thread-b", &[test_attachment("b.csv", "123456")])
+            .unwrap();
+        cache.resolve_for_thread("thread-a", &[]).unwrap();
+        cache
+            .resolve_for_thread("thread-c", &[test_attachment("c.csv", "123456")])
+            .unwrap();
+
+        assert_eq!(cache.resolve_for_thread("thread-b", &[]).unwrap().len(), 0);
+        assert_eq!(cache.resolve_for_thread("thread-a", &[]).unwrap().len(), 1);
+        assert_eq!(cache.resolve_for_thread("thread-c", &[]).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_session_attachment_cache_clears_thread() {
+        let cache = SessionAttachmentCache::with_limits(test_limits());
+
+        cache
+            .resolve_for_thread("thread-1", &[test_attachment("a.csv", "1")])
+            .unwrap();
+        cache.clear_thread("thread-1");
+
+        assert!(cache
+            .resolve_for_thread("thread-1", &[])
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_chat_service_clears_cached_attachments_when_thread_is_deleted() {
+        let env = Arc::new(MockEnvironment::new());
+        let service = ChatService::new(env, ChatConfig::default());
+
+        let thread = service.create_thread().await.unwrap();
+        let thread_id = thread.id.clone();
+        let attachment = test_attachment("trades.csv", "a,b\n1,2");
+
+        service
+            .session_attachments
+            .resolve_for_thread(&thread_id, &[attachment])
+            .unwrap();
+        assert_eq!(
+            service
+                .session_attachments
+                .resolve_for_thread(&thread_id, &[])
+                .unwrap()
+                .len(),
+            1
+        );
+
+        service.delete_thread(&thread_id).await.unwrap();
+
+        assert!(service
+            .session_attachments
+            .resolve_for_thread(&thread_id, &[])
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]

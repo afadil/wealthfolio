@@ -23,6 +23,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 log = { workspace = true }
 reqwest = { workspace = true }
+sha2 = { workspace = true }
 
 # LLM orchestration (rig-core crate exports as "rig")
 rig = { package = "rig-core", version = "0.30" }
