@@ -207,6 +207,26 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const liveToolCalls = new Set<string>();
+const liveCsvContentByToolCall = new Map<string, string>();
+
+function isRedactedCsvContent(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.toLowerCase().includes("redacted") &&
+    value.toLowerCase().includes("session")
+  );
+}
+
+function getSessionCsvContent(toolCallId: string | undefined, value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim() && !isRedactedCsvContent(value)) {
+    if (toolCallId) {
+      liveCsvContentByToolCall.set(toolCallId, value);
+    }
+    return value;
+  }
+
+  return toolCallId ? liveCsvContentByToolCall.get(toolCallId) : undefined;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
@@ -226,9 +246,10 @@ function ImportCsvToolUIContentImpl({
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
 
-  // csvContent lives in the tool ARGS (what the LLM sent), not the result
-  // (the tool no longer echoes it back to avoid double-storing in the DB).
-  const csvContent = (args as Record<string, unknown>)?.csvContent as string | undefined;
+  // csvContent lives in live tool args only. Persisted tool args are redacted,
+  // so keep an in-memory copy for this page session.
+  const rawCsvContent = (args as Record<string, unknown>)?.csvContent;
+  const csvContent = getSessionCsvContent(toolCallId, rawCsvContent);
 
   const { mapping, errorMessage: normalizeError } = useMemo(
     () => normalizeMappingResult(result as RawResult, csvContent ?? ""),

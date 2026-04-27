@@ -307,6 +307,45 @@ function normalizeParseConfig(input: ParseConfig): ParseConfig {
   };
 }
 
+function resolveAvailableAccountId(
+  value: string | null | undefined,
+  accounts: ImportCsvMappingOutput["availableAccounts"],
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  return (
+    accounts.find((account) => account.id === trimmed)?.id ??
+    accounts.find((account) => account.name.toLowerCase() === trimmed.toLowerCase())?.id
+  );
+}
+
+function normalizeAccountMappings(
+  mappings: Record<string, string>,
+  accounts: ImportCsvMappingOutput["availableAccounts"],
+): Record<string, string> {
+  const normalized: Record<string, string> = {};
+
+  for (const account of accounts) {
+    normalized[account.id] = account.id;
+    normalized[account.name] = account.id;
+    normalized[account.name.toLowerCase()] = account.id;
+  }
+
+  for (const [rawValue, mappedValue] of Object.entries(mappings)) {
+    const key = rawValue.trim();
+    if (!key) continue;
+
+    const accountId =
+      resolveAvailableAccountId(mappedValue, accounts) ?? resolveAvailableAccountId(key, accounts);
+    if (accountId) {
+      normalized[key] = accountId;
+    }
+  }
+
+  return normalized;
+}
+
 /**
  * Merge backend check results (errors, warnings, duplicates, enrichment) into
  * the local drafts. Matches the manual wizard's validate flow, minus the
@@ -333,9 +372,17 @@ function applyBackendValidation(
   validated: ActivityImport[],
 ): DraftActivity[] {
   return drafts.map((draft) => {
+    const localValidation = validateDraft(draft);
     const backendResult = validated.find((v) => v.lineNumber === draft.rowIndex + 1);
     if (!backendResult) {
-      return { ...draft, duplicateOfId: undefined, duplicateOfLineNumber: undefined };
+      return {
+        ...draft,
+        errors: localValidation.errors,
+        warnings: localValidation.warnings,
+        duplicateOfId: undefined,
+        duplicateOfLineNumber: undefined,
+        status: draft.status === "skipped" ? "skipped" : localValidation.status,
+      };
     }
 
     const backendErrors: Record<string, string[]> = {};
@@ -354,10 +401,8 @@ function applyBackendValidation(
       backendErrors.general = ["Validation failed"];
     }
 
-    const mergedErrors = mergeIssueMaps(draft.errors || {}, backendErrors);
-    const retainedWarnings = { ...(draft.warnings || {}) };
-    delete retainedWarnings._duplicate;
-    const mergedWarnings = mergeIssueMaps(retainedWarnings, backendWarnings);
+    const mergedErrors = mergeIssueMaps(localValidation.errors, backendErrors);
+    const mergedWarnings = mergeIssueMaps(localValidation.warnings, backendWarnings);
     const hasErrors = Object.keys(mergedErrors).length > 0;
     const hasWarnings = Object.keys(mergedWarnings).length > 0;
 
@@ -465,6 +510,14 @@ function computeStats(drafts: DraftActivity[]): ChatImportStats {
     }
   }
   return stats;
+}
+
+function isImportableDraft(draft: DraftActivity): boolean {
+  return (
+    draft.status === "valid" ||
+    draft.status === "warning" ||
+    (draft.status === "duplicate" && !!draft.forceImport)
+  );
 }
 
 function filterDrafts(drafts: DraftActivity[], filter: ChatImportFilter): DraftActivity[] {
@@ -584,10 +637,19 @@ export function useChatImportSession({
             ? (aiFieldMappings as Record<string, string | string[]>)
             : autoDetectFieldMappings(parsed.headers);
 
+        const accountMappings = normalizeAccountMappings(
+          applied.accountMappings ?? {},
+          mapping.availableAccounts,
+        );
+        const validAccountIds = new Set(mapping.availableAccounts.map((account) => account.id));
+
         // Prefer AI's inferred account → saved mapping's account → single
-        // available account. Leave empty only when multiple accounts exist
-        // and AI didn't pick one.
-        const inferredAccountId = mapping.accountId ?? applied.accountId ?? "";
+        // available account, but only when the ID/name exists in this app
+        // session. Stale account IDs from older demo DBs must not validate.
+        const inferredAccountId =
+          resolveAvailableAccountId(mapping.accountId, mapping.availableAccounts) ??
+          resolveAvailableAccountId(applied.accountId, mapping.availableAccounts) ??
+          "";
         const accountId =
           inferredAccountId ||
           (mapping.availableAccounts.length === 1 ? mapping.availableAccounts[0].id : "");
@@ -599,7 +661,7 @@ export function useChatImportSession({
             fieldMappings: effectiveFieldMappings,
             activityMappings: applied.activityMappings ?? {},
             symbolMappings: applied.symbolMappings ?? {},
-            accountMappings: applied.accountMappings ?? {},
+            accountMappings,
             symbolMappingMeta: applied.symbolMappingMeta ?? {},
           },
           {
@@ -612,6 +674,7 @@ export function useChatImportSession({
               parsed.detectedConfig.defaultCurrency ?? parseConfig.defaultCurrency ?? "USD",
           },
           accountId,
+          validAccountIds,
         );
 
         if (drafts.length === 0) {
@@ -625,24 +688,25 @@ export function useChatImportSession({
           return;
         }
 
-        // Only run backend validation + asset preview if an account is
-        // selected. Without an account, the backend rejects the batch with
-        // "Record not found". The user picks the account from the dropdown
-        // → triggers revalidation with a real account ID.
-        const hasAccount = !!accountId;
-        const activitiesToValidate = hasAccount
+        // Only run backend validation + asset preview once every imported
+        // row has an account. The user can pick one from the dropdown, which
+        // triggers revalidation with that account ID.
+        const hasAccounts = drafts.every(
+          (draft) => draft.status === "skipped" || !!draft.accountId,
+        );
+        const activitiesToValidate = hasAccounts
           ? buildActivitiesToValidate(drafts, parseConfig.defaultCurrency ?? "USD")
           : [];
-        const candidates = hasAccount
+        const candidates = hasAccounts
           ? drafts
               .map(buildImportAssetCandidateFromDraft)
               .filter((c): c is NonNullable<typeof c> => c !== null)
               .filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i)
           : [];
 
-        // Backend validation + asset preview are best-effort. If they fail
-        // (e.g., "Record not found" for a new symbol), proceed with local-only
-        // validation. The user can still review, edit, and import.
+        // Backend validation + asset preview are best-effort. If they fail,
+        // proceed with local-only validation. The user can still review,
+        // edit, and import.
         let validated: ActivityImport[] = [];
         let preview: ImportAssetPreviewItem[] = [];
         try {
@@ -992,8 +1056,11 @@ export function useChatImportSession({
     () => filterDrafts(state.drafts, state.filter),
     [state.drafts, state.filter],
   );
+  const importableDrafts = useMemo(() => state.drafts.filter(isImportableDraft), [state.drafts]);
   const canConfirm =
-    state.status === "ready" && stats.toImport > 0 && state.accountId.trim().length > 0;
+    state.status === "ready" &&
+    importableDrafts.length > 0 &&
+    importableDrafts.every((draft) => Boolean(draft.accountId?.trim()));
   const isSubmitting = state.status === "submitting";
   const submitted = state.status === "submitted";
 
