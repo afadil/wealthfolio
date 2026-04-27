@@ -35,14 +35,19 @@ fn compute_goal_value_from_shares(
     funding_rules: &[GoalFundingRule],
     valuations: &AccountValuationMap,
 ) -> f64 {
-    funding_rules
+    let value: f64 = funding_rules
         .iter()
         .filter_map(|r| {
             valuations
                 .get(&r.account_id)
                 .map(|&v| v * r.share_percent / 100.0)
         })
-        .sum()
+        .sum();
+    if value == 0.0 {
+        0.0
+    } else {
+        value
+    }
 }
 
 fn build_account_share_totals(rules: &[GoalFundingRule]) -> HashMap<String, f64> {
