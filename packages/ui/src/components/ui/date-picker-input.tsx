@@ -24,6 +24,8 @@ function toDateValue(
   const hasTimeGranularity = granularity !== "day";
 
   if (value instanceof Date) {
+    if (!Number.isFinite(value.getTime())) return null;
+
     if (hasTimeGranularity) {
       return new CalendarDateTime(
         value.getFullYear(),

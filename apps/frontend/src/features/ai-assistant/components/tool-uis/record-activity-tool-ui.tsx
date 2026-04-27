@@ -109,11 +109,94 @@ interface RecordActivityOutput {
 /**
  * Parse an ISO date string preserving the date/time as-is (no timezone conversion).
  */
-function parseActivityDateToLocal(dateString: string): Date {
-  if (dateString.includes("T")) {
-    return dateFnsParse(dateString.substring(0, 19), "yyyy-MM-dd'T'HH:mm:ss", new Date());
+function parseActivityDateToLocal(dateString: string): Date | undefined {
+  const value = dateString.trim();
+  if (!value) return undefined;
+
+  const parsed = value.includes("T")
+    ? dateFnsParse(value.substring(0, 19), "yyyy-MM-dd'T'HH:mm:ss", new Date())
+    : dateFnsParse(value.substring(0, 10), "yyyy-MM-dd", new Date());
+
+  if (Number.isFinite(parsed.getTime())) {
+    return parsed;
   }
-  return dateFnsParse(dateString.substring(0, 10), "yyyy-MM-dd", new Date());
+
+  return undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function finiteNumberValue(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : undefined;
+}
+
+function formatActivityDate(dateString: string): string {
+  return parseActivityDateToLocal(dateString)?.toLocaleDateString() ?? "Invalid date";
+}
+
+function displayPart(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
+function hasSameDisplayValue(a: string | undefined, b: string | undefined): boolean {
+  const left = displayPart(a)?.toLowerCase();
+  const right = displayPart(b)?.toLowerCase();
+  return Boolean(left && right && left === right);
+}
+
+function joinDisplayParts(parts: Array<string | undefined>): string | undefined {
+  const visibleParts = parts.filter((part): part is string => Boolean(displayPart(part)));
+  return visibleParts.length > 0 ? visibleParts.join(" \u00b7 ") : undefined;
+}
+
+function formatExchange(resolvedAsset: ResolvedAsset | undefined): string | undefined {
+  const exchange = displayPart(resolvedAsset?.exchange);
+  const exchangeMic = displayPart(resolvedAsset?.exchangeMic);
+
+  if (exchange && exchangeMic && !hasSameDisplayValue(exchange, exchangeMic)) {
+    return `${exchange} (${exchangeMic})`;
+  }
+
+  return exchange ?? exchangeMic;
+}
+
+interface AssetSummary {
+  primary: string;
+  secondary?: string;
+}
+
+function getAssetSummary(
+  draft: ActivityDraft,
+  resolvedAsset: ResolvedAsset | undefined,
+): AssetSummary | undefined {
+  const symbol = displayPart(resolvedAsset?.symbol) ?? displayPart(draft.symbol);
+  const name = displayPart(resolvedAsset?.name) ?? displayPart(draft.assetName);
+  const exchange = formatExchange(resolvedAsset);
+  const currency = displayPart(resolvedAsset?.currency) ?? displayPart(draft.currency);
+
+  if (!symbol && !name) {
+    if (
+      draft.activityType === ActivityType.DEPOSIT ||
+      draft.activityType === ActivityType.WITHDRAWAL
+    ) {
+      return { primary: "Cash", secondary: currency };
+    }
+    return undefined;
+  }
+
+  return {
+    primary: symbol ?? name ?? "",
+    secondary: joinDisplayParts([
+      hasSameDisplayValue(symbol, name) ? undefined : name,
+      exchange,
+      currency,
+    ]),
+  };
 }
 
 // ============================================================================
@@ -140,24 +223,20 @@ function normalizeResult(result: unknown, fallbackCurrency: string): RecordActiv
   }
 
   const draftRaw = (candidate.draft ?? candidate) as Record<string, unknown>;
+  const activityDate =
+    stringValue(draftRaw.activityDate) ??
+    stringValue(draftRaw.activity_date) ??
+    new Date().toISOString();
   const draft: ActivityDraft = {
     activityType: (draftRaw.activityType as string) ?? (draftRaw.activity_type as string) ?? "",
-    activityDate:
-      (draftRaw.activityDate as string) ??
-      (draftRaw.activity_date as string) ??
-      new Date().toISOString(),
+    activityDate,
     symbol: (draftRaw.symbol as string) ?? undefined,
     assetId: (draftRaw.assetId as string) ?? (draftRaw.asset_id as string) ?? undefined,
     assetName: (draftRaw.assetName as string) ?? (draftRaw.asset_name as string) ?? undefined,
-    quantity: draftRaw.quantity != null ? Number(draftRaw.quantity) : undefined,
-    unitPrice:
-      draftRaw.unitPrice != null
-        ? Number(draftRaw.unitPrice)
-        : draftRaw.unit_price != null
-          ? Number(draftRaw.unit_price)
-          : undefined,
-    amount: draftRaw.amount != null ? Number(draftRaw.amount) : undefined,
-    fee: draftRaw.fee != null ? Number(draftRaw.fee) : undefined,
+    quantity: finiteNumberValue(draftRaw.quantity),
+    unitPrice: finiteNumberValue(draftRaw.unitPrice ?? draftRaw.unit_price),
+    amount: finiteNumberValue(draftRaw.amount),
+    fee: finiteNumberValue(draftRaw.fee),
     currency: (draftRaw.currency as string) ?? fallbackCurrency,
     accountId: (draftRaw.accountId as string) ?? (draftRaw.account_id as string) ?? undefined,
     accountName: (draftRaw.accountName as string) ?? (draftRaw.account_name as string) ?? undefined,
@@ -324,7 +403,7 @@ function SuccessState({ draft, createdActivityId, currency }: SuccessStateProps)
           </div>
           <div>
             <span className="text-muted-foreground">Date:</span>{" "}
-            <span className="font-medium">{new Date(draft.activityDate).toLocaleDateString()}</span>
+            <span className="font-medium">{formatActivityDate(draft.activityDate)}</span>
           </div>
           {draft.symbol && (
             <div>
@@ -465,6 +544,140 @@ function aiSpecificDefaultOverrides(
   return overrides;
 }
 
+interface ValidationHintsProps {
+  validation: ValidationResult;
+}
+
+function ValidationHints({ validation }: ValidationHintsProps) {
+  if (validation.errors.length === 0 && validation.missingFields.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-warning/10 border-warning/30 rounded-md border p-2 text-xs">
+      <p className="font-medium">The AI flagged some issues — please review:</p>
+      <ul className="mt-1 list-disc pl-4">
+        {validation.errors.map((e, i) => (
+          <li key={`err-${i}`}>
+            <span className="font-medium">{e.field}:</span> {e.message}
+          </li>
+        ))}
+        {validation.missingFields.map((f) => (
+          <li key={`missing-${f}`}>Missing: {f}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+interface DraftReviewProps {
+  draft: ActivityDraft;
+  validation: ValidationResult;
+  resolvedAsset?: ResolvedAsset;
+  activityTypeDisplay: string;
+  isLoading: boolean;
+  canConfirm: boolean;
+  onConfirm: () => void;
+  onEdit: () => void;
+}
+
+interface ReviewFieldProps {
+  label: string;
+  value: string;
+  className?: string;
+}
+
+function ReviewField({ label, value, className }: ReviewFieldProps) {
+  return (
+    <div className={className}>
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+function DraftReview({
+  draft,
+  validation,
+  resolvedAsset,
+  activityTypeDisplay,
+  isLoading,
+  canConfirm,
+  onConfirm,
+  onEdit,
+}: DraftReviewProps) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  const formatAmount = useCallback(
+    (value: number | undefined) => {
+      if (value === undefined) return "-";
+      if (isBalanceHidden) return "\u2022\u2022\u2022\u2022\u2022";
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: draft.currency,
+      }).format(value);
+    },
+    [draft.currency, isBalanceHidden],
+  );
+
+  const assetSummary = getAssetSummary(draft, resolvedAsset);
+
+  return (
+    <CardContent className="space-y-5">
+      {assetSummary && (
+        <div className="border-border/70 bg-background/60 flex min-w-0 items-start gap-3 rounded-lg border px-3 py-2.5">
+          <div className="bg-muted flex size-9 shrink-0 items-center justify-center rounded-md">
+            <Icons.ReceiptText className="text-muted-foreground size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-base font-semibold">{assetSummary.primary}</div>
+            {assetSummary.secondary && (
+              <div className="text-muted-foreground mt-0.5 truncate text-xs font-medium">
+                {assetSummary.secondary}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        <ReviewField label="Type" value={activityTypeDisplay} />
+        <ReviewField label="Date" value={formatActivityDate(draft.activityDate)} />
+        <ReviewField label="Account" value={draft.accountName ?? draft.accountId ?? "-"} />
+        {draft.quantity !== undefined && (
+          <ReviewField label="Quantity" value={String(draft.quantity)} />
+        )}
+        {draft.unitPrice !== undefined && (
+          <ReviewField label="Unit price" value={formatAmount(draft.unitPrice)} />
+        )}
+        {draft.amount !== undefined && (
+          <ReviewField label="Amount" value={formatAmount(draft.amount)} />
+        )}
+        {draft.fee !== undefined && <ReviewField label="Fee" value={formatAmount(draft.fee)} />}
+        {draft.subtype && <ReviewField label="Subtype" value={draft.subtype} />}
+      </div>
+
+      {draft.notes && (
+        <div className="border-border/70 rounded-lg border px-3 py-2.5 text-sm">
+          <div className="text-muted-foreground text-xs font-medium">Notes</div>
+          <div className="mt-1 font-medium">{draft.notes}</div>
+        </div>
+      )}
+
+      <ValidationHints validation={validation} />
+
+      <div className="border-border/60 flex justify-end gap-2 border-t pt-4">
+        <Button type="button" variant="ghost" size="sm" onClick={onEdit} disabled={isLoading}>
+          Edit
+        </Button>
+        <Button type="button" size="sm" onClick={onConfirm} disabled={isLoading || !canConfirm}>
+          {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+          Confirm
+        </Button>
+      </div>
+    </CardContent>
+  );
+}
+
 // ============================================================================
 // Draft Form — dispatcher
 // ============================================================================
@@ -488,6 +701,8 @@ function DraftForm({
 }: DraftFormProps) {
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
+  const { isBalanceHidden } = useBalancePrivacy();
+  const [isEditing, setIsEditing] = useState(false);
 
   const pickerType = useMemo(() => toPickerActivityType(draft.activityType), [draft.activityType]);
   const config = pickerType ? ACTIVITY_FORM_CONFIG[pickerType] : undefined;
@@ -511,8 +726,14 @@ function DraftForm({
   const defaultValues = useMemo(() => {
     if (!config) return undefined;
     const base = config.getDefaults(pseudoActivity, accountOptions);
-    return { ...base, ...aiSpecificDefaultOverrides(draft, resolvedAsset) };
+    const dateOverride = parseActivityDateToLocal(draft.activityDate)
+      ? {}
+      : { activityDate: undefined };
+    return { ...base, ...aiSpecificDefaultOverrides(draft, resolvedAsset), ...dateOverride };
   }, [config, pseudoActivity, accountOptions, draft, resolvedAsset]);
+  const canConfirm = Boolean(
+    defaultValues && validation.isValid && parseActivityDateToLocal(draft.activityDate),
+  );
 
   // Reuse the existing add-activity mutation — it already handles symbol
   // nesting (id, symbol, exchangeMic, quoteCcy, instrumentType, etc.),
@@ -566,6 +787,11 @@ function DraftForm({
     [config, pickerType, threadId, toolCallId, onSuccess, addActivityMutation],
   );
 
+  const handleConfirm = useCallback(() => {
+    if (!defaultValues || !canConfirm) return;
+    void handleFormSubmit(defaultValues as ActivityFormValues);
+  }, [canConfirm, defaultValues, handleFormSubmit]);
+
   if (!config) {
     return (
       <Card className="border-destructive/30 bg-destructive/5">
@@ -582,50 +808,73 @@ function DraftForm({
   const activityTypeDisplay =
     (ACTIVITY_TYPE_DISPLAY_NAMES as Record<string, string>)[draft.activityType] ??
     draft.activityType;
-
-  // AI-side validation hints (informational only — per-type form runs its own Zod schema).
-  const showValidationHints = validation.errors.length > 0 || validation.missingFields.length > 0;
+  const cardTitle = `${isEditing ? "Edit" : "Review"} ${activityTypeDisplay.toLowerCase()} activity`;
+  const headerAmount =
+    draft.amount ??
+    (draft.quantity != null && draft.unitPrice != null
+      ? draft.quantity * draft.unitPrice
+      : undefined);
+  const headerAmountLabel =
+    headerAmount !== undefined
+      ? isBalanceHidden
+        ? "\u2022\u2022\u2022\u2022\u2022"
+        : new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: draft.currency,
+          }).format(headerAmount)
+      : undefined;
 
   return (
     <Card className="bg-muted/40 border-primary/10">
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base">{activityTypeDisplay} draft</CardTitle>
-          {draft.isCustomAsset && (
-            <Badge variant="warning" className="text-xs">
-              Custom Asset
-            </Badge>
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">{cardTitle}</CardTitle>
+              {draft.isCustomAsset && (
+                <Badge variant="warning" className="text-xs">
+                  Custom Asset
+                </Badge>
+              )}
+            </div>
+            {draft.isCustomAsset && draft.symbol && (
+              <p className="text-warning mt-1 text-xs">
+                "{draft.symbol}" wasn't found. It will be created as a custom asset on save.
+              </p>
+            )}
+          </div>
+          {headerAmountLabel && (
+            <div className="text-right">
+              <div className="text-muted-foreground text-xs font-medium">Estimated total</div>
+              <div className="text-lg font-semibold tabular-nums">{headerAmountLabel}</div>
+            </div>
           )}
         </div>
-        {draft.isCustomAsset && draft.symbol && (
-          <p className="text-warning mt-1 text-xs">
-            "{draft.symbol}" wasn't found. It will be created as a custom asset on save.
-          </p>
-        )}
-        {showValidationHints && (
-          <div className="bg-warning/10 border-warning/30 mt-2 rounded-md border p-2 text-xs">
-            <p className="font-medium">The AI flagged some issues — please confirm:</p>
-            <ul className="mt-1 list-disc pl-4">
-              {validation.errors.map((e, i) => (
-                <li key={`err-${i}`}>
-                  <span className="font-medium">{e.field}:</span> {e.message}
-                </li>
-              ))}
-              {validation.missingFields.map((f) => (
-                <li key={`missing-${f}`}>Missing: {f}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </CardHeader>
-      <CardContent>
-        <FormComponent
-          accounts={accountOptions}
-          defaultValues={defaultValues}
-          onSubmit={handleFormSubmit}
+      {!isEditing ? (
+        <DraftReview
+          draft={draft}
+          validation={validation}
+          resolvedAsset={resolvedAsset}
+          activityTypeDisplay={activityTypeDisplay}
           isLoading={addActivityMutation.isPending}
+          canConfirm={canConfirm}
+          onConfirm={handleConfirm}
+          onEdit={() => setIsEditing(true)}
         />
-      </CardContent>
+      ) : (
+        <CardContent>
+          <ValidationHints validation={validation} />
+          <FormComponent
+            accounts={accountOptions}
+            defaultValues={defaultValues}
+            onSubmit={handleFormSubmit}
+            onCancel={() => setIsEditing(false)}
+            isLoading={addActivityMutation.isPending}
+            isEditing
+          />
+        </CardContent>
+      )}
     </Card>
   );
 }
