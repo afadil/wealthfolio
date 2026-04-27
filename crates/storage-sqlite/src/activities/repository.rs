@@ -45,12 +45,15 @@ fn apply_decimal_patch(existing: Option<String>, patch: Option<Option<Decimal>>)
 fn set_transfer_flow_external(metadata: Option<String>, is_external: bool) -> Option<String> {
     let mut value = metadata
         .and_then(|metadata| serde_json::from_str::<serde_json::Value>(&metadata).ok())
-        .filter(|value| value.is_object())
         .unwrap_or_else(|| serde_json::json!({}));
 
-    let Some(object) = value.as_object_mut() else {
-        return Some(serde_json::json!({ "flow": { "is_external": is_external } }).to_string());
-    };
+    if !value.is_object() {
+        value = serde_json::json!({});
+    }
+
+    let object = value
+        .as_object_mut()
+        .expect("transfer metadata value should be an object");
     let flow = object
         .entry("flow")
         .or_insert_with(|| serde_json::json!({}));
@@ -492,16 +495,26 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 transfer_out.updated_at = now;
 
                 let updated_in = diesel::update(activities::table.find(&transfer_in.id))
-                    .set(&transfer_in)
+                    .set((
+                        activities::source_group_id.eq(transfer_in.source_group_id.clone()),
+                        activities::metadata.eq(transfer_in.metadata.clone()),
+                        activities::is_user_modified.eq(transfer_in.is_user_modified),
+                        activities::updated_at.eq(&transfer_in.updated_at),
+                    ))
                     .get_result::<ActivityDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let updated_out = diesel::update(activities::table.find(&transfer_out.id))
-                    .set(&transfer_out)
+                    .set((
+                        activities::source_group_id.eq(transfer_out.source_group_id.clone()),
+                        activities::metadata.eq(transfer_out.metadata.clone()),
+                        activities::is_user_modified.eq(transfer_out.is_user_modified),
+                        activities::updated_at.eq(&transfer_out.updated_at),
+                    ))
                     .get_result::<ActivityDB>(tx.conn())
                     .map_err(StorageError::from)?;
 
-                tx.update(&transfer_in)?;
-                tx.update(&transfer_out)?;
+                tx.update(&updated_in)?;
+                tx.update(&updated_out)?;
 
                 Ok((Activity::from(updated_in), Activity::from(updated_out)))
             })
