@@ -52,25 +52,31 @@ impl RebalancingServiceImpl {
     }
 
     /// Calculate category-level shortfalls (Step 1).
-    /// Returns map of category_id -> shortfall amount (always >= 0).
+    /// In buy_only mode: returns only positive shortfalls (underweight categories).
+    /// In buy_and_sell mode: returns signed deltas (negative = overweight, sell needed).
     fn calculate_category_shortfalls(
         &self,
         deviation_report: &crate::portfolio::targets::DeviationReport,
         new_total_value: Decimal,
+        rebalance_mode: &str,
     ) -> HashMap<String, Decimal> {
         let mut shortfalls = HashMap::new();
+        let buy_only = rebalance_mode != "buy_and_sell";
 
         for deviation in &deviation_report.deviations {
-            // Calculate target value based on new total (current + cash)
             let target_value = (deviation.target_percent / dec!(100)) * new_total_value;
-
-            // Current value stays the same (we're not selling)
             let current_value = deviation.current_value;
+            let delta = target_value - current_value;
 
-            // Shortfall is how much we need to buy (clamped to >= 0, buy-only)
-            let shortfall = (target_value - current_value).max(Decimal::ZERO);
+            let shortfall = if buy_only {
+                // Buy-only: clamp to >= 0
+                delta.max(Decimal::ZERO)
+            } else {
+                // Buy & sell: preserve sign
+                delta
+            };
 
-            if shortfall > Decimal::ZERO {
+            if shortfall != Decimal::ZERO {
                 shortfalls.insert(deviation.category_id.clone(), shortfall);
             }
         }
@@ -438,6 +444,7 @@ mod tests {
             account_id: account_id.to_string(),
             taxonomy_id: "asset_classes".to_string(),
             is_active: true,
+            rebalance_mode: "buy_only".to_string(),
             created_at: naive_now(),
             updated_at: naive_now(),
         }
@@ -1058,8 +1065,11 @@ impl RebalancingService for RebalancingServiceImpl {
         let new_total_value = deviation_report.total_value + input.available_cash;
 
         // Step 2: Calculate category-level shortfalls
-        let category_shortfalls =
-            self.calculate_category_shortfalls(&deviation_report, new_total_value);
+        let category_shortfalls = self.calculate_category_shortfalls(
+            &deviation_report,
+            new_total_value,
+            &target.rebalance_mode,
+        );
 
         let total_shortfall: Decimal = category_shortfalls.values().sum();
 

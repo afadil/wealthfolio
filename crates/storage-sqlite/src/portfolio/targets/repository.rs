@@ -87,6 +87,7 @@ impl PortfolioTargetRepositoryTrait for PortfolioTargetRepository {
                         account_id: target.account_id,
                         taxonomy_id: target.taxonomy_id,
                         is_active: if target.is_active { 1 } else { 0 },
+                        rebalance_mode: target.rebalance_mode,
                         created_at: target.created_at.and_utc().to_rfc3339(),
                         updated_at: now,
                     };

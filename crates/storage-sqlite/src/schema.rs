@@ -336,6 +336,7 @@ diesel::table! {
         account_id -> Text,
         taxonomy_id -> Text,
         is_active -> Integer,
+        rebalance_mode -> Text,
         created_at -> Text,
         updated_at -> Text,
     }

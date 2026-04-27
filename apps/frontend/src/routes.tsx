@@ -33,6 +33,7 @@ import ContributionLimitPage from "./pages/settings/contribution-limits/contribu
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
 import SettingsGoalsPage from "./pages/settings/goals/goals-page";
+import AllocationStrategyPage from "./pages/settings/allocation-strategy/allocation-strategy-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
@@ -112,6 +113,7 @@ export function AppRoutes() {
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
             <Route path="goals" element={<SettingsGoalsPage />} />
+            <Route path="allocation-strategy" element={<AllocationStrategyPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />

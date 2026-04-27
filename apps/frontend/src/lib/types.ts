@@ -1763,12 +1763,15 @@ export interface CheckHoldingsImportResult {
 // Portfolio Target Allocation Types
 // ============================================================================
 
+export type RebalanceMode = "buy_only" | "buy_and_sell";
+
 export interface PortfolioTarget {
   id: string;
   name: string;
   accountId: string;
   taxonomyId: string;
   isActive: boolean;
+  rebalanceMode: RebalanceMode;
   createdAt: string;
   updatedAt: string;
 }
@@ -1779,6 +1782,7 @@ export interface NewPortfolioTarget {
   accountId: string;
   taxonomyId: string;
   isActive: boolean;
+  rebalanceMode?: RebalanceMode;
 }
 
 export interface TargetAllocation {

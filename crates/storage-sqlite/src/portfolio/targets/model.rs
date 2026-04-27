@@ -27,6 +27,7 @@ pub struct PortfolioTargetDB {
     pub account_id: String,
     pub taxonomy_id: String,
     pub is_active: i32,
+    pub rebalance_mode: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -39,6 +40,7 @@ pub struct NewPortfolioTargetDB {
     pub account_id: String,
     pub taxonomy_id: String,
     pub is_active: i32,
+    pub rebalance_mode: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -111,6 +113,7 @@ impl From<PortfolioTargetDB> for wealthfolio_core::portfolio::targets::Portfolio
             account_id: db.account_id,
             taxonomy_id: db.taxonomy_id,
             is_active: db.is_active != 0,
+            rebalance_mode: db.rebalance_mode,
             created_at: text_to_datetime(&db.created_at),
             updated_at: text_to_datetime(&db.updated_at),
         }
@@ -158,6 +161,7 @@ impl From<wealthfolio_core::portfolio::targets::NewPortfolioTarget> for NewPortf
             account_id: domain.account_id,
             taxonomy_id: domain.taxonomy_id,
             is_active: if domain.is_active { 1 } else { 0 },
+            rebalance_mode: domain.rebalance_mode,
             created_at: now.clone(),
             updated_at: now,
         }

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import { useTargetAllocations } from "@/hooks/use-portfolio-targets";
-import type { AllocationDeviation, NewTargetAllocation } from "@/lib/types";
+import type { AllocationDeviation, NewTargetAllocation, RebalanceMode } from "@/lib/types";
 
 interface TargetListProps {
   deviations: AllocationDeviation[];
   targetId: string | undefined;
+  rebalanceMode?: RebalanceMode;
   onSave: (allocations: NewTargetAllocation[]) => void;
   onDeleteAllocation: (allocationId: string) => void;
   onToggleLock: (allocation: NewTargetAllocation) => void;
@@ -34,6 +36,7 @@ interface PendingEdit {
 export function TargetList({
   deviations,
   targetId,
+  rebalanceMode,
   onSave,
   onDeleteAllocation,
   onToggleLock,
@@ -42,6 +45,7 @@ export function TargetList({
   onHover,
   onCategoryClick,
 }: TargetListProps) {
+  const navigate = useNavigate();
   const { allocations } = useTargetAllocations(targetId);
 
   // Track pending edits (not yet saved)
@@ -409,12 +413,23 @@ export function TargetList({
           <CardTitle className="text-sm font-medium uppercase tracking-wider">
             Allocation Targets
           </CardTitle>
-          {(allocations.length > 0 || hasPendingEdits) && (
-            <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs">
-              <Icons.Trash className="mr-1.5 h-3 w-3" />
-              Clear All
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {rebalanceMode && (
+              <button
+                onClick={() => navigate("/settings/allocation-strategy")}
+                className="text-muted-foreground bg-muted hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
+                title="Rebalancing strategy — click to change"
+              >
+                {rebalanceMode === "buy_only" ? "Buy only" : "Buy & Sell"}
+              </button>
+            )}
+            {(allocations.length > 0 || hasPendingEdits) && (
+              <Button variant="ghost" size="sm" onClick={handleClearAll} className="h-7 text-xs">
+                <Icons.Trash className="mr-1.5 h-3 w-3" />
+                Clear All
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 

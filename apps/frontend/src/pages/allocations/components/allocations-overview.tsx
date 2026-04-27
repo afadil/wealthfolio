@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyPlaceholder } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -79,6 +79,12 @@ export function AllocationsOverview({
     actualPercent: number;
     allocationId?: string;
   } | null>(null);
+
+  // Reset drilldown when account changes
+  useEffect(() => {
+    setDrilldownCategory(null);
+    setDrilldownStripData(null);
+  }, [accountId]);
 
   const handleAccountSelect = (account: Account) => {
     onAccountChange(account);
@@ -338,6 +344,7 @@ export function AllocationsOverview({
               <TargetList
                 deviations={deviations}
                 targetId={activeTarget?.id}
+                rebalanceMode={activeTarget?.rebalanceMode}
                 onSave={handleSaveAllocations}
                 onDeleteAllocation={handleDeleteAllocation}
                 onToggleLock={handleToggleLock}

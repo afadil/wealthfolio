@@ -13,6 +13,7 @@ pub struct PortfolioTarget {
     pub account_id: String,
     pub taxonomy_id: String,
     pub is_active: bool,
+    pub rebalance_mode: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
@@ -26,6 +27,7 @@ pub struct NewPortfolioTarget {
     pub account_id: String,
     pub taxonomy_id: String,
     pub is_active: bool,
+    pub rebalance_mode: String,
 }
 
 impl Default for NewPortfolioTarget {
@@ -36,6 +38,7 @@ impl Default for NewPortfolioTarget {
             account_id: "PORTFOLIO".to_string(),
             taxonomy_id: "asset_classes".to_string(),
             is_active: true,
+            rebalance_mode: "buy_only".to_string(),
         }
     }
 }

@@ -38,6 +38,12 @@ const settingsSections = [
         icon: <Icons.Goal className="size-5" />,
       },
       {
+        title: "Allocation Strategy",
+        href: "allocation-strategy",
+        subtitle: "Buy-only or buy & sell rebalancing",
+        icon: <Icons.Target className="size-5" />,
+      },
+      {
         title: "Contribution Limits",
         href: "contribution-limits",
         subtitle: "Limits by year and account",
