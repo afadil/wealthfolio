@@ -18,7 +18,7 @@ import type { Account, AllocationDeviation, NewTargetAllocation } from "@/lib/ty
 import { AllocationDonut } from "./allocation-donut";
 import { HealthStrip } from "./health-strip";
 import { TargetList } from "./target-list";
-import { CategorySidePanel } from "./category-side-panel";
+import { DrilldownView } from "./drilldown-view";
 import { useTargetMutations } from "../use-target-mutations";
 
 interface AllocationsOverviewProps {
@@ -57,9 +57,21 @@ export function AllocationsOverview({
   // Hover sync between donut and bullet rows
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  // Side panel state
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<{
+  // Holding-level deviations pushed up from DrilldownView
+  const [drilldownStripData, setDrilldownStripData] = useState<{
+    deviations: AllocationDeviation[];
+    categoryValue: number;
+  } | null>(null);
+
+  const handleHoldingDeviationsChange = useCallback(
+    (deviations: AllocationDeviation[], categoryValue: number) => {
+      setDrilldownStripData({ deviations, categoryValue });
+    },
+    [],
+  );
+
+  // Drill-down state
+  const [drilldownCategory, setDrilldownCategory] = useState<{
     categoryId: string;
     categoryName: string;
     categoryColor: string;
@@ -81,7 +93,7 @@ export function AllocationsOverview({
       actualPercent: number,
       allocationId?: string,
     ) => {
-      setSelectedCategory({
+      setDrilldownCategory({
         categoryId,
         categoryName,
         categoryColor,
@@ -89,7 +101,6 @@ export function AllocationsOverview({
         actualPercent,
         allocationId,
       });
-      setSidePanelOpen(true);
     },
     [],
   );
@@ -276,63 +287,69 @@ export function AllocationsOverview({
       ) : (
         <>
           <HealthStrip
-            deviations={deviations}
+            deviations={
+              drilldownCategory && drilldownStripData ? drilldownStripData.deviations : deviations
+            }
             currency={baseCurrency}
-            totalValue={totalPortfolioValue}
+            totalValue={
+              drilldownCategory && drilldownStripData
+                ? drilldownStripData.categoryValue
+                : totalPortfolioValue
+            }
           />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-            {/* Left: Donut */}
-            <Card className="flex flex-col overflow-hidden">
-              <CardHeader className="shrink-0 pb-4">
-                <CardTitle className="text-sm font-medium uppercase tracking-wider">
-                  Current Allocation
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex min-h-0 flex-1 items-center justify-center p-4">
-                <AllocationDonut
-                  targetData={targetData}
-                  currentData={currentData}
-                  totalValue={totalPortfolioValue}
-                  currency={baseCurrency}
-                  hoveredId={hoveredId}
-                  onHover={setHoveredId}
-                  onCategoryClick={handleDonutClick}
-                  className="h-160 w-160"
-                />
-              </CardContent>
-            </Card>
-
-            {/* Right: Bullet target list */}
-            <TargetList
-              deviations={deviations}
-              targetId={activeTarget?.id}
-              onSave={handleSaveAllocations}
-              onDeleteAllocation={handleDeleteAllocation}
-              onToggleLock={handleToggleLock}
-              isSaving={batchSaveAllocationsMutation.isPending}
-              hoveredId={hoveredId}
-              onHover={setHoveredId}
-              onCategoryClick={handleCategoryClick}
+          {drilldownCategory ? (
+            <DrilldownView
+              category={drilldownCategory}
+              onBack={() => {
+                setDrilldownCategory(null);
+                setDrilldownStripData(null);
+              }}
+              accountId={accountId}
+              taxonomyId={activeTarget?.taxonomyId ?? ""}
+              baseCurrency={baseCurrency}
+              totalValue={totalPortfolioValue}
+              onHoldingDeviationsChange={handleHoldingDeviationsChange}
             />
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+              {/* Left: Donut */}
+              <Card className="flex flex-col overflow-hidden">
+                <CardHeader className="shrink-0 pb-4">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wider">
+                    Current Allocation
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex min-h-0 flex-1 items-center justify-center p-4">
+                  <AllocationDonut
+                    targetData={targetData}
+                    currentData={currentData}
+                    totalValue={totalPortfolioValue}
+                    currency={baseCurrency}
+                    hoveredId={hoveredId}
+                    onHover={setHoveredId}
+                    onCategoryClick={handleDonutClick}
+                    className="h-160 w-160"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Right: Bullet target list */}
+              <TargetList
+                deviations={deviations}
+                targetId={activeTarget?.id}
+                onSave={handleSaveAllocations}
+                onDeleteAllocation={handleDeleteAllocation}
+                onToggleLock={handleToggleLock}
+                isSaving={batchSaveAllocationsMutation.isPending}
+                hoveredId={hoveredId}
+                onHover={setHoveredId}
+                onCategoryClick={handleCategoryClick}
+              />
+            </div>
+          )}
         </>
       )}
-
-      {/* Category Side Panel for Holdings */}
-      <CategorySidePanel
-        isOpen={sidePanelOpen}
-        onOpenChange={setSidePanelOpen}
-        categoryId={selectedCategory?.categoryId ?? ""}
-        allocationId={selectedCategory?.allocationId}
-        categoryName={selectedCategory?.categoryName}
-        categoryColor={selectedCategory?.categoryColor}
-        categoryPercent={selectedCategory?.categoryPercent ?? 0}
-        actualPercent={selectedCategory?.actualPercent ?? 0}
-        accountId={accountId}
-        taxonomyId={activeTarget?.taxonomyId ?? ""}
-        baseCurrency={baseCurrency}
-      />
     </>
   );
 }

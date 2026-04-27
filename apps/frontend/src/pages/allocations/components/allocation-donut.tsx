@@ -20,6 +20,8 @@ interface AllocationDonutProps {
   hoveredId?: string | null;
   onHover?: (id: string | null) => void;
   onCategoryClick?: (categoryId: string) => void;
+  highlightedIds?: Set<string> | null;
+  centerLabel?: string;
   className?: string;
 }
 
@@ -31,6 +33,8 @@ export function AllocationDonut({
   hoveredId = null,
   onHover,
   onCategoryClick,
+  highlightedIds,
+  centerLabel = "Total Portfolio",
   className,
 }: AllocationDonutProps) {
   const handleMouseEnter = (_: React.MouseEvent, index: number) => {
@@ -115,7 +119,13 @@ export function AllocationDonut({
               <Cell
                 key={`current-${index}`}
                 fill={item.color}
-                opacity={hoveredId !== null && hoveredId !== item.id ? 0.4 : 1}
+                opacity={
+                  highlightedIds && !highlightedIds.has(item.id)
+                    ? 0.12
+                    : hoveredId !== null && hoveredId !== item.id
+                      ? 0.4
+                      : 1
+                }
                 style={{ cursor: onCategoryClick ? "pointer" : "default" }}
               />
             ))}
@@ -125,10 +135,12 @@ export function AllocationDonut({
 
       {/* Center label */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
+        <div className="w-[52%] text-center">
           {activeItem ? (
             <>
-              <p className="text-muted-foreground text-xs">{activeItem.name}</p>
+              <p className="text-muted-foreground line-clamp-2 break-words text-xs leading-tight">
+                {activeItem.name}
+              </p>
               <p className="text-foreground text-xl font-bold">
                 {totalCurrent > 0 ? ((activeItem.value / totalCurrent) * 100).toFixed(1) : "0.0"}%
               </p>
@@ -149,7 +161,7 @@ export function AllocationDonut({
             </>
           ) : (
             <>
-              <p className="text-muted-foreground text-[10px] uppercase">Total Portfolio</p>
+              <p className="text-muted-foreground text-[10px] uppercase">{centerLabel}</p>
               <p className="text-foreground text-lg font-bold">
                 {formatAmount(totalValue, currency)}
               </p>
