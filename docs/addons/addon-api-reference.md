@@ -652,13 +652,33 @@ const updatedGoal = await ctx.api.goals.update({
 });
 ```
 
+#### `getFunding(goalId: string): Promise<GoalAllocation[]>`
+
+Gets funding rules for a goal.
+
+```typescript
+const allocations = await ctx.api.goals.getFunding("goal-123");
+```
+
+#### `saveFunding(goalId: string, allocations: GoalAllocation[]): Promise<GoalAllocation[]>`
+
+Saves funding rules for a goal.
+
+```typescript
+await ctx.api.goals.saveFunding("goal-123", [
+  { goalId: "goal-123", accountId: "account-456", sharePercent: 50 },
+]);
+```
+
 #### `updateAllocations(allocations: GoalAllocation[]): Promise<void>`
 
 Updates goal allocations.
 
+Deprecated: use `saveFunding(goalId, allocations)` instead.
+
 ```typescript
 await ctx.api.goals.updateAllocations([
-  { goalId: "goal-123", accountId: "account-456", percentage: 50 },
+  { goalId: "goal-123", accountId: "account-456", sharePercent: 50 },
   // ... other allocations
 ]);
 ```
@@ -666,6 +686,8 @@ await ctx.api.goals.updateAllocations([
 #### `getAllocations(): Promise<GoalAllocation[]>`
 
 Gets goal allocations.
+
+Deprecated: use `getAll()` and `getFunding(goalId)` instead.
 
 ```typescript
 const allocations = await ctx.api.goals.getAllocations();

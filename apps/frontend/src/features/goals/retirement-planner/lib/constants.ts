@@ -1,0 +1,1 @@
+export const DEFAULT_DC_PAYOUT_ESTIMATE_RATE = 0.035;

@@ -92,12 +92,12 @@ import {
   PanelLeft,
   PanelLeftOpen,
   PauseCircle,
-  PlayCircle,
   Pencil,
   Percent,
   PieChart,
   Pin,
   PinOff,
+  PlayCircle,
   Plus,
   PlusCircle,
   Presentation,
@@ -128,31 +128,31 @@ import {
   TrendingDown,
   TrendingUp,
   Type,
-  Wand2,
   Undo2,
   Upload,
   User,
   Users,
   Wallet,
+  Wand2,
   X,
   XCircle,
 } from "lucide-react";
 import type { ComponentType, CSSProperties } from "react";
 
 // Phosphor icons - deep imports for optimal tree shaking with Vite
-import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
 import { CarProfileIcon } from "@phosphor-icons/react/dist/csr/CarProfile";
 import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise";
 import { CoinsIcon } from "@phosphor-icons/react/dist/csr/Coins";
 import { CreditCardIcon } from "@phosphor-icons/react/dist/csr/CreditCard";
 import { CubeIcon } from "@phosphor-icons/react/dist/csr/Cube";
 import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
-import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
 import { DotsThreeOutlineIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutline";
 import { DotsThreeOutlineVerticalIcon } from "@phosphor-icons/react/dist/csr/DotsThreeOutlineVertical";
 import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
 import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { GarageIcon } from "@phosphor-icons/react/dist/csr/Garage";
 import { HouseIcon } from "@phosphor-icons/react/dist/csr/House";
+import { SketchLogoIcon } from "@phosphor-icons/react/dist/csr/SketchLogo";
 import { SparkleIcon } from "@phosphor-icons/react/dist/csr/Sparkle";
 import { TagIcon } from "@phosphor-icons/react/dist/csr/Tag";
 import { UploadSimpleIcon } from "@phosphor-icons/react/dist/csr/UploadSimple";

@@ -1,79 +1,102 @@
 import type {
-  FireSettings,
+  DecisionSensitivityMap,
+  DecisionSensitivityMatrix,
   FireProjection,
   MonteCarloResult,
+  RetirementPlan,
   ScenarioResult,
   SorrScenario,
-  SensitivityResult,
-  StrategyComparisonResult,
-} from "@/pages/fire-planner/types";
-import {
-  projectFireDate,
-  runMonteCarlo,
-  runScenarioAnalysis,
-  runSequenceOfReturnsRisk,
-  runSensitivityAnalysis,
-  runStrategyComparison,
-} from "@/pages/fire-planner/lib/fire-math";
+  StressTestResult,
+} from "@/features/goals/retirement-planner/types";
+import type { PlannerMode } from "@/lib/types";
+import { invoke } from "./core";
 
-const STORAGE_KEY = "fire_planner_settings";
-
-export const getFireSettings = async (): Promise<FireSettings | null> => {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as FireSettings;
-  } catch {
-    return null;
-  }
-};
-
-export const saveFireSettings = async (settings: FireSettings): Promise<void> => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-};
-
-export const calculateFireProjection = async (
-  settings: FireSettings,
+export const calculateRetirementProjection = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
 ): Promise<FireProjection> => {
-  return projectFireDate(settings, currentPortfolio);
+  return invoke<FireProjection>("calculate_retirement_projection", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
 };
 
-const WEB_MAX_SIMS = 10_000;
-
-export const runFireMonteCarlo = async (
-  settings: FireSettings,
+export const runRetirementMonteCarlo = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
-  nSims = WEB_MAX_SIMS,
+  nSims = 100_000,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+  seed?: number,
 ): Promise<MonteCarloResult> => {
-  return runMonteCarlo(settings, currentPortfolio, Math.min(nSims, WEB_MAX_SIMS));
+  return invoke<MonteCarloResult>("run_retirement_monte_carlo", {
+    plan,
+    currentPortfolio,
+    nSims,
+    plannerMode,
+    goalId,
+    seed,
+  });
 };
 
-export const runFireScenarioAnalysis = async (
-  settings: FireSettings,
+export const runRetirementStressTests = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<StressTestResult[]> => {
+  return invoke<StressTestResult[]>("run_retirement_stress_tests", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
+};
+
+export const runRetirementScenarioAnalysis = async (
+  plan: RetirementPlan,
+  currentPortfolio: number,
+  plannerMode?: PlannerMode,
+  goalId?: string,
 ): Promise<ScenarioResult[]> => {
-  return runScenarioAnalysis(settings, currentPortfolio);
+  return invoke<ScenarioResult[]>("run_retirement_scenario_analysis", {
+    plan,
+    currentPortfolio,
+    plannerMode,
+    goalId,
+  });
 };
 
-export const runFireSorr = async (
-  settings: FireSettings,
+export const runRetirementSorr = async (
+  plan: RetirementPlan,
   portfolioAtFire: number,
+  retirementStartAge: number,
+  goalId?: string,
 ): Promise<SorrScenario[]> => {
-  return runSequenceOfReturnsRisk(settings, portfolioAtFire);
+  return invoke<SorrScenario[]>("run_retirement_sorr", {
+    plan,
+    portfolioAtFire,
+    retirementStartAge,
+    goalId,
+  });
 };
 
-export const runFireSensitivity = async (
-  settings: FireSettings,
+export const runRetirementDecisionSensitivityMap = async (
+  plan: RetirementPlan,
   currentPortfolio: number,
-): Promise<SensitivityResult> => {
-  return runSensitivityAnalysis(settings, currentPortfolio);
-};
-
-export const runFireStrategyComparison = async (
-  settings: FireSettings,
-  currentPortfolio: number,
-  nSims = 5_000,
-): Promise<StrategyComparisonResult> => {
-  return runStrategyComparison(settings, currentPortfolio, nSims);
+  map: DecisionSensitivityMap,
+  plannerMode?: PlannerMode,
+  goalId?: string,
+): Promise<DecisionSensitivityMatrix> => {
+  return invoke<DecisionSensitivityMatrix>("run_retirement_decision_sensitivity_map", {
+    plan,
+    currentPortfolio,
+    map,
+    plannerMode,
+    goalId,
+  });
 };

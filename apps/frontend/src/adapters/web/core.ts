@@ -61,11 +61,33 @@ export const COMMANDS: CommandMap = {
   get_income_summary: { method: "GET", path: "/income/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
+  get_goal: { method: "GET", path: "/goals" },
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
-  update_goal_allocations: { method: "POST", path: "/goals/allocations" },
-  load_goals_allocations: { method: "GET", path: "/goals/allocations" },
+  get_goal_funding: { method: "GET", path: "/goals" },
+  save_goal_funding: { method: "PUT", path: "/goals" },
+  get_goal_plan: { method: "GET", path: "/goals" },
+  save_goal_plan: { method: "POST", path: "/goals/plan" },
+  delete_goal_plan: { method: "DELETE", path: "/goals" },
+  refresh_goal_summary: { method: "POST", path: "/goals" },
+  refresh_all_goal_summaries: { method: "POST", path: "/goals/refresh-summaries" },
+  get_retirement_overview: { method: "GET", path: "/goals" },
+  get_save_up_overview: { method: "GET", path: "/goals" },
+  preview_save_up_overview: { method: "POST", path: "/goals/save-up/preview" },
+  // Retirement plan simulations
+  calculate_retirement_projection: { method: "POST", path: "/goals/retirement/projection" },
+  run_retirement_monte_carlo: { method: "POST", path: "/goals/retirement/monte-carlo" },
+  run_retirement_stress_tests: { method: "POST", path: "/goals/retirement/stress-tests" },
+  run_retirement_scenario_analysis: {
+    method: "POST",
+    path: "/goals/retirement/scenario-analysis",
+  },
+  run_retirement_decision_sensitivity_map: {
+    method: "POST",
+    path: "/goals/retirement/decision-sensitivity-map",
+  },
+  run_retirement_sorr: { method: "POST", path: "/goals/retirement/sequence-of-returns" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -530,9 +552,62 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       }
       break;
     }
+    case "get_goal":
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
+      break;
+    }
+    case "get_goal_funding": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      break;
+    }
+    case "save_goal_funding": {
+      const { goalId, rules } = payload as { goalId: string; rules: unknown[] };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      body = JSON.stringify(rules);
+      break;
+    }
+    case "get_goal_plan":
+    case "delete_goal_plan": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/plan`;
+      break;
+    }
+    case "save_goal_plan": {
+      const { plan } = payload as { plan: Record<string, unknown> };
+      body = JSON.stringify(plan);
+      break;
+    }
+    case "refresh_goal_summary": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/refresh-summary`;
+      break;
+    }
+    case "get_retirement_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/retirement/overview`;
+      break;
+    }
+    case "get_save_up_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/save-up/overview`;
+      break;
+    }
+    case "preview_save_up_overview": {
+      const { input } = payload as { input: Record<string, unknown> };
+      body = JSON.stringify(input);
+      break;
+    }
+    // Retirement plan simulation commands
+    case "calculate_retirement_projection":
+    case "run_retirement_monte_carlo":
+    case "run_retirement_stress_tests":
+    case "run_retirement_scenario_analysis":
+    case "run_retirement_decision_sensitivity_map":
+    case "run_retirement_sorr": {
+      body = JSON.stringify(payload);
       break;
     }
     case "create_goal": {
@@ -543,11 +618,6 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "update_goal": {
       const { goal } = payload as { goal: Record<string, unknown> };
       body = JSON.stringify(goal);
-      break;
-    }
-    case "update_goal_allocations": {
-      const { allocations } = payload as { allocations: Record<string, unknown> };
-      body = JSON.stringify(allocations);
       break;
     }
     case "update_exchange_rate": {

@@ -94,7 +94,10 @@ pub mod test_env {
         },
         assets::{Asset, AssetServiceTrait, ProviderProfile},
         errors::DatabaseError,
-        goals::{Goal, GoalServiceTrait, GoalsAllocation, NewGoal},
+        goals::{
+            AccountValuationMap, Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan,
+            GoalServiceTrait, NewGoal, PreparedRetirementSimulationInput, SaveGoalPlan,
+        },
         health::{
             checks::{
                 AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, LegacyMigrationInfo,
@@ -103,7 +106,9 @@ pub mod test_env {
             FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
         },
         holdings::{Holding, HoldingsServiceTrait},
+        planning::SaveUpOverview,
         portfolio::allocation::{AllocationHoldings, AllocationServiceTrait, PortfolioAllocations},
+        portfolio::fire::RetirementOverview,
         portfolio::income::{IncomeServiceTrait, IncomeSummary},
         portfolio::performance::{PerformanceMetrics, PerformanceServiceTrait},
         quotes::{
@@ -562,7 +567,6 @@ pub mod test_env {
     #[derive(Default)]
     pub struct MockGoalService {
         pub goals: Vec<Goal>,
-        pub allocations: Vec<GoalsAllocation>,
     }
 
     #[async_trait]
@@ -571,8 +575,8 @@ pub mod test_env {
             Ok(self.goals.clone())
         }
 
-        fn load_goals_allocations(&self) -> CoreResult<Vec<GoalsAllocation>> {
-            Ok(self.allocations.clone())
+        fn get_goal(&self, _goal_id: &str) -> CoreResult<Goal> {
+            unimplemented!("MockGoalService::get_goal")
         }
 
         async fn create_goal(&self, _goal: NewGoal) -> CoreResult<Goal> {
@@ -587,11 +591,67 @@ pub mod test_env {
             unimplemented!("MockGoalService::delete_goal")
         }
 
-        async fn upsert_goal_allocations(
+        fn get_goal_funding(&self, _goal_id: &str) -> CoreResult<Vec<GoalFundingRule>> {
+            Ok(Vec::new())
+        }
+
+        async fn save_goal_funding(
             &self,
-            _allocations: Vec<GoalsAllocation>,
-        ) -> CoreResult<usize> {
-            unimplemented!("MockGoalService::upsert_goal_allocations")
+            _goal_id: &str,
+            _rules: Vec<GoalFundingRuleInput>,
+        ) -> CoreResult<Vec<GoalFundingRule>> {
+            unimplemented!("MockGoalService::save_goal_funding")
+        }
+
+        fn get_goal_plan(&self, _goal_id: &str) -> CoreResult<Option<GoalPlan>> {
+            Ok(None)
+        }
+
+        async fn save_goal_plan(&self, _plan: SaveGoalPlan) -> CoreResult<GoalPlan> {
+            unimplemented!("MockGoalService::save_goal_plan")
+        }
+
+        async fn delete_goal_plan(&self, _goal_id: &str) -> CoreResult<usize> {
+            unimplemented!("MockGoalService::delete_goal_plan")
+        }
+
+        async fn refresh_goal_summary(
+            &self,
+            _goal_id: &str,
+            _valuations: &AccountValuationMap,
+        ) -> CoreResult<Goal> {
+            unimplemented!("MockGoalService::refresh_goal_summary")
+        }
+
+        async fn compute_retirement_overview(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<RetirementOverview> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::compute_retirement_overview is not implemented".to_string(),
+            ))
+        }
+
+        async fn prepare_retirement_simulation_input(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<PreparedRetirementSimulationInput> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::prepare_retirement_simulation_input is not implemented"
+                    .to_string(),
+            ))
+        }
+
+        async fn compute_save_up_overview(
+            &self,
+            _goal_id: &str,
+            _valuation_map: &AccountValuationMap,
+        ) -> CoreResult<SaveUpOverview> {
+            Err(CoreError::Unexpected(
+                "MockGoalService::compute_save_up_overview is not implemented".to_string(),
+            ))
         }
     }
 

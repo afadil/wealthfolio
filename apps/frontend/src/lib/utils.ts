@@ -308,19 +308,20 @@ export function formatAmount(
   if (amount == null) return "-";
   const numericAmount = typeof amount === "string" ? Number(amount) : amount;
   if (!Number.isFinite(numericAmount)) return "-";
+  const displayAmount = Math.abs(numericAmount) < 0.005 ? 0 : numericAmount;
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
 
   if (isPenceCurrency) {
-    const formattedNumber = decimalFormatter.format(numericAmount);
+    const formattedNumber = decimalFormatter.format(displayAmount);
     return displayCurrency ? `${formattedNumber}p` : formattedNumber;
   }
 
   if (!displayCurrency) {
-    return decimalFormatter.format(numericAmount);
+    return decimalFormatter.format(displayAmount);
   }
 
-  return getCurrencyFormatter(rawCurrency).format(numericAmount);
+  return getCurrencyFormatter(rawCurrency).format(displayAmount);
 }
 
 export function formatPercent(value: number | null | undefined) {

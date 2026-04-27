@@ -32,13 +32,14 @@ import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
-import SettingsGoalsPage from "./pages/settings/goals/goals-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
-import FirePlannerPage from "./pages/fire-planner/fire-planner-page";
-import FirePlannerSettingsPage from "./pages/settings/fire-planner/fire-planner-settings-page";
+import GoalsDashboardPage from "@/features/goals/pages/goals-dashboard-page";
+import GoalNewPage from "@/features/goals/pages/goal-new-page";
+import GoalDetailPage from "@/features/goals/pages/goal-detail-page";
+import GoalRetirementGuidePage from "@/features/goals/pages/goal-retirement-guide-page";
 
 export function AppRoutes() {
   const [dynamicRoutes, setDynamicRoutes] = useState<
@@ -93,7 +94,10 @@ export function AppRoutes() {
           <Route path="health" element={<HealthPage />} />
           <Route path="assistant" element={<AiAssistantPage />} />
           <Route path="connect" element={<ConnectPage />} />
-          <Route path="fire-planner" element={<FirePlannerPage />} />
+          <Route path="goals" element={<GoalsDashboardPage />} />
+          <Route path="goals/new" element={<GoalNewPage />} />
+          <Route path="goals/:goalId/guide" element={<GoalRetirementGuidePage />} />
+          <Route path="goals/:goalId" element={<GoalDetailPage />} />
           {/* Dynamic addon routes */}
           {dynamicRoutes.map(({ path, component: Component }) => (
             <Route
@@ -112,12 +116,10 @@ export function AppRoutes() {
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
-            <Route path="goals" element={<SettingsGoalsPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />
             <Route path="contribution-limits" element={<ContributionLimitPage />} />
-            <Route path="fire-planner" element={<FirePlannerSettingsPage />} />
             <Route path="market-data" element={<MarketDataSettingsPage />} />
             <Route path="market-data/import" element={<MarketDataImportPage />} />
             <Route path="securities" element={<AssetsPage />} />

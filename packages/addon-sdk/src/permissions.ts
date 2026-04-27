@@ -128,10 +128,18 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     riskLevel: 'low',
   },
   {
-    id: 'goals',
-    name: 'Goals Management',
+    id: 'financial-planning',
+    name: 'Financial Planning',
     description: 'Access to financial goals and allocations',
-    functions: ['getAll', 'create', 'update', 'updateAllocations', 'getAllocations'],
+    functions: [
+      'getAll',
+      'create',
+      'update',
+      'getFunding',
+      'saveFunding',
+      'updateAllocations',
+      'getAllocations',
+    ],
     riskLevel: 'medium',
   },
   {

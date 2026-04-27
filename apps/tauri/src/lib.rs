@@ -311,8 +311,17 @@ pub fn run() {
             commands::goal::update_goal,
             commands::goal::delete_goal,
             commands::goal::get_goals,
-            commands::goal::update_goal_allocations,
-            commands::goal::load_goals_allocations,
+            commands::goal::get_goal,
+            commands::goal::get_goal_funding,
+            commands::goal::save_goal_funding,
+            commands::goal::get_goal_plan,
+            commands::goal::save_goal_plan,
+            commands::goal::delete_goal_plan,
+            commands::goal::refresh_all_goal_summaries,
+            commands::goal::refresh_goal_summary,
+            commands::goal::get_retirement_overview,
+            commands::goal::get_save_up_overview,
+            commands::goal::preview_save_up_overview,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
@@ -599,15 +608,13 @@ pub fn run() {
             commands::health::execute_health_fix,
             commands::health::get_health_config,
             commands::health::update_health_config,
-            // FIRE planner commands
-            commands::fire::get_fire_settings,
-            commands::fire::save_fire_settings,
-            commands::fire::calculate_fire_projection,
-            commands::fire::run_fire_monte_carlo,
-            commands::fire::run_fire_scenario_analysis,
-            commands::fire::run_fire_sorr,
-            commands::fire::run_fire_sensitivity,
-            commands::fire::run_fire_strategy_comparison,
+            // RetirementPlan-based FIRE commands
+            commands::fire::calculate_retirement_projection,
+            commands::fire::run_retirement_decision_sensitivity_map,
+            commands::fire::run_retirement_monte_carlo,
+            commands::fire::run_retirement_scenario_analysis,
+            commands::fire::run_retirement_sorr,
+            commands::fire::run_retirement_stress_tests,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

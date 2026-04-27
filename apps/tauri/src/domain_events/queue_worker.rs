@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::{debug, error, info, warn};
+use rust_decimal::prelude::ToPrimitive;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
@@ -186,6 +187,10 @@ async fn process_event_batch(
     let timezone = context.get_timezone();
     if let Some(payload) = plan_portfolio_job(events, &timezone) {
         run_portfolio_job(app_handle, context, payload).await;
+
+        // 2b. Refresh all active goal summaries after portfolio valuations update.
+        // This keeps goal cards current without client-side polling.
+        refresh_all_goal_summaries(context).await;
     }
 
     #[cfg(feature = "connect-sync")]
@@ -444,6 +449,88 @@ async fn run_portfolio_calculation(
     if let Err(e) = app_handle.emit(PORTFOLIO_UPDATE_COMPLETE, &()) {
         error!("Failed to emit portfolio:update-complete event: {}", e);
     }
+}
+
+/// Refreshes cached summary fields for all active goals.
+///
+/// Called after portfolio valuations are recalculated so that goal dashboard
+/// cards always reflect the latest account values without client-side polling.
+async fn refresh_all_goal_summaries(context: &Arc<ServiceContext>) {
+    let goals = match context.goal_service().get_goals() {
+        Ok(g) => g,
+        Err(e) => {
+            warn!("Failed to load goals for summary refresh: {}", e);
+            return;
+        }
+    };
+
+    let active_goals: Vec<_> = goals
+        .iter()
+        .filter(|g| g.status_lifecycle == "active")
+        .collect();
+
+    if active_goals.is_empty() {
+        return;
+    }
+
+    // Fetch valuations once for all accounts
+    let accounts = match context.account_service().get_active_non_archived_accounts() {
+        Ok(a) => a,
+        Err(e) => {
+            warn!("Failed to load accounts for goal summary refresh: {}", e);
+            return;
+        }
+    };
+    let account_ids: Vec<String> = accounts.into_iter().map(|a| a.id).collect();
+    let valuations = match context
+        .valuation_service()
+        .get_latest_valuations(&account_ids)
+    {
+        Ok(v) => v,
+        Err(e) => {
+            warn!("Failed to load valuations for goal summary refresh: {}", e);
+            return;
+        }
+    };
+
+    let mut valuation_map = std::collections::HashMap::new();
+    for v in &valuations {
+        let Some(total) = v.total_value.to_f64() else {
+            warn!(
+                "Skipping goal summary refresh: invalid valuation total for account {}",
+                v.account_id
+            );
+            return;
+        };
+        let Some(fx) = v.fx_rate_to_base.to_f64() else {
+            warn!(
+                "Skipping goal summary refresh: invalid FX rate for account {}",
+                v.account_id
+            );
+            return;
+        };
+        let value_in_base = total * fx;
+        valuation_map.insert(v.account_id.clone(), value_in_base);
+    }
+
+    // Refresh each active goal
+    for goal in active_goals {
+        if let Err(e) = context
+            .goal_service()
+            .refresh_goal_summary(&goal.id, &valuation_map)
+            .await
+        {
+            debug!("Failed to refresh summary for goal {}: {}", goal.id, e);
+        }
+    }
+
+    debug!(
+        "Refreshed summaries for {} active goal(s)",
+        goals
+            .iter()
+            .filter(|g| g.status_lifecycle == "active")
+            .count()
+    );
 }
 
 #[cfg(test)]

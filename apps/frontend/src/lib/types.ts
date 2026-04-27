@@ -713,28 +713,82 @@ export interface SettingsContextType {
   setAccountsGrouped: (value: boolean) => void;
 }
 
+export type GoalType = "retirement" | "education" | "wedding" | "home" | "car" | "custom_save_up";
+export type GoalLifecycle = "active" | "achieved" | "archived";
+export type GoalHealth = "on_track" | "at_risk" | "off_track" | "not_applicable";
+export type PlanKind = "retirement" | "save_up";
+export type PlannerMode = "fire" | "traditional";
+
 export interface Goal {
   id: string;
+  goalType: GoalType;
   title: string;
   description?: string;
-  targetAmount: number;
-  isAchieved?: boolean;
-  allocations?: GoalAllocation[];
+  targetAmount?: number;
+  statusLifecycle: GoalLifecycle;
+  statusHealth: GoalHealth;
+  priority: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+  summaryCurrentValue?: number;
+  summaryProgress?: number;
+  projectedCompletionDate?: string;
+  projectedValueAtTargetDate?: number;
+  createdAt: string;
+  updatedAt: string;
+  summaryTargetAmount?: number;
 }
 
-export interface GoalAllocation {
+export interface NewGoal {
+  id?: string;
+  goalType: GoalType;
+  title: string;
+  description?: string;
+  targetAmount?: number;
+  statusLifecycle?: GoalLifecycle;
+  statusHealth?: GoalHealth;
+  priority?: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+}
+
+export interface GoalFundingRule {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  sharePercent: number;
+  taxBucket?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface GoalProgress {
-  name: string;
-  targetValue: number;
-  currentValue: number;
-  progress: number;
-  currency: string;
+export interface GoalFundingRuleInput {
+  accountId: string;
+  sharePercent: number;
+  taxBucket?: string;
+}
+
+export interface GoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveGoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson?: string;
 }
 
 export interface IncomeByAsset {
@@ -1927,4 +1981,134 @@ export interface CheckHoldingsImportResult {
   symbols: SymbolCheckResult[];
   /** Validation errors found in the import data */
   validationErrors: string[];
+}
+
+// ─── Planning DTOs (backend-computed overviews) ──────────────────
+
+export interface TaxBucketBalances {
+  taxable: number;
+  taxDeferred: number;
+  taxFree: number;
+}
+
+export interface RetirementOverview {
+  analysisMode: string;
+  status: string;
+  successStatus: string;
+  desiredFireAge: number;
+  fiAge: number | null;
+  retirementStartAge: number | null;
+  retirementStartReason?: "funded" | "target_age_forced" | null;
+  fundedAtGoalAge: boolean;
+  eventuallyReachesFi: boolean;
+  fundedAtRetirementStart: boolean;
+  portfolioNow: number;
+  portfolioAtRetirementStart: number;
+  netFireTarget: number;
+  grossFireTarget: number;
+  portfolioAtGoalAge: number;
+  requiredCapitalReachable: boolean;
+  requiredCapitalAtGoalAge: number;
+  shortfallAtGoalAge: number;
+  surplusAtGoalAge: number;
+  fundedThroughAge: number | null;
+  failureAge: number | null;
+  spendingShortfallAge: number | null;
+  requiredAdditionalMonthlyContribution: number;
+  suggestedGoalAgeIfUnchanged: number | null;
+  coastAmountToday: number;
+  coastReached: boolean;
+  progress: number;
+  taxBucketBalances: TaxBucketBalances;
+  budgetBreakdown: BudgetBreakdown;
+  targetReconciliation: TargetReconciliation;
+  trajectory: RetirementTrajectoryPoint[];
+}
+
+export interface RetirementTrajectoryPoint {
+  age: number;
+  year: number;
+  phase: string;
+  portfolioStart: number;
+  annualContribution: number;
+  annualIncome: number;
+  annualExpenses: number;
+  netWithdrawalFromPortfolio: number;
+  portfolioEnd: number;
+  requiredCapital: number | null;
+  pensionAssets: number;
+  annualTaxes?: number;
+  grossWithdrawal?: number;
+  plannedExpenses?: number;
+  fundedExpenses?: number;
+  annualShortfall?: number;
+}
+
+export interface BudgetBreakdown {
+  totalMonthlyBudget: number;
+  monthlyPortfolioWithdrawal: number;
+  incomeStreams: BudgetStreamItem[];
+  effectiveTaxRate?: number;
+}
+
+export interface BudgetStreamItem {
+  label: string;
+  monthlyAmount: number;
+  percentageOfBudget: number;
+}
+
+export interface TargetReconciliation {
+  targetAge: number;
+  requiredCapitalReachable: boolean;
+  inflationFactorToTarget: number;
+  plannedAnnualExpensesTodayValue: number;
+  plannedAnnualExpensesNominal: number;
+  annualIncomeTodayValue: number;
+  annualIncomeNominal: number;
+  netAnnualSpendingGapTodayValue: number;
+  netAnnualSpendingGapNominal: number;
+  grossAnnualPortfolioWithdrawalTodayValue: number;
+  grossAnnualPortfolioWithdrawalNominal: number;
+  estimatedAnnualTaxesTodayValue: number;
+  estimatedAnnualTaxesNominal: number;
+  requiredCapitalTodayValue: number;
+  requiredCapitalNominal: number;
+  portfolioAtTargetTodayValue: number;
+  portfolioAtTargetNominal: number;
+  shortfallTodayValue: number;
+  shortfallNominal: number;
+  preRetirementNetReturn: number;
+  retirementNetReturn: number;
+  annualInvestmentFeeRate: number;
+}
+
+export interface SaveUpOverviewDTO {
+  currentValue: number;
+  targetAmount: number;
+  progress: number;
+  health: GoalHealth;
+  projectedValueAtTargetDate: number;
+  requiredMonthlyContribution: number;
+  projectedCompletionDate: string | null;
+  trajectory: SaveUpTrajectoryPointDTO[];
+}
+
+export interface SaveUpPreviewInputDTO {
+  currentValue: number;
+  targetAmount: number;
+  targetDate: string | null;
+  monthlyContribution: number;
+  expectedAnnualReturn: number;
+}
+
+export interface SaveUpTrajectoryPointDTO {
+  date: string;
+  nominal: number;
+  optimistic: number;
+  pessimistic: number;
+  target: number;
+}
+
+export interface SaveUpProjectionPointDTO extends SaveUpTrajectoryPointDTO {
+  range: [number, number];
 }

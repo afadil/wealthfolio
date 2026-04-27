@@ -296,7 +296,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     ));
 
     let goal_repository = Arc::new(GoalRepository::new(pool.clone(), writer.clone()));
-    let goal_service = Arc::new(GoalService::new(goal_repository));
+    let goal_service = Arc::new(GoalService::new(goal_repository, account_service.clone()));
 
     let limits_repository = Arc::new(ContributionLimitRepository::new(
         pool.clone(),
@@ -431,6 +431,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         quote_service.clone(),
         valuation_service.clone(),
         account_service.clone(),
+        goal_service.clone(),
         fx_service.clone(),
         timezone.clone(),
         secret_store.clone(),

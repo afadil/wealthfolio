@@ -99,10 +99,19 @@ export { parseCsv } from "./activities";
 export {
   createGoal,
   deleteGoal,
+  deleteGoalPlan,
+  getGoal,
+  getGoalFunding,
+  getGoalPlan,
   getGoals,
-  getGoalsAllocation,
+  getRetirementOverview,
+  getSaveUpOverview,
+  previewSaveUpOverview,
+  refreshAllGoalSummaries,
+  refreshGoalSummary,
+  saveGoalFunding,
+  saveGoalPlan,
   updateGoal,
-  updateGoalsAllocations,
 } from "../shared/goals";
 
 // Secrets Commands
@@ -376,14 +385,12 @@ export {
 
 // FIRE Planner (desktop-only — stubs throw at runtime)
 export {
-  getFireSettings,
-  saveFireSettings,
-  calculateFireProjection,
-  runFireMonteCarlo,
-  runFireScenarioAnalysis,
-  runFireSorr,
-  runFireSensitivity,
-  runFireStrategyComparison,
+  calculateRetirementProjection,
+  runRetirementDecisionSensitivityMap,
+  runRetirementMonteCarlo,
+  runRetirementScenarioAnalysis,
+  runRetirementSorr,
+  runRetirementStressTests,
 } from "./fire-planner";
 
 // Crypto Commands (web stubs - not available in web mode)

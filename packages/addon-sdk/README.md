@@ -785,6 +785,8 @@ ctx.api.logger.debug('Debug info:', debugData);
 | `marketData.getAssetProfile(assetId)`           | Get asset profile                                         | `market-data`        |
 | `marketData.searchTicker(query)`                | Search for tickers                                        | `market-data`        |
 | `goals.getAll()`                                | Get financial goals                                       | `financial-planning` |
+| `goals.getFunding(goalId)`                      | Get funding rules for a goal                              | `financial-planning` |
+| `goals.saveFunding(goalId, rules)`              | Save funding rules for a goal                             | `financial-planning` |
 | `settings.get()`                                | Get app settings                                          | `settings`           |
 | `query.getClient()`                             | Get shared QueryClient instance                           | None                 |
 

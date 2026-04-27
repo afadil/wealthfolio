@@ -1,89 +1,121 @@
-import { getGoals, getGoalsAllocation } from "@/adapters";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@wealthfolio/ui/components/ui/card";
+import { getGoals } from "@/adapters";
+import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Progress } from "@wealthfolio/ui/components/ui/progress";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { useAccounts } from "@/hooks/use-accounts";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
-import { calculateGoalProgress } from "@/lib/portfolio-helper";
-import { Goal, GoalAllocation } from "@/lib/types";
+import { QueryKeys } from "@/lib/query-keys";
+import type { Goal } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, formatPercent } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { cn, formatCompactAmount } from "@wealthfolio/ui";
 import { Link } from "react-router-dom";
+
+const MAX_DISPLAYED_GOALS = 5;
+
+function goalTime(goal: Goal) {
+  const date = goal.targetDate ?? goal.projectedCompletionDate;
+  if (!date) return Infinity;
+  const time = new Date(date).getTime();
+  return Number.isFinite(time) ? time : Infinity;
+}
+
+function goalTarget(goal: Goal) {
+  return goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
+}
+
+function sortDashboardGoals(a: Goal, b: Goal) {
+  const aRetirement = a.goalType === "retirement" ? 0 : 1;
+  const bRetirement = b.goalType === "retirement" ? 0 : 1;
+  if (aRetirement !== bRetirement) return aRetirement - bRetirement;
+
+  const dateDiff = goalTime(a) - goalTime(b);
+  if (dateDiff !== 0) return dateDiff;
+
+  const targetDiff = goalTarget(b) - goalTarget(a);
+  if (targetDiff !== 0) return targetDiff;
+
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+}
+
+function statusDotClass(status: Goal["statusHealth"]) {
+  if (status === "off_track") return "bg-destructive";
+  if (status === "at_risk") return "bg-amber-500";
+  if (status === "on_track") return "bg-success";
+  return "bg-muted-foreground/35";
+}
+
+function formatTimeRemaining(targetDate?: string): string {
+  if (!targetDate) return "NO DEADLINE";
+  const target = new Date(targetDate);
+  const now = new Date();
+  if (!Number.isFinite(target.getTime())) return "NO DEADLINE";
+  if (target.getTime() <= now.getTime()) return "DUE";
+  let months =
+    (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+  if (target.getDate() < now.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const remMonths = months % 12;
+  if (years === 0) return `${Math.max(1, remMonths)}M`;
+  if (remMonths === 0) return `${years} YR${years === 1 ? "" : "S"}`;
+  return `${years}Y ${remMonths}M`;
+}
 
 export function SavingGoals() {
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const { accounts, isLoading: isLoadingAccounts } = useAccounts();
-
-  const accountIds = useMemo(() => accounts?.map((acc) => acc.id) ?? [], [accounts]);
-
-  const { latestValuations, isLoading: isLoadingValuations } = useLatestValuations(accountIds);
-
-  const { data: goals, isLoading: isLoadingGoals } = useQuery<Goal[], Error>({
-    queryKey: ["goals"],
+  const { data: goals, isLoading } = useQuery<Goal[], Error>({
+    queryKey: [QueryKeys.GOALS],
     queryFn: getGoals,
   });
 
-  const { data: allocations, isLoading: isLoadingAllocations } = useQuery<GoalAllocation[], Error>({
-    queryKey: ["goals_allocations"],
-    queryFn: getGoalsAllocation,
-  });
-
-  const goalsProgress = useMemo(() => {
-    if (!latestValuations || !goals || !allocations) {
-      return undefined;
-    }
-    return calculateGoalProgress(latestValuations, goals, allocations);
-  }, [latestValuations, goals, allocations]);
-
-  const isLoading =
-    isLoadingAccounts || isLoadingValuations || isLoadingGoals || isLoadingAllocations;
-
-  // Check for empty goals - this is a valid state, show empty state instead of error
-  const hasGoals = goals && goals.length > 0;
-
   if (isLoading) {
     return (
-      <Card className="w-full border-0 bg-transparent shadow-none">
-        <CardHeader className="py-2">
-          <CardTitle className="text-md">Saving Goals</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Card className="w-full shadow-sm">
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <Skeleton className="h-4 w-1/4" />
-                <Skeleton className="h-2.5 w-full" />
-                <Skeleton className="h-4 w-1/3" />
-                <Skeleton className="h-2.5 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+      <div className="pb-4">
+        <div className="flex items-center justify-between py-2">
+          <h2 className="text-md font-semibold">Goals</h2>
+        </div>
+        <Card className="shadow-xs w-full">
+          <CardContent className="px-5 py-6">
+            <div className="space-y-6">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-1/3" />
+                  <Skeleton className="h-[2px] w-2/3" />
+                  <Skeleton className="h-3 w-1/4" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
-  if (!hasGoals) {
+  const activeGoals = (goals ?? [])
+    .filter((g) => g.statusLifecycle === "active")
+    .sort(sortDashboardGoals);
+  const visibleGoals = activeGoals.slice(0, MAX_DISPLAYED_GOALS);
+  const hiddenGoalsCount = Math.max(0, activeGoals.length - visibleGoals.length);
+
+  if (activeGoals.length === 0) {
     return (
-      <div className="flex flex-wrap gap-4 pb-4">
-        <h2 className="text-md font-semibold">Saving Goals</h2>
+      <div className="pb-4">
+        <div className="flex items-center justify-between py-2">
+          <h2 className="text-md font-semibold">Goals</h2>
+          <Link
+            to="/goals"
+            className="text-muted-foreground hover:bg-success/10 inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
+          >
+            View All
+            <Icons.ChevronRight className="ml-1 h-3 w-3" />
+          </Link>
+        </div>
         <Card className="border-border/50 bg-success/10 shadow-xs w-full">
           <CardContent className="px-4 py-6">
             <div className="text-center">
-              <p className="text-sm">No saving goals set.</p>
+              <p className="text-sm">No goals set.</p>
               <Link
-                to="/settings/goals"
+                to="/goals/new"
                 className="text-muted-foreground hover:text-foreground mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
               >
                 Create your first goal
@@ -97,74 +129,99 @@ export function SavingGoals() {
   }
 
   return (
-    <div className="flex flex-wrap gap-4 pb-4">
-      <h2 className="text-md font-semibold">Saving Goals</h2>
+    <div className="pb-4">
+      <div className="flex items-center justify-between py-2">
+        <h2 className="text-md font-semibold">Goals</h2>
+        <Link
+          to="/goals"
+          className="text-muted-foreground hover:bg-success/10 inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors"
+        >
+          View All
+          <Icons.ChevronRight className="ml-1 h-3 w-3" />
+        </Link>
+      </div>
       <Card className="shadow-xs w-full">
-        <CardContent className="bg-transparent px-4 pt-6">
-          {[...goals]
-            .sort((a, b) => a.targetAmount - b.targetAmount)
-            .slice(0, 5)
-            .map((goal) => {
-              const progressData = goalsProgress?.find((p) => p.name === goal.title);
+        <CardContent className="px-4 pb-2 pt-4">
+          {visibleGoals.map((goal) => {
+            const progress = goal.summaryProgress ?? 0;
+            const pct = Math.max(0, Math.min(1, progress));
+            const currentValue = goal.summaryCurrentValue ?? 0;
+            const target = goal.summaryTargetAmount ?? goal.targetAmount ?? 0;
+            const currency = goal.currency ?? "USD";
+            const deadline = goal.targetDate ?? goal.projectedCompletionDate;
+            const timeStr = formatTimeRemaining(deadline);
+            const pctDisplay = Math.round(pct * 100);
 
-              const currentProgress = progressData?.progress ?? 0;
-              const currentValue = progressData?.currentValue ?? 0;
-              const currency =
-                progressData?.currency ?? latestValuations?.[0]?.baseCurrency ?? "USD";
+            const currentDisplay = isBalanceHidden
+              ? "••••"
+              : formatCompactAmount(currentValue, currency);
+            const targetDisplay = isBalanceHidden
+              ? "••••"
+              : target > 0
+                ? formatCompactAmount(target, currency)
+                : "—";
 
-              return (
-                <Tooltip key={goal.id}>
-                  <TooltipTrigger asChild>
-                    <div className="mb-4 cursor-help items-center">
-                      <CardDescription className="text-muted-foreground mb-2 flex items-center text-sm font-light">
-                        {goal.title}
-                        {currentProgress >= 100 ? (
-                          <Icons.CheckCircle className="text-success ml-1 h-4 w-4" />
-                        ) : null}
-                      </CardDescription>
-
-                      <Progress
-                        value={currentProgress * 100}
-                        className="[&>div]:bg-success h-2.5 w-full"
+            return (
+              <Link
+                key={goal.id}
+                to={`/goals/${goal.id}`}
+                className="border-border hover:bg-muted/30 group block border-b py-3 transition-colors last:border-0"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    {/* Title row with status dot */}
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-sm font-semibold leading-tight">{goal.title}</h3>
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full",
+                          statusDotClass(goal.statusHealth),
+                        )}
                       />
+                      {progress >= 1 ? (
+                        <Icons.CheckCircle className="text-success h-3.5 w-3.5 shrink-0" />
+                      ) : null}
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="space-y-2">
-                    <h3 className="text-md text-muted-foreground font-bold">{goal.title}</h3>
-                    <ul className="list-inside list-disc text-xs">
-                      <li>
-                        Progress: <b>{formatPercent(currentProgress)}</b>
-                      </li>
-                      <li>
-                        Current Value:{" "}
-                        <b>
-                          <AmountDisplay
-                            value={currentValue}
-                            currency={currency}
-                            isHidden={isBalanceHidden}
-                          />
-                        </b>
-                      </li>
-                      <li>
-                        Target Value:{" "}
-                        <b>
-                          <AmountDisplay
-                            value={goal.targetAmount}
-                            currency={currency}
-                            isHidden={isBalanceHidden}
-                          />
-                        </b>
-                      </li>
-                    </ul>
-                    {!progressData && (
-                      <p className="text-muted-foreground text-xs italic">
-                        Progress calculation pending or not applicable.
-                      </p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
+
+                    {/* Amounts directly under title */}
+                    <div className="text-muted-foreground mt-0.5 text-[11px] tabular-nums">
+                      {currentDisplay} / {targetDisplay}
+                    </div>
+                  </div>
+
+                  {/* Right: big % + time */}
+                  <div className="shrink-0 text-right">
+                    <div className="text-base font-semibold tabular-nums leading-none">
+                      {pctDisplay}
+                      <span className="text-[9px] font-medium">%</span>
+                    </div>
+                    <div className="text-muted-foreground mt-1 text-[10px] tracking-[0.1em]">
+                      {timeStr}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full-width progress bar at row bottom */}
+                <div className="bg-muted/60 relative mt-2.5 h-1.5 w-full overflow-hidden rounded-full">
+                  <div
+                    className="bg-success h-full rounded-full transition-all"
+                    style={{ width: `${pct * 100}%` }}
+                  />
+                </div>
+              </Link>
+            );
+          })}
+          {hiddenGoalsCount > 0 && (
+            <Link
+              to="/goals"
+              className="text-muted-foreground hover:text-foreground flex items-center justify-between pt-3 text-xs transition-colors"
+            >
+              <span>
+                +{hiddenGoalsCount} more {hiddenGoalsCount === 1 ? "goal" : "goals"}
+              </span>
+              <Icons.ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
         </CardContent>
       </Card>
     </div>

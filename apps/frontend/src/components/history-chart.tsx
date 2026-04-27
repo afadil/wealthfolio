@@ -7,6 +7,7 @@ import { AmountDisplay } from "@wealthfolio/ui";
 import { useId, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, ReferenceDot, Tooltip, XAxis, YAxis } from "recharts";
 import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
+import { getAutomaticHistoryChartScale } from "./history-chart-scale";
 
 const CHART_SCRUB_HAPTIC_INTERVAL_MS = 80;
 
@@ -69,6 +70,7 @@ const CustomTooltip = ({
     return null;
   }
 
+  const netContributionPayload = ncPayload ?? tvPayload;
   const tooltipColor = tvPayload.totalValue >= 0 ? "var(--success)" : "var(--destructive)";
 
   return (
@@ -87,7 +89,7 @@ const CustomTooltip = ({
           className="text-xs font-semibold"
         />
       </div>
-      {isChartHovered && ncPayload && (
+      {isChartHovered && netContributionPayload && (
         <div className="flex items-center justify-between space-x-2">
           <div className="flex items-center space-x-1.5">
             <span
@@ -97,8 +99,8 @@ const CustomTooltip = ({
             <span className="text-muted-foreground text-xs">Net Deposit:</span>
           </div>
           <AmountDisplay
-            value={ncPayload.netContribution}
-            currency={ncPayload.currency}
+            value={netContributionPayload.netContribution}
+            currency={netContributionPayload.currency}
             isHidden={isBalanceHidden}
             className="text-xs font-semibold"
           />
@@ -126,6 +128,7 @@ export function HistoryChart({
   const id = useId();
   const fillGradientId = `historyFill-${id}`;
   const strokeGradientId = `historyStroke-${id}`;
+  const scaleConfig = useMemo(() => getAutomaticHistoryChartScale(data), [data]);
 
   const chartConfig = {
     totalValue: {
@@ -148,11 +151,10 @@ export function HistoryChart({
     }
     if (min >= 0) return { zeroOffset: 1, allPositive: true, allNegative: false };
     if (max <= 0) return { zeroOffset: 0, allPositive: false, allNegative: true };
-    // Account for the 2% padding on the Y domain minimum
-    const adjustedMin = min - Math.abs(min) * 0.02;
-    const offset = max / (max - adjustedMin);
+    const [domainMin, domainMax] = scaleConfig.domain;
+    const offset = domainMax / (domainMax - domainMin);
     return { zeroOffset: offset, allPositive: false, allNegative: false };
-  }, [data]);
+  }, [data, scaleConfig.domain]);
 
   // Build a map of date -> index for efficient lookup
   const dateToIndexMap = useMemo(() => {
@@ -323,7 +325,8 @@ export function HistoryChart({
         <YAxis
           hide
           type="number"
-          domain={[(dataMin: number) => dataMin - Math.abs(dataMin) * 0.02, "auto"]}
+          scale={scaleConfig.scale === "log" ? "log" : "auto"}
+          domain={scaleConfig.domain}
         />
         <Area
           isAnimationActive={true}
@@ -337,19 +340,21 @@ export function HistoryChart({
           fill={`url(#${fillGradientId})`}
           style={{ pointerEvents: "none" }}
         />
-        <Area
-          isAnimationActive={true}
-          animationDuration={300}
-          animationEasing="ease-out"
-          connectNulls={true}
-          type="monotone"
-          dataKey="netContribution"
-          stroke="var(--muted-foreground)"
-          fill="transparent"
-          strokeDasharray="5 5"
-          strokeOpacity={isChartHovered ? 0.8 : 0}
-          style={{ pointerEvents: "none" }}
-        />
+        {scaleConfig.showNetContribution && (
+          <Area
+            isAnimationActive={true}
+            animationDuration={300}
+            animationEasing="ease-out"
+            connectNulls={true}
+            type="monotone"
+            dataKey="netContribution"
+            stroke="var(--muted-foreground)"
+            fill="transparent"
+            strokeDasharray="5 5"
+            strokeOpacity={isChartHovered ? 0.8 : 0}
+            style={{ pointerEvents: "none" }}
+          />
+        )}
         {/* Snapshot markers - diamond shape */}
         {showMarkers &&
           markerDataPoints.map((point) => (
