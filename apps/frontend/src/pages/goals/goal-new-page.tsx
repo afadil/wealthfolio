@@ -21,11 +21,14 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGoalMutations, useGoals } from "./hooks/use-goals";
+import { useCreateGoalFlow } from "./hooks/use-create-goal-flow";
+import { useGoals } from "./hooks/use-goals";
 import { toast } from "sonner";
 import {
+  DEFAULT_RETIREMENT_PLAN,
   ageFromBirthYearMonth,
   inferBirthYearMonthFromAge,
+  normalizeRetirementPlan,
 } from "@/features/goals/retirement-planner/lib/plan-adapter";
 
 const DEFAULT_RETIREMENT_CURRENT_AGE = 30;
@@ -99,7 +102,7 @@ function hasRetirementGoal(goals: Goal[]): boolean {
 
 export default function GoalNewPage() {
   const navigate = useNavigate();
-  const { createMutation } = useGoalMutations();
+  const createGoalFlow = useCreateGoalFlow();
   const { goals } = useGoals();
   const { settings } = useSettingsContext();
   const [selectedType, setSelectedType] = useState<GoalType | null>(null);
@@ -161,33 +164,47 @@ export default function GoalNewPage() {
   const handleCreate = () => {
     if (!selectedType || !template || !trimmedTitle) return;
 
-    createMutation.mutate(
+    const goalInput = {
+      goalType: selectedType,
+      title: trimmedTitle,
+      description: trimmedDescription || undefined,
+      targetAmount: isRetirement ? undefined : Math.max(0, targetAmount),
+      coverImageKey: selectedType,
+      currency: baseCurrency,
+      targetDate: !isRetirement && targetDate ? targetDate : undefined,
+    };
+
+    const initialPlan = isRetirement
+      ? {
+          planKind: "retirement" as const,
+          plannerMode,
+          settingsJson: JSON.stringify(
+            normalizeRetirementPlan({
+              ...DEFAULT_RETIREMENT_PLAN,
+              currency: baseCurrency,
+              personal: {
+                ...DEFAULT_RETIREMENT_PLAN.personal,
+                birthYearMonth: retirementBirthYearMonthForCreate,
+                currentAge: retirementCurrentAge,
+                targetRetirementAge: Math.max(retirementCurrentAge + 1, retirementTargetAge),
+                planningHorizonAge: Math.max(
+                  DEFAULT_RETIREMENT_PLAN.personal.planningHorizonAge,
+                  retirementTargetAge + 1,
+                ),
+              },
+            }),
+          ),
+        }
+      : undefined;
+
+    createGoalFlow.mutate(
       {
-        goalType: selectedType,
-        title: trimmedTitle,
-        description: trimmedDescription || undefined,
-        targetAmount: isRetirement ? undefined : Math.max(0, targetAmount),
-        coverImageKey: selectedType,
-        currency: baseCurrency,
-        targetDate: !isRetirement && targetDate ? targetDate : undefined,
+        goal: goalInput,
+        initialPlan,
       },
       {
-        onSuccess: (goal) => {
-          if (selectedType === "retirement") {
-            const params = new URLSearchParams({
-              setup: "true",
-              mode: plannerMode,
-              birthYearMonth: retirementBirthYearMonthForCreate,
-              retirementAge: String(Math.max(retirementCurrentAge + 1, retirementTargetAge)),
-            });
-            navigate(`/goals/${goal.id}?${params.toString()}`);
-          } else {
-            navigate(`/goals/${goal.id}?setup=true`);
-          }
-        },
-        onError: (error) => {
-          const message = error instanceof Error ? error.message : "Failed to create goal.";
-          toast.error(message);
+        onSuccess: ({ goal }) => {
+          navigate(`/goals/${goal.id}`);
         },
       },
     );
@@ -428,9 +445,9 @@ export default function GoalNewPage() {
               <Button
                 className="flex-1"
                 onClick={handleCreate}
-                disabled={createMutation.isPending || !trimmedTitle}
+                disabled={createGoalFlow.isPending || !trimmedTitle}
               >
-                {createMutation.isPending ? "Creating..." : "Create Goal"}
+                {createGoalFlow.isPending ? "Creating..." : "Create Goal"}
               </Button>
             </div>
           </div>

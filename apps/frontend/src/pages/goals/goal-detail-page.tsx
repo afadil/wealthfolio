@@ -18,8 +18,8 @@ import {
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useState, useMemo, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import {
   useGoalDetail,
@@ -35,8 +35,6 @@ import {
   parseSettingsJson,
   DEFAULT_RETIREMENT_PLAN,
   normalizeRetirementPlan,
-  inferBirthYearMonthFromAge,
-  ageFromBirthYearMonth,
 } from "@/features/goals/retirement-planner/lib/plan-adapter";
 import { usePortfolioData } from "@/features/goals/retirement-planner/hooks/use-portfolio";
 import DashboardPage from "@/features/goals/retirement-planner/pages/dashboard-page";
@@ -53,30 +51,13 @@ const GOAL_TYPE_LABELS: Record<string, string> = {
   custom_save_up: "Savings Goal",
 };
 
-function parseSetupAge(value: string | null) {
-  if (!value) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
-}
-
-function parseSetupBirthYearMonth(value: string | null) {
-  if (!value || !/^\d{4}-\d{2}$/.test(value)) return undefined;
-  return ageFromBirthYearMonth(value) == null ? undefined : value;
-}
-
 export default function GoalDetailPage() {
   const { goalId } = useParams<{ goalId: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const isSetup = searchParams.get("setup") === "true";
-  const setupMode = searchParams.get("mode");
-  const setupBirthYearMonth = parseSetupBirthYearMonth(searchParams.get("birthYearMonth"));
-  const setupCurrentAge = parseSetupAge(searchParams.get("age"));
-  const setupRetirementAge = parseSetupAge(searchParams.get("retirementAge"));
 
   const { goal, plan, fundingRules, isLoading, error } = useGoalDetail(goalId);
   const { savePlanMutation } = useGoalPlanMutations(goalId ?? "");
-  const { mutate: savePlan, isPending: planCreationPending } = savePlanMutation;
+  const { mutate: savePlan } = savePlanMutation;
   const { deleteMutation } = useGoalMutations();
   const { settings } = useSettingsContext();
 
@@ -111,59 +92,8 @@ export default function GoalDetailPage() {
   // Feed portfolio data from funding-rule-derived accounts
   const portfolioData = usePortfolioData(isRetirement ? eligibleAccountIds : undefined);
 
-  // Setup now lands on Overview because all primary settings live in the dashboard sidebar.
+  // Retirement pages land on Overview because all primary settings live in the dashboard sidebar.
   const [activeTab, setActiveTab] = useState("overview");
-
-  // On setup, auto-create the retirement plan
-  useEffect(() => {
-    if (isSetup && goalId && goal && !isLoading && !plan && !planCreationPending) {
-      if (isRetirement) {
-        const mode = (setupMode ?? "traditional") as "fire" | "traditional";
-        const currentAge =
-          (setupBirthYearMonth ? ageFromBirthYearMonth(setupBirthYearMonth) : undefined) ??
-          setupCurrentAge ??
-          DEFAULT_RETIREMENT_PLAN.personal.currentAge;
-        const targetRetirementAge = Math.max(
-          currentAge + 1,
-          setupRetirementAge ?? DEFAULT_RETIREMENT_PLAN.personal.targetRetirementAge,
-        );
-        const initialPlan = {
-          ...DEFAULT_RETIREMENT_PLAN,
-          currency: baseCurrency,
-          personal: {
-            ...DEFAULT_RETIREMENT_PLAN.personal,
-            birthYearMonth: setupBirthYearMonth ?? inferBirthYearMonthFromAge(currentAge),
-            currentAge,
-            targetRetirementAge,
-            planningHorizonAge: Math.max(
-              DEFAULT_RETIREMENT_PLAN.personal.planningHorizonAge,
-              targetRetirementAge + 1,
-            ),
-          },
-        };
-        savePlan({
-          goalId,
-          planKind: "retirement",
-          plannerMode: mode,
-          settingsJson: JSON.stringify(normalizeRetirementPlan(initialPlan)),
-        });
-      }
-    }
-  }, [
-    baseCurrency,
-    goal,
-    goalId,
-    isRetirement,
-    isSetup,
-    isLoading,
-    plan,
-    planCreationPending,
-    savePlan,
-    setupBirthYearMonth,
-    setupCurrentAge,
-    setupMode,
-    setupRetirementAge,
-  ]);
 
   const handleSaveRetirementPlan = useCallback(
     (updated: RetirementPlan, nextPlannerMode?: PlannerMode) => {
