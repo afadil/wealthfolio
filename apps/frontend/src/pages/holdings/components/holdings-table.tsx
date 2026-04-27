@@ -8,9 +8,8 @@ import {
   DropdownMenuTrigger,
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { isExpiredOptionSymbol, parseOccSymbol } from "@/lib/occ-symbol";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { safeDivide } from "@/lib/utils";
-import { usePersistentState } from "@/hooks/use-persistent-state";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GainPercent, Badge } from "@wealthfolio/ui";
 
@@ -66,13 +65,6 @@ export const HoldingsTable = ({
   const { isBalanceHidden } = useBalancePrivacy();
   const { settings } = useSettingsContext();
   const [showConvertedValues, setShowConvertedValues] = useState(false);
-  const [hideExpired, setHideExpired] = usePersistentState<boolean>("holdings-hide-expired", true);
-
-  const hasAnyExpired = holdings.some((h) => isExpiredOptionSymbol(h.instrument?.symbol ?? h.id));
-  const visibleHoldings =
-    hideExpired && hasAnyExpired
-      ? holdings.filter((h) => !isExpiredOptionSymbol(h.instrument?.symbol ?? h.id))
-      : holdings;
 
   const baseCurrency = settings?.baseCurrency ?? holdings[0]?.baseCurrency;
   const hasMultipleCurrencies = holdings.some((holding) => {
@@ -119,7 +111,7 @@ export const HoldingsTable = ({
   return (
     <div className="flex h-full flex-col">
       <DataTable
-        data={visibleHoldings}
+        data={holdings}
         columns={getColumns(isBalanceHidden, showConvertedValues, showTotalReturn, onClassify)}
         searchBy="symbol"
         filters={filters}
@@ -168,27 +160,6 @@ export const HoldingsTable = ({
                 </TooltipContent>
               </Tooltip>
             )}
-            {hasAnyExpired && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setHideExpired(!hideExpired)}
-                    className="h-8 w-8 rounded-lg"
-                  >
-                    {hideExpired ? (
-                      <Icons.EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Icons.Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{hideExpired ? "Show expired options" : "Hide expired options"}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
           </div>
         }
       />
@@ -219,7 +190,6 @@ const getColumns = (
       // Parse OCC symbol for options
       const parsedOption = parseOccSymbol(symbol);
       const displaySymbol = parsedOption ? parsedOption.underlying : symbol;
-      const isExpiredOption = isExpiredOptionSymbol(symbol);
 
       // Option subtitle: "Mar 29 $150 CALL"
       const optionSubtitle = parsedOption
@@ -242,11 +212,6 @@ const getColumns = (
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="font-medium">{displaySymbol}</span>
-              {isExpiredOption && (
-                <Badge variant="destructive" className="h-4 px-1 py-0 text-[10px]">
-                  Expired
-                </Badge>
-              )}
               {isManual && (
                 <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px]">
                   Manual

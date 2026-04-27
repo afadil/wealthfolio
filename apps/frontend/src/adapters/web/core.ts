@@ -100,6 +100,7 @@ export const COMMANDS: CommandMap = {
   save_activities: { method: "POST", path: "/activities/bulk" },
   delete_activity: { method: "DELETE", path: "/activities" },
   link_transfer_activities: { method: "POST", path: "/activities/link" },
+  unlink_transfer_activities: { method: "POST", path: "/activities/unlink" },
   // Activity import
   check_activities_import: { method: "POST", path: "/activities/import/check" },
   preview_import_assets: { method: "POST", path: "/activities/import/assets/preview" },
@@ -663,6 +664,14 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "link_transfer_activities": {
+      const { activityAId, activityBId } = payload as {
+        activityAId: string;
+        activityBId: string;
+      };
+      body = JSON.stringify({ activityAId, activityBId });
+      break;
+    }
+    case "unlink_transfer_activities": {
       const { activityAId, activityBId } = payload as {
         activityAId: string;
         activityBId: string;

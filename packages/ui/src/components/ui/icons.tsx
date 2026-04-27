@@ -129,6 +129,7 @@ import {
   TrendingUp,
   Type,
   Undo2,
+  Unlink,
   Upload,
   User,
   Users,
@@ -277,6 +278,7 @@ const IconsInternal = {
   TrendingDown: TrendingDown,
   Wand2: Wand2,
   Link: Link,
+  Unlink: Unlink,
   Building: Building2,
   Car: Car,
   Gem: Gem,
@@ -823,6 +825,7 @@ export type IconName =
   | "TrendingDown"
   | "Wand2"
   | "Link"
+  | "Unlink"
   | "Building"
   | "Car"
   | "Gem"

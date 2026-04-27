@@ -339,6 +339,14 @@ pub mod test_env {
             unimplemented!("MockActivityService::link_transfer_activities")
         }
 
+        async fn unlink_transfer_activities(
+            &self,
+            _activity_a_id: String,
+            _activity_b_id: String,
+        ) -> CoreResult<(Activity, Activity)> {
+            unimplemented!("MockActivityService::unlink_transfer_activities")
+        }
+
         async fn bulk_mutate_activities(
             &self,
             _request: ActivityBulkMutationRequest,

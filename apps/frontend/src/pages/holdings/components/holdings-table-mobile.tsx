@@ -1,12 +1,10 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
-import { usePersistentState } from "@/hooks/use-persistent-state";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
-import { isExpiredOptionSymbol, parseOccSymbol } from "@/lib/occ-symbol";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AmountDisplay, GainPercent, Input, Separator } from "@wealthfolio/ui";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -64,13 +62,6 @@ export const HoldingsTableMobile = ({
   const showTotalReturn = controlledShowTotalReturn ?? internalShowTotalReturn;
   const setShowTotalReturn = controlledSetShowTotalReturn ?? setInternalShowTotalReturn;
 
-  const [hideExpired, setHideExpired] = usePersistentState<boolean>("holdings-hide-expired", true);
-
-  const hasAnyExpired = useMemo(
-    () => holdings.some((h) => isExpiredOptionSymbol(h.instrument?.symbol ?? h.id)),
-    [holdings],
-  );
-
   const hasActiveFilters = useMemo(() => {
     const hasAccountFilter = showAccountFilter && selectedAccount?.id !== PORTFOLIO_ACCOUNT_ID;
     const hasTypeFilter = selectedTypes.length > 0;
@@ -79,12 +70,6 @@ export const HoldingsTableMobile = ({
 
   const filteredHoldings = useMemo(() => {
     let result = [...holdings];
-
-    if (hideExpired && hasAnyExpired) {
-      result = result.filter(
-        (holding) => !isExpiredOptionSymbol(holding.instrument?.symbol ?? holding.id),
-      );
-    }
 
     if (selectedTypes.length > 0) {
       result = result.filter((holding) => {
@@ -123,7 +108,7 @@ export const HoldingsTableMobile = ({
       }
       return 0;
     });
-  }, [holdings, selectedTypes, searchQuery, sortBy, hideExpired, hasAnyExpired]);
+  }, [holdings, selectedTypes, searchQuery, sortBy]);
 
   const handleNavigate = (holding: Holding) => {
     // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
@@ -177,7 +162,6 @@ export const HoldingsTableMobile = ({
             const symbol = holding.instrument?.symbol ?? holding.id;
             const isCash = symbol.startsWith("$CASH");
             const parsedOption = isCash ? null : parseOccSymbol(symbol);
-            const isExpiredOption = !isCash && isExpiredOptionSymbol(symbol);
             const avatarSymbol = isCash ? "$CASH" : parsedOption ? parsedOption.underlying : symbol;
             const displaySymbol = isCash
               ? symbol.split("-")[0]
@@ -204,11 +188,6 @@ export const HoldingsTableMobile = ({
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-1.5">
                         <p className="truncate font-semibold">{displaySymbol}</p>
-                        {isExpiredOption && (
-                          <Badge variant="destructive" className="h-4 px-1 py-0 text-[10px]">
-                            Expired
-                          </Badge>
-                        )}
                       </div>
                       {subtitle && (
                         <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
@@ -276,9 +255,6 @@ export const HoldingsTableMobile = ({
         showTotalReturn={showTotalReturn}
         setShowTotalReturn={setShowTotalReturn}
         typeOptions={typeOptions}
-        hideExpired={hideExpired}
-        setHideExpired={setHideExpired}
-        showExpiredToggle={hasAnyExpired}
       />
     </div>
   );

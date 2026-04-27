@@ -8,6 +8,7 @@ mod tests {
         UpdateAssetProfile,
     };
     use crate::errors::Result;
+    use crate::events::{DomainEvent, MockDomainEventSink};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::quotes::service::ProviderInfo;
     use crate::quotes::{
@@ -709,6 +710,61 @@ mod tests {
             _activity_b_id: String,
         ) -> Result<(Activity, Activity)> {
             unimplemented!()
+        }
+
+        async fn unlink_transfer_activities(
+            &self,
+            activity_a_id: String,
+            activity_b_id: String,
+        ) -> Result<(Activity, Activity)> {
+            let mut activities = self.activities.lock().unwrap();
+            let first_index = activities
+                .iter()
+                .position(|activity| activity.id == activity_a_id)
+                .ok_or_else(|| {
+                    crate::errors::Error::Unexpected("first activity not found".to_string())
+                })?;
+            let second_index = activities
+                .iter()
+                .position(|activity| activity.id == activity_b_id)
+                .ok_or_else(|| {
+                    crate::errors::Error::Unexpected("second activity not found".to_string())
+                })?;
+
+            let first = activities[first_index].clone();
+            let second = activities[second_index].clone();
+            let (transfer_in_index, transfer_out_index) =
+                match (first.activity_type.as_str(), second.activity_type.as_str()) {
+                    ("TRANSFER_IN", "TRANSFER_OUT") => (first_index, second_index),
+                    ("TRANSFER_OUT", "TRANSFER_IN") => (second_index, first_index),
+                    _ => {
+                        return Err(crate::errors::Error::Unexpected(
+                            "unlink requires transfer pair".to_string(),
+                        ));
+                    }
+                };
+
+            let transfer_in_group = activities[transfer_in_index].source_group_id.clone();
+            let transfer_out_group = activities[transfer_out_index].source_group_id.clone();
+            if transfer_in_group.is_none() || transfer_in_group != transfer_out_group {
+                return Err(crate::errors::Error::Unexpected(
+                    "transfer pair is not linked".to_string(),
+                ));
+            }
+
+            let mut transfer_in = activities[transfer_in_index].clone();
+            let mut transfer_out = activities[transfer_out_index].clone();
+            transfer_in.source_group_id = None;
+            transfer_in.metadata = Some(json!({ "flow": { "is_external": true } }));
+            transfer_out.source_group_id = None;
+            transfer_out.metadata = Some(json!({ "flow": { "is_external": true } }));
+            transfer_in.updated_at = Utc::now();
+            transfer_out.updated_at = Utc::now();
+
+            activities[transfer_in_index] = transfer_in.clone();
+            activities[transfer_out_index] = transfer_out.clone();
+
+            Ok((transfer_in, transfer_out))
         }
 
         async fn bulk_mutate_activities(
@@ -3788,6 +3844,137 @@ mod tests {
             transfer_out_stored.source_group_id, transfer_in_stored.source_group_id,
             "paired transfers should share the same source_group_id"
         );
+    }
+
+    #[tokio::test]
+    async fn unlink_transfer_activities_emits_activities_changed_event() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        let fx_service = Arc::new(MockFxService::new());
+        let activity_repository = Arc::new(MockActivityRepository::new());
+        let event_sink = Arc::new(MockDomainEventSink::new());
+        let quote_service = Arc::new(MockQuoteService);
+        let activity_service = ActivityService::new(
+            activity_repository.clone(),
+            account_service,
+            asset_service,
+            fx_service,
+            quote_service,
+        )
+        .with_event_sink(event_sink.clone());
+
+        let earlier = DateTime::parse_from_rfc3339("2024-01-15T00:00:00Z")
+            .expect("valid date")
+            .with_timezone(&Utc);
+        let later = DateTime::parse_from_rfc3339("2024-01-16T00:00:00Z")
+            .expect("valid date")
+            .with_timezone(&Utc);
+        activity_repository.activities.lock().unwrap().extend([
+            Activity {
+                id: "transfer-in".to_string(),
+                account_id: "acc-in".to_string(),
+                asset_id: Some("asset-in".to_string()),
+                activity_type: "TRANSFER_IN".to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: later,
+                settlement_date: None,
+                quantity: None,
+                unit_price: None,
+                amount: Some(dec!(100)),
+                fee: Some(dec!(0)),
+                currency: "CAD".to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: Some(json!({ "flow": { "is_external": false } })),
+                source_system: Some("MANUAL".to_string()),
+                source_record_id: None,
+                source_group_id: Some("transfer-group".to_string()),
+                idempotency_key: None,
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: earlier,
+                updated_at: earlier,
+            },
+            Activity {
+                id: "transfer-out".to_string(),
+                account_id: "acc-out".to_string(),
+                asset_id: Some("asset-out".to_string()),
+                activity_type: "TRANSFER_OUT".to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: earlier,
+                settlement_date: None,
+                quantity: None,
+                unit_price: None,
+                amount: Some(dec!(100)),
+                fee: Some(dec!(0)),
+                currency: "USD".to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: Some(json!({ "flow": { "is_external": false } })),
+                source_system: Some("MANUAL".to_string()),
+                source_record_id: None,
+                source_group_id: Some("transfer-group".to_string()),
+                idempotency_key: None,
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: earlier,
+                updated_at: earlier,
+            },
+        ]);
+
+        activity_service
+            .unlink_transfer_activities("transfer-in".to_string(), "transfer-out".to_string())
+            .await
+            .expect("unlink should succeed");
+
+        let stored = activity_repository
+            .get_activities()
+            .expect("stored activities");
+        assert!(stored
+            .iter()
+            .all(|activity| activity.source_group_id.is_none()));
+        assert!(stored.iter().all(|activity| {
+            activity
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.get("flow"))
+                .and_then(|flow| flow.get("is_external"))
+                .and_then(|value| value.as_bool())
+                == Some(true)
+        }));
+
+        let events = event_sink.events();
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            DomainEvent::ActivitiesChanged {
+                account_ids,
+                asset_ids,
+                currencies,
+                earliest_activity_at_utc,
+            } => {
+                let mut account_ids = account_ids.clone();
+                account_ids.sort();
+                assert_eq!(account_ids, vec!["acc-in", "acc-out"]);
+
+                let mut asset_ids = asset_ids.clone();
+                asset_ids.sort();
+                assert_eq!(asset_ids, vec!["asset-in", "asset-out"]);
+
+                let mut currencies = currencies.clone();
+                currencies.sort();
+                assert_eq!(currencies, vec!["CAD", "USD"]);
+                assert_eq!(*earliest_activity_at_utc, Some(earlier));
+            }
+            event => panic!("expected ActivitiesChanged event, got {event:?}"),
+        }
     }
 
     #[tokio::test]

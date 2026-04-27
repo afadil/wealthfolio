@@ -83,6 +83,7 @@ export {
   getAccountImportMapping,
   linkAccountTemplate,
   linkTransferActivities,
+  unlinkTransferActivities,
   getActivities,
   importActivities,
   listImportTemplates,

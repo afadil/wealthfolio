@@ -351,6 +351,13 @@ mod tests {
         ) -> Result<(Activity, Activity)> {
             unimplemented!()
         }
+        async fn unlink_transfer_activities(
+            &self,
+            _: String,
+            _: String,
+        ) -> Result<(Activity, Activity)> {
+            unimplemented!()
+        }
         async fn bulk_mutate_activities(
             &self,
             _: Vec<NewActivity>,

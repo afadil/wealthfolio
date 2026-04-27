@@ -110,6 +110,21 @@ pub async fn link_transfer_activities(
 }
 
 #[tauri::command]
+pub async fn unlink_transfer_activities(
+    activity_a_id: String,
+    activity_b_id: String,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<(Activity, Activity), String> {
+    debug!("Unlinking transfer activities...");
+    // Domain events handle recalculation automatically
+    state
+        .activity_service()
+        .unlink_transfer_activities(activity_a_id, activity_b_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn save_activities(
     request: ActivityBulkMutationRequest,
     state: State<'_, Arc<ServiceContext>>,

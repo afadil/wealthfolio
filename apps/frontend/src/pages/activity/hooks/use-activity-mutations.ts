@@ -4,6 +4,7 @@ import {
   linkTransferActivities,
   logger,
   saveActivities,
+  unlinkTransferActivities,
   updateActivity,
 } from "@/adapters";
 import { generateId } from "@/lib/id";
@@ -255,6 +256,23 @@ export function useActivityMutations(
     },
   });
 
+  const unlinkTransferActivitiesMutation = useMutation({
+    mutationFn: ({ activityAId, activityBId }: { activityAId: string; activityBId: string }) =>
+      unlinkTransferActivities(activityAId, activityBId),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success("Transfers unlinked", {
+        description: "The two activities are external transfers again.",
+      });
+    },
+    onError: (error: string) => {
+      logger.error(`Error unlinking transfers: ${String(error)}`);
+      toast.error("Failed to unlink transfers", {
+        description: String(error),
+      });
+    },
+  });
+
   const duplicateActivity = async (activityToDuplicate: ActivityDetails) => {
     const {
       id: _id,
@@ -355,5 +373,6 @@ export function useActivityMutations(
     duplicateActivityMutation,
     saveActivitiesMutation,
     linkTransferActivitiesMutation,
+    unlinkTransferActivitiesMutation,
   };
 }

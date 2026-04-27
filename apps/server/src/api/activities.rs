@@ -156,6 +156,18 @@ async fn link_transfer_activities(
     Ok(Json(pair))
 }
 
+async fn unlink_transfer_activities(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkTransferActivitiesBody>,
+) -> ApiResult<Json<(Activity, Activity)>> {
+    let pair = state
+        .activity_service
+        .unlink_transfer_activities(body.activity_a_id, body.activity_b_id)
+        .await?;
+    // Domain events handle portfolio recalculation
+    Ok(Json(pair))
+}
+
 #[derive(serde::Deserialize)]
 struct ImportCheckBody {
     activities: Vec<ActivityImport>,
@@ -380,6 +392,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))
         .route("/activities/link", post(link_transfer_activities))
+        .route("/activities/unlink", post(unlink_transfer_activities))
         .route("/activities/import/check", post(check_activities_import))
         .route(
             "/activities/import/assets/preview",

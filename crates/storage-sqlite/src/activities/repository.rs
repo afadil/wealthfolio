@@ -42,6 +42,31 @@ fn apply_decimal_patch(existing: Option<String>, patch: Option<Option<Decimal>>)
     }
 }
 
+fn set_transfer_flow_external(metadata: Option<String>, is_external: bool) -> Option<String> {
+    let mut value = metadata
+        .and_then(|metadata| serde_json::from_str::<serde_json::Value>(&metadata).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    if !value.is_object() {
+        value = serde_json::json!({});
+    }
+
+    let object = value
+        .as_object_mut()
+        .expect("transfer metadata value should be an object");
+    let flow = object
+        .entry("flow")
+        .or_insert_with(|| serde_json::json!({}));
+    if !flow.is_object() {
+        *flow = serde_json::json!({});
+    }
+    if let Some(flow_object) = flow.as_object_mut() {
+        flow_object.insert("is_external".to_string(), serde_json::json!(is_external));
+    }
+
+    Some(value.to_string())
+}
+
 // Inherent methods for ActivityRepository
 impl ActivityRepository {
     /// Creates a new ActivityRepository instance
@@ -451,29 +476,136 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         "One or both activities are already linked to another transfer".to_string(),
                     )));
                 }
+                if transfer_in.account_id == transfer_out.account_id {
+                    return Err(Error::from(ActivityError::InvalidData(
+                        "Both transfer legs share the same account".to_string(),
+                    )));
+                }
 
                 let group_id = Uuid::new_v4().to_string();
                 let now = chrono::Utc::now().to_rfc3339();
-                let internal_metadata = Some(r#"{"flow":{"is_external":false}}"#.to_string());
 
                 transfer_in.source_group_id = Some(group_id.clone());
-                transfer_in.metadata = internal_metadata.clone();
+                transfer_in.metadata = set_transfer_flow_external(transfer_in.metadata, false);
+                transfer_in.is_user_modified = 1;
                 transfer_in.updated_at = now.clone();
                 transfer_out.source_group_id = Some(group_id);
-                transfer_out.metadata = internal_metadata;
+                transfer_out.metadata = set_transfer_flow_external(transfer_out.metadata, false);
+                transfer_out.is_user_modified = 1;
                 transfer_out.updated_at = now;
 
                 let updated_in = diesel::update(activities::table.find(&transfer_in.id))
-                    .set(&transfer_in)
+                    .set((
+                        activities::source_group_id.eq(transfer_in.source_group_id.clone()),
+                        activities::metadata.eq(transfer_in.metadata.clone()),
+                        activities::is_user_modified.eq(transfer_in.is_user_modified),
+                        activities::updated_at.eq(&transfer_in.updated_at),
+                    ))
                     .get_result::<ActivityDB>(tx.conn())
                     .map_err(StorageError::from)?;
                 let updated_out = diesel::update(activities::table.find(&transfer_out.id))
-                    .set(&transfer_out)
+                    .set((
+                        activities::source_group_id.eq(transfer_out.source_group_id.clone()),
+                        activities::metadata.eq(transfer_out.metadata.clone()),
+                        activities::is_user_modified.eq(transfer_out.is_user_modified),
+                        activities::updated_at.eq(&transfer_out.updated_at),
+                    ))
                     .get_result::<ActivityDB>(tx.conn())
                     .map_err(StorageError::from)?;
 
-                tx.update(&transfer_in)?;
-                tx.update(&transfer_out)?;
+                tx.update(&updated_in)?;
+                tx.update(&updated_out)?;
+
+                Ok((Activity::from(updated_in), Activity::from(updated_out)))
+            })
+            .await
+    }
+
+    async fn unlink_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)> {
+        use wealthfolio_core::activities::{ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT};
+
+        if activity_a_id == activity_b_id {
+            return Err(Error::from(ActivityError::InvalidData(
+                "Cannot unlink an activity from itself".to_string(),
+            )));
+        }
+
+        self.writer
+            .exec_tx(move |tx| -> Result<(Activity, Activity)> {
+                let a = activities::table
+                    .select(ActivityDB::as_select())
+                    .find(&activity_a_id)
+                    .first::<ActivityDB>(tx.conn())
+                    .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
+                let b = activities::table
+                    .select(ActivityDB::as_select())
+                    .find(&activity_b_id)
+                    .first::<ActivityDB>(tx.conn())
+                    .map_err(|e| Error::from(ActivityError::NotFound(e.to_string())))?;
+
+                let (mut transfer_in, mut transfer_out) =
+                    match (a.activity_type.as_str(), b.activity_type.as_str()) {
+                        (ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT) => (a, b),
+                        (ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_TRANSFER_IN) => (b, a),
+                        _ => {
+                            return Err(Error::from(ActivityError::InvalidData(
+                                "Unlinking requires one TRANSFER_IN and one TRANSFER_OUT activity"
+                                    .to_string(),
+                            )));
+                        }
+                    };
+
+                let Some(in_group_id) = transfer_in.source_group_id.clone() else {
+                    return Err(Error::from(ActivityError::InvalidData(
+                        "Both activities must already be linked".to_string(),
+                    )));
+                };
+                let Some(out_group_id) = transfer_out.source_group_id.clone() else {
+                    return Err(Error::from(ActivityError::InvalidData(
+                        "Both activities must already be linked".to_string(),
+                    )));
+                };
+                if in_group_id != out_group_id {
+                    return Err(Error::from(ActivityError::InvalidData(
+                        "Selected activities belong to different linked transfers".to_string(),
+                    )));
+                }
+
+                let now = chrono::Utc::now().to_rfc3339();
+                transfer_in.source_group_id = None;
+                transfer_in.metadata = set_transfer_flow_external(transfer_in.metadata, true);
+                transfer_in.is_user_modified = 1;
+                transfer_in.updated_at = now.clone();
+                transfer_out.source_group_id = None;
+                transfer_out.metadata = set_transfer_flow_external(transfer_out.metadata, true);
+                transfer_out.is_user_modified = 1;
+                transfer_out.updated_at = now;
+
+                let updated_in = diesel::update(activities::table.find(&transfer_in.id))
+                    .set((
+                        activities::source_group_id.eq(None::<String>),
+                        activities::metadata.eq(transfer_in.metadata.clone()),
+                        activities::is_user_modified.eq(1),
+                        activities::updated_at.eq(&transfer_in.updated_at),
+                    ))
+                    .get_result::<ActivityDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+                let updated_out = diesel::update(activities::table.find(&transfer_out.id))
+                    .set((
+                        activities::source_group_id.eq(None::<String>),
+                        activities::metadata.eq(transfer_out.metadata.clone()),
+                        activities::is_user_modified.eq(1),
+                        activities::updated_at.eq(&transfer_out.updated_at),
+                    ))
+                    .get_result::<ActivityDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+
+                tx.update(&updated_in)?;
+                tx.update(&updated_out)?;
 
                 Ok((Activity::from(updated_in), Activity::from(updated_out)))
             })
@@ -1832,6 +1964,68 @@ mod tests {
         .expect("insert template");
     }
 
+    fn insert_transfer_activity(
+        conn: &mut SqliteConnection,
+        id: &str,
+        account_id: &str,
+        activity_type: &str,
+        source_group_id: Option<&str>,
+        metadata: Option<&str>,
+    ) {
+        let activity = ActivityDB {
+            id: id.to_string(),
+            account_id: account_id.to_string(),
+            asset_id: None,
+            activity_type: activity_type.to_string(),
+            activity_type_override: None,
+            source_type: None,
+            subtype: None,
+            status: "POSTED".to_string(),
+            activity_date: "2024-01-15T00:00:00+00:00".to_string(),
+            settlement_date: None,
+            quantity: None,
+            unit_price: None,
+            amount: Some("100".to_string()),
+            fee: Some("0".to_string()),
+            currency: "USD".to_string(),
+            fx_rate: None,
+            notes: None,
+            metadata: metadata.map(str::to_string),
+            source_system: Some("MANUAL".to_string()),
+            source_record_id: None,
+            source_group_id: source_group_id.map(str::to_string),
+            idempotency_key: Some(format!("{id}-idempotency")),
+            import_run_id: None,
+            is_user_modified: 0,
+            needs_review: 0,
+            created_at: "2024-01-15T00:00:00+00:00".to_string(),
+            updated_at: "2024-01-15T00:00:00+00:00".to_string(),
+        };
+
+        diesel::insert_into(activities::table)
+            .values(&activity)
+            .execute(conn)
+            .expect("insert transfer activity");
+    }
+
+    fn activity_metadata(conn: &mut SqliteConnection, id: &str) -> serde_json::Value {
+        let metadata: Option<String> = activities::table
+            .filter(activities::id.eq(id))
+            .select(activities::metadata)
+            .first(conn)
+            .expect("activity metadata");
+        serde_json::from_str(metadata.as_deref().expect("metadata should be set"))
+            .expect("valid metadata")
+    }
+
+    fn activity_user_modified(conn: &mut SqliteConnection, id: &str) -> i32 {
+        activities::table
+            .filter(activities::id.eq(id))
+            .select(activities::is_user_modified)
+            .first(conn)
+            .expect("activity is_user_modified")
+    }
+
     /// Regression: re-linking the same (account_id, context_kind, source_system) must preserve the row `id`
     /// so that sync outbox events keep a stable entity_id across updates. Generating a new UUID
     /// on every upsert causes remote devices to receive a different entity_id and fail with a
@@ -1883,6 +2077,237 @@ mod tests {
             .first(&mut conn)
             .expect("template_id after relink");
         assert_eq!(template_id_after, "tmpl-b");
+    }
+
+    #[tokio::test]
+    async fn link_transfer_activities_marks_user_modified_and_rejects_same_account() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-a");
+        insert_account(&mut conn, "acc-b");
+        insert_transfer_activity(
+            &mut conn,
+            "transfer-out",
+            "acc-a",
+            "TRANSFER_OUT",
+            None,
+            Some(r#"{"source":{"id":"manual"}}"#),
+        );
+        insert_transfer_activity(
+            &mut conn,
+            "transfer-in",
+            "acc-b",
+            "TRANSFER_IN",
+            None,
+            Some(r#"{"flow":{"is_external":true}}"#),
+        );
+        insert_transfer_activity(
+            &mut conn,
+            "same-account-in",
+            "acc-a",
+            "TRANSFER_IN",
+            None,
+            None,
+        );
+
+        let same_account = repo
+            .link_transfer_activities("same-account-in".to_string(), "transfer-out".to_string())
+            .await;
+        assert!(same_account.is_err());
+        let same_account_group: Option<String> = activities::table
+            .filter(activities::id.eq("same-account-in"))
+            .select(activities::source_group_id)
+            .first(&mut conn)
+            .expect("same-account-in group");
+        assert_eq!(same_account_group, None);
+
+        let (transfer_in, transfer_out) = repo
+            .link_transfer_activities("transfer-in".to_string(), "transfer-out".to_string())
+            .await
+            .expect("link should succeed");
+
+        assert!(transfer_in.is_user_modified);
+        assert!(transfer_out.is_user_modified);
+        assert!(transfer_in.source_group_id.is_some());
+        assert_eq!(transfer_in.source_group_id, transfer_out.source_group_id);
+        assert_eq!(
+            transfer_in.metadata.as_ref().and_then(|m| {
+                m.get("flow")
+                    .and_then(|flow| flow.get("is_external"))
+                    .and_then(|value| value.as_bool())
+            }),
+            Some(false)
+        );
+        assert_eq!(
+            transfer_out
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get("source"))
+                .and_then(|source| source.get("id"))
+                .and_then(|value| value.as_str()),
+            Some("manual"),
+            "link should preserve unrelated metadata"
+        );
+        assert_eq!(activity_user_modified(&mut conn, "transfer-in"), 1);
+        assert_eq!(activity_user_modified(&mut conn, "transfer-out"), 1);
+    }
+
+    #[tokio::test]
+    async fn unlink_transfer_activities_clears_pair_and_marks_external() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-in");
+        insert_account(&mut conn, "acc-out");
+        insert_transfer_activity(
+            &mut conn,
+            "transfer-in",
+            "acc-in",
+            "TRANSFER_IN",
+            Some("transfer-group"),
+            Some(r#"{"flow":{"is_external":false},"source":{"id":"snaptrade"}}"#),
+        );
+        insert_transfer_activity(
+            &mut conn,
+            "transfer-out",
+            "acc-out",
+            "TRANSFER_OUT",
+            Some("transfer-group"),
+            Some(r#"{"flow":{"is_external":false}}"#),
+        );
+
+        let (transfer_in, transfer_out) = repo
+            .unlink_transfer_activities("transfer-in".to_string(), "transfer-out".to_string())
+            .await
+            .expect("unlink should succeed");
+
+        assert_eq!(transfer_in.id, "transfer-in");
+        assert_eq!(transfer_out.id, "transfer-out");
+        assert_eq!(transfer_in.source_group_id, None);
+        assert_eq!(transfer_out.source_group_id, None);
+        assert!(transfer_in.is_user_modified);
+        assert!(transfer_out.is_user_modified);
+        assert_eq!(
+            transfer_in.metadata.as_ref().and_then(|m| {
+                m.get("flow")
+                    .and_then(|flow| flow.get("is_external"))
+                    .and_then(|value| value.as_bool())
+            }),
+            Some(true)
+        );
+        assert_eq!(
+            transfer_out.metadata.as_ref().and_then(|m| {
+                m.get("flow")
+                    .and_then(|flow| flow.get("is_external"))
+                    .and_then(|value| value.as_bool())
+            }),
+            Some(true)
+        );
+        assert_eq!(
+            transfer_in
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get("source"))
+                .and_then(|source| source.get("id"))
+                .and_then(|value| value.as_str()),
+            Some("snaptrade"),
+            "unlink should preserve unrelated metadata"
+        );
+
+        let source_group_ids: Vec<Option<String>> = activities::table
+            .filter(activities::id.eq_any(["transfer-in", "transfer-out"]))
+            .select(activities::source_group_id)
+            .load(&mut conn)
+            .expect("source group ids");
+        assert_eq!(source_group_ids, vec![None, None]);
+
+        assert_eq!(
+            activity_metadata(&mut conn, "transfer-in")["flow"]["is_external"],
+            true
+        );
+        assert_eq!(
+            activity_metadata(&mut conn, "transfer-out")["flow"]["is_external"],
+            true
+        );
+        assert_eq!(activity_user_modified(&mut conn, "transfer-in"), 1);
+        assert_eq!(activity_user_modified(&mut conn, "transfer-out"), 1);
+    }
+
+    #[tokio::test]
+    async fn unlink_transfer_activities_rejects_unlinked_or_mismatched_pairs() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-in");
+        insert_account(&mut conn, "acc-out");
+        insert_transfer_activity(
+            &mut conn,
+            "linked-in",
+            "acc-in",
+            "TRANSFER_IN",
+            Some("group-a"),
+            Some(r#"{"flow":{"is_external":false}}"#),
+        );
+        insert_transfer_activity(
+            &mut conn,
+            "linked-out",
+            "acc-out",
+            "TRANSFER_OUT",
+            Some("group-b"),
+            Some(r#"{"flow":{"is_external":false}}"#),
+        );
+        insert_transfer_activity(
+            &mut conn,
+            "unlinked-out",
+            "acc-out",
+            "TRANSFER_OUT",
+            None,
+            Some(r#"{"flow":{"is_external":true}}"#),
+        );
+        insert_transfer_activity(&mut conn, "buy-row", "acc-in", "BUY", Some("group-a"), None);
+
+        let mismatched = repo
+            .unlink_transfer_activities("linked-in".to_string(), "linked-out".to_string())
+            .await;
+        assert!(mismatched.is_err());
+
+        let unlinked = repo
+            .unlink_transfer_activities("linked-in".to_string(), "unlinked-out".to_string())
+            .await;
+        assert!(unlinked.is_err());
+
+        let non_transfer = repo
+            .unlink_transfer_activities("linked-in".to_string(), "buy-row".to_string())
+            .await;
+        assert!(non_transfer.is_err());
+
+        let linked_in_group: Option<String> = activities::table
+            .filter(activities::id.eq("linked-in"))
+            .select(activities::source_group_id)
+            .first(&mut conn)
+            .expect("linked-in group");
+        let linked_out_group: Option<String> = activities::table
+            .filter(activities::id.eq("linked-out"))
+            .select(activities::source_group_id)
+            .first(&mut conn)
+            .expect("linked-out group");
+        let unlinked_out_group: Option<String> = activities::table
+            .filter(activities::id.eq("unlinked-out"))
+            .select(activities::source_group_id)
+            .first(&mut conn)
+            .expect("unlinked-out group");
+
+        assert_eq!(linked_in_group.as_deref(), Some("group-a"));
+        assert_eq!(linked_out_group.as_deref(), Some("group-b"));
+        assert_eq!(unlinked_out_group, None);
+        assert_eq!(
+            activity_metadata(&mut conn, "linked-in")["flow"]["is_external"],
+            false
+        );
     }
 
     #[tokio::test]

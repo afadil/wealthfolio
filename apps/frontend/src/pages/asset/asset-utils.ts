@@ -1,4 +1,6 @@
 import { Asset, LatestQuoteSnapshot } from "@/lib/types";
+import { parseOccSymbol } from "@/lib/occ-symbol";
+import { resolveDisplayTimezone } from "@/lib/utils";
 
 export interface WeightedBreakdown {
   name: string;
@@ -9,6 +11,39 @@ export interface ParsedAsset extends Asset {
   sectorsList: WeightedBreakdown[];
   countriesList: WeightedBreakdown[];
 }
+
+const getDateStringInTimezone = (timezone?: string | null): string => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: resolveDisplayTimezone(timezone),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  return `${year}-${month}-${day}`;
+};
+
+export const isExpiredOptionAsset = (asset: Asset, timezone?: string | null): boolean => {
+  if (asset.instrumentType !== "OPTION") {
+    return false;
+  }
+
+  const today = getDateStringInTimezone(timezone);
+  const option = asset.metadata?.option as { expiration?: unknown } | undefined;
+  const metadataExpiration =
+    typeof option?.expiration === "string" && /^\d{4}-\d{2}-\d{2}$/.test(option.expiration)
+      ? option.expiration
+      : null;
+  const parsedExpiration =
+    parseOccSymbol(asset.instrumentSymbol ?? "")?.expiration ??
+    parseOccSymbol(asset.displayCode ?? "")?.expiration;
+  const expiration = metadataExpiration ?? parsedExpiration;
+
+  return !!expiration && expiration < today;
+};
 
 export const isStaleQuote = (snapshot?: LatestQuoteSnapshot, asset?: ParsedAsset): boolean => {
   if (!snapshot || asset?.isActive === false) {

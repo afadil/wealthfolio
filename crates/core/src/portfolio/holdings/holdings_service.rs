@@ -1,4 +1,6 @@
-use crate::assets::{Asset, AssetClassificationService, AssetKind, AssetServiceTrait};
+use crate::assets::{
+    Asset, AssetClassificationService, AssetKind, AssetServiceTrait, InstrumentType,
+};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
@@ -6,6 +8,7 @@ use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrumen
 use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use async_trait::async_trait;
+use chrono::NaiveDate;
 use log::{debug, error, warn};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -46,9 +49,48 @@ pub struct HoldingsService {
 
 struct AssetInfo {
     instrument: Instrument,
+    instrument_symbol: Option<String>,
+    is_option: bool,
     kind: AssetKind,
     metadata: Option<Value>,
     purchase_price: Option<Decimal>,
+}
+
+fn is_expired_option(
+    is_option: bool,
+    metadata: Option<&Value>,
+    symbols: &[&str],
+    today: NaiveDate,
+) -> bool {
+    if !is_option {
+        return false;
+    }
+
+    let expiration = metadata
+        .and_then(|m| m.get("option"))
+        .and_then(|o| o.get("expiration"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .or_else(|| {
+            symbols.iter().find_map(|symbol| {
+                crate::utils::occ_symbol::parse_occ_symbol(symbol)
+                    .ok()
+                    .map(|parsed| parsed.expiration)
+            })
+        });
+    matches!(expiration, Some(exp) if exp < today)
+}
+
+fn is_expired_option_asset(asset: &Asset, today: NaiveDate) -> bool {
+    is_expired_option(
+        asset.instrument_type.as_ref() == Some(&InstrumentType::Option),
+        asset.metadata.as_ref(),
+        &[
+            asset.instrument_symbol.as_deref().unwrap_or_default(),
+            asset.display_code.as_deref().unwrap_or_default(),
+        ],
+        today,
+    )
 }
 
 impl HoldingsService {
@@ -94,6 +136,7 @@ impl HoldingsService {
         latest_snapshot: &snapshot::AccountStateSnapshot,
         base_currency: &str,
         lots_asset_id: Option<&str>,
+        skip_expired_options: bool,
     ) -> Vec<Holding> {
         let today = self.today_in_user_timezone();
         let snapshot_positions: Vec<snapshot::Position> = latest_snapshot
@@ -134,6 +177,8 @@ impl HoldingsService {
 
                         let asset_info = AssetInfo {
                             instrument,
+                            instrument_symbol: asset.instrument_symbol.clone(),
+                            is_option: asset.instrument_type == Some(InstrumentType::Option),
                             kind: asset.kind,
                             metadata,
                             purchase_price,
@@ -163,6 +208,24 @@ impl HoldingsService {
                 );
                 continue;
             };
+
+            if skip_expired_options
+                && is_expired_option(
+                    asset_info.is_option,
+                    asset_info.metadata.as_ref(),
+                    &[
+                        asset_info.instrument_symbol.as_deref().unwrap_or_default(),
+                        &asset_info.instrument.symbol,
+                    ],
+                    today,
+                )
+            {
+                debug!(
+                    "Skipping expired option holding {} for account {}.",
+                    snapshot_pos.asset_id, account_id
+                );
+                continue;
+            }
 
             let (holding_type, id_prefix) = if asset_info.kind.is_alternative() {
                 (HoldingType::AlternativeAsset, "ALT")
@@ -384,6 +447,111 @@ fn apply_portfolio_weights(account_id: &str, holdings: &mut [Holding]) {
     }
 }
 
+#[cfg(test)]
+mod expired_option_metadata_tests {
+    use super::is_expired_option;
+    use chrono::NaiveDate;
+    use serde_json::json;
+
+    #[test]
+    fn detects_expired_option_metadata() {
+        let metadata = json!({
+            "option": {
+                "expiration": "2026-03-06"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(true, Some(&metadata), &[""], today));
+    }
+
+    #[test]
+    fn detects_expired_occ_symbol_without_metadata() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(
+            true,
+            None,
+            &["TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn detects_expired_canonical_symbol_when_display_symbol_is_custom() {
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(is_expired_option(
+            true,
+            None,
+            &["Custom Label", "TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn requires_option_instrument_type() {
+        let metadata = json!({
+            "option": {
+                "expiration": "2026-03-06"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(
+            false,
+            Some(&metadata),
+            &["TSLA260306C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn keeps_active_and_same_day_option_metadata() {
+        let same_day = json!({
+            "option": {
+                "expiration": "2026-04-27"
+            }
+        });
+        let future = json!({
+            "option": {
+                "expiration": "2026-05-15"
+            }
+        });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(true, Some(&same_day), &[""], today));
+        assert!(!is_expired_option(true, Some(&future), &[""], today));
+        assert!(!is_expired_option(
+            true,
+            None,
+            &["TSLA260427C00397500"],
+            today
+        ));
+    }
+
+    #[test]
+    fn ignores_non_option_or_invalid_metadata() {
+        let non_option = json!({ "bond": { "maturityDate": "2026-03-06" } });
+        let invalid_option = json!({ "option": { "expiration": "not-a-date" } });
+        let today = NaiveDate::from_ymd_opt(2026, 4, 27).unwrap();
+
+        assert!(!is_expired_option(
+            true,
+            Some(&non_option),
+            &["AAPL"],
+            today
+        ));
+        assert!(!is_expired_option(
+            true,
+            Some(&invalid_option),
+            &["AAPL"],
+            today
+        ));
+        assert!(!is_expired_option(true, None, &["AAPL"], today));
+    }
+}
+
 #[async_trait]
 impl HoldingsServiceTrait for HoldingsService {
     async fn get_holdings(&self, account_id: &str, base_currency: &str) -> Result<Vec<Holding>> {
@@ -414,7 +582,13 @@ impl HoldingsServiceTrait for HoldingsService {
         };
 
         let mut holdings = self
-            .build_live_holdings_from_snapshot(account_id, &latest_snapshot, base_currency, None)
+            .build_live_holdings_from_snapshot(
+                account_id,
+                &latest_snapshot,
+                base_currency,
+                None,
+                true,
+            )
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)
             .await;
@@ -499,6 +673,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 &latest_snapshot,
                 base_currency,
                 Some(asset_id),
+                true,
             )
             .await;
         self.value_holdings_best_effort(account_id, &mut holdings)
@@ -516,6 +691,16 @@ impl HoldingsServiceTrait for HoldingsService {
         });
 
         let Some(index) = holding_index else {
+            if let Ok(asset) = self.asset_service.get_asset_by_id(asset_id) {
+                if is_expired_option_asset(&asset, self.today_in_user_timezone()) {
+                    debug!(
+                        "Asset {} exists in snapshot for account {} but is an expired option hidden from live holdings.",
+                        asset_id, account_id
+                    );
+                    return Ok(None);
+                }
+            }
+
             error!(
                 "Asset {} exists in snapshot for account {} but holding view could not be built.",
                 asset_id, account_id
@@ -691,14 +876,429 @@ impl HoldingsServiceTrait for HoldingsService {
 
 #[cfg(test)]
 mod tests {
+    use crate::assets::{
+        AssetMetadata, AssetSpec, EnsureAssetsResult, NewAsset, QuoteMode, UpdateAssetProfile,
+    };
+    use crate::errors::Error;
+    use crate::portfolio::snapshot::{AccountStateSnapshot, Position, SnapshotRecalcMode};
     use crate::snapshot::Lot;
+    use crate::taxonomies::{
+        AssetTaxonomyAssignment, Category, NewAssetTaxonomyAssignment, NewCategory, NewTaxonomy,
+        Taxonomy, TaxonomyServiceTrait, TaxonomyWithCategories,
+    };
     use crate::utils::time_utils::valuation_date_today;
 
     use super::*;
-    use chrono::Utc;
+    use chrono::{NaiveDate, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::VecDeque;
+    use serde_json::json;
+    use std::collections::{HashMap, VecDeque};
+    use std::sync::Arc;
+
+    struct MockAssetService {
+        assets: HashMap<String, Asset>,
+    }
+
+    impl MockAssetService {
+        fn new(assets: Vec<Asset>) -> Self {
+            Self {
+                assets: assets
+                    .into_iter()
+                    .map(|asset| (asset.id.clone(), asset))
+                    .collect(),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl AssetServiceTrait for MockAssetService {
+        fn get_assets(&self) -> Result<Vec<Asset>> {
+            Ok(self.assets.values().cloned().collect())
+        }
+
+        fn get_asset_by_id(&self, asset_id: &str) -> Result<Asset> {
+            self.assets
+                .get(asset_id)
+                .cloned()
+                .ok_or_else(|| Error::Asset(format!("Asset not found: {asset_id}")))
+        }
+
+        async fn delete_asset(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn update_asset_profile(
+            &self,
+            _asset_id: &str,
+            _payload: UpdateAssetProfile,
+        ) -> Result<Asset> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn create_asset(&self, _new_asset: NewAsset) -> Result<Asset> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn get_or_create_minimal_asset(
+            &self,
+            _asset_id: &str,
+            _context_currency: Option<String>,
+            _metadata: Option<AssetMetadata>,
+            _quote_mode: Option<String>,
+        ) -> Result<Asset> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn update_quote_mode(&self, _asset_id: &str, _quote_mode: &str) -> Result<Asset> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
+            Ok(asset_ids
+                .iter()
+                .filter_map(|asset_id| self.assets.get(asset_id).cloned())
+                .collect())
+        }
+
+        async fn enrich_asset_profile(&self, _asset_id: &str) -> Result<Asset> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn enrich_assets(&self, _asset_ids: Vec<String>) -> Result<(usize, usize, usize)> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn cleanup_legacy_metadata(&self, _asset_id: &str) -> Result<()> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn merge_unknown_asset(
+            &self,
+            _resolved_asset_id: &str,
+            _unknown_asset_id: &str,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<u32> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn ensure_assets(
+            &self,
+            _specs: Vec<AssetSpec>,
+            _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
+        ) -> Result<EnsureAssetsResult> {
+            unimplemented!("unused in holdings service tests")
+        }
+    }
+
+    struct MockSnapshotService {
+        snapshot: AccountStateSnapshot,
+    }
+
+    #[async_trait::async_trait]
+    impl SnapshotServiceTrait for MockSnapshotService {
+        async fn recalculate_holdings_snapshots(
+            &self,
+            _account_ids: Option<&[String]>,
+            _mode: SnapshotRecalcMode,
+        ) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        fn get_holdings_keyframes(
+            &self,
+            _account_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+        ) -> Result<Vec<AccountStateSnapshot>> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        fn get_daily_holdings_snapshots(
+            &self,
+            _account_id: &str,
+            _start_date: Option<NaiveDate>,
+            _end_date: Option<NaiveDate>,
+        ) -> Result<Vec<AccountStateSnapshot>> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        fn get_latest_holdings_snapshot(
+            &self,
+            _account_id: &str,
+        ) -> Result<Option<AccountStateSnapshot>> {
+            Ok(Some(self.snapshot.clone()))
+        }
+
+        async fn recalculate_total_portfolio_snapshots(
+            &self,
+            _mode: SnapshotRecalcMode,
+        ) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn save_manual_snapshot(
+            &self,
+            _account_id: &str,
+            _snapshot: AccountStateSnapshot,
+        ) -> Result<()> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn update_snapshots_source(
+            &self,
+            _account_id: &str,
+            _new_source: &str,
+        ) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn ensure_holdings_history(&self, _account_id: &str) -> Result<()> {
+            unimplemented!("unused in holdings service tests")
+        }
+    }
+
+    struct MockValuationService {
+        values: HashMap<String, Decimal>,
+    }
+
+    #[async_trait::async_trait]
+    impl HoldingsValuationServiceTrait for MockValuationService {
+        async fn calculate_holdings_live_valuation(&self, holdings: &mut [Holding]) -> Result<()> {
+            for holding in holdings {
+                if let Some(asset_id) = holding.instrument.as_ref().map(|instrument| &instrument.id)
+                {
+                    if let Some(value) = self.values.get(asset_id) {
+                        holding.market_value = MonetaryValue {
+                            local: *value,
+                            base: *value,
+                        };
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+
+    struct EmptyTaxonomyService;
+
+    #[async_trait::async_trait]
+    impl TaxonomyServiceTrait for EmptyTaxonomyService {
+        fn get_taxonomies(&self) -> Result<Vec<Taxonomy>> {
+            Ok(Vec::new())
+        }
+
+        fn get_taxonomy(&self, _id: &str) -> Result<Option<TaxonomyWithCategories>> {
+            Ok(None)
+        }
+
+        fn get_taxonomies_with_categories(&self) -> Result<Vec<TaxonomyWithCategories>> {
+            Ok(Vec::new())
+        }
+
+        async fn create_taxonomy(&self, _taxonomy: NewTaxonomy) -> Result<Taxonomy> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn update_taxonomy(&self, _taxonomy: Taxonomy) -> Result<Taxonomy> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn delete_taxonomy(&self, _id: &str) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn create_category(&self, _category: NewCategory) -> Result<Category> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn update_category(&self, _category: Category) -> Result<Category> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn delete_category(&self, _taxonomy_id: &str, _category_id: &str) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn move_category(
+            &self,
+            _taxonomy_id: &str,
+            _category_id: &str,
+            _new_parent_id: Option<String>,
+            _position: i32,
+        ) -> Result<Category> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn import_taxonomy_json(&self, _json_str: &str) -> Result<Taxonomy> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        fn export_taxonomy_json(&self, _id: &str) -> Result<String> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        fn get_asset_assignments(&self, _asset_id: &str) -> Result<Vec<AssetTaxonomyAssignment>> {
+            Ok(Vec::new())
+        }
+
+        fn get_category_assignments(
+            &self,
+            _taxonomy_id: &str,
+            _category_id: &str,
+        ) -> Result<Vec<AssetTaxonomyAssignment>> {
+            Ok(Vec::new())
+        }
+
+        async fn assign_asset_to_category(
+            &self,
+            _assignment: NewAssetTaxonomyAssignment,
+        ) -> Result<AssetTaxonomyAssignment> {
+            unimplemented!("unused in holdings service tests")
+        }
+
+        async fn remove_asset_assignment(&self, _id: &str) -> Result<usize> {
+            unimplemented!("unused in holdings service tests")
+        }
+    }
+
+    fn test_asset(id: &str, symbol: &str, instrument_type: InstrumentType) -> Asset {
+        let now = Utc::now().naive_utc();
+        Asset {
+            id: id.to_string(),
+            kind: AssetKind::Investment,
+            name: Some(symbol.to_string()),
+            display_code: Some(symbol.to_string()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: "USD".to_string(),
+            instrument_type: Some(instrument_type),
+            instrument_symbol: Some(symbol.to_string()),
+            created_at: now,
+            updated_at: now,
+            ..Default::default()
+        }
+    }
+
+    fn test_position(account_id: &str, asset_id: &str) -> Position {
+        let now = Utc::now();
+        Position {
+            id: format!("POS-{asset_id}-{account_id}"),
+            account_id: account_id.to_string(),
+            asset_id: asset_id.to_string(),
+            quantity: dec!(1),
+            average_cost: dec!(100),
+            total_cost_basis: dec!(100),
+            currency: "USD".to_string(),
+            inception_date: now,
+            lots: VecDeque::new(),
+            created_at: now,
+            last_updated: now,
+            is_alternative: false,
+            contract_multiplier: Decimal::ONE,
+        }
+    }
+
+    fn test_service(
+        snapshot: AccountStateSnapshot,
+        assets: Vec<Asset>,
+        values: HashMap<String, Decimal>,
+    ) -> HoldingsService {
+        HoldingsService::new(
+            Arc::new(MockAssetService::new(assets)),
+            Arc::new(MockSnapshotService { snapshot }),
+            Arc::new(MockValuationService { values }),
+            Arc::new(AssetClassificationService::new(Arc::new(
+                EmptyTaxonomyService,
+            ))),
+        )
+    }
+
+    #[tokio::test]
+    async fn get_holding_uses_filtered_universe_for_weight() {
+        let account_id = "acc-1";
+        let active_asset_id = "AAPL";
+        let expired_asset_id = "TSLA200117C00397500";
+
+        let active_asset = test_asset(active_asset_id, "AAPL", InstrumentType::Equity);
+        let mut expired_asset =
+            test_asset(expired_asset_id, expired_asset_id, InstrumentType::Option);
+        expired_asset.metadata = Some(json!({
+            "option": {
+                "expiration": "2020-01-17"
+            }
+        }));
+
+        let mut positions = HashMap::new();
+        positions.insert(
+            active_asset_id.to_string(),
+            test_position(account_id, active_asset_id),
+        );
+        positions.insert(
+            expired_asset_id.to_string(),
+            test_position(account_id, expired_asset_id),
+        );
+
+        let snapshot = AccountStateSnapshot {
+            account_id: account_id.to_string(),
+            currency: "USD".to_string(),
+            positions,
+            ..Default::default()
+        };
+        let service = test_service(
+            snapshot,
+            vec![active_asset, expired_asset],
+            HashMap::from([
+                (active_asset_id.to_string(), dec!(100)),
+                (expired_asset_id.to_string(), dec!(100)),
+            ]),
+        );
+
+        let holdings = service.get_holdings(account_id, "USD").await.unwrap();
+        assert_eq!(holdings.len(), 1);
+        assert_eq!(holdings[0].weight, dec!(1));
+
+        let holding = service
+            .get_holding(account_id, active_asset_id, "USD")
+            .await
+            .unwrap()
+            .expect("active holding should exist");
+        assert_eq!(holding.weight, dec!(1));
+    }
+
+    #[tokio::test]
+    async fn get_holding_returns_none_for_expired_option_position() {
+        let account_id = "acc-1";
+        let expired_asset_id = "TSLA200117C00397500";
+
+        let mut expired_asset =
+            test_asset(expired_asset_id, expired_asset_id, InstrumentType::Option);
+        expired_asset.metadata = Some(json!({
+            "option": {
+                "expiration": "2020-01-17"
+            }
+        }));
+
+        let snapshot = AccountStateSnapshot {
+            account_id: account_id.to_string(),
+            currency: "USD".to_string(),
+            positions: HashMap::from([(
+                expired_asset_id.to_string(),
+                test_position(account_id, expired_asset_id),
+            )]),
+            ..Default::default()
+        };
+        let service = test_service(
+            snapshot,
+            vec![expired_asset],
+            HashMap::from([(expired_asset_id.to_string(), dec!(100))]),
+        );
+
+        let holding = service
+            .get_holding(account_id, expired_asset_id, "USD")
+            .await
+            .unwrap();
+        assert!(holding.is_none());
+    }
 
     #[test]
     fn normalize_holding_currency_converts_minor_security_units() {
