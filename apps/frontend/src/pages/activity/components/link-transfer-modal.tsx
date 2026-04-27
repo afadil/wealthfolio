@@ -14,7 +14,8 @@ import { formatDateTime } from "@/lib/utils";
 
 interface LinkTransferModalProps {
   isOpen: boolean;
-  isLinking: boolean;
+  mode: "link" | "unlink";
+  isProcessing: boolean;
   activityIn?: ActivityDetails;
   activityOut?: ActivityDetails;
   warnings: string[];
@@ -49,21 +50,27 @@ function ActivityRow({ activity, label }: { activity: ActivityDetails; label: st
 
 export function LinkTransferModal({
   isOpen,
-  isLinking,
+  mode,
+  isProcessing,
   activityIn,
   activityOut,
   warnings,
   onConfirm,
   onCancel,
 }: LinkTransferModalProps) {
+  const isUnlinkMode = mode === "unlink";
+
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => (!open ? onCancel() : undefined)}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Link as internal transfer</AlertDialogTitle>
+          <AlertDialogTitle>
+            {isUnlinkMode ? "Unlink internal transfer" : "Link as internal transfer"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            These two activities will be paired and treated as a single internal transfer between
-            your accounts.
+            {isUnlinkMode
+              ? "These two activities will become external transfers again."
+              : "These two activities will be paired and treated as a single internal transfer between your accounts."}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -77,8 +84,8 @@ export function LinkTransferModal({
           </div>
         ) : null}
 
-        {warnings.length > 0 ? (
-          <div className="border-warning/40 bg-warning/10 text-warning-foreground flex gap-2 rounded-md border px-3 py-2 text-xs">
+        {!isUnlinkMode && warnings.length > 0 ? (
+          <div className="border-warning/40 bg-warning/10 text-warning flex gap-2 rounded-md border px-3 py-2 text-xs">
             <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <ul className="space-y-0.5">
               {warnings.map((warning) => (
@@ -89,14 +96,16 @@ export function LinkTransferModal({
         ) : null}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isLinking}>Cancel</AlertDialogCancel>
-          <Button onClick={onConfirm} disabled={isLinking}>
-            {isLinking ? (
+          <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+          <Button onClick={onConfirm} disabled={isProcessing}>
+            {isProcessing ? (
               <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            ) : isUnlinkMode ? (
+              <Icons.Unlink className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Link className="mr-2 h-4 w-4" />
             )}
-            <span>Link transfers</span>
+            <span>{isUnlinkMode ? "Unlink transfers" : "Link transfers"}</span>
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

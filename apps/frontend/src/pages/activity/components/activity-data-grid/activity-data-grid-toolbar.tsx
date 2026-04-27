@@ -78,6 +78,16 @@ interface ActivityDataGridToolbarProps {
   linkDisabledReason?: string;
   /** Whether a link operation is in progress */
   isLinking?: boolean;
+  /** Handler invoked when user clicks "Unlink internal pair" */
+  onUnlinkSelected?: () => void;
+  /** Whether to show the unlink action for the current selection */
+  showUnlinkSelected?: boolean;
+  /** Whether the current selection is a linked TRANSFER_IN/TRANSFER_OUT pair */
+  canUnlinkSelected?: boolean;
+  /** Reason the current selection cannot be unlinked (used as button tooltip) */
+  unlinkDisabledReason?: string;
+  /** Whether an unlink operation is in progress */
+  isUnlinking?: boolean;
 }
 
 /**
@@ -100,6 +110,11 @@ export function ActivityDataGridToolbar({
   canLinkSelected,
   linkDisabledReason,
   isLinking,
+  onUnlinkSelected,
+  showUnlinkSelected,
+  canUnlinkSelected,
+  unlinkDisabledReason,
+  isUnlinking,
 }: ActivityDataGridToolbarProps) {
   // Prevent mousedown from bubbling to document, which would clear DataGrid selection
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -214,7 +229,24 @@ export function ActivityDataGridToolbar({
                 <span>Approve {selectedPendingCount}</span>
               </Button>
             )}
-            {selectedRowCount === 2 && onLinkSelected && (
+            {selectedRowCount === 2 && showUnlinkSelected && onUnlinkSelected ? (
+              <Button
+                onClick={onUnlinkSelected}
+                size="xs"
+                variant="outline"
+                className="shrink-0 rounded-md text-xs"
+                title={canUnlinkSelected ? "Unlink internal transfer" : unlinkDisabledReason}
+                aria-label="Unlink internal transfer"
+                disabled={!canUnlinkSelected || isUnlinking || isSaving}
+              >
+                {isUnlinking ? (
+                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icons.Unlink className="h-3.5 w-3.5" />
+                )}
+                <span>Unlink</span>
+              </Button>
+            ) : selectedRowCount === 2 && onLinkSelected ? (
               <Button
                 onClick={onLinkSelected}
                 size="xs"
@@ -231,7 +263,7 @@ export function ActivityDataGridToolbar({
                 )}
                 <span>Link</span>
               </Button>
-            )}
+            ) : null}
             <Button
               onClick={onDeleteSelected}
               size="xs"

@@ -48,6 +48,13 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         activity_a_id: String,
         activity_b_id: String,
     ) -> Result<(Activity, Activity)>;
+    /// Unpairs two linked transfer activities by clearing their shared `source_group_id`
+    /// and marking `metadata.flow.is_external` as true on both rows.
+    async fn unlink_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)>;
     async fn bulk_mutate_activities(
         &self,
         creates: Vec<NewActivity>,
@@ -175,6 +182,11 @@ pub trait ActivityServiceTrait: Send + Sync {
     async fn update_activity(&self, activity: ActivityUpdate) -> Result<Activity>;
     async fn delete_activity(&self, activity_id: String) -> Result<Activity>;
     async fn link_transfer_activities(
+        &self,
+        activity_a_id: String,
+        activity_b_id: String,
+    ) -> Result<(Activity, Activity)>;
+    async fn unlink_transfer_activities(
         &self,
         activity_a_id: String,
         activity_b_id: String,

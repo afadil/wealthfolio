@@ -395,6 +395,13 @@ mod tests {
         ) -> AppResult<(Activity, Activity)> {
             unimplemented!()
         }
+        async fn unlink_transfer_activities(
+            &self,
+            _activity_a_id: String,
+            _activity_b_id: String,
+        ) -> AppResult<(Activity, Activity)> {
+            unimplemented!()
+        }
         async fn bulk_mutate_activities(
             &self,
             _creates: Vec<NewActivity>,
@@ -599,6 +606,13 @@ mod tests {
             unimplemented!()
         }
         async fn link_transfer_activities(
+            &self,
+            _a: String,
+            _b: String,
+        ) -> AppResult<(Activity, Activity)> {
+            unimplemented!()
+        }
+        async fn unlink_transfer_activities(
             &self,
             _a: String,
             _b: String,
