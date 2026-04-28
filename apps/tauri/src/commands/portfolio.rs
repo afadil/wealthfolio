@@ -1018,6 +1018,13 @@ pub async fn get_snapshot_by_date(
             pricing_mode: asset.quote_mode.as_db_str().to_string(),
             preferred_provider: asset.preferred_provider(),
             exchange_mic: asset.instrument_exchange_mic.clone(),
+            isin: asset
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get("identifiers"))
+                .and_then(|i| i.get("isin"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
             classifications: None,
         };
 
