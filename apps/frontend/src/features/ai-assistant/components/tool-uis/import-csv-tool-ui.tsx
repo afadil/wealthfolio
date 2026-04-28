@@ -195,8 +195,8 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
         <p className="text-muted-foreground text-sm">
           {fieldCount > 0 ? `Mapped ${fieldCount} columns. ` : ""}
           {account ? `Target account: ${account.name}. ` : ""}
-          The file contents are no longer available in this chat session, so the review table
-          cannot be reopened.
+          The file contents are no longer available in this chat session, so the review table cannot
+          be reopened.
         </p>
         <p className="text-muted-foreground text-xs">
           Attach the CSV again to review, edit, or import these rows.
