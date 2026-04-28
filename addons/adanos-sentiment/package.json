@@ -1,0 +1,60 @@
+{
+  "name": "adanos-sentiment",
+  "version": "1.0.0",
+  "description": "A Wealthfolio addon that overlays Adanos market sentiment across your portfolio holdings",
+  "type": "module",
+  "main": "dist/addon.js",
+  "author": "Adanos Sentiment",
+  "license": "MIT",
+  "homepage": "https://api.adanos.org/docs",
+  "keywords": [
+    "wealthfolio",
+    "addon",
+    "adanos",
+    "sentiment",
+    "stocks",
+    "portfolio"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "dev:server": "wealthfolio dev",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "package": "mkdir -p dist && zip -r dist/$npm_package_name-$npm_package_version.zip manifest.json dist/ README.md",
+    "bundle": "pnpm clean && pnpm build && pnpm package",
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.20",
+    "@wealthfolio/addon-sdk": "workspace:*",
+    "@wealthfolio/ui": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20.19.33",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@wealthfolio/addon-dev-tools": "workspace:*",
+    "clsx": "^2.1.1",
+    "rollup-plugin-external-globals": "^0.13.0",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "jsdom": "^28.0.0",
+    "vitest": "^3.2.4"
+  },
+  "files": [
+    "dist/",
+    "manifest.json",
+    "README.md"
+  ]
+}
