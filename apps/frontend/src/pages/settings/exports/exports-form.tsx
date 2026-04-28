@@ -85,7 +85,7 @@ const dataTypes = {
       key: "full",
       name: "Export the full SQLite Database",
       icon: Icons.Database,
-      description: "Complete database backup with WAL/SHM files - choose your backup location",
+      description: "Complete database backup with WAL/SHM files",
     },
   ],
 };
