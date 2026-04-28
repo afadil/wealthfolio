@@ -50,7 +50,7 @@ export function HealthStrip({ deviations, currency, totalValue, rebalanceMode }:
         : "text-red-600 dark:text-red-400";
 
   return (
-    <div className="mb-4 grid grid-cols-[1fr_1fr_2fr_1fr] divide-x rounded-lg border">
+    <div className="mb-4 grid grid-cols-2 divide-x divide-y overflow-hidden rounded-lg border md:grid-cols-4 md:divide-y-0">
       {/* Slot 1 — Portfolio Value (always available) */}
       <div className="px-4 py-3">
         <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wider">
