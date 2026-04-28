@@ -102,13 +102,13 @@ export function HoldingTargetRow({
     scrollTimerRef.current = setTimeout(() => {
       const el = rowRef.current;
       if (!el) return;
-      let container: HTMLElement | null = el.parentElement as HTMLElement;
+      let container: HTMLElement | null = el.parentElement;
       while (
         container &&
         getComputedStyle(container).overflowY !== "auto" &&
         getComputedStyle(container).overflowY !== "scroll"
       ) {
-        container = container.parentElement as HTMLElement;
+        container = container.parentElement;
       }
       if (!container) return;
       const elRect = el.getBoundingClientRect();

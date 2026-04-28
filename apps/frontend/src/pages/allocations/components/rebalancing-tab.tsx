@@ -706,13 +706,13 @@ export function RebalancingTab({
                     { key: "shares" as SortKey, label: "Shares", align: "center", colClass: "" },
                     { key: "price" as SortKey, label: "Price", align: "right", colClass: "" },
                     { key: "amount" as SortKey, label: "Amount", align: "right", colClass: "" },
-                  ] as Array<{
+                  ] as {
                     key: SortKey;
                     label: string;
                     align: string;
                     noSort?: boolean;
                     colClass: string;
-                  }>
+                  }[]
                 ).map((col) =>
                   col.noSort ? (
                     <div

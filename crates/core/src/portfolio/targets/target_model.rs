@@ -57,7 +57,7 @@ pub struct TargetAllocation {
 }
 
 /// Data for creating or updating a target allocation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NewTargetAllocation {
     pub id: Option<String>,
@@ -65,18 +65,6 @@ pub struct NewTargetAllocation {
     pub category_id: String,
     pub target_percent: i32,
     pub is_locked: bool,
-}
-
-impl Default for NewTargetAllocation {
-    fn default() -> Self {
-        Self {
-            id: None,
-            target_id: String::new(),
-            category_id: String::new(),
-            target_percent: 0,
-            is_locked: false,
-        }
-    }
 }
 
 /// Deviation between current and target allocation for a single category.
@@ -109,7 +97,7 @@ pub struct HoldingTarget {
 }
 
 /// Data for creating or updating a holding target.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NewHoldingTarget {
     pub id: Option<String>,
@@ -117,18 +105,6 @@ pub struct NewHoldingTarget {
     pub asset_id: String,
     pub target_percent: i32,
     pub is_locked: bool,
-}
-
-impl Default for NewHoldingTarget {
-    fn default() -> Self {
-        Self {
-            id: None,
-            allocation_id: String::new(),
-            asset_id: String::new(),
-            target_percent: 0,
-            is_locked: false,
-        }
-    }
 }
 
 /// Full deviation report for a portfolio target.

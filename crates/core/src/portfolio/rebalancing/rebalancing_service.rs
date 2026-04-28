@@ -85,6 +85,7 @@ impl RebalancingServiceImpl {
     }
 
     /// Generate SELL recommendations for an overweight category (buy_and_sell mode only).
+    #[allow(clippy::too_many_arguments)]
     fn generate_sell_recommendations(
         &self,
         holdings: &[HoldingSummary],
@@ -253,6 +254,7 @@ impl RebalancingServiceImpl {
     /// Uses "Efficient Rebalancing" algorithm:
     /// - Phase 1: Buy shares that reduce deviation (improve targets)
     /// - Phase 2: Use remaining budget without exceeding category ceiling
+    #[allow(clippy::too_many_arguments)]
     fn optimize_whole_shares(
         &self,
         holdings: &[HoldingSummary],
