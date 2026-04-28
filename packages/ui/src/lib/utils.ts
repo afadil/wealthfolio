@@ -11,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
  */
 const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
   minimumFractionDigits: DISPLAY_DECIMAL_PRECISION,
-  maximumFractionDigits: DISPLAY_DECIMAL_PRECISION,
+  maximumFractionDigits: 4,
 };
 
 const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
