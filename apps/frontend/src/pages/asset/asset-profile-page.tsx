@@ -422,11 +422,13 @@ export const AssetProfilePage = () => {
       | { sectors?: string | null; countries?: string | null }
       | undefined;
 
+    const identifiers = asset?.metadata?.identifiers as { isin?: string } | undefined;
+
     return {
       id: instrument?.id ?? asset?.id ?? "",
       symbol: instrument?.symbol ?? asset?.displayCode ?? assetId,
       name: instrument?.name ?? asset?.name ?? "-",
-      isin: null,
+      isin: identifiers?.isin ?? null,
       assetType: null,
       symbolMapping: null,
       notes: instrument?.notes ?? asset?.notes ?? null,
@@ -1218,6 +1220,13 @@ export const AssetProfilePage = () => {
                         </Button>
                       )}
                     </div>
+
+                    {/* ISIN */}
+                    {profile.isin && (
+                      <p className="text-muted-foreground text-sm">
+                        <span className="font-medium">ISIN:</span> {profile.isin}
+                      </p>
+                    )}
 
                     {/* Notes section */}
                     <p className="text-muted-foreground text-sm">
