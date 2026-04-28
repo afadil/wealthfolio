@@ -149,7 +149,7 @@ function hasSameDisplayValue(a: string | undefined, b: string | undefined): bool
   return Boolean(left && right && left === right);
 }
 
-function joinDisplayParts(parts: Array<string | undefined>): string | undefined {
+function joinDisplayParts(parts: (string | undefined)[]): string | undefined {
   const visibleParts = parts.filter((part): part is string => Boolean(displayPart(part)));
   return visibleParts.length > 0 ? visibleParts.join(" \u00b7 ") : undefined;
 }
