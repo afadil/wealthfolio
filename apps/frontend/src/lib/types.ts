@@ -1001,6 +1001,7 @@ export interface UpdateAssetProfile {
   instrumentType?: string | null;
   instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 // Rename ComparisonItem to TrackedItem
