@@ -1356,6 +1356,7 @@ mod tests {
     }
 }
 
+#[allow(clippy::items_after_test_module)]
 #[async_trait]
 impl RebalancingService for RebalancingServiceImpl {
     async fn calculate_rebalancing_plan(&self, input: RebalancingInput) -> Result<RebalancingPlan> {
