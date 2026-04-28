@@ -660,6 +660,7 @@ impl AllocationServiceTrait for AllocationService {
                         .map(|i| i.symbol.clone())
                         .unwrap_or_default(),
                     name: holding.instrument.as_ref().and_then(|i| i.name.clone()),
+                    isin: holding.instrument.as_ref().and_then(|i| i.isin.clone()),
                     holding_type: holding.holding_type.clone(),
                     quantity: holding.quantity,
                     market_value: weighted_value,

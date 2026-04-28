@@ -316,6 +316,7 @@ export function RebalancingTab({
         "accountId",
         "accountName",
         "fee",
+        "isin",
       ],
     ];
     for (const rec of flatRows) {
@@ -331,6 +332,7 @@ export function RebalancingTab({
         "",
         "",
         "0",
+        rec.isin ?? "",
       ]);
     }
     const csvContent = rows

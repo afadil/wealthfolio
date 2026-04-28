@@ -27,6 +27,8 @@ pub struct TradeRecommendation {
     pub symbol: String,
     /// Asset name
     pub name: Option<String>,
+    /// ISIN identifier (if available)
+    pub isin: Option<String>,
     /// Category this holding belongs to
     pub category_id: String,
     /// Category display name
@@ -183,6 +185,7 @@ mod tests {
             asset_id: "AAPL".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            isin: None,
             category_id: "EQUITY".to_string(),
             category_name: "Equity".to_string(),
             action: "BUY".to_string(),
@@ -216,6 +219,7 @@ mod tests {
             asset_id: "AAPL".to_string(),
             symbol: "AAPL".to_string(),
             name: Some("Apple Inc.".to_string()),
+            isin: None,
             category_id: "EQUITY".to_string(),
             category_name: "Equity".to_string(),
             action: "BUY".to_string(),
@@ -232,6 +236,7 @@ mod tests {
             asset_id: "MSFT".to_string(),
             symbol: "MSFT".to_string(),
             name: Some("Microsoft Corp.".to_string()),
+            isin: None,
             category_id: "EQUITY".to_string(),
             category_name: "Equity".to_string(),
             action: "BUY".to_string(),

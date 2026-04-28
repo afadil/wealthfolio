@@ -30,6 +30,7 @@ pub struct Instrument {
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
     pub exchange_mic: Option<String>,
+    pub isin: Option<String>,
 
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,
@@ -59,6 +60,7 @@ pub struct HoldingSummary {
     pub id: String,
     pub symbol: String,
     pub name: Option<String>,
+    pub isin: Option<String>,
     pub holding_type: HoldingType,
     pub quantity: Decimal,
     pub market_value: Decimal,

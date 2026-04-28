@@ -2079,6 +2079,7 @@ export interface TradeRecommendation {
   assetId: string;
   symbol: string;
   name: string | null;
+  isin: string | null;
   categoryId: string;
   categoryName: string;
   action: string; // "BUY"
