@@ -1,10 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { PortfolioTarget, TargetAllocation, DeviationReport } from "@/lib/types";
-import {
-  getPortfolioTargets,
-  getTargetAllocations,
-  getAllocationDeviations,
-} from "@/adapters";
+import { getPortfolioTargets, getTargetAllocations, getAllocationDeviations } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 
 export function usePortfolioTargets(accountId: string) {

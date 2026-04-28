@@ -1,9 +1,8 @@
 # Allocations Feature — Master Plan
 
-**Branch**: `feature/allocation-targets`
-**Base**: `v3.0.0-beta.5`
-**Date**: February 2026
-**Status**: 
+**Branch**: `feature/allocation-targets` **Base**: `v3.0.0-beta.5` **Date**:
+February 2026 **Status**:
+
 - ✅ Section 0: Backend complete
 - ✅ Section 1: Category-level targets + UI complete
 - ✅ Section 2: Per-holding targets complete
@@ -13,14 +12,17 @@
 
 ## Overview
 
-The Allocations feature lets users set target allocation percentages, compare them against current holdings, and get rebalancing advice. It builds on the beta's taxonomy system (hierarchical categories with weighted assignments) rather than the old hardcoded `asset_class` / `asset_sub_class` fields.
+The Allocations feature lets users set target allocation percentages, compare
+them against current holdings, and get rebalancing advice. It builds on the
+beta's taxonomy system (hierarchical categories with weighted assignments)
+rather than the old hardcoded `asset_class` / `asset_sub_class` fields.
 
 ### What exists in beta already (not ours to build)
 
 - Taxonomy system: 5 system taxonomies + custom, hierarchical categories,
   weighted assignments (basis points)
-- Current allocation engine: `get_portfolio_allocations()` returns breakdowns
-  by all taxonomies
+- Current allocation engine: `get_portfolio_allocations()` returns breakdowns by
+  all taxonomies
 - Visualization components: `DrillableDonutChart`, `SegmentedAllocationBar`,
   `CompactAllocationStrip`, `SectorsChart`, `AllocationDetailSheet`
 - Holdings insights page at `/holdings-insights` (read-only current allocation)
@@ -54,9 +56,9 @@ tables reference taxonomy categories without modifying taxonomy tables.
 
 ### D3: Preview mode only (no strict mode)
 
-Auto-distribute unset holding targets proportionally by current market value.
-No strict validation requiring exact 100% sum. Simpler UX, simpler code.
-Strict mode was dropped from scope.
+Auto-distribute unset holding targets proportionally by current market value. No
+strict validation requiring exact 100% sum. Simpler UX, simpler code. Strict
+mode was dropped from scope.
 
 ### D4: Per-account targets with existing AccountSelector
 
@@ -67,23 +69,25 @@ feature — see `docs/features/portfolios/portfolio-grouping-spec.md`.
 
 ### D5: Manual target setup (no auto-create)
 
-**IMPLEMENTED:** Targets start at 0% by default when user first views an account. 
-The strategy switches to "auto-balancing" mode only when the user manually sets 
-the first target percentage. This gives users explicit control over when allocation 
-tracking begins, avoiding confusion from auto-generated targets.
+**IMPLEMENTED:** Targets start at 0% by default when user first views an
+account. The strategy switches to "auto-balancing" mode only when the user
+manually sets the first target percentage. This gives users explicit control
+over when allocation tracking begins, avoiding confusion from auto-generated
+targets.
 
 ### D6: Inline editing (no side panel for Section 1)
 
-**IMPLEMENTED:** Category-level targets are edited directly inline in the overview 
-table with text inputs. Side panel (Sheet component) will be used only in Section 2 
-for per-holding target editing within a category.
+**IMPLEMENTED:** Category-level targets are edited directly inline in the
+overview table with text inputs. Side panel (Sheet component) will be used only
+in Section 2 for per-holding target editing within a category.
 
 ### D7: Single donut + side-by-side bars (updated design)
 
-**IMPLEMENTED:** 
+**IMPLEMENTED:**
+
 - **Single donut chart** showing current allocation only (no outer target ring)
 - **Side-by-side bars** showing actual vs target percentages for comparison
-- **Drift indicators**: Badges show "Underweight -X%" / "Overweight +X%" for 
+- **Drift indicators**: Badges show "Underweight -X%" / "Overweight +X%" for
   categories drifting >5% from target (threshold configurable)
 - **Default center label**: Shows "TOTAL PORTFOLIO" with formatted total value
 - **Hover state**: Donut center dynamically shows:
@@ -93,8 +97,8 @@ for per-holding target editing within a category.
   - Drift status (Aligned/Underweight/Overweight) with colored icon
 - **Component**: `AllocationDonut` (renamed from `TwoRingDonut`)
 
-The two-ring donut was found to be visually unclear. The simplified design with 
-single donut + comparison bars provides better clarity. Hover interaction makes 
+The two-ring donut was found to be visually unclear. The simplified design with
+single donut + comparison bars provides better clarity. Hover interaction makes
 the chart more informative without visual clutter.
 
 ### D8: Text inputs for editing (no drag sliders)
@@ -147,18 +151,20 @@ within a category, referencing `portfolio_target_allocations.id`.
 
 - `crates/core/src/portfolio/targets/` — models, traits, service, deviation
   calculator
-- `crates/core/src/portfolio/rebalancing/` — rebalancing models, service, unit tests
+- `crates/core/src/portfolio/rebalancing/` — rebalancing models, service, unit
+  tests
 - `crates/storage-sqlite/src/portfolio/targets/` — Diesel repository
 - `apps/tauri/src/commands/portfolio_targets.rs` — 15 Tauri IPC commands
 - `apps/server/src/api/portfolio_targets.rs` — Axum REST routes
-- Migrations: `2026-02-11` (targets), `2026-02-13` (FK fix), `2026-02-15` (holding_targets)
+- Migrations: `2026-02-11` (targets), `2026-02-13` (FK fix), `2026-02-15`
+  (holding_targets)
 - Deviation calculator composes `AllocationService` for current state, compares
   against target percentages per category
 
 ### Frontend — complete
 
-- Types in `lib/types.ts`: PortfolioTarget, TargetAllocation, AllocationDeviation,
-  DeviationReport, HoldingTarget, RebalancingPlan, etc.
+- Types in `lib/types.ts`: PortfolioTarget, TargetAllocation,
+  AllocationDeviation, DeviationReport, HoldingTarget, RebalancingPlan, etc.
 - Schema in `lib/schemas.ts`: newPortfolioTargetSchema
 - Query keys in `lib/query-keys.ts`: PORTFOLIO_TARGETS, TARGET_ALLOCATIONS,
   ALLOCATION_DEVIATIONS, HOLDING_TARGETS
@@ -182,6 +188,7 @@ single donut visualization, and deviation tracking.
 ### Implementation Summary
 
 **Completed Features**:
+
 - ✅ Single donut chart showing current allocation with enhanced hover details
 - ✅ Inline target editing with side-by-side comparison bars
 - ✅ Drift indicators (Underweight/Overweight/Aligned)
@@ -193,6 +200,7 @@ single donut visualization, and deviation tracking.
 - ✅ Empty field support during editing
 
 **Key Behaviors**:
+
 - Auto-distribution triggers only when user actively edits targets
 - Locked categories maintain their values during auto-distribution
 - User-set edits (marked with `userSet` flag) are preserved
@@ -237,25 +245,26 @@ Two-column layout: donut chart on the left, category list on the right.
 ```
 
 **Layout**: Side-by-side comparison bars for each category (actual vs target).
-Text inputs for inline editing of target percentages.
-Drift indicators show underweight/overweight status when >5% deviation.
+Text inputs for inline editing of target percentages. Drift indicators show
+underweight/overweight status when >5% deviation.
 
 ### Components to build/rework
 
-| Component | Action | Description |
-|-----------|--------|-------------|
-| `allocations-page.tsx` | **Rewrite** | Two-tab layout (Overview, Rebalancing), AccountSelector |
-| `allocation-donut.tsx` | **New** | Single-ring donut showing current allocation with hover details, recharts |
-| `target-list.tsx` | **New** | Inline editing rows with side-by-side bars, target inputs, drift indicators |
-| `target-form.tsx` | **Remove** | No longer needed (inline editing) |
-| `allocation-editor.tsx` | **Remove** | Replaced by target-list |
-| `deviation-table.tsx` | **Remove** | Replaced by target-list (deviation shown inline) |
+| Component               | Action      | Description                                                                 |
+| ----------------------- | ----------- | --------------------------------------------------------------------------- |
+| `allocations-page.tsx`  | **Rewrite** | Two-tab layout (Overview, Rebalancing), AccountSelector                     |
+| `allocation-donut.tsx`  | **New**     | Single-ring donut showing current allocation with hover details, recharts   |
+| `target-list.tsx`       | **New**     | Inline editing rows with side-by-side bars, target inputs, drift indicators |
+| `target-form.tsx`       | **Remove**  | No longer needed (inline editing)                                           |
+| `allocation-editor.tsx` | **Remove**  | Replaced by target-list                                                     |
+| `deviation-table.tsx`   | **Remove**  | Replaced by target-list (deviation shown inline)                            |
 
 ### Data flow
 
 1. Page loads → fetch `portfolio_targets` for selected account
 2. If no target exists → empty state ("Set your first allocation target")
-3. If target exists → fetch taxonomy categories + target allocations + deviation report
+3. If target exists → fetch taxonomy categories + target allocations + deviation
+   report
 4. Render donut (current allocation only) with hover details
 5. Render target list with inline editing (side-by-side bars)
 6. Edit % → local state update
@@ -299,8 +308,9 @@ User selects account → check if PortfolioTarget exists for account
 
 ### Overview
 
-Allows users to drill down into a category (e.g., "Equity") and set granular 
-allocation targets for individual holdings (e.g., VTI, VOO, VXUS) within that category.
+Allows users to drill down into a category (e.g., "Equity") and set granular
+allocation targets for individual holdings (e.g., VTI, VOO, VXUS) within that
+category.
 
 ### User Flow
 
@@ -313,15 +323,19 @@ allocation targets for individual holdings (e.g., VTI, VOO, VXUS) within that ca
 
 ### Key Features
 
-- **Auto-Distribution**: Unlocked holdings automatically split remaining percentage proportionally
-- **Lock Mechanism**: Lock specific holdings to preserve targets when category % changes
+- **Auto-Distribution**: Unlocked holdings automatically split remaining
+  percentage proportionally
+- **Lock Mechanism**: Lock specific holdings to preserve targets when category %
+  changes
 - **Visual Feedback**: Italic/muted style for auto-calculated vs user-set values
 - **Validation**: Blocks save if total allocation > 100%
-- **Cascading Display**: Shows both category % and portfolio % (e.g., "50% of Equity = 35% of portfolio")
+- **Cascading Display**: Shows both category % and portfolio % (e.g., "50% of
+  Equity = 35% of portfolio")
 
 ### Design Decisions (Approved)
 
-- **Schema**: Migration changes `holding_targets.asset_class_id` → `allocation_id` (FK to `portfolio_target_allocations`)
+- **Schema**: Migration changes `holding_targets.asset_class_id` →
+  `allocation_id` (FK to `portfolio_target_allocations`)
 - **UI**: Simple bars + category recap (no sub-donut)
 - **Mode**: Preview mode only with auto-distribution algorithm
 - **Component**: Sheet slide-in panel (reusing existing pattern)
@@ -349,14 +363,18 @@ CREATE TABLE holding_targets (
 ```
 
 New service methods (implemented):
+
 - `get_holding_targets_by_allocation(allocation_id)` → Vec<HoldingTarget>
 - `upsert_holding_target(target)` → HoldingTarget
-- `batch_save_holding_targets(targets)` → Vec<HoldingTarget> — atomic DB transaction
+- `batch_save_holding_targets(targets)` → Vec<HoldingTarget> — atomic DB
+  transaction
 - `delete_holding_target(id)` → usize
 - `delete_holding_targets_by_allocation(allocation_id)` → usize
 
-New Tauri commands: `get_holding_targets`, `upsert_holding_target`, `batch_save_holding_targets`, `delete_holding_target`.
-Axum routes: GET `/allocations/{id}/holdings`, POST `/holdings`, POST `/holdings/batch`, DELETE `/holdings/{id}`.
+New Tauri commands: `get_holding_targets`, `upsert_holding_target`,
+`batch_save_holding_targets`, `delete_holding_target`. Axum routes: GET
+`/allocations/{id}/holdings`, POST `/holdings`, POST `/holdings/batch`, DELETE
+`/holdings/{id}`.
 
 ### Frontend additions
 
@@ -389,16 +407,21 @@ Side panel (Sheet) for per-holding targets within a category:
 ```
 
 New components (implemented):
-- `category-side-panel.tsx` — Sheet component with inline editing, auto-distribution,
-  lock mechanism, cascaded % display, batch save, and group collapsing.
-- `holding-target-row.tsx` — Per-holding row component (extracted from side panel).
+
+- `category-side-panel.tsx` — Sheet component with inline editing,
+  auto-distribution, lock mechanism, cascaded % display, batch save, and group
+  collapsing.
+- `holding-target-row.tsx` — Per-holding row component (extracted from side
+  panel).
 
 ### Auto-distribution logic (preview mode)
 
 When user sets targets for some holdings but not all:
+
 1. Sum user-set targets (respecting locks)
 2. Remainder = 100% - sum of user-set
-3. Distribute remainder proportionally by current market value among unset holdings
+3. Distribute remainder proportionally by current market value among unset
+   holdings
 4. Display auto-distributed values in italic/muted style
 5. "Save All Targets" commits everything (user-set + auto-distributed)
 
@@ -437,7 +460,9 @@ branch, moving calculation logic from frontend to Rust backend.
 
 An earlier implementation existed in `allocations/phase-4` with working UI and
 frontend-only calculations. Key adaptations needed:
-- **Old**: Free-text `asset_class` labels → **New**: Taxonomy-based `category_id`
+
+- **Old**: Free-text `asset_class` labels → **New**: Taxonomy-based
+  `category_id`
 - **Old**: Three-table hierarchy → **New**: Two-table (portfolio_targets →
   target_allocations → holding_targets)
 - **Old**: Frontend calculations → **New**: Rust backend for testability
@@ -445,6 +470,7 @@ frontend-only calculations. Key adaptations needed:
 ### UI (second tab)
 
 Tab structure (already wired in `allocations-page.tsx`):
+
 ```typescript
 <Tabs value={activeTab}>
   <TabsList>
@@ -455,6 +481,7 @@ Tab structure (already wired in `allocations-page.tsx`):
 ```
 
 Layout:
+
 ```
 ┌──────────────────────────────────────────────────────┐
 │  REBALANCING SUGGESTIONS                             │
@@ -491,6 +518,7 @@ Layout:
 ```
 
 Key UI elements:
+
 - **Cash input**: Number input with validation
 - **Calculate button**: Triggers backend calculation
 - **View toggle**: Overview (category-level) vs Detailed (per-holding)
@@ -505,6 +533,7 @@ Key UI elements:
 Implemented in Rust backend (`RebalancingService`). Complete 4-step process:
 
 **Step 1: Calculate category-level shortfalls**
+
 ```rust
 new_portfolio_total = current_total + available_cash
 
@@ -515,6 +544,7 @@ for each category in target_allocations:
 ```
 
 **Step 2: Scale budgets if cash insufficient**
+
 ```rust
 total_shortfall = sum(all category shortfalls)
 
@@ -527,18 +557,21 @@ scale_factor = if total_shortfall > available_cash {
 category_budgets = HashMap<category_id, shortfall * scale_factor>
 ```
 
-**Important**: `category_budgets` are stored in `RebalancingPlan.category_budgets` 
-and returned to frontend. This enables accurate residual calculation:
+**Important**: `category_budgets` are stored in
+`RebalancingPlan.category_budgets` and returned to frontend. This enables
+accurate residual calculation:
+
 ```rust
 residual_per_category = category_budget - sum(actual_spending_in_category)
 ```
 
 **Step 3: Per-holding shortfall calculation with percentage tracking**
+
 ```rust
 for each category with budget > 0:
     holdings = get_holdings_by_allocation(account, taxonomy, category)
     holding_targets = get_holding_targets(category.allocation_id)
-    
+
     // SPECIAL CASE: Categories without holding targets (e.g., Cash)
     if holding_targets.is_empty():
         // Still allocate budget, create category-level recommendation
@@ -551,30 +584,30 @@ for each category with budget > 0:
             // ... other fields zero/default
         })
         continue  // Skip to next category
-    
+
     // Calculate total category current value for percentage calculations
     category_current_value = sum(holdings.map(|h| h.market_value))
-    
+
     for each holding_target:
         holding = find_holding_by_id(holdings, holding_target.asset_id)
-        
+
         // Skip if no price available
         if holding.quantity == 0 or holding.market_value == 0:
             continue
-        
+
         current_price = holding.market_value / holding.quantity
-        
+
         // Percentage calculations
         target_percent_of_class = holding_target.target_percent / 100.0  // basis points → %
         current_percent_of_class = (holding.market_value / category_current_value) * 100.0
-        
+
         // Cascading calculation: holding% × category% = portfolio%
         target_portfolio_pct = (category.target_percent * target_percent_of_class) / 100.0
         target_value = (target_portfolio_pct / 100.0) * new_portfolio_total
-        
+
         current_value = holding.market_value
         holding_shortfall = max(0, target_value - current_value)
-        
+
         // Store in HoldingShortfall struct (includes percentages for later use)
         holding_shortfalls.push(HoldingShortfall {
             asset_id,
@@ -585,10 +618,12 @@ for each category with budget > 0:
         })
 ```
 
-**Key point**: We include ALL holdings with targets (even those with 0 shortfall) 
-so frontend can show them when user toggles "show zero-share holdings".
+**Key point**: We include ALL holdings with targets (even those with 0
+shortfall) so frontend can show them when user toggles "show zero-share
+holdings".
 
 **Step 4: Whole-share optimization with greedy algorithm**
+
 ```rust
 // Initialize: floor fractional shares to whole shares
 total_holding_shortfall = sum(holding_shortfalls.map(|h| h.shortfall_amount))
@@ -597,18 +632,18 @@ for each holding_shortfall:
     // Skip if 0 shortfall (at or above target)
     if holding_shortfall.shortfall_amount == 0:
         continue
-    
+
     // Scale to fit category budget proportionally
     scaled_shortfall = if total_holding_shortfall > 0 {
         holding_shortfall.shortfall_amount * (category_budget / total_holding_shortfall)
     } else {
         holding_shortfall.shortfall_amount
     }
-    
+
     // Floor to whole shares
     fractional_shares = scaled_shortfall / holding_shortfall.price_per_share
     whole_shares = floor(fractional_shares)
-    
+
     shares_to_buy[asset_id] = whole_shares
     remaining_budget -= whole_shares * price_per_share
 
@@ -616,34 +651,34 @@ for each holding_shortfall:
 while remaining_budget > 0:
     best_holding = None
     best_improvement_per_dollar = 0
-    
+
     for each holding_shortfall where price <= remaining_budget:
         current_shares = shares_to_buy[holding.asset_id]
         new_shares = current_shares + 1
-        
+
         // Calculate CURRENT value INCLUDING shares already bought
         current_value_before = holding.market_value + (current_shares * price_per_share)
         current_pct_before = (current_value_before / new_portfolio_total) * 100.0
-        
+
         // Calculate value AFTER buying 1 more share
         current_value_after = holding.market_value + (new_shares * price_per_share)
         current_pct_after = (current_value_after / new_portfolio_total) * 100.0
-        
+
         // Improvement = reduction in deviation from target
         target_pct = (category.target_percent * holding.target_percent_of_class) / 100.0
         deviation_before = abs(current_pct_before - target_pct)
         deviation_after = abs(current_pct_after - target_pct)
         improvement = deviation_before - deviation_after
-        
+
         improvement_per_dollar = improvement / price_per_share
-        
+
         if improvement_per_dollar > best_improvement_per_dollar:
             best_holding = holding
             best_improvement_per_dollar = improvement_per_dollar
-    
+
     if best_holding is None:
         break  // no more affordable improvements
-    
+
     shares_to_buy[best_holding.asset_id] += 1
     remaining_budget -= best_holding.price_per_share
 
@@ -651,7 +686,7 @@ while remaining_budget > 0:
 for each holding_shortfall:
     shares = shares_to_buy[asset_id] || 0
     total_amount = shares * price_per_share
-    
+
     // Note: residual_amount is 0 (calculated per-category in frontend)
     recommendations.push(TradeRecommendation {
         asset_id,
@@ -670,13 +705,15 @@ for each holding_shortfall:
     })
 ```
 
-**Critical bug fix (2024-02-16)**: Original implementation incorrectly calculated 
-`current_pct_before` as just `holding.market_value / new_portfolio_total`, ignoring 
-shares already purchased in previous iterations. This caused the optimizer to stop 
-too early, leaving excessive remaining cash. The fix includes `current_shares * price` 
-in the calculation.
+**Critical bug fix (2024-02-16)**: Original implementation incorrectly
+calculated `current_pct_before` as just
+`holding.market_value / new_portfolio_total`, ignoring shares already purchased
+in previous iterations. This caused the optimizer to stop too early, leaving
+excessive remaining cash. The fix includes `current_shares * price` in the
+calculation.
 
 **Properties**:
+
 - Buy-only (never suggests sells)
 - Whole shares only (no fractional)
 - Respects category budgets (no cross-category spending)
@@ -690,11 +727,14 @@ in the calculation.
 **New module**: `crates/core/src/portfolio/rebalancing/`
 
 Files:
+
 - `mod.rs` — module exports
 - `rebalancing_model.rs` — data structures
-- `rebalancing_service.rs` — algorithm implementation + inline unit tests (`#[cfg(test)]`)
+- `rebalancing_service.rs` — algorithm implementation + inline unit tests
+  (`#[cfg(test)]`)
 
 **Data structures** (`rebalancing_model.rs`):
+
 ```rust
 pub struct RebalancingInput {
     pub target_id: String,
@@ -738,6 +778,7 @@ pub struct RebalancingPlan {
 ```
 
 **Service trait** (`rebalancing_service.rs`):
+
 ```rust
 pub trait RebalancingService: Send + Sync {
     fn calculate_rebalancing_plan(&self, input: RebalancingInput) -> Result<RebalancingPlan>;
@@ -750,12 +791,14 @@ pub struct RebalancingServiceImpl {
 ```
 
 **Key methods**:
+
 - `calculate_rebalancing_plan()` — main entry point
 - `calculate_category_shortfalls()` — step 1
 - `calculate_holding_shortfalls()` — step 3
 - `optimize_whole_shares()` — step 4 greedy algorithm
 
 **Tauri IPC command** (`apps/tauri/src/commands/portfolio_targets.rs`):
+
 ```rust
 #[tauri::command]
 pub async fn calculate_rebalancing_plan(
@@ -767,6 +810,7 @@ pub async fn calculate_rebalancing_plan(
 ```
 
 **Web endpoint** (`apps/server/src/api/portfolio_targets.rs`):
+
 ```
 POST /api/v1/portfolio/rebalancing/calculate
 Body: { targetId, availableCash, baseCurrency }
@@ -776,6 +820,7 @@ Response: RebalancingPlan (JSON)
 ### Frontend Implementation
 
 **New files**:
+
 - `apps/frontend/src/pages/allocations/components/rebalancing-tab.tsx` — main
   component
 - `apps/frontend/src/pages/allocations/components/overview-view.tsx` —
@@ -784,6 +829,7 @@ Response: RebalancingPlan (JSON)
   accordion
 
 **Modified files**:
+
 - `apps/frontend/src/pages/allocations/allocations-page.tsx` — replace
   placeholder
 - `apps/frontend/src/lib/types.ts` — add rebalancing types
@@ -792,6 +838,7 @@ Response: RebalancingPlan (JSON)
 - `apps/frontend/src/adapters/shared/portfolio-targets.ts` — add adapter
 
 **TypeScript types** (`types.ts`):
+
 ```typescript
 interface RebalancingInput {
   targetId: string;
@@ -815,9 +862,9 @@ interface TradeRecommendation {
   pricePerShare: number;
   totalAmount: number;
   impactPercent: number;
-  currentPercentOfClass: number;  // NEW: current % within category
-  targetPercentOfClass: number;   // NEW: target % within category
-  residualAmount: number;         // Always 0 from backend
+  currentPercentOfClass: number; // NEW: current % within category
+  targetPercentOfClass: number; // NEW: target % within category
+  residualAmount: number; // Always 0 from backend
 }
 
 interface RebalancingPlan {
@@ -829,31 +876,34 @@ interface RebalancingPlan {
   totalAllocated: number;
   remainingCash: number;
   additionalCashNeeded: number;
-  categoryBudgets: CategoryBudget[];  // NEW: for residual calculation
+  categoryBudgets: CategoryBudget[]; // NEW: for residual calculation
   recommendations: TradeRecommendation[];
 }
 ```
 
 **Frontend residual calculation**:
 
-Per-category residual is calculated in the frontend using the backend-provided budgets:
+Per-category residual is calculated in the frontend using the backend-provided
+budgets:
+
 ```typescript
 // In groupedRecommendations useMemo
-const categoryBudget = categorySummaries.find(
-  s => s.categoryId === categoryId
-)?.budget || 0;
+const categoryBudget =
+  categorySummaries.find((s) => s.categoryId === categoryId)?.budget || 0;
 
 const totalSpent = recommendations.reduce((sum, r) => sum + r.totalAmount, 0);
 const residualAmount = Math.max(0, categoryBudget - totalSpent);
 ```
 
 **Why not calculate residual in backend?**
+
 - Backend calculates per-holding, but residual is conceptually per-category
 - Frontend already has category grouping logic
 - Avoids sending redundant data (residual = budget - sum(amounts))
 - Single source of truth: `categoryBudgets` from backend
 
 **Relationship: remaining vs residuals**
+
 ```
 remaining_cash = available_cash - total_allocated
 total_allocated = sum(all recommendations.totalAmount)
@@ -863,6 +913,7 @@ sum(all residuals) ≈ remaining_cash  // (within rounding errors)
 ```
 
 **Component structure** (`rebalancing-tab.tsx`):
+
 ```typescript
 function RebalancingTab({
   selectedAccount,
@@ -879,7 +930,7 @@ function RebalancingTab({
   // Calculate category summaries with budgets from backend
   const categorySummaries = useMemo(() => {
     if (!plan || !deviationReport) return [];
-    
+
     // Initialize from deviation report
     const summaries = new Map();
     for (const deviation of deviationReport.deviations) {
@@ -893,7 +944,7 @@ function RebalancingTab({
         budget: 0,
       });
     }
-    
+
     // Add budgets from backend
     for (const categoryBudget of plan.categoryBudgets) {
       const summary = summaries.get(categoryBudget.categoryId);
@@ -901,7 +952,7 @@ function RebalancingTab({
         summary.budget = categoryBudget.budget;
       }
     }
-    
+
     // Add actual spending
     for (const rec of plan.recommendations) {
       const summary = summaries.get(rec.categoryId);
@@ -909,7 +960,7 @@ function RebalancingTab({
         summary.suggestedBuy += rec.totalAmount;
       }
     }
-    
+
     // Calculate new percentages
     const newTotalValue = deviationReport.totalValue + plan.totalAllocated;
     for (const summary of summaries.values()) {
@@ -918,19 +969,19 @@ function RebalancingTab({
       );
       if (deviation) {
         const newValue = deviation.currentValue + summary.suggestedBuy;
-        summary.newPercent = newTotalValue > 0 
-          ? (newValue / newTotalValue) * 100 
+        summary.newPercent = newTotalValue > 0
+          ? (newValue / newTotalValue) * 100
           : 0;
       }
     }
-    
+
     return Array.from(summaries.values());
   }, [plan, deviationReport]);
 
   // Group recommendations with residual calculation
   const groupedRecommendations = useMemo(() => {
     if (!plan) return [];
-    
+
     const groups = new Map();
     for (const rec of plan.recommendations) {
       if (!groups.has(rec.categoryId)) {
@@ -938,18 +989,18 @@ function RebalancingTab({
       }
       groups.get(rec.categoryId).push(rec);
     }
-    
+
     return Array.from(groups.entries()).map(([categoryId, recommendations]) => {
       const totalAmount = recommendations.reduce((sum, r) => sum + r.totalAmount, 0);
-      
+
       // Get budget from backend
       const categoryBudget = categorySummaries.find(
         s => s.categoryId === categoryId
       )?.budget || 0;
-      
+
       // Calculate residual
       const residualAmount = Math.max(0, categoryBudget - totalAmount);
-      
+
       return {
         categoryId,
         categoryName: recommendations[0]?.categoryName || categoryId,
@@ -998,13 +1049,13 @@ function RebalancingTab({
     </>
   );
 }
-  
+
   return (
     <Card>
       {/* Input section */}
       <Input value={availableCash} onChange={...} />
       <Button onClick={handleCalculate}>Calculate</Button>
-      
+
       {/* Results */}
       {plan && (
         <>
@@ -1012,16 +1063,16 @@ function RebalancingTab({
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="detailed">Detailed</TabsTrigger>
           </Tabs>
-          
+
           {viewMode === "overview" && <OverviewView plan={plan} />}
           {viewMode === "detailed" && <DetailedView plan={plan} />}
-          
+
           {/* Summary */}
           <div>
             Total: {plan.totalAllocated} | Remaining: {plan.remainingCash}
             {plan.additionalCashNeeded > 0 && <div>Need: {plan.additionalCashNeeded}</div>}
           </div>
-          
+
           {/* Export */}
           <Button onClick={() => copyAsText(plan)}>Copy</Button>
           <Button onClick={() => downloadCsv(plan)}>CSV</Button>
@@ -1033,11 +1084,13 @@ function RebalancingTab({
 ```
 
 **Overview view**:
+
 - Category cards with color bars
 - Target % | Current % | Suggested Buy
 - Projected new % after purchases
 
 **Detailed view**:
+
 - Grouped accordion by category
 - Holdings sorted by amount (descending)
 - Per-holding display:
@@ -1052,37 +1105,46 @@ function RebalancingTab({
 ### Design Decisions (2024-02-16)
 
 **D1: Category budgets returned from backend**
+
 - Problem: Frontend needs category budget to calculate residual
 - Solution: Add `category_budgets: Vec<CategoryBudget>` to `RebalancingPlan`
 - Backend already calculates these, just needed to return them
 - Enables: `residual = budget - sum(spending)` in frontend
-- Alternative rejected: Recalculate shortfall + scaling in frontend (duplication)
+- Alternative rejected: Recalculate shortfall + scaling in frontend
+  (duplication)
 
 **D2: Zero-share holdings included in recommendations**
+
 - Problem: Holdings at/above target have 0 shares but should appear when toggled
 - Solution: Backend returns ALL holdings (even with shortfall = 0)
 - Frontend filters based on `showZeroShares` toggle
 - Example: "Indépendance AM Europe Small I (C)" at 16.4% (target 10%) → 0 shares
 
 **D3: Residual calculated per-category, not per-holding**
+
 - Problem: Residual represents unspent cash within category budget
 - Backend sets `residual_amount = 0` in `TradeRecommendation`
-- Frontend calculates: `residual = category_budget - sum(category_recs.totalAmount)`
+- Frontend calculates:
+  `residual = category_budget - sum(category_recs.totalAmount)`
 - Displayed once per category after all holdings
 - Conceptually correct: residual is leftover budget, not per-holding
 
 **D4: Greedy optimizer includes shares already bought**
-- Critical bug fix: Original code calculated improvement from initial holding value
+
+- Critical bug fix: Original code calculated improvement from initial holding
+  value
 - Correct: Include shares purchased in previous iterations
 - Formula: `current_value_before = market_value + (current_shares * price)`
 - Impact: Fixes optimizer stopping too early, leaving 10-20% cash unallocated
 
 **D5: Holdings sorted by amount descending**
+
 - User sees largest recommendations first
 - Matches investment priority (biggest impact holdings)
 - Consistent with phase-4 UX
 
 **D6: Default view is "detailed"**
+
 - Power users want per-holding breakdown
 - Overview mode available but not default
 - Matches phase-4 behavior
@@ -1090,6 +1152,7 @@ function RebalancingTab({
 - Filter toggle for zero-share holdings
 
 **D7: Categories without holdings get budget allocation**
+
 - Problem: Asset classes like Cash with no holding targets were skipped entirely
 - Solution: Backend creates category-level recommendation with `shares: 0`
 - Shows budget allocated to category even without specific holdings to buy
@@ -1097,18 +1160,22 @@ function RebalancingTab({
 - Ensures: `remaining ≈ sum(all category residuals)`
 
 **D8: Taxonomy colors for visual consistency**
+
 - Applied colored left border (4px) to category cards/collapsibles
 - Colors from `deviationReport.deviations[].color`
 - Matches Overview tab and Side Panel design
 - Helps users quickly identify categories across tabs
 
 **D9: UI polish and accessibility**
-- Holdings display as "Name (SYMBOL)" - e.g., "iShares Core S&P 500 UCITS ETF (CSP5.PA)"
+
+- Holdings display as "Name (SYMBOL)" - e.g., "iShares Core S&P 500 UCITS ETF
+  (CSP5.PA)"
 - Holding names are clickable links to `/holdings/{symbol}`
 - Added vertical spacing in cash input section
 - Rebalancing plan resets when account changes (prevents showing stale data)
 
 **D10: Export functionality with user feedback**
+
 - **Copy to clipboard**: Formatted plain text with category grouping
   - Format: `BUY {shares} shares of {name} ({symbol}) at {price} = {amount}`
   - Includes summary section with totals and remaining cash
@@ -1117,26 +1184,32 @@ function RebalancingTab({
 - **CSV download**: Spreadsheet export for detailed analysis
   - Columns: Category | Symbol | Name | Action | Shares | Price | Amount
   - Proper CSV escaping (quotes, commas, newlines)
-  - Filename format: `YYYY-MM-DD-rebalancing-suggestions.csv` (date-first for sorting)
+  - Filename format: `YYYY-MM-DD-rebalancing-suggestions.csv` (date-first for
+    sorting)
   - Toast notification confirms download
 - Both features respect `showZeroShares` toggle and category grouping
 - Disabled when no plan exists
 
 **D11: State persistence and navigation**
-- **SessionStorage for rebalancing state**: Plan and cash input persist per account
+
+- **SessionStorage for rebalancing state**: Plan and cash input persist per
+  account
   - Survives navigation to holdings and back (React Router Link)
   - Survives page refresh
   - Cleared when browser closes
   - Account switching properly resets to new account's state
-- **SessionStorage for selected account**: Account selection persists across tab switches
+- **SessionStorage for selected account**: Account selection persists across tab
+  switches
   - Remembered when navigating between Overview and Rebalancing tabs
   - Remembered when navigating to other pages (Insights) and back
   - Cleared when browser closes
-- **Client-side navigation**: Holdings links use React Router `<Link>` for instant navigation
+- **Client-side navigation**: Holdings links use React Router `<Link>` for
+  instant navigation
   - No full page reload
   - Smooth user experience matching other pages
 
 **D12: UI polish and validation**
+
 - **Number input cleanup**: Removed spinner arrows from percentage inputs
   - CSS: `[appearance:textfield]` + webkit pseudo-element hiding
   - Applies to Overview tab target inputs and Side panel holding target inputs
@@ -1145,24 +1218,33 @@ function RebalancingTab({
   - PortfolioTarget exists but has zero asset class allocations
   - Prevents UI showing with invalid/orphaned target data
 - **Navigation order**: Allocations moved after Insights in main menu
-  - Order: Dashboard → Holdings → Insights → Allocations → Activities → Assistant
+  - Order: Dashboard → Holdings → Insights → Allocations → Activities →
+    Assistant
 - **Missing holding targets warning**: In Allocation Plan cards
-  - Shows amber info message when category has budget but no holding targets configured
-  - Detection: Category has budget > 0 but only category-level recommendation (no specific holdings)
-  - Message: "Configure holding targets in Overview tab for detailed suggestions"
-  - Does NOT show for categories with no holdings (like Cash) - only for categories with holdings but missing targets
+  - Shows amber info message when category has budget but no holding targets
+    configured
+  - Detection: Category has budget > 0 but only category-level recommendation
+    (no specific holdings)
+  - Message: "Configure holding targets in Overview tab for detailed
+    suggestions"
+  - Does NOT show for categories with no holdings (like Cash) - only for
+    categories with holdings but missing targets
   - Helps users discover incomplete configuration
 
 **D10: Cash category handling (2024-02-17)**
-- Problem: Cash holdings (EUR, USD, etc.) are synthetic IDs without real asset records
+
+- Problem: Cash holdings (EUR, USD, etc.) are synthetic IDs without real asset
+  records
 - Cannot create `holding_targets` for Cash (requires asset_id foreign key)
 - Solution: Block Cash from holding-level targeting entirely
   - Hide "Holdings" button for CASH/CASH_BANK_DEPOSITS categories in target list
   - Prevent donut chart clicks from opening side panel for Cash
   - Exclude Cash from detailed rebalancing view
   - Hide "Configure holding targets" warning for Cash
-- Rationale: Cash is fungible, category-level allocation (e.g., 5%) is sufficient
-- Alternative assets (personal assets) DO have real asset IDs and support holding targets
+- Rationale: Cash is fungible, category-level allocation (e.g., 5%) is
+  sufficient
+- Alternative assets (personal assets) DO have real asset IDs and support
+  holding targets
 
 ---
 
@@ -1170,10 +1252,12 @@ function RebalancingTab({
 
 **Previous Issue: Conservative algorithm left cash unallocated**
 
-**Problem (SOLVED):**
-The previous "greedy" optimization algorithm stopped when buying another share would overshoot the target, even if budget remained. This left significant cash unallocated.
+**Problem (SOLVED):** The previous "greedy" optimization algorithm stopped when
+buying another share would overshoot the target, even if budget remained. This
+left significant cash unallocated.
 
 Example before implementation:
+
 ```
 Available cash: €1000
 Equity target: 70% (shortfall €397.61)
@@ -1186,6 +1270,7 @@ Remaining unused: €393.48 ❌ (60% utilization)
 ```
 
 After implementation:
+
 ```
 Available cash: €1000
 Algorithm allocates: €900+ (90%+ utilization) ✅
@@ -1194,14 +1279,17 @@ Remaining: <€100
 
 **Solution Implemented: "Efficient Rebalancing" Algorithm**
 
-Two-phase approach to maximize cash deployment while respecting category targets:
+Two-phase approach to maximize cash deployment while respecting category
+targets:
 
 **Phase 1: Reduce deviation** ✅ IMPLEMENTED
+
 - Buy shares that move holdings closer to their targets
 - Continue while `improvement_per_dollar > 0`
 - Location: `rebalancing_service.rs` lines 205-287
 
 **Phase 2: Respect category ceilings** ✅ IMPLEMENTED
+
 - After Phase 1 exhausts, continue buying
 - Calculate current category % (including Phase 1 purchases)
 - Only buy if purchase won't exceed category-level target
@@ -1209,8 +1297,6 @@ Two-phase approach to maximize cash deployment while respecting category targets
 - Stop when category would exceed its target (e.g., 70.1%)
 - Score by distance from ceiling (prefer furthest below)
 - Location: `rebalancing_service.rs` lines 288-366
-
-
 
 **Implementation Details:**
 
@@ -1226,37 +1312,40 @@ if remaining_budget > Decimal::ZERO {
                 h.market_value + (shares_bought * price)
             })
             .sum();
-        
-        let category_current_percent = 
+
+        let category_current_percent =
             (category_current_value / new_total_value) * 100;
 
         // Find best purchase that doesn't exceed ceiling
         for shortfall in &shortfalls {
             let new_category_value = category_current_value + shortfall.price_per_share;
             let new_category_percent = (new_category_value / new_total_value) * 100;
-            
+
             if new_category_percent <= category_target_percent {
                 // Score by distance from ceiling
                 let distance = category_target_percent - new_category_percent;
                 // Track best (furthest from ceiling)
             }
         }
-        
+
         // Buy best or stop if all would overshoot
     }
 }
 ```
 
 **Results:**
+
 - ✅ Cash utilization: 60% → 90%+ (50% improvement)
 - ✅ Respects category targets (no overshoots)
 - ✅ Conservative approach maintained
 - ✅ Better capital efficiency
 
 **Testing Status:**
+
 - ✅ Manual testing: Confirmed improvement with €1000 cash example
 - ✅ Unit tests: 5 scenarios in `rebalancing_service.rs` (`#[cfg(test)]`)
-- ✅ Edge cases covered: insufficient cash, zero cash, multiple categories, phase-2 ceiling
+- ✅ Edge cases covered: insufficient cash, zero cash, multiple categories,
+  phase-2 ceiling
 
 ---
 
@@ -1265,14 +1354,16 @@ if remaining_budget > Decimal::ZERO {
 **Allow Small Overshoots for Maximum Cash Utilization**
 
 **Current State:**
+
 - Algorithm stops when buying would exceed category target
 - Typical remaining cash: 5-10% of available funds
 - Example: €1000 available → €900-950 allocated
 
-**Proposed Enhancement:**
-Allow users to optionally permit small overshoots (1-2%) per category to maximize cash deployment.
+**Proposed Enhancement:** Allow users to optionally permit small overshoots
+(1-2%) per category to maximize cash deployment.
 
 **Benefits:**
+
 - Higher cash utilization: 95-98% (vs current 90-95%)
 - Minimize idle cash in account
 - Flexible for different investor preferences
@@ -1280,6 +1371,7 @@ Allow users to optionally permit small overshoots (1-2%) per category to maximiz
 **Implementation Options:**
 
 **Option A: Simple Toggle (Recommended)**
+
 ```
 Settings → Portfolio Target → Rebalancing
 ☐ Allow small overshoots to maximize cash deployment
@@ -1287,6 +1379,7 @@ Settings → Portfolio Target → Rebalancing
 ```
 
 **Option B: User-Defined Limit**
+
 ```
 Max overshoot per category: [2.0]%
   Range: 0% (disabled) to 5%
@@ -1294,6 +1387,7 @@ Max overshoot per category: [2.0]%
 ```
 
 **Option C: Rebalancing Strategy Presets**
+
 ```
 Rebalancing Strategy: [Conservative ▼]
   • Conservative: Stop at target (90-95% utilization)
@@ -1303,29 +1397,34 @@ Rebalancing Strategy: [Conservative ▼]
 
 **Technical Design:**
 
-*Database:*
-- Add column to `allocation_targets` table: `max_overshoot_percent REAL DEFAULT 0`
+_Database:_
+
+- Add column to `allocation_targets` table:
+  `max_overshoot_percent REAL DEFAULT 0`
 - Nullable: NULL = disabled (conservative)
 - Range validation: 0.0 to 5.0
 
-*Backend:*
+_Backend:_
+
 ```rust
 // After Phase 2, if budget remains and setting enabled
 if remaining_budget > 0 && max_overshoot_percent > 0.0 {
     // Phase 3: Allow small overshoots
     let overshoot_ceiling = category_target_percent + max_overshoot_percent;
-    
+
     // Buy until hitting overshoot ceiling
     // ... (similar to Phase 2 but with higher ceiling)
 }
 ```
 
-*Frontend:*
+_Frontend:_
+
 - Add toggle/slider to target settings
 - Show in Overview tab: "Overshoot allowed: ±2%"
 - Display in results: "Equity: 71.5% (target 70%, +1.5% overshoot)"
 
 **Trade-offs:**
+
 - ✅ Maximizes capital efficiency
 - ✅ User has control (opt-in)
 - ✅ Transparent (clearly shown)
@@ -1334,6 +1433,7 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
 - ⚠️ Requires validation and clear messaging
 
 **Recommendation:**
+
 - **Default**: Disabled (conservative, 0% overshoot)
 - **Storage**: Per-target setting (not global)
 - **UI**: Simple toggle in target settings, optional slider for advanced users
@@ -1342,6 +1442,7 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
   - Implement if users frequently ask "why isn't all my cash used?"
 
 **Estimated Effort:**
+
 - Backend: 1-2 hours (add setting column, implement logic)
 - Frontend: 1 hour (add toggle/slider to settings UI)
 - Testing: 30 minutes
@@ -1352,13 +1453,18 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
 ### Verify
 
 **Backend tests** (inline in `rebalancing_service.rs`, `#[cfg(test)]`):
+
 1. `test_basic_buy_recommendations` — sufficient cash → correct BUY shares
-2. `test_budget_scaling_when_cash_insufficient` — proportional scaling, `additional_cash_needed > 0`
-3. `test_category_without_holding_targets_gets_budget_recommendation` — cash-like categories get shares=0 rec
+2. `test_budget_scaling_when_cash_insufficient` — proportional scaling,
+   `additional_cash_needed > 0`
+3. `test_category_without_holding_targets_gets_budget_recommendation` —
+   cash-like categories get shares=0 rec
 4. `test_zero_cash_produces_no_allocations` — zero cash → empty recommendations
-5. `test_phase2_deploys_remaining_cash_without_overshoot` — phase-2 ceiling not exceeded
+5. `test_phase2_deploys_remaining_cash_without_overshoot` — phase-2 ceiling not
+   exceeded
 
 **Frontend manual testing**:
+
 1. Create portfolio target (60% EQUITY, 40% FIXED_INCOME)
 2. Navigate to Rebalancing tab
 3. Enter $10,000 cash
@@ -1369,7 +1475,8 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
 8. Verify Summary: allocated + remaining + needed
 9. Test zero-share holdings toggle (Eye icon)
 10. Test state persistence:
-    - Click holding name → navigate to holding page → back arrow → verify plan still intact
+    - Click holding name → navigate to holding page → back arrow → verify plan
+      still intact
     - Refresh page (F5) → verify plan and account selection persist
     - Switch accounts → verify resets to blank for new account
     - Close browser → reopen → verify resets to "All Portfolio"
@@ -1378,18 +1485,26 @@ if remaining_budget > 0 && max_overshoot_percent > 0.0 {
     - Switch back to Account A → verify blank (no persisted plan from before)
 12. Test export features:
     - Click "Copy Text" → verify toast notification → paste and verify format
-    - Click "Export CSV" → verify toast notification → verify file downloads as `YYYY-MM-DD-rebalancing-suggestions.csv`
-    - Open CSV and verify columns: Category | Symbol | Name | Action | Shares | Price | Amount
-13. Test edge cases: zero cash, very large cash, insufficient cash, categories without holdings (Cash)
-14. Test empty states: Account with no targets shows "No allocation targets set" message
-15. Test number inputs: Verify no spinner arrows on percentage inputs in Overview and Side panel
+    - Click "Export CSV" → verify toast notification → verify file downloads as
+      `YYYY-MM-DD-rebalancing-suggestions.csv`
+    - Open CSV and verify columns: Category | Symbol | Name | Action | Shares |
+      Price | Amount
+13. Test edge cases: zero cash, very large cash, insufficient cash, categories
+    without holdings (Cash)
+14. Test empty states: Account with no targets shows "No allocation targets set"
+    message
+15. Test number inputs: Verify no spinner arrows on percentage inputs in
+    Overview and Side panel
 16. Test missing holding targets warning:
-    - Create category target (e.g., Bonds 10%) but don't configure holding targets
+    - Create category target (e.g., Bonds 10%) but don't configure holding
+      targets
     - Calculate rebalancing with available cash
-    - Verify amber warning shows in Allocation Plan card: "Configure holding targets in Overview tab for detailed suggestions"
+    - Verify amber warning shows in Allocation Plan card: "Configure holding
+      targets in Overview tab for detailed suggestions"
     - Verify Cash (no holdings) does NOT show the warning
 
 **End-to-end**:
+
 ```bash
 pnpm tauri dev
 # Navigate to Allocations → select account → activate target
@@ -1447,38 +1562,40 @@ Pre-merge cleanup:
 
 ### Backend (already built)
 
-| File | Purpose |
-|------|---------|
-| `crates/core/src/portfolio/targets/target_model.rs` | Domain models |
-| `crates/core/src/portfolio/targets/target_traits.rs` | Service + repository traits |
-| `crates/core/src/portfolio/targets/target_service.rs` | CRUD + deviation calculator |
-| `crates/storage-sqlite/src/portfolio/targets/repository.rs` | Diesel repository |
+| File                                                           | Purpose                                 |
+| -------------------------------------------------------------- | --------------------------------------- |
+| `crates/core/src/portfolio/targets/target_model.rs`            | Domain models                           |
+| `crates/core/src/portfolio/targets/target_traits.rs`           | Service + repository traits             |
+| `crates/core/src/portfolio/targets/target_service.rs`          | CRUD + deviation calculator             |
+| `crates/storage-sqlite/src/portfolio/targets/repository.rs`    | Diesel repository                       |
 | `crates/core/src/portfolio/rebalancing/rebalancing_service.rs` | Two-phase greedy algorithm + unit tests |
-| `crates/core/src/portfolio/rebalancing/rebalancing_model.rs` | Rebalancing data structures |
-| `apps/tauri/src/commands/portfolio_targets.rs` | Tauri IPC commands (15 total) |
-| `apps/server/src/api/portfolio_targets.rs` | Axum REST routes |
+| `crates/core/src/portfolio/rebalancing/rebalancing_model.rs`   | Rebalancing data structures             |
+| `apps/tauri/src/commands/portfolio_targets.rs`                 | Tauri IPC commands (15 total)           |
+| `apps/server/src/api/portfolio_targets.rs`                     | Axum REST routes                        |
 
 ### Frontend (built/modified)
 
-| File | Status |
-|------|--------|
-| `adapters/shared/portfolio-targets.ts` | ✅ Done (includes HoldingTarget adapters) |
-| `adapters/web/core.ts` (COMMANDS entries) | ✅ Done |
-| `hooks/use-portfolio-targets.ts` | ✅ Done |
-| `pages/allocations/use-target-mutations.ts` | ✅ Done (batch save atomic via `batch_save_target_allocations`) |
-| `lib/types.ts` (PortfolioTarget, HoldingTarget, etc.) | ✅ Done |
-| `lib/schemas.ts` (newPortfolioTargetSchema) | ✅ Done |
-| `lib/query-keys.ts` (PORTFOLIO_TARGETS, HOLDING_TARGETS, etc.) | ✅ Done |
-| `pages/allocations/allocations-page.tsx` | ✅ Rewritten |
-| `pages/allocations/components/allocation-donut.tsx` | ✅ Created (Section 1) |
-| `pages/allocations/components/target-list.tsx` | ✅ Created (Section 1) |
-| `pages/allocations/components/allocations-overview.tsx` | ✅ Created (Section 1) |
-| `pages/allocations/components/category-side-panel.tsx` | ✅ Created (Section 2) |
-| `pages/allocations/components/holding-target-row.tsx` | ✅ Created (Section 2) |
-| `pages/allocations/components/rebalancing-tab.tsx` | ✅ Created (Section 3) |
+| File                                                           | Status                                                          |
+| -------------------------------------------------------------- | --------------------------------------------------------------- |
+| `adapters/shared/portfolio-targets.ts`                         | ✅ Done (includes HoldingTarget adapters)                       |
+| `adapters/web/core.ts` (COMMANDS entries)                      | ✅ Done                                                         |
+| `hooks/use-portfolio-targets.ts`                               | ✅ Done                                                         |
+| `pages/allocations/use-target-mutations.ts`                    | ✅ Done (batch save atomic via `batch_save_target_allocations`) |
+| `lib/types.ts` (PortfolioTarget, HoldingTarget, etc.)          | ✅ Done                                                         |
+| `lib/schemas.ts` (newPortfolioTargetSchema)                    | ✅ Done                                                         |
+| `lib/query-keys.ts` (PORTFOLIO_TARGETS, HOLDING_TARGETS, etc.) | ✅ Done                                                         |
+| `pages/allocations/allocations-page.tsx`                       | ✅ Rewritten                                                    |
+| `pages/allocations/components/allocation-donut.tsx`            | ✅ Created (Section 1)                                          |
+| `pages/allocations/components/target-list.tsx`                 | ✅ Created (Section 1)                                          |
+| `pages/allocations/components/allocations-overview.tsx`        | ✅ Created (Section 1)                                          |
+| `pages/allocations/components/category-side-panel.tsx`         | ✅ Created (Section 2)                                          |
+| `pages/allocations/components/holding-target-row.tsx`          | ✅ Created (Section 2)                                          |
+| `pages/allocations/components/rebalancing-tab.tsx`             | ✅ Created (Section 3)                                          |
 
 Not created (logic kept inline):
-- `auto-distribution.ts` — logic inline in `category-side-panel.tsx` (deleted dead-code version)
+
+- `auto-distribution.ts` — logic inline in `category-side-panel.tsx` (deleted
+  dead-code version)
 - `trade-recommendations-table.tsx` — lives inside `rebalancing-tab.tsx`
 
 ---
