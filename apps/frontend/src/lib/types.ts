@@ -54,6 +54,7 @@ export interface Account {
   isActive: boolean;
   isArchived: boolean;
   trackingMode: TrackingMode;
+  taxTreatment?: TaxTreatment; // Optional - tax classification (TAXABLE, TAX_FREE, TAX_DEFERRED)
   createdAt: Date;
   updatedAt: Date;
   platformId?: string; // Optional - links to platform/broker
@@ -1595,6 +1596,12 @@ export interface MigrationResult {
  * Matches the backend TrackingMode enum.
  */
 export type TrackingMode = "TRANSACTIONS" | "HOLDINGS" | "NOT_SET";
+
+/**
+ * Tax treatment classification for an account.
+ * Matches the backend TaxTreatment enum.
+ */
+export type TaxTreatment = "TAXABLE" | "TAX_FREE" | "TAX_DEFERRED";
 
 // ============================================================================
 // AI Provider Types
