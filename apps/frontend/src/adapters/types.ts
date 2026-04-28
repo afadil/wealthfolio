@@ -92,6 +92,7 @@ export interface MarketDataProviderSetting {
   enabled: boolean;
   logoFilename: string | null;
   capabilities: ProviderCapabilities | null;
+  providerType?: string;
   requiresApiKey: boolean;
   hasApiKey: boolean;
   assetCount: number;
@@ -224,6 +225,13 @@ export interface BackendSyncEngineStatusResult {
   bootstrapRequired: boolean;
 }
 
+export interface BackendSyncPairingSourceStatusResult {
+  status: "ready" | "restore_required";
+  message: string;
+  localCursor: number;
+  serverCursor: number;
+}
+
 export interface BackendSyncBootstrapOverwriteCheckTableResult {
   table: string;
   rows: number;
@@ -241,7 +249,11 @@ export interface BackendSyncBootstrapOverwriteCheckResult {
 
 export interface BackendSyncReconcileReadyResult {
   action?: "PULL_TAIL" | "BOOTSTRAP_SNAPSHOT" | "WAIT_SNAPSHOT" | "NOOP";
-  bootstrapAction: "PULL_REMOTE_OVERWRITE" | "NO_REMOTE_PULL" | "NO_BOOTSTRAP";
+  bootstrapAction:
+    | "PULL_REMOTE_OVERWRITE"
+    | "NO_REMOTE_PULL"
+    | "WAIT_REMOTE_SNAPSHOT"
+    | "NO_BOOTSTRAP";
   reason?: string;
   reconcileReason?: string;
   cursor?: number;
@@ -292,6 +304,7 @@ export interface BackendSyncCycleResult {
   needsBootstrap: boolean;
   bootstrapSnapshotId: string | null;
   bootstrapSnapshotSeq: number | null;
+  deadLetterCount: number;
 }
 
 export interface BackendSyncBackgroundEngineResult {

@@ -122,6 +122,8 @@ pub struct HoldingsPositionInput {
     pub currency: String,
     /// Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step
     pub exchange_mic: Option<String>,
+    /// Resolved asset ID from asset review step
+    pub asset_id: Option<String>,
 }
 
 /// A single snapshot from CSV import (one date's worth of holdings)

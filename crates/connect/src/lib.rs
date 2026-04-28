@@ -8,6 +8,7 @@ pub mod broker;
 pub mod broker_ingest;
 pub mod client;
 pub mod platform;
+pub mod token_lifecycle;
 
 // Re-export commonly used types
 #[cfg(feature = "broker")]
@@ -22,6 +23,10 @@ pub use broker::{
 
 // Re-export the HTTP client and public functions
 pub use client::{fetch_subscription_plans_public, ConnectApiClient, DEFAULT_CLOUD_API_URL};
+pub use token_lifecycle::{
+    ensure_valid_access_token, TokenLifecycleConfig, TokenLifecycleError, TokenLifecycleState,
+    CLOUD_ACCESS_TOKEN_KEY, CLOUD_REFRESH_TOKEN_KEY,
+};
 
 pub use broker_ingest::{
     BrokerSyncState, BrokerSyncStateRepositoryTrait, CoreImportRunRepositoryAdapter, ImportRun,

@@ -104,11 +104,12 @@ impl NetWorthService {
         &self,
         quantity: Decimal,
         price: Decimal,
+        contract_multiplier: Decimal,
         asset_currency: &str,
         base_currency: &str,
         date: NaiveDate,
     ) -> Result<Decimal> {
-        let local_value = quantity * price;
+        let local_value = quantity * price * contract_multiplier;
 
         if asset_currency == base_currency {
             return Ok(local_value.round_dp(DECIMAL_PRECISION));
@@ -178,7 +179,7 @@ impl NetWorthService {
             .collect();
 
         // Sort by value descending for better display
-        breakdown.sort_by(|a, b| b.value.cmp(&a.value));
+        breakdown.sort_by_key(|b| std::cmp::Reverse(b.value));
 
         // Calculate total
         let total = breakdown.iter().map(|item| item.value).sum();
@@ -201,7 +202,7 @@ impl NetWorthService {
             .collect();
 
         // Sort by value descending
-        breakdown.sort_by(|a, b| b.value.cmp(&a.value));
+        breakdown.sort_by_key(|b| std::cmp::Reverse(b.value));
 
         // Calculate total
         let total = breakdown.iter().map(|item| item.value).sum();
@@ -296,7 +297,12 @@ impl NetWorthServiceTrait for NetWorthService {
 
                 // Get asset info to determine category more precisely
                 let asset = asset_map.get(asset_id);
-                let asset_name = asset.and_then(|a| a.name.clone());
+                let asset_name = asset.and_then(|a| {
+                    a.name
+                        .clone()
+                        .filter(|n| !n.is_empty())
+                        .or_else(|| a.display_code.clone())
+                });
 
                 // Determine category: prefer asset kind if available, fallback to account type
                 let category = if let Some(asset) = asset {
@@ -337,6 +343,7 @@ impl NetWorthServiceTrait for NetWorthService {
                 let market_value_base = match self.calculate_market_value(
                     position.quantity,
                     normalized_price,
+                    position.contract_multiplier,
                     normalized_currency,
                     &base_currency,
                     date,
@@ -347,7 +354,7 @@ impl NetWorthServiceTrait for NetWorthService {
                             "Failed to calculate market value for {}: {}. Using local value.",
                             asset_id, e
                         );
-                        position.quantity * price
+                        position.quantity * price * position.contract_multiplier
                     }
                 };
 
@@ -436,6 +443,7 @@ impl NetWorthServiceTrait for NetWorthService {
             let market_value_base = match self.calculate_market_value(
                 quantity,
                 normalized_price,
+                Decimal::ONE,
                 normalized_currency,
                 &base_currency,
                 date,
@@ -454,7 +462,11 @@ impl NetWorthServiceTrait for NetWorthService {
 
             valuations.push(ValuationInfo {
                 asset_id: asset.id.clone(),
-                name: asset.name.clone(),
+                name: asset
+                    .name
+                    .clone()
+                    .filter(|n| !n.is_empty())
+                    .or_else(|| asset.display_code.clone()),
                 market_value_base,
                 valuation_date,
                 category,

@@ -56,7 +56,6 @@ mod desktop {
     /// Initializes desktop-specific plugins.
     pub fn init_plugins(handle: &AppHandle) {
         let _ = handle.plugin(tauri_plugin_updater::Builder::new().build());
-        let _ = handle.plugin(tauri_plugin_window_state::Builder::new().build());
     }
 
     /// Performs synchronous setup on desktop: initializes context, menu, and registers listeners.
@@ -96,6 +95,17 @@ mod desktop {
         let startup_context = Arc::clone(&context);
         tauri::async_runtime::spawn(async move {
             scheduler::run_startup_sync(&startup_handle, &startup_context).await;
+        });
+
+        // Start periodic market data sync (6h interval, 2min initial delay)
+        let periodic_quote_service = Arc::clone(&context.quote_service);
+        tauri::async_runtime::spawn(async move {
+            wealthfolio_core::quotes::scheduler::run_periodic_sync(
+                periodic_quote_service,
+                std::time::Duration::from_secs(120),
+                std::time::Duration::from_secs(6 * 3600),
+            )
+            .await;
         });
 
         // Start background device sync engine (self-skips when device is not READY).
@@ -187,7 +197,21 @@ fn get_app_data_dir(handle: &AppHandle) -> Result<String, Box<dyn std::error::Er
 pub fn run() {
     dotenv().ok();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Single-instance must be the first plugin registered (per Tauri docs).
+    // With the "deep-link" feature, it automatically forwards deep link URLs
+    // to the existing instance's on_open_url handler instead of spawning a new process.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // Focus the existing window when a second instance is attempted
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+
+    let builder = builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(if cfg!(debug_assertions) {
@@ -205,7 +229,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_deep_link::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+
+    builder
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -226,7 +255,7 @@ pub fn run() {
             let deep_link_handle = handle.clone();
             app.deep_link().on_open_url(move |event| {
                 let urls = event.urls();
-                log::info!("Deep link received: {:?}", urls);
+                log::debug!("Deep link received (count: {})", urls.len());
                 for url in urls {
                     let _ = deep_link_handle.emit("deep-link-received", url.to_string());
                 }
@@ -256,10 +285,18 @@ pub fn run() {
             commands::activity::update_activity,
             commands::activity::save_activities,
             commands::activity::delete_activity,
+            commands::activity::link_transfer_activities,
+            commands::activity::unlink_transfer_activities,
             commands::activity::check_activities_import,
+            commands::activity::preview_import_assets,
             commands::activity::import_activities,
             commands::activity::get_account_import_mapping,
             commands::activity::save_account_import_mapping,
+            commands::activity::link_account_template,
+            commands::activity::list_import_templates,
+            commands::activity::get_import_template,
+            commands::activity::save_import_template,
+            commands::activity::delete_import_template,
             commands::activity::check_existing_duplicates,
             commands::activity::parse_csv,
             // Settings commands
@@ -275,8 +312,17 @@ pub fn run() {
             commands::goal::update_goal,
             commands::goal::delete_goal,
             commands::goal::get_goals,
-            commands::goal::update_goal_allocations,
-            commands::goal::load_goals_allocations,
+            commands::goal::get_goal,
+            commands::goal::get_goal_funding,
+            commands::goal::save_goal_funding,
+            commands::goal::get_goal_plan,
+            commands::goal::save_goal_plan,
+            commands::goal::delete_goal_plan,
+            commands::goal::refresh_all_goal_summaries,
+            commands::goal::refresh_goal_summary,
+            commands::goal::get_retirement_overview,
+            commands::goal::get_save_up_overview,
+            commands::goal::preview_save_up_overview,
             // Portfolio commands
             commands::portfolio::get_holdings,
             commands::portfolio::get_holding,
@@ -316,6 +362,7 @@ pub fn run() {
             commands::asset::update_asset_profile,
             commands::asset::update_quote_mode,
             commands::asset::delete_asset,
+            commands::asset::create_asset,
             // Alternative asset commands
             commands::alternative_assets::create_alternative_asset,
             commands::alternative_assets::update_alternative_asset_valuation,
@@ -338,6 +385,7 @@ pub fn run() {
             commands::market_data::check_quotes_import,
             commands::market_data::import_quotes_csv,
             commands::market_data::get_exchanges,
+            commands::market_data::fetch_yahoo_dividends,
             // Taxonomy commands
             commands::taxonomy::get_taxonomies,
             commands::taxonomy::get_taxonomy,
@@ -420,6 +468,8 @@ pub fn run() {
             commands::wealthfolio_connect::store_sync_session,
             #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
             commands::wealthfolio_connect::clear_sync_session,
+            #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+            commands::wealthfolio_connect::restore_sync_session,
             #[cfg(feature = "connect-sync")]
             commands::brokers_sync::sync_broker_data,
             #[cfg(feature = "connect-sync")]
@@ -446,6 +496,10 @@ pub fn run() {
             commands::brokers_sync::get_import_runs,
             #[cfg(feature = "connect-sync")]
             commands::brokers_sync::get_data_import_runs,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::get_broker_sync_profile,
+            #[cfg(feature = "connect-sync")]
+            commands::brokers_sync::save_broker_sync_profile_rules,
             // Device sync commands
             #[cfg(feature = "device-sync")]
             commands::device_sync::enroll_device,
@@ -474,6 +528,8 @@ pub fn run() {
             commands::device_sync::device_sync_bootstrap_snapshot_if_needed,
             #[cfg(feature = "device-sync")]
             commands::device_sync::device_sync_engine_status,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::device_sync_pairing_source_status,
             #[cfg(feature = "device-sync")]
             commands::device_sync::device_sync_bootstrap_overwrite_check,
             #[cfg(feature = "device-sync")]
@@ -506,6 +562,20 @@ pub fn run() {
             commands::device_sync::get_pairing_messages,
             #[cfg(feature = "device-sync")]
             commands::device_sync::confirm_pairing,
+            // Composite pairing endpoints
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::complete_pairing_with_transfer,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::confirm_pairing_with_bootstrap,
+            // Pairing flow coordinator
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::begin_pairing_confirm,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::get_pairing_flow_state,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::approve_pairing_overwrite,
+            #[cfg(feature = "device-sync")]
+            commands::device_sync::cancel_pairing_flow,
             // Device enroll service (high-level commands)
             #[cfg(feature = "device-sync")]
             commands::device_enroll_service::get_device_sync_state,
@@ -535,9 +605,17 @@ pub fn run() {
             #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_hash_pairing_code,
             #[cfg(feature = "device-sync")]
+            commands::sync_crypto::sync_hmac_sha256,
+            #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_compute_sas,
             #[cfg(feature = "device-sync")]
             commands::sync_crypto::sync_generate_device_id,
+            // Custom provider commands
+            commands::custom_provider::get_custom_providers,
+            commands::custom_provider::create_custom_provider,
+            commands::custom_provider::update_custom_provider,
+            commands::custom_provider::delete_custom_provider,
+            commands::custom_provider::test_custom_provider_source,
             // Health commands
             commands::health::get_health_status,
             commands::health::run_health_checks,
@@ -547,6 +625,13 @@ pub fn run() {
             commands::health::execute_health_fix,
             commands::health::get_health_config,
             commands::health::update_health_config,
+            // RetirementPlan-based FIRE commands
+            commands::fire::calculate_retirement_projection,
+            commands::fire::run_retirement_decision_sensitivity_map,
+            commands::fire::run_retirement_monte_carlo,
+            commands::fire::run_retirement_scenario_analysis,
+            commands::fire::run_retirement_sorr,
+            commands::fire::run_retirement_stress_tests,
         ])
         .build(tauri::generate_context!())
         .expect("Failed to build Wealthfolio application")

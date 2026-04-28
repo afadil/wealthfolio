@@ -1,5 +1,4 @@
 // Web-specific activity commands
-import { getAuthToken } from "@/lib/auth-token";
 import type { ParseConfig, ParsedCsvResult } from "@/lib/types";
 import { API_PREFIX, logger } from "./core";
 
@@ -41,16 +40,10 @@ export const parseCsv = async (file: File, config: ParseConfig): Promise<ParsedC
     formData.append("file", file);
     formData.append("config", JSON.stringify(config));
 
-    const headers: HeadersInit = {};
-    const token = getAuthToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
     const response = await fetch(`${API_PREFIX}/activities/import/parse`, {
       method: "POST",
-      headers,
       body: formData,
+      credentials: "same-origin",
     });
 
     if (!response.ok) {

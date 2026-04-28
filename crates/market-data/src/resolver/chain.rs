@@ -31,6 +31,7 @@ use super::traits::{ResolvedInstrument, Resolver, SymbolResolver};
 ///     overrides: None,
 ///     currency_hint: Some("CAD".into()),
 ///     preferred_provider: None,
+///     bond_metadata: None, custom_provider_code: None,
 /// };
 ///
 /// let resolved = chain.resolve(&"YAHOO".into(), &context)?;
@@ -108,6 +109,8 @@ impl SymbolResolver for ResolverChain {
             InstrumentId::Fx { quote, .. } => Some(quote.clone()),
             InstrumentId::Crypto { quote, .. } => Some(quote.clone()),
             InstrumentId::Metal { quote, .. } => Some(quote.clone()),
+            InstrumentId::Option { .. } => None,
+            InstrumentId::Bond { .. } => None,
         }
     }
 }
@@ -141,6 +144,8 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -168,6 +173,8 @@ mod tests {
             overrides: None,
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -203,6 +210,8 @@ mod tests {
             overrides: Some(overrides),
             currency_hint: Some("CAD".into()),
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         // Resolve for ALPHA_VANTAGE (no override) - should use rules
@@ -229,6 +238,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let resolved = chain.resolve(&"YAHOO".into(), &context).unwrap();
@@ -246,13 +257,15 @@ mod tests {
         let chain = ResolverChain::new();
 
         let context = QuoteContext {
-            instrument: InstrumentId::Equity {
-                ticker: Arc::from("TEST"),
-                mic: Some("UNKNOWN_MIC".into()),
+            instrument: InstrumentId::Crypto {
+                base: Arc::from("BTC"),
+                quote: "USD".into(),
             },
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let result = chain.resolve(&"UNKNOWN_PROVIDER".into(), &context);
@@ -278,6 +291,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);
@@ -296,6 +311,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let currency = chain.get_currency(&"YAHOO".into(), &context);

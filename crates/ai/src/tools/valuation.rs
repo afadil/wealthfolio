@@ -152,12 +152,18 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
                     .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 
                 for v in account_valuations {
+                    let Some(fx_rate) = v.fx_rate_to_base.to_f64() else {
+                        log::warn!(
+                            "Dropping valuation for account {} on {} from AI valuation: invalid FX rate",
+                            v.account_id,
+                            v.valuation_date
+                        );
+                        continue;
+                    };
                     let entry = aggregated.entry(v.valuation_date).or_insert((0.0, 0.0));
                     // Convert to base currency using fx_rate
-                    let total_in_base = v.total_value.to_f64().unwrap_or(0.0)
-                        * v.fx_rate_to_base.to_f64().unwrap_or(1.0);
-                    let contribution_in_base = v.net_contribution.to_f64().unwrap_or(0.0)
-                        * v.fx_rate_to_base.to_f64().unwrap_or(1.0);
+                    let total_in_base = v.total_value.to_f64().unwrap_or(0.0) * fx_rate;
+                    let contribution_in_base = v.net_contribution.to_f64().unwrap_or(0.0) * fx_rate;
                     entry.0 += total_in_base;
                     entry.1 += contribution_in_base;
                 }
@@ -175,7 +181,7 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
                     },
                 )
                 .collect();
-            result.sort_by(|a, b| a.date.cmp(&b.date));
+            result.sort_by_key(|a| a.date.clone());
             result
         } else {
             // Single account valuations
@@ -187,17 +193,24 @@ impl<E: AiEnvironment + 'static> Tool for GetValuationHistoryTool<E> {
 
             account_valuations
                 .into_iter()
-                .map(|v| {
-                    let total_in_base = v.total_value.to_f64().unwrap_or(0.0)
-                        * v.fx_rate_to_base.to_f64().unwrap_or(1.0);
-                    let contribution_in_base = v.net_contribution.to_f64().unwrap_or(0.0)
-                        * v.fx_rate_to_base.to_f64().unwrap_or(1.0);
-                    ValuationPointDto {
+                .filter_map(|v| {
+                    let Some(fx_rate) = v.fx_rate_to_base.to_f64() else {
+                        log::warn!(
+                            "Dropping valuation for account {} on {} from AI valuation: invalid FX rate",
+                            v.account_id,
+                            v.valuation_date
+                        );
+                        return None;
+                    };
+                    let total_in_base = v.total_value.to_f64().unwrap_or(0.0) * fx_rate;
+                    let contribution_in_base =
+                        v.net_contribution.to_f64().unwrap_or(0.0) * fx_rate;
+                    Some(ValuationPointDto {
                         date: v.valuation_date.format("%Y-%m-%d").to_string(),
                         total_value: total_in_base,
                         net_contribution: contribution_in_base,
                         currency: self.base_currency.clone(),
-                    }
+                    })
                 })
                 .collect()
         };

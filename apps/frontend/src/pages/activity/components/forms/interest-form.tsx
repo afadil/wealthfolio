@@ -1,18 +1,20 @@
-import { useMemo } from "react";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
+import { useSettings } from "@/hooks/use-settings";
+import { ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { ActivityType } from "@/lib/constants";
-import { useSettings } from "@/hooks/use-settings";
+import { useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  DatePicker,
-  AmountInput,
-  NotesInput,
   AdvancedOptionsSection,
+  AmountInput,
+  createValidatedSubmit,
+  DatePicker,
+  NotesInput,
+  SymbolSearch,
   type AccountSelectOption,
 } from "./fields";
 
@@ -20,6 +22,9 @@ import {
 export const interestFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
   activityDate: z.date({ required_error: "Please select a date." }),
+  // Optional symbol (e.g., for bond interest)
+  symbol: z.string().optional().nullable(),
+  exchangeMic: z.string().nullable().optional(),
   amount: z.coerce
     .number({
       required_error: "Please enter an amount.",
@@ -29,7 +34,15 @@ export const interestFormSchema = z.object({
   comment: z.string().optional().nullable(),
   // Advanced options
   currency: z.string().min(1, { message: "Currency is required." }),
+  fxRate: z.coerce
+    .number({
+      invalid_type_error: "FX Rate must be a number.",
+    })
+    .positive({ message: "FX Rate must be positive." })
+    .optional(),
   subtype: z.string().optional().nullable(),
+  symbolQuoteCcy: z.string().nullable().optional(),
+  symbolInstrumentType: z.string().nullable().optional(),
 });
 
 export type InterestFormValues = z.infer<typeof interestFormSchema>;
@@ -66,8 +79,10 @@ export function InterestForm({
     defaultValues: {
       accountId: initialAccountId,
       activityDate: new Date(),
+      symbol: null,
       amount: undefined,
       comment: null,
+      fxRate: undefined,
       subtype: null,
       ...defaultValues,
       currency: defaultValues?.currency?.trim() || initialCurrency,
@@ -85,7 +100,7 @@ export function InterestForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 
@@ -97,6 +112,18 @@ export function InterestForm({
             {/* Account Selection */}
             <AccountSelect name="accountId" accounts={accounts} currencyName="currency" />
 
+            {/* Optional Symbol (e.g., for bond interest) */}
+            <SymbolSearch
+              name="symbol"
+              label="Symbol (optional)"
+              exchangeMicName="exchangeMic"
+              currencyName="currency"
+              quoteCcyName="symbolQuoteCcy"
+              instrumentTypeName="symbolInstrumentType"
+            />
+            <input type="hidden" {...form.register("symbolQuoteCcy")} />
+            <input type="hidden" {...form.register("symbolInstrumentType")} />
+
             {/* Date Picker */}
             <DatePicker name="activityDate" label="Date" />
 
@@ -106,6 +133,7 @@ export function InterestForm({
             {/* Advanced Options */}
             <AdvancedOptionsSection
               currencyName="currency"
+              fxRateName="fxRate"
               subtypeName="subtype"
               activityType={ActivityType.INTEREST}
               accountCurrency={accountCurrency}

@@ -620,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn test_new_activity_symbol_hint_helpers() {
+    fn test_new_activity_symbol_helpers() {
         let activity = NewActivity {
             id: Some("a1".to_string()),
             account_id: "acc-1".to_string(),
@@ -650,12 +650,12 @@ mod tests {
             idempotency_key: None,
         };
 
-        assert_eq!(activity.get_quote_ccy_hint(), Some("GBp"));
-        assert_eq!(activity.get_instrument_type_hint(), Some("EQUITY"));
+        assert_eq!(activity.get_quote_ccy(), Some("GBp"));
+        assert_eq!(activity.get_instrument_type(), Some("EQUITY"));
     }
 
     #[test]
-    fn test_activity_import_to_new_activity_preserves_symbol_hints() {
+    fn test_activity_import_to_new_activity_preserves_symbol_inputs() {
         let import = ActivityImport {
             id: Some("imp-1".to_string()),
             date: "2024-01-15".to_string(),
@@ -673,7 +673,7 @@ mod tests {
             exchange_mic: Some("XLON".to_string()),
             quote_ccy: Some("GBp".to_string()),
             instrument_type: Some("EQUITY".to_string()),
-            quote_mode: None,
+            quote_mode: Some("MANUAL".to_string()),
             errors: None,
             warnings: None,
             duplicate_of_id: None,
@@ -683,6 +683,9 @@ mod tests {
             line_number: Some(1),
             fx_rate: None,
             subtype: None,
+            asset_id: None,
+            isin: None,
+            force_import: false,
         };
 
         let converted = NewActivity::from(import);
@@ -690,5 +693,6 @@ mod tests {
         assert_eq!(symbol.quote_ccy.as_deref(), Some("GBp"));
         assert_eq!(symbol.instrument_type.as_deref(), Some("EQUITY"));
         assert_eq!(symbol.exchange_mic.as_deref(), Some("XLON"));
+        assert_eq!(symbol.quote_mode.as_deref(), Some("MANUAL"));
     }
 }

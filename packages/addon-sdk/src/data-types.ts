@@ -189,12 +189,12 @@ export interface Activity {
   settlementDate?: string;
 
   // Quantities (strings to preserve decimal precision)
-  quantity?: string;
-  unitPrice?: string;
-  amount?: string;
-  fee?: string;
+  quantity?: string | null;
+  unitPrice?: string | null;
+  amount?: string | null;
+  fee?: string | null;
   currency: string;
-  fxRate?: string;
+  fxRate?: string | null;
 
   // Metadata
   notes?: string;
@@ -350,17 +350,26 @@ export interface ActivityImport {
   activityType: ActivityType;
   subtype?: string;
   date?: Date | string;
-  symbol: string;
-  amount?: number;
-  quantity?: number;
-  unitPrice?: number;
-  fee?: number;
-  fxRate?: number;
+  symbol?: string;
+  amount?: number | string | null;
+  quantity?: number | string | null;
+  unitPrice?: number | string | null;
+  fee?: number | string | null;
+  fxRate?: number | string | null;
   accountName?: string;
   symbolName?: string;
   /** Resolved exchange MIC for the symbol (populated during validation) */
   exchangeMic?: string;
+  /** Resolved quote currency hint (e.g., GBp) */
+  quoteCcy?: string;
+  /** Resolved instrument type hint (e.g., EQUITY, CRYPTO) */
+  instrumentType?: string;
+  /** Resolved quote mode hint (e.g., MANUAL, MARKET) */
+  quoteMode?: string;
   errors?: Record<string, string[]>;
+  warnings?: Record<string, string[]>;
+  duplicateOfId?: string;
+  duplicateOfLineNumber?: number;
   isValid: boolean;
   lineNumber?: number;
   isDraft: boolean;
@@ -384,7 +393,7 @@ export interface ImportActivitiesResult {
 
 export interface ImportMappingData {
   accountId: string;
-  fieldMappings: Record<string, string>;
+  fieldMappings: Record<string, string | string[]>;
   activityMappings: Record<string, string[]>;
   symbolMappings: Record<string, string>;
   accountMappings: Record<string, string>;
@@ -619,6 +628,7 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  timezone?: string;
   instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
@@ -631,7 +641,7 @@ export interface Goal {
   title: string;
   description?: string;
   targetAmount: number;
-  isAchieved?: boolean;
+  statusLifecycle?: 'active' | 'achieved' | 'archived';
   allocations?: GoalAllocation[];
 }
 
@@ -639,7 +649,8 @@ export interface GoalAllocation {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  sharePercent: number;
+  taxBucket?: string;
 }
 
 export interface GoalProgress {
@@ -782,8 +793,8 @@ export interface PerformanceMetrics {
   currency: string;
   /** Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode) */
   periodGain: number;
-  /** Period return percentage (SOTA formula for HOLDINGS mode) */
-  periodReturn: number;
+  /** Period return percentage (SOTA formula for HOLDINGS mode). Null when start value ≤ 0. */
+  periodReturn: number | null;
   /** Time-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
   cumulativeTwr?: number | null;
   /** Legacy field for backward compatibility */
@@ -879,4 +890,63 @@ export interface BrokerSyncState {
   syncStatus: SyncStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Snapshot Types
+// ============================================================================
+
+export interface SnapshotInfo {
+  id: string;
+  snapshotDate: string;
+  source: string;
+  positionCount: number;
+  cashCurrencyCount: number;
+}
+
+export interface SnapshotHoldingInput {
+  assetId?: string;
+  symbol: string;
+  quantity: string;
+  currency: string;
+  averageCost?: string;
+  exchangeMic?: string;
+  name?: string;
+  dataSource?: string;
+  assetKind?: string;
+}
+
+export interface SnapshotPositionInput {
+  symbol: string;
+  quantity: string;
+  avgCost?: string;
+  currency: string;
+  exchangeMic?: string;
+}
+
+export interface SnapshotInput {
+  date: string;
+  positions: SnapshotPositionInput[];
+  cashBalances: Record<string, string>;
+}
+
+export interface SnapshotSymbolCheckResult {
+  symbol: string;
+  found: boolean;
+  assetName?: string;
+  assetId?: string;
+  currency?: string;
+  exchangeMic?: string;
+}
+
+export interface CheckSnapshotImportResult {
+  existingDates: string[];
+  symbols: SnapshotSymbolCheckResult[];
+  validationErrors: string[];
+}
+
+export interface SnapshotImportResult {
+  snapshotsImported: number;
+  snapshotsFailed: number;
+  errors: string[];
 }

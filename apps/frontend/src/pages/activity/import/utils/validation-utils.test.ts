@@ -5,7 +5,7 @@ import {
   normalizeNumericValue,
   parseAndAbsoluteValue,
 } from "./validation-utils";
-import { ImportFormat, ActivityType } from "@/lib/types";
+import { ImportFormat, ActivityType, ImportType } from "@/lib/types";
 
 describe("validation-utils", () => {
   describe("normalizeNumericValue", () => {
@@ -85,6 +85,7 @@ describe("validation-utils", () => {
   describe("validateActivityImport with negative values", () => {
     const testMapping = {
       accountId: "test-account",
+      importType: ImportType.ACTIVITY,
       name: "Test Mapping",
       fieldMappings: {
         [ImportFormat.DATE]: "date",
@@ -212,6 +213,34 @@ describe("validation-utils", () => {
       expect(activity.fee).toBe(10.0); // converted to positive
     });
 
+    it("should correct unitPrice when CSV amount disagrees with qty*price (bond import)", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-01-05T00:00:00.000Z",
+          symbol: "BBG0140BZHN4",
+          activityType: "BUY",
+          quantity: "6000",
+          unitPrice: "97.04917", // bond price as % of par
+          amount: "5822.95", // correct tel quel amount from broker
+          fee: "2.95",
+          currency: "EUR",
+        },
+      ];
+
+      const result = validateActivityImport(testData, testMapping, "test-account", "EUR");
+
+      expect(result.activities).toHaveLength(1);
+      const activity = result.activities[0];
+
+      // Amount should be the CSV value, not qty*price
+      expect(activity.amount).toBe(5822.95);
+      // unitPrice should be derived from amount/quantity (fraction of par)
+      expect(activity.unitPrice).toBeCloseTo(5822.95 / 6000, 10);
+      expect(activity.quantity).toBe(6000);
+      expect(activity.fee).toBe(2.95);
+    });
+
     it("should handle SPLIT activities with no cash impact", () => {
       const testData = [
         {
@@ -330,6 +359,31 @@ describe("validation-utils", () => {
       expect(buyActivity.fee).toBe(0);
     });
 
+    it("should not reconcile when qty*price roughly matches CSV amount", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "AAPL",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "150.50",
+          amount: "1505.00",
+          fee: "5.00",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(testData, testMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      const activity = result.activities[0];
+
+      // No reconciliation needed — qty*price matches CSV amount
+      expect(activity.amount).toBe(1505);
+      expect(activity.unitPrice).toBe(150.5);
+    });
+
     it("should handle FEE activities with fee value only (no amount)", () => {
       const testData = [
         {
@@ -380,6 +434,238 @@ describe("validation-utils", () => {
       expect(activity.amount).toBe(50.0); // Should use provided amount
       expect(activity.fee).toBe(5.0); // Should use provided fee
       expect(activity.errors).toBeUndefined();
+    });
+  });
+
+  describe("validateActivityImport with instrument types", () => {
+    const baseMapping = {
+      accountId: "test-account",
+      importType: ImportType.ACTIVITY,
+      name: "Test Mapping",
+      fieldMappings: {
+        [ImportFormat.DATE]: "date",
+        [ImportFormat.SYMBOL]: "symbol",
+        [ImportFormat.ACTIVITY_TYPE]: "activityType",
+        [ImportFormat.QUANTITY]: "quantity",
+        [ImportFormat.UNIT_PRICE]: "unitPrice",
+        [ImportFormat.AMOUNT]: "amount",
+        [ImportFormat.FEE]: "fee",
+        [ImportFormat.CURRENCY]: "currency",
+        [ImportFormat.INSTRUMENT_TYPE]: "instrumentType",
+      },
+      activityMappings: {
+        [ActivityType.BUY]: ["BUY"],
+        [ActivityType.SELL]: ["SELL"],
+      },
+      symbolMappings: {},
+      accountMappings: {},
+    };
+
+    const mappingWithoutInstrumentType = {
+      ...baseMapping,
+      fieldMappings: Object.fromEntries(
+        Object.entries(baseMapping.fieldMappings).filter(
+          ([key]) => key !== ImportFormat.INSTRUMENT_TYPE,
+        ),
+      ),
+    };
+
+    it("should parse BOND instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "US912828ZT58",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "99.50",
+          amount: "995.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "BOND",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("BOND");
+      expect(result.activities[0].symbol).toBe("US912828ZT58");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should normalize bond aliases from CSV column", () => {
+      for (const alias of ["FIXEDINCOME", "FIXED_INCOME", "DEBT", "Fixed Income"]) {
+        const testData = [
+          {
+            lineNumber: "1",
+            date: "2024-06-01T00:00:00.000Z",
+            symbol: "US912828ZT58",
+            activityType: "BUY",
+            quantity: "10",
+            unitPrice: "99.50",
+            amount: "995.00",
+            fee: "0",
+            currency: "USD",
+            instrumentType: alias,
+          },
+        ];
+
+        const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+        expect(result.activities[0].instrumentType).toBe("BOND");
+      }
+    });
+
+    it("should parse OPTION instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2026-03-01T00:00:00.000Z",
+          symbol: "AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0.65",
+          currency: "USD",
+          instrumentType: "OPTION",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("OPTION");
+      expect(result.activities[0].symbol).toBe("AAPL260918C00200000");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should extract instrument type from bond: prefix when no column mapped", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "bond:US912828ZT58",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "99.50",
+          amount: "995.00",
+          fee: "0",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("BOND");
+      expect(result.activities[0].symbol).toBe("US912828ZT58");
+    });
+
+    it("should extract instrument type from option: prefix when no column mapped", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2026-03-01T00:00:00.000Z",
+          symbol: "option:AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0.65",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("OPTION");
+      expect(result.activities[0].symbol).toBe("AAPL260918C00200000");
+    });
+
+    it("should prefer CSV column over typed prefix", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "option:AAPL260918C00200000",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "5.50",
+          amount: "550.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "EQUITY",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      // CSV column value takes precedence over prefix
+      expect(result.activities[0].instrumentType).toBe("EQUITY");
+    });
+
+    it("should parse METAL instrument type from CSV column", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "XAUUSD",
+          activityType: "BUY",
+          quantity: "1",
+          unitPrice: "2350.00",
+          amount: "2350.00",
+          fee: "0",
+          currency: "USD",
+          instrumentType: "METAL",
+        },
+      ];
+
+      const result = validateActivityImport(testData, baseMapping, "test-account", "USD");
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBe("METAL");
+      expect(result.activities[0].isValid).toBe(true);
+    });
+
+    it("should handle rows with no instrument type gracefully", () => {
+      const testData = [
+        {
+          lineNumber: "1",
+          date: "2024-06-01T00:00:00.000Z",
+          symbol: "AAPL",
+          activityType: "BUY",
+          quantity: "10",
+          unitPrice: "190.00",
+          amount: "1900.00",
+          fee: "0",
+          currency: "USD",
+        },
+      ];
+
+      const result = validateActivityImport(
+        testData,
+        mappingWithoutInstrumentType,
+        "test-account",
+        "USD",
+      );
+
+      expect(result.activities).toHaveLength(1);
+      expect(result.activities[0].instrumentType).toBeUndefined();
+      expect(result.activities[0].isValid).toBe(true);
     });
   });
 });

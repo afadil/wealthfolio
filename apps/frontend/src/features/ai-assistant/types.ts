@@ -12,6 +12,8 @@ export type {
   ModelCapabilityOverrideUpdate,
   FetchedModel,
   ListModelsResponse,
+  ProviderTuning,
+  ProviderTuningOverrides,
 } from "@/lib/types";
 
 // ============================================================================
@@ -144,6 +146,22 @@ export interface AiSendMessageRequest {
   modelId?: string;
   /** Tool allowlist for this request (uses all if not specified). */
   allowedTools?: string[];
+  /** Parent message ID for edit operations. When set, AI context is truncated to this message. */
+  parentMessageId?: string;
+  /** File attachments (CSV, images, PDFs). */
+  attachments?: AiMessageAttachment[];
+}
+
+/**
+ * A file attachment sent with an AI chat message.
+ */
+export interface AiMessageAttachment {
+  /** Original filename. */
+  name: string;
+  /** MIME type (e.g., "text/csv", "image/png", "application/pdf"). */
+  contentType: string;
+  /** File content: plain text for CSV, base64-encoded for images/PDFs. */
+  data: string;
 }
 
 /**
@@ -421,75 +439,125 @@ export type AiChatMessage = ChatMessage;
 export type AiUsageStats = UsageStats;
 
 // ============================================================================
-// Import CSV Tool Types (uses same format as manual import)
+// Record Activities Tool Types
+// ============================================================================
+
+export interface RecordActivitiesIntent {
+  activityType: string;
+  symbol?: string;
+  activityDate: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  fee?: number;
+  account?: string;
+  subtype?: string;
+  notes?: string;
+}
+
+export interface RecordActivitiesArgs {
+  activities: RecordActivitiesIntent[];
+}
+
+export interface RecordActivitiesValidationError {
+  field: string;
+  message: string;
+}
+
+export interface RecordActivitiesRowValidation {
+  isValid: boolean;
+  missingFields: string[];
+  errors: RecordActivitiesValidationError[];
+}
+
+export interface RecordActivitiesDraft {
+  activityType: string;
+  activityDate: string;
+  symbol?: string;
+  assetId?: string;
+  assetName?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount?: number;
+  fee?: number;
+  currency: string;
+  accountId?: string;
+  accountName?: string;
+  subtype?: string;
+  notes?: string;
+  priceSource: string;
+  pricingMode: string;
+  isCustomAsset: boolean;
+  assetKind?: string;
+}
+
+export interface RecordActivitiesResolvedAsset {
+  assetId: string;
+  symbol: string;
+  name: string;
+  currency: string;
+  exchange?: string;
+  exchangeMic?: string;
+}
+
+export interface RecordActivitiesSubtypeOption {
+  value: string;
+  label: string;
+}
+
+export interface RecordActivitiesAccountOption {
+  id: string;
+  name: string;
+  currency: string;
+}
+
+export interface RecordActivitiesDraftRow {
+  rowIndex: number;
+  draft: RecordActivitiesDraft;
+  validation: RecordActivitiesRowValidation;
+  errors: string[];
+  resolvedAsset?: RecordActivitiesResolvedAsset;
+  availableSubtypes: RecordActivitiesSubtypeOption[];
+}
+
+export interface RecordActivitiesValidationSummary {
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+}
+
+export interface RecordActivitiesSubmissionStatus {
+  rowIndex: number;
+  status: "submitted" | "error";
+  error?: string;
+}
+
+export interface RecordActivitiesOutput {
+  drafts: RecordActivitiesDraftRow[];
+  validation: RecordActivitiesValidationSummary;
+  availableAccounts: RecordActivitiesAccountOption[];
+  resolvedAssets?: RecordActivitiesResolvedAsset[];
+  submitted?: boolean;
+  createdCount?: number;
+  errorCount?: number;
+  rowStatuses?: RecordActivitiesSubmissionStatus[];
+  submittedAt?: string;
+}
+
+// ============================================================================
+// Import CSV Tool Types — mapping-only output
 // ============================================================================
 
 /**
- * Import mapping data - same format as manual import.
- * Uses header names (e.g., "Date") instead of column indices.
+ * Rough confidence badge for the mapping returned by the AI.
+ * - High: saved template hit OR all core fields mapped
+ * - Medium: most core fields mapped
+ * - Low: few core fields mapped — user likely needs to review mapping
  */
-export interface ImportCsvMappingData {
-  /** Account ID this mapping belongs to */
-  accountId?: string;
-  /** Optional name for this mapping profile */
-  name?: string;
-  /** Field mappings: fieldName → headerName (e.g., { date: "Date", symbol: "Ticker" }) */
-  fieldMappings?: Record<string, string>;
-  /** Activity type mappings: ActivityType → [csvValues] (e.g., { BUY: ["Purchase", "Buy"] }) */
-  activityMappings?: Record<string, string[]>;
-  /** Symbol mappings: csvSymbol → canonicalSymbol */
-  symbolMappings?: Record<string, string>;
-  /** Account mappings: csvAccount → accountId */
-  accountMappings?: Record<string, string>;
-  /** CSV parsing configuration */
-  parseConfig?: {
-    hasHeaderRow?: boolean;
-    headerRowIndex?: number;
-    delimiter?: string;
-    quoteChar?: string;
-    skipTopRows?: number;
-    skipBottomRows?: number;
-    skipEmptyRows?: boolean;
-    dateFormat?: string;
-    decimalSeparator?: string;
-    thousandsSeparator?: string;
-    defaultCurrency?: string;
-  };
-}
+export type MappingConfidence = "HIGH" | "MEDIUM" | "LOW";
 
 /**
- * Description of a cleaning action performed on the CSV data.
- */
-export interface ImportCsvCleaningAction {
-  type: "skip_rows" | "skip_metadata" | "normalize_dates" | "clean_numbers" | "map_activity_types";
-  description: string;
-  affectedRows?: number;
-}
-
-/**
- * Validation error/warning for a specific row.
- */
-export interface ImportCsvRowError {
-  row: number;
-  field: string;
-  message: string;
-  severity: "error" | "warning";
-}
-
-/**
- * Summary of validation results for the import.
- */
-export interface ImportCsvValidationSummary {
-  totalRows: number;
-  validRows: number;
-  warningRows: number;
-  errorRows: number;
-  errors: ImportCsvRowError[];
-  globalErrors?: string[];
-}
-
-/**
- * Account option for the import UI.
+ * Account option exposed to the chat tool UI.
  */
 export interface ImportCsvAccountOption {
   id: string;
@@ -498,70 +566,62 @@ export interface ImportCsvAccountOption {
 }
 
 /**
- * A single parsed activity draft from CSV import.
- * Matches the structure expected by ActivityDataGrid's LocalTransaction.
- */
-export interface ImportCsvActivityDraft {
-  tempId: string;
-  isNew: true;
-  accountId?: string;
-  activityType?: string;
-  activityDate?: string;
-  symbol?: string;
-  /** Resolved exchange MIC for the symbol (e.g., "XNAS", "XNYS") */
-  exchangeMic?: string;
-  quantity?: string | number | null;
-  unitPrice?: string | number | null;
-  amount?: string | number | null;
-  fee?: string | number | null;
-  fxRate?: string | number | null;
-  currency?: string;
-  comment?: string;
-  subtype?: string;
-  /** Validation status for this row */
-  validationStatus: "valid" | "warning" | "error";
-  /** Validation error messages for this row */
-  validationErrors?: string[];
-  /** Original row number in CSV (for error reference) */
-  sourceRow: number;
-}
-
-/**
- * Arguments for the import_csv tool.
+ * Arguments the LLM provides when calling the import_csv tool.
  */
 export interface ImportCsvArgs {
   csvContent: string;
-  accountId?: string;
-  /** User-provided mapping to apply */
-  mapping?: ImportCsvMappingData;
+  accountId?: string | null;
+  fieldMappings?: Record<string, string> | null;
+  activityMappings?: Record<string, string[]> | null;
+  symbolMappings?: Record<string, string> | null;
+  accountMappings?: Record<string, string> | null;
+  delimiter?: string | null;
+  skipTopRows?: number | null;
+  skipBottomRows?: number | null;
+  dateFormat?: string | null;
+  decimalSeparator?: string | null;
+  thousandsSeparator?: string | null;
+  defaultCurrency?: string | null;
 }
 
 /**
- * Output from the import_csv tool.
+ * Persisted patch applied via `updateToolResult` once the user confirms an import.
  */
-export interface ImportCsvOutput {
-  /** Parsed activities as drafts ready for editing */
-  activities: ImportCsvActivityDraft[];
-  /** The mapping that was applied (from saved profile, LLM suggestion, or auto-detected) */
-  appliedMapping: ImportCsvMappingData;
-  /** List of cleaning actions performed */
-  cleaningActions: ImportCsvCleaningAction[];
-  /** Validation summary */
-  validation: ImportCsvValidationSummary;
-  /** Available accounts for selection */
-  availableAccounts: ImportCsvAccountOption[];
-  /** Detected headers from CSV */
-  detectedHeaders?: string[];
-  /** Total rows in source CSV */
-  totalRows?: number;
-  /** Whether output was truncated */
-  truncated?: boolean;
-  /** Whether a saved profile was used as the starting point */
-  usedSavedProfile?: boolean;
-  /** Persisted state: whether activities have been saved */
+export interface ImportCsvSubmissionResult {
   submitted?: boolean;
-  /** IDs of created activities (after save) */
-  createdActivityIds?: string[];
-  /** Timestamp when activities were saved */
+  importedCount?: number;
+  importRunId?: string;
   submittedAt?: string;
+}
+
+/**
+ * Output from the import_csv tool — mapping inference only.
+ *
+ * The chat tool UI uses this to drive the backend pipeline
+ * (parse_csv → check_activities_import → import_activities). No drafts,
+ * no validation, no normalization happens in the AI tool itself.
+ *
+ * Mirrors `crates/ai/src/tools/import_csv.rs::ImportCsvMappingOutput`.
+ */
+export interface ImportCsvMappingOutput extends ImportCsvSubmissionResult {
+  /** CSV content read from tool ARGS (not echoed in result — avoids double-storing). */
+  csvContent: string;
+  /** The mapping the AI (or saved template) settled on. Same shape as manual import. */
+  appliedMapping: import("@/lib/types").ImportMappingData;
+  /** Parse config the frontend should use. */
+  parseConfig: import("@/lib/types").ParseConfig;
+  /** AI's inferred account (null if ambiguous — chat UI will prompt). */
+  accountId?: string | null;
+  /** Headers detected by parse_csv. */
+  detectedHeaders: string[];
+  /** First few data rows (≤10) for UI preview. */
+  sampleRows: string[][];
+  /** Total number of rows parsed (before truncation). */
+  totalRows: number;
+  /** Rough confidence for the mapping. */
+  mappingConfidence: MappingConfidence;
+  /** Accounts available for selection. */
+  availableAccounts: ImportCsvAccountOption[];
+  /** True when the mapping came from a saved template (no LLM inference). */
+  usedSavedProfile?: boolean;
 }

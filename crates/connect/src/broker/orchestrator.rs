@@ -109,12 +109,10 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         api_client: &dyn BrokerApiClient,
     ) -> Result<SyncResult, String> {
         // Step 1: Sync connections (platforms)
-        info!("Fetching broker connections...");
         let connections = api_client
             .list_connections()
             .await
             .map_err(|e| e.to_string())?;
-        info!("Found {} broker connections", connections.len());
 
         let connections_result = self
             .sync_service
@@ -122,13 +120,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .await
             .map_err(|e| format!("Failed to sync connections: {}", e))?;
 
-        info!(
+        debug!(
             "Connections synced: {} created, {} updated",
             connections_result.platforms_created, connections_result.platforms_updated
         );
 
         // Step 2: Sync accounts (filter by sync_enabled)
-        info!("Fetching broker accounts...");
         let authorization_ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
         let all_accounts = api_client
             .list_accounts(if authorization_ids.is_empty() {
@@ -138,20 +135,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             })
             .await
             .map_err(|e| e.to_string())?;
-
-        info!(
-            "Fetched {} total broker accounts from API",
-            all_accounts.len()
-        );
-        for acc in &all_accounts {
-            debug!(
-                "  Account '{}' (id={:?}): sync_enabled={}, shared_with_household={}",
-                acc.name.as_deref().unwrap_or("unnamed"),
-                acc.id,
-                acc.sync_enabled,
-                acc.shared_with_household
-            );
-        }
 
         // Track sync-enabled broker IDs for data sync
         let sync_enabled_broker_ids: HashSet<String> = all_accounts
@@ -166,8 +149,6 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .filter(|a| a.sync_enabled)
             .collect();
 
-        info!("Syncing {} sync-enabled broker accounts", accounts.len());
-
         let accounts_result = self
             .sync_service
             .sync_accounts(accounts)
@@ -179,15 +160,12 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             accounts_result.created, accounts_result.updated, accounts_result.skipped
         );
 
-        // Collect new accounts info before moving accounts_result
-        let new_accounts_info = accounts_result.new_accounts_info.clone();
-
         // Step 3: Sync data for all synced accounts based on their tracking mode
         // - TRANSACTIONS mode: sync activities
         // - HOLDINGS mode: sync holdings (positions)
         // - NOT_SET mode: skip (needs user configuration first)
         let (activities_result, holdings_result) = self
-            .sync_account_data(api_client, &sync_enabled_broker_ids, &new_accounts_info)
+            .sync_account_data(api_client, &sync_enabled_broker_ids)
             .await?;
 
         // Build the accounts_needing_setup list - sync-enabled accounts with trackingMode=NOT_SET
@@ -220,10 +198,11 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         };
 
         let total_failed = activities_result.accounts_failed + holdings_result.accounts_failed;
+        let total_warnings = activities_result.accounts_warned;
         let result = SyncResult {
             success: total_failed == 0,
             message: format!(
-                "Sync completed. {} accounts created, {} activities synced, {} holdings synced{}",
+                "Sync completed. {} accounts created, {} activities synced, {} holdings synced{}{}",
                 accounts_result.created,
                 activities_result.activities_upserted,
                 holdings_result.positions_upserted,
@@ -231,6 +210,15 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     ".".to_string()
                 } else {
                     format!(" ({} failed).", total_failed)
+                },
+                if total_warnings == 0 {
+                    "".to_string()
+                } else {
+                    format!(
+                        " ({} warning{}).",
+                        total_warnings,
+                        if total_warnings == 1 { "" } else { "s" }
+                    )
                 }
             ),
             connections_synced: Some(connections_result),
@@ -251,15 +239,8 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         &self,
         api_client: &dyn BrokerApiClient,
         sync_enabled_broker_ids: &HashSet<String>,
-        new_accounts_info: &[NewAccountInfo],
     ) -> Result<(SyncActivitiesResponse, SyncHoldingsResponse), String> {
         let end_date = chrono::Utc::now().date_naive();
-
-        // Build a set of newly created account IDs to skip them (they have trackingMode=NOT_SET)
-        let new_account_ids: HashSet<String> = new_accounts_info
-            .iter()
-            .map(|info| info.local_account_id.clone())
-            .collect();
 
         let synced_accounts = self
             .sync_service
@@ -283,190 +264,20 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 continue;
             }
 
-            // Skip newly created accounts - they have trackingMode=NOT_SET and need user configuration
-            if new_account_ids.contains(&account.id) {
+            let account_id = account.id.clone();
+            let account_name = account.name.clone();
+            let is_holdings_mode = account.tracking_mode == TrackingMode::Holdings;
+
+            if account.tracking_mode == TrackingMode::NotSet {
                 info!(
-                    "Skipping sync for new account '{}' (trackingMode=NOT_SET, needs user configuration)",
-                    account.name
+                    "Skipping sync for account '{}' (trackingMode=NOT_SET)",
+                    account_name
                 );
                 continue;
             }
 
-            // Check tracking mode to determine sync type
-            match account.tracking_mode {
-                TrackingMode::NotSet => {
-                    info!(
-                        "Skipping sync for account '{}' (trackingMode=NOT_SET)",
-                        account.name
-                    );
-                    continue;
-                }
-                TrackingMode::Holdings => {
-                    let account_id = account.id.clone();
-                    let account_name = account.name.clone();
-
-                    // Determine import run mode from existing sync state
-                    let import_mode = match self.sync_service.get_activity_sync_state(&account_id) {
-                        Ok(Some(state)) if state.last_successful_at.is_some() => {
-                            ImportRunMode::Incremental
-                        }
-                        Ok(_) => ImportRunMode::Initial,
-                        Err(e) => {
-                            warn!(
-                                "Failed to read sync state for '{}' before holdings sync: {}",
-                                account_name, e
-                            );
-                            ImportRunMode::Initial
-                        }
-                    };
-                    // Mark sync attempt
-                    if let Err(err) = self
-                        .sync_service
-                        .mark_activity_sync_attempt(account_id.clone())
-                        .await
-                        .map_err(|e| format!("Failed to mark holdings sync attempt: {}", e))
-                    {
-                        error!(
-                            "Failed to mark holdings sync attempt for '{}': {}",
-                            account_name, err
-                        );
-                        holdings_summary.accounts_failed += 1;
-                        continue;
-                    }
-
-                    // Create import run for holdings sync
-                    let import_run = match self
-                        .sync_service
-                        .create_import_run(&account_id, import_mode)
-                        .await
-                    {
-                        Ok(run) => {
-                            debug!(
-                                "Created holdings import run {} for account '{}'",
-                                run.id, account_name
-                            );
-                            Some(run)
-                        }
-                        Err(e) => {
-                            error!(
-                                "Failed to create holdings import run for '{}': {}",
-                                account_name, e
-                            );
-                            None
-                        }
-                    };
-                    let import_run_id = import_run.as_ref().map(|r| r.id.clone());
-
-                    // Sync holdings for HOLDINGS mode accounts
-                    match self
-                        .sync_account_holdings(
-                            api_client,
-                            &account_id,
-                            &account_name,
-                            &broker_account_id,
-                        )
-                        .await
-                    {
-                        Ok((diff, assets_created, new_asset_ids)) => {
-                            let summary = ImportRunSummary {
-                                fetched: diff.total_positions as u32,
-                                inserted: diff.added_positions as u32,
-                                updated: diff.updated_positions as u32,
-                                skipped: diff.unchanged_positions as u32,
-                                warnings: 0,
-                                errors: 0,
-                                removed: diff.removed_positions as u32,
-                                assets_created: assets_created as u32,
-                            };
-
-                            // Finalize sync success (updates brokers_sync_state table)
-                            let last_synced_date = end_date.format("%Y-%m-%d").to_string();
-                            let sync_state_failed = self
-                                .sync_service
-                                .finalize_activity_sync_success(
-                                    account_id.clone(),
-                                    last_synced_date,
-                                    import_run_id.clone(),
-                                )
-                                .await
-                                .is_err();
-
-                            if sync_state_failed {
-                                error!(
-                                    "Failed to update holdings sync state for '{}', but holdings were synced",
-                                    account_name
-                                );
-                            }
-
-                            // Always finalize import run (even if sync state update failed)
-                            if let Some(ref run_id) = import_run_id {
-                                let _ = self
-                                    .sync_service
-                                    .finalize_import_run(
-                                        run_id,
-                                        summary,
-                                        ImportRunStatus::Applied,
-                                        None,
-                                    )
-                                    .await;
-                            }
-
-                            holdings_summary.accounts_synced += 1;
-                            holdings_summary.positions_upserted +=
-                                diff.added_positions + diff.updated_positions;
-                            holdings_summary.snapshots_upserted +=
-                                if diff.snapshot_saved { 1 } else { 0 };
-                            holdings_summary.assets_inserted += assets_created;
-                            holdings_summary.new_asset_ids.extend(new_asset_ids);
-                        }
-                        Err(err) => {
-                            error!("Failed to sync holdings for '{}': {}", account_name, err);
-
-                            // Finalize sync failure
-                            let _ = self
-                                .sync_service
-                                .finalize_activity_sync_failure(
-                                    account_id.clone(),
-                                    err.clone(),
-                                    import_run_id.clone(),
-                                )
-                                .await;
-
-                            // Finalize import run as failed
-                            if let Some(ref run_id) = import_run_id {
-                                let _ = self
-                                    .sync_service
-                                    .finalize_import_run(
-                                        run_id,
-                                        ImportRunSummary::default(),
-                                        ImportRunStatus::Failed,
-                                        Some(err.clone()),
-                                    )
-                                    .await;
-                            }
-
-                            // Emit failure event
-                            self.progress_reporter.report_progress(
-                                SyncProgressPayload::new(
-                                    &account_id,
-                                    &account_name,
-                                    SyncStatus::Failed,
-                                )
-                                .with_message(err),
-                            );
-
-                            holdings_summary.accounts_failed += 1;
-                        }
-                    }
-                    continue;
-                }
-                TrackingMode::Transactions => {
-                    // Continue with activity sync below
-                }
-            }
-
-            let account_id = account.id.clone();
-            let account_name = account.name.clone();
+            // Track reference-only activity issues for HOLDINGS accounts.
+            let mut activity_warning: Option<String> = None;
 
             // Mark sync attempt
             if let Err(err) = self
@@ -479,173 +290,364 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                     "Failed to mark activity sync attempt for '{}': {}",
                     account_name, err
                 );
-                activities_summary.accounts_failed += 1;
+                if is_holdings_mode {
+                    let warning = err.to_string();
+                    self.progress_reporter.report_progress(
+                        SyncProgressPayload::new(
+                            &account_id,
+                            &account_name,
+                            SyncStatus::NeedsReview,
+                        )
+                        .with_message(format!(
+                            "Activity reference sync setup failed; continuing holdings sync: {}",
+                            warning
+                        )),
+                    );
+                    activities_summary.accounts_warned += 1;
+                    activity_warning = Some(warning);
+                } else {
+                    activities_summary.accounts_failed += 1;
+                    continue;
+                }
+            }
+
+            let mut activity_import_run_id: Option<String> = None;
+
+            if activity_warning.is_none() {
+                let query_window = match self.compute_activity_query_window(&account_id, end_date) {
+                    Ok(window) => Some(window),
+                    Err(err) => {
+                        error!(
+                            "Failed to compute activity query window for '{}': {}",
+                            account_name, err
+                        );
+                        if is_holdings_mode {
+                            self.progress_reporter.report_progress(
+                                SyncProgressPayload::new(
+                                    &account_id,
+                                    &account_name,
+                                    SyncStatus::NeedsReview,
+                                )
+                                .with_message(format!(
+                                    "Activity reference query window failed; continuing holdings sync: {}",
+                                    err
+                                )),
+                            );
+                            activities_summary.accounts_warned += 1;
+                            activity_warning = Some(err);
+                            None
+                        } else {
+                            activities_summary.accounts_failed += 1;
+                            continue;
+                        }
+                    }
+                };
+
+                if let Some((start_date, end_date_filter)) = query_window {
+                    let import_mode = if start_date.is_none() {
+                        ImportRunMode::Initial
+                    } else {
+                        ImportRunMode::Incremental
+                    };
+
+                    let import_run = match self
+                        .sync_service
+                        .create_import_run(&account_id, import_mode)
+                        .await
+                    {
+                        Ok(run) => {
+                            debug!(
+                                "Created import run {} for account '{}'",
+                                run.id, account_name
+                            );
+                            Some(run)
+                        }
+                        Err(e) => {
+                            error!("Failed to create import run for '{}': {}", account_name, e);
+                            None
+                        }
+                    };
+                    activity_import_run_id = import_run.as_ref().map(|r| r.id.clone());
+
+                    let window_label = match (&start_date, &end_date_filter) {
+                        (Some(s), Some(e)) => format!("{} -> {}", s, e),
+                        _ => "ALL".to_string(),
+                    };
+                    info!(
+                        "Syncing activities for account '{}' ({}): {}",
+                        account_name, broker_account_id, window_label
+                    );
+
+                    self.progress_reporter.report_progress(
+                        SyncProgressPayload::new(&account_id, &account_name, SyncStatus::Syncing)
+                            .with_message(format!("Starting sync: {}", window_label)),
+                    );
+
+                    match self
+                        .sync_account_activities(
+                            api_client,
+                            &account_id,
+                            &account_name,
+                            &broker_account_id,
+                            start_date.as_deref(),
+                            end_date_filter.as_deref(),
+                            activity_import_run_id.clone(),
+                        )
+                        .await
+                    {
+                        Ok((fetched, inserted, assets_created, needs_review, new_asset_ids)) => {
+                            let summary = ImportRunSummary {
+                                fetched,
+                                inserted,
+                                updated: 0,
+                                skipped: 0,
+                                warnings: needs_review,
+                                errors: 0,
+                                removed: 0,
+                                assets_created,
+                            };
+
+                            let last_synced_date = end_date.format("%Y-%m-%d").to_string();
+                            let sync_state_failed = self
+                                .sync_service
+                                .finalize_activity_sync_success(
+                                    account_id.clone(),
+                                    last_synced_date,
+                                    activity_import_run_id.clone(),
+                                )
+                                .await
+                                .is_err();
+
+                            if sync_state_failed {
+                                error!(
+                                    "Failed to update activity sync state for '{}', but activities were synced",
+                                    account_name
+                                );
+                            }
+
+                            if let Some(ref run_id) = activity_import_run_id {
+                                let status = if needs_review > 0 {
+                                    info!(
+                                        "Import run {} has {} activities needing review",
+                                        run_id, needs_review
+                                    );
+                                    ImportRunStatus::NeedsReview
+                                } else {
+                                    ImportRunStatus::Applied
+                                };
+
+                                let _ = self
+                                    .sync_service
+                                    .finalize_import_run(run_id, summary, status, None)
+                                    .await;
+                            }
+
+                            let status = if needs_review > 0 {
+                                SyncStatus::NeedsReview
+                            } else {
+                                SyncStatus::Complete
+                            };
+                            self.progress_reporter.report_progress(
+                                SyncProgressPayload::new(&account_id, &account_name, status)
+                                    .with_activities_fetched(fetched as usize)
+                                    .with_message(format!(
+                                        "Synced {} activities ({} need review)",
+                                        inserted, needs_review
+                                    )),
+                            );
+
+                            activities_summary.accounts_synced += 1;
+                            activities_summary.activities_upserted += inserted as usize;
+                            activities_summary.assets_inserted += assets_created as usize;
+                            activities_summary.new_asset_ids.extend(new_asset_ids);
+                        }
+                        Err(err) => {
+                            error!("Failed to sync activities for '{}': {}", account_name, err);
+
+                            let _ = self
+                                .sync_service
+                                .finalize_activity_sync_failure(
+                                    account_id.clone(),
+                                    err.clone(),
+                                    activity_import_run_id.clone(),
+                                )
+                                .await;
+
+                            if let Some(ref run_id) = activity_import_run_id {
+                                let summary = ImportRunSummary::default();
+                                let _ = self
+                                    .sync_service
+                                    .finalize_import_run(
+                                        run_id,
+                                        summary,
+                                        ImportRunStatus::Failed,
+                                        Some(err.clone()),
+                                    )
+                                    .await;
+                            }
+
+                            if is_holdings_mode {
+                                self.progress_reporter.report_progress(
+                                    SyncProgressPayload::new(
+                                        &account_id,
+                                        &account_name,
+                                        SyncStatus::NeedsReview,
+                                    )
+                                    .with_message(format!(
+                                        "Activity reference sync failed; continuing holdings sync: {}",
+                                        err
+                                    )),
+                                );
+                                activities_summary.accounts_warned += 1;
+                                activity_warning = Some(err);
+                            } else {
+                                self.progress_reporter.report_progress(
+                                    SyncProgressPayload::new(
+                                        &account_id,
+                                        &account_name,
+                                        SyncStatus::Failed,
+                                    )
+                                    .with_message(err.clone()),
+                                );
+                                activities_summary.accounts_failed += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !is_holdings_mode {
                 continue;
             }
 
-            // Compute query window
-            let (start_date, end_date_filter) =
-                self.compute_activity_query_window(&account_id, end_date)?;
-
-            // Determine import run mode
-            let import_mode = if start_date.is_none() {
-                ImportRunMode::Initial
-            } else {
-                ImportRunMode::Incremental
+            // Determine import run mode from existing sync state.
+            let holdings_import_mode = match self.sync_service.get_activity_sync_state(&account_id)
+            {
+                Ok(Some(state)) if state.last_successful_at.is_some() => ImportRunMode::Incremental,
+                Ok(_) => ImportRunMode::Initial,
+                Err(e) => {
+                    warn!(
+                        "Failed to read sync state for '{}' before holdings sync: {}",
+                        account_name, e
+                    );
+                    ImportRunMode::Initial
+                }
             };
 
-            // Create import run
-            let import_run = match self
+            let holdings_import_run = match self
                 .sync_service
-                .create_import_run(&account_id, import_mode)
+                .create_import_run(&account_id, holdings_import_mode)
                 .await
             {
                 Ok(run) => {
                     debug!(
-                        "Created import run {} for account '{}'",
+                        "Created holdings import run {} for account '{}'",
                         run.id, account_name
                     );
                     Some(run)
                 }
                 Err(e) => {
-                    error!("Failed to create import run for '{}': {}", account_name, e);
+                    error!(
+                        "Failed to create holdings import run for '{}': {}",
+                        account_name, e
+                    );
                     None
                 }
             };
-            let import_run_id = import_run.as_ref().map(|r| r.id.clone());
+            let holdings_import_run_id = holdings_import_run.as_ref().map(|r| r.id.clone());
 
-            let window_label = match (&start_date, &end_date_filter) {
-                (Some(s), Some(e)) => format!("{} -> {}", s, e),
-                _ => "ALL".to_string(),
-            };
-            info!(
-                "Syncing activities for account '{}' ({}): {}",
-                account_name, broker_account_id, window_label
-            );
-
-            // Emit sync start event
-            self.progress_reporter.report_progress(
-                SyncProgressPayload::new(&account_id, &account_name, SyncStatus::Syncing)
-                    .with_message(format!("Starting sync: {}", window_label)),
-            );
-
-            // Sync activities with pagination
             match self
-                .sync_account_activities(
-                    api_client,
-                    &account_id,
-                    &account_name,
-                    &broker_account_id,
-                    start_date.as_deref(),
-                    end_date_filter.as_deref(),
-                    import_run_id.clone(),
-                )
+                .sync_account_holdings(api_client, &account_id, &account_name, &broker_account_id)
                 .await
             {
-                Ok((fetched, inserted, assets_created, needs_review, new_asset_ids)) => {
-                    // Build import run summary first (needed for both success and failure paths)
+                Ok((diff, assets_created, new_asset_ids)) => {
                     let summary = ImportRunSummary {
-                        fetched,
-                        inserted,
-                        updated: 0,
-                        skipped: 0,
-                        warnings: needs_review,
+                        fetched: diff.total_positions as u32,
+                        inserted: diff.added_positions as u32,
+                        updated: diff.updated_positions as u32,
+                        skipped: diff.unchanged_positions as u32,
+                        warnings: 0,
                         errors: 0,
-                        removed: 0,
-                        assets_created,
+                        removed: diff.removed_positions as u32,
+                        assets_created: assets_created as u32,
                     };
 
-                    // Finalize sync success (updates broker_sync_state table)
-                    let last_synced_date = end_date.format("%Y-%m-%d").to_string();
-                    let sync_state_failed = self
-                        .sync_service
-                        .finalize_activity_sync_success(
-                            account_id.clone(),
-                            last_synced_date,
-                            import_run_id.clone(),
-                        )
-                        .await
-                        .is_err();
-
-                    if sync_state_failed {
-                        error!(
-                            "Failed to update sync state for '{}', but activities were synced",
-                            account_name
-                        );
-                    }
-
-                    // Always finalize import run (even if sync state update failed)
-                    if let Some(ref run_id) = import_run_id {
-                        let status = if needs_review > 0 {
-                            info!(
-                                "Import run {} has {} activities needing review",
-                                run_id, needs_review
-                            );
-                            ImportRunStatus::NeedsReview
-                        } else {
-                            ImportRunStatus::Applied
-                        };
-
+                    if let Some(ref run_id) = holdings_import_run_id {
                         let _ = self
                             .sync_service
-                            .finalize_import_run(run_id, summary, status, None)
+                            .finalize_import_run(run_id, summary, ImportRunStatus::Applied, None)
                             .await;
                     }
 
-                    // Emit completion event
-                    let status = if needs_review > 0 {
-                        SyncStatus::NeedsReview
-                    } else {
-                        SyncStatus::Complete
-                    };
-                    self.progress_reporter.report_progress(
-                        SyncProgressPayload::new(&account_id, &account_name, status)
-                            .with_activities_fetched(fetched as usize)
-                            .with_message(format!(
-                                "Synced {} activities ({} need review)",
-                                inserted, needs_review
-                            )),
-                    );
+                    holdings_summary.accounts_synced += 1;
+                    holdings_summary.positions_upserted +=
+                        diff.added_positions + diff.updated_positions;
+                    holdings_summary.snapshots_upserted += if diff.snapshot_saved { 1 } else { 0 };
+                    holdings_summary.assets_inserted += assets_created;
+                    holdings_summary.new_asset_ids.extend(new_asset_ids);
 
-                    activities_summary.accounts_synced += 1;
-                    activities_summary.activities_upserted += inserted as usize;
-                    activities_summary.assets_inserted += assets_created as usize;
-                    activities_summary.new_asset_ids.extend(new_asset_ids);
+                    if let Some(warning) = activity_warning {
+                        let warning_message = format!(
+                            "Holdings synced, but activity reference sync needs review: {}",
+                            warning
+                        );
+                        if let Err(e) = self
+                            .sync_service
+                            .finalize_activity_sync_needs_review(
+                                account_id.clone(),
+                                warning_message.clone(),
+                                activity_import_run_id.clone(),
+                            )
+                            .await
+                        {
+                            error!(
+                                "Failed to mark activity sync state as needs review for '{}': {}",
+                                account_name, e
+                            );
+                        }
+
+                        self.progress_reporter.report_progress(
+                            SyncProgressPayload::new(
+                                &account_id,
+                                &account_name,
+                                SyncStatus::NeedsReview,
+                            )
+                            .with_message(warning_message),
+                        );
+                    }
                 }
                 Err(err) => {
-                    error!("Failed to sync activities for '{}': {}", account_name, err);
+                    error!("Failed to sync holdings for '{}': {}", account_name, err);
 
-                    // Finalize sync failure
-                    let _ = self
-                        .sync_service
-                        .finalize_activity_sync_failure(
-                            account_id.clone(),
-                            err.clone(),
-                            import_run_id.clone(),
-                        )
-                        .await;
-
-                    // Finalize import run as failed
-                    if let Some(ref run_id) = import_run_id {
-                        let summary = ImportRunSummary::default();
+                    if let Some(ref run_id) = holdings_import_run_id {
                         let _ = self
                             .sync_service
                             .finalize_import_run(
                                 run_id,
-                                summary,
+                                ImportRunSummary::default(),
                                 ImportRunStatus::Failed,
                                 Some(err.clone()),
                             )
                             .await;
                     }
 
-                    // Emit failure event
+                    // Holdings is the valuation source for HOLDINGS mode, so this is a hard failure.
+                    let _ = self
+                        .sync_service
+                        .finalize_activity_sync_failure(
+                            account_id.clone(),
+                            format!("Holdings sync failed: {}", err),
+                            holdings_import_run_id.clone(),
+                        )
+                        .await;
+
                     self.progress_reporter.report_progress(
                         SyncProgressPayload::new(&account_id, &account_name, SyncStatus::Failed)
-                            .with_message(err.clone()),
+                            .with_message(err),
                     );
 
-                    activities_summary.accounts_failed += 1;
+                    holdings_summary.accounts_failed += 1;
                 }
             }
         }
@@ -682,11 +684,16 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             .map_err(|e| e.to_string())?;
 
         let positions_count = holdings.positions.as_ref().map(|p| p.len()).unwrap_or(0);
+        let option_positions_count = holdings
+            .option_positions
+            .as_ref()
+            .map(|p| p.len())
+            .unwrap_or(0);
         let balances_count = holdings.balances.as_ref().map(|b| b.len()).unwrap_or(0);
 
         info!(
-            "Fetched {} positions and {} balances for '{}'",
-            positions_count, balances_count, account_name
+            "Fetched {} positions, {} option positions, and {} balances for '{}'",
+            positions_count, option_positions_count, balances_count, account_name
         );
 
         // Save holdings as a snapshot
@@ -696,6 +703,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
                 account_id.to_string(),
                 holdings.balances.unwrap_or_default(),
                 holdings.positions.unwrap_or_default(),
+                holdings.option_positions.unwrap_or_default(),
             )
             .await
             .map_err(|e| format!("Failed to save broker holdings: {}", e))?;

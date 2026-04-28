@@ -1,24 +1,16 @@
 // Web adapter - Sync Crypto Commands
 // These call the REST API endpoints for E2EE cryptographic operations.
 
-import { getAuthToken } from "@/lib/auth-token";
 import type { EphemeralKeyPair } from "../types";
 import { API_PREFIX } from "./core";
 
 // Helper to make authenticated POST requests to crypto endpoints
 async function cryptoPost<T>(endpoint: string, body?: Record<string, unknown>): Promise<T> {
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  };
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const res = await fetch(`${API_PREFIX}/sync/crypto/${endpoint}`, {
     method: "POST",
-    headers,
+    headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
   });
 
   if (!res.ok) {
@@ -93,6 +85,11 @@ export const syncGeneratePairingCode = async (): Promise<string> => {
 
 export const syncHashPairingCode = async (code: string): Promise<string> => {
   const response = await cryptoPost<StringResponse>("hash-pairing-code", { code });
+  return response.value;
+};
+
+export const syncHmacSha256 = async (key: string, data: string): Promise<string> => {
+  const response = await cryptoPost<StringResponse>("hmac-sha256", { key, data });
   return response.value;
 };
 

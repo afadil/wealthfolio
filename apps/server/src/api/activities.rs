@@ -8,9 +8,10 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::activities::{
-    Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
-    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportMappingData, NewActivity,
-    ParseConfig, ParsedCsvResult,
+    import_type, Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
+    ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportAssetCandidate,
+    ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, NewActivity, ParseConfig,
+    ParsedCsvResult,
 };
 
 use super::shared::parse_date_optional;
@@ -48,6 +49,8 @@ struct ActivitySearchBody {
     date_from: Option<String>, // YYYY-MM-DD format
     #[serde(rename = "dateTo")]
     date_to: Option<String>, // YYYY-MM-DD format
+    #[serde(rename = "instrumentTypeFilter")]
+    instrument_type_filter: Option<StringOrVec>,
 }
 
 async fn search_activities(
@@ -70,6 +73,11 @@ async fn search_activities(
         Some(StringOrVec::Many(v)) => Some(v),
         None => None,
     };
+    let instrument_types: Option<Vec<String>> = match body.instrument_type_filter {
+        Some(StringOrVec::One(s)) => Some(vec![s]),
+        Some(StringOrVec::Many(v)) => Some(v),
+        None => None,
+    };
     // Parse date filters
     let date_from_parsed = parse_date_optional(body.date_from, "dateFrom")?;
     let date_to_parsed = parse_date_optional(body.date_to, "dateTo")?;
@@ -84,6 +92,7 @@ async fn search_activities(
         body.needs_review_filter,
         date_from_parsed,
         date_to_parsed,
+        instrument_types,
     )?;
     Ok(Json(resp))
 }
@@ -129,9 +138,38 @@ async fn delete_activity(
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LinkTransferActivitiesBody {
+    activity_a_id: String,
+    activity_b_id: String,
+}
+
+async fn link_transfer_activities(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkTransferActivitiesBody>,
+) -> ApiResult<Json<(Activity, Activity)>> {
+    let pair = state
+        .activity_service
+        .link_transfer_activities(body.activity_a_id, body.activity_b_id)
+        .await?;
+    // Domain events handle portfolio recalculation
+    Ok(Json(pair))
+}
+
+async fn unlink_transfer_activities(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkTransferActivitiesBody>,
+) -> ApiResult<Json<(Activity, Activity)>> {
+    let pair = state
+        .activity_service
+        .unlink_transfer_activities(body.activity_a_id, body.activity_b_id)
+        .await?;
+    // Domain events handle portfolio recalculation
+    Ok(Json(pair))
+}
+
+#[derive(serde::Deserialize)]
 struct ImportCheckBody {
-    #[serde(rename = "accountId")]
-    account_id: String,
     activities: Vec<ActivityImport>,
 }
 
@@ -141,15 +179,13 @@ async fn check_activities_import(
 ) -> ApiResult<Json<Vec<ActivityImport>>> {
     let res = state
         .activity_service
-        .check_activities_import(body.account_id, body.activities)
+        .check_activities_import(body.activities)
         .await?;
     Ok(Json(res))
 }
 
 #[derive(serde::Deserialize)]
 struct ImportBody {
-    #[serde(rename = "accountId")]
-    account_id: String,
     activities: Vec<ActivityImport>,
 }
 
@@ -159,9 +195,25 @@ async fn import_activities(
 ) -> ApiResult<Json<ImportActivitiesResult>> {
     let result = state
         .activity_service
-        .import_activities(body.account_id, body.activities)
+        .import_activities(body.activities)
         .await?;
     // Domain events handle asset enrichment and portfolio recalculation
+    Ok(Json(result))
+}
+
+#[derive(serde::Deserialize)]
+struct AssetPreviewBody {
+    candidates: Vec<ImportAssetCandidate>,
+}
+
+async fn preview_import_assets(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<AssetPreviewBody>,
+) -> ApiResult<Json<Vec<ImportAssetPreviewItem>>> {
+    let result = state
+        .activity_service
+        .preview_import_assets(body.candidates)
+        .await?;
     Ok(Json(result))
 }
 
@@ -169,13 +221,21 @@ async fn import_activities(
 struct MappingQuery {
     #[serde(rename = "accountId")]
     account_id: String,
+    #[serde(rename = "contextKind", default = "default_activity_context_kind")]
+    context_kind: String,
+}
+
+fn default_activity_context_kind() -> String {
+    import_type::ACTIVITY.to_string()
 }
 
 async fn get_account_import_mapping(
     State(state): State<Arc<AppState>>,
     Query(q): Query<MappingQuery>,
 ) -> ApiResult<Json<ImportMappingData>> {
-    let res = state.activity_service.get_import_mapping(q.account_id)?;
+    let res = state
+        .activity_service
+        .get_import_mapping(q.account_id, q.context_kind)?;
     Ok(Json(res))
 }
 
@@ -193,6 +253,69 @@ async fn save_account_import_mapping(
         .save_import_mapping(body.mapping)
         .await?;
     Ok(Json(res))
+}
+
+async fn list_import_templates(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<ImportTemplateData>>> {
+    Ok(Json(state.activity_service.list_import_templates()?))
+}
+
+#[derive(serde::Deserialize)]
+struct ImportTemplateQuery {
+    id: String,
+}
+
+async fn get_import_template(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ImportTemplateQuery>,
+) -> ApiResult<Json<ImportTemplateData>> {
+    Ok(Json(state.activity_service.get_import_template(q.id)?))
+}
+
+#[derive(serde::Deserialize)]
+struct SaveImportTemplateBody {
+    template: ImportTemplateData,
+}
+
+async fn save_import_template(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<SaveImportTemplateBody>,
+) -> ApiResult<Json<ImportTemplateData>> {
+    let result = state
+        .activity_service
+        .save_import_template(body.template)
+        .await?;
+    Ok(Json(result))
+}
+
+async fn delete_import_template(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<ImportTemplateQuery>,
+) -> ApiResult<Json<serde_json::Value>> {
+    state.activity_service.delete_import_template(q.id).await?;
+    Ok(Json(serde_json::json!({ "success": true })))
+}
+
+#[derive(serde::Deserialize)]
+struct LinkAccountTemplateBody {
+    #[serde(rename = "accountId")]
+    account_id: String,
+    #[serde(rename = "templateId")]
+    template_id: String,
+    #[serde(rename = "contextKind", default = "default_activity_context_kind")]
+    context_kind: String,
+}
+
+async fn link_account_template(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<LinkAccountTemplateBody>,
+) -> ApiResult<Json<serde_json::Value>> {
+    state
+        .activity_service
+        .link_account_template(body.account_id, body.template_id, body.context_kind)
+        .await?;
+    Ok(Json(serde_json::json!({ "success": true })))
 }
 
 #[derive(serde::Deserialize)]
@@ -268,12 +391,32 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/activities", post(create_activity).put(update_activity))
         .route("/activities/bulk", post(save_activities))
         .route("/activities/{id}", delete(delete_activity))
+        .route("/activities/link", post(link_transfer_activities))
+        .route("/activities/unlink", post(unlink_transfer_activities))
         .route("/activities/import/check", post(check_activities_import))
+        .route(
+            "/activities/import/assets/preview",
+            post(preview_import_assets),
+        )
         .route("/activities/import", post(import_activities))
         .route("/activities/import/parse", post(parse_csv_endpoint))
         .route(
             "/activities/import/mapping",
             get(get_account_import_mapping).post(save_account_import_mapping),
+        )
+        .route(
+            "/activities/import/templates",
+            get(list_import_templates)
+                .post(save_import_template)
+                .delete(delete_import_template),
+        )
+        .route(
+            "/activities/import/templates/item",
+            get(get_import_template),
+        )
+        .route(
+            "/activities/import/templates/link",
+            post(link_account_template),
         )
         .route(
             "/activities/import/check-duplicates",

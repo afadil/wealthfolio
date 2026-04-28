@@ -10,17 +10,34 @@ import { importActivitySchema } from "@/lib/schemas";
 import { tryParseDate } from "@/lib/utils";
 import { logger } from "@/adapters";
 import { SUBTYPES_BY_ACTIVITY_TYPE, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import { looksLikeOccSymbol, normalizeOptionSymbol } from "@/lib/occ-symbol";
+import { looksLikeIsin } from "@/lib/isin";
+import { findMappedActivityType } from "./activity-type-mapping";
+import { normalizeInstrumentType, splitInstrumentPrefixedSymbol } from "./instrument-type";
 
 // Ticker symbol validation regex
-const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,10}([.-][A-Z0-9]+){0,2})$/;
+const tickerRegex = /^(CASH:[A-Z]{3}|[A-Z0-9]{1,21}([.-][A-Z0-9]+){0,2})$/;
+
+// CUSIP: 9 alphanumeric chars ending in a digit
+const cusipRegex = /^[A-Z0-9]{8}\d$/;
 
 // Helper to validate ticker symbol format
 export function validateTickerSymbol(symbol: string): boolean {
-  return tickerRegex.test(symbol.trim());
+  const { symbol: strippedSymbol } = splitInstrumentPrefixedSymbol(symbol);
+  const s = (strippedSymbol || "").trim();
+  const upper = s.toUpperCase();
+  if (!s) return false;
+  return (
+    tickerRegex.test(upper) ||
+    looksLikeOccSymbol(s) ||
+    normalizeOptionSymbol(s) !== null ||
+    looksLikeIsin(s) ||
+    cusipRegex.test(upper)
+  );
 }
 
 // Re-export shared activity type mapping utilities
-export { ACTIVITY_TYPE_SMART_DEFAULTS, findMappedActivityType } from "./activity-type-mapping";
+export { findMappedActivityType };
 
 // Build reverse lookup from display names to subtype codes
 const DISPLAY_NAME_TO_SUBTYPE: Record<string, string> = {};
@@ -397,10 +414,18 @@ function transformRowToActivity(
 ): Partial<ActivityImport> {
   const activity: Partial<ActivityImport> = { accountId, isDraft: true, isValid: false };
 
-  // Helper to get mapped value
+  // Helper to get mapped value (supports fallback column arrays)
   const getMappedValue = (field: ImportFormat): string | undefined => {
     const headerName = mapping.fieldMappings[field];
     if (!headerName) return undefined;
+    if (Array.isArray(headerName)) {
+      for (const h of headerName) {
+        const value = row[h];
+        const trimmed = typeof value === "string" ? value.trim() : undefined;
+        if (trimmed) return trimmed;
+      }
+      return undefined;
+    }
     const value = row[headerName];
     return typeof value === "string" ? value.trim() : undefined;
   };
@@ -416,6 +441,8 @@ function transformRowToActivity(
   const rawDate = getMappedValue(ImportFormat.DATE);
   activity.date = rawDate ? tryParseDate(rawDate)?.toISOString() : undefined;
   activity.symbol = getMappedValue(ImportFormat.SYMBOL);
+  const rawInstrumentType = getMappedValue(ImportFormat.INSTRUMENT_TYPE);
+  activity.instrumentType = normalizeInstrumentType(rawInstrumentType);
   const csvActivityType = getMappedValue(ImportFormat.ACTIVITY_TYPE);
   // Store raw parsed values temporarily before applying logic
   // Use absolute values for numeric fields to handle brokers that use negative values for direction
@@ -445,15 +472,15 @@ function transformRowToActivity(
     activity.symbol = mapping.symbolMappings[activity.symbol];
   }
 
+  // Support typed symbol format (e.g. bond:US037833DU14)
+  const symbolWithType = splitInstrumentPrefixedSymbol(activity.symbol);
+  activity.symbol = symbolWithType.symbol;
+  activity.instrumentType = activity.instrumentType || symbolWithType.instrumentType;
+
   // 2. Determine Activity Type
   if (csvActivityType) {
-    const trimmedCsvType = csvActivityType.trim().toUpperCase();
-    for (const [appType, csvTypes] of Object.entries(mapping.activityMappings)) {
-      if (csvTypes?.some((ct) => trimmedCsvType.startsWith(ct.trim().toUpperCase()))) {
-        activity.activityType = appType as ActivityType;
-        break;
-      }
-    }
+    activity.activityType =
+      findMappedActivityType(csvActivityType, mapping.activityMappings) ?? activity.activityType;
   }
 
   // Validate subtype against allowed subtypes for the determined activity type
@@ -470,6 +497,22 @@ function transformRowToActivity(
   activity.symbol = logic.calculateSymbol(currentActivityState, accountCurrency);
   activity.amount = logic.calculateAmount(currentActivityState);
   activity.fee = logic.calculateFee(currentActivityState);
+
+  // For BUY/SELL: if CSV amount significantly disagrees with qty*price,
+  // trust CSV amount and derive unitPrice (handles bond % of par, etc.)
+  if (
+    (activity.activityType === ActivityType.BUY || activity.activityType === ActivityType.SELL) &&
+    activity.amount !== undefined &&
+    activity.amount > 0
+  ) {
+    const csvAmount = toNum(currentActivityState.amount);
+    if (csvAmount && csvAmount > 0 && activity.amount / csvAmount > 1.02) {
+      activity.amount = csvAmount;
+      if (activity.quantity && activity.quantity > 0) {
+        activity.unitPrice = csvAmount / activity.quantity;
+      }
+    }
+  }
 
   // 4. Final Cleanup & Defaulting
   // Handle NaN values resulting from calculations or initial parsing

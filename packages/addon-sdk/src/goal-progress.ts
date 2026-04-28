@@ -1,5 +1,13 @@
 import type { Goal, GoalAllocation, AccountValuation, GoalProgress } from './data-types';
 
+function isParticipatingGoal(goal: Goal): boolean {
+  if (goal.statusLifecycle) {
+    return goal.statusLifecycle === 'active';
+  }
+
+  return true;
+}
+
 /**
  * Calculate goal progress using allocations.
  * Converts account values to base currency, applies percent allocation per account,
@@ -30,14 +38,16 @@ export function calculateGoalProgress(
     allocationsByGoal.set(alloc.goalId, [...existing, alloc]);
   });
 
-  const sortedGoals = [...goals].sort((a, b) => a.targetAmount - b.targetAmount);
+  const sortedGoals = [...goals]
+    .filter(isParticipatingGoal)
+    .sort((a, b) => a.targetAmount - b.targetAmount);
 
   return sortedGoals.map((goal) => {
     const goalAllocations = allocationsByGoal.get(goal.id) ?? [];
 
     const totalAllocatedValue = goalAllocations.reduce((total, allocation) => {
       const accountValueInBase = accountValueMap.get(allocation.accountId) ?? 0;
-      return total + (accountValueInBase * allocation.percentAllocation) / 100;
+      return total + (accountValueInBase * allocation.sharePercent) / 100;
     }, 0);
 
     const progress = goal.targetAmount > 0 ? totalAllocatedValue / goal.targetAmount : 0;

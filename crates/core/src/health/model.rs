@@ -70,6 +70,8 @@ pub enum HealthCategory {
     DataConsistency,
     /// Issues related to account configuration (tracking mode, etc.)
     AccountConfiguration,
+    /// Issues related to application settings configuration (timezone, locale, etc.)
+    SettingsConfiguration,
 }
 
 impl HealthCategory {
@@ -81,6 +83,7 @@ impl HealthCategory {
             HealthCategory::Classification => "CLASSIFICATION",
             HealthCategory::DataConsistency => "DATA_CONSISTENCY",
             HealthCategory::AccountConfiguration => "ACCOUNT_CONFIGURATION",
+            HealthCategory::SettingsConfiguration => "SETTINGS_CONFIGURATION",
         }
     }
 
@@ -92,6 +95,7 @@ impl HealthCategory {
             HealthCategory::Classification => "Classifications",
             HealthCategory::DataConsistency => "Data Consistency",
             HealthCategory::AccountConfiguration => "Account Setup",
+            HealthCategory::SettingsConfiguration => "Settings",
         }
     }
 }
@@ -321,6 +325,15 @@ impl NavigateAction {
             route: "/settings/market-data".to_string(),
             query: None,
             label: "View Market Data".to_string(),
+        }
+    }
+
+    /// Creates a navigate action to the general settings page.
+    pub fn to_general_settings() -> Self {
+        Self {
+            route: "/settings/general".to_string(),
+            query: None,
+            label: "Open General Settings".to_string(),
         }
     }
 

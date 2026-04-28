@@ -2,6 +2,7 @@
 //!
 //! This module provides market data from Alpha Vantage API:
 //! - Equities via TIME_SERIES_DAILY endpoint
+//! - Options via REALTIME_OPTIONS endpoint (premium)
 //! - FX rates via FX_DAILY endpoint
 //! - Cryptocurrencies via DIGITAL_CURRENCY_DAILY endpoint
 //!
@@ -21,7 +22,8 @@ use std::time::Duration;
 
 use crate::errors::MarketDataError;
 use crate::models::{
-    AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
+    AssetProfile, Coverage, InstrumentId, InstrumentKind, ProviderInstrument, Quote, QuoteContext,
+    SearchResult,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 use crate::resolver::ResolverChain;
@@ -176,6 +178,38 @@ impl CryptoDailyQuote {
         }
         None
     }
+}
+
+/// REALTIME_OPTIONS response for option chain/contract quotes (premium endpoint).
+#[derive(Debug, Deserialize)]
+struct OptionsResponse {
+    data: Option<Vec<OptionContract>>,
+    #[serde(rename = "Error Message")]
+    error_message: Option<String>,
+    #[serde(rename = "Note")]
+    note: Option<String>,
+    #[serde(rename = "Information")]
+    information: Option<String>,
+}
+
+/// A single option contract from the REALTIME_OPTIONS response.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct OptionContract {
+    #[serde(rename = "contractID")]
+    contract_id: Option<String>,
+    symbol: Option<String>,
+    expiration: Option<String>,
+    strike: Option<String>,
+    #[serde(rename = "type")]
+    option_type: Option<String>,
+    last: Option<String>,
+    mark: Option<String>,
+    bid: Option<String>,
+    ask: Option<String>,
+    volume: Option<String>,
+    open_interest: Option<String>,
+    date: Option<String>,
 }
 
 /// SYMBOL_SEARCH response for symbol lookup
@@ -387,6 +421,7 @@ impl EtfProfileResponse {
                 .and_then(|s| Self::parse_weight(s)),
             week_52_high: None,
             week_52_low: None,
+            isin: None,
         }
     }
 }
@@ -439,6 +474,7 @@ impl CompanyOverviewResponse {
             dividend_yield: Self::parse_f64(&self.dividend_yield),
             week_52_high: Self::parse_f64(&self.week_52_high),
             week_52_low: Self::parse_f64(&self.week_52_low),
+            isin: None,
         }
     }
 }
@@ -631,7 +667,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} equity quotes for {}",
@@ -640,6 +676,87 @@ impl AlphaVantageProvider {
         );
 
         Ok(quotes)
+    }
+
+    /// Extract the underlying ticker from an OCC symbol (chars before the date portion).
+    fn extract_underlying_from_occ(occ_symbol: &str) -> String {
+        // OCC format: UNDERLYING + YYMMDD + C/P + STRIKE(8) = 15 non-underlying chars
+        let s = occ_symbol.trim();
+        let underlying_len = s.len().saturating_sub(15);
+        if underlying_len == 0 {
+            s.to_string()
+        } else {
+            s[..underlying_len].trim().to_string()
+        }
+    }
+
+    /// Fetch a single option contract quote using REALTIME_OPTIONS endpoint.
+    ///
+    /// Uses `symbol` (underlying) + `contract` (OCC symbol) to get a specific contract.
+    async fn fetch_option_quote(&self, occ_symbol: &str) -> Result<Quote, MarketDataError> {
+        let underlying = Self::extract_underlying_from_occ(occ_symbol);
+
+        let params = [
+            ("function", "REALTIME_OPTIONS"),
+            ("symbol", &underlying),
+            ("contract", occ_symbol),
+        ];
+
+        let text = self.fetch(&params).await?;
+        let response: OptionsResponse =
+            serde_json::from_str(&text).map_err(|e| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("Failed to parse options response: {}", e),
+            })?;
+
+        Self::check_api_error(
+            &response.error_message,
+            &response.note,
+            &response.information,
+        )?;
+
+        let contracts = response.data.ok_or_else(|| {
+            MarketDataError::SymbolNotFound(format!("No options data for: {}", occ_symbol))
+        })?;
+
+        let contract = contracts.into_iter().next().ok_or_else(|| {
+            MarketDataError::SymbolNotFound(format!("Contract not found: {}", occ_symbol))
+        })?;
+
+        // Use `last` traded price; fall back to `mark` (mid of bid/ask)
+        let close = contract
+            .last
+            .as_deref()
+            .and_then(Self::parse_decimal)
+            .or_else(|| contract.mark.as_deref().and_then(Self::parse_decimal))
+            .ok_or_else(|| MarketDataError::ProviderError {
+                provider: PROVIDER_ID.to_string(),
+                message: format!("No price data for contract: {}", occ_symbol),
+            })?;
+
+        let volume = contract.volume.as_deref().and_then(Self::parse_decimal);
+
+        let timestamp = contract
+            .date
+            .as_deref()
+            .and_then(Self::parse_date)
+            .unwrap_or_else(Utc::now);
+
+        debug!(
+            "Alpha Vantage: fetched option quote for {} — close={}",
+            occ_symbol, close
+        );
+
+        Ok(Quote {
+            timestamp,
+            open: None,
+            high: None,
+            low: None,
+            close,
+            volume,
+            currency: "USD".to_string(), // US options are always USD
+            source: PROVIDER_ID.to_string(),
+        })
     }
 
     /// Fetch FX quotes using FX_DAILY endpoint.
@@ -691,7 +808,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} FX quotes for {}/{}",
@@ -752,7 +869,7 @@ impl AlphaVantageProvider {
             .collect();
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Alpha Vantage: fetched {} crypto quotes for {}/{}",
@@ -921,6 +1038,7 @@ impl MarketDataProvider for AlphaVantageProvider {
                 InstrumentKind::Equity,
                 InstrumentKind::Crypto,
                 InstrumentKind::Fx,
+                InstrumentKind::Option,
             ],
             // Use best_effort to accept instruments without MIC codes
             coverage: Coverage::global_best_effort(),
@@ -944,6 +1062,15 @@ impl MarketDataProvider for AlphaVantageProvider {
         context: &QuoteContext,
         instrument: ProviderInstrument,
     ) -> Result<Quote, MarketDataError> {
+        // Options are routed as EquitySymbol by the resolver but need the
+        // REALTIME_OPTIONS endpoint. Use the QuoteContext instrument kind
+        // to detect options reliably (no heuristic needed).
+        if matches!(context.instrument, InstrumentId::Option { .. }) {
+            if let ProviderInstrument::EquitySymbol { ref symbol } = instrument {
+                return self.fetch_option_quote(symbol).await;
+            }
+        }
+
         // Fetch historical quotes and return the most recent one
         let quotes = match instrument {
             ProviderInstrument::EquitySymbol { ref symbol } => {
@@ -984,6 +1111,11 @@ impl MarketDataProvider for AlphaVantageProvider {
                     "Alpha Vantage does not support metals".to_string(),
                 ));
             }
+            ProviderInstrument::BondIsin { .. } => {
+                return Err(MarketDataError::UnsupportedAssetType(
+                    "Alpha Vantage does not support bonds".to_string(),
+                ));
+            }
         };
 
         // Return the most recent quote
@@ -1000,6 +1132,15 @@ impl MarketDataProvider for AlphaVantageProvider {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>, MarketDataError> {
+        // HISTORICAL_OPTIONS requires per-day API calls — not practical with rate limits.
+        // Use NotSupported so the registry falls through to the next provider (e.g. Yahoo).
+        if matches!(context.instrument, InstrumentId::Option { .. }) {
+            return Err(MarketDataError::NotSupported {
+                operation: "historical_quotes".to_string(),
+                provider: PROVIDER_ID.to_string(),
+            });
+        }
+
         let quotes = match instrument {
             ProviderInstrument::EquitySymbol { ref symbol } => {
                 let currency = self.resolve_currency(context);
@@ -1037,6 +1178,11 @@ impl MarketDataProvider for AlphaVantageProvider {
             ProviderInstrument::MetalSymbol { .. } => {
                 return Err(MarketDataError::UnsupportedAssetType(
                     "Alpha Vantage does not support metals".to_string(),
+                ));
+            }
+            ProviderInstrument::BondIsin { .. } => {
+                return Err(MarketDataError::UnsupportedAssetType(
+                    "Alpha Vantage does not support bonds".to_string(),
                 ));
             }
         };
@@ -1112,6 +1258,8 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 
@@ -1160,6 +1308,7 @@ mod tests {
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Equity));
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Crypto));
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Fx));
+        assert!(caps.instrument_kinds.contains(&InstrumentKind::Option));
         assert!(caps.supports_latest);
         assert!(caps.supports_historical);
         assert!(caps.supports_search); // Via SYMBOL_SEARCH endpoint
@@ -1440,5 +1589,58 @@ mod tests {
         let json = r#"{"bestMatches": []}"#;
         let response: SymbolSearchResponse = serde_json::from_str(json).unwrap();
         assert!(response.best_matches.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_extract_underlying_from_occ() {
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("AAPL250321C00150000"),
+            "AAPL"
+        );
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("IBM270115P00390000"),
+            "IBM"
+        );
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("GOOGL250620C01500000"),
+            "GOOGL"
+        );
+        // Edge case: 1-char underlying
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("X250321C00050000"),
+            "X"
+        );
+        // Space-padded OCC symbol — underlying should be trimmed
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("TSLA  250321C00250000"),
+            "TSLA"
+        );
+    }
+
+    #[test]
+    fn test_options_response_parsing() {
+        let json = r#"{
+            "data": [{
+                "contractID": "IBM270115C00390000",
+                "symbol": "IBM",
+                "expiration": "2027-01-15",
+                "strike": "390.00",
+                "type": "call",
+                "last": "25.50",
+                "mark": "25.75",
+                "bid": "25.40",
+                "ask": "26.10",
+                "volume": "1500",
+                "open_interest": "5000",
+                "date": "2025-03-07"
+            }]
+        }"#;
+        let response: OptionsResponse = serde_json::from_str(json).unwrap();
+        assert!(response.error_message.is_none());
+        let data = response.data.unwrap();
+        assert_eq!(data.len(), 1);
+        assert_eq!(data[0].last.as_deref(), Some("25.50"));
+        assert_eq!(data[0].mark.as_deref(), Some("25.75"));
+        assert_eq!(data[0].volume.as_deref(), Some("1500"));
     }
 }

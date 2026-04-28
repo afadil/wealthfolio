@@ -28,7 +28,8 @@ use super::alternative_assets_traits::{
 use super::{AssetKind, AssetRepositoryTrait, NewAsset, QuoteMode};
 use crate::errors::{Error, Result, ValidationError};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
-use crate::quotes::{DataSource, Quote, QuoteServiceTrait};
+use crate::quotes::constants::DATA_SOURCE_MANUAL;
+use crate::quotes::{Quote, QuoteServiceTrait};
 
 /// Service for managing alternative assets.
 ///
@@ -259,7 +260,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                 adjclose: purchase_price,
                 volume: Decimal::ZERO,
                 currency: request.currency.clone(),
-                data_source: DataSource::Manual,
+                data_source: DATA_SOURCE_MANUAL.to_string(),
                 created_at: Utc::now(),
                 notes: None,
             };
@@ -283,7 +284,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             adjclose: request.current_value,
             volume: Decimal::ZERO,
             currency: request.currency.clone(),
-            data_source: DataSource::Manual,
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: None,
         };
@@ -333,7 +334,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             adjclose: request.value,
             volume: Decimal::ZERO,
             currency,
-            data_source: DataSource::Manual,
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: request.notes.clone(),
         };
@@ -539,7 +540,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
                     adjclose: purchase_price,
                     volume: Decimal::ZERO,
                     currency: asset.quote_ccy.clone(),
-                    data_source: DataSource::Manual,
+                    data_source: DATA_SOURCE_MANUAL.to_string(),
                     created_at: Utc::now(),
                     notes: None,
                 };

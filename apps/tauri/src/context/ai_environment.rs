@@ -8,9 +8,10 @@ use std::sync::{Arc, RwLock};
 use wealthfolio_ai::{AiEnvironment, ChatRepositoryTrait};
 use wealthfolio_core::{
     accounts::AccountServiceTrait, activities::ActivityServiceTrait,
-    allocation::AllocationServiceTrait, goals::GoalServiceTrait, holdings::HoldingsServiceTrait,
-    income::IncomeServiceTrait, performance::PerformanceServiceTrait, quotes::QuoteServiceTrait,
-    secrets::SecretStore, settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
+    allocation::AllocationServiceTrait, goals::GoalServiceTrait, health::HealthServiceTrait,
+    holdings::HoldingsServiceTrait, income::IncomeServiceTrait,
+    performance::PerformanceServiceTrait, quotes::QuoteServiceTrait, secrets::SecretStore,
+    settings::SettingsServiceTrait, valuation::ValuationServiceTrait,
 };
 
 /// Tauri-side implementation of AiEnvironment.
@@ -31,6 +32,7 @@ pub struct TauriAiEnvironment {
     allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
     performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
     income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
+    health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
 }
 
 impl TauriAiEnvironment {
@@ -50,6 +52,7 @@ impl TauriAiEnvironment {
         allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
         performance_service: Arc<dyn PerformanceServiceTrait + Send + Sync>,
         income_service: Arc<dyn IncomeServiceTrait + Send + Sync>,
+        health_service: Arc<dyn HealthServiceTrait + Send + Sync>,
     ) -> Self {
         Self {
             base_currency,
@@ -65,6 +68,7 @@ impl TauriAiEnvironment {
             allocation_service,
             performance_service,
             income_service,
+            health_service,
         }
     }
 }
@@ -120,5 +124,9 @@ impl AiEnvironment for TauriAiEnvironment {
 
     fn income_service(&self) -> Arc<dyn IncomeServiceTrait> {
         self.income_service.clone()
+    }
+
+    fn health_service(&self) -> Arc<dyn HealthServiceTrait> {
+        self.health_service.clone()
     }
 }

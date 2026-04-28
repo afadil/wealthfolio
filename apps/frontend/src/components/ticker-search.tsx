@@ -3,7 +3,6 @@ import { getExchangeDisplayName } from "@/lib/constants";
 import { SymbolSearchResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { Badge } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -48,6 +47,8 @@ interface SearchProps {
   quoteInfo?: QuoteInfo;
   /** Called when the user clears the selection */
   onClear?: () => void;
+  /** Hide the "Create custom (manual)" option in search results */
+  hideCustomCreate?: boolean;
   /** Test ID for e2e testing */
   "data-testid"?: string;
 }
@@ -60,6 +61,7 @@ interface SearchResultsProps {
   selectedResult: SearchProps["selectedResult"];
   onSelect: (symbol: SymbolSearchResult) => void;
   onCreateCustomAsset: () => void;
+  hideCustomCreate?: boolean;
 }
 
 function getSearchResultKey(result: SymbolSearchResult) {
@@ -68,6 +70,7 @@ function getSearchResultKey(result: SymbolSearchResult) {
     result.symbol,
     result.exchangeMic ?? result.exchange,
     result.currency,
+    result.longName ?? result.shortName,
     result.index,
   ].filter(Boolean);
   return parts.join("|");
@@ -82,6 +85,7 @@ const SearchResults = memo(
     selectedResult,
     onSelect,
     onCreateCustomAsset,
+    hideCustomCreate,
   }: SearchResultsProps) => {
     const hasResults = results && results.length > 0;
     const showNoResults = !isLoading && !hasResults && query.length > 1;
@@ -138,8 +142,8 @@ const SearchResults = memo(
             );
           })}
 
-        {/* Create custom asset option - always visible */}
-        {!isLoading && (
+        {/* Create custom asset option - always visible unless hidden */}
+        {!isLoading && !hideCustomCreate && (
           <>
             {hasResults && <CommandSeparator />}
             <CommandItem
@@ -211,6 +215,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       selectedExchangeMic,
       quoteInfo,
       onClear,
+      hideCustomCreate,
       "data-testid": testId,
     },
     ref,
@@ -311,7 +316,22 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
     );
 
     useEffect(() => {
-      if (selectedResult) return;
+      if (selectedResult) {
+        const exchangeDisplay =
+          selectedResult.exchangeName || getExchangeDisplayName(selectedResult.exchange);
+        const exchangeSuffix = exchangeDisplay ? ` (${exchangeDisplay})` : "";
+        const displayText = `${selectedResult.symbol} - ${
+          selectedResult.longName || selectedResult.shortName || selectedResult.symbol
+        }${exchangeSuffix}`;
+        setSelected(displayText);
+        setSelectedTicker({
+          symbol: selectedResult.symbol,
+          name: selectedResult.longName || selectedResult.shortName || selectedResult.symbol,
+          exchangeDisplay: exchangeDisplay || "",
+        });
+        return;
+      }
+
       const current = value ?? defaultValue ?? "";
       if (!current) {
         setSelected("");
@@ -346,14 +366,23 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
       [handleSelectResult],
     );
 
+    // Auto-search on mount when a defaultValue is pre-filled
+    useEffect(() => {
+      if (defaultValue && defaultValue.length > 1) {
+        setDebouncedQuery(defaultValue);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Use debounced query for API call
     const { data, isLoading, isError } = useQuery<SymbolSearchResult[], Error>({
       queryKey: ["ticker-search", debouncedQuery],
       queryFn: () => searchTicker(debouncedQuery),
       enabled:
         debouncedQuery?.length > 1 &&
-        selected !== debouncedQuery &&
-        defaultValue !== debouncedQuery,
+        // Only block re-search after an actual confirmed selection (name is populated),
+        // not when the input is just pre-filled from defaultValue (name is empty).
+        !(selected === debouncedQuery && !!selectedTicker?.name),
       staleTime: 60000, // Cache results for 1 minute
       gcTime: 300000, // Keep in cache for 5 minutes (formerly cacheTime)
     });
@@ -444,7 +473,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               variant="outline"
               role="combobox"
               className={cn(
-                "h-auto min-h-10 w-full justify-between rounded-md px-3 py-2",
+                "min-h-input-height h-auto w-full justify-between rounded-md px-3 py-2",
                 open && "ring-ring ring-2",
                 className,
               )}
@@ -455,52 +484,57 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             >
               {selectedTicker ? (
                 <div className="flex w-full min-w-0 items-center gap-2">
-                  {/* Symbol | Name */}
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Badge className="rounded-sm">{selectedTicker.symbol}</Badge>
-                    {selectedTicker.name && (
-                      <>
-                        <div className="bg-border h-4 w-px shrink-0" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    {/* Row 1: Symbol + Name (left) — Clear (right) */}
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="shrink-0 text-sm font-semibold tracking-tight">
+                        {selectedTicker.symbol}
+                      </span>
+                      {selectedTicker.name && (
                         <span className="text-muted-foreground truncate text-sm">
                           {selectedTicker.name}
                         </span>
-                      </>
-                    )}
-                  </div>
-                  {/* Right side: exchange badge, currency badge, price, clear */}
-                  <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                    {selectedTicker.exchangeDisplay && (
-                      <span className="bg-muted mr-2 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                        {selectedTicker.exchangeDisplay}
-                      </span>
-                    )}
-                    {quoteInfo?.isLoading ? (
-                      <Skeleton className="h-4 w-14" />
-                    ) : (
-                      quoteInfo?.price != null && (
-                        <span className="text-sm tabular-nums">
-                          {quoteInfo.price.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 4,
-                          })}
+                      )}
+                    </div>
+                    {/* Row 2: Exchange (left) — Price + Currency (right) */}
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      {selectedTicker.exchangeDisplay ? (
+                        <span className="text-muted-foreground shrink-0 uppercase">
+                          {selectedTicker.exchangeDisplay}
                         </span>
-                      )
-                    )}
-                    {quoteInfo?.currency && !quoteInfo.isLoading && (
-                      <span className="text-muted-foreground px-0 py-0.5 font-light">
-                        {quoteInfo.currency}
-                      </span>
-                    )}
-                    {onClear && (
-                      <span
-                        onMouseDown={handleClearMouseDown}
-                        onClick={handleClearClick}
-                        className="text-muted-foreground hover:text-foreground ml-0.5 rounded-sm p-0.5"
-                      >
-                        <Icons.Close className="size-3.5" />
-                      </span>
-                    )}
+                      ) : (
+                        <span />
+                      )}
+                      <div className="flex shrink-0 items-center gap-1">
+                        {quoteInfo?.isLoading ? (
+                          <Skeleton className="h-3 w-12" />
+                        ) : (
+                          quoteInfo?.price != null && (
+                            <span className="tabular-nums">
+                              {quoteInfo.price.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 4,
+                              })}
+                            </span>
+                          )
+                        )}
+                        {quoteInfo?.currency && !quoteInfo.isLoading && (
+                          <span className="text-muted-foreground font-light">
+                            {quoteInfo.currency}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  {onClear && (
+                    <span
+                      onMouseDown={handleClearMouseDown}
+                      onClick={handleClearClick}
+                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-0.5"
+                    >
+                      <Icons.Close className="size-3.5" />
+                    </span>
+                  )}
                 </div>
               ) : (
                 <>
@@ -517,6 +551,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
             className="w-(--radix-popover-trigger-width) h-auto min-w-[280px] p-0"
             onOpenAutoFocus={handleOpenAutoFocus}
             onCloseAutoFocus={handleCloseAutoFocus}
+            onWheel={(e) => e.stopPropagation()}
           >
             <Command shouldFilter={false} className="border-none">
               <CommandInput
@@ -536,6 +571,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
                 selectedResult={selectedResult}
                 onSelect={handleSelectResult}
                 onCreateCustomAsset={handleCreateCustomAsset}
+                hideCustomCreate={hideCustomCreate}
               />
             </Command>
           </PopoverContent>

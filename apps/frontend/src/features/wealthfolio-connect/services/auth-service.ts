@@ -2,6 +2,7 @@ import {
   logger,
   storeSyncSession as storeSyncSessionApi,
   clearSyncSession as clearSyncSessionApi,
+  restoreSyncSession as restoreSyncSessionApi,
 } from "@/adapters";
 
 /**
@@ -9,12 +10,9 @@ import {
  * The backend uses the refresh token to mint fresh access tokens when needed.
  * Works in both desktop (Tauri) and web modes.
  */
-export const storeSyncSession = async (
-  refreshToken: string,
-  accessToken?: string,
-): Promise<void> => {
+export const storeSyncSession = async (refreshToken: string): Promise<void> => {
   try {
-    await storeSyncSessionApi(refreshToken, accessToken);
+    await storeSyncSessionApi(refreshToken);
     logger.debug("Sync session stored in backend");
   } catch (error) {
     logger.error("Error storing sync session in backend");
@@ -26,6 +24,17 @@ export const storeSyncSession = async (
  * Clear Wealthfolio Connect session from the backend's secret store.
  * Works in both desktop (Tauri) and web modes.
  */
+/**
+ * Restore Wealthfolio Connect session from the backend (web mode only).
+ * The backend holds the canonical refresh token and can mint a fresh access token.
+ */
+export const restoreSyncSession = async (): Promise<{
+  accessToken: string;
+  refreshToken: string;
+}> => {
+  return restoreSyncSessionApi();
+};
+
 export const clearSyncSession = async (): Promise<void> => {
   try {
     await clearSyncSessionApi();

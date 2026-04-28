@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-02-24
+
+### Changed
+
+- Updated SDK version to 3.0.0
+- Updated activity model and parsing logic for new addon SDK
+- Updated dependencies and package versions
+- Restructured project directories for new frontend/backend layout
+- Added @vitejs/plugin-react dependency
+- Adjusted grid layout for improved responsiveness on Fees Tracker page
+
+### Fixed
+
+- Fixed goal progress bugs and deduplicated addon code
+
+## [2.0.0] - 2025-10-28
+
+### Changed
+
+- Migrated to Tailwind CSS v4 and updated shadcn components
+- Improved layout and mobile responsiveness
+- Updated addons layout and fixed issues in mobile
+- Updated ESLint and Prettier configuration
+- Upgraded addon for Wealthfolio 2.0.0 compatibility
+
 ## [1.0.1] - 2025-08-23
 
 ### Fixed

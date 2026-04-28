@@ -21,11 +21,14 @@
 mod capabilities;
 mod traits;
 
-// Provider implementations (to be implemented)
+// Provider implementations
 pub mod alpha_vantage;
+pub mod boerse_frankfurt;
 pub mod finnhub;
 pub mod marketdata_app;
 pub mod metal_price_api;
+pub mod openfigi;
+pub mod us_treasury_calc;
 pub mod yahoo;
 
 // Re-exports

@@ -235,9 +235,60 @@ enum PayloadColumnResolution {
     Readonly,
 }
 
+/// Column renames applied during sync replay for backward compatibility.
+/// Old devices may still send payloads with the pre-rename column names.
+fn apply_column_rename(table: &str, column: &str) -> Option<&'static str> {
+    match (table, column) {
+        ("goals", "is_achieved") => Some("status_lifecycle"),
+        ("goals_allocation", "percent_allocation") => Some("share_percent"),
+        ("import_account_templates", "import_type") => Some("context_kind"),
+        _ => None,
+    }
+}
+
+/// Value transformations applied during sync replay for backward compatibility.
+/// Old payloads may send pre-rename enum values (e.g., "ACTIVITY" → "CSV_ACTIVITY").
+fn apply_value_migration(table: &str, column: &str, value: serde_json::Value) -> serde_json::Value {
+    match (table, column) {
+        ("goals", "status_lifecycle") => migrate_legacy_goal_lifecycle_value(value),
+        ("import_account_templates", "context_kind") => {
+            if let Some(s) = value.as_str() {
+                let migrated = wealthfolio_core::activities::normalize_context_kind_value(s);
+                if migrated != s {
+                    return serde_json::Value::String(migrated.to_string());
+                }
+            }
+            value
+        }
+        _ => value,
+    }
+}
+
+fn migrate_legacy_goal_lifecycle_value(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Bool(true) => serde_json::Value::String("achieved".to_string()),
+        serde_json::Value::Bool(false) | serde_json::Value::Null => {
+            serde_json::Value::String("active".to_string())
+        }
+        serde_json::Value::Number(n) if n.as_i64() == Some(1) || n.as_f64() == Some(1.0) => {
+            serde_json::Value::String("achieved".to_string())
+        }
+        serde_json::Value::Number(n) if n.as_i64() == Some(0) || n.as_f64() == Some(0.0) => {
+            serde_json::Value::String("active".to_string())
+        }
+        serde_json::Value::String(s) => match s.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" => serde_json::Value::String("achieved".to_string()),
+            "false" | "0" => serde_json::Value::String("active".to_string()),
+            _ => serde_json::Value::String(s),
+        },
+        value => value,
+    }
+}
+
 fn resolve_payload_column(
     raw_key: &str,
     catalog: &PayloadColumnCatalog,
+    table_name: &str,
 ) -> Option<PayloadColumnResolution> {
     if catalog.writable.contains(raw_key) {
         return Some(PayloadColumnResolution::Writable(raw_key.to_string()));
@@ -249,10 +300,22 @@ fn resolve_payload_column(
     let normalized = normalize_payload_key_to_snake_case(raw_key);
     if normalized != raw_key {
         if catalog.writable.contains(&normalized) {
-            return Some(PayloadColumnResolution::Writable(normalized));
+            return Some(PayloadColumnResolution::Writable(normalized.clone()));
         }
         if catalog.readonly.contains(&normalized) {
             return Some(PayloadColumnResolution::Readonly);
+        }
+    }
+
+    // Check for known column renames (backward compat with older sync payloads)
+    let check = if normalized != raw_key {
+        &normalized
+    } else {
+        raw_key
+    };
+    if let Some(renamed) = apply_column_rename(table_name, check) {
+        if catalog.writable.contains(renamed) {
+            return Some(PayloadColumnResolution::Writable(renamed.to_string()));
         }
     }
 
@@ -269,18 +332,20 @@ fn normalize_payload_fields(
     let mut seen_columns: HashMap<String, serde_json::Value> = HashMap::new();
 
     for (raw_key, value) in fields {
-        let resolution = resolve_payload_column(&raw_key, &catalog).ok_or_else(|| {
-            Error::Database(DatabaseError::Internal(format!(
-                "Sync payload column '{}' is not valid for table '{}'",
-                raw_key, table_name
-            )))
-        })?;
+        let resolution =
+            resolve_payload_column(&raw_key, &catalog, table_name).ok_or_else(|| {
+                Error::Database(DatabaseError::Internal(format!(
+                    "Sync payload column '{}' is not valid for table '{}'",
+                    raw_key, table_name
+                )))
+            })?;
 
         let column = match resolution {
             PayloadColumnResolution::Writable(column) => column,
             PayloadColumnResolution::Readonly => continue,
         };
 
+        let value = apply_value_migration(table_name, &column, value);
         if let Some(existing_value) = seen_columns.get(&column) {
             if existing_value != &value {
                 return Err(Error::Database(DatabaseError::Internal(format!(
@@ -328,6 +393,45 @@ fn normalize_outbox_payload(payload: serde_json::Value) -> Result<serde_json::Va
     Ok(serde_json::Value::Object(normalized))
 }
 
+/// Per-table WHERE filters for snapshot export and restore.
+/// During export: only rows matching the filter are copied to the snapshot.
+/// During restore: only rows matching the filter are deleted before importing snapshot data,
+/// so that unfiltered rows (e.g. system taxonomies) are preserved.
+/// Tables not listed here are exported/restored unfiltered.
+const SYNC_TABLE_SNAPSHOT_FILTERS: &[(&str, &str)] = &[
+    (
+        "holdings_snapshots",
+        "source IN ('MANUAL_ENTRY', 'CSV_IMPORT', 'SYNTHETIC', 'BROKER_IMPORTED')",
+    ),
+    ("quotes", "source = 'MANUAL'"),
+    // Taxonomy rows are all seeded by migrations — no user-created taxonomies yet.
+    // Export nothing; the table is in APP_SYNC_TABLES for future custom taxonomy support.
+    ("taxonomies", "is_system = 0"),
+    // Only export user-created categories under custom_groups.
+    ("taxonomy_categories", "taxonomy_id = 'custom_groups'"),
+    // Only export user-initiated import runs (CSV/manual), matching the outbox policy.
+    (
+        "import_runs",
+        "UPPER(run_type) = 'IMPORT' AND UPPER(source_system) IN ('CSV', 'MANUAL')",
+    ),
+    // Activities: match the outbox policy so broker activities don't reference
+    // filtered-out import_runs (which would cause FK violations on restore).
+    (
+        "activities",
+        "is_user_modified = 1 \
+         OR UPPER(COALESCE(source_system, '')) IN ('MANUAL', 'CSV') \
+         OR ((import_run_id IS NULL OR TRIM(import_run_id) = '') \
+             AND (source_record_id IS NULL OR TRIM(source_record_id) = ''))",
+    ),
+];
+
+fn snapshot_filter_for_table(table: &str) -> Option<&'static str> {
+    SYNC_TABLE_SNAPSHOT_FILTERS
+        .iter()
+        .find(|(t, _)| *t == table)
+        .map(|(_, f)| *f)
+}
+
 fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static str)> {
     match entity {
         SyncEntity::Account => Some(("accounts", "id")),
@@ -335,8 +439,10 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::Quote => Some(("quotes", "id")),
         SyncEntity::AssetTaxonomyAssignment => Some(("asset_taxonomy_assignments", "id")),
         SyncEntity::Activity => Some(("activities", "id")),
-        SyncEntity::ActivityImportProfile => Some(("activity_import_profiles", "account_id")),
+        SyncEntity::ActivityImportProfile => Some(("import_account_templates", "id")),
+        SyncEntity::ImportTemplate => Some(("import_templates", "id")),
         SyncEntity::Goal => Some(("goals", "id")),
+        SyncEntity::GoalPlan => Some(("goal_plans", "goal_id")),
         SyncEntity::GoalsAllocation => Some(("goals_allocation", "id")),
         SyncEntity::AiThread => Some(("ai_threads", "id")),
         SyncEntity::AiMessage => Some(("ai_messages", "id")),
@@ -344,6 +450,10 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::ContributionLimit => Some(("contribution_limits", "id")),
         SyncEntity::Platform => Some(("platforms", "id")),
         SyncEntity::Snapshot => Some(("holdings_snapshots", "id")),
+        SyncEntity::CustomProvider => Some(("market_data_custom_providers", "id")),
+        SyncEntity::ImportRun => Some(("import_runs", "id")),
+        // CustomTaxonomy uses bundle replay — handled by custom branch in apply_remote_event_lww_tx
+        SyncEntity::CustomTaxonomy => None,
     }
 }
 
@@ -407,7 +517,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
     let maybe_row = sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
         .filter(sync_device_config::key_version.is_not_null())
-        .order(sync_device_config::key_version.desc())
+        .order(sync_device_config::last_bootstrap_at.desc())
         .first::<SyncDeviceConfigDB>(conn)
         .optional()
         .map_err(StorageError::from)?;
@@ -421,6 +531,7 @@ fn resolve_payload_key_version(conn: &mut SqliteConnection, requested_version: i
 fn resolve_local_device_id(conn: &mut SqliteConnection) -> Option<String> {
     sync_device_config::table
         .filter(sync_device_config::trust_state.eq("trusted"))
+        .order(sync_device_config::last_bootstrap_at.desc())
         .select(sync_device_config::device_id)
         .first::<String>(conn)
         .optional()
@@ -502,6 +613,200 @@ fn to_entity_metadata(row: SyncEntityMetadataDB) -> Result<SyncEntityMetadata> {
     })
 }
 
+/// Build an upsert SQL statement from a JSON object and execute it.
+/// `conflict_keys` are the columns used in `ON CONFLICT(...)`.
+fn upsert_json_row(
+    conn: &mut SqliteConnection,
+    table: &str,
+    conflict_keys: &[&str],
+    row: &serde_json::Map<String, serde_json::Value>,
+) -> Result<()> {
+    let fields: Vec<(&String, &serde_json::Value)> = row.iter().collect();
+    if fields.is_empty() {
+        return Ok(());
+    }
+
+    let columns = fields
+        .iter()
+        .map(|(k, _)| quote_identifier(k))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let values = fields
+        .iter()
+        .map(|(_, v)| json_value_to_sql_literal(v))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let upserts = fields
+        .iter()
+        .map(|(k, _)| {
+            let q = quote_identifier(k);
+            format!("{q}=excluded.{q}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let conflict = conflict_keys
+        .iter()
+        .map(|k| quote_identifier(k))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let sql = format!(
+        "INSERT INTO {table_q} ({columns}) VALUES ({values}) ON CONFLICT({conflict}) DO UPDATE SET {upserts}",
+        table_q = quote_identifier(table),
+    );
+    diesel::sql_query(sql)
+        .execute(conn)
+        .map_err(StorageError::from)?;
+    Ok(())
+}
+
+/// Convert a serializable DB model to a JSON object with snake_case keys
+/// suitable for SQL upsert. Returns None if serialization fails.
+fn model_to_sql_fields<T: serde::Serialize>(
+    model: &T,
+) -> Result<serde_json::Map<String, serde_json::Value>> {
+    let value = serde_json::to_value(model)?;
+    let obj = value.as_object().ok_or_else(|| {
+        Error::Database(DatabaseError::Internal(
+            "Expected JSON object from model serialization".to_string(),
+        ))
+    })?;
+
+    // The DB models use #[serde(rename_all = "camelCase")], so we need to
+    // convert keys back to snake_case for the DB columns.
+    let mut fields = serde_json::Map::new();
+    for (key, val) in obj {
+        let snake = normalize_payload_key_to_snake_case(key);
+        let col = if snake.is_empty() { key.clone() } else { snake };
+        fields.insert(col, val.clone());
+    }
+    Ok(fields)
+}
+
+/// Apply a custom taxonomy bundle event (create/update/delete).
+/// For create/update: upserts taxonomy row, upserts each category, deletes stale categories.
+/// For delete: deletes the taxonomy row (FK cascade handles categories + assignments).
+fn apply_custom_taxonomy_event(
+    conn: &mut SqliteConnection,
+    taxonomy_id: &str,
+    op: SyncOperation,
+    payload_json: &serde_json::Value,
+) -> Result<()> {
+    match op {
+        SyncOperation::Delete => {
+            let sql = format!(
+                "DELETE FROM \"taxonomies\" WHERE \"id\" = '{}'",
+                escape_sqlite_str(taxonomy_id)
+            );
+            diesel::sql_query(sql)
+                .execute(conn)
+                .map_err(StorageError::from)?;
+        }
+        SyncOperation::Create | SyncOperation::Update => {
+            let bundle: crate::taxonomies::CustomTaxonomyPayload =
+                serde_json::from_value(payload_json.clone()).map_err(|e| {
+                    Error::Database(DatabaseError::Internal(format!(
+                        "Invalid custom_taxonomy payload: {}",
+                        e
+                    )))
+                })?;
+
+            // Reject system taxonomy payloads (except custom_groups which allows user categories)
+            if bundle.taxonomy.is_system != 0 && bundle.taxonomy.id != "custom_groups" {
+                return Err(Error::Database(DatabaseError::Internal(
+                    "Cannot sync system taxonomy".to_string(),
+                )));
+            }
+
+            // Validate payload taxonomy ID matches event entity_id
+            if bundle.taxonomy.id != taxonomy_id {
+                return Err(Error::Database(DatabaseError::Internal(format!(
+                    "custom_taxonomy payload id '{}' does not match entity_id '{}'",
+                    bundle.taxonomy.id, taxonomy_id
+                ))));
+            }
+
+            // Validate all categories belong to this taxonomy
+            for cat in &bundle.categories {
+                if cat.taxonomy_id != taxonomy_id {
+                    return Err(Error::Database(DatabaseError::Internal(format!(
+                        "custom_taxonomy category '{}' has taxonomy_id '{}', expected '{}'",
+                        cat.id, cat.taxonomy_id, taxonomy_id
+                    ))));
+                }
+            }
+
+            // Upsert taxonomy row — skip for custom_groups since it's seeded by migrations
+            // and only its categories are user data.
+            if taxonomy_id != "custom_groups" {
+                let tax_fields = model_to_sql_fields(&bundle.taxonomy)?;
+                upsert_json_row(conn, "taxonomies", &["id"], &tax_fields)?;
+            }
+
+            // Upsert each category
+            let mut incoming_cat_ids: Vec<String> = Vec::new();
+            for cat in &bundle.categories {
+                incoming_cat_ids.push(cat.id.clone());
+                let cat_fields = model_to_sql_fields(cat)?;
+                upsert_json_row(
+                    conn,
+                    "taxonomy_categories",
+                    &["taxonomy_id", "id"],
+                    &cat_fields,
+                )?;
+            }
+
+            // Delete local categories that are NOT in the incoming payload.
+            // This cascades their assignments via FK ON DELETE CASCADE.
+            if incoming_cat_ids.is_empty() {
+                let sql = format!(
+                    "DELETE FROM \"taxonomy_categories\" WHERE \"taxonomy_id\" = '{}'",
+                    escape_sqlite_str(taxonomy_id)
+                );
+                diesel::sql_query(sql)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+            } else {
+                let placeholders = incoming_cat_ids
+                    .iter()
+                    .map(|id| format!("'{}'", escape_sqlite_str(id)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let sql = format!(
+                    "DELETE FROM \"taxonomy_categories\" WHERE \"taxonomy_id\" = '{}' AND \"id\" NOT IN ({})",
+                    escape_sqlite_str(taxonomy_id),
+                    placeholders
+                );
+                diesel::sql_query(sql)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+            }
+        }
+    }
+
+    // Mark both tables as touched
+    let now = Utc::now().to_rfc3339();
+    for table in &["taxonomies", "taxonomy_categories"] {
+        diesel::insert_into(sync_table_state::table)
+            .values(SyncTableStateDB {
+                table_name: table.to_string(),
+                enabled: 1,
+                last_snapshot_restore_at: None,
+                last_incremental_apply_at: Some(now.clone()),
+            })
+            .on_conflict(sync_table_state::table_name)
+            .do_update()
+            .set((
+                sync_table_state::enabled.eq(1),
+                sync_table_state::last_incremental_apply_at.eq(Some(now.clone())),
+            ))
+            .execute(conn)
+            .map_err(StorageError::from)?;
+    }
+
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn apply_remote_event_lww_tx(
     conn: &mut SqliteConnection,
@@ -542,7 +847,9 @@ fn apply_remote_event_lww_tx(
     };
 
     if should_apply {
-        if let Some((table_name, pk_name)) = entity_storage_mapping(&entity) {
+        if entity == SyncEntity::CustomTaxonomy {
+            apply_custom_taxonomy_event(conn, &entity_id_value, op, &payload_json)?;
+        } else if let Some((table_name, pk_name)) = entity_storage_mapping(&entity) {
             match op {
                 SyncOperation::Delete => {
                     let sql = format!(
@@ -800,6 +1107,7 @@ impl AppSyncRepository {
                     key_version: key_version_value,
                     trust_state: trust_state_value.clone(),
                     last_bootstrap_at: None,
+                    min_snapshot_created_at: None,
                 };
 
                 diesel::insert_into(sync_device_config::table)
@@ -818,11 +1126,81 @@ impl AppSyncRepository {
             .await
     }
 
-    pub async fn mark_bootstrap_complete(
+    pub async fn reset_local_sync_session(&self) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                let now = Utc::now().to_rfc3339();
+
+                diesel::delete(sync_outbox::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_entity_metadata::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_applied_events::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_table_state::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                diesel::delete(sync_device_config::table)
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                diesel::insert_into(sync_cursor::table)
+                    .values(SyncCursorDB {
+                        id: 1,
+                        cursor: 0,
+                        updated_at: now.clone(),
+                    })
+                    .on_conflict(sync_cursor::id)
+                    .do_update()
+                    .set((
+                        sync_cursor::cursor.eq(0),
+                        sync_cursor::updated_at.eq(now.clone()),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                diesel::insert_into(sync_engine_state::table)
+                    .values(SyncEngineStateDB {
+                        id: 1,
+                        lock_version: 0,
+                        last_push_at: None,
+                        last_pull_at: None,
+                        last_error: None,
+                        consecutive_failures: 0,
+                        next_retry_at: None,
+                        last_cycle_status: None,
+                        last_cycle_duration_ms: None,
+                    })
+                    .on_conflict(sync_engine_state::id)
+                    .do_update()
+                    .set((
+                        sync_engine_state::lock_version.eq(0),
+                        sync_engine_state::last_push_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_pull_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_error.eq::<Option<String>>(None),
+                        sync_engine_state::consecutive_failures.eq(0),
+                        sync_engine_state::next_retry_at.eq::<Option<String>>(None),
+                        sync_engine_state::last_cycle_status.eq::<Option<String>>(None),
+                        sync_engine_state::last_cycle_duration_ms.eq::<Option<i64>>(None),
+                    ))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+
+                Ok(())
+            })
+            .await
+    }
+
+    pub async fn reset_and_mark_bootstrap_complete(
         &self,
         device_id_value: String,
         key_version_value: Option<i32>,
     ) -> Result<()> {
+        self.reset_local_sync_session().await?;
+
         self.writer
             .exec(move |conn| {
                 let now = Utc::now().to_rfc3339();
@@ -833,6 +1211,7 @@ impl AppSyncRepository {
                         key_version: key_version_value,
                         trust_state: "trusted".to_string(),
                         last_bootstrap_at: Some(now.clone()),
+                        min_snapshot_created_at: None,
                     })
                     .on_conflict(sync_device_config::device_id)
                     .do_update()
@@ -840,10 +1219,80 @@ impl AppSyncRepository {
                         sync_device_config::key_version.eq(key_version_value),
                         sync_device_config::trust_state.eq("trusted"),
                         sync_device_config::last_bootstrap_at.eq(Some(now.clone())),
+                        sync_device_config::min_snapshot_created_at.eq(None::<String>),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
 
+                Ok(())
+            })
+            .await
+    }
+
+    /// Persist the bootstrap freshness gate for a device.
+    /// Uses upsert so the gate is stored even if no device_config row exists yet.
+    pub async fn set_min_snapshot_created_at(
+        &self,
+        device_id_value: String,
+        value: String,
+    ) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::insert_into(sync_device_config::table)
+                    .values(SyncDeviceConfigDB {
+                        device_id: device_id_value.clone(),
+                        key_version: None,
+                        trust_state: "untrusted".to_string(),
+                        last_bootstrap_at: None,
+                        min_snapshot_created_at: Some(value.clone()),
+                    })
+                    .on_conflict(sync_device_config::device_id)
+                    .do_update()
+                    .set(sync_device_config::min_snapshot_created_at.eq(Some(&value)))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Read the bootstrap freshness gate for a device.
+    pub fn get_min_snapshot_created_at(&self, device_id_value: &str) -> Result<Option<String>> {
+        let mut conn = get_connection(&self.pool)?;
+        let row = sync_device_config::table
+            .filter(sync_device_config::device_id.eq(device_id_value))
+            .select(sync_device_config::min_snapshot_created_at)
+            .first::<Option<String>>(&mut conn)
+            .optional()
+            .map_err(StorageError::from)?;
+        Ok(row.flatten())
+    }
+
+    /// Clear the bootstrap freshness gate for ALL devices.
+    /// Used during logout/reset/reinitialize flows.
+    pub async fn clear_all_min_snapshot_created_at(&self) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(sync_device_config::table)
+                    .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
+                Ok(())
+            })
+            .await
+    }
+
+    /// Clear the bootstrap freshness gate for a device.
+    pub async fn clear_min_snapshot_created_at(&self, device_id_value: String) -> Result<()> {
+        self.writer
+            .exec(move |conn| {
+                diesel::update(
+                    sync_device_config::table
+                        .filter(sync_device_config::device_id.eq(&device_id_value)),
+                )
+                .set(sync_device_config::min_snapshot_created_at.eq(None::<String>))
+                .execute(conn)
+                .map_err(StorageError::from)?;
                 Ok(())
             })
             .await
@@ -1131,7 +1580,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1141,7 +1590,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1163,7 +1611,7 @@ impl AppSyncRepository {
                         last_error: None,
                         consecutive_failures: 0,
                         next_retry_at: None,
-                        last_cycle_status: Some("ok".to_string()),
+                        last_cycle_status: None,
                         last_cycle_duration_ms: None,
                     })
                     .on_conflict(sync_engine_state::id)
@@ -1173,7 +1621,6 @@ impl AppSyncRepository {
                         sync_engine_state::last_error.eq::<Option<String>>(None),
                         sync_engine_state::consecutive_failures.eq(0),
                         sync_engine_state::next_retry_at.eq::<Option<String>>(None),
-                        sync_engine_state::last_cycle_status.eq(Some("ok")),
                     ))
                     .execute(conn)
                     .map_err(StorageError::from)?;
@@ -1357,16 +1804,6 @@ impl AppSyncRepository {
     }
 
     pub async fn export_snapshot_sqlite_image(&self, tables: Vec<String>) -> Result<Vec<u8>> {
-        /// Per-table WHERE filters applied during snapshot export.
-        /// Tables not listed here are exported unfiltered.
-        const SYNC_TABLE_EXPORT_FILTERS: &[(&str, &str)] = &[
-            (
-                "holdings_snapshots",
-                "source IN ('MANUAL_ENTRY', 'CSV_IMPORT', 'SYNTHETIC', 'BROKER_IMPORTED')",
-            ),
-            ("quotes", "source = 'MANUAL'"),
-        ];
-
         let pool = Arc::clone(&self.pool);
         tokio::task::spawn_blocking(move || -> Result<Vec<u8>> {
             let mut conn = get_connection(&pool)?;
@@ -1395,10 +1832,7 @@ impl AppSyncRepository {
                 let run_export = (|| -> Result<()> {
                     for table in &table_set {
                         let table_ident = quote_identifier(table);
-                        let filter = SYNC_TABLE_EXPORT_FILTERS
-                            .iter()
-                            .find(|(t, _)| *t == table.as_str())
-                            .map(|(_, f)| *f);
+                        let filter = snapshot_filter_for_table(table);
                         let copy_sql = match filter {
                             Some(where_clause) => format!(
                                 "CREATE TABLE {snapshot_alias}.{table_ident} AS SELECT * FROM main.{table_ident} WHERE {where_clause}"
@@ -1491,10 +1925,29 @@ impl AppSyncRepository {
                     diesel::delete(sync_table_state::table)
                         .execute(conn)
                         .map_err(StorageError::from)?;
+                    // Remove stale device config rows from previous enrollment cycles so
+                    // resolve_payload_key_version never picks an outdated key_version.
+                    diesel::delete(
+                        sync_device_config::table
+                            .filter(sync_device_config::device_id.ne(&device_id_value)),
+                    )
+                    .execute(conn)
+                    .map_err(StorageError::from)?;
 
                     for table in &table_set {
                         let target_columns = load_table_columns(conn, "main", table)?;
                         let source_columns = load_table_columns(conn, &snapshot_alias, table)?;
+                        if source_columns.is_empty() {
+                            // Table is absent from the snapshot (e.g., snapshot was created by
+                            // an older client before this table was introduced). Skip it — the
+                            // local table retains whatever data it has, which is safer than
+                            // clearing it to empty.
+                            log::warn!(
+                                "Snapshot does not contain table '{}' — skipping restore for this table",
+                                table
+                            );
+                            continue;
+                        }
                         let source_column_set =
                             source_columns.into_iter().collect::<HashSet<String>>();
                         let common_columns = target_columns
@@ -1518,7 +1971,14 @@ impl AppSyncRepository {
                         let copy_sql = format!(
                             "INSERT INTO {table_ident} ({columns_sql}) SELECT {columns_sql} FROM {alias_ident}.{table_ident}"
                         );
-                        let clear_sql = format!("DELETE FROM {table_ident}");
+                        // For filtered tables, only delete rows matching the filter so
+                        // unfiltered rows (e.g. system taxonomies) are preserved.
+                        let clear_sql = match snapshot_filter_for_table(table) {
+                            Some(where_clause) => {
+                                format!("DELETE FROM {table_ident} WHERE {where_clause}")
+                            }
+                            None => format!("DELETE FROM {table_ident}"),
+                        };
                         diesel::sql_query(clear_sql)
                             .execute(conn)
                             .map_err(StorageError::from)?;
@@ -1565,6 +2025,7 @@ impl AppSyncRepository {
                             key_version: key_version_value,
                             trust_state: "trusted".to_string(),
                             last_bootstrap_at: Some(now.clone()),
+                            min_snapshot_created_at: None,
                         })
                         .on_conflict(sync_device_config::device_id)
                         .do_update()
@@ -1615,13 +2076,15 @@ impl AppSyncRepository {
 mod tests {
     use super::*;
     use diesel::dsl::count_star;
+    use diesel::Connection;
     use std::collections::BTreeSet;
     use tempfile::tempdir;
 
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::schema::{
-        accounts, activity_import_profiles, assets, goals, platforms, sync_applied_events,
-        sync_entity_metadata, sync_outbox,
+        accounts, assets, goals, goals_allocation, import_account_templates, import_templates,
+        platforms, sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox,
+        taxonomies, taxonomy_categories,
     };
 
     fn setup_db() -> (
@@ -1639,7 +2102,7 @@ mod tests {
         let db_path = init(&app_data).expect("init db");
         run_migrations(&db_path).expect("migrate db");
         let pool = create_pool(&db_path).expect("create pool");
-        let writer = spawn_writer(pool.as_ref().clone());
+        let writer = spawn_writer(pool.as_ref().clone()).expect("spawn writer");
         (pool, writer)
     }
 
@@ -1905,7 +2368,7 @@ mod tests {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool, writer);
 
-        repo.mark_bootstrap_complete("device-1".to_string(), Some(1))
+        repo.reset_and_mark_bootstrap_complete("device-1".to_string(), Some(1))
             .await
             .expect("mark bootstrap complete");
         assert!(
@@ -2081,6 +2544,120 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reset_local_sync_session_clears_control_plane_and_zeroes_cursors() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account_for_test(&mut conn, "acc-keep").expect("insert account");
+            insert_outbox_event(
+                &mut conn,
+                OutboxWriteRequest::new(
+                    SyncEntity::Account,
+                    "acc-dirty",
+                    SyncOperation::Update,
+                    serde_json::json!({ "id": "acc-dirty", "name": "dirty" }),
+                ),
+            )
+            .expect("insert outbox");
+        }
+
+        repo.upsert_entity_metadata(SyncEntityMetadata {
+            entity: SyncEntity::Account,
+            entity_id: "acc-dirty".to_string(),
+            last_event_id: "evt-dirty".to_string(),
+            last_client_timestamp: chrono::Utc::now().to_rfc3339(),
+            last_seq: 42,
+        })
+        .await
+        .expect("upsert metadata");
+        repo.mark_applied_event(
+            "evt-applied".to_string(),
+            43,
+            SyncEntity::Account,
+            "acc-dirty".to_string(),
+        )
+        .await
+        .expect("mark applied");
+        repo.upsert_device_config("device-1".to_string(), Some(3), "trusted".to_string())
+            .await
+            .expect("upsert device config");
+        repo.set_cursor(15).await.expect("set cursor");
+        repo.mark_engine_error("sync failed".to_string())
+            .await
+            .expect("mark engine error");
+
+        repo.reset_local_sync_session()
+            .await
+            .expect("reset local sync session");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let outbox_count: i64 = sync_outbox::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count outbox");
+        let metadata_count: i64 = sync_entity_metadata::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count metadata");
+        let applied_count: i64 = sync_applied_events::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count applied");
+        let device_config_count: i64 = sync_device_config::table
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count device config");
+
+        assert_eq!(outbox_count, 0);
+        assert_eq!(metadata_count, 0);
+        assert_eq!(applied_count, 0);
+        assert_eq!(device_config_count, 0);
+        assert_eq!(
+            count_account_rows(&pool, "acc-keep"),
+            1,
+            "app data must remain"
+        );
+        assert_eq!(repo.get_cursor().expect("cursor"), 0);
+
+        let status = repo.get_engine_status().expect("engine status");
+        assert_eq!(status.last_error, None);
+        assert_eq!(status.last_cycle_status, None);
+    }
+
+    #[tokio::test]
+    async fn reset_and_mark_bootstrap_complete_recreates_current_device_config() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        repo.set_cursor(21).await.expect("set cursor");
+        repo.upsert_device_config("old-device".to_string(), Some(2), "trusted".to_string())
+            .await
+            .expect("upsert old device config");
+
+        repo.reset_and_mark_bootstrap_complete("device-9".to_string(), Some(7))
+            .await
+            .expect("mark bootstrap complete");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let configs = sync_device_config::table
+            .load::<SyncDeviceConfigDB>(&mut conn)
+            .expect("load device configs");
+        assert_eq!(configs.len(), 1);
+        assert_eq!(configs[0].device_id, "device-9");
+        assert_eq!(configs[0].key_version, Some(7));
+        assert_eq!(configs[0].trust_state, "trusted");
+        assert!(configs[0].last_bootstrap_at.is_some());
+
+        assert_eq!(repo.get_cursor().expect("cursor"), 0);
+        assert!(
+            !repo.needs_bootstrap("device-9").expect("needs bootstrap"),
+            "bootstrap should be marked complete for the current device"
+        );
+    }
+
+    #[tokio::test]
     async fn outbox_uses_trusted_device_key_version_by_default() {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool, writer.clone());
@@ -2115,21 +2692,21 @@ mod tests {
         let payload = normalize_outbox_payload(serde_json::json!({
             "id": "goal-outbox-camel",
             "targetAmount": 5000.0,
-            "isAchieved": false
+            "statusLifecycle": "active"
         }))
         .expect("normalize payload");
         assert!(payload.get("target_amount").is_some());
-        assert!(payload.get("is_achieved").is_some());
+        assert!(payload.get("status_lifecycle").is_some());
         assert!(payload.get("targetAmount").is_none());
-        assert!(payload.get("isAchieved").is_none());
+        assert!(payload.get("statusLifecycle").is_none());
     }
 
     #[test]
     fn normalize_outbox_payload_rejects_conflicting_aliases() {
         let result = normalize_outbox_payload(serde_json::json!({
             "id": "goal-outbox-conflict",
-            "isAchieved": false,
-            "is_achieved": true
+            "statusLifecycle": "active",
+            "status_lifecycle": "archived"
         }));
         assert!(
             result.is_err(),
@@ -2318,7 +2895,7 @@ mod tests {
                     "title": "Emergency Fund",
                     "description": "6 months expenses",
                     "targetAmount": 50000.0,
-                    "isAchieved": true
+                    "statusLifecycle": "achieved"
                 }),
             )
             .await
@@ -2326,34 +2903,249 @@ mod tests {
         assert!(applied, "expected goal create to apply");
 
         let mut conn = get_connection(&pool).expect("conn");
-        let (target_amount_value, is_achieved_value): (f64, bool) = goals::table
+        let (target_amount_value, status_lifecycle_value): (f64, String) = goals::table
             .filter(goals::id.eq("goal-camel-case"))
-            .select((goals::target_amount, goals::is_achieved))
+            .select((goals::target_amount, goals::status_lifecycle))
             .first(&mut conn)
             .expect("goal row");
         assert_eq!(target_amount_value, 50000.0);
-        assert!(is_achieved_value);
+        assert_eq!(status_lifecycle_value, "achieved");
     }
 
     #[tokio::test]
-    async fn replay_accepts_camel_case_non_id_primary_key_payload() {
+    async fn replay_accepts_legacy_goal_is_achieved_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-legacy-achieved".to_string(),
+                SyncOperation::Create,
+                "evt-goal-legacy-achieved".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-legacy-achieved",
+                    "title": "Legacy Goal",
+                    "description": "Created before goals refactor",
+                    "targetAmount": 10000.0,
+                    "isAchieved": true
+                }),
+            )
+            .await
+            .expect("apply legacy goal create");
+        assert!(applied, "expected legacy goal create to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let (target_amount_value, status_lifecycle_value): (f64, String) = goals::table
+            .filter(goals::id.eq("goal-legacy-achieved"))
+            .select((goals::target_amount, goals::status_lifecycle))
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(target_amount_value, 10000.0);
+        assert_eq!(status_lifecycle_value, "achieved");
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_equivalent_legacy_and_current_goal_lifecycle_aliases() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-equivalent-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-equivalent-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-equivalent-lifecycle",
+                    "title": "Equivalent Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": " TRUE ",
+                    "statusLifecycle": "achieved"
+                }),
+            )
+            .await
+            .expect("apply equivalent lifecycle aliases");
+        assert!(applied, "expected equivalent lifecycle aliases to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let status_lifecycle_value: String = goals::table
+            .filter(goals::id.eq("goal-equivalent-lifecycle"))
+            .select(goals::status_lifecycle)
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(status_lifecycle_value, "achieved");
+    }
+
+    #[tokio::test]
+    async fn replay_rejects_conflicting_legacy_goal_lifecycle_aliases() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool, writer);
+
+        let result = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-conflicting-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-conflicting-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-conflicting-lifecycle",
+                    "title": "Conflicting Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": true,
+                    "statusLifecycle": "active"
+                }),
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "expected conflicting lifecycle aliases to be rejected"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("multiple values"),
+            "error should mention conflicting alias values: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_maps_legacy_null_goal_lifecycle_to_active() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-null-lifecycle".to_string(),
+                SyncOperation::Create,
+                "evt-goal-null-lifecycle".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-null-lifecycle",
+                    "title": "Null Legacy Goal",
+                    "targetAmount": 12000.0,
+                    "isAchieved": null
+                }),
+            )
+            .await
+            .expect("apply null legacy lifecycle");
+        assert!(applied, "expected null legacy lifecycle to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let status_lifecycle_value: String = goals::table
+            .filter(goals::id.eq("goal-null-lifecycle"))
+            .select(goals::status_lifecycle)
+            .first(&mut conn)
+            .expect("goal row");
+        assert_eq!(status_lifecycle_value, "active");
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_legacy_goals_allocation_percent_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-legacy-allocation").expect("insert account");
+        drop(conn);
+
+        let goal_created = repo
+            .apply_remote_event_lww(
+                SyncEntity::Goal,
+                "goal-legacy-allocation".to_string(),
+                SyncOperation::Create,
+                "evt-goal-for-legacy-allocation".to_string(),
+                "2026-03-30T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "goal-legacy-allocation",
+                    "title": "Legacy Allocation Goal",
+                    "targetAmount": 25000.0,
+                    "statusLifecycle": "active"
+                }),
+            )
+            .await
+            .expect("apply goal create");
+        assert!(goal_created, "expected goal create to apply");
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::GoalsAllocation,
+                "allocation-legacy-percent".to_string(),
+                SyncOperation::Create,
+                "evt-allocation-legacy-percent".to_string(),
+                "2026-03-30T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({
+                    "id": "allocation-legacy-percent",
+                    "goalId": "goal-legacy-allocation",
+                    "accountId": "acc-legacy-allocation",
+                    "percentAllocation": 33.5
+                }),
+            )
+            .await
+            .expect("apply legacy allocation create");
+        assert!(applied, "expected legacy allocation create to apply");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let share_percent_value: f64 = goals_allocation::table
+            .filter(goals_allocation::id.eq("allocation-legacy-percent"))
+            .select(goals_allocation::share_percent)
+            .first(&mut conn)
+            .expect("goals allocation row");
+        assert_eq!(share_percent_value, 33.5);
+    }
+
+    #[tokio::test]
+    async fn replay_accepts_import_profile_payload() {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool.clone(), writer);
         let mut conn = get_connection(&pool).expect("conn");
         insert_account_for_test(&mut conn, "acc-import-profile").expect("insert account");
 
+        // Insert a template that the account link can reference
+        diesel::insert_into(import_templates::table)
+            .values((
+                import_templates::id.eq("tmpl-import-profile"),
+                import_templates::name.eq("Broker Mapping"),
+                import_templates::scope.eq("ACCOUNT"),
+                import_templates::config.eq("{\"rules\":[]}"),
+                import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                    "2026-02-19 00:00:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap()),
+                import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                    "2026-02-19 00:00:00",
+                    "%Y-%m-%d %H:%M:%S",
+                )
+                .unwrap()),
+            ))
+            .execute(&mut conn)
+            .expect("insert template");
+
+        // Current format: entity_id is the UUID `id` column; payload includes `id`.
         let applied = repo
             .apply_remote_event_lww(
                 SyncEntity::ActivityImportProfile,
-                "acc-import-profile".to_string(),
+                "link-uuid-001".to_string(),
                 SyncOperation::Create,
-                "evt-import-profile-camel".to_string(),
+                "evt-import-profile-new".to_string(),
                 "2026-02-19T00:00:00Z".to_string(),
                 1,
                 serde_json::json!({
+                    "id": "link-uuid-001",
                     "accountId": "acc-import-profile",
-                    "name": "Broker Mapping",
-                    "config": "{\"rules\":[]}",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-profile",
                     "createdAt": "2026-02-19 00:00:00",
                     "updatedAt": "2026-02-19 00:00:00"
                 }),
@@ -2362,12 +3154,157 @@ mod tests {
             .expect("apply import profile create");
         assert!(applied, "expected import profile create to apply");
 
-        let name_value: String = activity_import_profiles::table
-            .filter(activity_import_profiles::account_id.eq("acc-import-profile"))
-            .select(activity_import_profiles::name)
+        let template_id_value: String = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-profile"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
+            .select(import_account_templates::template_id)
             .first(&mut conn)
-            .expect("import profile row");
-        assert_eq!(name_value, "Broker Mapping");
+            .expect("import account template row");
+        assert_eq!(template_id_value, "tmpl-import-profile");
+
+        // Legacy format (pre-id-column): entity_id was the account_id UUID, no `id` in payload.
+        // The generic replay injects `id = entity_id`, so this maps cleanly for migrated rows
+        // (migration sets id = account_id for all pre-existing rows).
+        insert_account_for_test(&mut conn, "acc-import-legacy").expect("insert account");
+        let applied_legacy = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "acc-import-legacy".to_string(), // old format: entity_id = account_id
+                SyncOperation::Create,
+                "evt-import-profile-legacy".to_string(),
+                "2026-02-19T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({
+                    // no "id" field — legacy payload
+                    "accountId": "acc-import-legacy",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-profile",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:00"
+                }),
+            )
+            .await
+            .expect("apply legacy import profile create");
+        assert!(
+            applied_legacy,
+            "expected legacy import profile create to apply"
+        );
+
+        let legacy_id: String = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-legacy"))
+            .select(import_account_templates::id)
+            .first(&mut conn)
+            .expect("legacy import account template row");
+        // id was injected from entity_id (= account_id), matching migration behaviour
+        assert_eq!(legacy_id, "acc-import-legacy");
+    }
+
+    #[tokio::test]
+    async fn replay_updates_import_profile_with_stable_id() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-import-update").expect("insert account");
+
+        diesel::insert_into(import_templates::table)
+            .values(vec![
+                (
+                    import_templates::id.eq("tmpl-import-a"),
+                    import_templates::name.eq("Broker Mapping A"),
+                    import_templates::scope.eq("ACCOUNT"),
+                    import_templates::config.eq("{\"rules\":[]}"),
+                    import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                    import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                ),
+                (
+                    import_templates::id.eq("tmpl-import-b"),
+                    import_templates::name.eq("Broker Mapping B"),
+                    import_templates::scope.eq("ACCOUNT"),
+                    import_templates::config.eq("{\"rules\":[]}"),
+                    import_templates::created_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                    import_templates::updated_at.eq(chrono::NaiveDateTime::parse_from_str(
+                        "2026-02-19 00:00:00",
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .unwrap()),
+                ),
+            ])
+            .execute(&mut conn)
+            .expect("insert templates");
+
+        let created = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "link-uuid-stable".to_string(),
+                SyncOperation::Create,
+                "evt-import-profile-create".to_string(),
+                "2026-02-19T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "link-uuid-stable",
+                    "accountId": "acc-import-update",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-a",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:00"
+                }),
+            )
+            .await
+            .expect("apply import profile create");
+        assert!(created, "expected import profile create to apply");
+
+        let updated = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityImportProfile,
+                "link-uuid-stable".to_string(),
+                SyncOperation::Update,
+                "evt-import-profile-update".to_string(),
+                "2026-02-19T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({
+                    "id": "link-uuid-stable",
+                    "accountId": "acc-import-update",
+                    "importType": "ACTIVITY",
+                    "templateId": "tmpl-import-b",
+                    "createdAt": "2026-02-19 00:00:00",
+                    "updatedAt": "2026-02-19 00:00:01"
+                }),
+            )
+            .await
+            .expect("apply import profile update");
+        assert!(updated, "expected import profile update to apply");
+
+        let row_count: i64 = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-update"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("import account template count");
+        assert_eq!(row_count, 1, "update should not duplicate the link row");
+
+        let (link_id, template_id): (String, String) = import_account_templates::table
+            .filter(import_account_templates::account_id.eq("acc-import-update"))
+            .filter(import_account_templates::context_kind.eq("CSV_ACTIVITY"))
+            .select((
+                import_account_templates::id,
+                import_account_templates::template_id,
+            ))
+            .first(&mut conn)
+            .expect("import account template row");
+        assert_eq!(link_id, "link-uuid-stable");
+        assert_eq!(template_id, "tmpl-import-b");
     }
 
     #[tokio::test]
@@ -2611,8 +3548,8 @@ mod tests {
                     "title": "Conflicting Goal",
                     "description": serde_json::Value::Null,
                     "targetAmount": 10.0,
-                    "isAchieved": false,
-                    "is_achieved": true
+                    "statusLifecycle": "active",
+                    "status_lifecycle": "archived"
                 }),
             )
             .await;
@@ -2627,5 +3564,327 @@ mod tests {
             "error should mention conflicting alias values: {}",
             err_msg
         );
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_create_upserts_taxonomy_and_categories() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-custom-1".to_string(),
+                SyncOperation::Create,
+                "evt-tax-create".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "tax-custom-1",
+                        "name": "My Sectors",
+                        "color": "#ff0000",
+                        "description": null,
+                        "isSystem": 0,
+                        "isSingleSelect": 0,
+                        "sortOrder": 99,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-01T00:00:00+00:00"
+                    },
+                    "categories": [
+                        {
+                            "id": "cat-a",
+                            "taxonomyId": "tax-custom-1",
+                            "parentId": null,
+                            "name": "Tech",
+                            "key": "tech",
+                            "color": "#00ff00",
+                            "description": null,
+                            "sortOrder": 1,
+                            "createdAt": "2026-03-01T00:00:00+00:00",
+                            "updatedAt": "2026-03-01T00:00:00+00:00"
+                        },
+                        {
+                            "id": "cat-b",
+                            "taxonomyId": "tax-custom-1",
+                            "parentId": null,
+                            "name": "Finance",
+                            "key": "finance",
+                            "color": "#0000ff",
+                            "description": "Financial sector",
+                            "sortOrder": 2,
+                            "createdAt": "2026-03-01T00:00:00+00:00",
+                            "updatedAt": "2026-03-01T00:00:00+00:00"
+                        }
+                    ]
+                }),
+            )
+            .await
+            .expect("apply custom taxonomy create");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let tax_name: String = taxonomies::table
+            .find("tax-custom-1")
+            .select(taxonomies::name)
+            .first(&mut conn)
+            .expect("taxonomy row");
+        assert_eq!(tax_name, "My Sectors");
+
+        let cat_count: i64 = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-custom-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("category count");
+        assert_eq!(cat_count, 2);
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_update_adds_and_removes_categories() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        // First: create with two categories
+        repo.apply_remote_event_lww(
+            SyncEntity::CustomTaxonomy,
+            "tax-upd-1".to_string(),
+            SyncOperation::Create,
+            "evt-1".to_string(),
+            "2026-03-01T00:00:00Z".to_string(),
+            1,
+            serde_json::json!({
+                "taxonomy": {
+                    "id": "tax-upd-1", "name": "Original", "color": "#aaa",
+                    "description": null, "isSystem": 0, "isSingleSelect": 0,
+                    "sortOrder": 1,
+                    "createdAt": "2026-03-01T00:00:00+00:00",
+                    "updatedAt": "2026-03-01T00:00:00+00:00"
+                },
+                "categories": [
+                    { "id": "c1", "taxonomyId": "tax-upd-1", "parentId": null,
+                      "name": "Cat1", "key": "c1", "color": "#111",
+                      "description": null, "sortOrder": 1,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" },
+                    { "id": "c2", "taxonomyId": "tax-upd-1", "parentId": null,
+                      "name": "Cat2", "key": "c2", "color": "#222",
+                      "description": null, "sortOrder": 2,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" }
+                ]
+            }),
+        )
+        .await
+        .expect("create");
+
+        // Update: remove c2, add c3, rename taxonomy
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-upd-1".to_string(),
+                SyncOperation::Update,
+                "evt-2".to_string(),
+                "2026-03-02T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "tax-upd-1", "name": "Renamed", "color": "#bbb",
+                        "description": "Now with description", "isSystem": 0,
+                        "isSingleSelect": 1, "sortOrder": 1,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-02T00:00:00+00:00"
+                    },
+                    "categories": [
+                        { "id": "c1", "taxonomyId": "tax-upd-1", "parentId": null,
+                          "name": "Cat1-updated", "key": "c1", "color": "#111",
+                          "description": null, "sortOrder": 1,
+                          "createdAt": "2026-03-01T00:00:00+00:00",
+                          "updatedAt": "2026-03-02T00:00:00+00:00" },
+                        { "id": "c3", "taxonomyId": "tax-upd-1", "parentId": null,
+                          "name": "Cat3-new", "key": "c3", "color": "#333",
+                          "description": null, "sortOrder": 2,
+                          "createdAt": "2026-03-02T00:00:00+00:00",
+                          "updatedAt": "2026-03-02T00:00:00+00:00" }
+                    ]
+                }),
+            )
+            .await
+            .expect("update");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+
+        // Taxonomy was renamed
+        let name: String = taxonomies::table
+            .find("tax-upd-1")
+            .select(taxonomies::name)
+            .first(&mut conn)
+            .expect("taxonomy");
+        assert_eq!(name, "Renamed");
+
+        // c1 was updated, c2 was deleted, c3 was added
+        let cat_ids: Vec<String> = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-upd-1"))
+            .select(taxonomy_categories::id)
+            .order(taxonomy_categories::sort_order.asc())
+            .load(&mut conn)
+            .expect("cats");
+        assert_eq!(cat_ids, vec!["c1", "c3"]);
+
+        // c1 name was updated
+        let c1_name: String = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-upd-1"))
+            .filter(taxonomy_categories::id.eq("c1"))
+            .select(taxonomy_categories::name)
+            .first(&mut conn)
+            .expect("c1");
+        assert_eq!(c1_name, "Cat1-updated");
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_delete_cascades() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        // Create a taxonomy with categories
+        repo.apply_remote_event_lww(
+            SyncEntity::CustomTaxonomy,
+            "tax-del-1".to_string(),
+            SyncOperation::Create,
+            "evt-del-1".to_string(),
+            "2026-03-01T00:00:00Z".to_string(),
+            1,
+            serde_json::json!({
+                "taxonomy": {
+                    "id": "tax-del-1", "name": "ToDelete", "color": "#000",
+                    "description": null, "isSystem": 0, "isSingleSelect": 0,
+                    "sortOrder": 1,
+                    "createdAt": "2026-03-01T00:00:00+00:00",
+                    "updatedAt": "2026-03-01T00:00:00+00:00"
+                },
+                "categories": [
+                    { "id": "dc1", "taxonomyId": "tax-del-1", "parentId": null,
+                      "name": "D1", "key": "d1", "color": "#111",
+                      "description": null, "sortOrder": 1,
+                      "createdAt": "2026-03-01T00:00:00+00:00",
+                      "updatedAt": "2026-03-01T00:00:00+00:00" }
+                ]
+            }),
+        )
+        .await
+        .expect("create for delete test");
+
+        // Delete the taxonomy
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-del-1".to_string(),
+                SyncOperation::Delete,
+                "evt-del-2".to_string(),
+                "2026-03-02T00:00:00Z".to_string(),
+                2,
+                serde_json::json!({ "id": "tax-del-1" }),
+            )
+            .await
+            .expect("delete");
+        assert!(applied);
+
+        let mut conn = get_connection(&pool).expect("conn");
+
+        // Taxonomy gone
+        let tax_count: i64 = taxonomies::table
+            .filter(taxonomies::id.eq("tax-del-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("tax count");
+        assert_eq!(tax_count, 0);
+
+        // Categories cascaded
+        let cat_count: i64 = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-del-1"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("cat count");
+        assert_eq!(cat_count, 0);
+    }
+
+    #[tokio::test]
+    async fn replay_custom_taxonomy_rejects_system_payload() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let result = repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "instrument_type".to_string(),
+                SyncOperation::Update,
+                "evt-system-hack".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "taxonomy": {
+                        "id": "instrument_type", "name": "Hacked", "color": "#000",
+                        "description": null, "isSystem": 1, "isSingleSelect": 0,
+                        "sortOrder": 1,
+                        "createdAt": "2026-03-01T00:00:00+00:00",
+                        "updatedAt": "2026-03-01T00:00:00+00:00"
+                    },
+                    "categories": []
+                }),
+            )
+            .await;
+
+        assert!(result.is_err(), "should reject system taxonomy payload");
+        assert!(
+            result.unwrap_err().to_string().contains("system taxonomy"),
+            "error should mention system taxonomy"
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_import_run_upserts_user_initiated_run() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account_for_test(&mut conn, "acc-import-run").expect("insert account");
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::ImportRun,
+                "run-csv-1".to_string(),
+                SyncOperation::Create,
+                "evt-run-1".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({
+                    "id": "run-csv-1",
+                    "account_id": "acc-import-run",
+                    "source_system": "csv",
+                    "run_type": "IMPORT",
+                    "mode": "INCREMENTAL",
+                    "status": "APPLIED",
+                    "started_at": "2026-03-01T00:00:00+00:00",
+                    "finished_at": "2026-03-01T00:01:00+00:00",
+                    "review_mode": "NEVER",
+                    "applied_at": "2026-03-01T00:01:00+00:00",
+                    "checkpoint_in": null,
+                    "checkpoint_out": null,
+                    "summary": null,
+                    "warnings": null,
+                    "error": null,
+                    "created_at": "2026-03-01T00:00:00+00:00",
+                    "updated_at": "2026-03-01T00:01:00+00:00"
+                }),
+            )
+            .await
+            .expect("apply import run create");
+        assert!(applied);
+
+        let source: String = crate::schema::import_runs::table
+            .find("run-csv-1")
+            .select(crate::schema::import_runs::source_system)
+            .first(&mut conn)
+            .expect("import run row");
+        assert_eq!(source, "csv");
     }
 }

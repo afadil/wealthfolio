@@ -1,4 +1,4 @@
-import { getHolding } from "@/adapters";
+import { createActivity, getAssetHoldings, getHolding } from "@/adapters";
 import { ActionPalette, type ActionPaletteGroup } from "@/components/action-palette";
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useHapticFeedback } from "@/hooks";
@@ -8,18 +8,30 @@ import { useQuoteHistory } from "@/hooks/use-quote-history";
 import { useSyncMarketDataMutation } from "@/hooks/use-sync-market-data";
 import { useAssetTaxonomyAssignments, useTaxonomy } from "@/hooks/use-taxonomies";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { AssetKind, Holding, Quote } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatedToggleGroup, Page, PageContent, PageHeader, SwipableView } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@wealthfolio/ui/components/ui/alert-dialog";
 import { Tabs, TabsContent } from "@wealthfolio/ui/components/ui/tabs";
 import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { AlternativeAssetContent, useAlternativeAssetActions } from "./alternative-asset-content";
 import { ValueHistoryDataGrid } from "./alternative-assets";
 import AssetDetailCard from "./asset-detail-card";
@@ -85,6 +97,16 @@ interface AssetDetailData {
     close: number;
     adjclose: number;
   } | null;
+  bondSpec?: {
+    maturityDate?: string | null;
+    couponRate?: number | null;
+    couponFrequency?: string | null;
+  } | null;
+  optionSpec?: {
+    right?: string | null;
+    strike?: number | null;
+    expiration?: string | null;
+  } | null;
 }
 
 type AssetTab = "overview" | "lots" | "history";
@@ -123,6 +145,18 @@ export const AssetProfilePage = () => {
   >("general");
   const { triggerHaptic } = useHapticFeedback();
   const isMobile = useIsMobileViewport();
+
+  const fxTabs = useMemo(() => {
+    const items: { value: "overview" | "quotes"; label: string }[] = [
+      { value: "overview", label: "Overview" },
+      { value: "quotes", label: "Quotes" },
+    ];
+    return items;
+  }, []);
+
+  const [fxActiveTab, setFxActiveTab] = useState<"overview" | "quotes">(
+    queryParams.get("tab") === "quotes" ? "quotes" : "overview",
+  );
 
   const {
     data: assetProfile,
@@ -286,8 +320,73 @@ export const AssetProfilePage = () => {
     return quoteHistory?.at(0) ?? null;
   }, [quoteHistory]);
 
+  // Bond metadata for display (only when asset is a bond)
+  const bondSpec = useMemo(() => {
+    if (assetProfile?.instrumentType !== "BOND" || !assetProfile?.metadata) return null;
+    const bond = assetProfile.metadata.bond as
+      | {
+          maturityDate?: string | null;
+          couponRate?: number | null;
+          couponFrequency?: string | null;
+        }
+      | undefined;
+    if (!bond || (!bond.maturityDate && bond.couponRate == null)) return null;
+    return bond;
+  }, [assetProfile]);
+
+  // Option metadata for display (only when asset is an option)
+  const optionSpec = useMemo(() => {
+    if (assetProfile?.instrumentType !== "OPTION" || !assetProfile?.metadata) return null;
+    const option = assetProfile.metadata.option as
+      | { right?: string | null; strike?: number | null; expiration?: string | null }
+      | undefined;
+    if (!option || (!option.right && option.strike == null && !option.expiration)) return null;
+    return option;
+  }, [assetProfile]);
+
+  const isExpiredOption = useMemo(() => {
+    if (!optionSpec?.expiration) return false;
+    // Compare date-only: expired once the calendar day after expiration has started
+    const today = new Date().toISOString().split("T")[0];
+    return optionSpec.expiration < today;
+  }, [optionSpec]);
+
+  const [confirmExpiryOpen, setConfirmExpiryOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const confirmExpiryMutation = useMutation({
+    mutationFn: async () => {
+      const accountHoldings = await getAssetHoldings(assetId);
+      const nonZeroHoldings = accountHoldings.filter((h) => h.quantity > 0);
+      if (nonZeroHoldings.length === 0) throw new Error("No open positions found");
+
+      for (const h of nonZeroHoldings) {
+        await createActivity({
+          idempotencyKey: generateId("option-expiry"),
+          accountId: h.accountId,
+          activityType: "ADJUSTMENT",
+          subtype: "OPTION_EXPIRY",
+          activityDate: optionSpec?.expiration ?? new Date().toISOString().split("T")[0],
+          symbol: { id: assetId },
+          quantity: String(h.quantity),
+          unitPrice: "0",
+          fee: "0",
+          currency: h.localCurrency,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success("Option expiry recorded");
+    },
+    onError: (error) => {
+      toast.error("Failed to record option expiry", { description: String(error) });
+    },
+  });
+
   const { saveQuoteMutation, deleteQuoteMutation } = useQuoteMutations(assetId);
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
+  const updateMarketDataMutation = useSyncMarketDataMutation(false);
 
   // Determine if manual tracking based on asset's quoteMode
   const isManualPricingMode = assetProfile?.quoteMode === "MANUAL";
@@ -386,8 +485,10 @@ export const AssetProfilePage = () => {
       currency: holding.localCurrency ?? holding.instrument?.currency ?? baseCurrency,
       quoteCurrency: quoteData?.quoteCurrency ?? null,
       quote: quoteData?.quote ?? null,
+      bondSpec: bondSpec ?? null,
+      optionSpec: optionSpec ?? null,
     };
-  }, [holding, quote]);
+  }, [holding, quote, bondSpec, optionSpec]);
 
   // Build toggle items dynamically based on available data
   const toggleItems = useMemo(() => {
@@ -589,10 +690,14 @@ export const AssetProfilePage = () => {
   const isLoading = isHoldingLoading || isQuotesLoading || isAssetProfileLoading;
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
 
+  const handleUpdateQuotes = useCallback(() => {
+    if (!profile?.id) return;
+    triggerHaptic();
+    updateMarketDataMutation.mutate([profile.id]);
+  }, [profile?.id, updateMarketDataMutation, triggerHaptic]);
+
   const handleRefreshQuotes = useCallback(() => {
-    if (!profile?.id) {
-      return;
-    }
+    if (!profile?.id) return;
     triggerHaptic();
     syncMarketDataMutation.mutate([profile.id]);
   }, [profile?.id, syncMarketDataMutation, triggerHaptic]);
@@ -622,45 +727,120 @@ export const AssetProfilePage = () => {
       </Page>
     ); // Show loading spinner
 
+  // FX assets use tabs: Overview (with chart) | Quotes
+
   // Simplified view for quote-only assets (like FX rates)
   if (assetProfile?.kind === "FX") {
     return (
       <Page>
         <PageHeader
-          heading="Quote History"
-          text={assetId}
+          heading={assetProfile.displayCode ?? assetId}
+          text={assetProfile.name ?? ""}
           onBack={handleBack}
           actions={
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleRefreshQuotesWithConfirm}
-              disabled={syncMarketDataMutation.isPending}
-              title="Refresh Quote"
-            >
-              <Icons.Refresh
-                className={`h-4 w-4 ${syncMarketDataMutation.isPending ? "animate-spin" : ""}`}
+            <div className="flex items-center gap-2">
+              <AnimatedToggleGroup
+                items={fxTabs}
+                value={fxActiveTab}
+                onValueChange={(next: "overview" | "quotes") => {
+                  if (next === fxActiveTab) return;
+                  triggerHaptic();
+                  setFxActiveTab(next);
+                  const url = `${location.pathname}?tab=${next}`;
+                  navigate(url, { replace: true });
+                }}
+                className="mr-2"
               />
-            </Button>
+              <ActionPalette
+                open={actionPaletteOpen}
+                onOpenChange={setActionPaletteOpen}
+                title={assetProfile.displayCode ?? assetId}
+                groups={
+                  [
+                    {
+                      title: "Manage",
+                      items: [
+                        {
+                          icon: Icons.Download,
+                          label: "Update Price",
+                          onClick: handleUpdateQuotes,
+                        },
+                        {
+                          icon: Icons.Refresh,
+                          label: "Refresh History",
+                          onClick: handleRefreshQuotesWithConfirm,
+                        },
+                        {
+                          icon: Icons.Pencil,
+                          label: "Edit",
+                          onClick: () => setEditSheetOpen(true),
+                        },
+                      ],
+                    },
+                  ] satisfies ActionPaletteGroup[]
+                }
+                trigger={
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <Icons.DotsThreeVertical className="h-5 w-5" weight="fill" />
+                  </Button>
+                }
+              />
+            </div>
           }
         />
         <PageContent>
-          <QuoteHistoryDataGrid
-            data={quoteHistory ?? []}
-            assetId={assetId}
-            currency={profile?.currency ?? baseCurrency}
-            assetKind={assetProfile?.kind}
-            isManualDataSource={isManualPricingMode}
-            onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
-            onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
-            onChangeDataSource={(isManual) => {
-              updateQuoteModeMutation.mutate({
-                assetId: assetId,
-                quoteMode: isManual ? "MANUAL" : "MARKET",
-              });
-            }}
-          />
+          {fxActiveTab === "overview" && (
+            <div className="space-y-4">
+              <AssetHistoryCard
+                assetId={assetId}
+                currency={quote?.currency ?? profile?.currency ?? baseCurrency}
+                marketPrice={quote?.close ?? 0}
+                totalGainAmount={0}
+                totalGainPercent={0}
+                quoteHistory={quoteHistory ?? []}
+                className="w-full"
+              />
+
+              {/* Type badge */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  FX Rate
+                </Badge>
+              </div>
+
+              {/* Notes section */}
+              <p className="text-muted-foreground text-sm">
+                {assetProfile?.notes || "No notes added."}
+              </p>
+            </div>
+          )}
+          {fxActiveTab === "quotes" && (
+            <QuoteHistoryDataGrid
+              data={quoteHistory ?? []}
+              assetId={assetId}
+              currency={profile?.currency ?? baseCurrency}
+              assetKind={assetProfile?.kind}
+              isManualDataSource={isManualPricingMode}
+              onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
+              onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+              onChangeDataSource={(isManual) => {
+                updateQuoteModeMutation.mutate({
+                  assetId: assetId,
+                  quoteMode: isManual ? "MANUAL" : "MARKET",
+                });
+              }}
+            />
+          )}
         </PageContent>
+
+        <AssetEditSheet
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+          asset={assetProfile ?? null}
+          latestQuote={quote}
+          defaultTab="general"
+        />
       </Page>
     );
   }
@@ -790,14 +970,28 @@ export const AssetProfilePage = () => {
                             onClick: () =>
                               navigate(`/activities/manage?assetId=${encodeURIComponent(assetId)}`),
                           },
+                          ...(isExpiredOption
+                            ? [
+                                {
+                                  icon: Icons.XCircle,
+                                  label: "Confirm Expiry",
+                                  onClick: () => setConfirmExpiryOpen(true),
+                                },
+                              ]
+                            : []),
                         ],
                       },
                       {
                         title: "Manage",
                         items: [
                           {
+                            icon: Icons.Download,
+                            label: "Update Price",
+                            onClick: handleUpdateQuotes,
+                          },
+                          {
                             icon: Icons.Refresh,
-                            label: "Refresh Price",
+                            label: "Refresh History",
                             onClick: handleRefreshQuotesWithConfirm,
                           },
                           {
@@ -1094,6 +1288,30 @@ export const AssetProfilePage = () => {
         onOpenChange={setRefreshConfirmOpen}
         onConfirm={handleRefreshQuotes}
       />
+
+      {/* Confirm Option Expiry Dialog */}
+      <AlertDialog open={confirmExpiryOpen} onOpenChange={setConfirmExpiryOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm option expiry</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will record the option as expired worthless, removing the position with no cash
+              effect. This action cannot be easily undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmExpiryMutation.mutate();
+                setConfirmExpiryOpen(false);
+              }}
+            >
+              Confirm Expiry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Sheet (for regular assets) */}
       <AssetEditSheet

@@ -63,6 +63,7 @@ pub struct SyncDeviceConfigDB {
     pub key_version: Option<i32>,
     pub trust_state: String,
     pub last_bootstrap_at: Option<String>,
+    pub min_snapshot_created_at: Option<String>,
 }
 
 #[derive(

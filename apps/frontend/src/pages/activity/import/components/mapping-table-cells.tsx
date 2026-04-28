@@ -12,7 +12,7 @@ import {
   type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { isCashSymbol, isSymbolRequired } from "@/lib/activity-utils";
+import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
 import {
   Badge,
   SearchableSelect,
@@ -25,6 +25,7 @@ import {
 } from "@wealthfolio/ui";
 import { useState } from "react";
 import { findMappedActivityType } from "../utils/activity-type-mapping";
+import { ACTIVITY_SKIP } from "../utils/draft-utils";
 
 const SKIP_FIELD_VALUE = "__skip__";
 
@@ -48,7 +49,8 @@ export function MappingHeaderCell({
 }) {
   const [editingHeader, setEditingHeader] = useState<ImportFormat | null>(null);
   const mappedHeader = mapping.fieldMappings[field];
-  const isMapped = typeof mappedHeader === "string" && headers.includes(mappedHeader);
+  const displayHeader = Array.isArray(mappedHeader) ? mappedHeader[0] : mappedHeader;
+  const isMapped = displayHeader ? headers.includes(displayHeader) : false;
   const isEditing = editingHeader === field || !isMapped;
   const isRequired = IMPORT_REQUIRED_FIELDS.includes(field as ImportRequiredField);
 
@@ -68,7 +70,7 @@ export function MappingHeaderCell({
             handleColumnMapping(field, val === SKIP_FIELD_VALUE ? "" : val);
             setEditingHeader(null);
           }}
-          value={mappedHeader || SKIP_FIELD_VALUE}
+          value={displayHeader || SKIP_FIELD_VALUE}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
           <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
@@ -98,10 +100,10 @@ export function MappingHeaderCell({
         <Button
           type="button"
           variant="ghost"
-          className="text-muted-foreground h-8 py-0 pl-0 font-normal"
+          className="text-muted-foreground h-8 rounded-md py-0 pl-0 font-normal"
           onClick={() => setEditingHeader(field)}
         >
-          {mappedHeader || (isRequired ? "Select column" : "Ignore")}
+          {displayHeader || (isRequired ? "Select column" : "Ignore")}
         </Button>
       )}
     </div>
@@ -110,42 +112,60 @@ export function MappingHeaderCell({
 
 interface ActivityTypeDisplayCellProps {
   csvType: string;
-  appType: ActivityType | null;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  appType: string | null;
+  subtype?: string;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
 }
 function ActivityTypeDisplayCell({
   csvType,
   appType,
+  subtype,
   handleActivityTypeMapping,
 }: ActivityTypeDisplayCellProps) {
   const trimmedCsvType = csvType.trim().toUpperCase();
   const displayValue =
     trimmedCsvType.length > 27 ? `${trimmedCsvType.substring(0, 27)}...` : trimmedCsvType;
+  // Show subtype when it differs from the resolved activity type (provides context)
+  const showSubtype = subtype && subtype.toUpperCase() !== trimmedCsvType;
 
   return (
     <div className="flex items-center gap-2">
-      <span
-        title={trimmedCsvType}
-        className={cn("shrink-0 truncate text-xs font-medium", !appType && "text-destructive")}
-      >
-        {displayValue}
-      </span>
+      <div className="shrink-0">
+        <span
+          title={trimmedCsvType}
+          className={cn("truncate text-xs font-medium", !appType && "text-destructive")}
+        >
+          {displayValue}
+        </span>
+        {showSubtype && <span className="text-muted-foreground ml-1 text-[10px]">{subtype}</span>}
+      </div>
       <span className="text-muted-foreground shrink-0">→</span>
       <div className="ml-auto">
         {appType ? (
           <Badge
-            variant="secondary"
-            className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+            variant={appType === ACTIVITY_SKIP ? "outline" : "secondary"}
+            className={cn(
+              "cursor-pointer text-xs transition-colors",
+              appType === ACTIVITY_SKIP
+                ? "text-muted-foreground hover:bg-muted/80 line-through"
+                : "hover:bg-secondary/80",
+            )}
             onClick={() => handleActivityTypeMapping(trimmedCsvType, "" as ActivityType)}
           >
-            {appType}
+            {appType === ACTIVITY_SKIP ? "Skipped" : appType}
           </Badge>
         ) : (
           <SearchableSelect
-            options={Object.values(ActivityType).map((type) => ({
-              value: type,
-              label: type,
-            }))}
+            options={[
+              ...Object.values(ActivityType)
+                .filter((t) => t !== "UNKNOWN")
+                .map((type) => ({ value: type, label: type })),
+              {
+                value: ACTIVITY_SKIP,
+                label: "SKIP",
+                className: "text-muted-foreground italic line-through",
+              },
+            ]}
             value=""
             onValueChange={(newType) =>
               handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
@@ -172,16 +192,27 @@ function AccountIdDisplayCell({
   handleAccountIdMapping,
 }: AccountIdDisplayCellProps) {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
-  if (!csvAccountId || csvAccountId.trim() === "") {
-    return null;
-  }
+  const trimmedAccountId = csvAccountId.trim();
+  const sourceLabel = trimmedAccountId || "Missing account";
 
   if (mappedAccountId) {
+    // When csvAccountId is empty the account comes from the default (no CSV column),
+    // so skip the "Missing account →" prefix and just show the resolved account.
+    if (!trimmedAccountId) {
+      return (
+        <Badge
+          variant="secondary"
+          className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+          onClick={() => handleAccountIdMapping(csvAccountId, "")}
+        >
+          {mappedAccountId}
+        </Badge>
+      );
+    }
     return (
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground shrink-0 truncate text-xs" title={csvAccountId}>
-          {csvAccountId}
+        <span className="text-muted-foreground shrink-0 truncate text-xs" title={trimmedAccountId}>
+          {trimmedAccountId}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
         <Badge
@@ -202,9 +233,9 @@ function AccountIdDisplayCell({
           "shrink-0 truncate text-xs",
           isInvalid ? "text-destructive" : "text-muted-foreground",
         )}
-        title={csvAccountId}
+        title={sourceLabel}
       >
-        {csvAccountId}
+        {sourceLabel}
       </span>
       <span className="text-muted-foreground shrink-0">→</span>
       <div className="ml-auto min-w-[180px]">
@@ -212,7 +243,7 @@ function AccountIdDisplayCell({
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
             setSelectedAccount(account);
-            handleAccountIdMapping(csvAccountId, account.id);
+            handleAccountIdMapping(trimmedAccountId, account.id);
           }}
           variant="form"
           className={MAPPING_TRIGGER_UNMAPPED_CLASS}
@@ -324,7 +355,7 @@ export function MappingCell({
   mapping: ImportMappingData;
   accounts: Account[];
   getMappedValue: (row: CsvRowData, field: ImportFormat) => string;
-  handleActivityTypeMapping: (csvActivity: string, activityType: ActivityType) => void;
+  handleActivityTypeMapping: (csvActivity: string, activityType: string) => void;
   handleSymbolMapping: (
     csvSymbol: string,
     newSymbol: string,
@@ -342,6 +373,8 @@ export function MappingCell({
     // For symbol field, if it's invalid (e.g. empty but required), we might still want to render SymbolDisplayCell
     if (field === ImportFormat.SYMBOL && invalidSymbols.includes(value || "")) {
       // Fall through to SymbolDisplayCell rendering
+    } else if (field === ImportFormat.ACCOUNT) {
+      // Fall through so the row shows the missing-account state.
     } else {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
@@ -350,10 +383,12 @@ export function MappingCell({
   // Special fields with custom renderers
   if (field === ImportFormat.ACTIVITY_TYPE) {
     const appType = findMappedActivityType(value, mapping.activityMappings);
+    const subtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
     return (
       <ActivityTypeDisplayCell
         csvType={value}
         appType={appType}
+        subtype={subtype}
         handleActivityTypeMapping={handleActivityTypeMapping}
       />
     );
@@ -362,8 +397,9 @@ export function MappingCell({
   if (field === ImportFormat.SYMBOL) {
     // Skip symbol display when not required (pure cash types, cash symbols)
     const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
+    const csvSubtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
     const appType = csvType ? findMappedActivityType(csvType, mapping.activityMappings) : null;
-    if (appType && (!isSymbolRequired(appType) || isCashSymbol(value))) {
+    if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(value))) {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
 
@@ -380,8 +416,9 @@ export function MappingCell({
   }
 
   if (field === ImportFormat.ACCOUNT) {
-    const isInvalid = invalidAccounts.includes(value || "");
-    const mappedAccountId = mapping.accountMappings?.[value];
+    const mappingKey = value?.trim() || "";
+    const isInvalid = mappingKey === "" || invalidAccounts.includes(mappingKey);
+    const mappedAccountId = mapping.accountMappings?.[mappingKey];
     const account = accounts.find((acc) => acc.id === mappedAccountId);
     return (
       <AccountIdDisplayCell

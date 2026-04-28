@@ -1,9 +1,14 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Badge, Card, FacetedSearchInput } from "@wealthfolio/ui";
+import { Badge, Card, Input } from "@wealthfolio/ui";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
+import { useSettingsContext } from "@/lib/settings-provider";
+import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
+import { parseOccSymbol } from "@/lib/occ-symbol";
+import { cn, formatAmount, formatDate } from "@/lib/utils";
+import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -23,15 +28,12 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
-import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
-import { cn, formatAmount, formatDate } from "@/lib/utils";
-import { useSettingsContext } from "@/lib/settings-provider";
-import { ScrollArea, Separator } from "@wealthfolio/ui";
 import { isStaleQuote, ParsedAsset } from "./asset-utils";
 
 interface AssetsTableMobileProps {
   assets: ParsedAsset[];
   latestQuotes?: Record<string, LatestQuoteSnapshot>;
+  heldAssetIds: Set<string>;
   isLoading?: boolean;
   onEdit: (asset: ParsedAsset) => void;
   onDelete: (asset: ParsedAsset) => void;
@@ -45,6 +47,7 @@ interface AssetsTableMobileProps {
 export function AssetsTableMobile({
   assets,
   latestQuotes = {},
+  heldAssetIds,
   isLoading,
   onEdit,
   onDelete,
@@ -61,6 +64,7 @@ export function AssetsTableMobile({
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
   const [selectedAssetKinds, setSelectedAssetKinds] = useState<string[]>([]);
   const [selectedPriceStatus, setSelectedPriceStatus] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(["true"]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   // Get unique quote modes
@@ -98,6 +102,14 @@ export function AssetsTableMobile({
       filtered = filtered.filter((asset) => asset.kind && selectedAssetKinds.includes(asset.kind));
     }
 
+    // Filter by holding status (held/not held)
+    if (selectedStatus.length > 0) {
+      filtered = filtered.filter((asset) => {
+        const held = heldAssetIds.has(asset.id) ? "true" : "false";
+        return selectedStatus.includes(held);
+      });
+    }
+
     // Filter by price status
     if (selectedPriceStatus.length > 0) {
       filtered = filtered.filter((asset) => {
@@ -116,19 +128,23 @@ export function AssetsTableMobile({
     searchQuery,
     selectedDataSources,
     selectedAssetKinds,
+    selectedStatus,
     selectedPriceStatus,
     latestQuotes,
+    heldAssetIds,
   ]);
 
   const hasActiveFilters =
     selectedDataSources.length > 0 ||
     selectedAssetKinds.length > 0 ||
-    selectedPriceStatus.length > 0;
+    selectedPriceStatus.length > 0 ||
+    (selectedStatus.length > 0 && !(selectedStatus.length === 1 && selectedStatus[0] === "true"));
 
   const handleResetFilters = () => {
     setSelectedDataSources([]);
     setSelectedAssetKinds([]);
     setSelectedPriceStatus([]);
+    setSelectedStatus(["true"]);
   };
 
   if (isLoading) {
@@ -168,7 +184,12 @@ export function AssetsTableMobile({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
+        <Input
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="bg-secondary/30 h-10 flex-1 rounded-full border-none"
+        />
         <Button
           variant="outline"
           size="icon"
@@ -191,21 +212,36 @@ export function AssetsTableMobile({
                 onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
                 className="hover:bg-muted/60 focus-visible:ring-ring flex flex-1 items-center gap-3 overflow-hidden rounded-md text-left transition"
               >
-                <TickerAvatar
-                  symbol={asset.displayCode ?? ""}
-                  className="h-10 w-10 flex-shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-semibold">
-                      {asset.displayCode ?? asset.name ?? "Unknown"}
-                    </p>
-                    <Badge variant="secondary" className="text-[10px] uppercase">
-                      {asset.quoteCcy}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground truncate text-sm">{asset.name ?? "-"}</p>
-                </div>
+                {(() => {
+                  const rawSymbol = asset.displayCode ?? "";
+                  const parsedOption = parseOccSymbol(rawSymbol);
+                  const displaySymbol = parsedOption
+                    ? parsedOption.underlying
+                    : (asset.displayCode ?? asset.name ?? "Unknown");
+                  const subtitle = parsedOption
+                    ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+                    : (asset.name ?? "-");
+                  const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
+                  return (
+                    <>
+                      <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate font-semibold">{displaySymbol}</p>
+                          {parsedOption ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Option
+                            </Badge>
+                          ) : null}
+                          <Badge variant="secondary" className="text-[10px] uppercase">
+                            {asset.quoteCcy}
+                          </Badge>
+                        </div>
+                        <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
+                      </div>
+                    </>
+                  );
+                })()}
               </button>
 
               <div className="flex flex-shrink-0 items-center gap-2">
@@ -261,11 +297,10 @@ export function AssetsTableMobile({
                       onClick={() => onRefetchQuotes(asset)}
                       disabled={isRefetchingQuotes}
                     >
-                      Refetch quotes
+                      Refetch price history
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => onClassify?.(asset)}>
-                      <Icons.Tag className="mr-2 h-4 w-4" />
                       Classify
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEdit(asset)}>Edit</DropdownMenuItem>
@@ -291,6 +326,75 @@ export function AssetsTableMobile({
           </SheetHeader>
           <ScrollArea className="flex-1 py-4">
             <div className="space-y-6">
+              {/* Status Filter */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                    Portfolio
+                  </h4>
+                  {selectedStatus.length > 0 &&
+                    !(selectedStatus.length === 1 && selectedStatus[0] === "true") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setSelectedStatus(["true"])}
+                      >
+                        Reset
+                      </Button>
+                    )}
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: "Current", value: "true" },
+                    { label: "Past", value: "false" },
+                  ].map((option) => {
+                    const isSelected = selectedStatus.includes(option.value);
+                    const count = assets.filter(
+                      (a) => (heldAssetIds.has(a.id) ? "true" : "false") === option.value,
+                    ).length;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStatus((prev) =>
+                            isSelected
+                              ? prev.filter((s) => s !== option.value)
+                              : [...prev, option.value],
+                          );
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-lg border p-3 text-sm transition-colors",
+                          isSelected
+                            ? "border-primary/50 bg-primary/5"
+                            : "hover:bg-muted/50 border-border",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={cn(
+                              "flex h-5 w-5 items-center justify-center rounded border-2 transition-colors",
+                              isSelected
+                                ? "border-primary bg-primary"
+                                : "border-muted-foreground/30",
+                            )}
+                          >
+                            {isSelected && <Icons.Check className="text-secondary h-3 w-3" />}
+                          </div>
+                          <span className="font-medium">{option.label}</span>
+                        </div>
+                        <Badge variant="secondary" className="ml-auto">
+                          {count}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Separator />
+
               {/* Data Source Filter */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">

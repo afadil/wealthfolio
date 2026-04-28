@@ -3,7 +3,7 @@ use crate::fx::currency::normalize_currency_code;
 use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::valuation_calculator::calculate_valuation;
-use crate::portfolio::valuation::valuation_model::DailyAccountValuation;
+use crate::portfolio::valuation::valuation_model::{DailyAccountValuation, NegativeBalanceInfo};
 use crate::portfolio::valuation::ValuationRepositoryTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::utils::time_utils;
@@ -16,23 +16,33 @@ use std::time::Instant;
 
 use super::DailyFxRateMap;
 
+/// Controls the scope of a valuation history recalculation.
+#[derive(Clone, Debug)]
+pub enum ValuationRecalcMode {
+    /// Delete all valuations and recalculate from the first snapshot.
+    Full,
+    /// Resume from the latest saved valuation date, only computing new dates forward.
+    IncrementalFromLast,
+    /// Delete valuations from `date` forward and recalculate from that date.
+    SinceDate(NaiveDate),
+}
+
 #[async_trait]
 pub trait ValuationServiceTrait: Send + Sync {
     /// Ensures the valuation history for the account is calculated and stored.
-    /// If `recalculate_all` is true, existing valuation data is deleted and fully recalculated.
-    /// Otherwise, it calculates incrementally from the last stored date (inclusive)
-    /// up to the latest available snapshot date.
+    ///
+    /// The `mode` controls how much history is recomputed:
+    /// - `Full`: delete all valuations and recalculate from the first snapshot.
+    /// - `IncrementalFromLast`: resume from the latest saved valuation date.
+    /// - `SinceDate(date)`: delete valuations from `date` forward and recalculate from that date.
     ///
     /// Args:
     ///     account_id: The ID of the account ("TOTAL" for portfolio aggregate).
-    ///     recalculate_all: Whether to force recalculation of the entire valuation data.
-    ///
-    /// Returns:
-    ///     A `Result` indicating success or an error.
+    ///     mode: Controls the recalculation scope.
     async fn calculate_valuation_history(
         &self,
         account_id: &str,
-        recalculate_all: bool,
+        mode: ValuationRecalcMode,
     ) -> CoreResult<()>;
 
     /// Loads the valuation data for the account within the specified date range.
@@ -70,6 +80,12 @@ pub trait ValuationServiceTrait: Send + Sync {
         account_ids: &[String],
         date: NaiveDate,
     ) -> CoreResult<Vec<DailyAccountValuation>>;
+
+    /// Returns info about accounts that have at least one negative total_value in their history.
+    fn get_accounts_with_negative_balance(
+        &self,
+        account_ids: &[String],
+    ) -> CoreResult<Vec<NegativeBalanceInfo>>;
 }
 
 #[derive(Clone)]
@@ -143,27 +159,36 @@ impl ValuationServiceTrait for ValuationService {
     async fn calculate_valuation_history(
         &self,
         account_id: &str,
-        recalculate_all: bool,
+        mode: ValuationRecalcMode,
     ) -> CoreResult<()> {
         let total_start_time = Instant::now();
         debug!(
-            "Starting valuation data update/recalculation for account '{}', recalculate_all: {}",
-            account_id, recalculate_all
+            "Starting valuation data update/recalculation for account '{}', mode: {:?}",
+            account_id, mode
         );
 
         let mut calculation_start_date: Option<NaiveDate> = None;
 
-        if recalculate_all {
-            self.valuation_repository
-                .delete_valuations_for_account(account_id)
-                .await?;
-        } else {
-            let last_saved_date_opt = self
-                .valuation_repository
-                .load_latest_valuation_date(account_id)?;
+        match &mode {
+            ValuationRecalcMode::Full => {
+                self.valuation_repository
+                    .delete_valuations_for_account(account_id, None)
+                    .await?;
+            }
+            ValuationRecalcMode::SinceDate(date) => {
+                self.valuation_repository
+                    .delete_valuations_for_account(account_id, Some(*date))
+                    .await?;
+                calculation_start_date = Some(*date);
+            }
+            ValuationRecalcMode::IncrementalFromLast => {
+                let last_saved_date_opt = self
+                    .valuation_repository
+                    .load_latest_valuation_date(account_id)?;
 
-            if let Some(last_saved) = last_saved_date_opt {
-                calculation_start_date = Some(last_saved);
+                if let Some(last_saved) = last_saved_date_opt {
+                    calculation_start_date = Some(last_saved);
+                }
             }
         }
 
@@ -272,42 +297,42 @@ impl ValuationServiceTrait for ValuationService {
                     .cloned()
                     .unwrap_or_default();
 
-                // Check for assets missing quotes that SHOULD have quotes
-                // (i.e., they have quotes elsewhere, just not for this date - indicates a gap)
-                // Assets with NO quotes at all are skipped - they'll be valued at ZERO
-                // and the health check will detect them
-                let missing_quotes_with_gap: Vec<_> = holdings_snapshot
+                // Count quotable positions (those with quotes somewhere in the range)
+                // and how many are missing a quote on this specific date.
+                let quotable_positions: Vec<_> = holdings_snapshot
                     .positions
                     .iter()
                     .filter(|(_, position)| !position.quantity.is_zero())
                     .map(|(symbol, _)| symbol)
-                    // Only flag as missing if the asset HAS quotes (somewhere) but not for this date
                     .filter(|symbol| assets_with_quotes.contains(*symbol))
+                    .cloned()
+                    .collect();
+
+                let missing_quotes: Vec<_> = quotable_positions
+                    .iter()
                     .filter(|symbol| !quotes_for_current_date.contains_key(*symbol))
                     .cloned()
                     .collect();
 
-                if !missing_quotes_with_gap.is_empty() {
+                // Full gap: no quotes at all for any quotable position → skip day
+                // to avoid recording a fake zero-value valuation.
+                if !quotable_positions.is_empty() && missing_quotes.len() == quotable_positions.len()
+                {
                     debug!(
-                        "Quote gap for {:?} on {} (account '{}'). Skipping day.",
-                        missing_quotes_with_gap, current_date, account_id_clone
+                        "No quotes for any quotable position on {} (account '{}'). Skipping day.",
+                        current_date, account_id_clone
                     );
                     return None;
                 }
 
-                // Check if there are any positions that need quotes
-                // but only consider positions that HAVE quotes somewhere
-                let has_quotable_positions = holdings_snapshot
-                    .positions
-                    .keys()
-                    .any(|symbol| assets_with_quotes.contains(symbol));
-
-                if quotes_for_current_date.is_empty() && has_quotable_positions {
+                // Partial gap: some quotes present, some missing → proceed.
+                // Missing positions valued at ZERO by the calculator, which is
+                // better than dropping the entire day (see #683).
+                if !missing_quotes.is_empty() {
                     debug!(
-                        "No quotes for date {} (account '{}'). Skipping day.",
-                        current_date, account_id_clone
+                        "Partial quote gap for {:?} on {} (account '{}').",
+                        missing_quotes, current_date, account_id_clone
                     );
-                    return None;
                 }
                 let account_curr = &holdings_snapshot.currency;
                 if account_curr != &base_curr_clone
@@ -391,5 +416,13 @@ impl ValuationServiceTrait for ValuationService {
         );
         self.valuation_repository
             .get_valuations_on_date(account_ids, date)
+    }
+
+    fn get_accounts_with_negative_balance(
+        &self,
+        account_ids: &[String],
+    ) -> CoreResult<Vec<NegativeBalanceInfo>> {
+        self.valuation_repository
+            .get_accounts_with_negative_balance(account_ids)
     }
 }

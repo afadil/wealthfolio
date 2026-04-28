@@ -15,6 +15,7 @@ import type {
   ActivitySearchResponse,
   ActivityUpdate,
   AccountValuation,
+  CheckSnapshotImportResult,
   ImportActivitiesResult,
   Asset,
   ContributionLimit,
@@ -31,6 +32,10 @@ import type {
   Quote,
   Settings,
   SimplePerformanceMetrics,
+  SnapshotHoldingInput,
+  SnapshotImportResult,
+  SnapshotInfo,
+  SnapshotInput,
   SymbolSearchResult,
   UpdateAssetProfile,
 } from './data-types';
@@ -179,19 +184,19 @@ export interface ActivitiesAPI {
   import(activities: ActivityImport[]): Promise<ImportActivitiesResult>;
 
   /**
-   * Check activities before import
-   * @param accountId Account identifier
+   * Check activities before import (read-only validation/preview)
    * @param activities Array of activities to check
    * @returns Promise resolving to validated activities
    */
-  checkImport(accountId: string, activities: ActivityImport[]): Promise<ActivityImport[]>;
+  checkImport(activities: ActivityImport[]): Promise<ActivityImport[]>;
 
   /**
    * Get import mapping configuration for an account
    * @param accountId Account identifier
+   * @param contextKind Optional context kind (defaults to 'ACTIVITY')
    * @returns Promise resolving to import mapping data
    */
-  getImportMapping(accountId: string): Promise<ImportMappingData>;
+  getImportMapping(accountId: string, contextKind?: string): Promise<ImportMappingData>;
 
   /**
    * Save import mapping configuration
@@ -199,6 +204,14 @@ export interface ActivitiesAPI {
    * @returns Promise resolving to saved mapping data
    */
   saveImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>;
+}
+
+/**
+ * A single dividend event returned by Yahoo Finance.
+ */
+export interface YahooDividend {
+  amount: number;
+  date: number; // unix seconds
 }
 
 /**
@@ -236,6 +249,13 @@ export interface MarketDataAPI {
    * @returns Promise resolving to array of provider info
    */
   getProviders(): Promise<MarketDataProviderInfo[]>;
+
+  /**
+   * Fetch dividend history for a symbol from Yahoo Finance.
+   * @param symbol Ticker symbol
+   * @returns Promise resolving to array of dividend events
+   */
+  fetchDividends(symbol: string): Promise<YahooDividend[]>;
 }
 
 /**
@@ -407,17 +427,34 @@ export interface GoalsAPI {
   update(goal: Goal): Promise<Goal>;
 
   /**
-   * Update goal allocations
-   * @param allocations Array of goal allocations
-   * @returns Promise that resolves when update is complete
+   * Get funding rules for a goal
+   * @param goalId Goal ID
+   * @returns Promise resolving to array of funding rules
    */
-  updateAllocations(allocations: GoalAllocation[]): Promise<void>;
+  getFunding(goalId: string): Promise<GoalAllocation[]>;
 
   /**
-   * Get goal allocations
-   * @returns Promise resolving to array of goal allocations
+   * Get funding rules across all goals
+   * @deprecated Use getAll() and getFunding(goalId). This compatibility shim will be removed in a future major version.
+   * @returns Promise resolving to array of funding rules
    */
   getAllocations(): Promise<GoalAllocation[]>;
+
+  /**
+   * Save funding rules for a goal
+   * @param goalId Goal ID
+   * @param rules Array of funding rule inputs
+   * @returns Promise resolving to saved rules
+   */
+  saveFunding(goalId: string, rules: GoalAllocation[]): Promise<GoalAllocation[]>;
+
+  /**
+   * Save funding rules grouped by goalId
+   * @deprecated Use saveFunding(goalId, rules). This compatibility shim will be removed in a future major version.
+   * @param allocations Array of funding rules
+   * @returns Promise resolving when funding rules are saved
+   */
+  updateAllocations(allocations: GoalAllocation[]): Promise<void>;
 }
 
 /**
@@ -435,7 +472,7 @@ export interface SettingsAPI {
    * @param settingsUpdate Updated settings data
    * @returns Promise resolving to updated settings
    */
-  update(settingsUpdate: Settings): Promise<Settings>;
+  update(settingsUpdate: Partial<Settings>): Promise<Settings>;
 
   /**
    * Create database backup
@@ -621,6 +658,36 @@ export interface NavigationAPI {
 }
 
 /**
+ * Toast notification APIs
+ * Allows addons to show toast notifications using the host application's toast system
+ */
+export interface ToastAPI {
+  /**
+   * Show a success toast
+   * @param message Message to display
+   */
+  success(message: string): void;
+
+  /**
+   * Show an error toast
+   * @param message Message to display
+   */
+  error(message: string): void;
+
+  /**
+   * Show a warning toast
+   * @param message Message to display
+   */
+  warning(message: string): void;
+
+  /**
+   * Show an info toast
+   * @param message Message to display
+   */
+  info(message: string): void;
+}
+
+/**
  * Query management APIs for React Query integration
  */
 export interface QueryAPI {
@@ -641,6 +708,30 @@ export interface QueryAPI {
    * @param queryKey The query key to refetch
    */
   refetchQueries(queryKey: string | string[]): void;
+}
+
+/**
+ * Snapshot management APIs
+ * For accounts using HOLDINGS tracking mode
+ */
+export interface SnapshotsAPI {
+  getAll(accountId: string, dateFrom?: string, dateTo?: string): Promise<SnapshotInfo[]>;
+  getByDate(accountId: string, date: string): Promise<Holding[]>;
+  save(
+    accountId: string,
+    holdings: SnapshotHoldingInput[],
+    cashBalances: Record<string, string>,
+    snapshotDate?: string,
+  ): Promise<void>;
+  checkImport(
+    accountId: string,
+    snapshots: SnapshotInput[],
+  ): Promise<CheckSnapshotImportResult>;
+  importSnapshots(
+    accountId: string,
+    snapshots: SnapshotInput[],
+  ): Promise<SnapshotImportResult>;
+  delete(accountId: string, date: string): Promise<void>;
 }
 
 /**
@@ -684,6 +775,9 @@ export interface HostAPI {
   /** File operations */
   files: FilesAPI;
 
+  /** Snapshot management for HOLDINGS mode accounts */
+  snapshots: SnapshotsAPI;
+
   /** Secrets management */
   secrets: SecretsAPI;
 
@@ -698,4 +792,7 @@ export interface HostAPI {
 
   /** React Query operations */
   query: QueryAPI;
+
+  /** Toast notification operations */
+  toast: ToastAPI;
 }

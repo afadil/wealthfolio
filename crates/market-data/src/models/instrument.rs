@@ -12,6 +12,8 @@ pub enum InstrumentKind {
     Crypto, // Cryptocurrencies
     Fx,     // Foreign exchange pairs
     Metal,  // Precious metals
+    Option, // Options contracts
+    Bond,   // Fixed-income instruments
 }
 
 /// Asset classification
@@ -47,6 +49,12 @@ pub enum InstrumentId {
 
     /// Precious metal
     Metal { code: Arc<str>, quote: Currency },
+
+    /// Options contract (OCC 21-char symbol)
+    Option { occ_symbol: Arc<str> },
+
+    /// Fixed-income instrument (ISIN)
+    Bond { isin: Arc<str> },
 }
 
 impl InstrumentId {
@@ -57,6 +65,8 @@ impl InstrumentId {
             Self::Crypto { .. } => AssetKind::Crypto,
             Self::Fx { .. } => AssetKind::FxRate,
             Self::Metal { .. } => AssetKind::Commodity,
+            Self::Option { .. } => AssetKind::Option,
+            Self::Bond { .. } => AssetKind::Security,
         }
     }
 
@@ -67,6 +77,8 @@ impl InstrumentId {
             Self::Crypto { .. } => InstrumentKind::Crypto,
             Self::Fx { .. } => InstrumentKind::Fx,
             Self::Metal { .. } => InstrumentKind::Metal,
+            Self::Option { .. } => InstrumentKind::Option,
+            Self::Bond { .. } => InstrumentKind::Bond,
         }
     }
 }

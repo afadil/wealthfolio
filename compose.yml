@@ -20,10 +20,28 @@ services:
       WF_DB_PATH: "/data/wealthfolio.db"
       # Required — generate with: openssl rand -base64 32
       WF_SECRET_KEY: "${WF_SECRET_KEY:?Set WF_SECRET_KEY}"
-      # Recommended for internet-facing deployments (Argon2id PHC hash)
+
+      # ── Authentication ────────────────────────────────────────────────
+      # Required when listening on 0.0.0.0 (the default for Docker).
+      # Provide an Argon2id PHC hash of your password.
+      #
+      # IMPORTANT — Docker Compose interpolates "$" in .env files and YAML:
+      #   .env file  → WF_AUTH_PASSWORD_HASH='$argon2id$v=19$...'  (single quotes)
+      #   .env file  → WF_AUTH_PASSWORD_HASH=$$argon2id$$v=19$$...  (double every $)
+      #   YAML inline → WF_AUTH_PASSWORD_HASH: '$$argon2id$$v=19$$...'  (double every $)
+      #
+      # Generate a hash:
+      #   printf 'your-password' | argon2 yoursalt16chars! -id -e
+      #
+      # If a reverse proxy handles auth instead, set WF_AUTH_REQUIRED: "false"
+      # and leave WF_AUTH_PASSWORD_HASH empty.
       WF_AUTH_PASSWORD_HASH: "${WF_AUTH_PASSWORD_HASH:-}"
       WF_AUTH_TOKEN_TTL_MINUTES: "${WF_AUTH_TOKEN_TTL_MINUTES:-60}"
-      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS:-*}"
+      # Set to "false" to skip the auth requirement (e.g. reverse proxy handles auth)
+      # WF_AUTH_REQUIRED: "true"
+
+      # Required when auth is enabled — set to your app's origin, e.g. https://wealthfolio.example.com
+      WF_CORS_ALLOW_ORIGINS: "${WF_CORS_ALLOW_ORIGINS}"
       WF_REQUEST_TIMEOUT_MS: "${WF_REQUEST_TIMEOUT_MS:-30000}"
     healthcheck:
       test:

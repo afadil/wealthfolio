@@ -137,7 +137,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
         onOpenChange={setRefreshConfirmOpen}
         onConfirm={handleRefreshQuotes}
       />
-      <Card className={className}>
+      <Card className={`flex flex-col ${className}`}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-md">
             <HoverCard>
@@ -190,7 +190,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
             </HoverCard>
           </CardTitle>
         </CardHeader>
-        <CardContent className="relative p-0">
+        <CardContent className="relative flex-1 p-0">
           <HistoryChart data={filteredData} />
           <IntervalSelector
             onIntervalSelect={handleIntervalSelect}

@@ -50,8 +50,8 @@ easy-to-use tool to track their investments and goals.
 - [x] Self-hosted web app with Docker support
 - [x] REST API server (Axum)
 - [x] Mobile app (iOS/Android via Tauri)
-- [ ] Wealthfolio Connect: Device sync with end-to-end encryption (E2EE)
-- [ ] Wealthfolio Connect: broker data sync service
+- [x] Wealthfolio Connect: Device sync with end-to-end encryption (E2EE)
+- [x] Wealthfolio Connect: broker data sync service
 
 **Wealthfolio Connect** is an optional paid subscription to sustain development:
 
@@ -60,13 +60,13 @@ easy-to-use tool to track their investments and goals.
 
 ### Phase 4: Wealth Tracking
 
-- [ ] Liabilities and debt tracking
-- [ ] Alternative assets (real estate, vehicles, collectibles)
+- [x] Liabilities and debt tracking
+- [x] Alternative assets (real estate, vehicles, collectibles)
 - [ ] Options trading support
 
 ### Phase 5: Smart Tools
 
-- [ ] AI assistant addon (local LLMs via Ollama/LM Studio, or BYOK for
+- [x] AI assistant addon (local LLMs via Ollama/LM Studio, or BYOK for
       OpenAI/Anthropic)
 - [ ] Portfolio analysis: sector allocation, concentration risk, dividend yield
 - [ ] Monte Carlo projection for portfolio outcomes
@@ -75,7 +75,10 @@ easy-to-use tool to track their investments and goals.
 ### Phase 6: Ecosystem
 
 - [ ] Addons catalog/marketplace for community addons
-- [ ] Addon monetization for developers
+
+### Phase 5: Budgeting and Spend Tracking
+
+- [] Budgeting and Sprend tracking Module
 
 ### Always Doing
 

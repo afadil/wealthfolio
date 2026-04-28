@@ -3,12 +3,7 @@ import { useState } from "react";
 
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { cn } from "@/lib/utils";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 
-/**
- * Type guard to check if result has wrapped format with meta
- */
 function hasResultMeta(
   result: unknown,
 ): result is { data: unknown; meta: Record<string, unknown> } {
@@ -27,80 +22,54 @@ export const ToolFallback: ToolCallMessagePartComponent = ({
   result,
   status,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
+  const isRunning = status?.type === "running";
   const isCancelled = status?.type === "incomplete" && status.reason === "cancelled";
-  const cancelledReason =
-    isCancelled && status.error
-      ? typeof status.error === "string"
-        ? status.error
-        : JSON.stringify(status.error)
-      : null;
 
-  // Extract actual result data and metadata
-  const hasMeta = hasResultMeta(result);
-  const resultData = hasMeta ? result.data : result;
-  const isTruncated = hasMeta && result.meta.truncated === true;
+  const resultData = hasResultMeta(result) ? result.data : result;
 
   return (
-    <div
-      className={cn(
-        "aui-tool-fallback-root flex w-full flex-col gap-3 rounded-lg border py-3",
-        isCancelled && "border-muted-foreground/30 bg-muted/30",
-      )}
-    >
-      <div className="aui-tool-fallback-header flex items-center gap-2 px-4">
-        {isCancelled ? (
-          <Icons.XCircle className="aui-tool-fallback-icon text-muted-foreground size-4" />
+    <div className="py-0.5">
+      {/* Compact one-liner */}
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          "text-muted-foreground flex items-center gap-2 text-xs",
+          "hover:text-foreground transition-colors",
+          isCancelled && "line-through opacity-60",
+        )}
+      >
+        {isRunning ? (
+          <Icons.Spinner className="h-3.5 w-3.5 shrink-0 animate-spin" />
+        ) : isCancelled ? (
+          <Icons.XCircle className="h-3.5 w-3.5 shrink-0" />
         ) : (
-          <Icons.Check className="aui-tool-fallback-icon size-4" />
+          <Icons.Check className="text-success h-3.5 w-3.5 shrink-0" />
         )}
-        <p
-          className={cn(
-            "aui-tool-fallback-title grow",
-            isCancelled && "text-muted-foreground line-through",
-          )}
-        >
-          {isCancelled ? "Cancelled tool: " : "Used tool: "}
-          <b>{toolName}</b>
-        </p>
-        {isTruncated && (
-          <Badge variant="secondary" className="text-muted-foreground gap-1 text-xs">
-            <Icons.AlertTriangle className="size-3" />
-            Result truncated
-          </Badge>
-        )}
-        <Button onClick={() => setIsCollapsed(!isCollapsed)}>
-          {isCollapsed ? <Icons.ChevronUp /> : <Icons.ChevronDown />}
-        </Button>
-      </div>
-      {!isCollapsed && (
-        <div className="aui-tool-fallback-content flex flex-col gap-2 border-t pt-2">
-          {cancelledReason && (
-            <div className="aui-tool-fallback-cancelled-root px-4">
-              <p className="aui-tool-fallback-cancelled-header text-muted-foreground font-semibold">
-                Cancelled reason:
-              </p>
-              <p className="aui-tool-fallback-cancelled-reason text-muted-foreground">
-                {cancelledReason}
-              </p>
-            </div>
-          )}
-          <div className={cn("aui-tool-fallback-args-root px-4", isCancelled && "opacity-60")}>
-            <pre className="aui-tool-fallback-args-value whitespace-pre-wrap">{argsText}</pre>
-          </div>
+        <span>
+          {isRunning
+            ? `Calling ${toolName}...`
+            : isCancelled
+              ? `Cancelled ${toolName}`
+              : `Used tool: ${toolName}`}
+        </span>
+        <Icons.ChevronDown
+          className={cn("h-3 w-3 shrink-0 transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+
+      {/* Expandable debug details */}
+      {expanded && (
+        <div className="text-muted-foreground ml-5.5 mt-1.5 space-y-1.5 text-xs">
+          <pre className="bg-muted/50 max-h-40 overflow-auto whitespace-pre-wrap rounded p-2">
+            {argsText}
+          </pre>
           {!isCancelled && resultData !== undefined && (
-            <div className="aui-tool-fallback-result-root border-t border-dashed px-4 pt-2">
-              <div className="aui-tool-fallback-result-header flex items-center gap-2">
-                <p className="font-semibold">Result:</p>
-                {isTruncated && (
-                  <span className="text-muted-foreground text-xs">(showing partial data)</span>
-                )}
-              </div>
-              <pre className="aui-tool-fallback-result-content whitespace-pre-wrap">
-                {typeof resultData === "string" ? resultData : JSON.stringify(resultData, null, 2)}
-              </pre>
-            </div>
+            <pre className="bg-muted/50 max-h-40 overflow-auto whitespace-pre-wrap rounded p-2">
+              {typeof resultData === "string" ? resultData : JSON.stringify(resultData, null, 2)}
+            </pre>
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
+export { ImportType } from "@/lib/schemas";
 import * as z from "zod";
 import {
   AccountType,
@@ -23,6 +24,7 @@ export {
   ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES,
   AssetKind,
   ASSET_KIND_DISPLAY_NAMES,
+  createPortfolioAccount,
   DataSource,
   defaultGroupForAccountType,
   ExportDataType,
@@ -182,9 +184,11 @@ export interface ActivityDetails {
   assetQuoteMode?: QuoteMode;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
+  instrumentType?: string;
   // Sync/source metadata
   sourceSystem?: string;
   sourceRecordId?: string;
+  sourceGroupId?: string;
   idempotencyKey?: string;
   importRunId?: string;
   isUserModified?: boolean;
@@ -289,6 +293,69 @@ export interface ActivityBulkMutationResult {
 export type ActivityImport = z.infer<typeof importActivitySchema>;
 export type ImportMappingData = z.infer<typeof importMappingSchema>;
 export type ParseConfig = z.infer<typeof parseConfigSchema>;
+export type ImportTemplateScope = "SYSTEM" | "USER";
+
+export interface ImportTemplateData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  kind: TemplateKind;
+  fieldMappings: Record<string, string | string[]>;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  accountMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+      quoteMode?: QuoteMode;
+    }
+  >;
+  parseConfig?: ParseConfig;
+}
+
+export type TemplateKind = "CSV_ACTIVITY" | "CSV_HOLDINGS" | "BROKER_ACTIVITY";
+export type TemplateContextKind = TemplateKind;
+
+export type BrokerProfileScope = "ACCOUNT" | "BROKER";
+
+export interface BrokerSyncProfileData {
+  id: string;
+  name: string;
+  scope: ImportTemplateScope;
+  sourceSystem: string;
+  activityMappings: Record<string, string[]>;
+  symbolMappings: Record<string, string>;
+  symbolMappingMeta: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
+}
+
+export interface SaveBrokerSyncProfileRulesRequest {
+  accountId: string;
+  sourceSystem: string;
+  scope: BrokerProfileScope;
+  activityRulePatches: Record<string, string[]>;
+  securityRulePatches: Record<string, string>;
+  securityRuleMetaPatches: Record<
+    string,
+    {
+      exchangeMic?: string;
+      symbolName?: string;
+      quoteCcy?: string;
+      instrumentType?: string;
+    }
+  >;
+}
 
 // Define a generic type for the parsed row data
 export type CsvRowData = Record<string, string> & { lineNumber: string };
@@ -364,6 +431,7 @@ export interface SymbolSearchResult {
 export interface ResolvedQuote {
   currency?: string;
   price?: number;
+  resolvedProviderId?: string;
 }
 
 export interface ExchangeInfo {
@@ -378,6 +446,7 @@ export interface MarketDataProviderInfo {
   name: string;
   logoFilename: string;
   lastSyncedDate: string | null; // ISO date string
+  providerType?: string;
 }
 
 export interface MarketData {
@@ -434,6 +503,8 @@ export interface ImportActivitiesSummary {
   assetsCreated: number;
   /** Whether the import was successful (no validation errors) */
   success: boolean;
+  /** Human-readable reason for failure, if success is false */
+  errorMessage?: string;
 }
 
 export type ValidationResult = { status: "success" } | { status: "error"; errors: string[] };
@@ -626,6 +697,7 @@ export interface Settings {
   theme: string;
   font: string;
   baseCurrency: string;
+  timezone: string;
   instanceId: string;
   onboardingCompleted: boolean;
   autoUpdateCheckEnabled: boolean;
@@ -642,28 +714,82 @@ export interface SettingsContextType {
   setAccountsGrouped: (value: boolean) => void;
 }
 
+export type GoalType = "retirement" | "education" | "wedding" | "home" | "car" | "custom_save_up";
+export type GoalLifecycle = "active" | "achieved" | "archived";
+export type GoalHealth = "on_track" | "at_risk" | "off_track" | "not_applicable";
+export type PlanKind = "retirement" | "save_up";
+export type PlannerMode = "fire" | "traditional";
+
 export interface Goal {
   id: string;
+  goalType: GoalType;
   title: string;
   description?: string;
-  targetAmount: number;
-  isAchieved?: boolean;
-  allocations?: GoalAllocation[];
+  targetAmount?: number;
+  statusLifecycle: GoalLifecycle;
+  statusHealth: GoalHealth;
+  priority: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+  summaryCurrentValue?: number;
+  summaryProgress?: number;
+  projectedCompletionDate?: string;
+  projectedValueAtTargetDate?: number;
+  createdAt: string;
+  updatedAt: string;
+  summaryTargetAmount?: number;
 }
 
-export interface GoalAllocation {
+export interface NewGoal {
+  id?: string;
+  goalType: GoalType;
+  title: string;
+  description?: string;
+  targetAmount?: number;
+  statusLifecycle?: GoalLifecycle;
+  statusHealth?: GoalHealth;
+  priority?: number;
+  coverImageKey?: string;
+  currency?: string;
+  startDate?: string;
+  targetDate?: string;
+}
+
+export interface GoalFundingRule {
   id: string;
   goalId: string;
   accountId: string;
-  percentAllocation: number;
+  sharePercent: number;
+  taxBucket?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface GoalProgress {
-  name: string;
-  targetValue: number;
-  currentValue: number;
-  progress: number;
-  currency: string;
+export interface GoalFundingRuleInput {
+  accountId: string;
+  sharePercent: number;
+  taxBucket?: string;
+}
+
+export interface GoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveGoalPlan {
+  goalId: string;
+  planKind: PlanKind;
+  plannerMode?: PlannerMode;
+  settingsJson: string;
+  summaryJson?: string;
 }
 
 export interface IncomeByAsset {
@@ -674,12 +800,20 @@ export interface IncomeByAsset {
   income: number;
 }
 
+export interface IncomeByAccount {
+  accountId: string;
+  accountName: string;
+  byMonth: Record<string, number>;
+  total: number;
+}
+
 export interface IncomeSummary {
   period: string;
   byMonth: Record<string, number>;
   byType: Record<string, number>;
   byAsset: Record<string, IncomeByAsset>;
   byCurrency: Record<string, number>;
+  byAccount: Record<string, IncomeByAccount>;
   totalIncome: number;
   currency: string;
   monthlyAverage: number;
@@ -781,8 +915,6 @@ export interface DepositsCalculation {
   byAccount: Record<string, AccountDeposit>;
 }
 
-export const ACTIVITY_TYPE_PREFIX_LENGTH = 12;
-
 // Renamed from CumulativeReturn to match Rust struct ReturnData
 export interface ReturnData {
   date: string; // Changed from CumulativeReturn
@@ -798,8 +930,8 @@ export interface PerformanceMetrics {
   currency: string;
   /** Period gain in dollars (SOTA: change in unrealized P&L for HOLDINGS mode) */
   periodGain: number;
-  /** Period return percentage (SOTA formula for HOLDINGS mode) */
-  periodReturn: number;
+  /** Period return percentage (SOTA formula for HOLDINGS mode). Null when start value ≤ 0. */
+  periodReturn: number | null;
   /** Time-weighted return (null for HOLDINGS mode - requires cash flow tracking) */
   cumulativeTwr?: number | null;
   /** Legacy field for backward compatibility */
@@ -818,6 +950,47 @@ export interface PerformanceMetrics {
   isHoldingsMode?: boolean;
 }
 
+export interface NewAsset {
+  id?: string;
+  kind: string;
+  name?: string;
+  displayCode?: string;
+  isActive: boolean;
+  quoteMode: string;
+  quoteCcy: string;
+  instrumentType?: string;
+  instrumentSymbol?: string;
+  instrumentExchangeMic?: string;
+  notes?: string;
+}
+
+export interface ImportAssetCandidate {
+  key: string;
+  accountId: string;
+  symbol: string;
+  currency?: string;
+  instrumentType?: string;
+  quoteCcy?: string;
+  quoteMode?: string;
+  exchangeMic?: string;
+  isin?: string;
+}
+
+export type ImportAssetPreviewStatus =
+  | "EXISTING_ASSET"
+  | "AUTO_RESOLVED_NEW_ASSET"
+  | "NEEDS_FIXING";
+
+export interface ImportAssetPreviewItem {
+  key: string;
+  status: ImportAssetPreviewStatus;
+  resolutionSource: string;
+  assetId?: string;
+  draft?: NewAsset;
+  errors?: Record<string, string[]>;
+  warnings?: Record<string, string[]>;
+}
+
 export interface UpdateAssetProfile {
   id: string;
   displayCode?: string | null;
@@ -826,6 +999,7 @@ export interface UpdateAssetProfile {
   kind?: AssetKind | null;
   quoteMode?: QuoteMode | null;
   quoteCcy?: string | null;
+  instrumentType?: string | null;
   instrumentExchangeMic?: string | null;
   providerConfig?: Record<string, unknown> | null;
 }
@@ -1487,6 +1661,44 @@ export interface CapabilityInfo {
 }
 
 /**
+ * Catalog-defined generation tuning defaults for a provider. Any field can be
+ * partially overridden by the user via `ProviderTuningOverrides`.
+ *
+ * Validation bounds (server-side, when overrides are persisted):
+ * - `temperature`: 0.0 – 2.0
+ * - `maxTokens` / `maxTokensThinking`: 256 – 131072
+ */
+export interface ProviderTuning {
+  /** Sampling temperature. Lower values → more deterministic output. */
+  temperature?: number;
+  /** Maximum output tokens per response (safety cap). */
+  maxTokens?: number;
+  /** Max tokens when the model's thinking/reasoning mode is enabled. */
+  maxTokensThinking?: number;
+  /**
+   * Provider-specific raw JSON (Ollama's `num_ctx`/`repeat_penalty`, Gemini's
+   * `safetySettings`, etc.). Catalog-only — not user-editable.
+   */
+  extraOptions?: Record<string, unknown>;
+}
+
+/**
+ * User-provided tuning overrides. Any field left undefined falls back to the
+ * catalog default.
+ *
+ * `extraOptionOverrides` is a per-key merge onto the catalog's `extraOptions`.
+ * Only primitive values (number, boolean, string, or null to reset) are
+ * accepted — complex shapes (arrays, objects like Gemini's `safetySettings`)
+ * remain catalog-only.
+ */
+export interface ProviderTuningOverrides {
+  temperature?: number;
+  maxTokens?: number;
+  maxTokensThinking?: number;
+  extraOptionOverrides?: Record<string, number | boolean | string | null>;
+}
+
+/**
  * A provider in the merged view returned to the UI.
  * Combines catalog data with user settings and computed fields.
  */
@@ -1521,6 +1733,14 @@ export interface MergedProvider {
   isDefault: boolean;
   /** Whether this provider supports dynamic model listing via API. */
   supportsModelListing: boolean;
+
+  // Tuning (three views: what ships, what user changed, what runtime uses)
+  /** Catalog tuning defaults for this provider (immutable reference). */
+  catalogTuning?: ProviderTuning;
+  /** User-supplied overrides; undefined means the user hasn't customized. */
+  tuningOverrides?: ProviderTuningOverrides;
+  /** Effective tuning the runtime will use (catalog merged with overrides). */
+  resolvedTuning?: ProviderTuning;
 }
 
 /**
@@ -1558,6 +1778,8 @@ export interface UpdateProviderSettingsRequest {
   favoriteModels?: string[];
   /** Update tools allowlist. null = all tools enabled, [] = no tools, [...] = only specified tools. */
   toolsAllowlist?: string[] | null;
+  /** Update user tuning overrides. null = reset to catalog defaults, {} or partial = set. */
+  tuningOverrides?: ProviderTuningOverrides | null;
 }
 
 /**
@@ -1600,7 +1822,8 @@ export type HealthCategory =
   | "FX_INTEGRITY"
   | "CLASSIFICATION"
   | "DATA_CONSISTENCY"
-  | "ACCOUNT_CONFIGURATION";
+  | "ACCOUNT_CONFIGURATION"
+  | "SETTINGS_CONFIGURATION";
 
 /**
  * Navigation action for health issue resolution.
@@ -1709,6 +1932,8 @@ export interface HoldingsPositionInput {
   currency: string;
   /** Exchange MIC code (e.g., "XNAS", "XTSE") resolved during check step */
   exchangeMic?: string;
+  /** Resolved asset ID from asset review step */
+  assetId?: string;
 }
 
 /**
@@ -1884,4 +2109,134 @@ export interface RebalancingPlan {
   totalSellAmount: number;
   categoryBudgets: CategoryBudget[];
   recommendations: TradeRecommendation[];
+}
+
+// ─── Planning DTOs (backend-computed overviews) ──────────────────
+
+export interface TaxBucketBalances {
+  taxable: number;
+  taxDeferred: number;
+  taxFree: number;
+}
+
+export interface RetirementOverview {
+  analysisMode: string;
+  status: string;
+  successStatus: string;
+  desiredFireAge: number;
+  fiAge: number | null;
+  retirementStartAge: number | null;
+  retirementStartReason?: "funded" | "target_age_forced" | null;
+  fundedAtGoalAge: boolean;
+  eventuallyReachesFi: boolean;
+  fundedAtRetirementStart: boolean;
+  portfolioNow: number;
+  portfolioAtRetirementStart: number;
+  netFireTarget: number;
+  grossFireTarget: number;
+  portfolioAtGoalAge: number;
+  requiredCapitalReachable: boolean;
+  requiredCapitalAtGoalAge: number;
+  shortfallAtGoalAge: number;
+  surplusAtGoalAge: number;
+  fundedThroughAge: number | null;
+  failureAge: number | null;
+  spendingShortfallAge: number | null;
+  requiredAdditionalMonthlyContribution: number;
+  suggestedGoalAgeIfUnchanged: number | null;
+  coastAmountToday: number;
+  coastReached: boolean;
+  progress: number;
+  taxBucketBalances: TaxBucketBalances;
+  budgetBreakdown: BudgetBreakdown;
+  targetReconciliation: TargetReconciliation;
+  trajectory: RetirementTrajectoryPoint[];
+}
+
+export interface RetirementTrajectoryPoint {
+  age: number;
+  year: number;
+  phase: string;
+  portfolioStart: number;
+  annualContribution: number;
+  annualIncome: number;
+  annualExpenses: number;
+  netWithdrawalFromPortfolio: number;
+  portfolioEnd: number;
+  requiredCapital: number | null;
+  pensionAssets: number;
+  annualTaxes?: number;
+  grossWithdrawal?: number;
+  plannedExpenses?: number;
+  fundedExpenses?: number;
+  annualShortfall?: number;
+}
+
+export interface BudgetBreakdown {
+  totalMonthlyBudget: number;
+  monthlyPortfolioWithdrawal: number;
+  incomeStreams: BudgetStreamItem[];
+  effectiveTaxRate?: number;
+}
+
+export interface BudgetStreamItem {
+  label: string;
+  monthlyAmount: number;
+  percentageOfBudget: number;
+}
+
+export interface TargetReconciliation {
+  targetAge: number;
+  requiredCapitalReachable: boolean;
+  inflationFactorToTarget: number;
+  plannedAnnualExpensesTodayValue: number;
+  plannedAnnualExpensesNominal: number;
+  annualIncomeTodayValue: number;
+  annualIncomeNominal: number;
+  netAnnualSpendingGapTodayValue: number;
+  netAnnualSpendingGapNominal: number;
+  grossAnnualPortfolioWithdrawalTodayValue: number;
+  grossAnnualPortfolioWithdrawalNominal: number;
+  estimatedAnnualTaxesTodayValue: number;
+  estimatedAnnualTaxesNominal: number;
+  requiredCapitalTodayValue: number;
+  requiredCapitalNominal: number;
+  portfolioAtTargetTodayValue: number;
+  portfolioAtTargetNominal: number;
+  shortfallTodayValue: number;
+  shortfallNominal: number;
+  preRetirementNetReturn: number;
+  retirementNetReturn: number;
+  annualInvestmentFeeRate: number;
+}
+
+export interface SaveUpOverviewDTO {
+  currentValue: number;
+  targetAmount: number;
+  progress: number;
+  health: GoalHealth;
+  projectedValueAtTargetDate: number;
+  requiredMonthlyContribution: number;
+  projectedCompletionDate: string | null;
+  trajectory: SaveUpTrajectoryPointDTO[];
+}
+
+export interface SaveUpPreviewInputDTO {
+  currentValue: number;
+  targetAmount: number;
+  targetDate: string | null;
+  monthlyContribution: number;
+  expectedAnnualReturn: number;
+}
+
+export interface SaveUpTrajectoryPointDTO {
+  date: string;
+  nominal: number;
+  optimistic: number;
+  pessimistic: number;
+  target: number;
+}
+
+export interface SaveUpProjectionPointDTO extends SaveUpTrajectoryPointDTO {
+  range: [number, number];
 }

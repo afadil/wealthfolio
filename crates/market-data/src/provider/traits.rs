@@ -7,7 +7,9 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 use crate::errors::MarketDataError;
-use crate::models::{AssetProfile, ProviderInstrument, Quote, QuoteContext, SearchResult};
+use crate::models::{
+    AssetProfile, ProviderInstrument, Quote, QuoteContext, SearchResult, SplitEvent,
+};
 
 use super::capabilities::{ProviderCapabilities, RateLimit};
 
@@ -146,6 +148,26 @@ pub trait MarketDataProvider: Send + Sync {
         let _ = symbol;
         Err(MarketDataError::NotSupported {
             operation: "profile".to_string(),
+            provider: self.id().to_string(),
+        })
+    }
+
+    /// Fetch split history for an instrument.
+    ///
+    /// # Returns
+    ///
+    /// A vector of split events, or `NotSupported` if the provider doesn't support splits.
+    /// Default implementation returns `NotSupported`.
+    async fn get_splits(
+        &self,
+        context: &QuoteContext,
+        instrument: ProviderInstrument,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> Result<Vec<SplitEvent>, MarketDataError> {
+        let _ = (context, instrument, start, end);
+        Err(MarketDataError::NotSupported {
+            operation: "splits".to_string(),
             provider: self.id().to_string(),
         })
     }

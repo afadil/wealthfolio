@@ -6,8 +6,14 @@ import * as React from "react";
 import { useComposedRefs } from "../../lib/compose-refs";
 import { cn } from "../../lib/utils";
 import { DataGridCell } from "./data-grid-cell";
-import type { CellPosition, Direction, RowHeightValue } from "./data-grid-types";
+import type { CellPosition, CellValidationState, Direction, RowHeightValue } from "./data-grid-types";
 import { flexRender, getCellKey, getCommonPinningStyles, getRowHeightValue } from "./data-grid-utils";
+
+const CELL_STATE_BG: Record<CellValidationState["type"], string> = {
+  error: "color-mix(in oklab, var(--destructive) 10%, transparent)",
+  warning: "color-mix(in oklab, var(--warning) 10%, transparent)",
+  success: "color-mix(in oklab, var(--success) 10%, transparent)",
+};
 
 interface DataGridRowProps<TData> extends React.ComponentProps<"div"> {
   row: Row<TData>;
@@ -26,6 +32,7 @@ interface DataGridRowProps<TData> extends React.ComponentProps<"div"> {
   dir: Direction;
   readOnly: boolean;
   stretchColumns: boolean;
+  columnCount: number;
 }
 
 export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
@@ -39,6 +46,11 @@ export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
 
   // Re-render if row data (original) reference changed
   if (prev.row.original !== next.row.original) {
+    return false;
+  }
+
+  // Re-render if the number of columns changed (columns added/removed)
+  if (prev.columnCount !== next.columnCount) {
     return false;
   }
 
@@ -80,6 +92,11 @@ export const DataGridRow = React.memo(DataGridRowImpl, (prev, next) => {
   // Re-render if this row's selected cells changed
   // Using stable Set reference that only includes this row's cells
   if (prev.cellSelectionKeys !== next.cellSelectionKeys) {
+    return false;
+  }
+
+  // Re-render if visible column count changed (e.g., actions column added/removed)
+  if (prev.row.getVisibleCells().length !== next.row.getVisibleCells().length) {
     return false;
   }
 
@@ -134,6 +151,7 @@ function DataGridRowImpl<TData>({
   dir,
   readOnly,
   stretchColumns,
+  columnCount: _columnCount,
   className,
   style,
   ref,
@@ -161,8 +179,8 @@ function DataGridRowImpl<TData>({
 
   // Memoize visible cells to avoid recreating cell array on every render
   // Though TanStack returns new Cell wrappers, memoizing the array helps React's reconciliation
-  // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility and columnPinning are used for calculating the visible cells
-  const visibleCells = React.useMemo(() => row.getVisibleCells(), [row, columnVisibility, columnPinning]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: columnVisibility, columnPinning, and _columnCount are used for calculating the visible cells
+  const visibleCells = React.useMemo(() => row.getVisibleCells(), [row, columnVisibility, columnPinning, _columnCount]);
 
   return (
     <div
@@ -198,6 +216,7 @@ function DataGridRowImpl<TData>({
             key={cell.id}
             role="gridcell"
             aria-colindex={colIndex + 1}
+            data-column-id={columnId}
             data-highlighted={isCellFocused ? "" : undefined}
             data-slot="grid-cell"
             tabIndex={-1}
@@ -212,9 +231,8 @@ function DataGridRowImpl<TData>({
           >
             {typeof cell.column.columnDef.header === "function" ? (
               <div
-                className={cn("size-full px-3 py-1.5", {
-                  "bg-primary/10": isRowSelected,
-                })}
+                className="size-full px-3 py-1.5"
+                style={cellState ? { backgroundColor: CELL_STATE_BG[cellState.type] } : undefined}
               >
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </div>

@@ -1,11 +1,38 @@
-use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Utc, Weekday};
+use crate::errors::{Error, Result, ValidationError};
+use chrono::{DateTime, Datelike, Duration, LocalResult, NaiveDate, TimeZone, Utc, Weekday};
 use chrono_tz::Tz;
 use wealthfolio_market_data::resolver::exchange_metadata;
 
 /// Default timezone for valuation dates.
-/// This is the canonical timezone used to convert UTC instants to domain dates.
-/// For a US-focused portfolio tracker, America/New_York is a sensible default.
-pub const DEFAULT_VALUATION_TZ: Tz = chrono_tz::America::New_York;
+/// This is used as a runtime fallback when user timezone is missing.
+pub const DEFAULT_VALUATION_TZ: Tz = chrono_tz::UTC;
+
+/// Parse and validate an IANA timezone string.
+pub fn parse_user_timezone(tz_raw: &str) -> Result<Tz> {
+    let normalized = tz_raw.trim();
+    if normalized.is_empty() {
+        return Err(Error::Validation(ValidationError::InvalidInput(
+            "Timezone cannot be empty".to_string(),
+        )));
+    }
+
+    normalized.parse::<Tz>().map_err(|_| {
+        Error::Validation(ValidationError::InvalidInput(format!(
+            "Invalid timezone: {normalized}"
+        )))
+    })
+}
+
+/// Parse timezone or fall back to DEFAULT_VALUATION_TZ.
+pub fn parse_user_timezone_or_default(tz_raw: &str) -> Tz {
+    parse_user_timezone(tz_raw).unwrap_or(DEFAULT_VALUATION_TZ)
+}
+
+/// Canonicalize timezone string for persistence.
+pub fn canonicalize_timezone(tz_raw: &str) -> Result<String> {
+    let tz = parse_user_timezone(tz_raw)?;
+    Ok(tz.name().to_string())
+}
 
 /// Converts a UTC instant to a valuation date in the given timezone.
 ///
@@ -23,6 +50,53 @@ pub fn valuation_date_from_utc(instant: DateTime<Utc>, tz: Tz) -> NaiveDate {
 /// Equivalent to `valuation_date_from_utc(instant, DEFAULT_VALUATION_TZ)`.
 pub fn valuation_date_today() -> NaiveDate {
     valuation_date_from_utc(Utc::now(), DEFAULT_VALUATION_TZ)
+}
+
+/// Returns today's date in the configured user timezone.
+pub fn user_today(tz: Tz) -> NaiveDate {
+    valuation_date_from_utc(Utc::now(), tz)
+}
+
+/// Converts a UTC instant to a user-local date.
+pub fn user_date_from_utc(instant: DateTime<Utc>, tz: Tz) -> NaiveDate {
+    valuation_date_from_utc(instant, tz)
+}
+
+/// Converts an activity UTC timestamp to a user-local date.
+pub fn activity_date_in_tz(activity_instant: DateTime<Utc>, tz: Tz) -> NaiveDate {
+    valuation_date_from_utc(activity_instant, tz)
+}
+
+/// Converts an activity UTC timestamp to a user-local date using a timezone name.
+/// Invalid or empty timezone values fall back to UTC.
+pub fn activity_date_in_user_timezone(activity_instant: DateTime<Utc>, tz_raw: &str) -> NaiveDate {
+    activity_date_in_tz(activity_instant, parse_user_timezone_or_default(tz_raw))
+}
+
+/// Returns UTC boundaries for a local calendar year in a timezone.
+/// The returned range is [start_utc, end_utc_exclusive).
+pub fn local_year_utc_bounds(year: i32, tz: Tz) -> Result<(DateTime<Utc>, DateTime<Utc>)> {
+    let start_local = resolve_local_datetime(tz.with_ymd_and_hms(year, 1, 1, 0, 0, 0), year)?;
+    let end_exclusive_local =
+        resolve_local_datetime(tz.with_ymd_and_hms(year + 1, 1, 1, 0, 0, 0), year + 1)?;
+
+    Ok((
+        start_local.with_timezone(&Utc),
+        end_exclusive_local.with_timezone(&Utc),
+    ))
+}
+
+fn resolve_local_datetime(
+    result: LocalResult<chrono::DateTime<Tz>>,
+    year: i32,
+) -> Result<chrono::DateTime<Tz>> {
+    match result {
+        LocalResult::Single(dt) => Ok(dt),
+        LocalResult::Ambiguous(earliest, _) => Ok(earliest),
+        LocalResult::None => Err(Error::Validation(ValidationError::InvalidInput(format!(
+            "Invalid local datetime boundary for year {year}"
+        )))),
+    }
 }
 
 /// Default grace period after market close before considering a new trading day.
@@ -126,5 +200,66 @@ pub fn market_calendar_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate 
         previous_trading_day(local_date)
     } else {
         local_date
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn parse_user_timezone_rejects_empty() {
+        let err = parse_user_timezone("").unwrap_err().to_string();
+        assert!(err.contains("Timezone cannot be empty"));
+    }
+
+    #[test]
+    fn parse_user_timezone_rejects_invalid() {
+        let err = parse_user_timezone("Mars/Phobos").unwrap_err().to_string();
+        assert!(err.contains("Invalid timezone"));
+    }
+
+    #[test]
+    fn canonicalize_timezone_returns_iana_name() {
+        assert_eq!(
+            canonicalize_timezone("America/Toronto").unwrap(),
+            "America/Toronto"
+        );
+    }
+
+    #[test]
+    fn parse_user_timezone_or_default_falls_back_to_utc() {
+        let tz = parse_user_timezone_or_default("invalid");
+        assert_eq!(tz, chrono_tz::UTC);
+    }
+
+    #[test]
+    fn user_date_from_utc_handles_dst_transition() {
+        let tz = chrono_tz::Europe::Paris;
+        let instant = Utc.with_ymd_and_hms(2026, 3, 29, 0, 30, 0).unwrap();
+        let local_date = user_date_from_utc(instant, tz);
+        assert_eq!(local_date.to_string(), "2026-03-29");
+    }
+
+    #[test]
+    fn activity_date_in_user_timezone_uses_timezone_name() {
+        let instant = Utc.with_ymd_and_hms(2025, 1, 1, 1, 30, 0).unwrap();
+        let local_date = activity_date_in_user_timezone(instant, "America/Toronto");
+        assert_eq!(local_date.to_string(), "2024-12-31");
+    }
+
+    #[test]
+    fn local_year_utc_bounds_match_local_midnight_boundaries() {
+        let tz = chrono_tz::Pacific::Kiritimati; // UTC+14 edge case
+        let (start_utc, end_exclusive_utc) = local_year_utc_bounds(2026, tz).unwrap();
+        assert_eq!(
+            start_utc,
+            Utc.with_ymd_and_hms(2025, 12, 31, 10, 0, 0).unwrap()
+        );
+        assert_eq!(
+            end_exclusive_utc,
+            Utc.with_ymd_and_hms(2026, 12, 31, 10, 0, 0).unwrap()
+        );
     }
 }

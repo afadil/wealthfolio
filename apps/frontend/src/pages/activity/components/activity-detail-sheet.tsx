@@ -1,7 +1,9 @@
 import { ActivityStatus, ActivityTypeNames, SUBTYPE_DISPLAY_NAMES } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import {
   Badge,
+  Button,
   Icons,
   Separator,
   Sheet,
@@ -88,6 +90,15 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
     return format(d, "PP");
   };
 
+  // Parse OCC symbol for option activities
+  const isOption = activity.instrumentType === "OPTION";
+  const parsedOption = isOption ? parseOccSymbol(activity.assetSymbol ?? "") : null;
+
+  // Format option expiration for display (YYYY-MM-DD → "Mar 29, 2025")
+  const optionExpirationDisplay = parsedOption?.expiration
+    ? format(new Date(parsedOption.expiration + "T12:00:00"), "PP")
+    : undefined;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
@@ -99,13 +110,15 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             <div className="flex flex-col items-start">
               <span>Activity Details</span>
               <span className="text-muted-foreground text-xs font-normal">
-                {activity.assetSymbol || "Cash Transaction"}
+                {parsedOption
+                  ? parsedOption.underlying
+                  : activity.assetSymbol || "Cash Transaction"}
               </span>
             </div>
           </SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-6 pb-8">
+        <div className="space-y-6 pb-6 md:pb-8">
           {/* Header Summary */}
           <div className="from-primary/5 to-primary/10 rounded-xl border bg-gradient-to-br p-4">
             <div className="flex items-start justify-between">
@@ -113,11 +126,23 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                 <div className="text-muted-foreground mb-1 text-xs uppercase tracking-wide">
                   {ActivityTypeNames[activity.activityType] || activity.activityType}
                 </div>
-                {activity.assetSymbol && (
-                  <div className="text-xl font-bold">{activity.assetSymbol}</div>
-                )}
-                {activity.assetName && (
-                  <div className="text-muted-foreground text-sm">{activity.assetName}</div>
+                {parsedOption ? (
+                  <>
+                    <div className="text-xl font-bold">{parsedOption.underlying}</div>
+                    <div className="text-muted-foreground text-sm">
+                      {optionExpirationDisplay} ${parsedOption.strikePrice}{" "}
+                      {parsedOption.optionType}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {activity.assetSymbol && (
+                      <div className="text-xl font-bold">{activity.assetSymbol}</div>
+                    )}
+                    {activity.assetName && (
+                      <div className="text-muted-foreground text-sm">{activity.assetName}</div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -160,11 +185,30 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             <DetailRow label="Account" value={activity.accountName} />
           </DetailSection>
 
+          {/* Option Contract Details */}
+          {parsedOption && (
+            <DetailSection title="Option Contract" icon={<Icons.BarChart className="h-4 w-4" />}>
+              <DetailRow label="Underlying" value={parsedOption.underlying} />
+              <DetailRow
+                label="Type"
+                value={<Badge variant="outline">{parsedOption.optionType}</Badge>}
+              />
+              <DetailRow
+                label="Strike Price"
+                value={
+                  <AmountDisplay value={parsedOption.strikePrice} currency={activity.currency} />
+                }
+              />
+              <DetailRow label="Expiration" value={optionExpirationDisplay} />
+              <DetailRow label="OCC Symbol" value={activity.assetSymbol} />
+            </DetailSection>
+          )}
+
           {/* Financial Details */}
           <DetailSection title="Financial Details" icon={<Icons.DollarSign className="h-4 w-4" />}>
             {Number(activity.quantity) !== 0 && (
               <DetailRow
-                label="Quantity"
+                label={isOption ? "Contracts" : "Quantity"}
                 value={Number(activity.quantity).toLocaleString(undefined, {
                   maximumFractionDigits: 8,
                 })}
@@ -172,14 +216,14 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             )}
             {Number(activity.unitPrice) !== 0 && (
               <DetailRow
-                label="Unit Price"
+                label={isOption ? "Premium/Share" : "Unit Price"}
                 value={
                   <AmountDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
                 }
               />
             )}
             <DetailRow
-              label="Amount"
+              label={isOption ? "Total Premium" : "Amount"}
               value={<AmountDisplay value={Number(activity.amount)} currency={activity.currency} />}
             />
             {Number(activity.fee) !== 0 && (
@@ -211,88 +255,16 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
 
           {/* Metadata */}
           <DetailSection title="Record Info" icon={<Icons.Info className="h-4 w-4" />}>
-            <DetailRow
-              label="ID"
-              value={
-                <code className="bg-muted max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                  {activity.id}
-                </code>
-              }
-            />
-            {activity.assetId && (
-              <DetailRow
-                label="Asset ID"
-                value={
-                  <code className="bg-muted max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                    {activity.assetId}
-                  </code>
-                }
-              />
-            )}
-            {activity.assetQuoteMode && (
-              <DetailRow
-                label="Quote Mode"
-                value={
-                  <Badge variant="secondary" className="text-xs">
-                    {activity.assetQuoteMode}
-                  </Badge>
-                }
-              />
-            )}
             <DetailRow label="Created" value={formatDate(activity.createdAt)} />
             <DetailRow label="Updated" value={formatDate(activity.updatedAt)} />
           </DetailSection>
+        </div>
 
-          {/* Sync & Source Info - only show for synced activities */}
-          {activity.sourceSystem && (
-            <DetailSection title="Sync Information" icon={<Icons.RefreshCw className="h-4 w-4" />}>
-              {activity.sourceRecordId && (
-                <DetailRow
-                  label="Source Record ID"
-                  value={
-                    <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                      {activity.sourceRecordId}
-                    </code>
-                  }
-                />
-              )}
-              {activity.idempotencyKey && (
-                <DetailRow
-                  label="Idempotency Key"
-                  value={
-                    <code className="bg-muted block max-w-[200px] truncate rounded px-1.5 py-0.5 text-xs">
-                      {activity.idempotencyKey}
-                    </code>
-                  }
-                />
-              )}
-              {activity.importRunId && (
-                <DetailRow
-                  label="Import Run"
-                  value={
-                    <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
-                      {activity.importRunId}
-                    </code>
-                  }
-                />
-              )}
-              {activity.isUserModified !== undefined && (
-                <DetailRow
-                  label="User Modified"
-                  value={
-                    activity.isUserModified ? (
-                      <Badge variant="outline" className="text-xs">
-                        <Icons.User className="mr-1 h-3 w-3" />
-                        Yes
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">No</span>
-                    )
-                  }
-                />
-              )}
-            </DetailSection>
-          )}
+        {/* Mobile close button */}
+        <div className="bg-background border-t p-4 md:hidden">
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

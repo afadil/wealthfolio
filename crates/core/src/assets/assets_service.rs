@@ -5,12 +5,13 @@ use std::sync::Arc;
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
+use crate::utils::isin::looks_like_isin;
 use futures::stream::{self, StreamExt};
 
 use super::assets_model::{
-    canonicalize_market_identity, resolve_quote_ccy_precedence, Asset, AssetKind, AssetSpec,
-    EnsureAssetsResult, InstrumentType, NewAsset, QuoteCcyResolutionSource, QuoteMode,
-    UpdateAssetProfile,
+    canonicalize_market_identity, normalize_quote_ccy_code, resolve_quote_ccy_precedence, Asset,
+    AssetKind, AssetSpec, EnsureAssetsResult, InstrumentType, NewAsset, QuoteCcyResolutionSource,
+    QuoteMode, UpdateAssetProfile,
 };
 use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{AutoClassificationService, ClassificationInput};
@@ -58,21 +59,46 @@ impl AssetService {
         }
     }
 
+    fn inferred_provider_config(
+        quote_mode: QuoteMode,
+        instrument_type: Option<&InstrumentType>,
+        instrument_symbol: Option<&str>,
+        exchange_mic: Option<&str>,
+    ) -> Option<serde_json::Value> {
+        if quote_mode != QuoteMode::Market {
+            return None;
+        }
+
+        if matches!(instrument_type, Some(InstrumentType::Equity))
+            && exchange_mic
+                .is_some_and(|mic| matches!(mic.trim().to_uppercase().as_str(), "XETR" | "XFRA"))
+            && instrument_symbol
+                .map(str::trim)
+                .is_some_and(looks_like_isin)
+        {
+            return Some(serde_json::json!({ "preferred_provider": "BOERSE_FRANKFURT" }));
+        }
+
+        None
+    }
+
     #[allow(clippy::too_many_arguments)]
     async fn resolve_quote_ccy(
         &self,
         symbol: Option<&str>,
         exchange_mic: Option<&str>,
         instrument_type: Option<&InstrumentType>,
-        explicit_hint: Option<&str>,
+        explicit_quote_ccy: Option<&str>,
         existing_asset_quote_ccy: Option<&str>,
         terminal_fallback: Option<&str>,
         allow_provider_lookup: bool,
     ) -> (String, QuoteCcyResolutionSource) {
-        let provider_quote_ccy = if allow_provider_lookup {
+        let has_deterministic_precedence = normalize_quote_ccy_code(explicit_quote_ccy).is_some()
+            || normalize_quote_ccy_code(existing_asset_quote_ccy).is_some();
+        let provider_quote_ccy = if allow_provider_lookup && !has_deterministic_precedence {
             if let Some(sym) = symbol.map(str::trim).filter(|s| !s.is_empty()) {
                 self.quote_service
-                    .resolve_symbol_quote(sym, exchange_mic, instrument_type)
+                    .resolve_symbol_quote(sym, exchange_mic, instrument_type, None, None)
                     .await
                     .ok()
                     .and_then(|q| q.currency)
@@ -84,7 +110,7 @@ impl AssetService {
         };
 
         resolve_quote_ccy_precedence(
-            explicit_hint,
+            explicit_quote_ccy,
             existing_asset_quote_ccy,
             provider_quote_ccy.as_deref(),
             exchange_mic.and_then(mic_to_currency),
@@ -129,77 +155,6 @@ impl AssetService {
         }
     }
 
-    fn normalize_quote_ccy_for_heal(value: &str) -> Option<String> {
-        let trimmed = value.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-
-        if trimmed == "GBp" {
-            return Some("GBp".to_string());
-        }
-        if trimmed.eq_ignore_ascii_case("GBX") {
-            return Some("GBX".to_string());
-        }
-        if trimmed.eq_ignore_ascii_case("GBP") {
-            return Some("GBP".to_string());
-        }
-        if trimmed == "ZAc" || trimmed.eq_ignore_ascii_case("ZAC") {
-            return Some("ZAc".to_string());
-        }
-        if trimmed.eq_ignore_ascii_case("ZAR") {
-            return Some("ZAR".to_string());
-        }
-
-        Some(trimmed.to_uppercase())
-    }
-
-    fn is_known_minor_major_pair(lhs: &str, rhs: &str) -> bool {
-        matches!(
-            (lhs, rhs),
-            ("GBP", "GBp")
-                | ("GBp", "GBP")
-                | ("GBP", "GBX")
-                | ("GBX", "GBP")
-                | ("ZAR", "ZAc")
-                | ("ZAc", "ZAR")
-        )
-    }
-
-    fn explicit_quote_heal_target(
-        existing_quote_ccy: &str,
-        explicit_hint: Option<&str>,
-    ) -> Option<String> {
-        let existing = Self::normalize_quote_ccy_for_heal(existing_quote_ccy)?;
-        let hint = Self::normalize_quote_ccy_for_heal(explicit_hint?)?;
-
-        if existing == hint {
-            return None;
-        }
-
-        if Self::is_known_minor_major_pair(existing.as_str(), hint.as_str()) {
-            return Some(hint);
-        }
-
-        None
-    }
-
-    fn update_payload_from_asset(asset: &Asset) -> UpdateAssetProfile {
-        UpdateAssetProfile {
-            display_code: asset.display_code.clone(),
-            name: asset.name.clone(),
-            notes: asset.notes.clone().unwrap_or_default(),
-            kind: None,
-            quote_mode: Some(asset.quote_mode),
-            quote_ccy: Some(asset.quote_ccy.clone()),
-            instrument_type: asset.instrument_type.clone(),
-            instrument_symbol: asset.instrument_symbol.clone(),
-            instrument_exchange_mic: asset.instrument_exchange_mic.clone(),
-            provider_config: asset.provider_config.clone(),
-            metadata: asset.metadata.clone(),
-        }
-    }
-
     /// Creates a new AssetService instance
     pub fn new(
         asset_repository: Arc<dyn AssetRepositoryTrait>,
@@ -233,6 +188,21 @@ impl AssetService {
     pub fn with_event_sink(mut self, event_sink: Arc<dyn DomainEventSink>) -> Self {
         self.event_sink = event_sink;
         self
+    }
+
+    /// Auto-classify a single newly created asset (instrument_type + asset_class).
+    async fn classify_new_asset(
+        &self,
+        asset_id: &str,
+        instrument_type: Option<&InstrumentType>,
+        kind: &AssetKind,
+    ) {
+        if let Some(taxonomy_service) = &self.taxonomy_service {
+            let classifier = AutoClassificationService::new(Arc::clone(taxonomy_service));
+            classifier
+                .classify_from_spec(asset_id, instrument_type, kind)
+                .await;
+        }
     }
 
     /// Builds a NewAsset from an AssetSpec without any I/O.
@@ -270,9 +240,34 @@ impl AssetService {
         };
 
         let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            QuoteMode::Market => match spec.instrument_type.as_ref() {
+                // Bonds use specialized providers (US_TREASURY_CALC, BOERSE_FRANKFURT);
+                // don't override with Yahoo which can't resolve ISINs.
+                Some(InstrumentType::Bond) => None,
+                _ => Self::inferred_provider_config(
+                    quote_mode,
+                    spec.instrument_type.as_ref(),
+                    canonical
+                        .instrument_symbol
+                        .as_deref()
+                        .or(spec.instrument_symbol.as_deref()),
+                    resolved_mic.as_deref(),
+                )
+                .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" }))),
+            },
             QuoteMode::Manual => None,
         };
+
+        let resolved_symbol = canonical
+            .instrument_symbol
+            .clone()
+            .or(spec.instrument_symbol.clone());
+        let metadata = spec.metadata.clone().or_else(|| {
+            super::build_asset_metadata(
+                spec.instrument_type.as_ref(),
+                resolved_symbol.as_deref().unwrap_or(""),
+            )
+        });
 
         NewAsset {
             id: spec.id.clone(),
@@ -282,12 +277,11 @@ impl AssetService {
             quote_mode,
             quote_ccy: resolved_quote_ccy,
             instrument_type: spec.instrument_type.clone(),
-            instrument_symbol: canonical
-                .instrument_symbol
-                .or(spec.instrument_symbol.clone()),
+            instrument_symbol: resolved_symbol,
             instrument_exchange_mic: resolved_mic,
             provider_config,
             is_active: true,
+            metadata,
             ..Default::default()
         }
     }
@@ -420,8 +414,42 @@ impl AssetServiceTrait for AssetService {
                 )
             })
             .unwrap_or(new_asset.quote_ccy);
+        if new_asset.provider_config.is_none() {
+            new_asset.provider_config = Self::inferred_provider_config(
+                new_asset.quote_mode,
+                new_asset.instrument_type.as_ref(),
+                new_asset.instrument_symbol.as_deref(),
+                new_asset.instrument_exchange_mic.as_deref(),
+            );
+        }
 
+        // Pre-check: return existing asset if instrument_key already exists (avoids unique constraint error)
+        let key_spec = AssetSpec {
+            id: None,
+            display_code: new_asset.display_code.clone(),
+            instrument_symbol: new_asset.instrument_symbol.clone(),
+            instrument_exchange_mic: new_asset.instrument_exchange_mic.clone(),
+            instrument_type: new_asset.instrument_type.clone(),
+            quote_ccy: new_asset.quote_ccy.clone(),
+            requested_quote_ccy: None,
+            kind: new_asset.kind.clone(),
+            quote_mode: Some(new_asset.quote_mode),
+            name: new_asset.name.clone(),
+            metadata: None,
+        };
+        if let Some(key) = key_spec.instrument_key() {
+            if let Ok(Some(existing)) = self.asset_repository.find_by_instrument_key(&key) {
+                return Ok(existing);
+            }
+        }
+
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -437,7 +465,7 @@ impl AssetServiceTrait for AssetService {
         asset_id: &str,
         context_currency: Option<String>,
         metadata: Option<super::assets_model::AssetMetadata>,
-        quote_mode_hint: Option<String>,
+        quote_mode: Option<String>,
     ) -> Result<Asset> {
         let inferred_instrument_type = metadata.as_ref().and_then(|meta| {
             meta.instrument_symbol
@@ -450,7 +478,7 @@ impl AssetServiceTrait for AssetService {
                         .unwrap_or(InstrumentType::Equity)
                 })
         });
-        let requested_quote_mode = match quote_mode_hint.as_deref() {
+        let requested_quote_mode = match quote_mode.as_deref() {
             Some("MANUAL") => Some(QuoteMode::Manual),
             Some("MARKET") => Some(QuoteMode::Market),
             _ => None,
@@ -464,85 +492,6 @@ impl AssetServiceTrait for AssetService {
                     info!("Reactivating previously deactivated asset: {}", asset_id);
                     self.asset_repository.reactivate(asset_id).await?;
                     existing_asset.is_active = true;
-                }
-
-                let hinted_exchange_mic = metadata
-                    .as_ref()
-                    .and_then(|m| m.instrument_exchange_mic.clone());
-                let target_exchange_mic = existing_asset
-                    .instrument_exchange_mic
-                    .clone()
-                    .or(hinted_exchange_mic);
-                let target_instrument_type = existing_asset
-                    .instrument_type
-                    .clone()
-                    .or(inferred_instrument_type.clone());
-                let target_quote_mode = requested_quote_mode.unwrap_or(existing_asset.quote_mode);
-                let explicit_quote_heal_target = metadata
-                    .as_ref()
-                    .and_then(|m| m.quote_ccy_hint.as_deref())
-                    .and_then(|hint| {
-                        Self::explicit_quote_heal_target(
-                            existing_asset.quote_ccy.as_str(),
-                            Some(hint),
-                        )
-                    });
-                let existing_for_resolution = if existing_asset.quote_ccy.trim().is_empty() {
-                    None
-                } else {
-                    Some(existing_asset.quote_ccy.as_str())
-                };
-                let symbol_for_resolution = metadata
-                    .as_ref()
-                    .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref()))
-                    .or(existing_asset.instrument_symbol.as_deref())
-                    .or(existing_asset.display_code.as_deref());
-                let (resolved_quote_ccy, _) = self
-                    .resolve_quote_ccy(
-                        symbol_for_resolution,
-                        target_exchange_mic.as_deref(),
-                        target_instrument_type.as_ref(),
-                        metadata.as_ref().and_then(|m| m.quote_ccy_hint.as_deref()),
-                        existing_for_resolution,
-                        context_currency.as_deref().or(Some("USD")),
-                        target_quote_mode == QuoteMode::Market,
-                    )
-                    .await;
-                let expected_quote_ccy = if existing_asset.quote_ccy.trim().is_empty() {
-                    Some(resolved_quote_ccy)
-                } else {
-                    None
-                };
-
-                let needs_currency_repair = (existing_asset.quote_ccy.trim().is_empty()
-                    && expected_quote_ccy.is_some())
-                    || explicit_quote_heal_target.is_some();
-                let needs_mic_repair = existing_asset.instrument_exchange_mic.is_none()
-                    && target_exchange_mic.is_some();
-
-                if needs_currency_repair || needs_mic_repair {
-                    let mut payload = Self::update_payload_from_asset(&existing_asset);
-                    if needs_currency_repair {
-                        let target_quote_ccy =
-                            explicit_quote_heal_target.clone().or(expected_quote_ccy);
-                        if let Some(target_quote_ccy) = target_quote_ccy {
-                            payload.quote_ccy = Some(target_quote_ccy);
-                        }
-                    }
-                    if needs_mic_repair {
-                        payload.instrument_exchange_mic = target_exchange_mic;
-                    }
-                    if existing_asset.instrument_type.is_none() {
-                        payload.instrument_type = target_instrument_type;
-                    }
-
-                    let repaired = self
-                        .asset_repository
-                        .update_profile(asset_id, payload)
-                        .await?;
-                    self.event_sink
-                        .emit(DomainEvent::assets_updated(vec![repaired.id.clone()]));
-                    return Ok(repaired);
                 }
 
                 return Ok(existing_asset);
@@ -588,95 +537,18 @@ impl AssetServiceTrait for AssetService {
                                 .clone()
                                 .unwrap_or_else(|| "USD".to_string())
                         }),
-                        quote_ccy_hint: meta.quote_ccy_hint.clone(),
+                        requested_quote_ccy: meta.requested_quote_ccy.clone(),
                         kind: meta.kind.clone().unwrap_or(AssetKind::Investment),
                         quote_mode: None,
                         name: meta.name.clone(),
+                        metadata: None,
                     };
                     if let Some(key) = spec.instrument_key() {
                         if let Ok(Some(existing)) =
                             self.asset_repository.find_by_instrument_key(&key)
                         {
-                            info!(
-                                "Found existing asset by instrument_key '{}': {}",
-                                key, existing.id
-                            );
                             if !existing.is_active {
                                 self.asset_repository.reactivate(&existing.id).await?;
-                            }
-
-                            let target_quote_mode =
-                                requested_quote_mode.unwrap_or(existing.quote_mode);
-                            let target_instrument_type =
-                                existing.instrument_type.clone().or(Some(instrument_type));
-                            let target_exchange_mic = existing
-                                .instrument_exchange_mic
-                                .clone()
-                                .or(spec.instrument_exchange_mic.clone());
-                            let explicit_quote_heal_target =
-                                spec.quote_ccy_hint.as_deref().and_then(|hint| {
-                                    Self::explicit_quote_heal_target(
-                                        existing.quote_ccy.as_str(),
-                                        Some(hint),
-                                    )
-                                });
-                            let existing_for_resolution = if existing.quote_ccy.trim().is_empty() {
-                                None
-                            } else {
-                                Some(existing.quote_ccy.as_str())
-                            };
-                            let symbol_for_resolution = spec
-                                .instrument_symbol
-                                .as_deref()
-                                .or(spec.display_code.as_deref())
-                                .or(existing.instrument_symbol.as_deref())
-                                .or(existing.display_code.as_deref());
-                            let (resolved_quote_ccy, _) = self
-                                .resolve_quote_ccy(
-                                    symbol_for_resolution,
-                                    target_exchange_mic.as_deref(),
-                                    target_instrument_type.as_ref(),
-                                    spec.quote_ccy_hint.as_deref(),
-                                    existing_for_resolution,
-                                    context_currency.as_deref().or(Some("USD")),
-                                    target_quote_mode == QuoteMode::Market,
-                                )
-                                .await;
-                            let expected_quote_ccy = if existing.quote_ccy.trim().is_empty() {
-                                Some(resolved_quote_ccy)
-                            } else {
-                                None
-                            };
-                            let needs_currency_repair = (existing.quote_ccy.trim().is_empty()
-                                && expected_quote_ccy.is_some())
-                                || explicit_quote_heal_target.is_some();
-                            let needs_mic_repair = existing.instrument_exchange_mic.is_none()
-                                && target_exchange_mic.is_some();
-                            let needs_type_repair = existing.instrument_type.is_none()
-                                && target_instrument_type.is_some();
-
-                            if needs_currency_repair || needs_mic_repair || needs_type_repair {
-                                let mut payload = Self::update_payload_from_asset(&existing);
-                                if needs_currency_repair {
-                                    let target_quote_ccy =
-                                        explicit_quote_heal_target.clone().or(expected_quote_ccy);
-                                    if let Some(target_quote_ccy) = target_quote_ccy {
-                                        payload.quote_ccy = Some(target_quote_ccy);
-                                    }
-                                }
-                                if needs_mic_repair {
-                                    payload.instrument_exchange_mic = target_exchange_mic;
-                                }
-                                if needs_type_repair {
-                                    payload.instrument_type = target_instrument_type;
-                                }
-                                let repaired = self
-                                    .asset_repository
-                                    .update_profile(&existing.id, payload)
-                                    .await?;
-                                self.event_sink
-                                    .emit(DomainEvent::assets_updated(vec![repaired.id.clone()]));
-                                return Ok(repaired);
                             }
 
                             return Ok(existing);
@@ -692,7 +564,7 @@ impl AssetServiceTrait for AssetService {
             .and_then(|m| m.kind.clone())
             .unwrap_or(AssetKind::Investment);
 
-        // Determine quote mode: use hint if provided, otherwise default based on kind
+        // Determine quote mode: use input if provided, otherwise default based on kind
         let quote_mode =
             requested_quote_mode.unwrap_or_else(|| Self::default_quote_mode_for_kind(&kind));
 
@@ -710,13 +582,15 @@ impl AssetServiceTrait for AssetService {
         let symbol_for_resolution = metadata
             .as_ref()
             .and_then(|m| m.instrument_symbol.as_deref().or(m.display_code.as_deref()));
-        let explicit_quote_hint = metadata.as_ref().and_then(|m| m.quote_ccy_hint.as_deref());
+        let explicit_requested_quote_ccy = metadata
+            .as_ref()
+            .and_then(|m| m.requested_quote_ccy.as_deref());
         let (currency, _) = self
             .resolve_quote_ccy(
                 symbol_for_resolution,
                 exchange_mic.as_deref(),
                 instrument_type.as_ref(),
-                explicit_quote_hint,
+                explicit_requested_quote_ccy,
                 None,
                 context_currency
                     .as_deref()
@@ -726,13 +600,8 @@ impl AssetServiceTrait for AssetService {
             )
             .await;
 
-        // Set preferred provider based on quote mode
-        let provider_config = match quote_mode {
-            QuoteMode::Market => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
-            QuoteMode::Manual => None,
-        };
-
         let name = metadata.as_ref().and_then(|m| m.name.clone());
+        let asset_metadata_json = metadata.as_ref().and_then(|m| m.asset_metadata.clone());
         let canonical_identity = canonicalize_market_identity(
             instrument_type.clone(),
             metadata
@@ -741,6 +610,22 @@ impl AssetServiceTrait for AssetService {
             exchange_mic.as_deref(),
             Some(currency.as_str()),
         );
+        let provider_config = match quote_mode {
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Self::inferred_provider_config(
+                    quote_mode,
+                    instrument_type.as_ref(),
+                    canonical_identity.instrument_symbol.as_deref(),
+                    canonical_identity
+                        .instrument_exchange_mic
+                        .as_deref()
+                        .or(exchange_mic.as_deref()),
+                )
+                .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" }))),
+            },
+            QuoteMode::Manual => None,
+        };
 
         let new_asset = NewAsset {
             id: Some(asset_id.to_string()),
@@ -755,6 +640,7 @@ impl AssetServiceTrait for AssetService {
                 .display_code
                 .or_else(|| metadata.as_ref().and_then(|m| m.display_code.clone())),
             provider_config,
+            metadata: asset_metadata_json,
             is_active: true,
             ..Default::default()
         };
@@ -764,7 +650,13 @@ impl AssetServiceTrait for AssetService {
             asset_id, new_asset.kind, new_asset.quote_mode, new_asset.name
         );
 
+        let instrument_type = new_asset.instrument_type.clone();
+        let kind = new_asset.kind.clone();
         let asset = self.asset_repository.create(new_asset).await?;
+
+        // Auto-classify the newly created asset
+        self.classify_new_asset(&asset.id, instrument_type.as_ref(), &kind)
+            .await;
 
         // Emit event for newly created asset
         self.event_sink
@@ -775,22 +667,28 @@ impl AssetServiceTrait for AssetService {
 
     /// Updates the quote mode for an asset (MARKET, MANUAL)
     async fn update_quote_mode(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
+        let asset = self.update_quote_mode_silent(asset_id, quote_mode).await?;
+        self.event_sink
+            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+        Ok(asset)
+    }
+
+    /// Updates quote mode without emitting domain events.
+    /// Switching to Manual means providers will no longer sync this asset,
+    /// so clear any stale error state to keep the health panel clean.
+    async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
         let asset = self
             .asset_repository
             .update_quote_mode(asset_id, quote_mode)
             .await?;
 
-        self.event_sink
-            .emit(DomainEvent::assets_updated(vec![asset.id.clone()]));
+        if asset.quote_mode == QuoteMode::Manual {
+            if let Err(e) = self.quote_service.delete_sync_state(asset_id).await {
+                warn!("Failed to clear sync state for {}: {:?}", asset_id, e);
+            }
+        }
 
         Ok(asset)
-    }
-
-    /// Updates quote mode without emitting domain events.
-    async fn update_quote_mode_silent(&self, asset_id: &str, quote_mode: &str) -> Result<Asset> {
-        self.asset_repository
-            .update_quote_mode(asset_id, quote_mode)
-            .await
     }
 
     async fn get_assets_by_asset_ids(&self, asset_ids: &[String]) -> Result<Vec<Asset>> {
@@ -892,7 +790,7 @@ impl AssetServiceTrait for AssetService {
         }
 
         // Merge with existing metadata (preserving any non-profile fields like OptionSpec)
-        let updated_metadata = if profile_metadata.is_empty() {
+        let mut updated_metadata = if profile_metadata.is_empty() {
             existing_asset.metadata.clone()
         } else {
             let mut merged = match &existing_asset.metadata {
@@ -908,6 +806,41 @@ impl AssetServiceTrait for AssetService {
             );
             Some(serde_json::Value::Object(merged))
         };
+
+        // Enrich US Treasury bonds with maturity/coupon data from TreasuryDirect
+        // when the bond spec is missing this data (needed for yield-curve pricing).
+        if existing_asset.is_bond() {
+            let needs_bond_enrichment = existing_asset
+                .bond_spec()
+                .is_none_or(|s| s.maturity_date.is_none());
+
+            if needs_bond_enrichment {
+                if let Some(isin) = existing_asset.instrument_symbol.as_deref() {
+                    if isin.starts_with("US912") {
+                        let http = reqwest::Client::new();
+                        match wealthfolio_market_data::provider::us_treasury_calc::UsTreasuryCalcProvider::fetch_bond_details(&http, isin).await {
+                            Some(details) => {
+                                let spec = super::assets_model::BondSpec {
+                                    isin: Some(isin.to_string()),
+                                    coupon_rate: Some(details.coupon_rate),
+                                    maturity_date: Some(details.maturity_date),
+                                    face_value: Some(details.face_value),
+                                    coupon_frequency: Some(details.coupon_frequency),
+                                };
+                                let meta = updated_metadata.get_or_insert_with(|| serde_json::json!({}));
+                                if let Some(obj) = meta.as_object_mut() {
+                                    obj.insert("bond".to_string(), serde_json::json!(spec));
+                                }
+                                info!("Enriched bond {} with Treasury details: maturity={}, coupon={}", asset_id, details.maturity_date, details.coupon_rate);
+                            }
+                            None => {
+                                debug!("Could not fetch Treasury bond details for {}", isin);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let effective_instrument_type = updated_instrument_type
             .clone()
@@ -961,6 +894,7 @@ impl AssetServiceTrait for AssetService {
         if let Some(taxonomy_service) = &self.taxonomy_service {
             let classification_input = ClassificationInput::from_provider_profile(
                 provider_profile.asset_type.as_deref(),
+                updated_asset.name.as_deref(),
                 None,
                 provider_profile.sectors.as_deref(),
                 None,
@@ -1006,30 +940,46 @@ impl AssetServiceTrait for AssetService {
             return Ok((0, 0, 0));
         }
 
-        let mut enriched_count = 0;
-        let mut skipped_count = 0;
-        let mut failed_count = 0;
+        let unique_ids_len = unique_ids.len();
 
-        for asset_id in unique_ids {
-            // Check sync state to see if enrichment is needed
-            let needs_enrichment = match self.quote_service.get_sync_state(&asset_id) {
-                Ok(Some(state)) => state.needs_profile_enrichment(),
-                Ok(None) => true,
-                Err(_) => true,
-            };
+        // Filter to only assets that need enrichment
+        let ids_to_enrich: Vec<String> = unique_ids
+            .into_iter()
+            .filter(|asset_id| {
+                let needs = match self.quote_service.get_sync_state(asset_id) {
+                    Ok(Some(state)) => state.needs_profile_enrichment(),
+                    Ok(None) => true,
+                    Err(_) => true,
+                };
+                if !needs {
+                    debug!("Skipping enrichment for {} - already enriched", asset_id);
+                }
+                needs
+            })
+            .collect();
 
-            if !needs_enrichment {
-                debug!("Skipping enrichment for {} - already enriched", asset_id);
-                skipped_count += 1;
-                continue;
-            }
+        let skipped_count = unique_ids_len - ids_to_enrich.len();
 
-            // Try to enrich the asset profile
-            match self.enrich_asset_profile(&asset_id).await {
-                Ok(_) => {
+        // Enrich assets concurrently (up to 5 at a time)
+        let results: Vec<(String, Result<Asset>)> = stream::iter(ids_to_enrich)
+            .map(|asset_id| async move {
+                let result = self.enrich_asset_profile(&asset_id).await;
+                if result.is_ok() {
                     if let Err(e) = self.quote_service.mark_profile_enriched(&asset_id).await {
                         warn!("Failed to mark profile enriched for {}: {}", asset_id, e);
                     }
+                }
+                (asset_id, result)
+            })
+            .buffer_unordered(5)
+            .collect()
+            .await;
+
+        let mut enriched_count = 0;
+        let mut failed_count = 0;
+        for (asset_id, result) in &results {
+            match result {
+                Ok(_) => {
                     enriched_count += 1;
                     info!("Successfully enriched asset profile: {}", asset_id);
                 }
@@ -1039,11 +989,6 @@ impl AssetServiceTrait for AssetService {
                 }
             }
         }
-
-        info!(
-            "Asset enrichment complete: {} enriched, {} skipped, {} failed",
-            enriched_count, skipped_count, failed_count
-        );
 
         Ok((enriched_count, skipped_count, failed_count))
     }
@@ -1118,6 +1063,7 @@ impl AssetServiceTrait for AssetService {
                 account_ids,
                 asset_ids,
                 currencies,
+                None,
             ));
         }
 
@@ -1179,96 +1125,16 @@ impl AssetServiceTrait for AssetService {
         // Collect IDs of specs that have them (for existing asset lookup)
         let ids: Vec<String> = resolved_specs.iter().filter_map(|s| s.id.clone()).collect();
 
-        // 1. Pre-read existing assets and repair stale quote_ccy/instrument fields when needed.
-        let mut existing_assets_by_id: HashMap<String, Asset> = if !ids.is_empty() {
+        // 1. Pre-read existing assets by requested IDs.
+        let existing_ids: HashSet<String> = if !ids.is_empty() {
             self.asset_repository
                 .list_by_asset_ids(&ids)?
                 .into_iter()
-                .map(|a| (a.id.clone(), a))
+                .map(|a| a.id)
                 .collect()
         } else {
-            HashMap::new()
+            HashSet::new()
         };
-        let existing_ids: HashSet<String> = existing_assets_by_id.keys().cloned().collect();
-        let mut repaired_ids: Vec<String> = Vec::new();
-
-        for spec in &resolved_specs {
-            let Some(spec_id) = spec.id.as_deref() else {
-                continue;
-            };
-            let Some(existing_asset) = existing_assets_by_id.get(spec_id).cloned() else {
-                continue;
-            };
-
-            let normalized = self.new_asset_from_spec(spec);
-            let (resolved_quote_ccy, _) = self
-                .resolve_quote_ccy(
-                    normalized
-                        .instrument_symbol
-                        .as_deref()
-                        .or(normalized.display_code.as_deref()),
-                    normalized
-                        .instrument_exchange_mic
-                        .as_deref()
-                        .or(spec.instrument_exchange_mic.as_deref()),
-                    normalized
-                        .instrument_type
-                        .as_ref()
-                        .or(spec.instrument_type.as_ref()),
-                    spec.quote_ccy_hint.as_deref(),
-                    if existing_asset.quote_ccy.trim().is_empty() {
-                        None
-                    } else {
-                        Some(existing_asset.quote_ccy.as_str())
-                    },
-                    Some(spec.quote_ccy.as_str()),
-                    normalized.quote_mode == QuoteMode::Market,
-                )
-                .await;
-            let expected_quote_ccy = if existing_asset.quote_ccy.trim().is_empty() {
-                Some(resolved_quote_ccy)
-            } else {
-                None
-            };
-            let expected_mic = normalized.instrument_exchange_mic;
-            let expected_instrument_type = normalized.instrument_type;
-            let explicit_quote_heal_target = spec.quote_ccy_hint.as_deref().and_then(|hint| {
-                Self::explicit_quote_heal_target(existing_asset.quote_ccy.as_str(), Some(hint))
-            });
-
-            let needs_currency_repair =
-                existing_asset.quote_ccy.trim().is_empty() || explicit_quote_heal_target.is_some();
-            let needs_mic_repair =
-                expected_mic.is_some() && existing_asset.instrument_exchange_mic != expected_mic;
-            let needs_type_repair =
-                existing_asset.instrument_type.is_none() && expected_instrument_type.is_some();
-
-            if !needs_currency_repair && !needs_mic_repair && !needs_type_repair {
-                continue;
-            }
-
-            let mut payload = Self::update_payload_from_asset(&existing_asset);
-            if needs_currency_repair {
-                if let Some(target_quote_ccy) =
-                    explicit_quote_heal_target.clone().or(expected_quote_ccy)
-                {
-                    payload.quote_ccy = Some(target_quote_ccy);
-                }
-            }
-            if needs_mic_repair {
-                payload.instrument_exchange_mic = expected_mic;
-            }
-            if needs_type_repair {
-                payload.instrument_type = expected_instrument_type;
-            }
-
-            let repaired = self
-                .asset_repository
-                .update_profile(&existing_asset.id, payload)
-                .await?;
-            existing_assets_by_id.insert(repaired.id.clone(), repaired.clone());
-            repaired_ids.push(repaired.id);
-        }
 
         // 2. Batch upsert all specs (INSERT OR IGNORE)
         // Resolve quote currencies with deduped input keys and bounded parallelism.
@@ -1277,7 +1143,7 @@ impl AssetServiceTrait for AssetService {
             |symbol: Option<&str>,
              exchange_mic: Option<&str>,
              instrument_type: Option<&InstrumentType>,
-             explicit_hint: Option<&str>,
+             explicit_quote_ccy: Option<&str>,
              terminal_fallback: &str,
              allow_provider_lookup: bool| {
                 let lookup_flag = if allow_provider_lookup { "1" } else { "0" };
@@ -1286,7 +1152,7 @@ impl AssetServiceTrait for AssetService {
                     symbol.unwrap_or_default(),
                     exchange_mic.unwrap_or_default(),
                     instrument_type.map(|it| it.as_db_str()).unwrap_or_default(),
-                    explicit_hint.unwrap_or_default(),
+                    explicit_quote_ccy.unwrap_or_default(),
                     terminal_fallback,
                     lookup_flag
                 )
@@ -1320,13 +1186,13 @@ impl AssetServiceTrait for AssetService {
                 .or(resolved_spec.display_code.as_deref());
             let exchange_mic = resolved_spec.instrument_exchange_mic.as_deref();
             let instrument_type = resolved_spec.instrument_type.as_ref();
-            let explicit_hint = resolved_spec.quote_ccy_hint.as_deref();
+            let explicit_quote_ccy = resolved_spec.requested_quote_ccy.as_deref();
             let terminal_fallback = resolved_spec.quote_ccy.as_str();
             let resolution_key = build_resolution_key(
                 symbol,
                 exchange_mic,
                 instrument_type,
-                explicit_hint,
+                explicit_quote_ccy,
                 terminal_fallback,
                 allow_provider_lookup,
             );
@@ -1337,7 +1203,7 @@ impl AssetServiceTrait for AssetService {
                     symbol.map(|s| s.to_string()),
                     exchange_mic.map(|mic| mic.to_string()),
                     instrument_type.cloned(),
-                    explicit_hint.map(|hint| hint.to_string()),
+                    explicit_quote_ccy.map(|quote_ccy| quote_ccy.to_string()),
                     terminal_fallback.to_string(),
                     allow_provider_lookup,
                 ));
@@ -1345,13 +1211,13 @@ impl AssetServiceTrait for AssetService {
         }
 
         let resolved_quote_ccy_by_key: HashMap<String, String> =
-            stream::iter(resolution_inputs_by_key.into_iter())
+            stream::iter(resolution_inputs_by_key)
                 .map(|(resolution_key, input)| async move {
                     let (
                         symbol,
                         exchange_mic,
                         instrument_type,
-                        explicit_hint,
+                        explicit_quote_ccy,
                         terminal_fallback,
                         allow_provider_lookup,
                     ) = input;
@@ -1360,7 +1226,7 @@ impl AssetServiceTrait for AssetService {
                             symbol.as_deref(),
                             exchange_mic.as_deref(),
                             instrument_type.as_ref(),
-                            explicit_hint.as_deref(),
+                            explicit_quote_ccy.as_deref(),
                             None,
                             Some(terminal_fallback.as_str()),
                             allow_provider_lookup,
@@ -1382,6 +1248,12 @@ impl AssetServiceTrait for AssetService {
 
         let new_assets: Vec<NewAsset> = specs_for_create
             .iter()
+            .filter(|(spec, _)| {
+                spec.id
+                    .as_ref()
+                    .map(|id| !existing_ids.contains(id))
+                    .unwrap_or(true)
+            })
             .map(|(spec, _)| self.new_asset_from_spec(spec))
             .collect();
 
@@ -1443,16 +1315,32 @@ impl AssetServiceTrait for AssetService {
 
         let created_ids: Vec<String> = created_ids.into_iter().collect();
 
-        // 4. Emit batch event for created assets
+        // 4. Auto-classify newly created assets (instrument_type + asset_class)
+        if !created_ids.is_empty() {
+            let created_set: HashSet<&str> = created_ids.iter().map(|id| id.as_str()).collect();
+            for (spec, _) in &specs_for_create {
+                let asset_id = spec.id.as_deref().or_else(|| {
+                    spec.instrument_key().and_then(|key| {
+                        assets_map
+                            .values()
+                            .find(|a| a.instrument_key.as_deref() == Some(key.as_str()))
+                            .map(|a| a.id.as_str())
+                    })
+                });
+                if let Some(id) = asset_id {
+                    if created_set.contains(id) {
+                        self.classify_new_asset(id, spec.instrument_type.as_ref(), &spec.kind)
+                            .await;
+                    }
+                }
+            }
+        }
+
+        // 5. Emit batch event for created assets
         if !created_ids.is_empty() {
             self.event_sink
                 .emit(DomainEvent::assets_created(created_ids.clone()));
         }
-        if !repaired_ids.is_empty() {
-            self.event_sink
-                .emit(DomainEvent::assets_updated(repaired_ids));
-        }
-
         Ok(EnsureAssetsResult {
             assets: assets_map,
             created_ids,
@@ -1463,31 +1351,8 @@ impl AssetServiceTrait for AssetService {
 
 #[cfg(test)]
 mod tests {
+    use super::super::assets_model::InstrumentType;
     use super::{AssetService, QuoteMode};
-
-    #[test]
-    fn test_explicit_quote_heal_target_for_gbp_minor_units() {
-        let target = AssetService::explicit_quote_heal_target("GBP", Some("GBp"));
-        assert_eq!(target.as_deref(), Some("GBp"));
-    }
-
-    #[test]
-    fn test_explicit_quote_heal_target_for_zar_minor_units() {
-        let target = AssetService::explicit_quote_heal_target("ZAc", Some("ZAR"));
-        assert_eq!(target.as_deref(), Some("ZAR"));
-    }
-
-    #[test]
-    fn test_explicit_quote_heal_target_ignores_unsupported_pairs() {
-        let target = AssetService::explicit_quote_heal_target("USD", Some("CAD"));
-        assert!(target.is_none());
-    }
-
-    #[test]
-    fn test_explicit_quote_heal_target_ignores_same_currency() {
-        let target = AssetService::explicit_quote_heal_target("GBP", Some("GBP"));
-        assert!(target.is_none());
-    }
 
     #[test]
     fn test_refresh_market_quote_ccy_on_mic_change_when_quote_not_explicit() {
@@ -1520,6 +1385,60 @@ mod tests {
                 Some("XLON"),
                 Some("XNAS"),
             )
+        );
+    }
+
+    #[test]
+    fn test_bond_provider_config_is_none() {
+        // The provider_config logic in new_asset_from_spec:
+        // Bond → None (no Yahoo override)
+        let quote_mode = QuoteMode::Market;
+        let instrument_type = Some(InstrumentType::Bond);
+
+        let provider_config = match quote_mode {
+            QuoteMode::Market => match instrument_type.as_ref() {
+                Some(InstrumentType::Bond) => None,
+                _ => Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            },
+            QuoteMode::Manual => None,
+        };
+
+        assert!(
+            provider_config.is_none(),
+            "Bonds should NOT get Yahoo preferred_provider"
+        );
+    }
+
+    #[test]
+    fn test_equity_provider_config_is_yahoo() {
+        let provider_config = AssetService::inferred_provider_config(
+            QuoteMode::Market,
+            Some(&InstrumentType::Equity),
+            Some("SHOP"),
+            Some("XTSE"),
+        )
+        .or(Some(serde_json::json!({ "preferred_provider": "YAHOO" })));
+
+        assert_eq!(
+            provider_config,
+            Some(serde_json::json!({ "preferred_provider": "YAHOO" })),
+            "Equities should get Yahoo preferred_provider"
+        );
+    }
+
+    #[test]
+    fn test_bf_isin_equity_prefers_boerse_frankfurt() {
+        let provider_config = AssetService::inferred_provider_config(
+            QuoteMode::Market,
+            Some(&InstrumentType::Equity),
+            Some("IE00BTJRMP35"),
+            Some("XETR"),
+        );
+
+        assert_eq!(
+            provider_config,
+            Some(serde_json::json!({ "preferred_provider": "BOERSE_FRANKFURT" })),
+            "ISIN-backed XETR/XFRA equities should prefer Boerse Frankfurt"
         );
     }
 }

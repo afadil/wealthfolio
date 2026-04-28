@@ -18,7 +18,7 @@ import { useMemo, useCallback, useRef, useState } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 
 import { streamChatResponse, type ChatModelConfig } from "../api";
-import type { AiThread, ChatMessage, ChatThread, ThreadPage } from "../types";
+import type { AiMessageAttachment, AiThread, ChatMessage, ChatThread, ThreadPage } from "../types";
 import { QueryKeys } from "@/lib/query-keys";
 import { generateId } from "@/lib/id";
 import { AI_THREADS_KEY } from "./use-threads";
@@ -205,40 +205,79 @@ interface ThreadListItemData {
   title?: string;
 }
 
+/** Maximum attachment size in bytes (10 MB). */
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
+/** Accepted file types for the AI assistant. */
+const ACCEPTED_FILE_TYPES =
+  ".csv,text/csv,application/csv,image/png,image/jpeg,image/jpg,application/pdf";
+
+/** Read a File as a base64 string (without the data: prefix). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve(dataUrl.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
- * CSV attachment adapter for importing activity data.
- * Accepts CSV files and reads content as text for AI processing.
+ * Unified file attachment adapter for CSV, images, and PDFs.
  */
-const csvAttachmentAdapter: AttachmentAdapter = {
-  accept: ".csv,text/csv,application/csv",
+const fileAttachmentAdapter: AttachmentAdapter = {
+  accept: ACCEPTED_FILE_TYPES,
 
   async add({ file }): Promise<PendingAttachment> {
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      throw new Error(`File "${file.name}" is too large (max 10 MB)`);
+    }
+
+    const isImage = file.type.startsWith("image/");
     return {
       id: generateId(),
-      type: "document",
+      type: isImage ? "image" : "document",
       name: file.name,
-      contentType: file.type || "text/csv",
+      contentType: file.type || "application/octet-stream",
       file,
       status: { type: "requires-action", reason: "composer-send" },
     };
   },
 
-  async remove(): Promise<void> {
-    // No cleanup needed for local file references
-  },
+  async remove(): Promise<void> {},
 
   async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
-    // Read CSV file content as text
-    const csvContent = await attachment.file.text();
+    const file = attachment.file;
+    const isCsv =
+      file.type === "text/csv" || file.type === "application/csv" || file.name.endsWith(".csv");
+    const isImage = file.type.startsWith("image/");
 
+    if (isCsv) {
+      const csvText = await file.text();
+      return {
+        id: attachment.id,
+        type: "document",
+        name: attachment.name,
+        contentType: "text/csv",
+        status: { type: "complete" },
+        content: [{ type: "text" as const, text: csvText }],
+      };
+    }
+
+    // Images and PDFs: read as base64
+    const base64 = await fileToBase64(file);
     return {
       id: attachment.id,
-      type: "document",
+      type: isImage ? "image" : "document",
       name: attachment.name,
       contentType: attachment.contentType,
       status: { type: "complete" },
-      // Store CSV content as text part for AI to process
-      content: [{ type: "text", text: csvContent }],
+      content: isImage
+        ? [{ type: "image" as const, image: `data:${file.type};base64,${base64}` }]
+        : [{ type: "text" as const, text: base64 }],
     };
   },
 };
@@ -384,6 +423,9 @@ export function useChatRuntime(config?: ChatModelConfig) {
   // Thread ID ref - persists across streaming calls
   const threadIdRef = useRef<string | null>(null);
 
+  // Parent message ID ref - set during edit to truncate AI context
+  const editParentIdRef = useRef<string | null>(null);
+
   // Abort controller for cancelling streams
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -444,36 +486,68 @@ export function useChatRuntime(config?: ChatModelConfig) {
         .map((part) => part.text)
         .join("\n");
 
-      // Extract CSV attachment content if present
-      // Attachments are processed by csvAttachmentAdapter.send() which stores content as text parts
-      let attachmentContent = "";
+      // Build structured attachment payloads for the backend
+      const attachmentPayloads: AiMessageAttachment[] = [];
       const attachmentNames: string[] = [];
-      let hasCsvAttachment = false;
       if (message.attachments && message.attachments.length > 0) {
         for (const attachment of message.attachments) {
           attachmentNames.push(attachment.name);
-          if (attachment.content) {
+          if (!attachment.content) continue;
+
+          const isCsv =
+            attachment.contentType === "text/csv" ||
+            attachment.contentType === "application/csv" ||
+            attachment.name.endsWith(".csv");
+          const isImage = attachment.contentType?.startsWith("image/");
+
+          if (isCsv) {
+            // CSV: content stored as text part (plain text)
             const csvText = attachment.content
-              .filter((part): part is { type: "text"; text: string } => part.type === "text")
-              .map((part) => part.text)
+              .filter((c): c is { type: "text"; text: string } => c.type === "text")
+              .map((c) => c.text)
               .join("\n");
             if (csvText) {
-              hasCsvAttachment = true;
-              // Format attachment content with metadata for AI
-              attachmentContent += `\n\n[Attached CSV file: ${attachment.name}]\n${csvText}`;
+              attachmentPayloads.push({
+                name: attachment.name,
+                contentType: "text/csv",
+                data: csvText,
+              });
+            }
+          } else if (isImage) {
+            // Image: content stored as image part (data URL with base64)
+            const imgContent = attachment.content.find(
+              (c): c is { type: "image"; image: string } => c.type === "image",
+            );
+            if (imgContent) {
+              const raw = imgContent.image.includes(",")
+                ? imgContent.image.split(",")[1]!
+                : imgContent.image;
+              attachmentPayloads.push({
+                name: attachment.name,
+                contentType: attachment.contentType ?? "image/png",
+                data: raw,
+              });
+            }
+          } else {
+            // PDF and other binary: content stored as text part (base64)
+            const b64Content = attachment.content.find(
+              (c): c is { type: "text"; text: string } => c.type === "text",
+            );
+            if (b64Content) {
+              attachmentPayloads.push({
+                name: attachment.name,
+                contentType: attachment.contentType ?? "application/octet-stream",
+                data: b64Content.text,
+              });
             }
           }
         }
       }
 
-      // Content for AI includes both text and attachment content
-      // For CSV files, prepend explicit tool instruction for smaller models
-      let contentForAi = textContent + attachmentContent;
-      if (hasCsvAttachment) {
-        contentForAi = `[INSTRUCTION: A CSV file is attached. You MUST call the import_csv tool with the full CSV content in csvContent parameter. Do NOT analyze or summarize the data yourself - use the tool.]\n\n${contentForAi}`;
-      }
-
-      if (!contentForAi.trim()) return;
+      // Text content only — attachments sent separately in structured field
+      const contentForAi = textContent;
+      const hasContent = contentForAi.trim() || attachmentPayloads.length > 0;
+      if (!hasContent) return;
       const initialThreadTitle = deriveInitialThreadTitle(
         textContent || attachmentNames[0] || "New chat",
       );
@@ -557,10 +631,19 @@ export function useChatRuntime(config?: ChatModelConfig) {
             content: contentForAi,
             config,
             threadId: threadIdRef.current ?? undefined,
+            parentMessageId: editParentIdRef.current ?? undefined,
+            attachments: attachmentPayloads.length > 0 ? attachmentPayloads : undefined,
           },
           signal,
         )) {
           if (signal.aborted) break;
+
+          // Replace a part with a new object so downstream memoization can detect changes
+          // by reference instead of deep-comparing content. Other unchanged parts keep
+          // their identity, allowing memoized tool UIs to skip re-renders during text streaming.
+          const replacePart = (index: number, next: ExternalMessagePart) => {
+            streamParts[index] = next;
+          };
 
           switch (event.type) {
             case "system":
@@ -636,7 +719,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (textPartIndex !== null) {
                 const part = streamParts[textPartIndex];
                 if (part?.type === "text") {
-                  part.content += event.delta;
+                  replacePart(textPartIndex, {
+                    type: "text",
+                    content: part.content + event.delta,
+                  });
                 }
               } else {
                 textPartIndex = streamParts.length;
@@ -651,7 +737,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (reasoningPartIndex !== null) {
                 const part = streamParts[reasoningPartIndex];
                 if (part?.type === "reasoning") {
-                  part.content += event.delta;
+                  replacePart(reasoningPartIndex, {
+                    type: "reasoning",
+                    content: part.content + event.delta,
+                  });
                 }
               } else {
                 reasoningPartIndex = streamParts.length;
@@ -682,12 +771,16 @@ export function useChatRuntime(config?: ChatModelConfig) {
               if (tcIdx !== undefined) {
                 const part = streamParts[tcIdx];
                 if (part?.type === "toolCall") {
-                  part.result = event.result.success
+                  const nextResult = event.result.success
                     ? event.result.meta
                       ? { data: event.result.data, meta: event.result.meta }
                       : event.result.data
                     : { error: event.result.error };
-                  part.meta = event.result.meta;
+                  replacePart(tcIdx, {
+                    ...part,
+                    result: nextResult,
+                    meta: event.result.meta,
+                  });
                 }
               }
               updateAssistantMessage();
@@ -744,6 +837,20 @@ export function useChatRuntime(config?: ChatModelConfig) {
   const handleCancel = useCallback(async () => {
     abortControllerRef.current?.abort();
   }, []);
+
+  // Handle message edit - truncate history to parent, then re-run
+  const handleEdit = useCallback(
+    async (message: AppendMessage) => {
+      setMessages((prev) => {
+        const parentIndex = prev.findIndex((m) => m.id === message.parentId);
+        return parentIndex >= 0 ? prev.slice(0, parentIndex + 1) : [];
+      });
+      editParentIdRef.current = message.parentId ?? null;
+      await handleNew(message);
+      editParentIdRef.current = null;
+    },
+    [handleNew],
+  );
 
   const handleSwitchToNewThread = useCallback(async () => {
     await handleCancel();
@@ -818,9 +925,10 @@ export function useChatRuntime(config?: ChatModelConfig) {
       setMessages: handleSetMessages,
       convertMessage,
       onNew: handleNew,
+      onEdit: handleEdit,
       onCancel: handleCancel,
       adapters: {
-        attachments: csvAttachmentAdapter,
+        attachments: fileAttachmentAdapter,
         threadList: {
           threadId: currentThreadId ?? undefined,
           isLoading: isThreadListLoading,
@@ -837,6 +945,7 @@ export function useChatRuntime(config?: ChatModelConfig) {
       messages,
       handleSetMessages,
       handleNew,
+      handleEdit,
       handleCancel,
       currentThreadId,
       isThreadListLoading,

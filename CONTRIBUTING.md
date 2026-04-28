@@ -44,6 +44,17 @@ By submitting a pull request, you confirm you have read and agree to
 
 See the [README](README.md#getting-started) for detailed setup instructions.
 
+### Optional Git Hooks
+
+Install the tracked Git hooks to run CI-equivalent checks before `git push`:
+
+```bash
+pnpm hooks:install
+```
+
+Git does not enable repository hooks automatically, so each contributor must opt
+in once per clone.
+
 ### Code Style
 
 - **Rust**: Follow standard Rust conventions, use `cargo fmt` and `cargo clippy`

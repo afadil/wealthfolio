@@ -3,13 +3,17 @@ use std::sync::Arc;
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
     extract::State,
+    http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
 use wealthfolio_core::health::{FixAction, HealthConfig, HealthStatus};
 
 /// Get current health status (cached or fresh check).
-async fn get_health_status(State(state): State<Arc<AppState>>) -> ApiResult<Json<HealthStatus>> {
+async fn get_health_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> ApiResult<Json<HealthStatus>> {
     // Try to get cached status first
     if let Some(status) = state.health_service.get_cached_status().await {
         if !status.is_stale {
@@ -19,14 +23,21 @@ async fn get_health_status(State(state): State<Arc<AppState>>) -> ApiResult<Json
 
     // Run fresh checks
     let base_currency = state.base_currency.read().unwrap().clone();
-    let status = run_health_checks_internal(&state, &base_currency).await?;
+    let client_timezone = extract_client_timezone(&headers);
+    let status =
+        run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
     Ok(Json(status))
 }
 
 /// Run health checks and return fresh status.
-async fn run_health_checks(State(state): State<Arc<AppState>>) -> ApiResult<Json<HealthStatus>> {
+async fn run_health_checks(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> ApiResult<Json<HealthStatus>> {
     let base_currency = state.base_currency.read().unwrap().clone();
-    let status = run_health_checks_internal(&state, &base_currency).await?;
+    let client_timezone = extract_client_timezone(&headers);
+    let status =
+        run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
     Ok(Json(status))
 }
 
@@ -34,7 +45,9 @@ async fn run_health_checks(State(state): State<Arc<AppState>>) -> ApiResult<Json
 async fn run_health_checks_internal(
     state: &Arc<AppState>,
     base_currency: &str,
+    client_timezone: Option<&str>,
 ) -> Result<HealthStatus, anyhow::Error> {
+    let configured_timezone = state.timezone.read().unwrap().clone();
     state
         .health_service
         .run_full_checks(
@@ -44,9 +57,21 @@ async fn run_health_checks_internal(
             state.quote_service.clone(),
             state.asset_service.clone(),
             state.taxonomy_service.clone(),
+            state.valuation_service.clone(),
+            Some(configured_timezone.as_str()),
+            client_timezone,
         )
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+fn extract_client_timezone(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("X-Client-Timezone")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|tz| !tz.is_empty())
+        .map(ToString::to_string)
 }
 
 #[derive(serde::Deserialize)]

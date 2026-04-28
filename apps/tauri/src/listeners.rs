@@ -5,6 +5,8 @@ use std::time::Instant;
 use tauri::{async_runtime::spawn, AppHandle, Emitter, Listener, Manager};
 use wealthfolio_core::constants::PORTFOLIO_TOTAL_ACCOUNT_ID;
 use wealthfolio_core::health::HealthServiceTrait;
+use wealthfolio_core::portfolio::snapshot::SnapshotRecalcMode;
+use wealthfolio_core::portfolio::valuation::ValuationRecalcMode;
 use wealthfolio_core::quotes::MarketSyncMode;
 
 use crate::context::ServiceContext;
@@ -26,7 +28,7 @@ pub fn setup_event_listeners(handle: AppHandle) {
     // Listener for full portfolio recalculation requests
     let recalc_handle = handle.clone();
     handle.listen(PORTFOLIO_TRIGGER_RECALCULATE, move |event| {
-        handle_portfolio_request(recalc_handle.clone(), event.payload(), true); // force_recalc = true
+        handle_portfolio_request(recalc_handle.clone(), event.payload(), true);
     });
 }
 
@@ -103,10 +105,21 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                                 }
 
                                 // Trigger calculation after successful sync
+                                let snap_mode = if force_recalc {
+                                    SnapshotRecalcMode::Full
+                                } else {
+                                    SnapshotRecalcMode::IncrementalFromLast
+                                };
+                                let val_mode = if force_recalc {
+                                    ValuationRecalcMode::Full
+                                } else {
+                                    ValuationRecalcMode::IncrementalFromLast
+                                };
                                 handle_portfolio_calculation(
                                     handle_clone.clone(),
                                     accounts_to_recalc,
-                                    force_recalc,
+                                    snap_mode,
+                                    val_mode,
                                 );
                             }
                             Err(e) => {
@@ -121,10 +134,21 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
                     } else {
                         // MarketSyncMode::None - skip market sync, just recalculate
                         info!("Skipping market sync (MarketSyncMode::None)");
+                        let snap_mode = if force_recalc {
+                            SnapshotRecalcMode::Full
+                        } else {
+                            SnapshotRecalcMode::IncrementalFromLast
+                        };
+                        let val_mode = if force_recalc {
+                            ValuationRecalcMode::Full
+                        } else {
+                            ValuationRecalcMode::IncrementalFromLast
+                        };
                         handle_portfolio_calculation(
                             handle_clone.clone(),
                             accounts_to_recalc,
-                            force_recalc,
+                            snap_mode,
+                            val_mode,
                         );
                     }
                 } else {
@@ -158,7 +182,8 @@ fn handle_portfolio_request(handle: AppHandle, payload_str: &str, force_recalc: 
 fn handle_portfolio_calculation(
     app_handle: AppHandle,
     account_ids_input: Option<Vec<String>>,
-    force_full_recalculation: bool,
+    snapshot_mode: SnapshotRecalcMode,
+    valuation_mode: ValuationRecalcMode,
 ) {
     if let Err(e) = app_handle.emit(PORTFOLIO_UPDATE_START, ()) {
         error!("Failed to emit {} event: {}", PORTFOLIO_UPDATE_START, e);
@@ -206,19 +231,12 @@ fn handle_portfolio_calculation(
 
         // --- Step 1: Calculate Account-Specific Snapshots (only if there are specific active accounts to process) ---
         if !initially_targeted_active_accounts.is_empty() {
-            let account_snapshot_result = if force_full_recalculation {
-                snapshot_service
-                    .force_recalculate_holdings_snapshots(Some(
-                        initially_targeted_active_accounts.as_slice(),
-                    ))
-                    .await
-            } else {
-                snapshot_service
-                    .calculate_holdings_snapshots(Some(
-                        initially_targeted_active_accounts.as_slice(),
-                    ))
-                    .await
-            };
+            let account_snapshot_result = snapshot_service
+                .recalculate_holdings_snapshots(
+                    Some(initially_targeted_active_accounts.as_slice()),
+                    snapshot_mode.clone(),
+                )
+                .await;
 
             if let Err(e) = account_snapshot_result {
                 let err_msg = format!(
@@ -236,13 +254,9 @@ fn handle_portfolio_calculation(
         }
 
         // --- Step 2: Calculate TOTAL portfolio snapshot ---
-        let total_result = if force_full_recalculation {
-            snapshot_service
-                .force_recalculate_total_portfolio_snapshots()
-                .await
-        } else {
-            snapshot_service.calculate_total_portfolio_snapshots().await
-        };
+        let total_result = snapshot_service
+            .recalculate_total_portfolio_snapshots(snapshot_mode)
+            .await;
         if let Err(e) = total_result {
             let err_msg = format!("Failed to calculate TOTAL portfolio snapshot: {}", e);
             error!("{}", err_msg);
@@ -291,9 +305,10 @@ fn handle_portfolio_calculation(
             let history_futures = accounts_for_valuation.iter().map(|account_id| {
                 let valuation_service_clone = valuation_service.clone();
                 let account_id_clone = account_id.clone();
+                let valuation_mode_clone = valuation_mode.clone();
                 async move {
                     let result = valuation_service_clone
-                        .calculate_valuation_history(&account_id_clone, force_full_recalculation)
+                        .calculate_valuation_history(&account_id_clone, valuation_mode_clone)
                         .await;
                     (account_id_clone, result)
                 }

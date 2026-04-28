@@ -12,9 +12,16 @@ use crate::error::AiError;
 // Tool Arguments and Output
 // ============================================================================
 
-/// Arguments for the get_accounts tool (no required args).
+/// Arguments for the get_accounts tool.
 #[derive(Debug, Default, Deserialize)]
-pub struct GetAccountsArgs {}
+#[serde(rename_all = "camelCase")]
+pub struct GetAccountsArgs {
+    /// Display hint for the UI. Pass "compact" when fetching accounts as a
+    /// prerequisite for another action (e.g., resolving account name before
+    /// import). Omit or pass "full" when the user asked to see accounts.
+    #[serde(default)]
+    pub display_mode: Option<String>,
+}
 
 /// DTO for account data in tool output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +82,13 @@ impl<E: AiEnvironment + 'static> Tool for GetAccountsTool<E> {
             description: "Get the list of active investment accounts. Returns account id, name, type, and currency for each account.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "displayMode": {
+                        "type": "string",
+                        "enum": ["full", "compact"],
+                        "description": "Pass 'compact' when fetching accounts as input for another tool call (e.g., resolving account name before import_csv). Omit when the user directly asked to see their accounts."
+                    }
+                },
                 "required": []
             }),
         }
@@ -127,7 +140,7 @@ mod tests {
         let env = Arc::new(MockEnvironment::new());
         let tool = GetAccountsTool::new(env);
 
-        let result = tool.call(GetAccountsArgs {}).await;
+        let result = tool.call(GetAccountsArgs::default()).await;
         assert!(result.is_ok());
 
         let output = result.unwrap();

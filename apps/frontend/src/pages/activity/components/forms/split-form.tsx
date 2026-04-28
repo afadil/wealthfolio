@@ -1,19 +1,20 @@
-import { useMemo } from "react";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
+import { useSettings } from "@/hooks/use-settings";
+import { ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { ActivityType } from "@/lib/constants";
-import { useSettings } from "@/hooks/use-settings";
+import { useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  SymbolSearch,
-  DatePicker,
-  QuantityInput,
-  NotesInput,
   AdvancedOptionsSection,
+  createValidatedSubmit,
+  DatePicker,
+  NotesInput,
+  QuantityInput,
+  SymbolSearch,
   type AccountSelectOption,
 } from "./fields";
 
@@ -21,7 +22,7 @@ import {
 export const splitFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
   symbol: z.string().min(1, { message: "Please enter a symbol." }),
-  exchangeMic: z.string().optional(),
+  exchangeMic: z.string().nullable().optional(),
   activityDate: z.date({ required_error: "Please select a date." }),
   splitRatio: z.coerce
     .number({
@@ -33,8 +34,8 @@ export const splitFormSchema = z.object({
   // Advanced options
   currency: z.string().min(1, { message: "Currency is required." }),
   subtype: z.string().optional().nullable(),
-  symbolQuoteCcy: z.string().optional(),
-  symbolInstrumentType: z.string().optional(),
+  symbolQuoteCcy: z.string().nullable().optional(),
+  symbolInstrumentType: z.string().nullable().optional(),
 });
 
 export type SplitFormValues = z.infer<typeof splitFormSchema>;
@@ -97,7 +98,7 @@ export function SplitForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 

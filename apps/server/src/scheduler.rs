@@ -12,7 +12,7 @@ use tracing::info;
 use tracing::{debug, info, warn};
 
 #[cfg(feature = "connect-sync")]
-use crate::api::connect::perform_broker_sync;
+use crate::api::connect::{has_broker_sync, perform_broker_sync};
 use crate::main_lib::AppState;
 
 /// Sync interval: 4 hours (not user-configurable to prevent API abuse)
@@ -63,6 +63,22 @@ async fn run_scheduled_sync(state: &Arc<AppState>) {
     if !has_token {
         debug!("Scheduled sync skipped: no refresh token configured");
         return;
+    }
+
+    // Check if user's plan includes broker sync
+    match has_broker_sync(state).await {
+        Ok(true) => {}
+        Ok(false) => {
+            debug!("Scheduled sync skipped: plan does not include broker sync");
+            return;
+        }
+        Err(e) => {
+            debug!(
+                "Scheduled sync skipped: could not verify broker sync access ({})",
+                e
+            );
+            return;
+        }
     }
 
     // Perform the sync using the shared perform_broker_sync from api::connect

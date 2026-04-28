@@ -18,7 +18,7 @@ import { MobileNavBar } from "./navigation/mobile-navbar";
 import { NavigationModeProvider, useNavigationMode } from "./navigation/navigation-mode-context";
 
 const AppLayoutContent = () => {
-  const { data: settings, isLoading: isSettingsLoading } = useSettings();
+  const { data: settings, isSuccess: isSettingsReady } = useSettings();
   const location = useLocation();
   const navigation = useNavigation();
   const { isMobile } = usePlatform();
@@ -37,7 +37,16 @@ const AppLayoutContent = () => {
   useGlobalEventListener();
   useNavigationEventListener();
 
-  if (isSettingsLoading) return null;
+  if (!isSettingsReady) {
+    return (
+      <div
+        className="flex h-screen items-center justify-center"
+        style={{ backgroundColor: "#09090b" }}
+      >
+        <img src="/logo-gold.png" alt="Wealthfolio" className="h-[100px] w-auto" />
+      </div>
+    );
+  }
 
   if (!settings?.onboardingCompleted && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" />;

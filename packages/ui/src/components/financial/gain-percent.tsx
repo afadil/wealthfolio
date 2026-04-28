@@ -8,6 +8,7 @@ interface GainPercentProps extends React.HTMLAttributes<HTMLDivElement> {
   animated?: boolean;
   variant?: GainPercentVariant;
   showSign?: boolean;
+  invertColor?: boolean;
 }
 
 function AnimatedNumber({ value }: { value: number }) {
@@ -41,17 +42,22 @@ export function GainPercent({
   animated = false,
   variant = "text",
   showSign = true,
+  invertColor = false,
   className,
   ...props
 }: GainPercentProps) {
+  const successColor = invertColor ? "text-destructive" : "text-success";
+  const destructiveColor = invertColor ? "text-success" : "text-destructive";
+  const successBg = invertColor ? "bg-destructive/10" : "bg-success/10";
+  const destructiveBg = invertColor ? "bg-success/10" : "bg-destructive/10";
   return (
     <div
       className={cn(
         "amount inline-flex items-center justify-end text-right text-sm",
-        value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-foreground",
+        value > 0 ? successColor : value < 0 ? destructiveColor : "text-foreground",
         variant === "badge" && [
           "rounded-md py-px pl-[9px] pr-[12px] font-light",
-          value > 0 ? "bg-success/10" : value < 0 ? "bg-destructive/10" : "bg-foreground/10",
+          value > 0 ? successBg : value < 0 ? destructiveBg : "bg-foreground/10",
         ],
         className,
       )}

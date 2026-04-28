@@ -17,13 +17,18 @@ function formatCompactNumber(value: number, currency: string): string {
   const sign = value < 0 ? "-" : "";
 
   // Get currency symbol
-  const formatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  const symbol = formatter.format(0).replace(/[0-9]/g, "").trim();
+  let symbol = "";
+  try {
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+    symbol = formatter.format(0).replace(/[0-9]/g, "").trim();
+  } catch {
+    // Invalid currency code — skip symbol
+  }
 
   if (absValue >= 1_000_000_000) {
     return `${sign}${symbol}${(absValue / 1_000_000_000).toFixed(1)}B`;

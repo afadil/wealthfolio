@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { ExternalLink } from "@/components/external-link";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -21,7 +22,15 @@ import {
   CommandList,
 } from "@wealthfolio/ui/components/ui/command";
 import { cn } from "@/lib/utils";
-import type { MergedProvider, MergedModel, FetchedModel, ModelCapabilityOverrides } from "../types";
+import type {
+  MergedProvider,
+  MergedModel,
+  FetchedModel,
+  ModelCapabilityOverrides,
+  ProviderTuning,
+  ProviderTuningOverrides,
+} from "../types";
+import type { ConnectionField } from "@/lib/types";
 import { ProviderIcon } from "./provider-icons";
 
 interface ProviderSettingsCardProps {
@@ -37,6 +46,11 @@ interface ProviderSettingsCardProps {
   onSetFavoriteModels?: (modelIds: string[]) => void;
   onSetCapabilityOverride?: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange?: (tools: string[] | null) => void;
+  /**
+   * Persist tuning overrides. Pass `null` to clear (reset to catalog defaults),
+   * or a partial object to set/update individual fields.
+   */
+  onTuningOverridesChange?: (overrides: ProviderTuningOverrides | null) => void;
   isLast?: boolean;
   // Model fetching props (controlled by parent via React Query)
   modelComboboxOpen?: boolean;
@@ -47,28 +61,47 @@ interface ProviderSettingsCardProps {
   onRefreshModels?: () => void;
 }
 
-// Novice-friendly tool mapping for data access settings
+// Novice-friendly tool mapping for data access settings.
+// Each card can represent multiple backend tools that belong to the same user capability.
 const DATA_ACCESS_OPTIONS = [
-  { toolId: "get_accounts", label: "Accounts", description: "Account names, types, and balances" },
-  { toolId: "get_holdings", label: "Holdings", description: "Current positions and their values" },
   {
-    toolId: "search_activities",
-    label: "Transactions",
-    description: "Past transactions and activities",
+    toolIds: ["get_accounts", "get_cash_balances"],
+    label: "Accounts",
+    description: "Account details and cash balances",
   },
   {
-    toolId: "get_performance",
+    toolIds: ["get_holdings"],
+    label: "Holdings",
+    description: "Current positions and their values",
+  },
+  {
+    toolIds: ["search_activities", "record_activity", "record_activities", "import_csv"],
+    label: "Transactions",
+    description: "View, draft, and import activities",
+  },
+  {
+    toolIds: ["get_performance"],
     label: "Performance",
     description: "Returns and performance metrics",
   },
-  { toolId: "get_income", label: "Income", description: "Income summary and breakdown" },
-  { toolId: "get_goals", label: "Goals", description: "Investment goals and progress" },
+  { toolIds: ["get_income"], label: "Income", description: "Income summary and breakdown" },
+  { toolIds: ["get_goals"], label: "Goals", description: "Investment goals and progress" },
   {
-    toolId: "get_asset_allocation",
+    toolIds: ["get_asset_allocation"],
     label: "Allocation",
     description: "Portfolio allocation breakdown",
   },
-  { toolId: "get_valuation_history", label: "History", description: "Portfolio value over time" },
+  {
+    toolIds: ["get_valuation_history"],
+    label: "History",
+    description: "Portfolio value over time",
+  },
+];
+
+const HIDDEN_DEFAULT_TOOL_IDS = ["get_health_status"];
+const ALL_DATA_ACCESS_TOOL_IDS = [
+  ...DATA_ACCESS_OPTIONS.flatMap((option) => option.toolIds),
+  ...HIDDEN_DEFAULT_TOOL_IDS,
 ];
 
 export function ProviderSettingsCard({
@@ -83,6 +116,7 @@ export function ProviderSettingsCard({
   onSetFavoriteModels,
   onSetCapabilityOverride,
   onToolsAllowlistChange,
+  onTuningOverridesChange,
   isLast = false,
   // Model fetching props
   modelComboboxOpen: controlledComboboxOpen,
@@ -234,41 +268,47 @@ export function ProviderSettingsCard({
     onSetCapabilityOverride(modelId, newOverrides);
   };
 
-  // Handle tool allowlist toggle
-  const handleToolToggle = (toolId: string, enabled: boolean) => {
-    if (!onToolsAllowlistChange) return;
-
-    const currentAllowlist = provider.toolsAllowlist;
-    const allToolIds = DATA_ACCESS_OPTIONS.map((opt) => opt.toolId);
-
-    if (currentAllowlist === null || currentAllowlist === undefined) {
-      // Currently all tools enabled (null = all). If disabling one, create allowlist with all except this one.
-      if (!enabled) {
-        const newAllowlist = allToolIds.filter((id) => id !== toolId);
-        onToolsAllowlistChange(newAllowlist);
-      }
-      // If enabling when already all enabled, no action needed
-    } else {
-      // We have an explicit allowlist
-      if (enabled) {
-        // Add tool to allowlist
-        const newAllowlist = [...currentAllowlist, toolId];
-        // Always send the list - don't use null to avoid serialization issues
-        onToolsAllowlistChange(newAllowlist);
-      } else {
-        // Remove tool from allowlist
-        const newAllowlist = currentAllowlist.filter((id) => id !== toolId);
-        onToolsAllowlistChange(newAllowlist);
-      }
-    }
-  };
-
-  // Check if a tool is enabled
-  const isToolEnabled = (toolId: string): boolean => {
+  // Check if a tool group is enabled. Some legacy settings only contain one
+  // tool from a group, so treat any matching tool as enabled and repair the
+  // full group the next time settings are saved.
+  const isToolGroupEnabled = (toolIds: string[]): boolean => {
     const allowlist = provider.toolsAllowlist;
     // null/undefined means all tools are enabled
     if (allowlist === null || allowlist === undefined) return true;
-    return allowlist.includes(toolId);
+    return toolIds.some((toolId) => allowlist.includes(toolId));
+  };
+
+  // Handle grouped tool allowlist toggle
+  const handleToolToggle = (toolIds: string[], enabled: boolean) => {
+    if (!onToolsAllowlistChange) return;
+
+    const enabledToolIds = new Set<string>();
+    for (const option of DATA_ACCESS_OPTIONS) {
+      const isTarget = option.toolIds.some((toolId) => toolIds.includes(toolId));
+      const nextEnabled = isTarget ? enabled : isToolGroupEnabled(option.toolIds);
+      if (nextEnabled) {
+        for (const toolId of option.toolIds) {
+          enabledToolIds.add(toolId);
+        }
+      }
+    }
+
+    const hasVisibleAccess = DATA_ACCESS_OPTIONS.some((option) =>
+      option.toolIds.some((toolId) => enabledToolIds.has(toolId)),
+    );
+    if (hasVisibleAccess) {
+      for (const toolId of HIDDEN_DEFAULT_TOOL_IDS) {
+        enabledToolIds.add(toolId);
+      }
+    }
+
+    const allEnabled = ALL_DATA_ACCESS_TOOL_IDS.every((toolId) => enabledToolIds.has(toolId));
+    if (allEnabled) {
+      onToolsAllowlistChange(null);
+      return;
+    }
+
+    onToolsAllowlistChange(ALL_DATA_ACCESS_TOOL_IDS.filter((toolId) => enabledToolIds.has(toolId)));
   };
 
   return (
@@ -336,15 +376,13 @@ export function ProviderSettingsCard({
                         API Key
                       </Label>
                       {provider.documentationUrl && (
-                        <a
+                        <ExternalLink
                           href={provider.documentationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
                         >
                           Get API key
                           <Icons.ExternalLink className="h-3 w-3" />
-                        </a>
+                        </ExternalLink>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -667,50 +705,9 @@ export function ProviderSettingsCard({
                 </div>
               )}
 
-              {/* Custom Base URL Section */}
-              {supportsCustomUrl && customUrlField && (
-                <div className="bg-muted/40 rounded-lg p-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor={`baseurl-${provider.id}`} className="text-sm font-medium">
-                        {customUrlField.label}
-                      </Label>
-                      {customUrlField.helpUrl && (
-                        <a
-                          href={customUrlField.helpUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs transition-colors"
-                        >
-                          Learn more
-                          <Icons.ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id={`baseurl-${provider.id}`}
-                        type="url"
-                        value={customUrlValue}
-                        onChange={(e) => setCustomUrlValue(e.target.value)}
-                        placeholder={customUrlField.placeholder}
-                        className="bg-background flex-1 font-mono text-sm"
-                      />
-                      <Button
-                        onClick={() => onCustomUrlChange?.(customUrlValue)}
-                        size="default"
-                        className="shrink-0"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Data Access Section */}
               {onToolsAllowlistChange && (
-                <div className="space-y-3">
+                <div className="bg-muted/40 space-y-3 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Data Access</Label>
                     <span className="text-muted-foreground text-xs">
@@ -719,12 +716,12 @@ export function ProviderSettingsCard({
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {DATA_ACCESS_OPTIONS.map((option) => {
-                      const isEnabled = isToolEnabled(option.toolId);
+                      const isEnabled = isToolGroupEnabled(option.toolIds);
                       return (
                         <button
-                          key={option.toolId}
+                          key={option.label}
                           type="button"
-                          onClick={() => handleToolToggle(option.toolId, !isEnabled)}
+                          onClick={() => handleToolToggle(option.toolIds, !isEnabled)}
                           className={cn(
                             "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-all",
                             isEnabled
@@ -754,10 +751,751 @@ export function ProviderSettingsCard({
                   </div>
                 </div>
               )}
+
+              {/* Advanced Options — last because rarely touched (endpoint URL + tuning) */}
+              {onTuningOverridesChange && (
+                <AdvancedTuningSection
+                  provider={provider}
+                  onChange={onTuningOverridesChange}
+                  customUrlField={customUrlField}
+                  customUrlValue={customUrlValue}
+                  onCustomUrlValueChange={setCustomUrlValue}
+                  onCustomUrlSave={onCustomUrlChange}
+                  supportsCustomUrl={supportsCustomUrl}
+                />
+              )}
             </div>
           </div>
         </CollapsibleContent>
       </div>
     </Collapsible>
+  );
+}
+
+// ============================================================================
+// Advanced Tuning Section
+// ============================================================================
+
+interface AdvancedTuningSectionProps {
+  provider: MergedProvider;
+  onChange: (overrides: ProviderTuningOverrides | null) => void;
+  /** Catalog-defined connection field for the endpoint URL, if this provider supports one. */
+  customUrlField?: ConnectionField;
+  /** Current URL draft value (controlled by the parent card's local state). */
+  customUrlValue: string;
+  /** Update the URL draft value — called on each keystroke. */
+  onCustomUrlValueChange: (value: string) => void;
+  /** Persist the URL draft value to backend (called when user hits Save). */
+  onCustomUrlSave?: (url: string) => void;
+  /** Whether this provider supports a custom endpoint URL at all. */
+  supportsCustomUrl: boolean;
+}
+
+type PrimitiveExtraValue = number | boolean | string;
+type TuningFieldSource = "primary" | "extra";
+type TuningFieldGroup = "sampling" | "limits" | "repetition" | "other";
+
+interface PrimaryFieldMeta {
+  label: string;
+  description: string;
+  group: TuningFieldGroup;
+  bounds: { min: number; max: number; step: number };
+  format: (v: number) => string;
+}
+
+/**
+ * The three cross-provider scalar fields that sit on `tuning` directly
+ * (not inside `extraOptions`). Rendered with friendly labels.
+ */
+const PRIMARY_FIELDS: Record<"temperature" | "maxTokens" | "maxTokensThinking", PrimaryFieldMeta> =
+  {
+    temperature: {
+      label: "Temperature",
+      description: "Controls randomness. Lower = more deterministic output.",
+      group: "sampling",
+      bounds: { min: 0, max: 2, step: 0.05 },
+      format: (v) => v.toFixed(2),
+    },
+    maxTokens: {
+      label: "Max output tokens",
+      description: "Safety cap on response length.",
+      group: "limits",
+      bounds: { min: 256, max: 131_072, step: 256 },
+      format: (v) => v.toLocaleString(),
+    },
+    maxTokensThinking: {
+      label: "Max tokens (thinking)",
+      description:
+        "Used when the model reasons internally — reasoning tokens count against this cap, so it should be larger than Max output tokens.",
+      group: "limits",
+      bounds: { min: 256, max: 131_072, step: 256 },
+      format: (v) => v.toLocaleString(),
+    },
+  };
+
+/**
+ * Grouping + descriptions for known provider-specific scalar keys under
+ * `extraOptions`. Unknown keys fall into "other".
+ */
+const EXTRA_FIELD_META: Record<string, { group: TuningFieldGroup; description: string }> = {
+  num_ctx: {
+    group: "limits",
+    description: "Context window size in tokens. Input + output must fit inside.",
+  },
+  num_predict: {
+    group: "limits",
+    description: "Max tokens to generate (Ollama's equivalent of max_tokens).",
+  },
+  top_k: {
+    group: "sampling",
+    description: "Only sample from the top-K most likely tokens. 0 = disabled.",
+  },
+  top_p: {
+    group: "sampling",
+    description: "Nucleus sampling — consider tokens up to this cumulative probability.",
+  },
+  min_p: {
+    group: "sampling",
+    description: "Minimum probability threshold for candidate tokens.",
+  },
+  mirostat: {
+    group: "sampling",
+    description: "Mirostat sampling mode. 0 = off, 1 or 2 = enabled.",
+  },
+  mirostat_eta: { group: "sampling", description: "Mirostat learning rate." },
+  mirostat_tau: { group: "sampling", description: "Mirostat target entropy." },
+  repeat_penalty: {
+    group: "repetition",
+    description: "Penalize repeated tokens. 1 = none, >1 = discourage repetition.",
+  },
+  repeat_last_n: {
+    group: "repetition",
+    description: "How many recent tokens the repeat penalty considers.",
+  },
+  frequency_penalty: {
+    group: "repetition",
+    description: "Penalize tokens by how often they've appeared. Range -2 to 2.",
+  },
+  presence_penalty: {
+    group: "sampling",
+    description: "Encourage new topics by penalizing any repetition. Range -2 to 2.",
+  },
+  seed: {
+    group: "other",
+    description: "Seed for reproducible output. Leave empty for random.",
+  },
+};
+
+const GROUP_META: Record<TuningFieldGroup, { title: string; blurb: string }> = {
+  sampling: {
+    title: "Sampling",
+    blurb: "How randomly the model picks the next token.",
+  },
+  limits: {
+    title: "Output limits",
+    blurb: "Caps on response length and context size.",
+  },
+  repetition: {
+    title: "Repetition",
+    blurb: "Discourage the model from repeating itself.",
+  },
+  other: { title: "Other", blurb: "Miscellaneous provider-specific options." },
+};
+
+const GROUP_ORDER: TuningFieldGroup[] = ["sampling", "limits", "repetition", "other"];
+
+/**
+ * Soft numeric bounds for well-known Ollama/LLM scalar keys in `extraOptions`.
+ */
+const KNOWN_NUMERIC_BOUNDS: Record<string, { min: number; max: number; step: number }> = {
+  num_ctx: { min: 512, max: 131_072, step: 512 },
+  repeat_penalty: { min: 0, max: 2, step: 0.05 },
+  repeat_last_n: { min: 0, max: 8192, step: 1 },
+  top_k: { min: 0, max: 200, step: 1 },
+  top_p: { min: 0, max: 1, step: 0.01 },
+  min_p: { min: 0, max: 1, step: 0.01 },
+  mirostat: { min: 0, max: 2, step: 1 },
+  mirostat_eta: { min: 0, max: 1, step: 0.01 },
+  mirostat_tau: { min: 0, max: 10, step: 0.1 },
+  seed: { min: 0, max: 2_147_483_647, step: 1 },
+  num_predict: { min: 1, max: 131_072, step: 1 },
+  frequency_penalty: { min: -2, max: 2, step: 0.1 },
+  presence_penalty: { min: -2, max: 2, step: 0.1 },
+};
+
+function isPrimitive(value: unknown): value is PrimitiveExtraValue {
+  return typeof value === "number" || typeof value === "boolean" || typeof value === "string";
+}
+
+/** Unified descriptor for one editable tuning field (primary or extra). */
+interface TuningFieldDescriptor {
+  id: string; // key for React and htmlFor
+  source: TuningFieldSource;
+  label: string;
+  monoLabel: boolean; // raw catalog keys render monospace
+  description: string;
+  group: TuningFieldGroup;
+  type: "number" | "boolean" | "string";
+  catalogValue: PrimitiveExtraValue | undefined;
+  overrideValue: PrimitiveExtraValue | null | undefined;
+  effectiveValue: PrimitiveExtraValue | undefined;
+  bounds?: { min: number; max: number; step: number };
+  formatValue: (v: PrimitiveExtraValue) => string;
+}
+
+function defaultFormat(v: PrimitiveExtraValue): string {
+  if (typeof v === "number") {
+    return Number.isInteger(v) ? v.toLocaleString() : String(v);
+  }
+  return String(v);
+}
+
+function AdvancedTuningSection({
+  provider,
+  onChange,
+  customUrlField,
+  customUrlValue,
+  onCustomUrlValueChange,
+  onCustomUrlSave,
+  supportsCustomUrl,
+}: AdvancedTuningSectionProps) {
+  const [open, setOpen] = useState(false);
+
+  const catalog: ProviderTuning = provider.catalogTuning ?? {};
+  const overrides: ProviderTuningOverrides = provider.tuningOverrides ?? {};
+  const resolved: ProviderTuning = provider.resolvedTuning ?? catalog;
+  const extraOverrides = overrides.extraOptionOverrides ?? {};
+
+  const supportsThinking = provider.models.some((m) => m.capabilities.thinking);
+
+  const hasOverrides =
+    overrides.temperature !== undefined ||
+    overrides.maxTokens !== undefined ||
+    overrides.maxTokensThinking !== undefined ||
+    Object.keys(extraOverrides).length > 0;
+
+  // Build the unified list of editable fields from primary + extraOptions.
+  const fields = useMemo<TuningFieldDescriptor[]>(() => {
+    const list: TuningFieldDescriptor[] = [];
+
+    // Primary fields — always render when the provider has tuning at all.
+    // Max tokens (thinking) is hidden if no model in the provider supports thinking.
+    const primaryKeys: ("temperature" | "maxTokens" | "maxTokensThinking")[] = [
+      "temperature",
+      "maxTokens",
+      ...(supportsThinking ? (["maxTokensThinking"] as const) : []),
+    ];
+    for (const key of primaryKeys) {
+      const meta = PRIMARY_FIELDS[key];
+      const catalogValue = catalog[key];
+      const overrideValue = overrides[key];
+      if (catalogValue === undefined && overrideValue === undefined) continue;
+      list.push({
+        id: key,
+        source: "primary",
+        label: meta.label,
+        monoLabel: false,
+        description: meta.description,
+        group: meta.group,
+        type: "number",
+        catalogValue,
+        overrideValue,
+        effectiveValue: resolved[key],
+        bounds: meta.bounds,
+        formatValue: (v) => (typeof v === "number" ? meta.format(v) : String(v)),
+      });
+    }
+
+    // Extra options — iterate the catalog, keep primitives, drop complex shapes.
+    const catalogExtras = catalog.extraOptions ?? {};
+    if (catalogExtras && typeof catalogExtras === "object" && !Array.isArray(catalogExtras)) {
+      for (const [key, value] of Object.entries(catalogExtras as Record<string, unknown>)) {
+        if (!isPrimitive(value)) continue;
+        const meta = EXTRA_FIELD_META[key];
+        list.push({
+          id: `extra-${key}`,
+          source: "extra",
+          label: key,
+          monoLabel: true,
+          description: meta?.description ?? "",
+          group: meta?.group ?? "other",
+          type: typeof value as "number" | "boolean" | "string",
+          catalogValue: value,
+          overrideValue: extraOverrides[key] ?? undefined,
+          effectiveValue:
+            extraOverrides[key] !== undefined && extraOverrides[key] !== null
+              ? extraOverrides[key]
+              : value,
+          bounds: typeof value === "number" ? KNOWN_NUMERIC_BOUNDS[key] : undefined,
+          formatValue: defaultFormat,
+        });
+      }
+    }
+
+    return list;
+  }, [catalog, overrides, resolved, extraOverrides, supportsThinking]);
+
+  // Bucket by group and preserve insertion order inside each.
+  const grouped = useMemo(() => {
+    const buckets: Record<TuningFieldGroup, TuningFieldDescriptor[]> = {
+      sampling: [],
+      limits: [],
+      repetition: [],
+      other: [],
+    };
+    for (const f of fields) buckets[f.group].push(f);
+    return buckets;
+  }, [fields]);
+
+  // Complex (array/object) catalog extras — read-only display.
+  const complexEntries = useMemo(() => {
+    const extras = catalog.extraOptions;
+    if (!extras || typeof extras !== "object" || Array.isArray(extras)) return [];
+    return Object.entries(extras as Record<string, unknown>).filter(([, v]) => !isPrimitive(v));
+  }, [catalog.extraOptions]);
+
+  // Orphaned: user override exists for a key no longer in the catalog.
+  const orphanedEntries = useMemo(() => {
+    const catalogKeys = new Set<string>();
+    const extras = catalog.extraOptions;
+    if (extras && typeof extras === "object" && !Array.isArray(extras)) {
+      for (const k of Object.keys(extras as Record<string, unknown>)) catalogKeys.add(k);
+    }
+    return Object.entries(extraOverrides).filter(([k]) => !catalogKeys.has(k));
+  }, [catalog.extraOptions, extraOverrides]);
+
+  /**
+   * Commit a single field's new value. Handles routing to either the top-level
+   * override field (primary) or the per-key `extraOptionOverrides` map (extra).
+   * `value === null` clears the override for that field.
+   */
+  const commitField = (field: TuningFieldDescriptor, value: PrimitiveExtraValue | null) => {
+    const next: ProviderTuningOverrides = {
+      temperature: overrides.temperature,
+      maxTokens: overrides.maxTokens,
+      maxTokensThinking: overrides.maxTokensThinking,
+      extraOptionOverrides: { ...extraOverrides },
+    };
+
+    if (field.source === "primary") {
+      const key = field.id as "temperature" | "maxTokens" | "maxTokensThinking";
+      if (value === null) {
+        next[key] = undefined;
+      } else if (typeof value === "number") {
+        next[key] = value;
+      }
+    } else {
+      // strip the "extra-" prefix we use for React keys
+      const rawKey = field.label;
+      const extras = next.extraOptionOverrides ?? {};
+      if (value === null) {
+        delete extras[rawKey];
+      } else {
+        extras[rawKey] = value;
+      }
+      next.extraOptionOverrides = extras;
+    }
+
+    // Normalize: if extraOptionOverrides is empty, drop it.
+    if (next.extraOptionOverrides && Object.keys(next.extraOptionOverrides).length === 0) {
+      next.extraOptionOverrides = undefined;
+    }
+
+    const isEmpty =
+      next.temperature === undefined &&
+      next.maxTokens === undefined &&
+      next.maxTokensThinking === undefined &&
+      !next.extraOptionOverrides;
+    onChange(isEmpty ? null : next);
+  };
+
+  const clearOrphaned = (key: string) => {
+    const extras = { ...extraOverrides };
+    delete extras[key];
+    const next: ProviderTuningOverrides = {
+      ...overrides,
+      extraOptionOverrides: Object.keys(extras).length === 0 ? undefined : extras,
+    };
+    const isEmpty =
+      next.temperature === undefined &&
+      next.maxTokens === undefined &&
+      next.maxTokensThinking === undefined &&
+      !next.extraOptionOverrides;
+    onChange(isEmpty ? null : next);
+  };
+
+  const resetAll = () => onChange(null);
+
+  const endpointAvailable = supportsCustomUrl && !!customUrlField;
+
+  // Nothing to show at all (e.g. a provider with no tuning, no extras, no URL).
+  const hasAnything =
+    fields.length > 0 ||
+    complexEntries.length > 0 ||
+    orphanedEntries.length > 0 ||
+    endpointAvailable;
+  if (!hasAnything) return null;
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="bg-muted/40 space-y-3 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="text-foreground inline-flex items-center gap-1.5 text-sm font-medium"
+            >
+              <Icons.ChevronRight
+                className={cn(
+                  "text-muted-foreground h-3.5 w-3.5 transition-transform",
+                  open && "rotate-90",
+                )}
+              />
+              Advanced Options
+              {hasOverrides && (
+                <Badge variant="secondary" className="ml-1 text-[10px] uppercase">
+                  Customized
+                </Badge>
+              )}
+            </button>
+          </CollapsibleTrigger>
+          {hasOverrides && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground h-7 px-2 text-xs"
+              onClick={resetAll}
+            >
+              Reset to defaults
+            </Button>
+          )}
+        </div>
+
+        <CollapsibleContent>
+          <div className="space-y-3">
+            {endpointAvailable && customUrlField && (
+              <EndpointGroupCard
+                providerId={provider.id}
+                field={customUrlField}
+                value={customUrlValue}
+                onValueChange={onCustomUrlValueChange}
+                onSave={onCustomUrlSave}
+              />
+            )}
+            {GROUP_ORDER.map((groupKey) => {
+              const groupFields = grouped[groupKey];
+              if (groupFields.length === 0) return null;
+              return (
+                <TuningGroupCard
+                  key={groupKey}
+                  title={GROUP_META[groupKey].title}
+                  blurb={GROUP_META[groupKey].blurb}
+                  fields={groupFields}
+                  providerId={provider.id}
+                  onCommit={commitField}
+                />
+              );
+            })}
+
+            {complexEntries.length > 0 && (
+              <div className="bg-muted/40 space-y-1.5 rounded-md p-3">
+                <div className="flex items-center gap-1.5">
+                  <Icons.Settings className="text-muted-foreground h-3 w-3" />
+                  <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                    Structured options
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-[11px] leading-tight">
+                  Arrays and objects ship with the app and can't be edited here.
+                </p>
+                <dl className="font-mono text-[11px]">
+                  {complexEntries.map(([key, value]) => (
+                    <div key={key} className="flex items-baseline gap-2">
+                      <dt className="text-muted-foreground/80 shrink-0">{key}</dt>
+                      <dd className="text-foreground/70 truncate">{JSON.stringify(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
+            {orphanedEntries.length > 0 && (
+              <div className="border-warning/30 bg-warning/5 space-y-2 rounded-md border p-3">
+                <p className="text-warning text-[11px] font-medium">
+                  Orphaned overrides — the following keys are no longer in the catalog:
+                </p>
+                <ul className="space-y-1">
+                  {orphanedEntries.map(([key, value]) => (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between gap-2 font-mono text-[11px]"
+                    >
+                      <span>
+                        {key} = {JSON.stringify(value)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground h-6 px-2 text-[11px]"
+                        onClick={() => clearOrphaned(key)}
+                      >
+                        Remove
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
+// ============================================================================
+// Tuning group card (Sampling / Output limits / Repetition / Other)
+// ============================================================================
+
+interface TuningGroupCardProps {
+  title: string;
+  blurb: string;
+  fields: TuningFieldDescriptor[];
+  providerId: string;
+  onCommit: (field: TuningFieldDescriptor, value: PrimitiveExtraValue | null) => void;
+}
+
+function TuningGroupCard({ title, blurb, fields, providerId, onCommit }: TuningGroupCardProps) {
+  return (
+    <div className="bg-muted/40 space-y-3 rounded-md p-3">
+      <div className="space-y-0.5">
+        <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+          {title}
+        </span>
+        <p className="text-muted-foreground/80 text-[11px] leading-tight">{blurb}</p>
+      </div>
+      <div className="space-y-3">
+        {fields.map((field) => (
+          <TuningFieldRow
+            key={field.id}
+            field={field}
+            providerId={providerId}
+            onCommit={(value) => onCommit(field, value)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Tuning field row — unified editor used for both primary + extra fields
+// ============================================================================
+
+interface TuningFieldRowProps {
+  field: TuningFieldDescriptor;
+  providerId: string;
+  onCommit: (value: PrimitiveExtraValue | null) => void;
+}
+
+function TuningFieldRow({ field, providerId, onCommit }: TuningFieldRowProps) {
+  const {
+    id,
+    label,
+    monoLabel,
+    description,
+    type,
+    catalogValue,
+    overrideValue,
+    effectiveValue,
+    bounds,
+    formatValue,
+  } = field;
+
+  const inputId = `tuning-${providerId}-${id}`;
+  const hasOverride = overrideValue !== undefined && overrideValue !== null;
+
+  const catalogDisplay = catalogValue !== undefined ? formatValue(catalogValue) : "model default";
+  const effectiveDisplay = effectiveValue !== undefined ? formatValue(effectiveValue) : "—";
+
+  // Local draft so blur-to-commit works without re-rendering on every keypress.
+  const [draft, setDraft] = useState<string>(() =>
+    overrideValue !== undefined && overrideValue !== null ? String(overrideValue) : "",
+  );
+  useEffect(() => {
+    setDraft(overrideValue !== undefined && overrideValue !== null ? String(overrideValue) : "");
+  }, [overrideValue]);
+
+  // --- Boolean: switch layout (still label left + description, switch right) ---
+  if (type === "boolean") {
+    const catalogBool = typeof catalogValue === "boolean" ? catalogValue : false;
+    const checked = typeof effectiveValue === "boolean" ? effectiveValue : catalogBool;
+    return (
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <Label htmlFor={inputId} className={cn("text-xs font-medium", monoLabel && "font-mono")}>
+            {label}
+          </Label>
+          {description && (
+            <p className="text-muted-foreground text-[10px] leading-tight">{description}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <Switch
+            id={inputId}
+            checked={checked}
+            onCheckedChange={(next) => {
+              onCommit(next === catalogBool ? null : next);
+            }}
+          />
+          <span className="text-muted-foreground text-[10px] tabular-nums">
+            {hasOverride ? "Overridden" : `Default: ${catalogDisplay}`}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Number / string: blur-to-commit input ---
+  const commit = () => {
+    if (draft.trim() === "") {
+      onCommit(null);
+      return;
+    }
+    if (type === "number") {
+      const parsed = Number(draft);
+      if (!Number.isFinite(parsed)) {
+        setDraft(
+          overrideValue !== undefined && overrideValue !== null ? String(overrideValue) : "",
+        );
+        return;
+      }
+      const clamped = bounds ? Math.min(Math.max(parsed, bounds.min), bounds.max) : parsed;
+      const rounded =
+        typeof catalogValue === "number" && Number.isInteger(catalogValue)
+          ? Math.round(clamped)
+          : clamped;
+      if (rounded === catalogValue) {
+        onCommit(null);
+        setDraft("");
+      } else {
+        onCommit(rounded);
+        setDraft(String(rounded));
+      }
+      return;
+    }
+    // string
+    if (draft === catalogValue) {
+      onCommit(null);
+      setDraft("");
+    } else {
+      onCommit(draft);
+    }
+  };
+
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <Label htmlFor={inputId} className={cn("text-xs font-medium", monoLabel && "font-mono")}>
+          {label}
+        </Label>
+        {description && (
+          <p className="text-muted-foreground text-[10px] leading-tight">{description}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <Input
+          id={inputId}
+          type={type === "number" ? "number" : "text"}
+          inputMode={type === "number" ? "decimal" : "text"}
+          step={bounds?.step}
+          min={bounds?.min}
+          max={bounds?.max}
+          value={draft}
+          placeholder={catalogDisplay}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          className="bg-background !h-8 w-28 !px-2 !py-1 font-mono !text-sm tabular-nums [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <span className="text-muted-foreground text-[10px] tabular-nums">
+          Effective: {effectiveDisplay}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Endpoint group — custom provider URL editor
+// ============================================================================
+
+interface EndpointGroupCardProps {
+  providerId: string;
+  field: ConnectionField;
+  value: string;
+  onValueChange: (value: string) => void;
+  onSave?: (url: string) => void;
+}
+
+/**
+ * Endpoint URL editor. Full-width input since URLs don't fit the narrow
+ * right-column scalar layout. Uses an explicit Save button (URL fields are
+ * typed deliberately — blur-to-save risks premature commits on focus shift).
+ */
+function EndpointGroupCard({
+  providerId,
+  field,
+  value,
+  onValueChange,
+  onSave,
+}: EndpointGroupCardProps) {
+  return (
+    <div className="bg-muted/40 space-y-3 rounded-md p-3">
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+            Endpoint
+          </span>
+          {field.helpUrl && (
+            <ExternalLink
+              href={field.helpUrl}
+              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] transition-colors"
+            >
+              Learn more
+              <Icons.ExternalLink className="h-3 w-3" />
+            </ExternalLink>
+          )}
+        </div>
+        <p className="text-muted-foreground/80 text-[11px] leading-tight">
+          Override the default endpoint for this provider.
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`baseurl-${providerId}`} className="text-xs font-medium">
+          {field.label}
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            id={`baseurl-${providerId}`}
+            type="url"
+            value={value}
+            onChange={(e) => onValueChange(e.target.value)}
+            placeholder={field.placeholder}
+            className="bg-background flex-1 font-mono !text-sm"
+          />
+          <Button
+            type="button"
+            onClick={() => onSave?.(value)}
+            size="sm"
+            variant="outline"
+            className="shrink-0"
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

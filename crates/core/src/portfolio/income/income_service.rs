@@ -1,5 +1,5 @@
 use crate::constants::DISPLAY_DECIMAL_PRECISION;
-use crate::utils::time_utils::valuation_date_today;
+use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
 use crate::{
     activities::{ActivityError, ActivityRepositoryTrait, IncomeData},
     Error, Result,
@@ -14,13 +14,14 @@ use rust_decimal::Decimal;
 use std::sync::{Arc, RwLock};
 // Define the trait for the income service
 pub trait IncomeServiceTrait: Send + Sync {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>>;
+    fn get_income_summary(&self, account_id: Option<&str>) -> Result<Vec<IncomeSummary>>;
 }
 
 pub struct IncomeService {
     fx_service: Arc<dyn FxServiceTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
     base_currency: Arc<RwLock<String>>,
+    timezone: Arc<RwLock<String>>,
 }
 
 impl IncomeService {
@@ -29,11 +30,31 @@ impl IncomeService {
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
         base_currency: Arc<RwLock<String>>,
     ) -> Self {
+        Self::new_with_timezone(
+            fx_service,
+            activity_repository,
+            base_currency,
+            Arc::new(RwLock::new(String::new())),
+        )
+    }
+
+    pub fn new_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        base_currency: Arc<RwLock<String>>,
+        timezone: Arc<RwLock<String>>,
+    ) -> Self {
         IncomeService {
             fx_service,
             activity_repository,
             base_currency,
+            timezone,
         }
+    }
+
+    fn today_in_user_timezone(&self) -> NaiveDate {
+        let tz = parse_user_timezone_or_default(&self.timezone.read().unwrap());
+        user_today(tz)
     }
 
     fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
@@ -47,10 +68,13 @@ impl IncomeService {
 
 // Implement the trait for IncomeService
 impl IncomeServiceTrait for IncomeService {
-    fn get_income_summary(&self) -> Result<Vec<IncomeSummary>> {
+    fn get_income_summary(&self, account_id: Option<&str>) -> Result<Vec<IncomeSummary>> {
         debug!("Getting income summary...");
 
-        let activities = match self.activity_repository.get_income_activities_data() {
+        let activities = match self
+            .activity_repository
+            .get_income_activities_data(account_id)
+        {
             Ok(activity) => activity,
             Err(e) => {
                 error!("Error getting aggregated income data: {:?}", e);
@@ -63,17 +87,31 @@ impl IncomeServiceTrait for IncomeService {
         }
 
         let base_currency = self.base_currency.read().unwrap().clone();
-        let current_date = valuation_date_today();
+        let current_date = self.today_in_user_timezone();
         let current_year = current_date.year();
         let last_year = current_year - 1;
         let two_years_ago = current_year - 2;
         let current_month = current_date.month();
 
-        let oldest_date = match self.activity_repository.get_first_activity_date_overall() {
-            Ok(date) => date,
-            Err(e) => {
-                error!("Error getting first transaction date: {:?}", e);
-                return Err(e);
+        // Scope the baseline date to the filtered account so monthly-average
+        // denominators are correct.  Falls back to portfolio-wide when no filter.
+        let oldest_date = if let Some(id) = account_id {
+            let ids = vec![id.to_string()];
+            match self.activity_repository.get_first_activity_date(Some(&ids)) {
+                Ok(Some(date)) => date,
+                Ok(None) => return Ok(Vec::new()),
+                Err(e) => {
+                    error!("Error getting first activity date for account: {:?}", e);
+                    return Err(e);
+                }
+            }
+        } else {
+            match self.activity_repository.get_first_activity_date_overall() {
+                Ok(date) => date,
+                Err(e) => {
+                    error!("Error getting first transaction date: {:?}", e);
+                    return Err(e);
+                }
             }
         };
         let mut months_since_first_transaction: i32 =
@@ -130,7 +168,9 @@ impl IncomeServiceTrait for IncomeService {
                 symbol: activity.symbol.clone(),
                 symbol_name: activity.symbol_name.clone(),
                 currency: activity.currency.clone(),
-                amount: activity.amount, // Keep original amount in activity_copy if needed elsewhere
+                amount: activity.amount,
+                account_id: activity.account_id.clone(),
+                account_name: activity.account_name.clone(),
             };
 
             total_summary.add_income(&activity_copy, converted_amount);
@@ -194,6 +234,12 @@ impl IncomeServiceTrait for IncomeService {
                 }
                 for val in summary.by_currency.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                }
+                for entry in summary.by_account.values_mut() {
+                    entry.total = entry.total.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    for val in entry.by_month.values_mut() {
+                        *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
+                    }
                 }
                 summary
             })

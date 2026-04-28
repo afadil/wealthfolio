@@ -25,6 +25,7 @@ const COLUMN_DISPLAY_NAMES: Record<string, string> = {
   fxRate: "FX Rate",
   accountName: "Account",
   currency: "Currency",
+  instrumentType: "Instrument",
   comment: "Comment",
 };
 
@@ -32,6 +33,7 @@ const COLUMN_DISPLAY_NAMES: Record<string, string> = {
 const TOGGLEABLE_COLUMNS = [
   "activityType",
   "subtype",
+  "instrumentType",
   "activityStatus",
   "date",
   "assetSymbol",
@@ -68,6 +70,24 @@ interface ActivityDataGridToolbarProps {
   onSave: () => void;
   /** Handler for canceling/discarding changes */
   onCancel: () => void;
+  /** Handler invoked when user clicks "Link as internal pair" */
+  onLinkSelected?: () => void;
+  /** Whether the current selection is a valid TRANSFER_IN/TRANSFER_OUT pair */
+  canLinkSelected?: boolean;
+  /** Reason the current selection cannot be linked (used as button tooltip) */
+  linkDisabledReason?: string;
+  /** Whether a link operation is in progress */
+  isLinking?: boolean;
+  /** Handler invoked when user clicks "Unlink internal pair" */
+  onUnlinkSelected?: () => void;
+  /** Whether to show the unlink action for the current selection */
+  showUnlinkSelected?: boolean;
+  /** Whether the current selection is a linked TRANSFER_IN/TRANSFER_OUT pair */
+  canUnlinkSelected?: boolean;
+  /** Reason the current selection cannot be unlinked (used as button tooltip) */
+  unlinkDisabledReason?: string;
+  /** Whether an unlink operation is in progress */
+  isUnlinking?: boolean;
 }
 
 /**
@@ -86,6 +106,15 @@ export function ActivityDataGridToolbar({
   onApproveSelected,
   onSave,
   onCancel,
+  onLinkSelected,
+  canLinkSelected,
+  linkDisabledReason,
+  isLinking,
+  onUnlinkSelected,
+  showUnlinkSelected,
+  canUnlinkSelected,
+  unlinkDisabledReason,
+  isUnlinking,
 }: ActivityDataGridToolbarProps) {
   // Prevent mousedown from bubbling to document, which would clear DataGrid selection
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -200,6 +229,41 @@ export function ActivityDataGridToolbar({
                 <span>Approve {selectedPendingCount}</span>
               </Button>
             )}
+            {selectedRowCount === 2 && showUnlinkSelected && onUnlinkSelected ? (
+              <Button
+                onClick={onUnlinkSelected}
+                size="xs"
+                variant="outline"
+                className="shrink-0 rounded-md text-xs"
+                title={canUnlinkSelected ? "Unlink internal transfer" : unlinkDisabledReason}
+                aria-label="Unlink internal transfer"
+                disabled={!canUnlinkSelected || isUnlinking || isSaving}
+              >
+                {isUnlinking ? (
+                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icons.Unlink className="h-3.5 w-3.5" />
+                )}
+                <span>Unlink</span>
+              </Button>
+            ) : selectedRowCount === 2 && onLinkSelected ? (
+              <Button
+                onClick={onLinkSelected}
+                size="xs"
+                variant="outline"
+                className="shrink-0 rounded-md text-xs"
+                title={canLinkSelected ? "Link as internal transfer" : linkDisabledReason}
+                aria-label="Link as internal transfer"
+                disabled={!canLinkSelected || isLinking || isSaving}
+              >
+                {isLinking ? (
+                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icons.Link className="h-3.5 w-3.5" />
+                )}
+                <span>Link</span>
+              </Button>
+            ) : null}
             <Button
               onClick={onDeleteSelected}
               size="xs"

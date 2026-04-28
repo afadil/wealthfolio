@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from "react";
 import { logger } from "@/adapters";
 import { ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
-import type { ActivityCreate, ActivityDetails } from "@/lib/types";
+import type { ActivityCreate, ActivityDetails, SymbolInput } from "@/lib/types";
+import { useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
 import type { TransferFormValues } from "../components/forms/transfer-form";
@@ -11,11 +12,21 @@ import {
   type ActivityFormValues,
   type PickerActivityType,
 } from "../config/activity-form-config";
-import { isPureCashActivity } from "../utils/activity-form-utils";
 import { useActivityMutations } from "./use-activity-mutations";
 
 function generateSourceGroupId(): string {
   return generateId("wf-transfer");
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === "object") {
+    const raw = error as Record<string, unknown>;
+    if (typeof raw.error === "string" && raw.error.trim()) return raw.error;
+    if (typeof raw.message === "string" && raw.message.trim()) return raw.message;
+  }
+  return "Failed to save activity. Please check your inputs and try again.";
 }
 
 export interface UseActivityFormParams {
@@ -91,13 +102,38 @@ export function useActivityForm({
             const fromAccount = accounts.find((a) => a.value === transferData.fromAccountId);
             const toAccount = accounts.find((a) => a.value === transferData.toAccountId);
 
-            // Extract assetId and fxRate from payload
-            // - assetId: converted to symbol (ActivityCreate uses symbol, not assetId)
-            // - fxRate: only applies to IN leg (converts activity currency to destination account currency)
-            const { assetId, fxRate, ...sharedFields } = formPayload as {
+            // Extract symbol-related and fxRate fields from payload
+            const {
+              assetId,
+              fxRate,
+              exchangeMic,
+              quoteMode,
+              symbolQuoteCcy,
+              symbolInstrumentType,
+              assetMetadata,
+              ...sharedFields
+            } = formPayload as {
               assetId?: string;
               fxRate?: number;
+              exchangeMic?: string;
+              quoteMode?: string;
+              symbolQuoteCcy?: string;
+              symbolInstrumentType?: string;
+              assetMetadata?: { name?: string; kind?: string; exchangeMic?: string };
             } & Record<string, unknown>;
+
+            // Build the nested symbol object with all metadata
+            const symbolInput: ActivityCreate["symbol"] = assetId
+              ? {
+                  symbol: assetId,
+                  exchangeMic,
+                  quoteMode: quoteMode as SymbolInput["quoteMode"],
+                  quoteCcy: symbolQuoteCcy,
+                  instrumentType: symbolInstrumentType,
+                  name: assetMetadata?.name,
+                  kind: assetMetadata?.kind,
+                }
+              : undefined;
 
             // Create TRANSFER_OUT on source account (no fxRate - activity currency = account currency)
             const transferOutActivity: ActivityCreate = {
@@ -106,7 +142,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_OUT,
               currency: fromAccount?.currency,
               sourceGroupId,
-              symbol: assetId ? { symbol: assetId } : undefined,
+              symbol: symbolInput,
             } as ActivityCreate;
 
             // Create TRANSFER_IN on destination account (fxRate applies if currencies differ)
@@ -116,7 +152,7 @@ export function useActivityForm({
               activityType: ActivityType.TRANSFER_IN,
               currency: toAccount?.currency,
               sourceGroupId,
-              symbol: assetId ? { symbol: assetId } : undefined,
+              symbol: symbolInput,
               fxRate,
             } as ActivityCreate;
 
@@ -136,7 +172,6 @@ export function useActivityForm({
           const submitData: NewActivityFormValues = {
             ...basePayload,
             activityType,
-            currency: account?.currency,
           } as NewActivityFormValues;
 
           if (!submitData.currency?.trim() && account?.currency) {
@@ -146,8 +181,9 @@ export function useActivityForm({
           if (isEditing && activity?.id) {
             await updateActivityMutation.mutateAsync({
               id: activity.id,
+              existingAssetId: activity.assetId,
               ...submitData,
-            });
+            } as NewActivityFormValues & { id: string; existingAssetId?: string });
           } else {
             await addActivityMutation.mutateAsync(submitData);
           }
@@ -164,10 +200,6 @@ export function useActivityForm({
         const submitData: NewActivityFormValues = {
           ...basePayload,
           activityType: config.activityType as NewActivityFormValues["activityType"],
-          // For pure cash activities, include account currency
-          ...(isPureCashActivity(config.activityType) && account
-            ? { currency: account.currency }
-            : {}),
         } as NewActivityFormValues;
 
         if (!submitData.currency?.trim() && account?.currency) {
@@ -177,12 +209,15 @@ export function useActivityForm({
         if (isEditing && activity?.id) {
           await updateActivityMutation.mutateAsync({
             id: activity.id,
+            existingAssetId: activity.assetId,
             ...submitData,
-          });
+          } as NewActivityFormValues & { id: string; existingAssetId?: string });
         } else {
           await addActivityMutation.mutateAsync(submitData);
         }
       } catch (err) {
+        const message = extractErrorMessage(err);
+        toast.error("Failed to save activity", { description: message });
         logger.error(`Activity Form Submit Error: ${JSON.stringify({ error: err, formData })}`);
       }
     },

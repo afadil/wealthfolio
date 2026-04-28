@@ -67,6 +67,9 @@ export const QueryKeys = {
   ADDON_STORE_LISTINGS: 'addonStoreListings',
   ADDON_AUTO_UPDATE_CHECK: 'addonAutoUpdateCheck',
 
+  SNAPSHOTS: 'snapshots',
+  snapshots: (accountId: string) => [QueryKeys.SNAPSHOTS, accountId],
+
   secrets: {
     apiKey: (providerId: string) => ['secrets', 'apiKey', providerId],
   },

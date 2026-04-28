@@ -188,6 +188,7 @@ use super::model::{FixAction, HealthStatus};
 use crate::accounts::AccountServiceTrait;
 use crate::assets::AssetServiceTrait;
 use crate::portfolio::holdings::HoldingsServiceTrait;
+use crate::portfolio::valuation::ValuationServiceTrait;
 use crate::quotes::QuoteServiceTrait;
 use crate::taxonomies::TaxonomyServiceTrait;
 use std::collections::HashMap;
@@ -227,6 +228,8 @@ pub trait HealthServiceTrait: Send + Sync {
     /// * `consistency_issues` - Pre-detected data consistency issues
     /// * `legacy_migration_info` - Info about legacy classification data needing migration
     /// * `unconfigured_accounts` - Accounts without tracking mode set
+    /// * `configured_timezone` - App-configured timezone from settings (if available)
+    /// * `client_timezone` - Client/browser timezone from request context (if available)
     ///
     /// # Returns
     ///
@@ -244,6 +247,8 @@ pub trait HealthServiceTrait: Send + Sync {
         consistency_issues: &[ConsistencyIssueInfo],
         legacy_migration_info: &Option<LegacyMigrationInfo>,
         unconfigured_accounts: &[UnconfiguredAccountInfo],
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus>;
 
     /// Gets the cached health status.
@@ -307,6 +312,9 @@ pub trait HealthServiceTrait: Send + Sync {
     /// * `quote_service` - Service for accessing quotes
     /// * `asset_service` - Service for accessing assets
     /// * `taxonomy_service` - Service for accessing taxonomy data
+    /// * `configured_timezone` - App-configured timezone from settings
+    /// * `client_timezone` - Client/browser timezone from request context
+    #[allow(clippy::too_many_arguments)]
     async fn run_full_checks(
         &self,
         base_currency: &str,
@@ -315,6 +323,9 @@ pub trait HealthServiceTrait: Send + Sync {
         quote_service: Arc<dyn QuoteServiceTrait>,
         asset_service: Arc<dyn AssetServiceTrait>,
         taxonomy_service: Arc<dyn TaxonomyServiceTrait>,
+        valuation_service: Arc<dyn ValuationServiceTrait>,
+        configured_timezone: Option<&str>,
+        client_timezone: Option<&str>,
     ) -> Result<HealthStatus>;
 }
 

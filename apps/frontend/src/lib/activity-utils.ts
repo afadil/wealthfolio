@@ -1,7 +1,13 @@
-import { ActivityType, INCOME_ACTIVITY_TYPES, SYMBOL_REQUIRED_TYPES } from "./constants";
+import {
+  ACTIVITY_SUBTYPES,
+  ActivityType,
+  DECIMAL_PRECISION,
+  INCOME_ACTIVITY_TYPES,
+  SYMBOL_REQUIRED_TYPES,
+} from "./constants";
 import { ActivityDetails } from "./types";
 
-const roundCurrency = (value: number, precision = 6) => {
+const roundCurrency = (value: number, precision = DECIMAL_PRECISION) => {
   if (!Number.isFinite(value)) {
     return 0;
   }
@@ -42,30 +48,118 @@ export const isSymbolRequired = (activityType: string): boolean => {
 };
 
 /**
- * Determines if an activity is a cash transfer based on its type and symbol
- * @param activityType The activity type to check
- * @param assetSymbol The asset symbol to check
- * @returns True if the activity is a cash transfer
+ * Import-time asset resolution can also be required by subtype even when the
+ * base activity type is normally cash-oriented (e.g. staking rewards).
  */
-export const isCashTransfer = (activityType: string, assetSymbol: string): boolean => {
+export const needsImportAssetResolution = (
+  activityType: string,
+  subtype?: string | null,
+): boolean => {
+  const normalizedSubtype = subtype?.trim().toUpperCase();
+  return (
+    isSymbolRequired(activityType) ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.DRIP ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND ||
+    normalizedSubtype === ACTIVITY_SUBTYPES.STAKING_REWARD
+  );
+};
+
+/**
+ * Determines if an activity is a cash transfer based on its type and identifiers.
+ * A transfer is cash when:
+ * - it has no asset identifier at all (blank symbol AND blank assetId), OR
+ * - its symbol/assetId matches any supported cash placeholder:
+ *   `CASH`, `CASH:USD`, `$CASH-EUR`, `CASH-GBP`, `CASH_GBP`, etc.
+ */
+export const isCashTransfer = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
   if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
     return false;
   }
-  // Recognize cash transfers by symbol:
-  // - CASH:{currency} (e.g., CASH:USD)
-  // - Display value: "CASH" (set by applyCashDefaults)
-  const upperSymbol = assetSymbol.toUpperCase();
 
-  if (upperSymbol === "CASH") {
+  const symbol = assetSymbol?.trim() ?? "";
+  const id = assetId?.trim() ?? "";
+
+  // No asset at all → cash transfer
+  if (!symbol && !id) {
     return true;
   }
 
-  if (upperSymbol.startsWith("CASH:")) {
-    const currency = upperSymbol.slice("CASH:".length);
+  const upper = (symbol || id).toUpperCase();
+
+  // Display placeholder used by applyCashDefaults
+  if (upper === "CASH") {
+    return true;
+  }
+
+  // Canonical backend form: CASH:{ccy}
+  if (upper.startsWith("CASH:")) {
+    const currency = upper.slice("CASH:".length);
     return /^[A-Z]{3}$/.test(currency);
   }
 
+  // Broker-export placeholders: $CASH-XXX, $CASH_XXX, CASH-XXX, CASH_XXX
+  return isCashSymbol(symbol) || isCashSymbol(id);
+};
+
+/**
+ * Securities transfer: TRANSFER_IN/OUT whose asset identifiers clearly refer
+ * to a real security (not cash, not blank). These move shares/units, so their
+ * value derives from quantity × unitPrice (or a stored amount when unitPrice
+ * is absent on legacy/imported rows).
+ */
+export const isSecuritiesTransfer = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
+  if (activityType !== ActivityType.TRANSFER_IN && activityType !== ActivityType.TRANSFER_OUT) {
+    return false;
+  }
+  const hasConcreteAsset = Boolean((assetSymbol?.trim() || assetId?.trim())?.length);
+  if (!hasConcreteAsset) {
+    return false;
+  }
+  return !isCashTransfer(activityType, assetSymbol, assetId);
+};
+
+const isCanonicalCashIdentifier = (identifier: string): boolean => {
+  const upper = identifier.toUpperCase();
+  if (upper === "CASH") {
+    return true;
+  }
+  if (upper.startsWith("CASH:")) {
+    const currency = upper.slice("CASH:".length);
+    return /^[A-Z]{3}$/.test(currency);
+  }
   return false;
+};
+
+/**
+ * Income activities can still be asset-backed (e.g. in-kind staking rewards).
+ * Returns true when an income activity carries a non-cash asset identifier.
+ */
+export const isAssetBackedIncomeActivity = (
+  activityType: string,
+  assetSymbol?: string,
+  assetId?: string,
+): boolean => {
+  if (!isIncomeActivity(activityType)) {
+    return false;
+  }
+
+  const identifiers = [assetSymbol, assetId]
+    .map((value) => value?.trim() ?? "")
+    .filter((value) => value.length > 0);
+
+  if (identifiers.length === 0) {
+    return false;
+  }
+
+  return identifiers.some((value) => !isCashSymbol(value) && !isCanonicalCashIdentifier(value));
 };
 
 // Helper to check if activity is a trade type
@@ -86,6 +180,37 @@ export const isTaxActivity = (activityType: string): boolean => {
 // Helper to check if activity is a split type
 export const isSplitActivity = (activityType: string): boolean => {
   return activityType === ActivityType.SPLIT;
+};
+
+// Format a split ratio stored as a decimal multiplier into a human-readable ratio string.
+// Uses rational approximation to find the simplest N:D form.
+// e.g. 2 → "2:1", 0.2 → "1:5", 0.3 → "3:10", 1.5 → "3:2"
+export const formatSplitRatio = (amount: number): string => {
+  if (!amount || amount <= 0) return "0:1";
+
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+  // Find the best rational approximation N/D ≈ amount with D ≤ maxDenom
+  const toFraction = (x: number, maxDenom = 1000): [number, number] => {
+    let bestN = 1,
+      bestD = 1,
+      minErr = Infinity;
+    for (let d = 1; d <= maxDenom; d++) {
+      const n = Math.round(x * d);
+      const err = Math.abs(x - n / d);
+      if (err < minErr) {
+        minErr = err;
+        bestN = n;
+        bestD = d;
+      }
+      if (err < 1e-9) break;
+    }
+    const g = gcd(bestN, bestD);
+    return [bestN / g, bestD / g];
+  };
+
+  const [n, d] = toFraction(amount);
+  return `${n}:${d}`;
 };
 
 /**
@@ -130,7 +255,7 @@ export const getUnitPrice = (activity: ActivityDetails): number => {
  * @returns The calculated value
  */
 export const calculateActivityValue = (activity: ActivityDetails): number => {
-  const { activityType, assetSymbol } = activity;
+  const { activityType, assetSymbol, assetId } = activity;
 
   // Handle special cases first
   if (activityType === ActivityType.SPLIT) {
@@ -145,10 +270,12 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     return roundCurrency(getFee(activity));
   }
 
-  // Handle cash activities
+  const isSecTransfer = isSecuritiesTransfer(activityType, assetSymbol, assetId);
+
+  // Handle cash activities (but NOT securities transfers, which need qty × price)
   if (
-    isCashActivity(activityType) ||
-    isCashTransfer(activityType, assetSymbol) ||
+    (isCashActivity(activityType) && !isSecTransfer) ||
+    isCashTransfer(activityType, assetSymbol, assetId) ||
     isIncomeActivity(activityType)
   ) {
     const amount = getAmount(activity);
@@ -163,11 +290,21 @@ export const calculateActivityValue = (activity: ActivityDetails): number => {
     return roundCurrency(Number(amount) - Number(fee));
   }
 
-  // Handle trading activities
+  // Handle trading activities (and securities transfers)
   const quantity = getQuantity(activity);
   const unitPrice = getUnitPrice(activity);
   const fee = getFee(activity);
-  const activityAmount = roundCurrency(Number(quantity) * Number(unitPrice));
+  let activityAmount = roundCurrency(Number(quantity) * Number(unitPrice));
+
+  // Securities transfers imported without a unit price (legacy / some broker
+  // exports) carry their monetary value on `amount`. Fall back to it so those
+  // rows don't render as 0 just because we no longer trust `amount` by default.
+  if (isSecTransfer && activityAmount === 0) {
+    const storedAmount = getAmount(activity);
+    if (storedAmount !== 0) {
+      activityAmount = roundCurrency(storedAmount);
+    }
+  }
 
   if (activityType === ActivityType.BUY) {
     return roundCurrency(Number(activityAmount) + Number(fee)); // Total cost including fees

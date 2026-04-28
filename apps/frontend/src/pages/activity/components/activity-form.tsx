@@ -1,3 +1,4 @@
+import { ExternalLink } from "@/components/external-link";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -70,21 +71,19 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="flex flex-col overflow-hidden sm:max-w-[625px]">
+      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-[625px]">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Update Activity" : "Add Activity"}</SheetTitle>
           <SheetDescription>
             {isEditing
               ? "Update the details of your transaction"
               : "Record a new transaction in your account."}{" "}
-            <a
+            <ExternalLink
               href="https://wealthfolio.app/docs/concepts/activity-types"
-              target="_blank"
-              rel="noopener noreferrer"
               className="underline"
             >
               Learn more
-            </a>
+            </ExternalLink>
           </SheetDescription>
         </SheetHeader>
 
@@ -115,7 +114,7 @@ export function ActivityForm({ accounts, activity, open, onClose }: ActivityForm
             isEditing={isEditing}
           />
 
-          {/* Display mutation error */}
+          {/* Display mutation error inside sheet */}
           {isError && (
             <Alert variant="destructive">
               <Icons.AlertCircle className="h-4 w-4" />

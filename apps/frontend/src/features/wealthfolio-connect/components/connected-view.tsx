@@ -1,4 +1,5 @@
 import { openUrlInBrowser } from "@/adapters";
+import { ExternalLink } from "@/components/external-link";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
@@ -12,7 +13,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import { useCallback, useState } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
@@ -21,6 +22,7 @@ import {
   syncBrokerData,
 } from "../services/broker-service";
 import type { BrokerAccount, BrokerConnection } from "../types";
+import { hasBrokerSync } from "../lib/plan-capabilities";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,15 +142,13 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
   const logoUrl =
     connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
-  const lastSyncedText = lastSyncDate
-    ? `Last synced ${formatDistanceToNow(new Date(lastSyncDate), { addSuffix: false })} ago`
-    : "Never synced";
+  const lastSyncedText = lastSyncDate ? `Data as of ${formatDate(lastSyncDate)}` : "No data yet";
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {/* Logo */}
-        <Avatar className="h-9 w-9 shrink-0 rounded-lg">
+        <Avatar className="mt-0.5 h-9 w-9 shrink-0 rounded-lg">
           <AvatarImage
             src={logoUrl}
             alt={account.institution_name || "Broker"}
@@ -161,7 +161,8 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
 
         {/* Main info - takes remaining space */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          {/* Row 1: name + badges + sync icon */}
+          <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-medium">{account.name || "Account"}</span>
             {account.is_paper && (
               <Badge variant="outline" className="h-5 shrink-0 text-[10px]">
@@ -171,31 +172,39 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
             <Tooltip>
               <TooltipTrigger>
                 {account.sync_enabled ? (
-                  <Icons.Eye className="h-4 w-4 shrink-0 text-blue-500" />
+                  <Icons.Eye className="h-3.5 w-3.5 shrink-0 text-blue-500" />
                 ) : (
-                  <Icons.EyeOff className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <Icons.EyeOff className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                 )}
               </TooltipTrigger>
               <TooltipContent>
-                {account.sync_enabled ? "Sync enabled" : "Sync disabled"}
+                {account.sync_enabled ? "Sync enabled" : "Excluded from sync"}
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+          {/* Row 2: institution · account number · shared */}
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-xs">
             <span className="truncate">{account.institution_name}</span>
-            {account.number && <span>{maskAccountNumber(account.number)}</span>}
+            {account.number && (
+              <>
+                <span className="shrink-0 opacity-40">·</span>
+                <span className="shrink-0">{maskAccountNumber(account.number)}</span>
+              </>
+            )}
+            {account.shared_with_household && (
+              <>
+                <span className="shrink-0 opacity-40">·</span>
+                <span className="flex shrink-0 items-center gap-0.5">
+                  <Icons.Users className="h-3 w-3" />
+                  Shared
+                </span>
+              </>
+            )}
+            {/* Sync time inline on sm+ */}
+            <span className="ml-auto hidden shrink-0 pl-2 sm:inline">{lastSyncedText}</span>
           </div>
-        </div>
-
-        {/* Status - sync time and shared info */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {account.shared_with_household && (
-            <span className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Icons.Users className="h-3 w-3" />
-              Shared
-            </span>
-          )}
-          <span className="text-muted-foreground text-xs">{lastSyncedText}</span>
+          {/* Row 3: Sync time on its own line on mobile */}
+          <p className="text-muted-foreground mt-0.5 text-[11px] sm:hidden">{lastSyncedText}</p>
         </div>
       </div>
     </div>
@@ -352,12 +361,17 @@ export function ConnectedView() {
   // Check if there's a service unavailable error (failed to fetch user info)
   const isServiceUnavailable = !!error && !isLoadingUserInfo && !userInfo;
 
-  // Check if user has an active subscription (has a team with a plan)
-  const hasSubscription = !!userInfo?.team?.plan;
+  // Check if user has an active subscription
+  const hasSubscription =
+    userInfo?.team?.subscription_status === "active" ||
+    userInfo?.team?.subscription_status === "trialing";
 
-  // Hooks - only fetch broker connections and accounts if user has a subscription
-  const connectionsQuery = useBrokerConnections(hasSubscription);
-  const accountsQuery = useBrokerAccountsQuery(hasSubscription);
+  // Check if user's plan includes broker sync
+  const showBrokerSync = hasBrokerSync(userInfo);
+
+  // Hooks - only fetch broker connections and accounts if user has broker sync
+  const connectionsQuery = useBrokerConnections(showBrokerSync);
+  const accountsQuery = useBrokerAccountsQuery(showBrokerSync);
 
   // Retry handler for service unavailable state
   const handleRetry = useCallback(async () => {
@@ -493,8 +507,8 @@ export function ConnectedView() {
         />
       )}
 
-      {/* Broker Connections Card - Only show if user has an active subscription */}
-      {hasSubscription && (
+      {/* Broker Connections Card - Only show if user has broker sync */}
+      {showBrokerSync && (
         <BrokerConnectionsCard
           connections={connections}
           isLoading={isLoadingConnections}
@@ -503,8 +517,8 @@ export function ConnectedView() {
         />
       )}
 
-      {/* Accounts Card - Only show if user has an active subscription */}
-      {hasSubscription && (
+      {/* Accounts Card - Only show if user has broker sync */}
+      {showBrokerSync && (
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">
@@ -578,20 +592,43 @@ export function ConnectedView() {
       {/* Device Sync Section - Only show if user has an active subscription */}
       {hasSubscription && <DeviceSyncSection />}
 
+      {/* Upgrade callout for basic plan users */}
+      {hasSubscription && !showBrokerSync && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-medium">Upgrade to sync broker accounts</h3>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Connect your brokerage accounts for automatic portfolio syncing.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() =>
+                  openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
+                }
+              >
+                Upgrade
+                <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Privacy Footnote */}
       <footer className="border-t pt-4">
         <p className="text-muted-foreground text-center text-xs leading-relaxed">
           Wealthfolio Connect doesn&apos;t store your brokerage credentials or financial data.
           Everything syncs securely via an aggregator to your local database. Device sync uses
           end-to-end encryption.{" "}
-          <a
+          <ExternalLink
             href="https://wealthfolio.app/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground underline underline-offset-2"
           >
             Learn more
-          </a>
+          </ExternalLink>
         </p>
       </footer>
     </div>

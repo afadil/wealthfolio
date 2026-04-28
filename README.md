@@ -232,18 +232,27 @@ All configuration is done via environment variables in `.env.web`.
 - `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
   - If a directory is provided, `app.db` will be used inside it
 - `WF_CORS_ALLOW_ORIGINS` - Comma-separated list of allowed CORS origins
-  (default: `*`)
-  - Example: `http://localhost:1420,http://localhost:3000`
+  (default: `*`). **Required when auth is enabled** — wildcard `*` is rejected.
+  - Example: `https://wealthfolio.example.com`
 - `WF_REQUEST_TIMEOUT_MS` - Request timeout in milliseconds (default: `30000`)
 - `WF_STATIC_DIR` - Directory for serving static frontend assets (default:
   `dist`)
 - `WF_SECRET_KEY` - **Required** 32-byte key used for secrets encryption and JWT
   signing
+  - Generate with: `openssl rand -base64 32`
 - `WF_AUTH_PASSWORD_HASH` - Argon2id PHC string enabling password-only
   authentication for web mode
 - `WF_AUTH_TOKEN_TTL_MINUTES` - Optional JWT access token expiry in minutes
   (default `60`)
-  - Generate with: `openssl rand -base64 32`
+- `WF_AUTH_REQUIRED` - Set to `false` to allow starting on non-loopback
+  addresses without authentication (e.g. when a reverse proxy handles auth)
+- `WF_COOKIE_SECURE` - Controls the `Secure` attribute on session cookies
+  (default: `auto`)
+  - `auto` - set `Secure` only when `X-Forwarded-Proto: https` is present
+    (recommended for most reverse-proxy setups)
+  - `true` - always set `Secure` (use when TLS is guaranteed but the header is
+    absent)
+  - `false` - never set `Secure` (plain HTTP without a reverse proxy)
 - `WF_SECRET_FILE` - **Optional** path to secrets storage file (default:
   `<data-root>/secrets.json`)
 - `WF_ADDONS_DIR` - **Optional** path to addons directory (default: derived from
@@ -260,16 +269,43 @@ All configuration is done via environment variables in `.env.web`.
   before accessing the Web App.
 
   You can generate the hash with online tools like
-  [argon2.online](argon2.online) or the following command:
+  [argon2.online](https://argon2.online) or the CLI (`argon2-utils` package):
 
   ```bash
-  argon2 "your-password" -id -e
+  printf 'your-password' | argon2 yoursalt16chars! -id -e
   ```
+
+  > **Tips:**
+  >
+  > - The first argument is the **salt** (use 16+ characters); the password is
+  >   read from stdin.
+  > - Use `printf` instead of `echo -n` to avoid hidden newline issues.
+  > - For Docker Compose `.env` / `--env-file`, single-quote the hash or double
+  >   every `$` (`$$argon2id$$...`).
 
   Copy the full output (starting with `$argon2id$...`) into `.env.web`.
 
-- Tokens are short-lived (default 60 minutes) and stored in memory on the
-  client; refresh the page to re-authenticate.
+  **Dollar-sign (`$`) escaping cheat-sheet** — Argon2 hashes contain `$`
+  characters that shells and Compose interpret as variable references:
+
+  | Context                            | Syntax                                  | Notes                                            |
+  | ---------------------------------- | --------------------------------------- | ------------------------------------------------ |
+  | `.env.web` / app-loaded dotenv     | `WF_AUTH_PASSWORD_HASH=$argon2id$...`   | Loaded by the app; no Compose interpolation      |
+  | Docker Compose `.env`/`--env-file` | `WF_AUTH_PASSWORD_HASH='$argon2id$...'` | Single quotes prevent Compose interpolation      |
+  | Docker Compose `.env`/`--env-file` | `WF_AUTH_PASSWORD_HASH=$$argon2id$$...` | Alternative: double every `$`                    |
+  | Docker Compose YAML inline         | `HASH: '$$argon2id$$v=19$$...'`         | Double every `$` to escape Compose interpolation |
+  | `docker run` (single quotes)       | `-e HASH='$argon2id$...'`               | Single quotes prevent shell expansion            |
+  | `docker run` (double quotes)       | `-e HASH="\$argon2id\$..."`             | Backslash-escape each `$`                        |
+
+- Sessions are cookie-based (`HttpOnly`, `SameSite=Lax`, `Path=/api`). The login
+  endpoint sets the session cookie automatically — no token is exposed to
+  client-side JavaScript. Sessions last 60 minutes by default (see
+  `WF_AUTH_TOKEN_TTL_MINUTES`).
+
+- **Reverse proxy (HTTPS):** If your reverse proxy terminates TLS, ensure it
+  forwards `X-Forwarded-Proto: https` so the server sets the `Secure` cookie
+  attribute correctly. Alternatively, set `WF_COOKIE_SECURE=true` to always set
+  `Secure`. See `WF_COOKIE_SECURE` above.
 
 #### Notes
 
@@ -347,7 +383,7 @@ cat > .env.docker << 'EOF'
 WF_LISTEN_ADDR=0.0.0.0:8088
 WF_DB_PATH=/data/wealthfolio.db
 WF_SECRET_KEY=<generate-with-openssl-rand>
-WF_CORS_ALLOW_ORIGINS=*
+WF_CORS_ALLOW_ORIGINS=https://wealthfolio.example.com
 WF_REQUEST_TIMEOUT_MS=30000
 WF_STATIC_DIR=dist
 EOF

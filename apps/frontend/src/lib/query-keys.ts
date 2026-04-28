@@ -19,7 +19,17 @@ export const QueryKeys = {
 
   // Goals related keys
   GOALS: "goals",
-  GOALS_ALLOCATIONS: "goals_allocations",
+  GOAL: "goal",
+  goal: (id: string) => [QueryKeys.GOAL, id],
+  GOAL_PLAN: "goalPlan",
+  goalPlan: (id: string) => [QueryKeys.GOAL_PLAN, id],
+  GOAL_FUNDING: "goalFunding",
+  goalFunding: (id: string) => [QueryKeys.GOAL_FUNDING, id],
+  RETIREMENT_OVERVIEW: "retirementOverview",
+  retirementOverview: (id: string) => [QueryKeys.RETIREMENT_OVERVIEW, id],
+  SAVE_UP_OVERVIEW: "saveUpOverview",
+  saveUpOverview: (id: string) => [QueryKeys.SAVE_UP_OVERVIEW, id],
+  SAVE_UP_PREVIEW: "saveUpPreview",
 
   // Settings related keys
   SETTINGS: "settings",
@@ -36,6 +46,7 @@ export const QueryKeys = {
   ASSETS: "assets",
   LATEST_QUOTES: "latest_quotes",
   IMPORT_MAPPING: "import_mapping",
+  IMPORT_TEMPLATES: "import_templates",
 
   PERFORMANCE_SUMMARY: "performanceSummary",
   PERFORMANCE_HISTORY: "performanceHistory",
@@ -54,6 +65,7 @@ export const QueryKeys = {
   // Market Data Providers
   MARKET_DATA_PROVIDERS: "marketDataProviders",
   MARKET_DATA_PROVIDER_SETTINGS: "marketDataProviderSettings",
+  CUSTOM_PROVIDERS: "CUSTOM_PROVIDERS",
 
   // AI Providers
   AI_PROVIDERS: "aiProviders",

@@ -1,7 +1,8 @@
 import { AnimatedToggleGroup } from "../ui/animated-toggle-group";
+import { useIsMobile } from "../../hooks/use-mobile";
 import { usePersistentState } from "../../hooks/use-persistent-state";
 import { cn } from "../../lib/utils";
-import { startOfYear, subMonths, subWeeks, subYears } from "date-fns";
+import { startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import React, { useCallback, useState } from "react";
 
 export type TimePeriod = "1D" | "1W" | "1M" | "3M" | "6M" | "YTD" | "1Y" | "5Y" | "ALL";
@@ -29,6 +30,11 @@ const intervalDescriptions: Record<TimePeriod, string> = {
 };
 
 const intervals: IntervalData[] = [
+  {
+    code: "1D",
+    description: intervalDescriptions["1D"],
+    calculateRange: () => ({ from: subDays(new Date(), 1), to: new Date() }),
+  },
   {
     code: "1W",
     description: intervalDescriptions["1W"],
@@ -96,6 +102,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   storageKey,
   onHaptic,
 }) => {
+  const isMobile = useIsMobile();
   // State for selection - persisted or local
   const [persistedValue, setPersistedValue] = usePersistentState<TimePeriod>(
     storageKey ?? "__interval_selector__",
@@ -144,7 +151,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
           items={items}
           value={currentValue}
           onValueChange={handleValueChange}
-          size="sm"
+          size={isMobile ? "compact" : "sm"}
           variant="default"
           className="pointer-events-auto bg-transparent"
         />

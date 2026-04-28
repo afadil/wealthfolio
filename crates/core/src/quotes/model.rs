@@ -8,80 +8,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 // =============================================================================
-// Constants
-// =============================================================================
-
-/// Data source identifiers
-pub const DATA_SOURCE_YAHOO: &str = "YAHOO";
-pub const DATA_SOURCE_MANUAL: &str = "MANUAL";
-pub const DATA_SOURCE_MARKET_DATA_APP: &str = "MARKETDATA_APP";
-pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
-pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
-pub const DATA_SOURCE_FINNHUB: &str = "FINNHUB";
-
-// =============================================================================
-// Data Source
-// =============================================================================
-
-/// Represents the source of market data.
-///
-/// Different providers have different capabilities, coverage, and reliability.
-/// The data source is tracked with each quote to support:
-/// - Provider-specific handling and formatting
-/// - Fallback logic when a provider fails
-/// - User visibility into data origin
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum DataSource {
-    /// Yahoo Finance - comprehensive global coverage
-    Yahoo,
-    /// MarketData.app - US stocks with real-time data
-    MarketDataApp,
-    /// Alpha Vantage - stocks, crypto, and forex
-    AlphaVantage,
-    /// Metal Price API - precious metals pricing
-    MetalPriceApi,
-    /// Finnhub - global stock data with real-time quotes
-    Finnhub,
-    /// Manual entry by user
-    #[default]
-    Manual,
-}
-
-impl DataSource {
-    /// Returns the string identifier for this data source.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DataSource::Yahoo => DATA_SOURCE_YAHOO,
-            DataSource::MarketDataApp => DATA_SOURCE_MARKET_DATA_APP,
-            DataSource::AlphaVantage => DATA_SOURCE_ALPHA_VANTAGE,
-            DataSource::MetalPriceApi => DATA_SOURCE_METAL_PRICE_API,
-            DataSource::Finnhub => DATA_SOURCE_FINNHUB,
-            DataSource::Manual => DATA_SOURCE_MANUAL,
-        }
-    }
-}
-
-impl From<DataSource> for String {
-    fn from(source: DataSource) -> Self {
-        source.as_str().to_string()
-    }
-}
-
-impl From<&str> for DataSource {
-    fn from(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
-            DATA_SOURCE_YAHOO => DataSource::Yahoo,
-            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
-            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
-            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
-            DATA_SOURCE_FINNHUB => DataSource::Finnhub,
-            _ => DataSource::Manual,
-        }
-    }
-}
-
-// =============================================================================
 // Quote
 // =============================================================================
 
@@ -116,7 +42,7 @@ pub struct Quote {
     pub adjclose: Decimal,
     pub volume: Decimal,
     pub currency: String,
-    pub data_source: DataSource,
+    pub data_source: String,
     pub created_at: DateTime<Utc>,
     pub notes: Option<String>,
 }
@@ -192,7 +118,7 @@ pub struct LatestQuotePair {
     pub previous: Option<Quote>,
 }
 
-/// Result from resolving a symbol's latest quote (currency + price).
+/// Result from resolving a symbol's latest quote (currency, price, and provider).
 ///
 /// Used during symbol selection to confirm inferred currency and pre-fill price.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -200,43 +126,5 @@ pub struct LatestQuotePair {
 pub struct ResolvedQuote {
     pub currency: Option<String>,
     pub price: Option<Decimal>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_data_source_from_str() {
-        assert_eq!(DataSource::from("YAHOO"), DataSource::Yahoo);
-        assert_eq!(DataSource::from("yahoo"), DataSource::Yahoo);
-        assert_eq!(
-            DataSource::from("MARKETDATA_APP"),
-            DataSource::MarketDataApp
-        );
-        assert_eq!(DataSource::from("ALPHA_VANTAGE"), DataSource::AlphaVantage);
-        assert_eq!(
-            DataSource::from("METAL_PRICE_API"),
-            DataSource::MetalPriceApi
-        );
-        assert_eq!(DataSource::from("FINNHUB"), DataSource::Finnhub);
-        assert_eq!(DataSource::from("finnhub"), DataSource::Finnhub);
-        assert_eq!(DataSource::from("MANUAL"), DataSource::Manual);
-        assert_eq!(DataSource::from("unknown"), DataSource::Manual);
-    }
-
-    #[test]
-    fn test_data_source_as_str() {
-        assert_eq!(DataSource::Yahoo.as_str(), "YAHOO");
-        assert_eq!(DataSource::MarketDataApp.as_str(), "MARKETDATA_APP");
-        assert_eq!(DataSource::AlphaVantage.as_str(), "ALPHA_VANTAGE");
-        assert_eq!(DataSource::MetalPriceApi.as_str(), "METAL_PRICE_API");
-        assert_eq!(DataSource::Finnhub.as_str(), "FINNHUB");
-        assert_eq!(DataSource::Manual.as_str(), "MANUAL");
-    }
-
-    #[test]
-    fn test_data_source_default() {
-        assert_eq!(DataSource::default(), DataSource::Manual);
-    }
+    pub resolved_provider_id: Option<String>,
 }

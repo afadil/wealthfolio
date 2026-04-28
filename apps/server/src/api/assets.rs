@@ -7,7 +7,7 @@ use axum::{
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::assets::{Asset as CoreAsset, UpdateAssetProfile};
+use wealthfolio_core::assets::{Asset as CoreAsset, NewAsset, UpdateAssetProfile};
 
 #[derive(serde::Deserialize)]
 struct AssetQuery {
@@ -59,6 +59,14 @@ async fn update_quote_mode(
     Ok(Json(asset))
 }
 
+async fn create_asset(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<NewAsset>,
+) -> ApiResult<Json<CoreAsset>> {
+    let asset = state.asset_service.create_asset(payload).await?;
+    Ok(Json(asset))
+}
+
 async fn delete_asset(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -69,7 +77,7 @@ async fn delete_asset(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/assets", get(list_assets))
+        .route("/assets", get(list_assets).post(create_asset))
         .route("/assets/{id}", delete(delete_asset))
         .route("/assets/profile", get(get_asset_profile))
         .route("/assets/profile/{id}", put(update_asset_profile))

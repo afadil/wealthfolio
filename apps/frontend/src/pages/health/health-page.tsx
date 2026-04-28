@@ -57,7 +57,12 @@ const CATEGORY_CONFIG: Record<HealthCategory, { label: string; icon: keyof typeo
   CLASSIFICATION: { label: "Categories", icon: "Tag" },
   DATA_CONSISTENCY: { label: "Data", icon: "Database" },
   ACCOUNT_CONFIGURATION: { label: "Accounts", icon: "Settings" },
+  SETTINGS_CONFIGURATION: { label: "Settings", icon: "Settings" },
 };
+
+export function getCategoryConfig(issue: HealthIssue): { label: string; icon: keyof typeof Icons } {
+  return CATEGORY_CONFIG[issue.category];
+}
 
 function SeverityDot({ severity }: { severity: HealthSeverity }) {
   const config = SEVERITY_CONFIG[severity];
@@ -79,7 +84,7 @@ function HealthIssueRow({
   isDismissing: boolean;
   isFixing: boolean;
 }) {
-  const categoryConfig = CATEGORY_CONFIG[issue.category];
+  const categoryConfig = getCategoryConfig(issue);
   const CategoryIcon = Icons[categoryConfig.icon];
 
   return (
@@ -112,7 +117,7 @@ function HealthIssueRow({
               {categoryConfig.label}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent side="top">{CATEGORY_CONFIG[issue.category].label}</TooltipContent>
+          <TooltipContent side="top">{categoryConfig.label}</TooltipContent>
         </Tooltip>
 
         {issue.fixAction && (

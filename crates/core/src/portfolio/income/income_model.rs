@@ -13,6 +13,15 @@ pub struct IncomeByAsset {
     pub income: Decimal,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IncomeByAccount {
+    pub account_id: String,
+    pub account_name: String,
+    pub by_month: HashMap<String, Decimal>,
+    pub total: Decimal,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IncomeSummary {
@@ -21,6 +30,7 @@ pub struct IncomeSummary {
     pub by_type: HashMap<String, Decimal>,
     pub by_asset: HashMap<String, IncomeByAsset>,
     pub by_currency: HashMap<String, Decimal>,
+    pub by_account: HashMap<String, IncomeByAccount>,
     pub total_income: Decimal,
     pub currency: String,
     pub monthly_average: Decimal,
@@ -35,6 +45,7 @@ impl IncomeSummary {
             by_type: HashMap::new(),
             by_asset: HashMap::new(),
             by_currency: HashMap::new(),
+            by_account: HashMap::new(),
             total_income: Decimal::ZERO,
             currency,
             monthly_average: Decimal::ZERO,
@@ -65,6 +76,25 @@ impl IncomeSummary {
             .by_currency
             .entry(data.currency.clone())
             .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        self.by_account
+            .entry(data.account_id.clone())
+            .and_modify(|entry| {
+                *entry
+                    .by_month
+                    .entry(data.date.clone())
+                    .or_insert(Decimal::ZERO) += converted_amount;
+                entry.total += converted_amount;
+            })
+            .or_insert_with(|| {
+                let mut by_month = HashMap::new();
+                by_month.insert(data.date.clone(), converted_amount);
+                IncomeByAccount {
+                    account_id: data.account_id.clone(),
+                    account_name: data.account_name.clone(),
+                    by_month,
+                    total: converted_amount,
+                }
+            });
         self.total_income += &converted_amount;
     }
 

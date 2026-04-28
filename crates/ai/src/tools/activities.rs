@@ -99,7 +99,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
     async fn definition(&self, _prompt: String) -> ToolDefinition {
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Search investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed.".to_string(),
+            description: "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed.".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -143,8 +143,9 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         use chrono::NaiveDate;
 
-        // Pagination: clamp page_size to MAX_ACTIVITIES_ROWS
+        // Pagination: external tool API is 1-based, backend search uses 0-based page index
         let page = args.page.unwrap_or(1).max(1);
+        let backend_page = page - 1;
         let page_size = args
             .page_size
             .unwrap_or(DEFAULT_PAGE_SIZE)
@@ -218,7 +219,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
             .env
             .activity_service()
             .search_activities(
-                page,
+                backend_page,
                 page_size,
                 account_ids.clone(),
                 activity_types,
@@ -227,6 +228,7 @@ impl<E: AiEnvironment + 'static> Tool for SearchActivitiesTool<E> {
                 None, // needs_review_filter
                 date_from,
                 date_to,
+                None, // instrument_type_filter
             )
             .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
 

@@ -1,12 +1,15 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 
 use crate::activities::ActivityRepositoryTrait;
 use crate::errors::{Error, Result, ValidationError};
 use crate::fx::FxServiceTrait;
+use crate::utils::time_utils::{
+    activity_date_in_tz, local_year_utc_bounds, parse_user_timezone_or_default,
+};
 
 use super::limits_model::{
     AccountDeposit, ContributionActivity, ContributionLimit, DepositsCalculation,
@@ -19,6 +22,7 @@ pub struct ContributionLimitService {
     fx_service: Arc<dyn FxServiceTrait>,
     limit_repository: Arc<dyn ContributionLimitRepositoryTrait>,
     activity_repository: Arc<dyn ActivityRepositoryTrait>,
+    timezone: Arc<RwLock<String>>,
 }
 
 impl ContributionLimitService {
@@ -27,11 +31,30 @@ impl ContributionLimitService {
         limit_repository: Arc<dyn ContributionLimitRepositoryTrait>,
         activity_repository: Arc<dyn ActivityRepositoryTrait>,
     ) -> Self {
+        Self::new_with_timezone(
+            fx_service,
+            limit_repository,
+            activity_repository,
+            Arc::new(RwLock::new(String::new())),
+        )
+    }
+
+    pub fn new_with_timezone(
+        fx_service: Arc<dyn FxServiceTrait>,
+        limit_repository: Arc<dyn ContributionLimitRepositoryTrait>,
+        activity_repository: Arc<dyn ActivityRepositoryTrait>,
+        timezone: Arc<RwLock<String>>,
+    ) -> Self {
         ContributionLimitService {
             fx_service,
             limit_repository,
             activity_repository,
+            timezone,
         }
+    }
+
+    fn user_timezone(&self) -> chrono_tz::Tz {
+        parse_user_timezone_or_default(&self.timezone.read().unwrap())
     }
 
     /// Checks if an activity has metadata.flow.is_external = true
@@ -47,8 +70,8 @@ impl ContributionLimitService {
     fn calculate_contributions_by_period(
         &self,
         account_ids: &[String],
-        start_date: NaiveDateTime,
-        end_date: NaiveDateTime,
+        start_utc: DateTime<Utc>,
+        end_exclusive_utc: DateTime<Utc>,
         base_currency: &str,
     ) -> Result<DepositsCalculation> {
         if account_ids.is_empty() {
@@ -61,9 +84,10 @@ impl ContributionLimitService {
 
         let activities = self.activity_repository.get_contribution_activities(
             account_ids,
-            start_date,
-            end_date,
+            start_utc,
+            end_exclusive_utc,
         )?;
+        let tz = self.user_timezone();
 
         // Build set of limit account_ids for O(1) lookup
         let limit_accounts: HashSet<&str> = account_ids.iter().map(|s| s.as_str()).collect();
@@ -88,19 +112,17 @@ impl ContributionLimitService {
             let should_count = match activity.activity_type.as_str() {
                 "DEPOSIT" => true,
                 "TRANSFER_IN" => {
-                    // Must be external AND not an internal transfer within this limit
-                    if !Self::is_external(activity) {
-                        false
-                    } else if let Some(group_id) = &activity.source_group_id {
-                        // Check if linked TRANSFER_OUT is also in this limit's accounts
-                        // If so, it's an internal transfer - don't count
+                    if let Some(group_id) = &activity.source_group_id {
+                        // Linked transfer pair: count only if the source account
+                        // is outside this limit (new money entering the limit).
                         !transfer_out_accounts
                             .get(group_id.as_str())
                             .map(|out_account| limit_accounts.contains(out_account))
                             .unwrap_or(false)
                     } else {
-                        // External with no link - count it
-                        true
+                        // Unlinked transfer: count only if explicitly marked external
+                        // (e.g. from outside the portfolio entirely).
+                        Self::is_external(activity)
                     }
                 }
                 "CREDIT" => Self::is_external(activity),
@@ -118,12 +140,14 @@ impl ContributionLimitService {
                 )))
             })?;
 
+            let activity_date = activity_date_in_tz(activity.activity_instant, tz);
+
             // Convert using the exchange rate on the activity date
             let converted_amount = self.fx_service.convert_currency_for_date(
                 amount,
                 &activity.currency,
                 base_currency,
-                activity.activity_date,
+                activity_date,
             )?;
 
             total += converted_amount;
@@ -200,30 +224,29 @@ impl ContributionLimitServiceTrait for ContributionLimitService {
         };
 
         if let (Some(start_str), Some(end_str)) = (limit.start_date, limit.end_date) {
-            let start = NaiveDateTime::parse_from_str(&start_str, "%Y-%m-%dT%H:%M:%S%.3fZ")
+            let start = DateTime::parse_from_rfc3339(&start_str)
+                .map(|dt| dt.with_timezone(&Utc))
                 .map_err(|e| Error::Validation(ValidationError::DateTimeParse(e)))?;
-            let end = NaiveDateTime::parse_from_str(&end_str, "%Y-%m-%dT%H:%M:%S%.3fZ")
+            let end_inclusive = DateTime::parse_from_rfc3339(&end_str)
+                .map(|dt| dt.with_timezone(&Utc))
                 .map_err(|e| Error::Validation(ValidationError::DateTimeParse(e)))?;
-            self.calculate_contributions_by_period(&account_ids, start, end, base_currency)
+            let end_exclusive = end_inclusive + chrono::Duration::seconds(1);
+            self.calculate_contributions_by_period(
+                &account_ids,
+                start,
+                end_exclusive,
+                base_currency,
+            )
         } else {
             let year = limit.contribution_year;
-            let start = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 1, 1).ok_or_else(|| {
-                    Error::Validation(ValidationError::InvalidInput(
-                        "Invalid start date".to_string(),
-                    ))
-                })?,
-                chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
-            );
-            let end = NaiveDateTime::new(
-                chrono::NaiveDate::from_ymd_opt(year, 12, 31).ok_or_else(|| {
-                    Error::Validation(ValidationError::InvalidInput(
-                        "Invalid start date".to_string(),
-                    ))
-                })?,
-                chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
-            );
-            self.calculate_contributions_by_period(&account_ids, start, end, base_currency)
+            let tz = self.user_timezone();
+            let (start_utc, end_exclusive_utc) = local_year_utc_bounds(year, tz)?;
+            self.calculate_contributions_by_period(
+                &account_ids,
+                start_utc,
+                end_exclusive_utc,
+                base_currency,
+            )
         }
     }
 }
@@ -237,7 +260,7 @@ mod tests {
         Sort,
     };
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
-    use chrono::{DateTime, NaiveDate, Utc};
+    use chrono::{DateTime, NaiveDate, TimeZone, Utc};
     use rust_decimal_macros::dec;
     use std::sync::RwLock;
 
@@ -260,8 +283,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             account_ids: &[String],
-            _start_date: NaiveDateTime,
-            _end_date: NaiveDateTime,
+            start_utc: DateTime<Utc>,
+            end_exclusive_utc: DateTime<Utc>,
         ) -> Result<Vec<ContributionActivity>> {
             let account_set: HashSet<&str> = account_ids.iter().map(|s| s.as_str()).collect();
             Ok(self
@@ -269,7 +292,11 @@ mod tests {
                 .read()
                 .unwrap()
                 .iter()
-                .filter(|a| account_set.contains(a.account_id.as_str()))
+                .filter(|a| {
+                    account_set.contains(a.account_id.as_str())
+                        && a.activity_instant >= start_utc
+                        && a.activity_instant < end_exclusive_utc
+                })
                 .cloned()
                 .collect())
         }
@@ -304,6 +331,7 @@ mod tests {
             _: Option<bool>,
             _: Option<NaiveDate>,
             _: Option<NaiveDate>,
+            _: Option<Vec<String>>,
         ) -> Result<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -314,6 +342,20 @@ mod tests {
             unimplemented!()
         }
         async fn delete_activity(&self, _: String) -> Result<Activity> {
+            unimplemented!()
+        }
+        async fn link_transfer_activities(
+            &self,
+            _: String,
+            _: String,
+        ) -> Result<(Activity, Activity)> {
+            unimplemented!()
+        }
+        async fn unlink_transfer_activities(
+            &self,
+            _: String,
+            _: String,
+        ) -> Result<(Activity, Activity)> {
             unimplemented!()
         }
         async fn bulk_mutate_activities(
@@ -330,16 +372,67 @@ mod tests {
         fn get_first_activity_date(&self, _: Option<&[String]>) -> Result<Option<DateTime<Utc>>> {
             unimplemented!()
         }
-        fn get_import_mapping(&self, _: &str) -> Result<Option<ImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _: &str,
+            _context_kind: &str,
+        ) -> Result<Option<ImportMapping>> {
             unimplemented!()
         }
         async fn save_import_mapping(&self, _: &ImportMapping) -> Result<()> {
             unimplemented!()
         }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_import_templates(&self) -> Result<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            unimplemented!()
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> Result<()> {
+            unimplemented!()
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> Result<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> Result<()> {
+            Ok(())
+        }
         fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> {
             unimplemented!()
         }
-        fn get_income_activities_data(&self) -> Result<Vec<IncomeData>> {
+        fn get_income_activities_data(&self, _account_id: Option<&str>) -> Result<Vec<IncomeData>> {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> Result<DateTime<Utc>> {
@@ -514,9 +607,9 @@ mod tests {
         Some(r#"{"flow":{"is_external":false}}"#.to_string())
     }
 
-    /// Default activity date for tests (2025-06-15)
-    fn default_date() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2025, 6, 15).unwrap()
+    /// Default activity instant for tests (2025-06-15T12:00:00Z)
+    fn default_instant() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap()
     }
 
     fn make_service(activities: Vec<ContributionActivity>) -> ContributionLimitService {
@@ -527,15 +620,21 @@ mod tests {
         )
     }
 
-    fn dates() -> (NaiveDateTime, NaiveDateTime) {
-        let start = NaiveDateTime::new(
-            NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-            chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
-        );
-        let end = NaiveDateTime::new(
-            NaiveDate::from_ymd_opt(2025, 12, 31).unwrap(),
-            chrono::NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
-        );
+    fn make_service_with_timezone(
+        activities: Vec<ContributionActivity>,
+        timezone: &str,
+    ) -> ContributionLimitService {
+        ContributionLimitService::new_with_timezone(
+            Arc::new(MockFxService),
+            Arc::new(MockLimitRepository),
+            Arc::new(MockActivityRepository::new(activities)),
+            Arc::new(RwLock::new(timezone.to_string())),
+        )
+    }
+
+    fn dates() -> (DateTime<Utc>, DateTime<Utc>) {
+        let start = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
         (start, end)
     }
 
@@ -572,7 +671,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "DEPOSIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: None,
@@ -595,7 +694,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(500)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -604,7 +703,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(300)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -626,7 +725,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: None, // No metadata = internal
@@ -647,7 +746,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: internal_metadata(),
@@ -668,7 +767,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: external_metadata(),
@@ -691,7 +790,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "TRANSFER_OUT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -700,7 +799,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc2".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -731,7 +830,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc_outside".to_string(),
                 activity_type: "TRANSFER_OUT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -740,7 +839,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -764,7 +863,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "CREDIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: None,
@@ -785,7 +884,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "CREDIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: external_metadata(),
@@ -806,7 +905,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "CREDIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: internal_metadata(),
@@ -827,7 +926,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_OUT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: external_metadata(),
@@ -848,7 +947,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "DEPOSIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "CAD".to_string(),
             metadata: None,
@@ -876,7 +975,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -885,7 +984,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc2".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(500)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -916,7 +1015,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(1000)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -926,7 +1025,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(500)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -936,7 +1035,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "CREDIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(100)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -946,7 +1045,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(200)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -956,7 +1055,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "CREDIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(50)),
                 currency: "USD".to_string(),
                 metadata: None,
@@ -966,7 +1065,7 @@ mod tests {
             ContributionActivity {
                 account_id: "acc1".to_string(),
                 activity_type: "TRANSFER_OUT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(300)),
                 currency: "USD".to_string(),
                 metadata: external_metadata(),
@@ -989,7 +1088,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "DEPOSIT".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: None, // Missing amount
             currency: "USD".to_string(),
             metadata: None,
@@ -1009,7 +1108,7 @@ mod tests {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(1000)),
             currency: "USD".to_string(),
             metadata: Some("invalid json".to_string()),
@@ -1032,7 +1131,7 @@ mod tests {
         let external = ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: external_metadata(),
@@ -1043,7 +1142,7 @@ mod tests {
         let internal = ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: internal_metadata(),
@@ -1054,7 +1153,7 @@ mod tests {
         let no_metadata = ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "TRANSFER_IN".to_string(),
-            activity_date: default_date(),
+            activity_instant: default_instant(),
             amount: Some(dec!(100)),
             currency: "USD".to_string(),
             metadata: None,
@@ -1080,7 +1179,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_savings".to_string(),
                 activity_type: "DEPOSIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(5000)),
                 currency: "CAD".to_string(),
                 metadata: None,
@@ -1090,7 +1189,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_savings".to_string(),
                 activity_type: "TRANSFER_OUT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(3000)),
                 currency: "CAD".to_string(),
                 metadata: external_metadata(), // Even if marked external
@@ -1100,7 +1199,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_invest".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(3000)),
                 currency: "CAD".to_string(),
                 metadata: external_metadata(), // Even if marked external
@@ -1110,7 +1209,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_invest".to_string(),
                 activity_type: "TRANSFER_IN".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(2000)),
                 currency: "CAD".to_string(),
                 metadata: external_metadata(),
@@ -1122,7 +1221,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_savings".to_string(),
                 activity_type: "CREDIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(50)),
                 currency: "CAD".to_string(),
                 metadata: None, // Internal
@@ -1132,7 +1231,7 @@ mod tests {
             ContributionActivity {
                 account_id: "tfsa_savings".to_string(),
                 activity_type: "CREDIT".to_string(),
-                activity_date: default_date(),
+                activity_instant: default_instant(),
                 amount: Some(dec!(100)),
                 currency: "CAD".to_string(),
                 metadata: external_metadata(),
@@ -1161,5 +1260,173 @@ mod tests {
             result.by_account.get("tfsa_invest").unwrap().amount,
             dec!(2000)
         );
+    }
+
+    #[test]
+    fn test_internal_transfer_from_outside_limit_counts_without_external_flag() {
+        // Reproduces GitHub issue #775:
+        // Internal transfer (no is_external metadata) from a Cash account
+        // outside the limit into a Registered account inside the limit.
+        // This should count because the source is outside the limit's scope.
+        let activities = vec![
+            // TRANSFER_OUT from Cash account (not in the limit)
+            ContributionActivity {
+                account_id: "cash_account".to_string(),
+                activity_type: "TRANSFER_OUT".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(1000)),
+                currency: "CAD".to_string(),
+                metadata: None, // No external flag — it's an internal transfer
+                source_group_id: Some("pair1".to_string()),
+            },
+            // TRANSFER_IN to Registered account (in the limit)
+            ContributionActivity {
+                account_id: "registered".to_string(),
+                activity_type: "TRANSFER_IN".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(1000)),
+                currency: "CAD".to_string(),
+                metadata: None, // No external flag
+                source_group_id: Some("pair1".to_string()),
+            },
+        ];
+        let service = make_service(activities);
+        let (start, end) = dates();
+
+        // Only the registered account is in the limit
+        let result = service
+            .calculate_contributions_by_period(&["registered".to_string()], start, end, "CAD")
+            .unwrap();
+
+        // Should count — source account is outside this limit
+        assert_eq!(result.total, dec!(1000));
+    }
+
+    #[test]
+    fn test_internal_transfer_within_limit_not_counted_without_external_flag() {
+        // Internal transfer between two accounts both in the limit — should NOT count.
+        let activities = vec![
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "TRANSFER_OUT".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(500)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: Some("pair1".to_string()),
+            },
+            ContributionActivity {
+                account_id: "acc2".to_string(),
+                activity_type: "TRANSFER_IN".to_string(),
+                activity_instant: default_instant(),
+                amount: Some(dec!(500)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: Some("pair1".to_string()),
+            },
+        ];
+        let service = make_service(activities);
+        let (start, end) = dates();
+
+        let result = service
+            .calculate_contributions_by_period(
+                &["acc1".to_string(), "acc2".to_string()],
+                start,
+                end,
+                "USD",
+            )
+            .unwrap();
+
+        assert_eq!(result.total, Decimal::ZERO);
+    }
+
+    #[test]
+    fn test_contribution_year_boundary_utc_minus_3() {
+        let activities = vec![
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "DEPOSIT".to_string(),
+                // 2025-12-31 23:30 local for UTC-3
+                activity_instant: Utc.with_ymd_and_hms(2026, 1, 1, 2, 30, 0).unwrap(),
+                amount: Some(dec!(100)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: None,
+            },
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "DEPOSIT".to_string(),
+                // 2026-01-01 00:30 local for UTC-3 (excluded from 2025)
+                activity_instant: Utc.with_ymd_and_hms(2026, 1, 1, 3, 30, 0).unwrap(),
+                amount: Some(dec!(50)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: None,
+            },
+        ];
+        let service = make_service_with_timezone(activities, "America/Sao_Paulo");
+        let (start_utc, end_exclusive_utc) =
+            local_year_utc_bounds(2025, service.user_timezone()).expect("timezone bounds");
+
+        let result = service
+            .calculate_contributions_by_period(
+                &["acc1".to_string()],
+                start_utc,
+                end_exclusive_utc,
+                "USD",
+            )
+            .unwrap();
+
+        assert_eq!(result.total, dec!(100));
+    }
+
+    #[test]
+    fn test_contribution_year_boundary_utc_plus_14() {
+        let activities = vec![
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "DEPOSIT".to_string(),
+                // 2025-01-01 01:00 local for UTC+14
+                activity_instant: Utc.with_ymd_and_hms(2024, 12, 31, 11, 0, 0).unwrap(),
+                amount: Some(dec!(100)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: None,
+            },
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "DEPOSIT".to_string(),
+                // 2025-12-31 23:30 local for UTC+14
+                activity_instant: Utc.with_ymd_and_hms(2025, 12, 31, 9, 30, 0).unwrap(),
+                amount: Some(dec!(40)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: None,
+            },
+            ContributionActivity {
+                account_id: "acc1".to_string(),
+                activity_type: "DEPOSIT".to_string(),
+                // 2026-01-01 00:30 local for UTC+14 (excluded from 2025)
+                activity_instant: Utc.with_ymd_and_hms(2025, 12, 31, 10, 30, 0).unwrap(),
+                amount: Some(dec!(25)),
+                currency: "USD".to_string(),
+                metadata: None,
+                source_group_id: None,
+            },
+        ];
+        let service = make_service_with_timezone(activities, "Pacific/Kiritimati");
+        let (start_utc, end_exclusive_utc) =
+            local_year_utc_bounds(2025, service.user_timezone()).expect("timezone bounds");
+
+        let result = service
+            .calculate_contributions_by_period(
+                &["acc1".to_string()],
+                start_utc,
+                end_exclusive_utc,
+                "USD",
+            )
+            .unwrap();
+
+        assert_eq!(result.total, dec!(140));
     }
 }

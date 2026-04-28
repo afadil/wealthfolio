@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+    use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
     use std::collections::{HashMap, HashSet, VecDeque};
@@ -20,8 +20,8 @@ mod tests {
     use crate::errors::{Error, Result as AppResult};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
     use crate::portfolio::snapshot::{
-        AccountStateSnapshot, Lot, Position, SnapshotRepositoryTrait, SnapshotService,
-        SnapshotServiceTrait,
+        AccountStateSnapshot, Lot, Position, SnapshotRecalcMode, SnapshotRepositoryTrait,
+        SnapshotService, SnapshotServiceTrait,
     };
     use crate::utils::time_utils::valuation_date_today;
 
@@ -359,8 +359,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             _account_ids: &[String],
-            _start_date: NaiveDateTime,
-            _end_date: NaiveDateTime,
+            _start_date: DateTime<Utc>,
+            _end_date: DateTime<Utc>,
         ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
@@ -375,6 +375,7 @@ mod tests {
             _is_draft_filter: Option<bool>,
             _date_from: Option<NaiveDate>,
             _date_to: Option<NaiveDate>,
+            _instrument_type_filter: Option<Vec<String>>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -385,6 +386,20 @@ mod tests {
             unimplemented!()
         }
         async fn delete_activity(&self, _activity_id: String) -> AppResult<Activity> {
+            unimplemented!()
+        }
+        async fn link_transfer_activities(
+            &self,
+            _activity_a_id: String,
+            _activity_b_id: String,
+        ) -> AppResult<(Activity, Activity)> {
+            unimplemented!()
+        }
+        async fn unlink_transfer_activities(
+            &self,
+            _activity_a_id: String,
+            _activity_b_id: String,
+        ) -> AppResult<(Activity, Activity)> {
             unimplemented!()
         }
         async fn bulk_mutate_activities(
@@ -407,16 +422,67 @@ mod tests {
         fn get_import_mapping(
             &self,
             _account_id: &str,
+            _context_kind: &str,
         ) -> AppResult<Option<ActivityImportMapping>> {
             unimplemented!()
         }
         async fn save_import_mapping(&self, _mapping: &ActivityImportMapping) -> AppResult<()> {
             unimplemented!()
         }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> AppResult<()> {
+            unimplemented!()
+        }
+        fn list_import_templates(&self) -> AppResult<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            unimplemented!()
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
+            unimplemented!()
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
         fn calculate_average_cost(&self, _account_id: &str, _asset_id: &str) -> AppResult<Decimal> {
             unimplemented!()
         }
-        fn get_income_activities_data(&self) -> AppResult<Vec<ActivityIncomeData>> {
+        fn get_income_activities_data(
+            &self,
+            _account_id: Option<&str>,
+        ) -> AppResult<Vec<ActivityIncomeData>> {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
@@ -510,8 +576,8 @@ mod tests {
         fn get_contribution_activities(
             &self,
             _ids: &[String],
-            _s: NaiveDateTime,
-            _e: NaiveDateTime,
+            _s: DateTime<Utc>,
+            _e: DateTime<Utc>,
         ) -> AppResult<Vec<crate::limits::ContributionActivity>> {
             unimplemented!()
         }
@@ -526,6 +592,7 @@ mod tests {
             _is_draft_filter: Option<bool>,
             _date_from: Option<NaiveDate>,
             _date_to: Option<NaiveDate>,
+            _instrument_type_filter: Option<Vec<String>>,
         ) -> AppResult<ActivitySearchResponse> {
             unimplemented!()
         }
@@ -536,6 +603,20 @@ mod tests {
             unimplemented!()
         }
         async fn delete_activity(&self, _id: String) -> AppResult<Activity> {
+            unimplemented!()
+        }
+        async fn link_transfer_activities(
+            &self,
+            _a: String,
+            _b: String,
+        ) -> AppResult<(Activity, Activity)> {
+            unimplemented!()
+        }
+        async fn unlink_transfer_activities(
+            &self,
+            _a: String,
+            _b: String,
+        ) -> AppResult<(Activity, Activity)> {
             unimplemented!()
         }
         async fn bulk_mutate_activities(
@@ -555,16 +636,70 @@ mod tests {
         ) -> AppResult<Option<DateTime<Utc>>> {
             Ok(None)
         }
-        fn get_import_mapping(&self, _id: &str) -> AppResult<Option<ActivityImportMapping>> {
+        fn get_import_mapping(
+            &self,
+            _id: &str,
+            _context_kind: &str,
+        ) -> AppResult<Option<ActivityImportMapping>> {
             Ok(None)
         }
         async fn save_import_mapping(&self, _m: &ActivityImportMapping) -> AppResult<()> {
             Ok(())
         }
+        async fn link_account_template(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _context_kind: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        fn list_import_templates(&self) -> AppResult<Vec<crate::activities::ImportTemplate>> {
+            Ok(Vec::new())
+        }
+        fn get_import_template(
+            &self,
+            _template_id: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_import_template(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn delete_import_template(&self, _template_id: &str) -> AppResult<()> {
+            Ok(())
+        }
+        fn get_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _source_system: &str,
+        ) -> AppResult<Option<crate::activities::ImportTemplate>> {
+            Ok(None)
+        }
+        async fn save_broker_sync_profile(
+            &self,
+            _template: &crate::activities::ImportTemplate,
+        ) -> AppResult<()> {
+            Ok(())
+        }
+        async fn link_broker_sync_profile(
+            &self,
+            _account_id: &str,
+            _template_id: &str,
+            _source_system: &str,
+        ) -> AppResult<()> {
+            Ok(())
+        }
         fn calculate_average_cost(&self, _acc: &str, _asset: &str) -> AppResult<Decimal> {
             unimplemented!()
         }
-        fn get_income_activities_data(&self) -> AppResult<Vec<ActivityIncomeData>> {
+        fn get_income_activities_data(
+            &self,
+            _account_id: Option<&str>,
+        ) -> AppResult<Vec<ActivityIncomeData>> {
             unimplemented!()
         }
         fn get_first_activity_date_overall(&self) -> AppResult<DateTime<Utc>> {
@@ -1019,6 +1154,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         snap1_cad.positions.insert("TSE.TO".to_string(), pos1_tse);
         snap1_cad.cost_basis = dec!(500);
@@ -1043,6 +1179,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         snap2_usd.positions.insert("AAPL".to_string(), pos2_aapl);
         snap2_usd.cost_basis = dec!(750);
@@ -1067,7 +1204,9 @@ mod tests {
         );
 
         // Call the public method under test
-        let result = snapshot_service.calculate_total_portfolio_snapshots().await;
+        let result = snapshot_service
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
 
         log::info!("result: {:?}", result);
 
@@ -1236,6 +1375,7 @@ mod tests {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
 
@@ -1255,6 +1395,7 @@ mod tests {
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
                 is_alternative: false,
+                contract_multiplier: Decimal::ONE,
             },
         );
 
@@ -1272,7 +1413,9 @@ mod tests {
             mock_fx_service_arc.clone(),
         );
 
-        let result = snapshot_service.calculate_total_portfolio_snapshots().await;
+        let result = snapshot_service
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok());
 
         let saved_snapshots = mock_snapshot_repo_arc.get_saved_snapshots();
@@ -1352,7 +1495,10 @@ mod tests {
         );
 
         // should insert keyframes without error
-        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let saved = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert!(saved >= 2, "at least two keyframes expected");
     }
 
@@ -1398,7 +1544,10 @@ mod tests {
         );
 
         // No new dates remain to calculate (effective_start_date would be tomorrow), so no writes.
-        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let saved = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert_eq!(saved, 0);
         assert!(snapshot_repo.get_saved_snapshots().is_empty());
     }
@@ -1468,7 +1617,10 @@ mod tests {
         );
 
         // should compile & run without type errors and save >= 1 frame
-        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let saved = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert!(saved >= 1, "expected at least one keyframe saved");
 
         // dividend must NOT change net_contribution, but other activities (like deposits) should.
@@ -1549,7 +1701,10 @@ mod tests {
             fx,
         );
 
-        let saved = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let saved = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert!(saved >= 1);
 
         let frames = snapshot_repo.get_saved_snapshots();
@@ -1637,7 +1792,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -1715,7 +1873,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -1782,7 +1943,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -1846,7 +2010,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -1912,7 +2079,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -1976,7 +2146,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2049,7 +2222,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2120,7 +2296,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2187,7 +2366,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2241,7 +2423,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         assert!(!frames.is_empty());
@@ -2309,7 +2494,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2388,7 +2576,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -2405,6 +2596,132 @@ mod tests {
 
         // Average cost should be halved (200 / 2 = 100)
         assert_eq!(pos.average_cost, dec!(100));
+    }
+
+    #[tokio::test]
+    async fn test_split_multi_account_no_double_counting() {
+        // Regression: when the same asset is held in multiple accounts, sync_splits inserts
+        // one SPLIT activity per account. calculate_split_factors must deduplicate by date so
+        // the split is applied only once, not N times.
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc1 = create_test_account("acc1", "USD", "Account 1");
+        let acc2 = create_test_account("acc2", "USD", "Account 2");
+        account_repo.add_account(acc1.clone());
+        account_repo.add_account(acc2.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 20).unwrap();
+
+        // Each account buys 10 AAPL at $200
+        let deposit1 = create_test_activity(
+            "dep1",
+            &acc1.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(2000)),
+            "USD",
+        );
+        let buy1 = create_test_activity(
+            "buy1",
+            &acc1.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(200)),
+            Some(dec!(2000)),
+            "USD",
+        );
+        let deposit2 = create_test_activity(
+            "dep2",
+            &acc2.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(2000)),
+            "USD",
+        );
+        let buy2 = create_test_activity(
+            "buy2",
+            &acc2.id,
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(200)),
+            Some(dec!(2000)),
+            "USD",
+        );
+
+        // One SPLIT activity per account for the same 2:1 event (as sync_splits produces)
+        let split1 = create_test_activity(
+            "split-acc1",
+            &acc1.id,
+            Some("AAPL"),
+            "SPLIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2)),
+            "USD",
+        );
+        let split2 = create_test_activity(
+            "split-acc2",
+            &acc2.id,
+            Some("AAPL"),
+            "SPLIT",
+            d2,
+            None,
+            None,
+            Some(dec!(2)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            deposit1, buy1, deposit2, buy2, split1, split2,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
+
+        let frames = snapshot_repo.get_saved_snapshots();
+        let mut sorted = frames.clone();
+        sorted.sort_by_key(|s| s.snapshot_date);
+
+        // Each account should have 20 shares (10 * 2), not 40 (10 * 2 * 2)
+        let frame_d2: Vec<_> = sorted.iter().filter(|s| s.snapshot_date == d2).collect();
+        for frame in &frame_d2 {
+            if let Some(pos) = frame.positions.get("AAPL") {
+                assert_eq!(
+                    pos.quantity,
+                    dec!(20),
+                    "account {}: expected 20 shares after 2:1 split, got {} (double-counting?)",
+                    frame.account_id,
+                    pos.quantity
+                );
+            }
+        }
     }
 
     // ==================== FX CONVERSION TESTS ====================
@@ -2462,7 +2779,10 @@ mod tests {
             Arc::new(fx),
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         assert!(!frames.is_empty());
@@ -2475,10 +2795,10 @@ mod tests {
         assert_eq!(pos.currency, "USD");
         assert_eq!(pos.total_cost_basis, dec!(1500)); // USD cost basis
 
-        // Cash is debited in activity currency (USD)
-        // CAD cash unchanged by USD activity, USD cash debited
-        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(10000)));
-        assert_eq!(frame.cash_balances.get("USD"), Some(&dec!(-1500)));
+        // With fx_rate provided, cash is debited in account currency (CAD)
+        // CAD cash: 10000 - (1500 * 1.35) = 10000 - 2025 = 7975
+        assert_eq!(frame.cash_balances.get("CAD"), Some(&dec!(7975)));
+        assert_eq!(frame.cash_balances.get("USD"), None);
     }
 
     // ==================== MULTI-ACCOUNT TESTS ====================
@@ -2533,7 +2853,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         // Use get_snapshots_by_account instead of get_saved_snapshots since
         // the mock clears saved_snapshots on each save operation
@@ -2623,7 +2946,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
 
@@ -2692,7 +3018,10 @@ mod tests {
         );
 
         // First calculate to create keyframes
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         // Now get daily snapshots with gap filling
         let daily = svc
@@ -2772,7 +3101,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         // Get keyframes only (no gap filling)
         let keyframes = svc
@@ -2824,12 +3156,15 @@ mod tests {
         );
 
         // First calculation
-        let first_count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let first_count = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert!(first_count >= 1);
 
         // Force recalculation
         let second_count = svc
-            .force_recalculate_holdings_snapshots(None)
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
             .await
             .unwrap();
         assert!(second_count >= 1);
@@ -2864,7 +3199,10 @@ mod tests {
             fx,
         );
 
-        let count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let count = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert_eq!(count, 0, "Empty account should create no keyframes");
     }
 
@@ -2929,7 +3267,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         assert_eq!(frames.len(), 1); // Single keyframe for the day
@@ -2990,7 +3331,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let latest = svc.get_latest_holdings_snapshot(&acc.id).unwrap();
         assert!(latest.is_some());
@@ -2999,6 +3343,66 @@ mod tests {
         // Should be the most recent snapshot (d2)
         assert_eq!(snapshot.snapshot_date, d2);
         assert_eq!(snapshot.cash_balances.get("USD"), Some(&dec!(8000)));
+    }
+
+    #[tokio::test]
+    async fn test_get_latest_holdings_snapshot_excludes_future_dated_activity() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc = create_test_account("acc1", "USD", "Test Account");
+        account_repo.add_account(acc.clone());
+
+        let today = valuation_date_today();
+        let d1 = today.pred_opt().unwrap_or(today);
+        let d_future = today.succ_opt().unwrap_or(today);
+
+        let dep1 = create_test_activity(
+            "dep1",
+            &acc.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d1,
+            None,
+            None,
+            Some(dec!(5000)),
+            "USD",
+        );
+
+        let dep2 = create_test_activity(
+            "dep2",
+            &acc.id,
+            Some("CASH:USD"),
+            "DEPOSIT",
+            d_future,
+            None,
+            None,
+            Some(dec!(3000)),
+            "USD",
+        );
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![dep1, dep2]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
+
+        let latest = svc.get_latest_holdings_snapshot(&acc.id).unwrap().unwrap();
+        assert!(latest.snapshot_date < d_future);
+        assert_eq!(latest.cash_balances.get("USD"), Some(&dec!(5000)));
     }
 
     #[tokio::test]
@@ -3019,7 +3423,10 @@ mod tests {
             fx,
         );
 
-        let count = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let count = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
         assert_eq!(count, 0);
     }
 
@@ -3077,7 +3484,10 @@ mod tests {
             Arc::new(fx),
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let frame = &frames[0];
@@ -3144,7 +3554,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let frame = &frames[0];
@@ -3222,7 +3635,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo.get_saved_snapshots();
         let mut sorted = frames.clone();
@@ -3296,7 +3712,10 @@ mod tests {
 
         // Calculate only for acc1
         let _ = svc
-            .calculate_holdings_snapshots(Some(&["acc1".to_string()]))
+            .recalculate_holdings_snapshots(
+                Some(&["acc1".to_string()]),
+                SnapshotRecalcMode::IncrementalFromLast,
+            )
             .await
             .unwrap();
 
@@ -3375,7 +3794,10 @@ mod tests {
             fx,
         );
 
-        let _ = svc.calculate_holdings_snapshots(None).await.unwrap();
+        let _ = svc
+            .recalculate_holdings_snapshots(None, SnapshotRecalcMode::IncrementalFromLast)
+            .await
+            .unwrap();
 
         let frames = snapshot_repo
             .get_snapshots_by_account("acc1", None, None)
@@ -3768,6 +4190,7 @@ mod tests {
             created_at: Utc::now(),
             last_updated: Utc::now(),
             is_alternative: false,
+            contract_multiplier: Decimal::ONE,
         };
         manual_snapshot
             .positions
@@ -4246,7 +4669,9 @@ mod tests {
         );
 
         // Run TOTAL calculation
-        let result = svc.calculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok(), "TOTAL calculation should succeed");
 
         // Assert: closed but non-archived account's history is included in TOTAL
@@ -4312,7 +4737,9 @@ mod tests {
         );
 
         // Run TOTAL calculation
-        let result = svc.calculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok(), "TOTAL calculation should succeed");
 
         // Assert: archived account's history is NOT included in TOTAL
@@ -4390,7 +4817,9 @@ mod tests {
         );
 
         // Run TOTAL calculation
-        let result = svc.calculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok(), "TOTAL calculation should succeed");
 
         // Assert: Only A and B contribute to TOTAL (C and D excluded because archived)
@@ -4459,7 +4888,9 @@ mod tests {
         );
 
         // Run TOTAL calculation
-        let result = svc.calculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok(), "TOTAL calculation should succeed");
 
         // Assert: Empty or zero-value result
@@ -4511,7 +4942,9 @@ mod tests {
         );
 
         // First: Account is NOT archived, should be included
-        let result = svc.force_recalculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::Full)
+            .await;
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
@@ -4531,7 +4964,9 @@ mod tests {
         mock_snapshot_repo.update_non_archived_accounts(non_archived_ids.clone());
 
         // Assert: TOTAL now excludes this account
-        let result = svc.force_recalculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::Full)
+            .await;
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
@@ -4545,7 +4980,9 @@ mod tests {
         mock_snapshot_repo.update_non_archived_accounts(non_archived_ids);
 
         // Assert: TOTAL now includes this account again
-        let result = svc.force_recalculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::Full)
+            .await;
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
@@ -4610,7 +5047,9 @@ mod tests {
             fx,
         );
 
-        let result = svc.calculate_total_portfolio_snapshots().await;
+        let result = svc
+            .recalculate_total_portfolio_snapshots(SnapshotRecalcMode::IncrementalFromLast)
+            .await;
         assert!(result.is_ok());
 
         let saved = mock_snapshot_repo.get_saved_snapshots();
@@ -4656,6 +5095,248 @@ mod tests {
         assert!(
             account.is_active,
             "Test helper should create active accounts"
+        );
+    }
+
+    // ==================== LOT-LEVEL TRANSFER ORDERING TESTS ====================
+
+    /// Integration test: internal security transfer between two accounts preserves
+    /// cost basis via lot-level transfer. This exercises the snapshot service's
+    /// account ordering (topological sort) to ensure TRANSFER_OUT is processed
+    /// before TRANSFER_IN regardless of HashMap iteration order.
+    #[tokio::test]
+    async fn test_internal_transfer_preserves_cost_basis_via_snapshot_service() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc_a = create_test_account("acc_a", "USD", "Account A");
+        let acc_b = create_test_account("acc_b", "USD", "Account B");
+        account_repo.add_account(acc_a.clone());
+        account_repo.add_account(acc_b.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Day 1: Buy 10 AAPL @ $100 in Account A
+        let buy = create_test_activity(
+            "buy1",
+            "acc_a",
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(100)),
+            Some(dec!(1000)),
+            "USD",
+        );
+
+        // Day 2: Transfer 10 AAPL from A to B (paired via source_group_id)
+        let mut xfer_out = create_test_activity(
+            "xfer_out",
+            "acc_a",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out.source_group_id = Some("grp_test".to_string());
+
+        let mut xfer_in = create_test_activity(
+            "xfer_in",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in.source_group_id = Some("grp_test".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            buy, xfer_out, xfer_in,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        // Find Account B's final snapshot (latest date)
+        let acc_b_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_b", None, None)
+            .unwrap();
+        let acc_b_snap = acc_b_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account B should have a snapshot");
+
+        let pos = acc_b_snap
+            .positions
+            .get("AAPL")
+            .expect("Account B should have AAPL position after transfer");
+
+        assert_eq!(pos.quantity, dec!(10), "Should have 10 shares");
+        // Cost basis must be preserved from the original buy: 10 * $100 = $1000
+        // If ordering were wrong, this would be 0 (fallback with no unit_price)
+        assert_eq!(
+            pos.total_cost_basis,
+            dec!(1000),
+            "Cost basis must be preserved from original buy, not zero"
+        );
+
+        // Account A should have no position
+        let acc_a_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_a", None, None)
+            .unwrap();
+        let acc_a_snap = acc_a_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account A should have a snapshot");
+
+        let pos_a = acc_a_snap.positions.get("AAPL");
+        assert!(
+            pos_a.is_none() || pos_a.unwrap().quantity == dec!(0),
+            "Account A should have 0 AAPL after transfer out"
+        );
+    }
+
+    /// Integration test for transfer chain: A→B→C on the same day.
+    /// Tests that the topological sort handles multi-hop dependencies.
+    #[tokio::test]
+    async fn test_transfer_chain_a_to_b_to_c_same_day() {
+        let base = Arc::new(RwLock::new("USD".to_string()));
+
+        let mut account_repo = MockAccountRepository::new();
+        let acc_a = create_test_account("acc_a", "USD", "Account A");
+        let acc_b = create_test_account("acc_b", "USD", "Account B");
+        let acc_c = create_test_account("acc_c", "USD", "Account C");
+        account_repo.add_account(acc_a.clone());
+        account_repo.add_account(acc_b.clone());
+        account_repo.add_account(acc_c.clone());
+
+        let d1 = NaiveDate::from_ymd_opt(2025, 1, 10).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+
+        // Day 1: Buy 10 AAPL @ $50 in Account A
+        let buy = create_test_activity(
+            "buy1",
+            "acc_a",
+            Some("AAPL"),
+            "BUY",
+            d1,
+            Some(dec!(10)),
+            Some(dec!(50)),
+            Some(dec!(500)),
+            "USD",
+        );
+
+        // Day 2: A→B (grp1), then B→C (grp2), all same day
+        let mut xfer_out_a = create_test_activity(
+            "xo_a",
+            "acc_a",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out_a.source_group_id = Some("grp1".to_string());
+
+        let mut xfer_in_b = create_test_activity(
+            "xi_b",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in_b.source_group_id = Some("grp1".to_string());
+
+        let mut xfer_out_b = create_test_activity(
+            "xo_b",
+            "acc_b",
+            Some("AAPL"),
+            "TRANSFER_OUT",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_out_b.source_group_id = Some("grp2".to_string());
+
+        let mut xfer_in_c = create_test_activity(
+            "xi_c",
+            "acc_c",
+            Some("AAPL"),
+            "TRANSFER_IN",
+            d2,
+            Some(dec!(10)),
+            None,
+            None,
+            "USD",
+        );
+        xfer_in_c.source_group_id = Some("grp2".to_string());
+
+        let activity_repo = Arc::new(MockActivityRepositoryWithData::new(vec![
+            buy, xfer_out_a, xfer_in_b, xfer_out_b, xfer_in_c,
+        ]));
+        let fx = Arc::new(MockFxService::new());
+        let snapshot_repo = Arc::new(MockSnapshotRepository::new());
+        let asset_repo = Arc::new(MockAssetRepository::new());
+
+        let svc = SnapshotService::new(
+            base,
+            Arc::new(account_repo),
+            activity_repo,
+            snapshot_repo.clone(),
+            asset_repo,
+            fx,
+        );
+
+        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+            .await
+            .unwrap();
+
+        // Account C should end up with the original cost basis
+        let acc_c_snaps = snapshot_repo
+            .get_snapshots_by_account("acc_c", None, None)
+            .unwrap();
+        let acc_c_snap = acc_c_snaps
+            .iter()
+            .max_by_key(|s| s.snapshot_date)
+            .expect("Account C should have a snapshot");
+
+        let pos_c = acc_c_snap
+            .positions
+            .get("AAPL")
+            .expect("Account C should have AAPL");
+        assert_eq!(pos_c.quantity, dec!(10));
+        assert_eq!(
+            pos_c.total_cost_basis,
+            dec!(500),
+            "Cost basis must carry through A→B→C chain: 10 * $50 = $500"
         );
     }
 }

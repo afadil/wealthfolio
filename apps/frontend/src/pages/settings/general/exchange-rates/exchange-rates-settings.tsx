@@ -58,6 +58,21 @@ export function ExchangeRatesSettings() {
       accessorKey: "source",
       header: "Source",
       enableHiding: false,
+      cell: ({ row }) => {
+        const source = row.original.source;
+        if (source.startsWith("CUSTOM_SCRAPER:")) {
+          const code = source.slice("CUSTOM_SCRAPER:".length);
+          return <span className="capitalize">{code}</span>;
+        }
+        const names: Record<string, string> = {
+          YAHOO: "Yahoo Finance",
+          ALPHA_VANTAGE: "Alpha Vantage",
+          MANUAL: "Manual",
+          CUSTOM_SCRAPER: "Custom",
+          CUSTOMSCRAPER: "Custom",
+        };
+        return <span>{names[source] ?? source}</span>;
+      },
     },
     {
       accessorKey: "rate",

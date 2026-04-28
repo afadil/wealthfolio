@@ -15,6 +15,11 @@ export interface DateRange {
 
 const ranges = [
   {
+    label: "1D",
+    name: "Last Day",
+    getValue: () => ({ from: subDays(new Date(), 1), to: new Date() }),
+  },
+  {
     label: "1W",
     name: "Last Week",
     getValue: () => ({ from: subDays(new Date(), 7), to: new Date() }),

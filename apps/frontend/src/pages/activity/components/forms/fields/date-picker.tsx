@@ -9,7 +9,7 @@ interface DatePickerProps<TFieldValues extends FieldValues = FieldValues> {
   enableTime?: boolean;
   /** Granularity of time selection: "hour" | "minute" | "second" */
   timeGranularity?: "hour" | "minute" | "second";
-  /** Whether to allow future dates (default: false - future dates not allowed) */
+  /** Whether to allow future dates (default: true for activity forms) */
   allowFutureDates?: boolean;
 }
 
@@ -18,7 +18,7 @@ export function DatePicker<TFieldValues extends FieldValues = FieldValues>({
   label = "Date",
   enableTime = true,
   timeGranularity = "minute",
-  allowFutureDates = false,
+  allowFutureDates = true,
 }: DatePickerProps<TFieldValues>) {
   const { control } = useFormContext<TFieldValues>();
 

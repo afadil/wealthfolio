@@ -44,6 +44,10 @@ vi.mock("../fields", () => ({
     </div>
   ),
   AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
+  SymbolSearch: ({ name, label }: { name: string; label: string }) => (
+    <div data-testid={`symbol-search-${name}`}>{label}</div>
+  ),
+  createValidatedSubmit: vi.fn((_form, handler) => handler),
 }));
 
 // Mock UI components

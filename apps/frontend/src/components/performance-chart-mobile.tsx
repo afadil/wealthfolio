@@ -97,7 +97,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
 
   return (
     <div className="h-full w-full">
-      <ChartContainer config={chartConfig} className="h-full w-full">
+      <ChartContainer config={chartConfig} className="h-full w-full" data-no-swipe-drag>
         <ResponsiveContainer width="100%" height="100%" aspect={undefined}>
           <LineChart data={formattedData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.3} />
@@ -117,7 +117,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
               tickMargin={4}
               domain={[-0.12, "auto"]}
               tick={{ fontSize: 10 }}
-              width={40}
+              width={50}
             />
             <ChartTooltip
               cursor={false}
@@ -138,6 +138,7 @@ export function PerformanceChartMobile({ data }: PerformanceChartMobileProps) {
                 strokeWidth={2}
                 dot={false}
                 name={series.name}
+                isAnimationActive={false}
               />
             ))}
           </LineChart>

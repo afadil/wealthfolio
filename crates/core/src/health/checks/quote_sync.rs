@@ -139,19 +139,15 @@ impl QuoteSyncCheck {
         }
 
         // Categorize by error count severity:
-        //   1-2 failures: might be transient, ignore
-        //   3-5 failures: warning (only if synced before — transient issues)
-        //   6+ failures: error (persistent issue, regardless of sync history)
-        let warning_threshold = 3;
+        //   1-5 failures: warning (visible immediately so health center
+        //     matches the toast notification the user just saw)
+        //   6+ failures: error (persistent issue)
+        let warning_threshold = 1;
         let error_threshold = 6;
 
         let warning_errors: Vec<_> = sync_errors
             .iter()
-            .filter(|e| {
-                e.has_synced_before
-                    && e.error_count >= warning_threshold
-                    && e.error_count < error_threshold
-            })
+            .filter(|e| e.error_count >= warning_threshold && e.error_count < error_threshold)
             .collect();
 
         let persistent_errors: Vec<_> = sync_errors
@@ -345,11 +341,11 @@ mod tests {
     }
 
     #[test]
-    fn test_low_error_count_ignored() {
+    fn test_low_error_count_shows_warning() {
         let check = QuoteSyncCheck::new();
         let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
 
-        // 2 failures - below warning threshold (for assets that have synced before)
+        // 2 failures - should show as warning (matches toast behavior)
         let sync_errors = vec![QuoteSyncErrorInfo {
             asset_id: "SEC:AAPL:XNAS".to_string(),
             symbol: "AAPL".to_string(),
@@ -360,7 +356,8 @@ mod tests {
         }];
 
         let issues = check.analyze(&sync_errors, &ctx);
-        assert!(issues.is_empty());
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Warning);
     }
 
     #[test]
@@ -404,11 +401,12 @@ mod tests {
     }
 
     #[test]
-    fn test_never_synced_low_errors_ignored() {
+    fn test_never_synced_low_errors_shows_warning() {
         let check = QuoteSyncCheck::new();
         let ctx = HealthContext::new(HealthConfig::default(), "USD", 100_000.0);
 
-        // Never synced with low error count — still transient, ignore
+        // Never synced with 1 error — should show as warning so health center
+        // matches the toast notification
         let sync_errors = vec![QuoteSyncErrorInfo {
             asset_id: "SEC:GOOGL:XTSE".to_string(),
             symbol: "GOOGL".to_string(),
@@ -419,10 +417,8 @@ mod tests {
         }];
 
         let issues = check.analyze(&sync_errors, &ctx);
-        assert!(
-            issues.is_empty(),
-            "Low error count never-synced assets should be ignored"
-        );
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].severity, Severity::Warning);
     }
 
     #[test]

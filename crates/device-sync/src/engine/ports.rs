@@ -28,6 +28,9 @@ pub struct SyncCycleResult {
     pub bootstrap_snapshot_id: Option<String>,
     #[serde(default)]
     pub bootstrap_snapshot_seq: Option<i64>,
+    /// Number of outbox events dead-lettered during this cycle (e.g. key version mismatch).
+    #[serde(default)]
+    pub dead_letter_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,6 +184,6 @@ pub trait CredentialStore: Send + Sync {
 pub trait ReadyReconcileStore: Send + Sync {
     async fn get_sync_state(&self) -> Result<SyncState, String>;
     async fn bootstrap_snapshot_if_needed(&self) -> Result<SyncBootstrapResult, String>;
-    async fn run_sync_cycle(&self) -> Result<SyncCycleResult, String>;
+    async fn run_sync_cycle(&self, post_bootstrap: bool) -> Result<SyncCycleResult, String>;
     async fn ensure_background_started(&self) -> Result<bool, String>;
 }

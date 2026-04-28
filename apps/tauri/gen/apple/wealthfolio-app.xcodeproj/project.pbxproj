@@ -68,6 +68,7 @@
 		AFC7346F7035420DB11DE772 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		B1BBCF8202A373998B530E72 /* queue_worker.rs */ = {isa = PBXFileReference; path = queue_worker.rs; sourceTree = "<group>"; };
 		B3B5B182F7455DC93E262A9A /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		B61407380CD4D9E94C77134F /* custom_provider.rs */ = {isa = PBXFileReference; path = custom_provider.rs; sourceTree = "<group>"; };
 		B942261504E85DBE761C2615 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		BE5C5E4A3C29625EE936B56E /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		BF02A56DE9679A42768DBA6C /* platform.rs */ = {isa = PBXFileReference; path = platform.rs; sourceTree = "<group>"; };
@@ -86,6 +87,7 @@
 		F78C9F28C93DBD86DA139B8A /* wealthfolio_connect.rs */ = {isa = PBXFileReference; path = wealthfolio_connect.rs; sourceTree = "<group>"; };
 		FBB7D0A948D1A3473181C27F /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		FBD4DFEFB9F8DD68984795E0 /* menu.rs */ = {isa = PBXFileReference; path = menu.rs; sourceTree = "<group>"; };
+		FDAB7F6241242469E757909A /* fire.rs */ = {isa = PBXFileReference; path = fire.rs; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -241,8 +243,10 @@
 				4E84394A175F80C164B7A005 /* alternative_assets.rs */,
 				00DAAADA0677741AA4F67598 /* asset.rs */,
 				6A09836EB6B6A66CA4EA1A73 /* brokers_sync.rs */,
+				B61407380CD4D9E94C77134F /* custom_provider.rs */,
 				5C172234CFE0FB57611B67C3 /* device_enroll_service.rs */,
 				65F737C8C10DDA3D6F05F89C /* error.rs */,
+				FDAB7F6241242469E757909A /* fire.rs */,
 				E8D27541EADE400FAF9666B2 /* goal.rs */,
 				5B0778423025288BA358523F /* health.rs */,
 				08D57B3EDF6DF4B78A16C449 /* limits.rs */,

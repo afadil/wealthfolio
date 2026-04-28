@@ -2,6 +2,7 @@ import { logger } from "@/adapters";
 import { type ClassValue, clsx } from "clsx";
 import { format, isValid, parse, parseISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
+import { DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION } from "./constants";
 import { AccountValuation } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -175,8 +176,9 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     return { date: "-", time: "-" };
   }
 
-  // Determine the effective timezone: use provided timezone or default to user's local timezone
-  const effectiveTimezone = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Determine the effective timezone: use configured app timezone when valid,
+  // otherwise fall back to the browser timezone.
+  const effectiveTimezone = resolveDisplayTimezone(timezone);
 
   const dateOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -200,6 +202,22 @@ export const formatDateTime = (date: string | Date, timezone?: string) => {
     time: timeFormatter.format(dateObj),
   };
 };
+
+export function resolveDisplayTimezone(timezone?: string | null): string {
+  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const candidate = timezone?.trim();
+  if (!candidate) {
+    return fallback;
+  }
+
+  try {
+    // Validate timezone string before passing it to formatters.
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return fallback;
+  }
+}
 
 /**
  * Formats a date for use with HTML datetime-local input elements.
@@ -229,8 +247,8 @@ export function formatDateTimeDisplay(date: Date | string | undefined): string {
   return format(value, "yyyy/MM/dd HH:mm");
 }
 const DECIMAL_FORMAT_OPTIONS: Intl.NumberFormatOptions = {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+  minimumFractionDigits: DISPLAY_DECIMAL_PRECISION,
+  maximumFractionDigits: DISPLAY_DECIMAL_PRECISION,
 };
 
 const decimalFormatter = new Intl.NumberFormat("en-US", DECIMAL_FORMAT_OPTIONS);
@@ -290,19 +308,20 @@ export function formatAmount(
   if (amount == null) return "-";
   const numericAmount = typeof amount === "string" ? Number(amount) : amount;
   if (!Number.isFinite(numericAmount)) return "-";
+  const displayAmount = Math.abs(numericAmount) < 0.005 ? 0 : numericAmount;
   const rawCurrency = currency ?? "USD";
   const isPenceCurrency = rawCurrency === "GBp" || rawCurrency === "GBX";
 
   if (isPenceCurrency) {
-    const formattedNumber = decimalFormatter.format(numericAmount);
+    const formattedNumber = decimalFormatter.format(displayAmount);
     return displayCurrency ? `${formattedNumber}p` : formattedNumber;
   }
 
   if (!displayCurrency) {
-    return decimalFormatter.format(numericAmount);
+    return decimalFormatter.format(displayAmount);
   }
 
-  return getCurrencyFormatter(rawCurrency).format(numericAmount);
+  return getCurrencyFormatter(rawCurrency).format(displayAmount);
 }
 
 export function formatPercent(value: number | null | undefined) {
@@ -409,7 +428,7 @@ export function calculatePerformanceMetrics(
  * @param precision The number of decimal places (default: 6)
  * @returns The rounded number, or 0 if the value is not finite
  */
-export function roundDecimal(value: number, precision = 6): number {
+export function roundDecimal(value: number, precision = DECIMAL_PRECISION): number {
   if (!Number.isFinite(value)) {
     return 0;
   }
@@ -423,10 +442,22 @@ export function roundDecimal(value: number, precision = 6): number {
  * @param precision The number of decimal places (default: 6)
  * @returns The parsed and rounded number, or 0 if parsing fails
  */
-export function parseDecimalInput(value: string | number, precision = 6): number {
+export function parseDecimalInput(value: string | number, precision = DECIMAL_PRECISION): number {
   const parsed =
     typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : NaN;
   return Number.isFinite(parsed) ? roundDecimal(parsed, precision) : 0;
+}
+
+/**
+ * Parses a YYYY-MM-DD string as a local-timezone Date.
+ * `new Date("2023-07-20")` treats date-only strings as UTC midnight, which
+ * shifts the day back for users west of UTC. This avoids that by splitting
+ * the components and constructing a local Date directly.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [datePart] = dateStr.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 /**
@@ -483,7 +514,7 @@ export function toFiniteNumberOrUndefined(value: unknown): number | undefined {
  * @param precision The number of decimal places (default: 6)
  * @returns A rounded number if valid, undefined otherwise
  */
-export function toPayloadNumber(value: unknown, precision = 6): number | undefined {
+export function toPayloadNumber(value: unknown, precision = DECIMAL_PRECISION): number | undefined {
   const parsed = toFiniteNumberOrUndefined(value);
   if (parsed === undefined) {
     return undefined;

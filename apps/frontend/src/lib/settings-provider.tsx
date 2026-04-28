@@ -10,7 +10,13 @@ interface ExtendedSettingsContextType extends SettingsContextType {
     updates: Partial<
       Pick<
         Settings,
-        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+        | "theme"
+        | "font"
+        | "baseCurrency"
+        | "timezone"
+        | "onboardingCompleted"
+        | "menuBarVisible"
+        | "syncEnabled"
       >
     >,
   ) => Promise<void>;
@@ -36,7 +42,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     updates: Partial<
       Pick<
         Settings,
-        "theme" | "font" | "baseCurrency" | "onboardingCompleted" | "menuBarVisible" | "syncEnabled"
+        | "theme"
+        | "font"
+        | "baseCurrency"
+        | "timezone"
+        | "onboardingCompleted"
+        | "menuBarVisible"
+        | "syncEnabled"
       >
     >,
   ) => {
@@ -123,6 +135,13 @@ const applySettingsToDocument = (newSettings: Settings) => {
   // Font classes
   document.body.classList.remove("font-mono", "font-sans", "font-serif");
   document.body.classList.add(newSettings.font);
+
+  // Cache theme/font in localStorage for pre-auth usage (login screen)
+  try {
+    localStorage.setItem("wealthfolio-theme", newSettings.theme);
+  } catch {
+    // noop – localStorage may be unavailable
+  }
 
   // Always clean up previous listeners before applying a new theme mode
   cleanupSystemThemeListeners();

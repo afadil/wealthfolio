@@ -1,7 +1,7 @@
 import { isCashActivity, isCashTransfer, isIncomeActivity } from "@/lib/activity-utils";
-import { ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
-import { normalizeDecimalString, parseLocalDateTime } from "@/lib/utils";
+import { normalizeDecimalString, parseLocalDateTime, toPayloadNumber } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
   ActivityUpdatePayload,
@@ -17,6 +17,23 @@ import { generateTempActivityId } from "./use-activity-grid-state";
  */
 const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "fxRate"]);
 
+const isTransferActivity = (activityType: string | undefined): boolean => {
+  return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
+};
+
+/** Subtypes where amount = quantity × unitPrice (DRIP, DIVIDEND_IN_KIND, STAKING_REWARD). */
+const isAssetBackedSubtype = (subtype: string | null | undefined): boolean =>
+  subtype === ACTIVITY_SUBTYPES.DRIP ||
+  subtype === ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND ||
+  subtype === ACTIVITY_SUBTYPES.STAKING_REWARD;
+
+const isAlwaysCashActivity = (activityType: string | undefined): boolean => {
+  if (!activityType) {
+    return false;
+  }
+  return isCashActivity(activityType) && !isTransferActivity(activityType);
+};
+
 /**
  * Converts a value to a string for API payloads.
  * Returns null for explicit null (clear), undefined for missing/invalid values.
@@ -27,6 +44,12 @@ function toDecimalString(value: unknown): string | null | undefined {
   if (typeof value === "string" && value.trim() === "") return null;
   const normalized = normalizeDecimalString(value);
   return normalized ?? undefined;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
 }
 
 /**
@@ -77,7 +100,7 @@ export function resolveAssetIdForTransaction(
   _fallbackCurrency: string,
 ): string | undefined {
   // For cash activities, don't return an assetId - backend will generate CASH:{currency}
-  if (isCashActivity(transaction.activityType)) {
+  if (isAlwaysCashActivity(transaction.activityType)) {
     return undefined;
   }
 
@@ -140,7 +163,7 @@ function applyCashDefaults(
   resolveTransactionCurrency: TransactionUpdateParams["resolveTransactionCurrency"],
   fallbackCurrency: string,
 ): LocalTransaction {
-  if (!isCashActivity(transaction.activityType)) {
+  if (!isAlwaysCashActivity(transaction.activityType)) {
     return transaction;
   }
   const derivedCurrency = resolveTransactionCurrency(transaction) ?? fallbackCurrency;
@@ -172,6 +195,21 @@ function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   };
 }
 
+function getAssetBackedAmount(
+  quantity: string | null | undefined,
+  unitPrice: string | null | undefined,
+): string | null {
+  const q = quantity != null ? Number.parseFloat(quantity) : NaN;
+  const p = unitPrice != null ? Number.parseFloat(unitPrice) : NaN;
+
+  if (!(q > 0) || !(p > 0)) {
+    return null;
+  }
+
+  const rounded = toPayloadNumber(q * p);
+  return rounded === undefined ? null : normalizeDecimalString(rounded);
+}
+
 /**
  * Applies an update to a transaction field with proper type handling and side effects
  */
@@ -199,16 +237,30 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
       updated = { ...updated, date: value };
     }
   } else if (field === "quantity") {
-    updated = { ...updated, quantity: normalizedDecimalOrNull(value) };
+    const newQty = normalizedDecimalOrNull(value);
+    updated = { ...updated, quantity: newQty };
+    if (isAssetBackedSubtype(updated.subtype) && newQty != null && updated.unitPrice != null) {
+      const computedAmount = getAssetBackedAmount(newQty, updated.unitPrice);
+      if (computedAmount != null) {
+        updated = { ...updated, amount: computedAmount };
+      }
+    }
     updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
     const newUnitPrice = normalizedDecimalOrNull(value);
     updated = { ...updated, unitPrice: newUnitPrice };
     if (
       newUnitPrice != null &&
-      (isCashActivity(updated.activityType) || isIncomeActivity(updated.activityType))
+      (isAlwaysCashActivity(updated.activityType) || isIncomeActivity(updated.activityType))
     ) {
-      updated = { ...updated, amount: newUnitPrice };
+      if (isAssetBackedSubtype(updated.subtype)) {
+        const computedAmount = getAssetBackedAmount(updated.quantity, newUnitPrice);
+        if (computedAmount != null) {
+          updated = { ...updated, amount: computedAmount };
+        }
+      } else {
+        updated = { ...updated, amount: newUnitPrice };
+      }
     }
     updated = applySplitDefaults(updated);
   } else if (field === "amount") {
@@ -267,11 +319,21 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "fxRate") {
     updated = { ...updated, fxRate: normalizeDecimalString(value) };
   } else if (field === "subtype") {
-    // Subtype is optional, can be string or null/undefined
-    updated = { ...updated, subtype: typeof value === "string" && value ? value : undefined };
+    const newSubtype = typeof value === "string" && value ? value : undefined;
+    updated = { ...updated, subtype: newSubtype };
+    if (isAssetBackedSubtype(newSubtype) && updated.quantity != null && updated.unitPrice != null) {
+      const computedAmount = getAssetBackedAmount(updated.quantity, updated.unitPrice);
+      if (computedAmount != null) {
+        updated = { ...updated, amount: computedAmount };
+      }
+    }
   } else if (field === "isExternal") {
     // isExternal flag for TRANSFER_IN/TRANSFER_OUT (stored in metadata.flow.is_external)
     updated = { ...updated, isExternal: Boolean(value) };
+  } else if (field === "instrumentType") {
+    // Instrument type (EQUITY, OPTION, BOND, etc.) — also set pendingInstrumentType for save payload
+    const instrumentType = typeof value === "string" && value ? value : undefined;
+    updated = { ...updated, instrumentType, pendingInstrumentType: instrumentType };
   }
 
   return { ...updated, updatedAt: new Date() };
@@ -360,26 +422,22 @@ export function buildSavePayload(
       resolveTransactionCurrency(transaction, { includeFallback: false }) ??
       dirtyCurrencyLookup.get(transaction.id);
     const currencyFallback = transaction.accountCurrency ?? fallbackCurrency;
+    const isTransfer =
+      transaction.activityType === ActivityType.TRANSFER_IN ||
+      transaction.activityType === ActivityType.TRANSFER_OUT;
+    const assetSymbol = (transaction.assetSymbol || "").trim();
+    const isCash = isTransfer
+      ? isCashTransfer(transaction.activityType, assetSymbol) || !assetSymbol
+      : isAlwaysCashActivity(transaction.activityType);
     // For assets not in our lookup (new assets), send undefined currency to let the backend
     // derive it from the asset and properly register the FX pair if needed.
     // Only use account currency fallback for cash activities where the currency is deterministic.
-    const currencyForPayload =
-      resolvedCurrency ?? (isCashActivity(transaction.activityType) ? currencyFallback : undefined);
+    const currencyForPayload = resolvedCurrency ?? (isCash ? currencyFallback : undefined);
 
     const isNew = transaction.isNew === true;
 
     // Build metadata JSON if needed (e.g., for isExternal flag on transfers)
     let metadataJson: string | undefined;
-    const isTransfer =
-      transaction.activityType === ActivityType.TRANSFER_IN ||
-      transaction.activityType === ActivityType.TRANSFER_OUT;
-
-    // Determine if this is a "pure cash" activity that doesn't need asset info
-    // Transfers are special: they can be cash OR securities, so check the symbol
-    const assetSymbol = (transaction.assetSymbol || "").trim();
-    const isCash = isTransfer
-      ? isCashTransfer(transaction.activityType, assetSymbol) || !assetSymbol
-      : isCashActivity(transaction.activityType);
     if (isTransfer && transaction.isExternal != null) {
       // Merge with existing metadata if present
       const existingMeta = typeof transaction.metadata === "object" ? transaction.metadata : {};
@@ -431,14 +489,17 @@ export function buildSavePayload(
         // Backend will generate the canonical ID
         const symbol = (transaction.assetSymbol || "").trim().toUpperCase();
         if (symbol) {
-          createPayload.symbol = {
+          const symbolInput = {
             symbol,
-            exchangeMic: transaction.exchangeMic,
-            kind: transaction.pendingAssetKind,
-            name: transaction.pendingAssetName,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            exchangeMic: normalizeOptionalString(transaction.exchangeMic),
+            kind: normalizeOptionalString(transaction.pendingAssetKind),
+            name: normalizeOptionalString(transaction.pendingAssetName),
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
+          };
+          createPayload.symbol = {
+            ...symbolInput,
           };
         }
       }
@@ -456,22 +517,25 @@ export function buildSavePayload(
 
         if (symbolChanged && currentSymbol) {
           // Symbol changed: send symbol + exchangeMic for backend to generate new canonical ID
-          updatePayload.symbol = {
+          const symbolInput = {
             symbol: currentSymbol,
-            exchangeMic: transaction.exchangeMic,
-            kind: transaction.pendingAssetKind,
-            name: transaction.pendingAssetName,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            exchangeMic: normalizeOptionalString(transaction.exchangeMic),
+            kind: normalizeOptionalString(transaction.pendingAssetKind),
+            name: normalizeOptionalString(transaction.pendingAssetName),
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
+          };
+          updatePayload.symbol = {
+            ...symbolInput,
           };
         } else if (transaction._originalAssetId) {
           // Symbol unchanged: send existing asset ID with quoteMode to allow mode updates
           updatePayload.symbol = {
             id: transaction._originalAssetId,
-            quoteMode: transaction.assetQuoteMode,
-            quoteCcy: transaction.pendingQuoteCcy,
-            instrumentType: transaction.pendingInstrumentType,
+            quoteMode: normalizeOptionalString(transaction.assetQuoteMode),
+            quoteCcy: normalizeOptionalString(transaction.pendingQuoteCcy),
+            instrumentType: normalizeOptionalString(transaction.pendingInstrumentType),
           };
         }
       }
@@ -494,6 +558,7 @@ export const TRACKED_FIELDS: (keyof LocalTransaction)[] = [
   "activityType",
   "subtype",
   "isExternal",
+  "instrumentType",
   "date",
   "assetSymbol",
   "quantity",

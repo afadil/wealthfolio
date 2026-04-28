@@ -6,6 +6,7 @@
 //! - sector (Technology, Healthcare) → industries_gics taxonomy
 //! - country (United States, Canada) → regions taxonomy
 
+use crate::assets::assets_model::{AssetKind, InstrumentType};
 use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 use log::{debug, warn};
 use std::sync::Arc;
@@ -22,7 +23,7 @@ use std::sync::Arc;
 /// - DERIVATIVE: OPTION, FUTURE, OTC_DERIVATIVE, CFD
 /// - CASH_FX: CASH, DEPOSIT, FX_POSITION
 /// - DIGITAL_ASSET: CRYPTO_NATIVE, STABLECOIN, TOKENIZED_SECURITY
-fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
+fn map_quote_type_to_instrument_type(quote_type: &str, name: Option<&str>) -> Option<&'static str> {
     match quote_type.to_uppercase().as_str() {
         "EQUITY" => Some("STOCK_COMMON"),
         "ETF" => Some("ETF"),
@@ -30,7 +31,13 @@ fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
         "INDEX" => Some("ETF"), // Index funds are typically ETFs
         "CRYPTOCURRENCY" | "CRYPTO" => Some("CRYPTO_NATIVE"),
         "OPTION" => Some("OPTION"),
-        "BOND" => Some("BOND_CORPORATE"), // Default to corporate, can be refined manually
+        "BOND" => {
+            if name.is_some_and(is_government_bond) {
+                Some("BOND_GOVERNMENT")
+            } else {
+                Some("BOND_CORPORATE")
+            }
+        }
         "MONEYMARKET" => Some("MONEY_MARKET_DEBT"),
         "FUTURE" | "FUTURES" => Some("FUTURE"),
         // ECNQUOTE: Used by Yahoo for some Canadian/international ETFs and securities
@@ -42,6 +49,27 @@ fn map_quote_type_to_instrument_type(quote_type: &str) -> Option<&'static str> {
         // CURRENCY/FOREX not mapped to instrument type (it's an FX rate, not a security)
         _ => None,
     }
+}
+
+/// Detect government/sovereign bonds by name keywords.
+/// Covers US Treasuries, Canadian govt bonds, UK gilts, German bunds,
+/// French OATs, Japanese JGBs, and generic sovereign patterns.
+fn is_government_bond(name: &str) -> bool {
+    let n = name.to_uppercase();
+    // US
+    n.contains("TREASURY") || n.contains("T-BILL") || n.contains("T-NOTE") || n.contains("T-BOND")
+    // Canada
+    || n.contains("GOVT OF CANADA") || n.contains("GOVERNMENT OF CANADA") || n.contains("CANADA GOVT")
+    // UK
+    || n.contains(" GILT")
+    // Germany
+    || n.contains("BUNDESREPUBLIK") || n.contains("BUNDESOBLIGATION")
+    // France
+    || n.contains("OAT ") || n.starts_with("OAT ")
+    // Japan
+    || n.contains("JAPAN GOVT") || n.contains("JAPANESE GOVERNMENT")
+    // Generic
+    || n.contains("SOVEREIGN")
 }
 
 /// Maps Yahoo quote_type to asset_classes taxonomy category ID
@@ -63,6 +91,46 @@ fn map_quote_type_to_asset_class(quote_type: &str) -> Option<&'static str> {
         // NONE: Delisted - skip
         "ECNQUOTE" | "NONE" => None,
         _ => None,
+    }
+}
+
+/// Maps InstrumentType enum to instrument_type taxonomy category ID.
+/// Used at asset creation time when no provider profile is available yet.
+fn map_instrument_type_to_taxonomy_category(
+    instrument_type: &InstrumentType,
+) -> Option<&'static str> {
+    match instrument_type {
+        InstrumentType::Equity => Some("STOCK_COMMON"),
+        InstrumentType::Crypto => Some("CRYPTO_NATIVE"),
+        InstrumentType::Option => Some("OPTION"),
+        InstrumentType::Bond => Some("BOND_CORPORATE"),
+        InstrumentType::Metal => Some("PHYSICAL_METAL"),
+        InstrumentType::Fx => None,
+    }
+}
+
+/// Maps InstrumentType enum to asset_classes taxonomy category ID.
+/// Used at asset creation time when no provider profile is available yet.
+fn map_instrument_type_to_asset_class(instrument_type: &InstrumentType) -> Option<&'static str> {
+    match instrument_type {
+        InstrumentType::Equity => Some("EQUITY"),
+        InstrumentType::Crypto => Some("DIGITAL_ASSETS"),
+        InstrumentType::Option => Some("EQUITY"),
+        InstrumentType::Bond => Some("FIXED_INCOME"),
+        InstrumentType::Metal => Some("COMMODITIES"),
+        InstrumentType::Fx => None,
+    }
+}
+
+/// Maps AssetKind to asset_classes taxonomy category ID.
+/// Covers non-Investment kinds that don't have an InstrumentType.
+fn map_kind_to_asset_class(kind: &AssetKind) -> Option<&'static str> {
+    match kind {
+        AssetKind::Property => Some("REAL_ESTATE"),
+        AssetKind::PreciousMetal => Some("COMMODITIES"),
+        AssetKind::PrivateEquity => Some("ALTERNATIVES"),
+        AssetKind::Vehicle | AssetKind::Collectible | AssetKind::Other => Some("ALTERNATIVES"),
+        AssetKind::Investment | AssetKind::Fx | AssetKind::Liability => None,
     }
 }
 
@@ -219,6 +287,7 @@ pub struct SectorWeight {
 #[derive(Debug, Clone, Default)]
 pub struct ClassificationInput {
     pub quote_type: Option<String>,
+    pub name: Option<String>,
     pub sectors: Vec<SectorWeight>,
     pub country: Option<String>,
 }
@@ -236,6 +305,7 @@ impl ClassificationInput {
     /// - Fallback: `exchange_mic` used to infer fund domicile when provider returns no country
     pub fn from_provider_profile(
         quote_type: Option<&str>,
+        name: Option<&str>,
         sector: Option<&str>,
         sectors_json: Option<&str>,
         country: Option<&str>,
@@ -244,6 +314,7 @@ impl ClassificationInput {
     ) -> Self {
         let mut input = ClassificationInput {
             quote_type: quote_type.map(String::from),
+            name: name.map(String::from),
             ..Default::default()
         };
 
@@ -332,7 +403,9 @@ impl AutoClassificationService {
 
         // 1. Classify instrument type
         if let Some(quote_type) = &input.quote_type {
-            if let Some(category_id) = map_quote_type_to_instrument_type(quote_type) {
+            if let Some(category_id) =
+                map_quote_type_to_instrument_type(quote_type, input.name.as_deref())
+            {
                 match self
                     .assign_to_taxonomy(asset_id, "instrument_type", category_id, 10000)
                     .await
@@ -424,6 +497,48 @@ impl AutoClassificationService {
         Ok(result)
     }
 
+    /// Classify a newly created asset using InstrumentType and AssetKind.
+    /// This is a lightweight classification at creation time, before any provider data is available.
+    /// Only assigns instrument_type and asset_class taxonomies.
+    pub async fn classify_from_spec(
+        &self,
+        asset_id: &str,
+        instrument_type: Option<&InstrumentType>,
+        kind: &AssetKind,
+    ) {
+        // 1. Classify instrument type (only if we have an InstrumentType)
+        if let Some(it) = instrument_type {
+            if let Some(category_id) = map_instrument_type_to_taxonomy_category(it) {
+                if let Err(e) = self
+                    .assign_to_taxonomy(asset_id, "instrument_type", category_id, 10000)
+                    .await
+                {
+                    debug!(
+                        "Initial classification of {} instrument_type failed: {}",
+                        asset_id, e
+                    );
+                }
+            }
+        }
+
+        // 2. Classify asset class — prefer InstrumentType mapping, fall back to AssetKind
+        let asset_class = instrument_type
+            .and_then(map_instrument_type_to_asset_class)
+            .or_else(|| map_kind_to_asset_class(kind));
+
+        if let Some(category_id) = asset_class {
+            if let Err(e) = self
+                .assign_to_taxonomy(asset_id, "asset_classes", category_id, 10000)
+                .await
+            {
+                debug!(
+                    "Initial classification of {} asset_classes failed: {}",
+                    asset_id, e
+                );
+            }
+        }
+    }
+
     /// Helper to assign an asset to a taxonomy category
     async fn assign_to_taxonomy(
         &self,
@@ -466,30 +581,76 @@ mod tests {
     #[test]
     fn test_map_quote_type_to_instrument_type() {
         assert_eq!(
-            map_quote_type_to_instrument_type("EQUITY"),
+            map_quote_type_to_instrument_type("EQUITY", None),
             Some("STOCK_COMMON")
         );
-        assert_eq!(map_quote_type_to_instrument_type("ETF"), Some("ETF"));
+        assert_eq!(map_quote_type_to_instrument_type("ETF", None), Some("ETF"));
         assert_eq!(
-            map_quote_type_to_instrument_type("MUTUALFUND"),
+            map_quote_type_to_instrument_type("MUTUALFUND", None),
             Some("FUND_MUTUAL")
         );
         assert_eq!(
-            map_quote_type_to_instrument_type("CRYPTOCURRENCY"),
+            map_quote_type_to_instrument_type("CRYPTOCURRENCY", None),
             Some("CRYPTO_NATIVE")
         );
+        // Bond without name defaults to corporate
         assert_eq!(
-            map_quote_type_to_instrument_type("BOND"),
+            map_quote_type_to_instrument_type("BOND", None),
+            Some("BOND_CORPORATE")
+        );
+        // Bond with government name
+        assert_eq!(
+            map_quote_type_to_instrument_type("BOND", Some("US TREASURY N/B - T 3.25 05/15/42")),
+            Some("BOND_GOVERNMENT")
+        );
+        assert_eq!(
+            map_quote_type_to_instrument_type("BOND", Some("GOVT OF CANADA 2.75 12/01/48")),
+            Some("BOND_GOVERNMENT")
+        );
+        // Bond with corporate name stays corporate
+        assert_eq!(
+            map_quote_type_to_instrument_type("BOND", Some("APPLE INC 3.0 06/20/27")),
             Some("BOND_CORPORATE")
         );
         assert_eq!(
-            map_quote_type_to_instrument_type("MONEYMARKET"),
+            map_quote_type_to_instrument_type("MONEYMARKET", None),
             Some("MONEY_MARKET_DEBT")
         );
-        assert_eq!(map_quote_type_to_instrument_type("FUTURE"), Some("FUTURE"));
-        assert_eq!(map_quote_type_to_instrument_type("FUTURES"), Some("FUTURE"));
-        assert_eq!(map_quote_type_to_instrument_type("OPTION"), Some("OPTION"));
-        assert_eq!(map_quote_type_to_instrument_type("unknown"), None);
+        assert_eq!(
+            map_quote_type_to_instrument_type("FUTURE", None),
+            Some("FUTURE")
+        );
+        assert_eq!(
+            map_quote_type_to_instrument_type("FUTURES", None),
+            Some("FUTURE")
+        );
+        assert_eq!(
+            map_quote_type_to_instrument_type("OPTION", None),
+            Some("OPTION")
+        );
+        assert_eq!(map_quote_type_to_instrument_type("unknown", None), None);
+    }
+
+    #[test]
+    fn test_is_government_bond() {
+        // US Treasuries
+        assert!(is_government_bond("US TREASURY N/B - T 3.25 05/15/42"));
+        assert!(is_government_bond("US Treasury Bond 2.0 11/15/41"));
+        assert!(is_government_bond("T-BILL 0.0 03/20/25"));
+        // Canada
+        assert!(is_government_bond("GOVT OF CANADA 2.75 12/01/48"));
+        assert!(is_government_bond("Government of Canada Bond 1.5"));
+        // UK
+        assert!(is_government_bond("UK GILT 1.625 10/22/54"));
+        // Germany
+        assert!(is_government_bond(
+            "BUNDESREPUBLIK DEUTSCHLAND 0.0 08/15/30"
+        ));
+        // Generic
+        assert!(is_government_bond("Some Sovereign Bond 3.0"));
+        // Corporate - should NOT match
+        assert!(!is_government_bond("APPLE INC 3.0 06/20/27"));
+        assert!(!is_government_bond("MICROSOFT CORP 2.5 09/15/50"));
     }
 
     #[test]
@@ -560,8 +721,15 @@ mod tests {
     #[test]
     fn test_parse_sectors_json() {
         let json = r#"[{"name":"Technology","weight":0.30},{"name":"Healthcare","weight":0.15}]"#;
-        let input =
-            ClassificationInput::from_provider_profile(None, None, Some(json), None, None, None);
+        let input = ClassificationInput::from_provider_profile(
+            None,
+            None,
+            None,
+            Some(json),
+            None,
+            None,
+            None,
+        );
         assert_eq!(input.sectors.len(), 2);
         assert_eq!(input.sectors[0].name, "Technology");
         assert_eq!(input.sectors[0].weight, 0.30);
@@ -572,6 +740,7 @@ mod tests {
         // For stocks: single sector with 100% weight
         let input = ClassificationInput::from_provider_profile(
             Some("EQUITY"),
+            None, // no name
             Some("Technology"),
             None, // no sectors JSON
             Some("United States"),
@@ -589,6 +758,7 @@ mod tests {
         // For ETFs: no country from provider, use exchange MIC
         let input = ClassificationInput::from_provider_profile(
             Some("ETF"),
+            None,
             None,
             None,
             None,         // no country from provider

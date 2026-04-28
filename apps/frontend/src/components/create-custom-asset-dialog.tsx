@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useSettingsContext } from "@/lib/settings-provider";
+import type { SymbolSearchResult } from "@/lib/types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CurrencyInput } from "@wealthfolio/ui";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import {
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -28,13 +27,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
-import { CurrencyInput } from "@wealthfolio/ui";
-import type { SymbolSearchResult } from "@/lib/types";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-// Simplified asset types for the form (values are InstrumentType)
 const ASSET_TYPE_OPTIONS = [
-  { value: "EQUITY", label: "Security (Stock, ETF, Bond)" },
+  { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
   { value: "CRYPTO", label: "Cryptocurrency" },
+  { value: "BOND", label: "Bond" },
+  { value: "OPTION", label: "Option" },
+  { value: "METAL", label: "Metal (Commodity)" },
   { value: "OTHER", label: "Other" },
 ] as const;
 
@@ -45,7 +47,7 @@ const customAssetSchema = z.object({
     .max(20, "Symbol must be 20 characters or less")
     .transform((val) => val.toUpperCase().trim()),
   name: z.string().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
-  assetType: z.enum(["EQUITY", "CRYPTO", "OTHER"]),
+  assetType: z.enum(["EQUITY", "CRYPTO", "BOND", "OPTION", "METAL", "OTHER"]),
   currency: z.string().min(1, "Currency is required"),
 });
 
@@ -101,7 +103,12 @@ export function CreateCustomAssetDialog({
       longName: values.name,
       shortName: values.name,
       exchange: "MANUAL",
-      quoteType: values.assetType === "CRYPTO" ? "CRYPTOCURRENCY" : "EQUITY",
+      quoteType:
+        values.assetType === "CRYPTO"
+          ? "CRYPTOCURRENCY"
+          : values.assetType === "OTHER"
+            ? "OTHER"
+            : values.assetType,
       index: "MANUAL",
       typeDisplay: "Custom Asset",
       dataSource: "MANUAL",
@@ -123,6 +130,17 @@ export function CreateCustomAssetDialog({
     form.reset();
   };
 
+  const handleCreateClick = () => {
+    void form.handleSubmit(handleSubmit)();
+  };
+
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    if ((e.target as HTMLElement).tagName === "TEXTAREA") return;
+    e.preventDefault();
+    void form.handleSubmit(handleSubmit)();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -135,7 +153,7 @@ export function CreateCustomAssetDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <div className="space-y-4" onKeyDown={handleDialogKeyDown}>
             <FormField
               control={form.control}
               name="symbol"
@@ -214,9 +232,11 @@ export function CreateCustomAssetDialog({
               <Button type="button" variant="outline" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button type="submit">Create Asset</Button>
+              <Button type="button" onClick={handleCreateClick}>
+                Create Asset
+              </Button>
             </DialogFooter>
-          </form>
+          </div>
         </Form>
       </DialogContent>
     </Dialog>

@@ -93,7 +93,13 @@ impl DefaultActivityCompiler {
         dividend_leg.subtype = None; // Clear subtype for calculator
         dividend_leg.quantity = None;
         dividend_leg.unit_price = None;
-        // amount stays as-is for income tracking
+        // if amount is missing, derive from qty * unit_price
+        // if provided, amount stays as-is for income tracking
+        if dividend_leg.amount.is_none() {
+            let qty = activity.quantity.unwrap_or(Decimal::ZERO);
+            let price = activity.unit_price.unwrap_or(Decimal::ZERO);
+            dividend_leg.amount = Some(qty * price);
+        }
 
         // Leg 2: BUY (share acquisition)
         let mut buy_leg = activity.clone();
@@ -331,6 +337,24 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_drip_derives_amount_when_missing() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.activity_type = ACTIVITY_TYPE_DIVIDEND.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_DRIP.to_string());
+        activity.quantity = Some(dec!(5));
+        activity.unit_price = Some(dec!(20));
+        activity.amount = None; // not provided in CSV
+
+        let result = compiler.compile(&activity).unwrap();
+
+        // Dividend leg  amount = qty * price so that it offsets the BUY
+        assert_eq!(result[0].amount, Some(dec!(100)));
+        // BUY leg still has no amount (computed by calculator)
+        assert!(result[1].amount.is_none());
+    }
+
+    #[test]
     fn test_compile_staking_reward_produces_two_legs() {
         let compiler = DefaultActivityCompiler::new();
         let mut activity = create_test_activity();
@@ -359,6 +383,35 @@ mod tests {
         assert!(result[1].subtype.is_none());
         assert_eq!(result[1].quantity, Some(dec!(0.01)));
         assert_eq!(result[1].unit_price, Some(dec!(2000)));
+        assert!(result[1].amount.is_none());
+        assert_eq!(result[1].fee, Some(dec!(0)));
+    }
+
+    #[test]
+    fn test_compile_staking_reward_with_zero_fmv_keeps_buy_quantity() {
+        let compiler = DefaultActivityCompiler::new();
+        let mut activity = create_test_activity();
+        activity.activity_type = ACTIVITY_TYPE_INTEREST.to_string();
+        activity.subtype = Some(ACTIVITY_SUBTYPE_STAKING_REWARD.to_string());
+        activity.asset_id = Some("SOL".to_string());
+        activity.quantity = Some(dec!(0.000000329));
+        activity.unit_price = Some(dec!(0));
+        activity.amount = Some(dec!(0));
+
+        let result = compiler.compile(&activity).unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // INTEREST leg keeps income amount semantics.
+        assert_eq!(result[0].activity_type, ACTIVITY_TYPE_INTEREST);
+        assert_eq!(result[0].amount, Some(dec!(0)));
+        assert!(result[0].quantity.is_none());
+        assert!(result[0].unit_price.is_none());
+
+        // BUY leg preserves quantity even when FMV is zero.
+        assert_eq!(result[1].activity_type, ACTIVITY_TYPE_BUY);
+        assert_eq!(result[1].quantity, Some(dec!(0.000000329)));
+        assert_eq!(result[1].unit_price, Some(dec!(0)));
         assert!(result[1].amount.is_none());
         assert_eq!(result[1].fee, Some(dec!(0)));
     }

@@ -8,11 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@wealthfolio/ui/components/ui/sheet";
-import {
-  INSTRUMENT_TYPE_OPTIONS,
-  HOLDING_CATEGORY_FILTERS,
-  PORTFOLIO_ACCOUNT_ID,
-} from "@/lib/constants";
+import { HOLDING_CATEGORY_FILTERS, PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
 import { Account, HoldingCategoryFilterId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -33,6 +29,7 @@ interface HoldingsMobileFilterSheetProps {
   setShowTotalReturn: (value: boolean) => void;
   categoryFilter?: HoldingCategoryFilterId;
   setCategoryFilter?: (value: HoldingCategoryFilterId) => void;
+  typeOptions?: { value: string; label: string }[];
 }
 
 export const HoldingsMobileFilterSheet = ({
@@ -50,6 +47,7 @@ export const HoldingsMobileFilterSheet = ({
   setShowTotalReturn,
   categoryFilter = "investments",
   setCategoryFilter,
+  typeOptions,
 }: HoldingsMobileFilterSheetProps) => {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
@@ -200,48 +198,50 @@ export const HoldingsMobileFilterSheet = ({
             )}
 
             {/* Asset Type Filter Section */}
-            <div className="space-y-3">
-              <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
-                Asset Type
-              </h4>
-              <div className="overflow-hidden rounded-lg border">
-                <div
-                  className={cn(
-                    "flex cursor-pointer items-center justify-between p-3 text-sm transition-colors",
-                    selectedTypes.length === 0 ? "bg-accent/50 font-medium" : "hover:bg-muted/50",
-                  )}
-                  onClick={() => {
-                    setSelectedTypes([]);
-                    onOpenChange(false);
-                  }}
-                >
-                  <span>All Types</span>
-                  {selectedTypes.length === 0 && <Icons.Check className="text-primary h-4 w-4" />}
-                </div>
-                {INSTRUMENT_TYPE_OPTIONS.map((type) => (
+            {typeOptions && typeOptions.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  Asset Type
+                </h4>
+                <div className="overflow-hidden rounded-lg border">
                   <div
-                    key={type.value}
                     className={cn(
-                      "flex cursor-pointer items-center justify-between border-t p-3 text-sm transition-colors",
-                      selectedTypes.includes(type.value)
-                        ? "bg-accent/50 font-medium"
-                        : "hover:bg-muted/50",
+                      "flex cursor-pointer items-center justify-between p-3 text-sm transition-colors",
+                      selectedTypes.length === 0 ? "bg-accent/50 font-medium" : "hover:bg-muted/50",
                     )}
                     onClick={() => {
-                      const newTypes = selectedTypes.includes(type.value)
-                        ? selectedTypes.filter((t) => t !== type.value)
-                        : [...selectedTypes, type.value];
-                      setSelectedTypes(newTypes);
+                      setSelectedTypes([]);
+                      onOpenChange(false);
                     }}
                   >
-                    <span>{type.label}</span>
-                    {selectedTypes.includes(type.value) && (
-                      <Icons.Check className="text-primary h-4 w-4" />
-                    )}
+                    <span>All Types</span>
+                    {selectedTypes.length === 0 && <Icons.Check className="text-primary h-4 w-4" />}
                   </div>
-                ))}
+                  {typeOptions.map((type) => (
+                    <div
+                      key={type.value}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between border-t p-3 text-sm transition-colors",
+                        selectedTypes.includes(type.value)
+                          ? "bg-accent/50 font-medium"
+                          : "hover:bg-muted/50",
+                      )}
+                      onClick={() => {
+                        const newTypes = selectedTypes.includes(type.value)
+                          ? selectedTypes.filter((t) => t !== type.value)
+                          : [...selectedTypes, type.value];
+                        setSelectedTypes(newTypes);
+                      }}
+                    >
+                      <span>{type.label}</span>
+                      {selectedTypes.includes(type.value) && (
+                        <Icons.Check className="text-primary h-4 w-4" />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </ScrollArea>
         <SheetFooter className="mt-auto">

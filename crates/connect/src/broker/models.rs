@@ -422,6 +422,9 @@ pub struct SyncActivitiesResponse {
     pub activities_upserted: usize,
     pub assets_inserted: usize,
     pub accounts_failed: usize,
+    /// Accounts with soft warnings (e.g., reference-only activity sync issues).
+    #[serde(default)]
+    pub accounts_warned: usize,
     /// IDs of newly created assets (for background enrichment)
     #[serde(default)]
     pub new_asset_ids: Vec<String>,
@@ -455,6 +458,16 @@ pub struct HoldingsSymbolType {
     pub description: Option<String>,
 }
 
+/// Exchange information from the holdings API.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsExchange {
+    pub id: Option<String>,
+    pub code: Option<String>,
+    pub mic_code: Option<String>,
+    pub name: Option<String>,
+    pub suffix: Option<String>,
+}
+
 /// Inner symbol information.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HoldingsInnerSymbol {
@@ -466,6 +479,7 @@ pub struct HoldingsInnerSymbol {
     pub currency: Option<HoldingsCurrency>,
     #[serde(rename = "type")]
     pub symbol_type: Option<HoldingsSymbolType>,
+    pub exchange: Option<HoldingsExchange>,
 }
 
 /// Symbol wrapper from the holdings API.
@@ -511,13 +525,38 @@ pub struct HoldingsOptionSymbol {
 }
 
 /// An option position from the holdings API.
+///
+/// The API provides option contract details in both `option_symbol` (recommended)
+/// and nested inside the deprecated `symbol.option_symbol` wrapper.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HoldingsOptionPosition {
-    pub symbol: Option<HoldingsOptionSymbol>,
+    /// Top-level option contract details (recommended field).
+    pub option_symbol: Option<HoldingsOptionSymbol>,
+    /// Deprecated account-scoped wrapper (contains `option_symbol` nested inside).
+    pub symbol: Option<HoldingsOptionSymbolWrapper>,
     pub units: Option<f64>,
     pub price: Option<f64>,
     pub average_purchase_price: Option<f64>,
     pub currency: Option<HoldingsCurrency>,
+}
+
+/// Deprecated wrapper around option symbol from the holdings API.
+/// Contains the actual `HoldingsOptionSymbol` nested inside.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HoldingsOptionSymbolWrapper {
+    pub option_symbol: Option<HoldingsOptionSymbol>,
+    pub id: Option<String>,
+    pub description: Option<String>,
+}
+
+impl HoldingsOptionPosition {
+    /// Returns the option symbol, preferring the top-level `option_symbol` field
+    /// and falling back to the deprecated `symbol.option_symbol` wrapper.
+    pub fn resolved_option_symbol(&self) -> Option<&HoldingsOptionSymbol> {
+        self.option_symbol
+            .as_ref()
+            .or_else(|| self.symbol.as_ref().and_then(|s| s.option_symbol.as_ref()))
+    }
 }
 
 /// Account info from holdings response.

@@ -45,11 +45,12 @@ pub enum AssetKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum InstrumentType {
-    Equity, // Stocks, ETFs, bonds, funds, commodity ETFs
+    Equity, // Stocks, ETFs, funds
     Crypto, // Cryptocurrencies
     Fx,     // Currency exchange rates
     Option, // Options contracts
     Metal,  // Precious metal spot prices (XAU, XAG)
+    Bond,   // Fixed-income instruments (bonds, T-bills, notes)
 }
 
 /// How the asset is priced/quoted
@@ -80,6 +81,7 @@ impl InstrumentType {
             InstrumentType::Fx => "FX",
             InstrumentType::Option => "OPTION",
             InstrumentType::Metal => "METAL",
+            InstrumentType::Bond => "BOND",
         }
     }
 
@@ -91,6 +93,23 @@ impl InstrumentType {
             "FX" => Some(InstrumentType::Fx),
             "OPTION" => Some(InstrumentType::Option),
             "METAL" => Some(InstrumentType::Metal),
+            "BOND" => Some(InstrumentType::Bond),
+            _ => None,
+        }
+    }
+
+    /// Parses provider/UI instrument labels into the canonical instrument type.
+    pub fn from_external_str(s: &str) -> Option<Self> {
+        match s.trim().to_uppercase().as_str() {
+            "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "MUTUAL_FUND" | "MUTUAL FUND" | "INDEX"
+            | "FUTURE" | "FUTURES" => Some(InstrumentType::Equity),
+            "CRYPTO" | "CRYPTOCURRENCY" => Some(InstrumentType::Crypto),
+            "FX" | "FOREX" | "CURRENCY" => Some(InstrumentType::Fx),
+            "OPTION" => Some(InstrumentType::Option),
+            "METAL" | "COMMODITY" => Some(InstrumentType::Metal),
+            "BOND" | "FIXEDINCOME" | "FIXED_INCOME" | "DEBT" | "MONEYMARKET" => {
+                Some(InstrumentType::Bond)
+            }
             _ => None,
         }
     }
@@ -106,6 +125,79 @@ pub struct OptionSpec {
     pub strike: Decimal,
     pub multiplier: Decimal,
     pub occ_symbol: Option<String>,
+}
+
+/// Bond specification stored in Asset.metadata["bond"]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BondSpec {
+    pub maturity_date: Option<chrono::NaiveDate>,
+    pub coupon_rate: Option<Decimal>, // Annual coupon rate (e.g., 0.04375 = 4.375%)
+    pub face_value: Option<Decimal>,  // Par value per bond (typically 1000.0)
+    pub coupon_frequency: Option<String>, // ANNUAL, SEMI_ANNUAL, QUARTERLY, MONTHLY
+    pub isin: Option<String>,
+}
+
+/// Builds structured asset metadata (OptionSpec, BondSpec) for the given instrument type.
+///
+/// Returns `Some(Value)` when the instrument type is Option or Bond and metadata
+/// can be constructed from the symbol. Returns `None` for other types or unparseable symbols.
+///
+/// For options, uses the standard contract multiplier of 100. Callers that need
+/// a different multiplier (e.g. mini options) should build the metadata directly
+/// and pass it via `AssetSpec.metadata`.
+pub fn build_asset_metadata(
+    instrument_type: Option<&InstrumentType>,
+    symbol: &str,
+) -> Option<serde_json::Value> {
+    match instrument_type? {
+        InstrumentType::Option => {
+            let parsed = crate::utils::occ_symbol::parse_occ_symbol(symbol).ok()?;
+            let spec = OptionSpec {
+                underlying_asset_id: parsed.underlying.clone(),
+                expiration: parsed.expiration,
+                right: parsed.option_type.as_str().to_string(),
+                strike: parsed.strike_price,
+                multiplier: Decimal::from(100),
+                occ_symbol: Some(parsed.to_occ_symbol()),
+            };
+            Some(serde_json::json!({ "option": spec }))
+        }
+        InstrumentType::Bond => {
+            // For US Treasury bills (CUSIP prefix 912797), set zero coupon.
+            // Other bonds get None and rely on user/provider to fill in.
+            let is_tbill = symbol.starts_with("US912797") || symbol.starts_with("912797");
+            let spec = BondSpec {
+                isin: Some(symbol.to_uppercase()),
+                coupon_rate: if is_tbill { Some(Decimal::ZERO) } else { None },
+                coupon_frequency: if is_tbill {
+                    Some("ZERO".to_string())
+                } else {
+                    None
+                },
+                ..Default::default()
+            };
+            Some(serde_json::json!({ "bond": spec }))
+        }
+        _ => None,
+    }
+}
+
+/// Builds option metadata with a specific contract multiplier.
+///
+/// Used by broker sync when the API provides `is_mini_option` to override
+/// the standard 100 multiplier.
+pub fn build_option_metadata(symbol: &str, multiplier: Decimal) -> Option<serde_json::Value> {
+    let parsed = crate::utils::occ_symbol::parse_occ_symbol(symbol).ok()?;
+    let spec = OptionSpec {
+        underlying_asset_id: parsed.underlying.clone(),
+        expiration: parsed.expiration,
+        right: parsed.option_type.as_str().to_string(),
+        strike: parsed.strike_price,
+        multiplier,
+        occ_symbol: Some(parsed.to_occ_symbol()),
+    };
+    Some(serde_json::json!({ "option": spec }))
 }
 
 /// Domain model representing an asset in the system.
@@ -265,14 +357,55 @@ impl Asset {
         self.kind.is_liability()
     }
 
+    /// Returns true if this asset is an options contract.
+    pub fn is_option(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Option)
+    }
+
+    /// Returns true if this asset is a bond / fixed-income instrument.
+    pub fn is_bond(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Bond)
+    }
+
+    /// Returns true if this asset is a precious metal.
+    pub fn is_metal(&self) -> bool {
+        self.instrument_type == Some(InstrumentType::Metal)
+    }
+
+    /// Returns the contract multiplier for this asset.
+    ///
+    /// For options, this is the number of shares per contract (typically 100).
+    /// For all other instruments it is 1.
+    pub fn contract_multiplier(&self) -> Decimal {
+        if let Some(spec) = self.option_spec() {
+            spec.multiplier
+        } else if self.is_option() {
+            // Option without metadata — default to standard 100 multiplier
+            Decimal::from(100)
+        } else {
+            Decimal::ONE
+        }
+    }
+
     /// Get option metadata if this is an option (instrument_type = OPTION)
     pub fn option_spec(&self) -> Option<OptionSpec> {
-        if self.instrument_type.as_ref() != Some(&InstrumentType::Option) {
+        if !self.is_option() {
             return None;
         }
         self.metadata
             .as_ref()
             .and_then(|m| m.get("option"))
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    /// Get bond metadata if this is a bond (instrument_type = BOND)
+    pub fn bond_spec(&self) -> Option<BondSpec> {
+        if !self.is_bond() {
+            return None;
+        }
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("bond"))
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 
@@ -302,7 +435,18 @@ impl Asset {
                 code: Arc::from(symbol.as_str()),
                 quote: Cow::Owned(self.quote_ccy.clone()),
             }),
-            InstrumentType::Option => None, // Options not resolvable to market data yet
+            InstrumentType::Option => {
+                // OCC symbol is stored as instrument_symbol
+                Some(InstrumentId::Option {
+                    occ_symbol: Arc::from(symbol.as_str()),
+                })
+            }
+            InstrumentType::Bond => {
+                // ISIN is stored as instrument_symbol
+                Some(InstrumentId::Bond {
+                    isin: Arc::from(symbol.as_str()),
+                })
+            }
         }
     }
 
@@ -460,6 +604,11 @@ impl NewAsset {
                     }
                 }
             }))
+        } else if let Some(custom_code) = provider.strip_prefix("CUSTOM_SCRAPER:") {
+            Some(serde_json::json!({
+                "preferred_provider": "CUSTOM_SCRAPER",
+                "custom_provider_code": custom_code
+            }))
         } else {
             Some(serde_json::json!({ "preferred_provider": provider }))
         };
@@ -476,6 +625,58 @@ impl NewAsset {
             instrument_exchange_mic: None,
             provider_config,
             notes: None,
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new option contract asset from an OptionSpec.
+    ///
+    /// The OCC symbol is used as `instrument_symbol`.
+    /// Metadata stores the full OptionSpec under the "option" key.
+    pub fn new_option_contract(spec: &OptionSpec, currency: &str) -> Self {
+        let occ = spec.occ_symbol.clone().unwrap_or_else(|| {
+            // Build from components if OCC symbol not provided
+            spec.underlying_asset_id.clone()
+        });
+        let name = format!(
+            "{} {} ${} {}",
+            spec.underlying_asset_id,
+            spec.right,
+            spec.strike,
+            spec.expiration.format("%Y-%m-%d")
+        );
+
+        Self {
+            kind: AssetKind::Investment,
+            name: Some(name.clone()),
+            display_code: Some(occ.clone()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Option),
+            instrument_symbol: Some(occ),
+            metadata: Some(serde_json::json!({ "option": spec })),
+            is_active: true,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new bond asset from a BondSpec and ISIN.
+    ///
+    /// Bonds use Market quote mode — prices are fetched via the
+    /// US_TREASURY_CALC or BOERSE_FRANKFURT providers.
+    pub fn new_bond(isin: &str, name: Option<String>, spec: BondSpec, currency: &str) -> Self {
+        let display = name.clone().unwrap_or_else(|| isin.to_uppercase());
+
+        Self {
+            kind: AssetKind::Investment,
+            name,
+            display_code: Some(display),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: currency.to_uppercase(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some(isin.to_uppercase()),
+            metadata: Some(serde_json::json!({ "bond": spec })),
             is_active: true,
             ..Default::default()
         }
@@ -578,8 +779,10 @@ pub struct AssetMetadata {
     pub instrument_symbol: Option<String>,
     pub instrument_type: Option<InstrumentType>,
     pub display_code: Option<String>,
-    /// Explicit quote currency hint provided by caller/search/provider (e.g. "GBp").
-    pub quote_ccy_hint: Option<String>,
+    /// Input quote currency provided by caller/search/provider (e.g. "GBp").
+    pub requested_quote_ccy: Option<String>,
+    /// Structured metadata (e.g. OptionSpec under "option", BondSpec under "bond").
+    pub asset_metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -592,7 +795,7 @@ pub struct CanonicalMarketIdentity {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuoteCcyResolutionSource {
-    ExplicitHint,
+    ExplicitInput,
     ExistingAsset,
     ProviderQuote,
     MicFallback,
@@ -628,14 +831,14 @@ pub fn normalize_quote_ccy_code(value: Option<&str>) -> Option<String> {
 }
 
 pub fn resolve_quote_ccy_precedence(
-    explicit_hint: Option<&str>,
+    explicit_quote_ccy: Option<&str>,
     existing_asset_quote_ccy: Option<&str>,
     provider_quote_ccy: Option<&str>,
     mic_fallback_quote_ccy: Option<&str>,
     terminal_fallback_quote_ccy: Option<&str>,
 ) -> Option<(String, QuoteCcyResolutionSource)> {
-    if let Some(ccy) = normalize_quote_ccy(explicit_hint) {
-        return Some((ccy, QuoteCcyResolutionSource::ExplicitHint));
+    if let Some(ccy) = normalize_quote_ccy(explicit_quote_ccy) {
+        return Some((ccy, QuoteCcyResolutionSource::ExplicitInput));
     }
     if let Some(ccy) = normalize_quote_ccy(existing_asset_quote_ccy) {
         return Some((ccy, QuoteCcyResolutionSource::ExistingAsset));
@@ -751,6 +954,32 @@ pub fn canonicalize_market_identity(
                 quote_ccy: normalized_quote,
             }
         }
+        Some(InstrumentType::Bond) => {
+            // Bonds use ISIN as symbol (uppercase, no exchange suffix)
+            if let Some(raw) = instrument_symbol.as_deref() {
+                let upper = raw.to_uppercase();
+                // Auto-convert 9-char CUSIPs to 12-char ISINs for proper
+                // provider routing (US_TREASURY_CALC, BOERSE_FRANKFURT).
+                // Country code comes from the search result's currency (set by
+                // the provider, e.g. OpenFIGI's securityType → "USD").
+                instrument_symbol = Some(if crate::utils::cusip::looks_like_cusip(&upper) {
+                    let country = match normalized_quote.as_deref() {
+                        Some("CAD") => "CA",
+                        Some("BMD") => "BM",
+                        _ => "US",
+                    };
+                    crate::utils::cusip::cusip_to_isin(&upper, country)
+                } else {
+                    upper
+                });
+            }
+            CanonicalMarketIdentity {
+                display_code: instrument_symbol.clone(),
+                instrument_symbol,
+                instrument_exchange_mic: None,
+                quote_ccy: normalized_quote,
+            }
+        }
         None => CanonicalMarketIdentity {
             display_code: normalize_opt(symbol),
             instrument_symbol: normalize_opt(symbol),
@@ -783,14 +1012,28 @@ pub struct AssetSpec {
     pub instrument_type: Option<InstrumentType>,
     /// Currency for quotes/valuations
     pub quote_ccy: String,
-    /// Explicit quote currency hint from caller/search/provider (strong evidence for repair).
-    pub quote_ccy_hint: Option<String>,
+    /// Input quote currency from caller/search/provider.
+    pub requested_quote_ccy: Option<String>,
     /// Asset kind
     pub kind: AssetKind,
     /// Optional quote mode override
     pub quote_mode: Option<QuoteMode>,
     /// User-provided name
     pub name: Option<String>,
+    /// Pre-built asset metadata (e.g. OptionSpec with custom multiplier).
+    /// When set, `new_asset_from_spec` uses this instead of calling `build_asset_metadata`.
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl AssetSpec {
+    /// Extracts the option contract multiplier from pre-built metadata, if present.
+    /// Handles both numeric (serde-float) and string serialization of Decimal.
+    pub fn option_multiplier(&self) -> Option<Decimal> {
+        let v = self.metadata.as_ref()?.get("option")?.get("multiplier")?;
+        v.as_f64()
+            .and_then(Decimal::from_f64_retain)
+            .or_else(|| v.as_str().and_then(|s| s.parse::<Decimal>().ok()))
+    }
 }
 
 impl AssetSpec {
@@ -842,4 +1085,135 @@ pub struct EnsureAssetsResult {
     pub created_ids: Vec<String>,
     /// Merge candidates: (resolved_id, unknown_id) pairs where UNKNOWN was merged into resolved
     pub merge_candidates: Vec<(String, String)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_build_asset_metadata_tbill_isin() {
+        let meta = build_asset_metadata(Some(&InstrumentType::Bond), "US912797NQ65");
+        let meta = meta.expect("T-bill should produce metadata");
+        let bond: BondSpec = serde_json::from_value(meta.get("bond").cloned().unwrap()).unwrap();
+
+        // T-bill (912797 prefix) should get zero coupon
+        assert_eq!(
+            bond.coupon_rate,
+            Some(dec!(0)),
+            "T-bill coupon_rate should be 0"
+        );
+        assert_eq!(
+            bond.coupon_frequency.as_deref(),
+            Some("ZERO"),
+            "T-bill coupon_frequency should be ZERO"
+        );
+        assert_eq!(
+            bond.isin.as_deref(),
+            Some("US912797NQ65"),
+            "ISIN should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_build_asset_metadata_corporate_bond_isin() {
+        let meta = build_asset_metadata(Some(&InstrumentType::Bond), "US00507VAJ89");
+        let meta = meta.expect("Corporate bond should produce metadata");
+        let bond: BondSpec = serde_json::from_value(meta.get("bond").cloned().unwrap()).unwrap();
+
+        // Non-T-bill bond: coupon_rate and coupon_frequency should be None
+        assert_eq!(
+            bond.coupon_rate, None,
+            "Corporate bond coupon_rate should be None"
+        );
+        assert_eq!(
+            bond.coupon_frequency, None,
+            "Corporate bond coupon_frequency should be None"
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_to_isin() {
+        // 9-char CUSIP for a bond should be converted to 12-char ISIN
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797NQ6"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym.len(), 12, "CUSIP should be converted to 12-char ISIN");
+        assert!(
+            sym.starts_with("US"),
+            "ISIN should start with US country code"
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_isin_passthrough() {
+        // 12-char ISIN for a bond should pass through unchanged
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("US912797NQ65"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym, "US912797NQ65", "ISIN should pass through unchanged");
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_to_isin_canadian() {
+        // Canadian bond CUSIP should produce a CA-prefixed ISIN
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("135087D26"),
+            None,
+            Some("CAD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert_eq!(sym.len(), 12, "CUSIP should be converted to 12-char ISIN");
+        assert!(
+            sym.starts_with("CA"),
+            "Canadian bond ISIN should start with CA, got {}",
+            sym
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_cusip_defaults_to_us() {
+        // When no currency is provided, CUSIP should default to US
+        let result =
+            canonicalize_market_identity(Some(InstrumentType::Bond), Some("912797NQ6"), None, None);
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert!(
+            sym.starts_with("US"),
+            "CUSIP with no currency should default to US, got {}",
+            sym
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_market_identity_us_treasury_with_usd_currency() {
+        // When the search provider sets currency to USD (from securityType),
+        // US Treasury CUSIPs get the correct US prefix.
+        let result = canonicalize_market_identity(
+            Some(InstrumentType::Bond),
+            Some("912797TR8"),
+            None,
+            Some("USD"),
+        );
+
+        let sym = result.instrument_symbol.expect("should have symbol");
+        assert!(
+            sym.starts_with("US"),
+            "US Treasury CUSIP with USD currency should get US prefix, got {}",
+            sym
+        );
+    }
 }

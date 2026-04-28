@@ -2709,7 +2709,7 @@ export function SymbolCell<TData>({
       <Popover open={isEditing && !disabled} onOpenChange={onOpenChange}>
         <PopoverAnchor asChild>
           <span data-slot="grid-cell-content" className={cn(!value && "text-muted-foreground")}>
-            {disabled ? value || "—" : value || "TICKER"}
+            {disabled ? value || "—" : value}
             {value && displayContext ? (
               <span className="text-muted-foreground ml-1 text-xs">({displayContext})</span>
             ) : null}

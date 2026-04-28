@@ -21,25 +21,37 @@
         }
       ],
       "models": {
+        "gemma4:e4b": {
+          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        },
+        "qwen3.5:9b": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
         "gpt-oss:20b": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
         "ministral-3": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "gemma3:4b": {
-          "capabilities": { "tools": false, "thinking": false, "vision": false }
-        },
-        "qwen3-vl:8b": {
-          "capabilities": { "tools": true, "thinking": true, "vision": true }
-        },
         "deepseek-r1:8b": {
           "capabilities": { "tools": false, "thinking": true, "vision": false }
         }
       },
-      "defaultModel": "ministral-3",
-      "titleModelId": "ministral-3",
-      "documentationUrl": "https://ollama.ai/docs"
+      "defaultModel": "gemma4:e4b",
+      "titleModelId": "gemma4:e4b",
+      "documentationUrl": "https://ollama.ai/docs",
+      "tuning": {
+        "temperature": 0.2,
+        "maxTokens": 16384,
+        "extraOptions": {
+          "num_ctx": 16384,
+          "repeat_penalty": 1.1,
+          "repeat_last_n": 64,
+          "top_k": 40,
+          "top_p": 0.9,
+          "min_p": 0.0
+        }
+      }
     },
     "groq": {
       "name": "Groq",
@@ -80,8 +92,12 @@
         }
       },
       "defaultModel": "openai/gpt-oss-120b",
-      "titleModelId": "groq/compound-mini",
-      "documentationUrl": "https://console.groq.com/docs"
+      "titleModelId": "groq/compound",
+      "documentationUrl": "https://console.groq.com/docs",
+      "tuning": {
+        "temperature": 0.2,
+        "maxTokens": 16384
+      }
     },
     "google": {
       "name": "Google AI",
@@ -122,8 +138,20 @@
         }
       },
       "defaultModel": "gemini-2.5-flash",
-      "titleModelId": "gemini-2.5-flash-lite",
-      "documentationUrl": "https://ai.google.dev/docs"
+      "titleModelId": "gemini-2.5-flash",
+      "documentationUrl": "https://ai.google.dev/docs",
+      "tuning": {
+        "temperature": 0.2,
+        "maxTokens": 16384,
+        "extraOptions": {
+          "safetySettings": [
+            { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH" },
+            { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH" },
+            { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH" },
+            { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH" }
+          ]
+        }
+      }
     },
     "anthropic": {
       "name": "Anthropic",
@@ -153,19 +181,27 @@
         }
       ],
       "models": {
-        "claude-sonnet-4-5-20250929": {
+        "claude-sonnet-4-6": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
         "claude-haiku-4-5-20251001": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "claude-opus-4-5-20251101": {
+        "claude-opus-4-6": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         }
       },
-      "defaultModel": "claude-sonnet-4-5-20250929",
+      "defaultModel": "claude-sonnet-4-6",
       "titleModelId": "claude-haiku-4-5-20251001",
-      "documentationUrl": "https://docs.anthropic.com/en/api/getting-started"
+      "documentationUrl": "https://docs.anthropic.com/en/api/getting-started",
+      "tuning": {
+        "maxTokens": 16384,
+        "maxTokensThinking": 32000,
+        "extraOptions": {
+          "top_p": 1.0,
+          "top_k": 0
+        }
+      }
     },
     "openai": {
       "name": "OpenAI",
@@ -195,22 +231,23 @@
         }
       ],
       "models": {
-        "gpt-5.2": {
+        "gpt-5.4": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
-        "gpt-5": {
-          "capabilities": { "tools": true, "thinking": true, "vision": true }
-        },
-        "gpt-5-mini": {
+        "gpt-5.4-mini": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "gpt-5-nano": {
+        "gpt-5.4-nano": {
           "capabilities": { "tools": true, "thinking": false, "vision": false }
         }
       },
-      "defaultModel": "gpt-5-mini",
-      "titleModelId": "gpt-5-nano",
-      "documentationUrl": "https://platform.openai.com/docs/introduction"
+      "defaultModel": "gpt-5.4-mini",
+      "titleModelId": "gpt-5.4-nano",
+      "documentationUrl": "https://platform.openai.com/docs/introduction",
+      "tuning": {
+        "temperature": 0.2,
+        "maxTokens": 16384
+      }
     },
     "openrouter": {
       "name": "OpenRouter",
@@ -249,13 +286,17 @@
         "openai/gpt-oss-120b:free": {
           "capabilities": { "tools": true, "thinking": false, "vision": true }
         },
-        "google/gemma-3-27b-it:free": {
+        "google/gemma-4-26b-a4b-it:free": {
           "capabilities": { "tools": false, "thinking": false, "vision": false }
         }
       },
       "defaultModel": "openrouter/free",
       "titleModelId": "openrouter/free",
-      "documentationUrl": "https://openrouter.ai/docs"
+      "documentationUrl": "https://openrouter.ai/docs",
+      "tuning": {
+        "temperature": 0.2,
+        "maxTokens": 16384
+      }
     }
   },
   "capabilities": {

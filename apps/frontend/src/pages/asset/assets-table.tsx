@@ -27,6 +27,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
 import { ASSET_KIND_DISPLAY_NAMES, LatestQuoteSnapshot } from "@/lib/types";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { formatAmount, formatDate } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { isStaleQuote, ParsedAsset } from "./asset-utils";
@@ -34,6 +35,7 @@ import { isStaleQuote, ParsedAsset } from "./asset-utils";
 interface AssetsTableProps {
   assets: ParsedAsset[];
   latestQuotes?: Record<string, LatestQuoteSnapshot>;
+  heldAssetIds: Set<string>;
   isLoading?: boolean;
   onEdit: (asset: ParsedAsset) => void;
   onDelete: (asset: ParsedAsset) => void;
@@ -48,9 +50,15 @@ const PRICE_STALE_OPTIONS = [
   { label: "Stale", value: "true" },
 ];
 
+const HOLDING_STATUS_OPTIONS = [
+  { label: "Current", value: "true" },
+  { label: "Past", value: "false" },
+];
+
 export function AssetsTable({
   assets,
   latestQuotes = {},
+  heldAssetIds,
   isLoading,
   onEdit,
   onDelete,
@@ -73,20 +81,33 @@ export function AssetsTable({
         maxSize: 260,
         cell: ({ row }) => {
           const asset = row.original;
-          const displaySymbol = asset.displayCode ?? asset.name ?? "Unknown";
+          const rawSymbol = asset.displayCode ?? "";
+          const parsedOption = parseOccSymbol(rawSymbol);
+          const displaySymbol = parsedOption
+            ? parsedOption.underlying
+            : (asset.displayCode ?? asset.name ?? "Unknown");
+          const subtitle = parsedOption
+            ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+            : (asset.name ?? "—");
+          const avatarSymbol = parsedOption ? parsedOption.underlying : rawSymbol;
           return (
             <button
               type="button"
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
-              <TickerAvatar symbol={asset.displayCode ?? ""} className="h-8 w-8 shrink-0" />
+              <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="group-hover:text-primary font-semibold leading-tight transition-colors">
+                <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}
+                  {parsedOption ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Option
+                    </Badge>
+                  ) : null}
                 </div>
                 <div className="text-muted-foreground line-clamp-2 text-xs leading-tight">
-                  {asset.name ?? "—"}
+                  {subtitle}
                 </div>
               </div>
             </button>
@@ -153,6 +174,17 @@ export function AssetsTable({
       },
       {
         accessorKey: "isStale",
+        header: () => null,
+        cell: () => null,
+        enableHiding: false,
+        filterFn: (row, id, value) => {
+          const filterValue = value as string[];
+          const cellValue = row.getValue(id);
+          return filterValue.includes(cellValue as string);
+        },
+      },
+      {
+        accessorKey: "holdingStatus",
         header: () => null,
         cell: () => null,
         enableHiding: false,
@@ -240,7 +272,7 @@ export function AssetsTable({
                     onClick={() => onRefetchQuotes(asset)}
                     disabled={isRefetchingQuotes}
                   >
-                    Refetch quotes
+                    Refetch price history
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -289,6 +321,11 @@ export function AssetsTable({
   const filters: DataTableFacetedFilterProps<ParsedAsset, unknown>[] = useMemo(
     () => [
       {
+        id: "holdingStatus",
+        title: "Portfolio",
+        options: HOLDING_STATUS_OPTIONS,
+      },
+      {
         id: "kind",
         title: "Kind",
         options: kindOptions,
@@ -313,8 +350,9 @@ export function AssetsTable({
       assets.map((asset) => ({
         ...asset,
         isStale: isStaleQuote(latestQuotes[asset.id], asset) ? "true" : "false",
+        holdingStatus: heldAssetIds.has(asset.id) ? "true" : "false",
       })),
-    [assets, latestQuotes],
+    [assets, latestQuotes, heldAssetIds],
   );
 
   if (isLoading) {
@@ -380,12 +418,14 @@ export function AssetsTable({
       defaultColumnVisibility={{
         quoteCcy: false,
         isStale: false,
+        holdingStatus: false,
         assetSubClass: false,
         quoteMode: false,
         kind: false,
       }}
+      defaultColumnFilters={[{ id: "holdingStatus", value: ["true"] }]}
       defaultSorting={[{ id: "symbol", desc: false }]}
-      storageKey="securities-table-v2"
+      storageKey="securities-table-v5"
       scrollable
     />
   );

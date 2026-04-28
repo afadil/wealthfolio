@@ -3,6 +3,8 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import NumberFlow from "@number-flow/react";
 import { useMemo } from "react";
 
+const isValidCurrencyCode = (code: string) => /^[A-Za-z]{3}$/.test(code);
+
 interface BalanceProps {
   targetValue: number;
   currency: string;
@@ -19,31 +21,39 @@ const Balance: React.FC<BalanceProps> = ({
   isLoading = false,
 }) => {
   const { isBalanceHidden } = useBalancePrivacy();
+  const validCurrency = isValidCurrencyCode(currency);
+
   const currencySymbol = useMemo(() => {
-    const formatter = new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-
-    const parts = formatter.formatToParts(0);
-    const symbolPart = parts.find((part) => part.type === "currency");
-
-    return symbolPart?.value ?? currency;
-  }, [currency]);
+    if (!validCurrency) return currency;
+    try {
+      const formatter = new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        currencyDisplay: "narrowSymbol",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+      const parts = formatter.formatToParts(0);
+      return parts.find((part) => part.type === "currency")?.value ?? currency;
+    } catch {
+      return currency;
+    }
+  }, [currency, validCurrency]);
 
   const formattedValue = useMemo(() => {
-    const formatter = new Intl.NumberFormat(undefined, {
-      currency,
-      style: displayCurrency ? "currency" : "decimal",
-      currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: displayDecimal ? 2 : 0,
-      maximumFractionDigits: displayDecimal ? 2 : 0,
-    });
-    return formatter.format(targetValue);
-  }, [currency, displayCurrency, displayDecimal, targetValue]);
+    const useCurrencyStyle = displayCurrency && validCurrency;
+    try {
+      const formatter = new Intl.NumberFormat(undefined, {
+        ...(useCurrencyStyle ? { currency, currencyDisplay: "narrowSymbol" } : {}),
+        style: useCurrencyStyle ? "currency" : "decimal",
+        minimumFractionDigits: displayDecimal ? 2 : 0,
+        maximumFractionDigits: displayDecimal ? 2 : 0,
+      });
+      return formatter.format(targetValue);
+    } catch {
+      return targetValue.toFixed(displayDecimal ? 2 : 0);
+    }
+  }, [currency, validCurrency, displayCurrency, displayDecimal, targetValue]);
 
   if (isLoading) {
     return <Skeleton className="h-9 w-48" />;
@@ -68,9 +78,10 @@ const Balance: React.FC<BalanceProps> = ({
               "--number-flow-mask-width": "0px",
             }}
             format={{
-              currency: currency,
-              style: displayCurrency ? "currency" : "decimal",
-              currencyDisplay: "narrowSymbol",
+              ...(displayCurrency && validCurrency
+                ? { currency, currencyDisplay: "narrowSymbol" as const }
+                : {}),
+              style: displayCurrency && validCurrency ? "currency" : "decimal",
               minimumFractionDigits: displayDecimal ? 2 : 0,
               maximumFractionDigits: displayDecimal ? 2 : 0,
             }}

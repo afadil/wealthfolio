@@ -141,6 +141,8 @@ pub struct ActivityDetailsDB {
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub source_record_id: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub source_group_id: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub idempotency_key: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub import_run_id: Option<String>,
@@ -160,6 +162,8 @@ pub struct ActivityDetailsDB {
     pub exchange_mic: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub asset_pricing_mode: Option<String>,
+    #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
+    pub instrument_type: Option<String>,
     #[diesel(sql_type = diesel::sql_types::Nullable<diesel::sql_types::Text>)]
     pub metadata: Option<String>,
 }
@@ -193,18 +197,37 @@ impl ActivityDetailsDB {
     }
 }
 
-/// Database model for activity import profile mapping
+/// Database model for account → import template association
 #[derive(
     Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
 )]
-#[diesel(primary_key(account_id))]
-#[diesel(table_name = crate::schema::activity_import_profiles)]
+#[diesel(table_name = crate::schema::import_account_templates)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[serde(rename_all = "camelCase")]
-pub struct ImportMappingDB {
+pub struct ImportAccountTemplateDB {
+    pub id: String,
     pub account_id: String,
+    pub context_kind: String,
+    pub source_system: String,
+    pub template_id: String,
+    pub created_at: NaiveDateTime,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Queryable, Identifiable, AsChangeset, Insertable,
+)]
+#[diesel(primary_key(id))]
+#[diesel(table_name = crate::schema::import_templates)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTemplateDB {
+    pub id: String,
     pub name: String,
-    /// JSON containing all mapping config: fieldMappings, activityMappings, symbolMappings, accountMappings, parseConfig
+    pub scope: String,
+    pub kind: String,
+    pub source_system: String,
+    pub config_version: i32,
     pub config: String,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
@@ -248,6 +271,14 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             _ => ActivityStatus::Posted, // Default to Posted for unknown values
         };
 
+        let amount = db.amount.or_else(|| {
+            let q = db.quantity.as_ref()?;
+            let p = db.unit_price.as_ref()?;
+            let qty = parse_decimal_string_tolerant(q, "quantity");
+            let price = parse_decimal_string_tolerant(p, "unit_price");
+            Some((qty * price).to_string())
+        });
+
         Self {
             id: db.id,
             account_id: db.account_id,
@@ -260,7 +291,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             unit_price: db.unit_price,
             currency: db.currency,
             fee: db.fee,
-            amount: db.amount,
+            amount,
             needs_review: db.needs_review != 0,
             comment: db.notes,
             fx_rate: db.fx_rate,
@@ -274,8 +305,10 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             asset_pricing_mode: db
                 .asset_pricing_mode
                 .unwrap_or_else(|| "MARKET".to_string()),
+            instrument_type: db.instrument_type,
             source_system: db.source_system,
             source_record_id: db.source_record_id,
+            source_group_id: db.source_group_id,
             idempotency_key: db.idempotency_key,
             import_run_id: db.import_run_id,
             is_user_modified: db.is_user_modified != 0,
@@ -284,11 +317,28 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
     }
 }
 
-impl From<ImportMappingDB> for wealthfolio_core::activities::ImportMapping {
-    fn from(db: ImportMappingDB) -> Self {
+impl From<ImportTemplateDB> for wealthfolio_core::activities::ImportTemplate {
+    fn from(db: ImportTemplateDB) -> Self {
+        use wealthfolio_core::activities::{ImportTemplateScope, TemplateKind};
+
+        let scope = match db.scope.as_str() {
+            "SYSTEM" => ImportTemplateScope::System,
+            _ => ImportTemplateScope::User,
+        };
+
+        let kind = match db.kind.as_str() {
+            "CSV_HOLDINGS" => TemplateKind::CsvHoldings,
+            "BROKER_ACTIVITY" => TemplateKind::BrokerActivity,
+            _ => TemplateKind::CsvActivity,
+        };
+
         Self {
-            account_id: db.account_id,
+            id: db.id,
             name: db.name,
+            scope,
+            kind,
+            source_system: db.source_system,
+            config_version: db.config_version,
             config: db.config,
             created_at: db.created_at,
             updated_at: db.updated_at,
@@ -296,11 +346,20 @@ impl From<ImportMappingDB> for wealthfolio_core::activities::ImportMapping {
     }
 }
 
-impl From<wealthfolio_core::activities::ImportMapping> for ImportMappingDB {
-    fn from(domain: wealthfolio_core::activities::ImportMapping) -> Self {
+impl From<wealthfolio_core::activities::ImportTemplate> for ImportTemplateDB {
+    fn from(domain: wealthfolio_core::activities::ImportTemplate) -> Self {
+        let scope = match domain.scope {
+            wealthfolio_core::activities::ImportTemplateScope::System => "SYSTEM",
+            wealthfolio_core::activities::ImportTemplateScope::User => "USER",
+        };
+
         Self {
-            account_id: domain.account_id,
+            id: domain.id,
             name: domain.name,
+            scope: scope.to_string(),
+            kind: domain.kind.as_str().to_string(),
+            source_system: domain.source_system,
+            config_version: domain.config_version,
             config: domain.config,
             created_at: domain.created_at,
             updated_at: domain.updated_at,

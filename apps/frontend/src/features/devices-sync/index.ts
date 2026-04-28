@@ -14,9 +14,6 @@ export { syncStorage } from "./storage/keyring";
 // Service
 export { deviceSyncService, syncService } from "./services/sync-service";
 
-// Provider
-export { DeviceSyncProvider, useDeviceSync } from "./providers/device-sync-provider";
-
 // Hooks
 export * from "./hooks";
 

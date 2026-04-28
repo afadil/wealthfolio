@@ -12,13 +12,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use log::{debug, info, warn};
+use log::{debug, warn};
 
 use super::{
     CircuitBreaker, FetchDiagnostics, QuoteValidator, RateLimitConfig, RateLimiter, SkipReason,
 };
 use crate::errors::{MarketDataError, RetryClass};
-use crate::models::{AssetProfile, InstrumentId, ProviderId, Quote, QuoteContext, SearchResult};
+use crate::models::{
+    AssetProfile, InstrumentId, ProviderId, Quote, QuoteContext, SearchResult, SplitEvent,
+};
 use crate::provider::MarketDataProvider;
 use crate::resolver::SymbolResolver;
 
@@ -210,6 +212,7 @@ impl ProviderRegistry {
                     );
                     return Ok(valid_quotes);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
 
@@ -291,6 +294,7 @@ impl ProviderRegistry {
 
                     return Ok(quote);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
 
@@ -311,6 +315,43 @@ impl ProviderRegistry {
         }
 
         Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed))
+    }
+
+    /// Fetch split history for an instrument.
+    ///
+    /// Tries providers in order. Returns empty vec (not error) if no provider supports splits.
+    pub async fn fetch_splits(
+        &self,
+        context: &QuoteContext,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> Vec<SplitEvent> {
+        let providers = self.ordered_providers(context, true);
+
+        for provider in providers {
+            let provider_id: ProviderId = Cow::Borrowed(provider.id());
+
+            let resolved = match self.resolver.resolve(&provider_id, context) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            self.rate_limiter.acquire(&provider_id).await;
+
+            match provider
+                .get_splits(context, resolved.instrument, start, end)
+                .await
+            {
+                Ok(splits) => return splits,
+                Err(MarketDataError::NotSupported { .. }) => continue,
+                Err(e) => {
+                    warn!("Split fetch failed for provider '{}': {:?}", provider_id, e);
+                    continue;
+                }
+            }
+        }
+
+        vec![]
     }
 
     /// Get providers ordered by preference for the given context.
@@ -344,6 +385,24 @@ impl ProviderRegistry {
                 } else {
                     caps.supports_latest
                 }
+            })
+            .collect();
+
+        self.sort_by_preference(&mut providers, context);
+        providers
+    }
+
+    /// Get profile-capable providers ordered by preference for the given context.
+    fn ordered_profile_providers(
+        &self,
+        context: &QuoteContext,
+    ) -> Vec<&Arc<dyn MarketDataProvider>> {
+        let mut providers: Vec<_> = self
+            .providers
+            .iter()
+            .filter(|p| {
+                let caps = p.capabilities();
+                caps.supports_profile && caps.supports_instrument(&context.instrument)
             })
             .collect();
 
@@ -465,11 +524,17 @@ impl ProviderRegistry {
     ///
     /// Tries providers that support search until one succeeds.
     pub async fn search(&self, query: &str) -> Result<Vec<SearchResult>, MarketDataError> {
-        let providers: Vec<_> = self
+        let mut providers: Vec<_> = self
             .providers
             .iter()
             .filter(|p| p.capabilities().supports_search)
             .collect();
+        providers.sort_by_key(|p| {
+            self.custom_priorities
+                .get(p.id())
+                .copied()
+                .unwrap_or_else(|| p.priority() as i32)
+        });
 
         if providers.is_empty() {
             return Err(MarketDataError::NotSupported {
@@ -479,8 +544,9 @@ impl ProviderRegistry {
         }
 
         let mut last_error: Option<MarketDataError> = None;
+        let mut fallback_results: Option<Vec<SearchResult>> = None;
 
-        for provider in providers {
+        for (i, provider) in providers.iter().enumerate() {
             let provider_id: ProviderId = Cow::Borrowed(provider.id());
 
             if !self.circuit_breaker.is_allowed(&provider_id) {
@@ -488,12 +554,30 @@ impl ProviderRegistry {
                 continue;
             }
 
-            self.rate_limiter.acquire(&provider_id).await;
+            // Primary provider: wait for rate limit token.
+            // Fallback providers: skip if rate-limited (avoids multi-second stalls
+            // when the primary returns empty for a speculative candidate).
+            if i == 0 {
+                self.rate_limiter.acquire(&provider_id).await;
+            } else if !self.rate_limiter.try_acquire(&provider_id) {
+                debug!(
+                    "Search: skipping '{}' for '{}' — rate limited",
+                    provider_id, query
+                );
+                continue;
+            }
 
             match provider.search(query).await {
                 Ok(results) if !results.is_empty() => {
                     self.circuit_breaker.record_success(&provider_id);
-                    return Ok(results);
+                    // If any result has MIC, return immediately
+                    if results.iter().any(|r| r.exchange_mic.is_some())
+                        || fallback_results.is_some()
+                    {
+                        return Ok(results);
+                    }
+                    // Save as fallback, try next provider for MIC-enriched results
+                    fallback_results = Some(results);
                 }
                 Ok(_) => {
                     debug!(
@@ -521,6 +605,10 @@ impl ProviderRegistry {
             }
         }
 
+        if let Some(results) = fallback_results {
+            return Ok(results);
+        }
+
         Err(last_error.unwrap_or(MarketDataError::AllProvidersFailed))
     }
 
@@ -534,11 +622,7 @@ impl ProviderRegistry {
         &self,
         context: &QuoteContext,
     ) -> Result<AssetProfile, MarketDataError> {
-        let providers: Vec<_> = self
-            .providers
-            .iter()
-            .filter(|p| p.capabilities().supports_profile)
-            .collect();
+        let providers = self.ordered_profile_providers(context);
 
         if providers.is_empty() {
             return Err(MarketDataError::NotSupported {
@@ -677,13 +761,9 @@ impl ProviderRegistry {
                     }
 
                     diagnostics.record_success(provider_id);
-                    info!(
-                        "Successfully fetched {} valid quotes. Diagnostics: {}",
-                        valid_quotes.len(),
-                        diagnostics.summary()
-                    );
                     return (Ok(valid_quotes), diagnostics);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
                     diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
@@ -764,6 +844,7 @@ impl ProviderRegistry {
                     diagnostics.record_success(provider_id);
                     return (Ok(quote), diagnostics);
                 }
+                Err(MarketDataError::NotSupported { .. }) => continue,
                 Err(e) => {
                     let retry_class = e.retry_class();
                     diagnostics.record_error(provider_id.clone(), format!("{:?}", e));
@@ -948,6 +1029,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -976,6 +1059,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1047,6 +1132,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let equity_providers = registry.ordered_providers(&equity_context, true);
@@ -1062,6 +1149,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let crypto_providers = registry.ordered_providers(&crypto_context, true);
@@ -1123,6 +1212,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
         assert_eq!(registry.ordered_providers(&us_context, true).len(), 1);
 
@@ -1135,6 +1226,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
         assert_eq!(registry.ordered_providers(&ca_context, true).len(), 0);
 
@@ -1147,6 +1240,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
         assert_eq!(registry.ordered_providers(&unknown_context, true).len(), 0);
     }
@@ -1176,6 +1271,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1212,6 +1309,8 @@ mod tests {
             overrides: None,
             currency_hint: None,
             preferred_provider: Some(Cow::Borrowed("PROVIDER_C")),
+            bond_metadata: None,
+            custom_provider_code: None,
         };
 
         let ordered = registry.ordered_providers(&context, true);
@@ -1220,5 +1319,98 @@ mod tests {
         assert_eq!(ordered[0].id(), "PROVIDER_C");
         assert_eq!(ordered[1].id(), "PROVIDER_A");
         assert_eq!(ordered[2].id(), "PROVIDER_B");
+    }
+
+    #[tokio::test]
+    async fn test_get_profile_respects_coverage_and_preference() {
+        struct ProfileProvider {
+            id: &'static str,
+            coverage: Coverage,
+            call_count: Arc<AtomicUsize>,
+        }
+
+        #[async_trait::async_trait]
+        impl MarketDataProvider for ProfileProvider {
+            fn id(&self) -> &'static str {
+                self.id
+            }
+
+            fn priority(&self) -> u8 {
+                10
+            }
+
+            fn capabilities(&self) -> ProviderCapabilities {
+                ProviderCapabilities {
+                    instrument_kinds: &[InstrumentKind::Equity],
+                    coverage: self.coverage,
+                    supports_latest: false,
+                    supports_historical: false,
+                    supports_search: false,
+                    supports_profile: true,
+                }
+            }
+
+            fn rate_limit(&self) -> RateLimit {
+                RateLimit::default()
+            }
+
+            async fn get_latest_quote(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+            ) -> Result<Quote, MarketDataError> {
+                unreachable!()
+            }
+
+            async fn get_historical_quotes(
+                &self,
+                _: &QuoteContext,
+                _: ProviderInstrument,
+                _: DateTime<Utc>,
+                _: DateTime<Utc>,
+            ) -> Result<Vec<Quote>, MarketDataError> {
+                unreachable!()
+            }
+
+            async fn get_profile(&self, _: &str) -> Result<AssetProfile, MarketDataError> {
+                self.call_count.fetch_add(1, Ordering::SeqCst);
+                Ok(AssetProfile::with_name(self.id))
+            }
+        }
+
+        let us_calls = Arc::new(AtomicUsize::new(0));
+        let global_calls = Arc::new(AtomicUsize::new(0));
+        let providers: Vec<Arc<dyn MarketDataProvider>> = vec![
+            Arc::new(ProfileProvider {
+                id: "US_ONLY_PROFILE",
+                coverage: Coverage::us_only_strict(),
+                call_count: us_calls.clone(),
+            }),
+            Arc::new(ProfileProvider {
+                id: "GLOBAL_PROFILE",
+                coverage: Coverage::global_best_effort(),
+                call_count: global_calls.clone(),
+            }),
+        ];
+
+        let resolver = Arc::new(MockResolver);
+        let registry = ProviderRegistry::new(providers, resolver);
+
+        let context = QuoteContext {
+            instrument: InstrumentId::Equity {
+                ticker: Arc::from("SHOP"),
+                mic: Some(Cow::Borrowed("XTSE")),
+            },
+            overrides: None,
+            currency_hint: None,
+            preferred_provider: Some(Cow::Borrowed("US_ONLY_PROFILE")),
+            bond_metadata: None,
+            custom_provider_code: None,
+        };
+
+        let profile = registry.get_profile(&context).await.unwrap();
+        assert_eq!(profile.name.as_deref(), Some("GLOBAL_PROFILE"));
+        assert_eq!(us_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(global_calls.load(Ordering::SeqCst), 1);
     }
 }

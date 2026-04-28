@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use async_trait::async_trait;
 
@@ -87,6 +87,62 @@ pub fn ensure_addons_directory(base_dir: impl AsRef<Path>) -> Result<PathBuf, St
 pub fn get_addon_path(base_dir: impl AsRef<Path>, addon_id: &str) -> Result<PathBuf, String> {
     let addons_dir = ensure_addons_directory(base_dir)?;
     Ok(addons_dir.join(addon_id))
+}
+
+pub fn validated_addon_archive_path(file_name: &str) -> Result<PathBuf, String> {
+    if file_name.is_empty() {
+        return Err("Unsafe addon archive path: path is empty".to_string());
+    }
+
+    if file_name.contains('\\') {
+        return Err(format!(
+            "Unsafe addon archive path '{}': backslashes are not allowed",
+            file_name
+        ));
+    }
+
+    if file_name.len() >= 2
+        && file_name.as_bytes()[1] == b':'
+        && file_name.as_bytes()[0].is_ascii_alphabetic()
+    {
+        return Err(format!(
+            "Unsafe addon archive path '{}': Windows drive prefixes are not allowed",
+            file_name
+        ));
+    }
+
+    let path = Path::new(file_name);
+    if path.is_absolute() {
+        return Err(format!(
+            "Unsafe addon archive path '{}': absolute paths are not allowed",
+            file_name
+        ));
+    }
+
+    let mut has_normal_component = false;
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => has_normal_component = true,
+            Component::ParentDir => {
+                return Err(format!(
+                    "Unsafe addon archive path '{}': parent traversal is not allowed",
+                    file_name
+                ));
+            }
+            Component::RootDir | Component::CurDir | Component::Prefix(_) => {
+                return Err(format!("Unsafe addon archive path '{}'", file_name));
+            }
+        }
+    }
+
+    if !has_normal_component {
+        return Err(format!(
+            "Unsafe addon archive path '{}': no file components found",
+            file_name
+        ));
+    }
+
+    Ok(path.to_path_buf())
 }
 
 /// Simple permission detection based on common API function patterns
@@ -440,6 +496,7 @@ pub fn extract_addon_zip_internal(zip_data: Vec<u8>) -> Result<ExtractedAddon, S
         }
 
         let file_name = file.name().to_string();
+        validated_addon_archive_path(&file_name)?;
         let mut contents = String::new();
 
         file.read_to_string(&mut contents)
@@ -1317,7 +1374,7 @@ impl AddonService {
         }
         let content = fs::read_to_string(&manifest_path)
             .map_err(|e| format!("Failed to read manifest {}: {}", manifest_path.display(), e))?;
-        let manifest = serde_json::from_str::<AddonManifest>(&content).map_err(|e| {
+        let manifest = parse_manifest_json_metadata(&content).map_err(|e| {
             format!(
                 "Failed to parse manifest {}: {}",
                 manifest_path.display(),
@@ -1334,7 +1391,8 @@ impl AddonService {
 
     fn write_addon_files(&self, addon_dir: &Path, files: &[AddonFile]) -> Result<(), String> {
         for file in files {
-            let file_path = addon_dir.join(&file.name);
+            let relative_path = validated_addon_archive_path(&file.name)?;
+            let file_path = addon_dir.join(relative_path);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create directory: {}", e))?;

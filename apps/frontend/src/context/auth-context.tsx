@@ -1,5 +1,5 @@
 import { isWeb } from "@/adapters";
-import { getAuthToken, setAuthToken, setUnauthorizedHandler } from "@/lib/auth-token";
+import { setUnauthorizedHandler } from "@/lib/auth-token";
 import {
   createContext,
   useCallback,
@@ -27,14 +27,14 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [requiresAuth, setRequiresAuth] = useState(false);
   const [statusLoading, setStatusLoading] = useState(isWeb);
-  const [token, setToken] = useState<string | null>(() => getAuthToken());
+  const [cookieSession, setCookieSession] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
+  const cookieSessionRef = useRef(false);
 
   useEffect(() => {
-    tokenRef.current = token;
-  }, [token]);
+    cookieSessionRef.current = cookieSession;
+  }, [cookieSession]);
 
   useEffect(() => {
     if (!isWeb) {
@@ -44,13 +44,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     const loadStatus = async () => {
       try {
-        const response = await fetch("/api/v1/auth/status");
+        const response = await fetch("/api/v1/auth/status", {
+          credentials: "same-origin",
+        });
         if (!response.ok) {
           throw new Error(`Failed to check authentication status: ${response.status}`);
         }
         const data = (await response.json()) as { requiresPassword: boolean };
-        if (!cancelled) {
-          setRequiresAuth(Boolean(data?.requiresPassword));
+        if (cancelled) return;
+        const needsAuth = Boolean(data?.requiresPassword);
+        setRequiresAuth(needsAuth);
+
+        // If auth is required, check if we have a valid cookie session
+        if (needsAuth) {
+          try {
+            const meRes = await fetch("/api/v1/auth/me", {
+              credentials: "same-origin",
+            });
+            if (meRes.ok && !cancelled) {
+              setCookieSession(true);
+            }
+          } catch {
+            // No valid session, user will need to log in
+          }
         }
       } catch (error) {
         console.error("Failed to load authentication status", error);
@@ -72,10 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = () => {
-      const hadToken = Boolean(tokenRef.current);
-      setToken(null);
-      setAuthToken(null);
-      if (hadToken) {
+      const hadSession = cookieSessionRef.current;
+      setCookieSession(false);
+      if (hadSession) {
         setLoginError("Session expired. Please sign in again.");
       }
     };
@@ -93,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
+        credentials: "same-origin",
       });
       if (!response.ok) {
         if (response.status === 404) {
@@ -107,18 +123,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         throw new Error(message);
       }
-      const body = (await response.json()) as { accessToken: string };
-      const accessToken = body?.accessToken;
-      if (!accessToken) {
-        throw new Error("Login response did not contain an access token");
-      }
-      setToken(accessToken);
-      setAuthToken(accessToken);
+      // Cookie is set by the server via Set-Cookie header
+      setCookieSession(true);
       setLoginError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login failed";
-      setToken(null);
-      setAuthToken(null);
+      setCookieSession(false);
       setLoginError(message);
       throw error;
     } finally {
@@ -127,8 +137,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
-    setAuthToken(null);
+    // Clear server-side cookie session
+    if (isWeb) {
+      fetch("/api/v1/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      }).catch(() => {});
+    }
+    setCookieSession(false);
     setLoginError(null);
   }, []);
 
@@ -137,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       requiresAuth,
-      isAuthenticated: !requiresAuth || Boolean(token),
+      isAuthenticated: !requiresAuth || cookieSession,
       statusLoading,
       loginLoading,
       loginError,
@@ -145,7 +161,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       clearError,
     }),
-    [requiresAuth, token, statusLoading, loginLoading, loginError, login, logout, clearError],
+    [
+      requiresAuth,
+      cookieSession,
+      statusLoading,
+      loginLoading,
+      loginError,
+      login,
+      logout,
+      clearError,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

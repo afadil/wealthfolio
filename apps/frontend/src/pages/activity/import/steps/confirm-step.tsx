@@ -8,12 +8,15 @@ import {
   nextStep,
   prevStep,
   setImportResult,
+  setStep,
   type DraftActivity,
+  type DraftActivityStatus,
 } from "../context";
 import { useActivityImportMutations } from "../hooks/use-activity-import-mutations";
 import { ImportAlert } from "../components/import-alert";
-import type { ActivityImport } from "@/lib/types";
-import { saveAccountImportMapping, logger } from "@/adapters";
+import { createAsset } from "@/adapters";
+import { draftToActivityImport } from "../utils/draft-utils";
+import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -24,6 +27,7 @@ interface ImportSummary {
   toImport: number;
   skipped: number;
   duplicates: number;
+  forcedDuplicates: number;
   errors: number;
   warnings: number;
   byType: Record<string, number>;
@@ -47,6 +51,7 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
     toImport: 0,
     skipped: 0,
     duplicates: 0,
+    forcedDuplicates: 0,
     errors: 0,
     warnings: 0,
     byType: {},
@@ -81,8 +86,12 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
       }
       case "duplicate": {
         summary.toImport++;
-        summary.warnings++;
         summary.duplicates++;
+        if (draft.forceImport) {
+          summary.forcedDuplicates++;
+        } else {
+          summary.warnings++;
+        }
         const duplicateType = draft.activityType ?? "UNKNOWN";
         summary.byType[duplicateType] = (summary.byType[duplicateType] ?? 0) + 1;
         break;
@@ -97,35 +106,6 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
   }
 
   return summary;
-}
-
-/**
- * Convert DraftActivity to ActivityImport for the backend
- */
-function draftToActivityImport(draft: DraftActivity): ActivityImport {
-  return {
-    id: undefined,
-    accountId: draft.accountId,
-    currency: draft.currency,
-    activityType: draft.activityType as ActivityImport["activityType"],
-    date: draft.activityDate,
-    symbol: draft.symbol ?? "",
-    amount: draft.amount,
-    quantity: draft.quantity,
-    unitPrice: draft.unitPrice,
-    fee: draft.fee,
-    fxRate: draft.fxRate,
-    subtype: draft.subtype,
-    exchangeMic: draft.exchangeMic,
-    quoteCcy: draft.quoteCcy,
-    instrumentType: draft.instrumentType,
-    quoteMode: draft.quoteMode,
-    errors: draft.errors,
-    isValid: draft.status === "valid" || draft.status === "warning",
-    lineNumber: draft.rowIndex + 1,
-    isDraft: false,
-    comment: draft.comment,
-  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -174,22 +154,33 @@ const ACTIVITY_TYPE_CONFIG: Record<string, { label: string; icon: Icon; color: s
 export function ConfirmStep() {
   const { state, dispatch } = useImportContext();
   const [importError, setImportError] = useState<string | null>(null);
+  const [isPreparingAssets, setIsPreparingAssets] = useState(false);
 
   const { confirmImportMutation } = useActivityImportMutations({
-    onSuccess: async (_activities, result) => {
+    onSuccess: (_activities, result) => {
       setImportError(null);
 
-      // Save the mapping profile for future imports (include parseConfig)
-      if (state.mapping && state.accountId) {
-        try {
-          await saveAccountImportMapping({
-            ...state.mapping,
-            accountId: state.accountId,
-            parseConfig: state.parseConfig,
+      // If the backend found validation errors, surface them in the review grid
+      // rather than showing "Import Failed". This should be rare since the
+      // frontend validates first, but guards against edge cases.
+      if (!result.summary.success) {
+        const errored = result.activities.filter(
+          (a) => !a.isValid || (a.errors && Object.keys(a.errors).length > 0),
+        );
+        if (errored.length > 0) {
+          const errorMap = new Map(errored.map((a) => [a.lineNumber, a]));
+          const updatedDrafts = state.draftActivities.map((draft) => {
+            const backendActivity = errorMap.get(draft.rowIndex + 1);
+            if (!backendActivity?.errors) return draft;
+            return {
+              ...draft,
+              errors: { ...(draft.errors ?? {}), ...backendActivity.errors },
+              status: "error" as DraftActivityStatus,
+            };
           });
-        } catch (error) {
-          // Log but don't fail the import - mapping save is not critical
-          logger.error(`Failed to save mapping profile: ${error}`);
+          dispatch({ type: "SET_VALIDATED_DRAFT_ACTIVITIES", payload: updatedDrafts });
+          dispatch(setStep("review"));
+          return;
         }
       }
 
@@ -205,6 +196,7 @@ export function ConfirmStep() {
             errors: 0,
           },
           importRunId: result.importRunId,
+          errorMessage: result.summary.errorMessage,
         }),
       );
       dispatch(nextStep());
@@ -214,24 +206,124 @@ export function ConfirmStep() {
     },
   });
 
-  const isProcessing = confirmImportMutation.isPending;
+  const isProcessing = confirmImportMutation.isPending || isPreparingAssets;
 
   const summary = useMemo(() => computeSummary(state.draftActivities), [state.draftActivities]);
 
   const skippedTotal = summary.skipped + summary.errors;
 
-  const handleImport = () => {
-    // Filter only valid/warning activities for import
-    const activitiesToImport = state.draftActivities
-      .filter((d) => d.status === "valid" || d.status === "warning")
-      .map(draftToActivityImport);
+  const persistCreatedAssets = (assetIdByKey: Record<string, string>) => {
+    const createdKeys = Object.keys(assetIdByKey);
+    if (createdKeys.length === 0) {
+      return;
+    }
 
-    if (activitiesToImport.length === 0) {
+    const nextDrafts = state.draftActivities.map((draft) => {
+      const resolvedAssetId =
+        (draft.importAssetKey ? assetIdByKey[draft.importAssetKey] : undefined) ||
+        (draft.assetCandidateKey ? assetIdByKey[draft.assetCandidateKey] : undefined);
+
+      if (!resolvedAssetId) {
+        return draft;
+      }
+
+      return {
+        ...draft,
+        assetId: resolvedAssetId,
+        importAssetKey: undefined,
+      };
+    });
+
+    dispatch({ type: "SET_VALIDATED_DRAFT_ACTIVITIES", payload: nextDrafts });
+    dispatch({
+      type: "SET_ASSET_PREVIEW_ITEMS",
+      payload: state.assetPreviewItems.map((item) => {
+        const assetId = assetIdByKey[item.key];
+        if (!assetId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          status: "EXISTING_ASSET",
+          resolutionSource: "created_on_import",
+          assetId,
+        };
+      }),
+    });
+
+    for (const key of createdKeys) {
+      dispatch({ type: "REMOVE_PENDING_IMPORT_ASSET", payload: key });
+    }
+  };
+
+  const handleImport = async () => {
+    // Send valid, warning, and duplicate activities to the backend.
+    // Duplicate-status rows with forceImport=true will have their idempotency key
+    // cleared server-side so they bypass the DB unique constraint and are inserted.
+    // Non-forced duplicates are dropped by the backend dedup logic.
+    const draftsToImport = state.draftActivities.filter(
+      (d) => d.status === "valid" || d.status === "warning" || d.status === "duplicate",
+    );
+    if (draftsToImport.length === 0) {
       setImportError("No valid activities to import");
       return;
     }
 
-    confirmImportMutation.mutate({ activities: activitiesToImport });
+    setImportError(null);
+    setIsPreparingAssets(true);
+    const createdAssetIdsByKey: Record<string, string> = {};
+
+    try {
+      const pendingAssets = new Map<string, ReturnType<typeof buildNewAssetFromDraft>>();
+
+      for (const pending of Object.values(state.pendingImportAssets)) {
+        pendingAssets.set(pending.key, pending.draft);
+      }
+
+      for (const draft of draftsToImport) {
+        if (draft.assetId) {
+          continue;
+        }
+        const key = draft.importAssetKey || draft.assetCandidateKey;
+        if (!key || pendingAssets.has(key)) {
+          continue;
+        }
+        const nextAsset = buildNewAssetFromDraft(draft);
+        if (nextAsset) {
+          pendingAssets.set(key, nextAsset);
+        }
+      }
+
+      for (const [key, assetDraft] of pendingAssets.entries()) {
+        if (!assetDraft) {
+          continue;
+        }
+        const created = await createAsset(assetDraft);
+        createdAssetIdsByKey[key] = created.id;
+      }
+
+      persistCreatedAssets(createdAssetIdsByKey);
+
+      const activitiesToImport = draftsToImport.map((draft) =>
+        draftToActivityImport({
+          ...draft,
+          assetId:
+            draft.assetId ||
+            (draft.importAssetKey ? createdAssetIdsByKey[draft.importAssetKey] : undefined) ||
+            (draft.assetCandidateKey ? createdAssetIdsByKey[draft.assetCandidateKey] : undefined),
+        }),
+      );
+
+      confirmImportMutation.mutate({ activities: activitiesToImport });
+    } catch (error) {
+      persistCreatedAssets(createdAssetIdsByKey);
+      setImportError(
+        error instanceof Error ? error.message : "Failed to prepare assets for import.",
+      );
+    } finally {
+      setIsPreparingAssets(false);
+    }
   };
 
   const handleBack = () => {
@@ -266,6 +358,12 @@ export function ConfirmStep() {
           variant="warning"
           title={`${summary.toImport} activities ready to import`}
           description={`${summary.warnings} activities have warnings but will still be imported.`}
+        />
+      ) : summary.forcedDuplicates > 0 ? (
+        <ImportAlert
+          variant="warning"
+          title={`${summary.toImport} activities ready to import`}
+          description={`Includes ${summary.forcedDuplicates} duplicate${summary.forcedDuplicates === 1 ? "" : "s"} marked "import anyway".`}
         />
       ) : (
         <div>
@@ -387,13 +485,13 @@ export function ConfirmStep() {
         <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
           <Button
             size="lg"
-            onClick={handleImport}
+            onClick={() => void handleImport()}
             disabled={summary.toImport === 0 || isProcessing}
           >
             {isProcessing ? (
               <>
                 <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
-                Importing...
+                {isPreparingAssets ? "Preparing assets..." : "Importing..."}
               </>
             ) : (
               <>

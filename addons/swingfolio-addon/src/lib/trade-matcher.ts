@@ -54,9 +54,9 @@ export class TradeMatcher {
     // Ensure all numeric fields are properly parsed
     const parsedActivities = this.parseActivities(activities);
 
-    // Separate trading activities from dividends
+    // Separate trading activities from dividends and splits
     const tradingActivities = parsedActivities.filter(
-      (a) => a.activityType === "BUY" || a.activityType === "SELL",
+      (a) => a.activityType === "BUY" || a.activityType === "SELL" || a.activityType === "SPLIT",
     );
     const dividendActivities = parsedActivities.filter((a) => a.activityType === "DIVIDEND");
 
@@ -166,7 +166,16 @@ export class TradeMatcher {
     let averageLot: AverageLot | null = null;
 
     for (const activity of activities) {
-      if (activity.activityType === "BUY") {
+      if (activity.activityType === "SPLIT") {
+        // Split: amount = split ratio (e.g., 10 for 10:1 split)
+        const splitRatio = activity.amount;
+        if (splitRatio > 0 && averageLot) {
+          averageLot.totalQuantity *= splitRatio;
+          averageLot.remainingQuantity *= splitRatio;
+          averageLot.averagePrice /= splitRatio;
+          // totalCostBasis stays the same (same total investment, more shares)
+        }
+      } else if (activity.activityType === "BUY") {
         // Add to average lot
         if (!averageLot) {
           averageLot = this.createNewAverageLot(activity, symbol);
@@ -292,7 +301,21 @@ export class TradeMatcher {
     const lots: Lot[] = [];
 
     for (const activity of activities) {
-      if (activity.activityType === "BUY") {
+      if (activity.activityType === "SPLIT") {
+        // Split: amount = split ratio (e.g., 10 for 10:1 split)
+        const splitRatio = activity.amount;
+        if (splitRatio > 0) {
+          for (const lot of lots) {
+            lot.remainingQuantity *= splitRatio;
+            lot.originalQuantity *= splitRatio;
+            lot.activity = {
+              ...lot.activity,
+              quantity: lot.activity.quantity * splitRatio,
+              unitPrice: lot.activity.unitPrice / splitRatio,
+            };
+          }
+        }
+      } else if (activity.activityType === "BUY") {
         const lot: Lot = {
           activity: activity,
           remainingQuantity: activity.quantity,
@@ -401,6 +424,7 @@ export class TradeMatcher {
     return {
       id: `avg-${averageLot.activities[0].id}-${sellActivity.id}-${Date.now()}`,
       symbol,
+      assetId: sellActivity.assetId,
       assetName: sellActivity.assetName || undefined,
       entryDate,
       exitDate,
@@ -446,6 +470,7 @@ export class TradeMatcher {
     return {
       id: `avg-open-${averageLot.activities[0].id}-${Date.now()}`,
       symbol,
+      assetId: latestActivity.assetId,
       assetName: latestActivity.assetName || undefined,
       quantity: averageLot.remainingQuantity,
       averageCost: averageLot.averagePrice,
@@ -498,6 +523,7 @@ export class TradeMatcher {
     return {
       id: `${buyActivity.id}-${sellActivity.id}-${Date.now()}`,
       symbol,
+      assetId: buyActivity.assetId,
       assetName: buyActivity.assetName || undefined,
       entryDate,
       exitDate,
@@ -539,6 +565,7 @@ export class TradeMatcher {
     return {
       id: `${lot.activity.id}-open-${Date.now()}`,
       symbol,
+      assetId: lot.activity.assetId,
       assetName: lot.activity.assetName || undefined,
       quantity: lot.remainingQuantity,
       averageCost: lot.activity.unitPrice,

@@ -11,6 +11,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
+use wealthfolio_core::portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode};
 use wealthfolio_core::quotes::{
     LatestQuoteSnapshot, MarketSyncMode, ProviderInfo, Quote, QuoteImport, SymbolSearchResult,
 };
@@ -90,7 +91,9 @@ async fn update_quote(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: true,
+            snapshot_mode: SnapshotRecalcMode::Full,
+            valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -108,7 +111,9 @@ async fn delete_quote(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: true,
+            snapshot_mode: SnapshotRecalcMode::Full,
+            valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -163,7 +168,9 @@ async fn import_quotes_csv(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            force_full_recalculation: true,
+            snapshot_mode: SnapshotRecalcMode::Full,
+            valuation_mode: ValuationRecalcMode::Full,
+            since_date: None,
         },
     );
 
@@ -206,7 +213,9 @@ async fn sync_market_data(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode,
-            force_full_recalculation: false,
+            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
+            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
+            since_date: None,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -234,6 +243,8 @@ struct ResolveSymbolQuoteQuery {
     symbol: String,
     exchange_mic: Option<String>,
     instrument_type: Option<String>,
+    quote_ccy: Option<String>,
+    provider_id: Option<String>,
 }
 
 async fn resolve_symbol_quote(
@@ -243,10 +254,16 @@ async fn resolve_symbol_quote(
     let inst_type = q
         .instrument_type
         .as_deref()
-        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+        .and_then(wealthfolio_core::assets::InstrumentType::from_external_str);
     let res = state
         .quote_service
-        .resolve_symbol_quote(&q.symbol, q.exchange_mic.as_deref(), inst_type.as_ref())
+        .resolve_symbol_quote(
+            &q.symbol,
+            q.exchange_mic.as_deref(),
+            inst_type.as_ref(),
+            q.quote_ccy.as_deref(),
+            q.provider_id.as_deref(),
+        )
         .await?;
     Ok(Json(res))
 }

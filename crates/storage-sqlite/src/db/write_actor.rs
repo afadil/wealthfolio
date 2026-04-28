@@ -4,8 +4,9 @@ use crate::sync::app_sync::ProjectedChange;
 use crate::sync::{flush_projected_outbox, OutboxWriteRequest, SyncOutboxModel};
 use diesel::SqliteConnection;
 use std::any::Any;
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, oneshot};
-use wealthfolio_core::errors::Result;
+use wealthfolio_core::errors::{DatabaseError, Error, Result};
 use wealthfolio_core::sync::SyncOperation;
 
 // Type alias for the job to be executed by the writer actor.
@@ -181,7 +182,7 @@ impl WriteProjection {
 
     pub fn capture_model_delete<T: SyncOutboxModel>(&mut self, model: &T) {
         if model.should_sync_outbox(SyncOperation::Delete) {
-            self.capture_delete::<T>(model.sync_entity_id().to_string());
+            self.capture_delete::<T>(model.sync_entity_id_owned());
         }
     }
 
@@ -198,7 +199,41 @@ impl WriteProjection {
 ///
 /// # Returns
 /// A `WriteHandle` to send jobs to the spawned actor.
-pub fn spawn_writer(pool: DbPool) -> WriteHandle {
+pub fn spawn_writer(pool: DbPool) -> Result<WriteHandle> {
+    fn acquire_writer_connection(pool: &DbPool) -> Result<super::DbConnection> {
+        const PER_ATTEMPT_TIMEOUT: Duration = Duration::from_millis(800);
+        const RETRY_SLEEP: Duration = Duration::from_millis(200);
+        const MAX_TOTAL_WAIT: Duration = Duration::from_secs(8);
+
+        let start = Instant::now();
+        let mut attempts: u32 = 0;
+        let mut last_err: Option<String> = None;
+
+        while start.elapsed() < MAX_TOTAL_WAIT {
+            attempts += 1;
+            match pool.get_timeout(PER_ATTEMPT_TIMEOUT) {
+                Ok(conn) => return Ok(conn),
+                Err(e) => {
+                    last_err = Some(e.to_string());
+                    log::warn!(
+                        "Writer actor init: pool.get_timeout() attempt {} failed ({}), retrying...",
+                        attempts,
+                        e
+                    );
+                    std::thread::sleep(RETRY_SLEEP);
+                }
+            }
+        }
+
+        let reason = last_err.unwrap_or_else(|| "unknown pool acquisition error".to_string());
+        Err(Error::Database(DatabaseError::ConnectionFailed(format!(
+            "Failed to initialize writer connection after {} attempts within {:?}: {}",
+            attempts, MAX_TOTAL_WAIT, reason
+        ))))
+    }
+
+    let mut conn = acquire_writer_connection(&pool)?;
+
     // Create an MPSC channel for sending jobs to the actor.
     // The channel is bounded; 1024 is an arbitrary size.
     let (tx, mut rx) = mpsc::channel::<(
@@ -207,10 +242,6 @@ pub fn spawn_writer(pool: DbPool) -> WriteHandle {
     )>(1024);
 
     tokio::spawn(async move {
-        // Acquire a single connection from the pool for this actor.
-        // This connection will be held for the lifetime of the actor.
-        let mut conn = pool.get().expect("Failed to get a connection from the DB pool for the writer actor. The pool might be exhausted or misconfigured.");
-
         // Loop to receive and process jobs.
         while let Some((job, reply_tx)) = rx.recv().await {
             // Execute the job within an immediate database transaction.
@@ -231,7 +262,7 @@ pub fn spawn_writer(pool: DbPool) -> WriteHandle {
         // so the actor can terminate.
     });
 
-    WriteHandle { tx }
+    Ok(WriteHandle { tx })
 }
 
 // Note: DbConnection (PooledConnection) derefs to SqliteConnection.

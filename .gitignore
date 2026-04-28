@@ -56,13 +56,15 @@ tsconfig.node.tsbuildinfo
 .stylelintcache
 
 # Database
-db/*
+./db/*
+apps/db/*
+apps/tauri/db/*
 
 # Rust/Cargo
 target/
 **/*.rs.bk
 
-# Tauri generated (schemas are auto-generated; apple project is manually maintained)
+# Tauri generated
 apps/tauri/gen/schemas/
 
 # OS generated files
@@ -84,8 +86,12 @@ src-tauri/dev.db
 /playwright/.auth/
 /AI-POC-COPY
 # AI tools
+.codex/
 .ralph-tui/
 .kiro/
 .conductor/
 db/
+apps/db/
+apps/tauri/db/
 tasks
+**/*.local.md

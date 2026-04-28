@@ -78,11 +78,11 @@ pub async fn check_for_updates(app_handle: AppHandle) -> Result<Option<serde_jso
     }
 }
 
-/// Download and install an available update. Shows native dialogs and restarts the app.
+/// Download and install an available update. Emits progress events and restarts the app.
 #[tauri::command]
 pub async fn install_app_update(app_handle: AppHandle) -> Result<(), String> {
     #[cfg(desktop)]
-    install_update(app_handle).await;
+    install_update(app_handle).await?;
     Ok(())
 }
 

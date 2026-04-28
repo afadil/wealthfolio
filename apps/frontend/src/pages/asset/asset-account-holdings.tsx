@@ -79,6 +79,7 @@ export function useHasManualSnapshots(assetId: string): boolean {
 export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHoldingsProps) {
   const { isBalanceHidden } = useBalancePrivacy();
   const { accounts } = useAccounts();
+  const isMobile = useIsMobileViewport();
 
   const { data: assetHoldings = [], isLoading } = useQuery<Holding[]>({
     queryKey: [QueryKeys.ASSET_HOLDINGS, assetId],
@@ -89,6 +90,53 @@ export function AssetAccountHoldings({ assetId, baseCurrency }: AssetAccountHold
   const accountsMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
 
   if (isLoading || assetHoldings.length === 0) return null;
+
+  if (isMobile) {
+    return (
+      <div className="space-y-2">
+        {assetHoldings.map((h) => {
+          const account = accountsMap.get(h.accountId);
+          const gainAmount = h.totalGain?.local ?? 0;
+          const gainPct = h.totalGainPct ?? 0;
+          const currency = h.localCurrency ?? baseCurrency;
+          return (
+            <div key={h.accountId} className="flex items-center gap-3 rounded-lg border p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-sm font-medium">{account?.name ?? h.accountId}</p>
+                  {account?.trackingMode === "HOLDINGS" && (
+                    <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]">
+                      Manual
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  <QuantityDisplay value={h.quantity} isHidden={isBalanceHidden} /> shares
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <AmountDisplay
+                  value={h.marketValue.local}
+                  currency={currency}
+                  isHidden={isBalanceHidden}
+                  className="text-sm"
+                />
+                <div className="flex items-center justify-end gap-1">
+                  <GainAmount
+                    value={gainAmount}
+                    currency={currency}
+                    displayCurrency={false}
+                    className="text-xs"
+                  />
+                  <GainPercent value={gainPct} className="text-xs" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border">

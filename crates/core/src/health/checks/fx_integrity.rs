@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 
 use crate::errors::Result;
-use crate::health::model::{FixAction, HealthCategory, HealthIssue, Severity};
+use crate::health::model::{AffectedItem, FixAction, HealthCategory, HealthIssue, Severity};
 use crate::health::traits::{HealthCheck, HealthContext};
 
 /// Data about a currency pair needed for FX checks.
@@ -47,27 +47,27 @@ impl FxIntegrityCheck {
             ctx.now - Duration::hours(ctx.config.fx_stale_critical_hours as i64);
 
         // Track issues by type
-        let mut missing_pairs: Vec<String> = Vec::new();
+        let mut missing_pairs: Vec<&FxPairInfo> = Vec::new();
         let mut missing_mv = 0.0;
-        let mut stale_warning_pairs: Vec<String> = Vec::new();
+        let mut stale_warning_pairs: Vec<&FxPairInfo> = Vec::new();
         let mut stale_warning_mv = 0.0;
-        let mut stale_error_pairs: Vec<String> = Vec::new();
+        let mut stale_error_pairs: Vec<&FxPairInfo> = Vec::new();
         let mut stale_error_mv = 0.0;
 
         for pair in fx_pairs {
             match pair.latest_quote_time {
                 Some(quote_time) => {
                     if quote_time < critical_threshold {
-                        stale_error_pairs.push(pair.pair_id.clone());
+                        stale_error_pairs.push(pair);
                         stale_error_mv += pair.affected_mv;
                     } else if quote_time < warning_threshold {
-                        stale_warning_pairs.push(pair.pair_id.clone());
+                        stale_warning_pairs.push(pair);
                         stale_warning_mv += pair.affected_mv;
                     }
                 }
                 None => {
                     // No rate exists at all
-                    missing_pairs.push(pair.pair_id.clone());
+                    missing_pairs.push(pair);
                     missing_mv += pair.affected_mv;
                 }
             }
@@ -91,13 +91,23 @@ impl FxIntegrityCheck {
             let title = if count == 1 {
                 format!(
                     "Missing exchange rate for {}",
-                    missing_pairs[0].split(':').next().unwrap_or("currency")
+                    missing_pairs[0].from_currency
                 )
             } else {
                 format!("Missing exchange rates for {} currencies", count)
             };
 
-            let data_hash = compute_data_hash(&missing_pairs, severity, mv_pct);
+            let pair_ids: Vec<String> = missing_pairs.iter().map(|p| p.pair_id.clone()).collect();
+            let affected_items: Vec<AffectedItem> = missing_pairs
+                .iter()
+                .map(|p| {
+                    AffectedItem::simple(
+                        &p.pair_id,
+                        format!("{} → {}", p.from_currency, p.to_currency),
+                    )
+                })
+                .collect();
+            let data_hash = compute_data_hash(&pair_ids, severity, mv_pct);
 
             issues.push(
                 HealthIssue::builder()
@@ -110,7 +120,8 @@ impl FxIntegrityCheck {
                     )
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
-                    .fix_action(FixAction::fetch_fx(missing_pairs))
+                    .fix_action(FixAction::fetch_fx(pair_ids))
+                    .affected_items(affected_items)
                     .data_hash(data_hash)
                     .build(),
             );
@@ -137,7 +148,20 @@ impl FxIntegrityCheck {
                 format!("Outdated exchange rates for {} currencies", count)
             };
 
-            let data_hash = compute_data_hash(&stale_error_pairs, severity, mv_pct);
+            let pair_ids: Vec<String> = stale_error_pairs
+                .iter()
+                .map(|p| p.pair_id.clone())
+                .collect();
+            let affected_items: Vec<AffectedItem> = stale_error_pairs
+                .iter()
+                .map(|p| {
+                    AffectedItem::simple(
+                        &p.pair_id,
+                        format!("{} → {}", p.from_currency, p.to_currency),
+                    )
+                })
+                .collect();
+            let data_hash = compute_data_hash(&pair_ids, severity, mv_pct);
 
             issues.push(
                 HealthIssue::builder()
@@ -150,7 +174,8 @@ impl FxIntegrityCheck {
                     )
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
-                    .fix_action(FixAction::fetch_fx(stale_error_pairs))
+                    .fix_action(FixAction::fetch_fx(pair_ids))
+                    .affected_items(affected_items)
                     .data_hash(data_hash)
                     .build(),
             );
@@ -177,7 +202,20 @@ impl FxIntegrityCheck {
                 format!("Exchange rate updates needed for {} currencies", count)
             };
 
-            let data_hash = compute_data_hash(&stale_warning_pairs, severity, mv_pct);
+            let pair_ids: Vec<String> = stale_warning_pairs
+                .iter()
+                .map(|p| p.pair_id.clone())
+                .collect();
+            let affected_items: Vec<AffectedItem> = stale_warning_pairs
+                .iter()
+                .map(|p| {
+                    AffectedItem::simple(
+                        &p.pair_id,
+                        format!("{} → {}", p.from_currency, p.to_currency),
+                    )
+                })
+                .collect();
+            let data_hash = compute_data_hash(&pair_ids, severity, mv_pct);
 
             issues.push(
                 HealthIssue::builder()
@@ -190,7 +228,8 @@ impl FxIntegrityCheck {
                     )
                     .affected_count(count as u32)
                     .affected_mv_pct(mv_pct)
-                    .fix_action(FixAction::fetch_fx(stale_warning_pairs))
+                    .fix_action(FixAction::fetch_fx(pair_ids))
+                    .affected_items(affected_items)
                     .data_hash(data_hash)
                     .build(),
             );

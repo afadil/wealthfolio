@@ -63,13 +63,13 @@ export function accountSupportsActivityType(account: Account, activityType: stri
 
 /**
  * Returns true if the account supports adding holdings directly.
- * Only true for manual HOLDINGS tracking mode accounts.
+ * True for any account in HOLDINGS tracking mode.
  */
 export function canAddHoldings(account: Account | undefined): boolean {
   if (!account) {
     return false;
   }
-  return account.trackingMode === "HOLDINGS" && !account.providerAccountId;
+  return account.trackingMode === "HOLDINGS";
 }
 
 /**

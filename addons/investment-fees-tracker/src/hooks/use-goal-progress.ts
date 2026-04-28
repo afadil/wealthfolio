@@ -11,11 +11,12 @@ interface UseGoalProgressOptions {
 
 export function useGoalProgress({ ctx }: UseGoalProgressOptions) {
   const { data: goals = [], isLoading: isLoadingGoals, error: goalsError } = useGoals({ ctx });
+  const goalIds = useMemo(() => goals.map((goal) => goal.id), [goals]);
   const {
     data: allocations = [],
     isLoading: isLoadingAllocations,
     error: allocationsError,
-  } = useGoalAllocations({ ctx });
+  } = useGoalAllocations({ ctx, goalIds });
   const {
     data: accounts = [],
     isLoading: isLoadingAccounts,

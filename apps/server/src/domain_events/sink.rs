@@ -3,13 +3,14 @@
 //! Receives domain events and sends them to a background queue worker
 //! for debounced processing.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use tokio::sync::mpsc;
-use wealthfolio_connect::BrokerSyncServiceTrait;
+use wealthfolio_connect::{BrokerSyncServiceTrait, TokenLifecycleState};
 use wealthfolio_core::{
     assets::AssetServiceTrait,
     events::{DomainEvent, DomainEventSink},
+    goals::GoalServiceTrait,
     secrets::SecretStore,
 };
 
@@ -68,8 +69,11 @@ impl WebDomainEventSink {
             dyn wealthfolio_core::portfolio::valuation::ValuationServiceTrait + Send + Sync,
         >,
         account_service: Arc<wealthfolio_core::accounts::AccountService>,
+        goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
         fx_service: Arc<dyn wealthfolio_core::fx::FxServiceTrait + Send + Sync>,
+        timezone: Arc<RwLock<String>>,
         secret_store: Arc<dyn SecretStore>,
+        token_lifecycle: Arc<TokenLifecycleState>,
     ) {
         let rx = self
             .rx
@@ -87,8 +91,11 @@ impl WebDomainEventSink {
             quote_service,
             valuation_service,
             account_service,
+            goal_service,
             fx_service,
+            timezone,
             secret_store,
+            token_lifecycle,
         });
 
         // Spawn the background worker

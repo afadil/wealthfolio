@@ -3,6 +3,7 @@ use super::registry::ServiceContext;
 use crate::domain_events::TauriDomainEventSink;
 use crate::secret_store::shared_secret_store;
 use crate::services::ConnectService;
+use log::error;
 use std::sync::{Arc, RwLock};
 use tokio::sync::mpsc;
 use wealthfolio_ai::{AiProviderService, ChatConfig, ChatService};
@@ -67,7 +68,10 @@ pub async fn initialize_context(
     db::run_migrations(&db_path)?;
 
     let pool = db::create_pool(&db_path)?;
-    let writer = write_actor::spawn_writer(pool.as_ref().clone());
+    let writer = write_actor::spawn_writer(pool.as_ref().clone()).map_err(|e| {
+        error!("Failed to initialize writer actor: {}", e);
+        e
+    })?;
 
     // Instantiate Repositories
     let settings_repository = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
@@ -106,9 +110,18 @@ pub async fn initialize_context(
     let settings = settings_service.get_settings()?;
     let base_currency_string = settings.base_currency.clone();
     let base_currency = Arc::new(RwLock::new(base_currency_string.clone()));
+    let timezone = Arc::new(RwLock::new(settings.timezone.clone()));
     let instance_id = Arc::new(settings.instance_id.clone());
 
     let secret_store = shared_secret_store();
+
+    // Custom provider repository
+    let custom_provider_repository = Arc::new(
+        wealthfolio_storage_sqlite::custom_provider::CustomProviderSqliteRepository::new(
+            pool.clone(),
+            writer.clone(),
+        ),
+    );
 
     // Quote sync state repository for optimized quote syncing
     let quote_sync_state_repository =
@@ -116,15 +129,24 @@ pub async fn initialize_context(
 
     // QuoteService provides all quote operations via QuoteServiceTrait
     let quote_service: Arc<dyn QuoteServiceTrait> = Arc::new(
-        QuoteService::new(
+        QuoteService::new_with_custom_provider(
             market_data_repo.clone(),            // QuoteStore
             quote_sync_state_repository.clone(), // SyncStateStore
             market_data_repo.clone(),            // ProviderSettingsStore
             asset_repository.clone(),            // AssetRepositoryTrait
             activity_repository.clone(),         // ActivityRepositoryTrait
             secret_store.clone(),
+            Some(custom_provider_repository.clone()),
         )
         .await?,
+    );
+
+    // Custom provider service
+    let custom_provider_service = Arc::new(
+        wealthfolio_core::custom_provider::CustomProviderService::new(
+            custom_provider_repository.clone(),
+            secret_store.clone(),
+        ),
     );
 
     // Create taxonomy service before asset service (needed for auto-classification)
@@ -167,22 +189,25 @@ pub async fn initialize_context(
         )
         .with_event_sink(domain_event_sink.clone()),
     );
-    let goal_service = Arc::new(GoalService::new(goal_repo.clone()));
-    let limits_service = Arc::new(ContributionLimitService::new(
+    let goal_service = Arc::new(GoalService::new(goal_repo.clone(), account_service.clone()));
+    let limits_service = Arc::new(ContributionLimitService::new_with_timezone(
         fx_service.clone(),
         limit_repository.clone(),
         activity_repository.clone(),
+        timezone.clone(),
     ));
 
-    let income_service = Arc::new(IncomeService::new(
+    let income_service = Arc::new(IncomeService::new_with_timezone(
         fx_service.clone(),
         activity_repository.clone(),
         base_currency.clone(),
+        timezone.clone(),
     ));
 
     let snapshot_service = Arc::new(
-        SnapshotService::new(
+        SnapshotService::new_with_timezone(
             base_currency.clone(),
+            timezone.clone(),
             account_repository.clone(),
             activity_repository.clone(),
             snapshot_repository.clone(),
@@ -192,9 +217,10 @@ pub async fn initialize_context(
         .with_event_sink(domain_event_sink.clone()),
     );
 
-    let holdings_valuation_service = Arc::new(HoldingsValuationService::new(
+    let holdings_valuation_service = Arc::new(HoldingsValuationService::new_with_timezone(
         fx_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
 
     let valuation_service = Arc::new(ValuationService::new(
@@ -205,18 +231,20 @@ pub async fn initialize_context(
         fx_service.clone(),
     ));
 
-    let performance_service = Arc::new(PerformanceService::new(
+    let performance_service = Arc::new(PerformanceService::new_with_timezone(
         valuation_service.clone(),
         quote_service.clone(),
+        timezone.clone(),
     ));
 
     let classification_service =
         Arc::new(AssetClassificationService::new(taxonomy_service.clone()));
-    let holdings_service = Arc::new(HoldingsService::new(
+    let holdings_service = Arc::new(HoldingsService::new_with_timezone(
         asset_service.clone(),
         snapshot_service.clone(),
         holdings_valuation_service.clone(),
         classification_service.clone(),
+        timezone.clone(),
     ));
 
     let allocation_service = Arc::new(AllocationService::new(
@@ -272,10 +300,11 @@ pub async fn initialize_context(
             snapshot_repository.clone(),
         )
         .with_event_sink(domain_event_sink.clone())
-        .with_snapshot_service(snapshot_service.clone()),
+        .with_snapshot_service(snapshot_service.clone())
+        .with_quote_store(market_data_repo.clone()),
     );
 
-    let connect_service = Arc::new(ConnectService::new());
+    let connect_service = Arc::new(ConnectService::new(secret_store.clone()));
 
     // AI provider service - catalog is embedded at compile time
     let ai_catalog_json = include_str!("../../../../crates/ai/src/ai_providers.json");
@@ -287,6 +316,11 @@ pub async fn initialize_context(
 
     // AI chat repository for thread/message persistence
     let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
+
+    // Health service for portfolio health diagnostics
+    let health_dismissal_repository =
+        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
+    let health_service = Arc::new(HealthService::new(health_dismissal_repository));
 
     // Create AI environment and chat service
     let ai_environment = Arc::new(TauriAiEnvironment::new(
@@ -303,6 +337,7 @@ pub async fn initialize_context(
         allocation_service.clone(),
         performance_service.clone(),
         income_service.clone(),
+        health_service.clone(),
     ));
     let ai_chat_service = Arc::new(ChatService::new(ai_environment, ChatConfig::default()));
 
@@ -318,14 +353,10 @@ pub async fn initialize_context(
     ));
     let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());
 
-    // Health service for portfolio health diagnostics
-    let health_dismissal_repository =
-        Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
-    let health_service = Arc::new(HealthService::new(health_dismissal_repository));
-
     Ok(ContextInitResult {
         context: ServiceContext {
             base_currency,
+            timezone,
             instance_id,
             domain_event_sink,
             settings_service,
@@ -356,6 +387,7 @@ pub async fn initialize_context(
             device_enroll_service,
             device_sync_runtime,
             health_service,
+            custom_provider_service,
         },
         event_receiver,
     })

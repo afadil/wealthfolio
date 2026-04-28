@@ -1,33 +1,15 @@
-import { useState } from "react";
-import { Avatar, AvatarImage, AvatarFallback } from "@wealthfolio/ui";
+import { TickerAvatar as BaseTickerAvatar } from "@wealthfolio/ui";
+import { parseOccSymbol } from "../lib/utils";
 
 interface TickerAvatarProps {
   symbol: string;
   className?: string;
 }
 
-export const TickerAvatar = ({ symbol, className = "w-8 h-8" }: TickerAvatarProps) => {
-  const [logoError, setLogoError] = useState(false);
+export const TickerAvatar = ({ symbol, className }: TickerAvatarProps) => {
+  // For OCC option symbols (e.g. "AAPL250321C00150000"), use the underlying ticker for logo
+  const parsed = symbol ? parseOccSymbol(symbol) : null;
+  const logoSymbol = parsed ? parsed.underlying : symbol;
 
-  // Extract the base symbol (before any dot or hyphen) for logo lookup and display
-  const baseSymbol = symbol ? symbol.split(/[.-]/)[0].toUpperCase() : "";
-  const logoUrl = baseSymbol ? `/ticker-logos/${baseSymbol}.png` : "";
-
-  return (
-    <Avatar
-      className={`bg-primary border-white/20 p-1.5 text-white backdrop-blur-md dark:bg-white/10 ${className}`}
-    >
-      {!logoError && baseSymbol && (
-        <AvatarImage
-          src={logoUrl}
-          alt={baseSymbol}
-          onError={() => setLogoError(true)}
-          className="object-contain p-0.5"
-        />
-      )}
-      <AvatarFallback className="bg-transparent text-xs font-medium">
-        {baseSymbol ? baseSymbol : "•"}
-      </AvatarFallback>
-    </Avatar>
-  );
+  return <BaseTickerAvatar symbol={logoSymbol} className={className} />;
 };

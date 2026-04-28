@@ -56,7 +56,44 @@ const CATEGORY_LABELS: Record<HealthCategory, { label: string; description: stri
     description:
       "Some accounts need configuration before data can be synced. Set tracking mode to start importing data.",
   },
+  SETTINGS_CONFIGURATION: {
+    label: "Settings",
+    description:
+      "Some application settings need attention to ensure data is interpreted correctly.",
+  },
 };
+
+function getCategoryConfigForIssue(issue: HealthIssue): { label: string; description: string } {
+  if (issue.category !== "SETTINGS_CONFIGURATION") {
+    return CATEGORY_LABELS[issue.category];
+  }
+
+  if (issue.id.startsWith("timezone_missing:")) {
+    return {
+      label: "Timezone Settings",
+      description:
+        "Your app timezone is not configured. Until you set it, user-facing dates may not match your locale.",
+    };
+  }
+
+  if (issue.id.startsWith("timezone_invalid:")) {
+    return {
+      label: "Timezone Settings",
+      description:
+        "Your configured timezone is invalid. Update it in General settings to restore consistent date handling.",
+    };
+  }
+
+  if (issue.id.startsWith("timezone_mismatch:")) {
+    return {
+      label: "Timezone Settings",
+      description:
+        "Your browser timezone differs from the configured app timezone. Portfolio dates follow the configured timezone.",
+    };
+  }
+
+  return CATEGORY_LABELS.SETTINGS_CONFIGURATION;
+}
 
 export function IssueDetailSheet({
   issue,
@@ -70,7 +107,19 @@ export function IssueDetailSheet({
   if (!issue) return null;
 
   const severityConfig = SEVERITY_CONFIG[issue.severity];
-  const categoryConfig = CATEGORY_LABELS[issue.category];
+  const categoryConfig = getCategoryConfigForIssue(issue);
+  const navigateActionRoute = issue.navigateAction
+    ? `${issue.navigateAction.route}${
+        issue.navigateAction.query
+          ? `?${new URLSearchParams(
+              Object.entries(issue.navigateAction.query).map(([key, value]) => [
+                key,
+                String(value),
+              ]),
+            ).toString()}`
+          : ""
+      }`
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -161,7 +210,7 @@ export function IssueDetailSheet({
               <h4 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                 Details
               </h4>
-              <p className="text-muted-foreground text-sm">{issue.details}</p>
+              <p className="text-muted-foreground whitespace-pre-line text-sm">{issue.details}</p>
             </div>
           )}
         </div>
@@ -189,10 +238,10 @@ export function IssueDetailSheet({
 
           {issue.navigateAction && (
             <Button variant="outline" className="w-full" asChild>
-              <a href={issue.navigateAction.route}>
+              <Link to={navigateActionRoute ?? issue.navigateAction.route}>
                 <Icons.ArrowRight className="mr-2 h-4 w-4" />
                 {issue.navigateAction.label}
-              </a>
+              </Link>
             </Button>
           )}
 

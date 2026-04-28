@@ -37,7 +37,8 @@ pub async fn install_addon_zip(
 
     // Write all addon files
     for file in &extracted.files {
-        let file_path = addon_dir.join(&file.name);
+        let relative_path = addons::validated_addon_archive_path(&file.name)?;
+        let file_path = addon_dir.join(relative_path);
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create file directory: {}", e))?;

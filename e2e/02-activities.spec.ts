@@ -79,6 +79,33 @@ test.describe("Activity Creation Tests", () => {
         amount: 1000,
         notes: "Transfer between accounts",
       },
+      externalCashTransferOut: {
+        account: "Test USD Account",
+        currency: "USD",
+        amount: 500,
+        notes: "External cash transfer out",
+      },
+      externalCashTransferIn: {
+        account: "Test USD Account",
+        currency: "USD",
+        amount: 750,
+        notes: "External cash transfer in",
+      },
+      internalSecuritiesTransfer: {
+        fromAccount: "Test USD Account",
+        toAccount: "Test CAD Account",
+        symbol: "AAPL",
+        quantity: 1,
+        notes: "Internal securities transfer",
+      },
+      externalSecuritiesTransferIn: {
+        account: "Test USD Account",
+        currency: "USD",
+        symbol: "MSFT",
+        quantity: 2,
+        costBasis: 400,
+        notes: "External securities transfer in",
+      },
       fee: {
         account: "Test USD Account",
         currency: "USD",
@@ -242,34 +269,26 @@ test.describe("Activity Creation Tests", () => {
 
   async function fillAmount(value: number, testId = "amount-input") {
     const amountInput = page.getByTestId(testId);
-    await amountInput.click();
-    await amountInput.press("Control+a");
-    await amountInput.type(String(value), { delay: 50 });
+    await amountInput.fill(String(value));
     await amountInput.blur();
     await page.waitForTimeout(200);
   }
 
   async function fillQuantity(value: number) {
     const quantityInput = page.getByTestId("quantity-input");
-    await quantityInput.click();
-    await quantityInput.press("Control+a");
-    await quantityInput.type(String(value), { delay: 50 });
+    await quantityInput.fill(String(value));
     await quantityInput.blur();
   }
 
   async function fillPrice(value: number) {
     const priceInput = page.getByTestId("price-input");
-    await priceInput.click();
-    await priceInput.press("Control+a");
-    await priceInput.type(String(value), { delay: 50 });
+    await priceInput.fill(String(value));
     await priceInput.blur();
   }
 
   async function fillFee(value: number) {
     const feeInput = page.getByTestId("fee-input");
-    await feeInput.click();
-    await feeInput.press("Control+a");
-    await feeInput.type(String(value), { delay: 50 });
+    await feeInput.fill(String(value));
     await feeInput.blur();
   }
 
@@ -302,9 +321,7 @@ test.describe("Activity Creation Tests", () => {
   async function fillFxRate(rate: number) {
     const fxRateInput = page.getByTestId("fx-rate-input");
     await expect(fxRateInput).toBeVisible({ timeout: 5000 });
-    await fxRateInput.click();
-    await fxRateInput.press("Control+a");
-    await fxRateInput.type(String(rate), { delay: 50 });
+    await fxRateInput.fill(String(rate));
     await fxRateInput.blur();
   }
 
@@ -312,10 +329,14 @@ test.describe("Activity Creation Tests", () => {
     // Transfer form has dynamic button text (e.g., "Transfer 1,000.00" when amount is filled)
     // We need to match the submit button specifically, not the activity type picker
     // Other forms use "Add {type}" pattern
-    const buttonPattern =
-      activityType === "Transfer"
-        ? /^Transfer\s+[\d,]+/i // Matches "Transfer 1,000.00" (submit button with amount)
-        : new RegExp(`Add ${activityType}`, "i");
+    let buttonPattern: RegExp;
+    if (activityType.startsWith("Transfer")) {
+      // Matches "Transfer 1,000.00", "Transfer Out $500.00", "Transfer In 2 MSFT", etc.
+      // Won't match the bare "Transfer" activity type selector button
+      buttonPattern = new RegExp(`^${activityType}\\s+`, "i");
+    } else {
+      buttonPattern = new RegExp(`Add ${activityType}`, "i");
+    }
     const submitButton = page.getByRole("button", { name: buttonPattern });
     await expect(submitButton).toBeEnabled({ timeout: 5000 });
     await submitButton.click();
@@ -618,6 +639,129 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("TRANSFER_OUT", null, { amount: transfer.amount });
   });
 
+  test("10b. Create external TRANSFER OUT (cash)", async () => {
+    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
+
+    await openAddActivitySheet();
+    await selectActivityType("Transfer");
+
+    const transfer = TEST_DATA.activities.externalCashTransferOut;
+
+    // Check "External transfer" checkbox
+    await page.getByLabel("External transfer").click();
+    await page.waitForTimeout(200);
+
+    // Select "Out" direction (default is "in")
+    await page.locator("#direction-out").click();
+    await page.waitForTimeout(200);
+
+    // Select account (label is "From Account" for external out)
+    await selectAccount(transfer.account, transfer.currency, "From Account");
+    await selectDate();
+    await fillAmount(transfer.amount);
+    await fillNotes(transfer.notes);
+
+    await submitActivity("Transfer Out");
+    await verifyActivityInTable("TRANSFER_OUT", null, { amount: transfer.amount });
+  });
+
+  test("10c. Create external TRANSFER IN (cash)", async () => {
+    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
+
+    await openAddActivitySheet();
+    await selectActivityType("Transfer");
+
+    const transfer = TEST_DATA.activities.externalCashTransferIn;
+
+    // Check "External transfer" checkbox
+    await page.getByLabel("External transfer").click();
+    await page.waitForTimeout(200);
+
+    // Explicitly select "In" direction
+    await page.locator("#direction-in").click();
+    await page.waitForTimeout(200);
+
+    // Select account (label is "To Account" for external in)
+    await selectAccount(transfer.account, transfer.currency, "To Account");
+    await selectDate();
+    await fillAmount(transfer.amount);
+    await fillNotes(transfer.notes);
+
+    await submitActivity("Transfer In");
+    await verifyActivityInTable("TRANSFER_IN", null, { amount: transfer.amount });
+  });
+
+  test("10d. Create internal TRANSFER (securities)", async () => {
+    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
+
+    await openAddActivitySheet();
+    await selectActivityType("Transfer");
+
+    const transfer = TEST_DATA.activities.internalSecuritiesTransfer;
+
+    // Switch to securities mode
+    await page.getByRole("button", { name: "Securities" }).click();
+    await page.waitForTimeout(200);
+
+    // Select from/to accounts (internal transfer)
+    await selectAccount("Test USD Account", "USD", "From Account");
+    await selectAccount("Test CAD Account", "CAD", "To Account");
+
+    // Search and select symbol
+    await searchAndSelectSymbol(transfer.symbol);
+    await selectDate();
+    await fillQuantity(transfer.quantity);
+    await fillNotes(transfer.notes);
+
+    await submitActivity("Transfer");
+    // Internal transfer creates paired activities
+    await verifyActivityInTable("TRANSFER_OUT", transfer.symbol, { quantity: transfer.quantity });
+  });
+
+  test("10e. Create external TRANSFER IN (securities)", async () => {
+    await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
+
+    await openAddActivitySheet();
+    await selectActivityType("Transfer");
+
+    const transfer = TEST_DATA.activities.externalSecuritiesTransferIn;
+
+    // Switch to securities mode
+    await page.getByRole("button", { name: "Securities" }).click();
+    await page.waitForTimeout(200);
+
+    // Check "External transfer" checkbox
+    await page.getByLabel("External transfer").click();
+    await page.waitForTimeout(200);
+
+    // Explicitly select "In" direction
+    await page.locator("#direction-in").click();
+    await page.waitForTimeout(200);
+
+    // Select account (label is "To Account" for external in)
+    await selectAccount(transfer.account, transfer.currency, "To Account");
+
+    // Search and select symbol
+    await searchAndSelectSymbol(transfer.symbol);
+    await selectDate();
+    await fillQuantity(transfer.quantity);
+
+    // Cost basis required for external securities transfer in
+    const costBasisInput = page.getByTestId("cost-basis-input");
+    await costBasisInput.fill(String(transfer.costBasis));
+    await costBasisInput.blur();
+    await page.waitForTimeout(200);
+
+    await fillNotes(transfer.notes);
+
+    await submitActivity("Transfer In");
+    await verifyActivityInTable("TRANSFER_IN", transfer.symbol, { quantity: transfer.quantity });
+  });
+
   test("11. Create FEE activity", async () => {
     await page.goto(`${BASE_URL}/activities`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible({ timeout: 10000 });
@@ -683,9 +827,7 @@ test.describe("Activity Creation Tests", () => {
 
     // Fill split ratio
     const splitRatioInput = page.getByLabel("Split Ratio");
-    await splitRatioInput.click();
-    await splitRatioInput.press("Control+a");
-    await splitRatioInput.type(String(split.splitRatio), { delay: 50 });
+    await splitRatioInput.fill(String(split.splitRatio));
     await splitRatioInput.blur();
 
     await fillNotes(split.notes);
@@ -732,10 +874,7 @@ test.describe("Activity Creation Tests", () => {
     await nameInput.fill(customBuy.customAsset.name);
 
     // Select asset type
-    const assetTypeSelect = page
-      .locator("button")
-      .filter({ hasText: /Security|Cryptocurrency|Other/i })
-      .first();
+    const assetTypeSelect = page.getByRole("combobox", { name: "Asset Type" });
     await assetTypeSelect.click();
     await page.getByRole("option", { name: customBuy.customAsset.assetType }).click();
 
@@ -837,13 +976,14 @@ test.describe("Activity Creation Tests", () => {
 
     // Count activity rows - we created activities:
     // deposit, withdrawal, 2 buys, sell, 2 dividends,
-    // internal transfer (creates 2), external transfer in, external transfer out, securities transfer (creates 2),
+    // internal cash transfer (creates 2), external cash transfer out (1), external cash transfer in (1),
+    // internal securities transfer (creates 2), external securities transfer in (1),
     // 1 fee, interest, 1 tax, split, custom buy
-    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 1 + 1 + 1 + 1 + 1 = 18
+    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 1 + 1 + 1 + 1 + 1 + 1 = 19
     const activityRows = page.locator("tbody tr");
     const rowCount = await activityRows.count();
 
-    // We should have at least 18 activities
-    expect(rowCount).toBeGreaterThanOrEqual(18);
+    // We should have at least 19 activities
+    expect(rowCount).toBeGreaterThanOrEqual(19);
   });
 });

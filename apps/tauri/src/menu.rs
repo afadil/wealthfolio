@@ -4,8 +4,6 @@ use tauri_plugin_dialog::DialogExt;
 
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
-        .item(&MenuItemBuilder::with_id("check_for_update", "Check for Update").build(app)?)
-        .separator()
         .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
         .separator()
         .item(&PredefinedMenuItem::hide(app, None).unwrap())

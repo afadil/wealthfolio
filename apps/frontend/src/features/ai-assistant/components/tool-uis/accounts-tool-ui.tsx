@@ -1,15 +1,17 @@
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-// No required args for get_accounts
-type GetAccountsArgs = Record<string, never>;
+interface GetAccountsArgs {
+  displayMode?: "compact" | "full";
+}
 
 interface AccountDto {
   id: string;
@@ -197,7 +199,7 @@ function ErrorState({ message }: { message?: string }) {
 
 type AccountsToolUIContentProps = ToolCallMessagePartProps<GetAccountsArgs, GetAccountsResult>;
 
-function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
+function AccountsToolUIContentImpl({ args, result, status }: AccountsToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const parsed = useMemo(() => normalizeResult(result, baseCurrency), [baseCurrency, result]);
@@ -217,6 +219,15 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
 
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return (
+      <CompactToolCard
+        label={`Fetched ${parsed.accounts.length} account${parsed.accounts.length !== 1 ? "s" : ""}`}
+      />
+    );
+  }
 
   // Show loading skeleton while running
   if (isLoading) {
@@ -267,6 +278,8 @@ function AccountsToolUIContent({ result, status }: AccountsToolUIContentProps) {
 // ============================================================================
 // Export
 // ============================================================================
+
+const AccountsToolUIContent = memo(AccountsToolUIContentImpl);
 
 export const AccountsToolUI = makeAssistantToolUI<GetAccountsArgs, GetAccountsResult>({
   toolName: "get_accounts",

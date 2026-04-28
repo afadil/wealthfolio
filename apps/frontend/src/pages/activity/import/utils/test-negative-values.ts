@@ -1,5 +1,5 @@
 import { validateActivityImport, calculateCashActivityAmount } from "./validation-utils";
-import { ImportFormat, ActivityType } from "@/lib/types";
+import { ImportFormat, ActivityType, ImportType } from "@/lib/types";
 
 // Test data with negative values (simulating broker exports that use negatives for direction)
 const testData = [
@@ -29,6 +29,7 @@ const testData = [
 
 const mapping = {
   accountId: "test-account",
+  importType: ImportType.ACTIVITY,
   name: "Test Mapping",
   fieldMappings: {
     [ImportFormat.DATE]: "date",

@@ -103,15 +103,19 @@ export function useExecuteHealthFix() {
       // Execute the fix
       await executeHealthFix(action);
       // Run health checks to get fresh status
-      return runHealthChecks();
+      const status = await runHealthChecks();
+      return { status, actionId: action.id };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ status, actionId }) => {
       // Update health status with fresh data from health checks
-      queryClient.setQueryData([QueryKeys.HEALTH_STATUS], data);
+      queryClient.setQueryData([QueryKeys.HEALTH_STATUS], status);
       // Invalidate holdings so related pages refresh
       queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.PORTFOLIO_ALLOCATIONS] });
-      toast.success("Fix applied successfully");
+      // Skip toast for sync actions — global event listeners handle feedback
+      if (actionId !== "sync_prices" && actionId !== "retry_sync") {
+        toast.success("Fix applied successfully");
+      }
     },
     onError: (error: Error) => {
       toast.error("Fix failed", { description: error.message });

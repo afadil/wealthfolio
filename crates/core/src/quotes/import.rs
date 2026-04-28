@@ -21,7 +21,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::model::{DataSource, Quote};
+use super::constants::DATA_SOURCE_MANUAL;
+use super::model::Quote;
 use super::store::QuoteStore;
 use super::types::{quote_id, AssetId, Currency, Day, QuoteSource};
 use crate::errors::{Result, ValidationError};
@@ -119,8 +120,11 @@ impl ValidationStatus {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuoteImport {
-    /// The asset identifier for the quote.
+    /// The asset identifier for the quote (replaced with asset ID after validation).
     pub symbol: String,
+    /// The original symbol from CSV, preserved for display.
+    #[serde(default)]
+    pub display_symbol: Option<String>,
     /// Date in ISO format (YYYY-MM-DD).
     pub date: String,
     /// Opening price (optional, defaults to close if not provided).
@@ -147,6 +151,7 @@ impl QuoteImport {
     pub fn new(symbol: String, date: String, close: Decimal, currency: String) -> Self {
         Self {
             symbol,
+            display_symbol: None,
             date,
             open: None,
             high: None,
@@ -173,6 +178,7 @@ impl QuoteImport {
     ) -> Self {
         Self {
             symbol,
+            display_symbol: None,
             date,
             open: Some(open),
             high: Some(high),
@@ -597,7 +603,7 @@ impl QuoteImportService {
             adjclose: validation.close,
             volume: validation.volume.unwrap_or(Decimal::ZERO),
             currency: validation.currency.0,
-            data_source: DataSource::Manual,
+            data_source: DATA_SOURCE_MANUAL.to_string(),
             created_at: Utc::now(),
             notes: None,
         }
@@ -924,7 +930,7 @@ mod tests {
             adjclose: Decimal::new(150, 0),
             volume: Decimal::new(1000000, 0),
             currency: "USD".to_string(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };
@@ -953,7 +959,7 @@ mod tests {
             adjclose: Decimal::new(150, 0),
             volume: Decimal::ZERO,
             currency: "USD".to_string(),
-            data_source: DataSource::Manual,
+            data_source: "MANUAL".to_string(),
             created_at: Utc::now(),
             notes: None,
         };

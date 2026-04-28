@@ -2,13 +2,18 @@ import { TickerAvatar } from "@/components/ticker-avatar";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import {
   calculateActivityValue,
+  formatSplitRatio,
+  isAssetBackedIncomeActivity,
   isCashActivity,
   isCashTransfer,
   isFeeActivity,
   isIncomeActivity,
+  isSecuritiesTransfer,
   isSplitActivity,
 } from "@/lib/activity-utils";
 import { ActivityType, ActivityTypeNames } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { formatAmount, Separator } from "@wealthfolio/ui";
@@ -31,6 +36,9 @@ export const ActivityTableMobile = ({
   handleDelete,
   onDuplicate,
 }: ActivityTableMobileProps) => {
+  const { settings } = useSettingsContext();
+  const appTimezone = settings?.timezone?.trim() || undefined;
+
   if (activities.length === 0) {
     return (
       <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
@@ -49,14 +57,23 @@ export const ActivityTableMobile = ({
         const activityType = activity.activityType;
         const isTransferActivity =
           activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
-        const hasAsset = Boolean(activity.assetId?.trim());
+        const isAssetBackedIncome = isAssetBackedIncomeActivity(
+          activityType,
+          symbol,
+          activity.assetId,
+        );
         const isCash = isTransferActivity
-          ? !hasAsset || isCashTransfer(activityType, symbol)
-          : isCashActivity(activityType);
-        const displaySymbol = isCash ? "Cash" : symbol;
+          ? isCashTransfer(activityType, symbol, activity.assetId)
+          : isCashActivity(activityType) && !isAssetBackedIncome;
+        const hasAsset = Boolean(activity.assetId?.trim());
+        const isOptionActivity = activity.instrumentType === "OPTION";
+        const parsedOption = isOptionActivity ? parseOccSymbol(symbol) : null;
+        const displaySymbol = isCash ? "Cash" : parsedOption ? parsedOption.underlying : symbol;
         const avatarSymbol = isCash ? "$CASH" : symbol;
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const formattedDate = formatDateTime(activity.date, userTimezone);
+        const optionSubtitle = parsedOption
+          ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+          : null;
+        const formattedDate = formatDateTime(activity.date, appTimezone);
         const displayValue = calculateActivityValue(activity);
 
         // Compact View
@@ -78,16 +95,23 @@ export const ActivityTableMobile = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-muted-foreground text-xs">{activityTypeLabel}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {optionSubtitle
+                            ? `${activityTypeLabel} · ${optionSubtitle}`
+                            : activityTypeLabel}
+                        </p>
                         <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                           <span>{formattedDate.date}</span>
-                          {!isCashActivity(activity.activityType) &&
-                            !isIncomeActivity(activity.activityType) &&
+                          {!isCash &&
+                            !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                             !isSplitActivity(activity.activityType) &&
-                            !isFeeActivity(activity.activityType) && (
+                            !isFeeActivity(activity.activityType) &&
+                            activity.quantity && (
                               <>
                                 <span>•</span>
-                                <span>{activity.quantity} shares</span>
+                                <span>
+                                  {activity.quantity} {isOptionActivity ? "contracts" : "shares"}
+                                </span>
                               </>
                             )}
                         </div>
@@ -129,7 +153,7 @@ export const ActivityTableMobile = ({
                       <div>
                         <p className="font-semibold">{displaySymbol}</p>
                         <p className="text-muted-foreground text-xs">
-                          {isCash ? activity.currency : activity.assetName}
+                          {isCash ? activity.currency : (optionSubtitle ?? activity.assetName)}
                         </p>
                       </div>
                     </>
@@ -172,12 +196,15 @@ export const ActivityTableMobile = ({
                 </div>
 
                 {/* Quantity (if applicable) */}
-                {!isCashActivity(activity.activityType) &&
-                  !isIncomeActivity(activity.activityType) &&
+                {!isCash &&
+                  !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                   !isSplitActivity(activity.activityType) &&
-                  !isFeeActivity(activity.activityType) && (
+                  !isFeeActivity(activity.activityType) &&
+                  activity.quantity && (
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Shares</span>
+                      <span className="text-muted-foreground">
+                        {isOptionActivity ? "Contracts" : "Shares"}
+                      </span>
                       <span className="font-medium">{activity.quantity}</span>
                     </div>
                   )}
@@ -187,20 +214,34 @@ export const ActivityTableMobile = ({
                   <span className="text-muted-foreground">
                     {activity.activityType === "SPLIT"
                       ? "Ratio"
-                      : isCashActivity(activity.activityType) ||
-                          isCashTransfer(activity.activityType, symbol) ||
-                          isIncomeActivity(activity.activityType)
+                      : (isCashActivity(activity.activityType) &&
+                            !isAssetBackedIncome &&
+                            !isSecuritiesTransfer(
+                              activity.activityType,
+                              symbol,
+                              activity.assetId,
+                            )) ||
+                          isCashTransfer(activity.activityType, symbol, activity.assetId) ||
+                          (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                         ? "Amount"
-                        : "Price"}
+                        : isOptionActivity
+                          ? "Premium"
+                          : "Price"}
                   </span>
                   <span className="font-medium">
                     {activity.activityType === "FEE"
                       ? "-"
                       : activity.activityType === "SPLIT"
-                        ? `${Number(activity.amount).toFixed(0)} : 1`
-                        : isCashActivity(activity.activityType) ||
-                            isCashTransfer(activity.activityType, symbol) ||
-                            isIncomeActivity(activity.activityType)
+                        ? formatSplitRatio(Number(activity.amount))
+                        : (isCashActivity(activity.activityType) &&
+                              !isAssetBackedIncome &&
+                              !isSecuritiesTransfer(
+                                activity.activityType,
+                                symbol,
+                                activity.assetId,
+                              )) ||
+                            isCashTransfer(activity.activityType, symbol, activity.assetId) ||
+                            (isIncomeActivity(activity.activityType) && !isAssetBackedIncome)
                           ? formatAmount(Number(activity.amount), activity.currency)
                           : formatAmount(Number(activity.unitPrice), activity.currency)}
                   </span>

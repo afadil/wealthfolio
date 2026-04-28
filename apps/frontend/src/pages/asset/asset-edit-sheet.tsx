@@ -1,26 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { getExchanges, resolveSymbolQuote } from "@/adapters";
+import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
+import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
+import { TickerAvatar } from "@/components/ticker-avatar";
+import { useCustomProviders } from "@/hooks/use-custom-providers";
+import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
+import { useTaxonomies } from "@/hooks/use-taxonomies";
+import type { Asset, Quote } from "@/lib/types";
+import { formatAmount } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  ResponsiveSelect,
-  type ResponsiveSelectOption,
-  SearchableSelect,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Switch,
-  Label,
   Alert,
   AlertDescription,
   CurrencyInput,
+  Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  ResponsiveSelect,
+  type ResponsiveSelectOption,
+  SearchableSelect,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  Switch,
 } from "@wealthfolio/ui";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Form,
   FormControl,
@@ -29,30 +37,25 @@ import {
   FormLabel,
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
-import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
-import { Badge } from "@wealthfolio/ui/components/ui/badge";
+import { Input } from "@wealthfolio/ui/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@wealthfolio/ui/components/ui/select";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { TickerAvatar } from "@/components/ticker-avatar";
-import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
-import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
-import { useTaxonomies } from "@/hooks/use-taxonomies";
-import { EDITABLE_ASSET_KINDS, ASSET_KIND_DISPLAY_NAMES, type AssetKind } from "@/lib/constants";
-import type { Asset, Quote } from "@/lib/types";
-import { formatAmount } from "@/lib/utils";
-import { getExchanges } from "@/adapters";
-import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui/components/ui/tabs";
+import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
+import * as z from "zod";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
-
-const PROVIDERS = [
-  { value: "YAHOO", label: "Yahoo Finance" },
-  { value: "ALPHA_VANTAGE", label: "Alpha Vantage" },
-  { value: "FINNHUB", label: "Finnhub" },
-  { value: "MARKETDATA_APP", label: "MarketData.app" },
-] as const;
 
 // Schema for a single provider override (type is derived from asset kind)
 const providerOverrideSchema = z.object({
@@ -81,7 +84,7 @@ type QuoteMode = (typeof QuoteMode)[keyof typeof QuoteMode];
 const assetFormSchema = z.object({
   name: z.string().optional(),
   notes: z.string().optional(),
-  kind: z.string().optional(),
+  instrumentType: z.string().optional(),
   quoteCcy: z.string().min(1, "Currency is required"),
   instrumentExchangeMic: z.string().optional(),
   quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
@@ -94,11 +97,39 @@ type ProviderOverride = z.infer<typeof providerOverrideSchema>;
 
 const normalizeMic = (mic?: string | null): string => mic?.trim().toUpperCase() ?? "";
 
-// Convert asset kind options from constants
-const kindOptions: ResponsiveSelectOption[] = EDITABLE_ASSET_KINDS.map((kind) => ({
-  label: ASSET_KIND_DISPLAY_NAMES[kind],
-  value: kind,
-}));
+const PROVIDER_SYMBOL_HINTS: Record<string, string> = {
+  YAHOO: "e.g. AAPL, LYMS.DE",
+  COINGECKO: "e.g. bitcoin, ethereum",
+  TWELVEDATA: "e.g. AAPL, EUR/USD",
+};
+
+function getSymbolPlaceholder(provider: string): string {
+  return PROVIDER_SYMBOL_HINTS[provider] ?? "e.g. AAPL";
+}
+
+function isResolvedByRequestedProvider(
+  resolvedProviderId: string | undefined,
+  requestedProvider: string | undefined,
+): boolean {
+  const requested = requestedProvider?.trim();
+  if (!requested) return true;
+  if (!resolvedProviderId) return false;
+
+  if (requested.startsWith("CUSTOM:")) {
+    const customProviderId = requested.slice("CUSTOM:".length);
+    return resolvedProviderId === `CUSTOM_SCRAPER:${customProviderId}`;
+  }
+
+  return resolvedProviderId === requested;
+}
+
+const EDIT_INSTRUMENT_TYPE_OPTIONS = [
+  { value: "EQUITY", label: "Equity (Stock, ETF, Fund)" },
+  { value: "CRYPTO", label: "Cryptocurrency" },
+  { value: "BOND", label: "Bond" },
+  { value: "OPTION", label: "Option" },
+  { value: "METAL", label: "Metal (Commodity)" },
+] as const;
 
 // Parse provider overrides from config JSON (supports nested and flat formats)
 function parseProviderOverrides(
@@ -122,12 +153,18 @@ function parseProviderOverrides(
 }
 
 // Extract preferred_provider from config JSON
+// Returns "CUSTOM:<code>" when preferred_provider is CUSTOM_SCRAPER with custom_provider_code
 function parsePreferredProvider(
   config: Record<string, unknown> | null | undefined,
 ): string | undefined {
   if (!config) return undefined;
   const pref = config.preferred_provider;
-  return typeof pref === "string" ? pref : undefined;
+  if (typeof pref !== "string") return undefined;
+  if (pref === "CUSTOM_SCRAPER") {
+    const code = config.custom_provider_code;
+    return typeof code === "string" ? `CUSTOM:${code}` : pref;
+  }
+  return pref;
 }
 
 // Serialize form values to nested provider config JSON
@@ -147,15 +184,25 @@ function serializeProviderConfig(
     }
   }
   const hasOverrides = Object.keys(overridesMap).length > 0;
-  const hasPref = !!preferredProvider;
+
+  // Handle CUSTOM:<code> format
+  let actualProvider = preferredProvider;
+  let customProviderCode: string | undefined;
+  if (preferredProvider?.startsWith("CUSTOM:")) {
+    actualProvider = "CUSTOM_SCRAPER";
+    customProviderCode = preferredProvider.slice("CUSTOM:".length);
+  }
+
+  const hasPref = !!actualProvider;
   if (!hasOverrides && !hasPref) return null;
   const result: Record<string, unknown> = {};
-  if (hasPref) result.preferred_provider = preferredProvider;
+  if (hasPref) result.preferred_provider = actualProvider;
+  if (customProviderCode) result.custom_provider_code = customProviderCode;
   if (hasOverrides) result.overrides = overridesMap;
   return result;
 }
 
-type EditTab = "general" | "classification" | "market-data";
+type EditTab = "general" | "classification" | "market-data" | "fx-settings";
 
 // Extracted component for pricing mode toggle with controlled popover
 // Uses "Automatic Updates" toggle: ON = automatic, OFF = manual (more intuitive)
@@ -243,6 +290,182 @@ interface AssetEditSheetProps {
   defaultTab?: EditTab;
 }
 
+type SymbolValidationStatus = "idle" | "loading" | "valid" | "invalid";
+
+interface SymbolMappingRowProps {
+  index: number;
+  fieldId: string;
+  initialSymbol?: string;
+  control: ReturnType<typeof useForm<AssetFormValues>>["control"];
+  mappingProviderOptions: ResponsiveSelectOption[];
+  onRemove: () => void;
+  onValidationChange: (fieldId: string, status: SymbolValidationStatus) => void;
+}
+
+function SymbolMappingRow({
+  index,
+  fieldId,
+  initialSymbol,
+  control,
+  mappingProviderOptions,
+  onRemove,
+  onValidationChange,
+}: SymbolMappingRowProps) {
+  const [validationStatus, setValidationStatus] = useState<SymbolValidationStatus>(
+    initialSymbol?.trim() ? "valid" : "idle",
+  );
+  // Track whether we are on the first render to avoid re-validating pre-loaded values.
+  const isFirstRender = useRef(true);
+  const validationRequestSeq = useRef(0);
+
+  const symbol = useWatch({
+    control,
+    name: `providerConfig.${index}.symbol` as Path<AssetFormValues>,
+  }) as string | undefined;
+  const provider = useWatch({
+    control,
+    name: `providerConfig.${index}.provider` as Path<AssetFormValues>,
+  }) as string | undefined;
+  const instrumentType = useWatch({
+    control,
+    name: "instrumentType" as Path<AssetFormValues>,
+  }) as string | undefined;
+  const exchangeMic = useWatch({
+    control,
+    name: "instrumentExchangeMic" as Path<AssetFormValues>,
+  }) as string | undefined;
+  const quoteCcy = useWatch({
+    control,
+    name: "quoteCcy" as Path<AssetFormValues>,
+  }) as string | undefined;
+
+  useEffect(() => {
+    const requestId = ++validationRequestSeq.current;
+
+    // Skip validation on mount when the symbol is already known-good (loaded from DB).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      if (symbol?.trim() === initialSymbol?.trim() && initialSymbol?.trim()) {
+        return;
+      }
+    }
+
+    const trimmedSymbol = symbol?.trim();
+    if (!trimmedSymbol) {
+      setValidationStatus("idle");
+      onValidationChange(fieldId, "idle");
+      return;
+    }
+
+    setValidationStatus("idle");
+    const requestExchangeMic = normalizeMic(exchangeMic) || undefined;
+    const requestInstrumentType = instrumentType?.trim() || undefined;
+    const requestQuoteCcy = quoteCcy?.trim() || undefined;
+    const requestProvider = provider?.trim() || undefined;
+
+    const timer = setTimeout(async () => {
+      if (validationRequestSeq.current !== requestId) return;
+
+      setValidationStatus("loading");
+      onValidationChange(fieldId, "idle");
+      try {
+        const result = await resolveSymbolQuote(
+          trimmedSymbol,
+          requestExchangeMic,
+          requestInstrumentType,
+          requestProvider,
+          requestQuoteCcy,
+        );
+        if (validationRequestSeq.current !== requestId) return;
+
+        const status: SymbolValidationStatus =
+          result?.price != null &&
+          isResolvedByRequestedProvider(result.resolvedProviderId, requestProvider)
+            ? "valid"
+            : "invalid";
+        setValidationStatus(status);
+        onValidationChange(fieldId, status);
+      } catch {
+        if (validationRequestSeq.current !== requestId) return;
+
+        setValidationStatus("invalid");
+        onValidationChange(fieldId, "invalid");
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [symbol, provider, instrumentType, exchangeMic, quoteCcy, fieldId, onValidationChange]); // eslint-disable-line react-hooks/exhaustive-deps -- initialSymbol is intentionally captured at mount time only
+
+  return (
+    <tr className="border-b last:border-b-0">
+      <td className="px-4 py-2">
+        <FormField
+          control={control}
+          name={`providerConfig.${index}.provider` as Path<AssetFormValues>}
+          render={({ field: providerField }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <ResponsiveSelect
+                  value={providerField.value as string | undefined}
+                  onValueChange={providerField.onChange}
+                  options={mappingProviderOptions}
+                  placeholder="Select provider"
+                  sheetTitle="Data Provider"
+                  sheetDescription="Select the data provider for this symbol mapping"
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </td>
+      <td className="px-4 py-2">
+        <FormField
+          control={control}
+          name={`providerConfig.${index}.symbol` as Path<AssetFormValues>}
+          render={({ field: symbolField }) => (
+            <FormItem className="space-y-0">
+              <FormControl>
+                <div className="relative flex items-center">
+                  <Input
+                    placeholder={getSymbolPlaceholder(provider ?? "")}
+                    {...{
+                      ...symbolField,
+                      value: (symbolField.value as string | undefined) ?? "",
+                    }}
+                    className="h-9 pr-8"
+                  />
+                  <span className="absolute right-2 flex items-center">
+                    {validationStatus === "loading" && (
+                      <span data-testid="symbol-validation-loading">
+                        <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                      </span>
+                    )}
+                    {validationStatus === "valid" && (
+                      <span data-testid="symbol-validation-valid">
+                        <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                      </span>
+                    )}
+                    {validationStatus === "invalid" && (
+                      <span data-testid="symbol-validation-invalid">
+                        <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </FormControl>
+            </FormItem>
+          )}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
+          <Icons.Close className="h-4 w-4" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
 export function AssetEditSheet({
   asset,
   latestQuote,
@@ -251,16 +474,50 @@ export function AssetEditSheet({
   defaultTab = "general",
 }: AssetEditSheetProps) {
   const [activeTab, setActiveTab] = useState<EditTab>(defaultTab);
+  const [symbolValidations, setSymbolValidations] = useState<
+    Record<string, SymbolValidationStatus>
+  >({});
+
+  const handleSymbolValidationChange = useCallback(
+    (fieldId: string, status: SymbolValidationStatus) => {
+      setSymbolValidations((prev) => ({ ...prev, [fieldId]: status }));
+    },
+    [],
+  );
   const { data: taxonomies = [], isLoading: isTaxonomiesLoading } = useTaxonomies();
   const { updateAssetProfileMutation } = useAssetProfileMutations();
   const { data: marketDataProviders = [] } = useMarketDataProviders();
+  const { data: customProviders = [] } = useCustomProviders();
+
+  // Built-in providers only (exclude CUSTOM_SCRAPER dispatcher and custom provider rows)
+  const builtinProviders = useMemo(
+    () =>
+      marketDataProviders.filter((p) => p.id !== "CUSTOM_SCRAPER" && p.providerType !== "custom"),
+    [marketDataProviders],
+  );
 
   const providerOptions: ResponsiveSelectOption[] = useMemo(() => {
-    return [
+    const options: ResponsiveSelectOption[] = [
       { value: "__auto__", label: "Auto (default)" },
-      ...marketDataProviders.map((p) => ({ value: p.id, label: p.name })),
+      ...builtinProviders.map((p) => ({ value: p.id, label: p.name })),
     ];
-  }, [marketDataProviders]);
+    for (const cp of customProviders) {
+      options.push({ value: `CUSTOM:${cp.id}`, label: cp.name });
+    }
+    return options;
+  }, [builtinProviders, customProviders]);
+
+  // Provider options for symbol mapping (without Auto, includes custom providers)
+  const mappingProviderOptions: ResponsiveSelectOption[] = useMemo(() => {
+    const options: ResponsiveSelectOption[] = builtinProviders.map((p) => ({
+      value: p.id,
+      label: p.name,
+    }));
+    for (const cp of customProviders) {
+      options.push({ value: `CUSTOM:${cp.id}`, label: cp.name });
+    }
+    return options;
+  }, [builtinProviders, customProviders]);
 
   const { data: exchanges = [] } = useQuery({
     queryKey: ["exchanges"],
@@ -300,7 +557,7 @@ export function AssetEditSheet({
     defaultValues: {
       name: asset?.name ?? "",
       notes: asset?.notes ?? "",
-      kind: asset?.kind ?? "INVESTMENT",
+      instrumentType: asset?.instrumentType ?? "",
       quoteCcy: asset?.quoteCcy ?? "",
       instrumentExchangeMic: normalizeMic(asset?.instrumentExchangeMic),
       quoteMode: asset?.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
@@ -328,7 +585,7 @@ export function AssetEditSheet({
       form.reset({
         name: asset.name ?? "",
         notes: asset.notes ?? "",
-        kind: asset.kind ?? "INVESTMENT",
+        instrumentType: asset.instrumentType ?? "",
         quoteCcy: asset.quoteCcy ?? "",
         instrumentExchangeMic: normalizeMic(asset.instrumentExchangeMic),
         quoteMode: asset.quoteMode === "MANUAL" ? QuoteMode.MANUAL : QuoteMode.MARKET,
@@ -342,23 +599,30 @@ export function AssetEditSheet({
     }
   }, [asset, form]);
 
-  // Reset tab when sheet opens
+  // Reset tab and validation state when sheet opens
   useEffect(() => {
     if (open) {
       setActiveTab(defaultTab);
+      setSymbolValidations({});
     }
-  }, [open, defaultTab]);
+  }, [open, defaultTab, asset?.id]);
 
   const handleSave = useCallback(
     async (values: AssetFormValues) => {
       if (!asset) return;
 
+      const hasInvalidMappings = Object.values(symbolValidations).some((s) => s === "invalid");
+      if (hasInvalidMappings) {
+        toast.warning(
+          "Some symbol mappings could not be validated. Prices may not update for those entries.",
+        );
+      }
+
       // Serialize provider config to nested JSON format
-      const assetKind = values.kind ?? asset.kind ?? "INVESTMENT";
       const serializedOverrides = serializeProviderConfig(
         values.preferredProvider,
         values.providerConfig ?? [],
-        assetKind,
+        asset.kind ?? "INVESTMENT",
       );
       const normalizedMic = normalizeMic(values.instrumentExchangeMic);
 
@@ -369,7 +633,7 @@ export function AssetEditSheet({
           displayCode: asset.displayCode,
           name: values.name || "",
           notes: values.notes ?? "",
-          kind: values.kind as AssetKind | undefined,
+          instrumentType: values.instrumentType || null,
           quoteMode: values.quoteMode,
           quoteCcy: values.quoteCcy,
           instrumentExchangeMic: normalizedMic || null,
@@ -382,7 +646,7 @@ export function AssetEditSheet({
         // Keep sheet open so user can retry
       }
     },
-    [asset, updateAssetProfileMutation, onOpenChange],
+    [asset, updateAssetProfileMutation, onOpenChange, symbolValidations],
   );
 
   const isManualMode = form.watch("quoteMode") === QuoteMode.MANUAL;
@@ -415,139 +679,225 @@ export function AssetEditSheet({
           onValueChange={(v) => setActiveTab(v as EditTab)}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="classification">Classification</TabsTrigger>
-            <TabsTrigger value="market-data">Market Data</TabsTrigger>
-          </TabsList>
+          {asset.kind === "FX" ? (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="market-data">Market Data</TabsTrigger>
+            </TabsList>
+          ) : (
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                General
+              </TabsTrigger>
+              <TabsTrigger value="classification" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                Classification
+              </TabsTrigger>
+              <TabsTrigger value="market-data" className="px-1.5 text-xs sm:px-3 sm:text-sm">
+                Market Data
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           <div className="min-h-0 flex-1 overflow-y-auto pt-4">
             {/* General Tab */}
             <TabsContent value="general" className="mt-0 h-full">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
-                  {/* Symbol (read-only) and Currency */}
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Symbol</label>
-                      <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
+                  {/* FX: Base and Quote Currency (both disabled) */}
+                  {asset.kind === "FX" ? (
+                    <div className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Base Currency</label>
+                          <Input
+                            value={asset.instrumentSymbol ?? ""}
+                            disabled
+                            className="bg-muted/50"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Quote Currency</label>
+                          <Input value={asset.quoteCcy ?? ""} disabled className="bg-muted/50" />
+                        </div>
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Asset display name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                rows={6}
+                                placeholder="Add any context or links"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex justify-end gap-3 pt-4">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isSaving}>
+                          {isSaving ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="quoteCcy"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Currency</FormLabel>
-                          <FormControl>
-                            <CurrencyInput
-                              value={field.value}
-                              onChange={field.onChange}
-                              placeholder="Select currency"
-                              valueDisplay="code"
-                              allowCustom
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                  ) : (
+                    /* Regular assets: Symbol, Currency, Name, Notes, Asset Type, Exchange */
+                    <div className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Symbol</label>
+                          <Input value={asset.displayCode ?? ""} disabled className="bg-muted/50" />
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="quoteCcy"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Currency</FormLabel>
+                              <FormControl>
+                                <CurrencyInput
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder="Select currency"
+                                  valueDisplay="code"
+                                  allowCustom
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                  {/* Editable fields */}
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Asset display name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      {/* Editable fields */}
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Asset display name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea rows={10} placeholder="Add any context or links" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                rows={10}
+                                placeholder="Add any context or links"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                  {/* Asset Type and Exchange */}
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="kind"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Asset Type</FormLabel>
-                          <FormControl>
-                            <ResponsiveSelect
-                              value={field.value ?? "INVESTMENT"}
-                              onValueChange={field.onChange}
-                              options={kindOptions}
-                              placeholder="Select type"
-                              sheetTitle="Asset Type"
-                              sheetDescription="Select the type of asset"
-                              disabled={isSystemManagedKind}
-                              triggerClassName="h-11"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      {/* Instrument Type and Exchange */}
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <FormField
+                          control={form.control}
+                          name="instrumentType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Instrument Type</FormLabel>
+                              <Select
+                                onValueChange={field.onChange}
+                                value={field.value ?? ""}
+                                disabled={isSystemManagedKind}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {EDIT_INSTRUMENT_TYPE_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                    <FormField
-                      control={form.control}
-                      name="instrumentExchangeMic"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Exchange</FormLabel>
-                          <FormControl>
-                            <SearchableSelect
-                              options={exchangeOptions}
-                              value={field.value ?? ""}
-                              onValueChange={field.onChange}
-                              placeholder="Select exchange"
-                              searchPlaceholder="Search exchanges..."
-                              className="h-11"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                        <FormField
+                          control={form.control}
+                          name="instrumentExchangeMic"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Exchange</FormLabel>
+                              <FormControl>
+                                <SearchableSelect
+                                  options={exchangeOptions}
+                                  value={field.value ?? ""}
+                                  onValueChange={field.onChange}
+                                  placeholder="Select exchange"
+                                  searchPlaceholder="Search exchanges..."
+                                  className="h-11"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => onOpenChange(false)}
-                      disabled={isSaving}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isSaving}>
-                      {isSaving ? (
-                        <span className="flex items-center gap-2">
-                          <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
-                        </span>
-                      ) : (
-                        "Save changes"
-                      )}
-                    </Button>
-                  </div>
+                      <div className="flex justify-end gap-3 pt-4">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => onOpenChange(false)}
+                          disabled={isSaving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isSaving}>
+                          {isSaving ? (
+                            <span className="flex items-center gap-2">
+                              <Icons.Spinner className="h-4 w-4 animate-spin" /> Saving
+                            </span>
+                          ) : (
+                            "Save changes"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </Form>
             </TabsContent>
@@ -652,19 +1002,53 @@ export function AssetEditSheet({
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Preferred Provider</FormLabel>
-                            <FormControl>
-                              <ResponsiveSelect
+                            {customProviders.length > 0 ? (
+                              <Select
                                 value={field.value ?? "__auto__"}
                                 onValueChange={(v) =>
                                   field.onChange(v === "__auto__" ? undefined : v)
                                 }
-                                options={providerOptions}
-                                placeholder="Auto (default)"
-                                sheetTitle="Preferred Provider"
-                                sheetDescription="Select which provider to use first for this asset"
-                                triggerClassName="h-11"
-                              />
-                            </FormControl>
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue placeholder="Auto (default)" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="__auto__">Auto (default)</SelectItem>
+                                  <SelectGroup>
+                                    <SelectLabel>Built-in</SelectLabel>
+                                    {builtinProviders.map((p) => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        {p.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+                                  <SelectGroup>
+                                    <SelectLabel>Custom</SelectLabel>
+                                    {customProviders.map((cp) => (
+                                      <SelectItem key={cp.id} value={`CUSTOM:${cp.id}`}>
+                                        {cp.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <FormControl>
+                                <ResponsiveSelect
+                                  value={field.value ?? "__auto__"}
+                                  onValueChange={(v) =>
+                                    field.onChange(v === "__auto__" ? undefined : v)
+                                  }
+                                  options={providerOptions}
+                                  placeholder="Auto (default)"
+                                  sheetTitle="Preferred Provider"
+                                  sheetDescription="Select which provider to use first for this asset"
+                                  triggerClassName="h-11"
+                                />
+                              </FormControl>
+                            )}
                             <p className="text-muted-foreground text-xs">
                               Choose which provider to try first when fetching prices.
                             </p>
@@ -721,59 +1105,23 @@ export function AssetEditSheet({
                               </thead>
                               <tbody>
                                 {overrideFields.map((field, index) => (
-                                  <tr key={field.id} className="border-b last:border-b-0">
-                                    <td className="px-4 py-2">
-                                      <FormField
-                                        control={form.control}
-                                        name={`providerConfig.${index}.provider`}
-                                        render={({ field: providerField }) => (
-                                          <FormItem className="space-y-0">
-                                            <FormControl>
-                                              <ResponsiveSelect
-                                                value={providerField.value}
-                                                onValueChange={providerField.onChange}
-                                                options={PROVIDERS.map((p) => ({
-                                                  label: p.label,
-                                                  value: p.value,
-                                                }))}
-                                                placeholder="Select provider"
-                                                sheetTitle="Data Provider"
-                                                sheetDescription="Select the data provider for this symbol mapping"
-                                              />
-                                            </FormControl>
-                                          </FormItem>
-                                        )}
-                                      />
-                                    </td>
-                                    <td className="px-4 py-2">
-                                      <FormField
-                                        control={form.control}
-                                        name={`providerConfig.${index}.symbol`}
-                                        render={({ field: symbolField }) => (
-                                          <FormItem className="space-y-0">
-                                            <FormControl>
-                                              <Input
-                                                placeholder="e.g., SHOP.TO"
-                                                {...symbolField}
-                                                className="h-9 uppercase"
-                                              />
-                                            </FormControl>
-                                          </FormItem>
-                                        )}
-                                      />
-                                    </td>
-                                    <td className="px-2 py-2">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => removeOverride(index)}
-                                      >
-                                        <Icons.Close className="h-4 w-4" />
-                                      </Button>
-                                    </td>
-                                  </tr>
+                                  <SymbolMappingRow
+                                    key={field.id}
+                                    index={index}
+                                    fieldId={field.id}
+                                    initialSymbol={field.symbol}
+                                    control={form.control}
+                                    mappingProviderOptions={mappingProviderOptions}
+                                    onRemove={() => {
+                                      setSymbolValidations((prev) => {
+                                        const next = { ...prev };
+                                        delete next[field.id];
+                                        return next;
+                                      });
+                                      removeOverride(index);
+                                    }}
+                                    onValidationChange={handleSymbolValidationChange}
+                                  />
                                 ))}
                               </tbody>
                             </table>

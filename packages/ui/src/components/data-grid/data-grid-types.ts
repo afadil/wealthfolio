@@ -20,10 +20,18 @@ export interface SymbolSearchResult {
   exchangeMic?: string;
   /** Currency derived from exchange (e.g., "USD", "CAD") */
   currency?: string;
+  /** Provenance of currency: "provider" or "exchange_inferred" */
+  currencySource?: string;
+  /** Instrument type (e.g., "EQUITY", "ETF", "BOND", "OPTION") */
+  quoteType?: string;
   score: number;
   dataSource?: string;
   /** Asset kind for custom assets (e.g., "SECURITY", "CRYPTO", "OTHER") */
   assetKind?: string;
+  /** True when this result maps to an existing persisted asset. */
+  isExisting?: boolean;
+  /** Persisted asset id when this result maps to an existing asset. */
+  existingAssetId?: string;
 }
 
 export type CellOpts =
@@ -221,7 +229,7 @@ export interface SearchState {
 }
 
 export interface CellValidationState {
-  type: "error" | "warning";
+  type: "error" | "warning" | "success";
   messages: string[];
 }
 

@@ -4,26 +4,41 @@ use serde::{Deserialize, Serialize};
 
 /// Canonical list of local tables that participate in app-side device sync.
 /// Order matters: parent tables before children (FK dependencies).
-pub const APP_SYNC_TABLES: [&str; 15] = [
+pub const APP_SYNC_TABLES: [&str; 20] = [
     // Base tables (no FK deps)
     "platforms",
     "assets",
+    // No FK deps
+    "market_data_custom_providers",
     // Depends on: assets
     "quotes",
     "goals",
+    "goal_plans",
     "ai_threads",
     "contribution_limits",
     // Depends on: platforms
     "accounts",
     // Depends on: accounts
     "import_runs",
-    // Depends on: accounts, assets, import_runs, goals, ai_threads
+    // Depends on: accounts, assets, import_runs
     "activities",
-    "activity_import_profiles",
+    // No FK deps
+    "import_templates",
+    // Depends on: import_templates
+    "import_account_templates",
+    // No FK deps (base table)
+    "taxonomies",
+    // Depends on: taxonomies
+    "taxonomy_categories",
+    // Depends on: assets, taxonomy_categories
     "asset_taxonomy_assignments",
+    // Depends on: accounts, goals
     "goals_allocation",
+    // Depends on: ai_threads
     "ai_messages",
+    // Depends on: ai_threads
     "ai_thread_tags",
+    // No FK deps (account_id has no FK constraint)
     "holdings_snapshots",
 ];
 
@@ -37,7 +52,9 @@ pub enum SyncEntity {
     AssetTaxonomyAssignment,
     Activity,
     ActivityImportProfile,
+    ImportTemplate,
     Goal,
+    GoalPlan,
     GoalsAllocation,
     AiThread,
     AiMessage,
@@ -45,6 +62,9 @@ pub enum SyncEntity {
     ContributionLimit,
     Platform,
     Snapshot,
+    CustomProvider,
+    CustomTaxonomy,
+    ImportRun,
 }
 
 /// Supported sync operations.
@@ -255,6 +275,7 @@ mod tests {
             SyncEntity::Activity,
             SyncEntity::ActivityImportProfile,
             SyncEntity::Goal,
+            SyncEntity::GoalPlan,
             SyncEntity::GoalsAllocation,
             SyncEntity::AiThread,
             SyncEntity::AiMessage,
@@ -262,6 +283,9 @@ mod tests {
             SyncEntity::ContributionLimit,
             SyncEntity::Platform,
             SyncEntity::Snapshot,
+            SyncEntity::CustomProvider,
+            SyncEntity::CustomTaxonomy,
+            SyncEntity::ImportRun,
         ]
         .iter()
         .map(|entity| serde_json::to_string(entity).expect("serialize sync entity"))
@@ -275,6 +299,7 @@ mod tests {
             "\"activity\"",
             "\"activity_import_profile\"",
             "\"goal\"",
+            "\"goal_plan\"",
             "\"goals_allocation\"",
             "\"ai_thread\"",
             "\"ai_message\"",
@@ -282,6 +307,9 @@ mod tests {
             "\"contribution_limit\"",
             "\"platform\"",
             "\"snapshot\"",
+            "\"custom_provider\"",
+            "\"custom_taxonomy\"",
+            "\"import_run\"",
         ];
 
         assert_eq!(actual, expected);

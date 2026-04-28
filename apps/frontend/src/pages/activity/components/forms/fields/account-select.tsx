@@ -52,7 +52,7 @@ export function AccountSelect<TFieldValues extends FieldValues = FieldValues>({
     const currentCurrency = watchedCurrency?.trim();
     if (currentCurrency === selected.currency) return;
 
-    const shouldAutoSetCurrency = !getFieldState(currencyName).isDirty || !currentCurrency;
+    const shouldAutoSetCurrency = !currentCurrency && !getFieldState(currencyName).isDirty;
     if (!shouldAutoSetCurrency) return;
 
     setValue(currencyName, selected.currency as PathValue<TFieldValues, typeof currencyName>, {

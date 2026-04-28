@@ -8,6 +8,22 @@ pub const DATA_SOURCE_CALCULATED: &str = "CALCULATED";
 pub const DATA_SOURCE_ALPHA_VANTAGE: &str = "ALPHA_VANTAGE";
 pub const DATA_SOURCE_METAL_PRICE_API: &str = "METAL_PRICE_API";
 pub const DATA_SOURCE_FINNHUB: &str = "FINNHUB";
+pub const DATA_SOURCE_OPENFIGI: &str = "OPENFIGI";
+pub const DATA_SOURCE_US_TREASURY_CALC: &str = "US_TREASURY_CALC";
+pub const DATA_SOURCE_BOERSE_FRANKFURT: &str = "BOERSE_FRANKFURT";
+pub const DATA_SOURCE_BROKER: &str = "BROKER";
+pub const DATA_SOURCE_CUSTOM_SCRAPER: &str = "CUSTOM_SCRAPER";
+pub const MARKET_DATA_PROVIDER_IDS: [&str; 9] = [
+    DATA_SOURCE_YAHOO,
+    DATA_SOURCE_ALPHA_VANTAGE,
+    DATA_SOURCE_MARKET_DATA_APP,
+    DATA_SOURCE_METAL_PRICE_API,
+    DATA_SOURCE_FINNHUB,
+    DATA_SOURCE_OPENFIGI,
+    DATA_SOURCE_US_TREASURY_CALC,
+    DATA_SOURCE_BOERSE_FRANKFURT,
+    DATA_SOURCE_CUSTOM_SCRAPER,
+];
 
 /// Default number of days of history to fetch for new symbols when no activity date exists.
 /// This provides a generous fallback for assets added without activities.

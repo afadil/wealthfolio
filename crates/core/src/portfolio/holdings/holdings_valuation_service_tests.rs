@@ -10,7 +10,7 @@ mod tests {
     use crate::portfolio::holdings::holdings_valuation_service::{
         HoldingsValuationService, HoldingsValuationServiceTrait,
     };
-    use crate::quotes::{DataSource, MarketDataError};
+    use crate::quotes::MarketDataError;
     use crate::quotes::{
         LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
         QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
@@ -375,6 +375,10 @@ mod tests {
             Ok(Vec::new())
         }
 
+        async fn reset_sync_errors(&self, _asset_ids: &[String]) -> Result<()> {
+            Ok(())
+        }
+
         // =========================================================================
         // Provider Settings
         // =========================================================================
@@ -433,7 +437,7 @@ mod tests {
             adjclose: close,
             volume: dec!(1000),
             currency: currency.to_string(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             created_at: Utc::now(),
             notes: None,
         }
@@ -459,6 +463,7 @@ mod tests {
                 notes: None,
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
+                exchange_mic: None,
                 classifications: None,
             })
         } else {
@@ -480,6 +485,7 @@ mod tests {
             asset_kind: None,
             open_date: None,
             lots: None,
+            contract_multiplier: Decimal::ONE,
             weight: dec!(0.0),
             as_of_date: NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(), // Placeholder
             market_value: MonetaryValue::zero(),                      // To be calculated

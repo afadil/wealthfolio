@@ -1,7 +1,7 @@
 // Web adapter core - Internal invoke function, COMMANDS map, and helpers
 // This module exports invoke, logger, and platform constants for shared modules
 
-import { getAuthToken, notifyUnauthorized } from "@/lib/auth-token";
+import { notifyUnauthorized } from "@/lib/auth-token";
 import type { Logger } from "../types";
 
 /** True when running in the desktop (Tauri) environment */
@@ -13,6 +13,16 @@ export const isWeb = true;
 export const API_PREFIX = "/api/v1";
 export const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
 export const AI_CHAT_STREAM_ENDPOINT = `${API_PREFIX}/ai/chat/stream`;
+
+const DEFAULT_INVOKE_TIMEOUT_MS = 300_000;
+
+// Commands that legitimately do batched network I/O over many symbols (Yahoo
+// Finance lookups during CSV import). Larger imports — especially Options —
+// can exceed the default 5-minute safety net. See issue #884.
+const INVOKE_TIMEOUT_OVERRIDES_MS: Record<string, number> = {
+  preview_import_assets: 600_000,
+  check_activities_import: 600_000,
+};
 
 type CommandMap = Record<string, { method: string; path: string }>;
 
@@ -51,11 +61,33 @@ export const COMMANDS: CommandMap = {
   get_income_summary: { method: "GET", path: "/income/summary" },
   // Goals
   get_goals: { method: "GET", path: "/goals" },
+  get_goal: { method: "GET", path: "/goals" },
   create_goal: { method: "POST", path: "/goals" },
   update_goal: { method: "PUT", path: "/goals" },
   delete_goal: { method: "DELETE", path: "/goals" },
-  update_goal_allocations: { method: "POST", path: "/goals/allocations" },
-  load_goals_allocations: { method: "GET", path: "/goals/allocations" },
+  get_goal_funding: { method: "GET", path: "/goals" },
+  save_goal_funding: { method: "PUT", path: "/goals" },
+  get_goal_plan: { method: "GET", path: "/goals" },
+  save_goal_plan: { method: "POST", path: "/goals/plan" },
+  delete_goal_plan: { method: "DELETE", path: "/goals" },
+  refresh_goal_summary: { method: "POST", path: "/goals" },
+  refresh_all_goal_summaries: { method: "POST", path: "/goals/refresh-summaries" },
+  get_retirement_overview: { method: "GET", path: "/goals" },
+  get_save_up_overview: { method: "GET", path: "/goals" },
+  preview_save_up_overview: { method: "POST", path: "/goals/save-up/preview" },
+  // Retirement plan simulations
+  calculate_retirement_projection: { method: "POST", path: "/goals/retirement/projection" },
+  run_retirement_monte_carlo: { method: "POST", path: "/goals/retirement/monte-carlo" },
+  run_retirement_stress_tests: { method: "POST", path: "/goals/retirement/stress-tests" },
+  run_retirement_scenario_analysis: {
+    method: "POST",
+    path: "/goals/retirement/scenario-analysis",
+  },
+  run_retirement_decision_sensitivity_map: {
+    method: "POST",
+    path: "/goals/retirement/decision-sensitivity-map",
+  },
+  run_retirement_sorr: { method: "POST", path: "/goals/retirement/sequence-of-returns" },
   // FX
   get_latest_exchange_rates: { method: "GET", path: "/exchange-rates/latest" },
   update_exchange_rate: { method: "PUT", path: "/exchange-rates" },
@@ -67,16 +99,30 @@ export const COMMANDS: CommandMap = {
   update_activity: { method: "PUT", path: "/activities" },
   save_activities: { method: "POST", path: "/activities/bulk" },
   delete_activity: { method: "DELETE", path: "/activities" },
+  link_transfer_activities: { method: "POST", path: "/activities/link" },
+  unlink_transfer_activities: { method: "POST", path: "/activities/unlink" },
   // Activity import
   check_activities_import: { method: "POST", path: "/activities/import/check" },
+  preview_import_assets: { method: "POST", path: "/activities/import/assets/preview" },
   import_activities: { method: "POST", path: "/activities/import" },
   get_account_import_mapping: { method: "GET", path: "/activities/import/mapping" },
   save_account_import_mapping: { method: "POST", path: "/activities/import/mapping" },
+  link_account_template: { method: "POST", path: "/activities/import/templates/link" },
+  list_import_templates: { method: "GET", path: "/activities/import/templates" },
+  get_import_template: { method: "GET", path: "/activities/import/templates/item" },
+  save_import_template: { method: "POST", path: "/activities/import/templates" },
+  delete_import_template: { method: "DELETE", path: "/activities/import/templates" },
   // Market data providers
   get_exchanges: { method: "GET", path: "/exchanges" },
   get_market_data_providers: { method: "GET", path: "/providers" },
   get_market_data_providers_settings: { method: "GET", path: "/providers/settings" },
   update_market_data_provider_settings: { method: "PUT", path: "/providers/settings" },
+  // Custom providers
+  get_custom_providers: { method: "GET", path: "/custom-providers" },
+  create_custom_provider: { method: "POST", path: "/custom-providers" },
+  update_custom_provider: { method: "PUT", path: "/custom-providers" },
+  delete_custom_provider: { method: "DELETE", path: "/custom-providers" },
+  test_custom_provider_source: { method: "POST", path: "/custom-providers/test-source" },
   // Contribution limits
   get_contribution_limits: { method: "GET", path: "/limits" },
   create_contribution_limit: { method: "POST", path: "/limits" },
@@ -85,6 +131,7 @@ export const COMMANDS: CommandMap = {
   calculate_deposits_for_contribution_limit: { method: "GET", path: "/limits" },
   // Asset profile
   get_assets: { method: "GET", path: "/assets" },
+  create_asset: { method: "POST", path: "/assets" },
   delete_asset: { method: "DELETE", path: "/assets" },
   get_asset_profile: { method: "GET", path: "/assets/profile" },
   update_asset_profile: { method: "PUT", path: "/assets/profile" },
@@ -186,10 +233,23 @@ export const COMMANDS: CommandMap = {
   claim_pairing: { method: "POST", path: "/sync/pairing/claim" },
   get_pairing_messages: { method: "GET", path: "/sync/pairing" },
   confirm_pairing: { method: "POST", path: "/sync/pairing" },
+  complete_pairing_with_transfer: {
+    method: "POST",
+    path: "/sync/pairing/complete-with-transfer",
+  },
+  confirm_pairing_with_bootstrap: {
+    method: "POST",
+    path: "/sync/pairing/confirm-with-bootstrap",
+  },
+  begin_pairing_confirm: { method: "POST", path: "/sync/pairing/flow/begin" },
+  get_pairing_flow_state: { method: "POST", path: "/sync/pairing/flow/state" },
+  approve_pairing_overwrite: { method: "POST", path: "/sync/pairing/flow/approve-overwrite" },
+  cancel_pairing_flow: { method: "POST", path: "/sync/pairing/flow/cancel" },
   // Wealthfolio Connect (Broker Sync)
   store_sync_session: { method: "POST", path: "/connect/session" },
   clear_sync_session: { method: "DELETE", path: "/connect/session" },
   get_sync_session_status: { method: "GET", path: "/connect/session/status" },
+  restore_sync_session: { method: "GET", path: "/connect/session/restore" },
   list_broker_connections: { method: "GET", path: "/connect/connections" },
   list_broker_accounts: { method: "GET", path: "/connect/accounts" },
   sync_broker_data: { method: "POST", path: "/connect/sync" },
@@ -207,12 +267,18 @@ export const COMMANDS: CommandMap = {
   get_broker_ingest_states: { method: "GET", path: "/connect/sync-states" },
   get_import_runs: { method: "GET", path: "/connect/import-runs" },
   get_data_import_runs: { method: "GET", path: "/connect/import-runs" },
+  get_broker_sync_profile: { method: "GET", path: "/connect/broker-sync-profile" },
+  save_broker_sync_profile_rules: { method: "POST", path: "/connect/broker-sync-profile" },
   // Device Sync / Enrollment
   get_device_sync_state: { method: "GET", path: "/connect/device/sync-state" },
   enable_device_sync: { method: "POST", path: "/connect/device/enable" },
   clear_device_sync_data: { method: "DELETE", path: "/connect/device/sync-data" },
   reinitialize_device_sync: { method: "POST", path: "/connect/device/reinitialize" },
   device_sync_engine_status: { method: "GET", path: "/connect/device/engine-status" },
+  device_sync_pairing_source_status: {
+    method: "GET",
+    path: "/connect/device/pairing-source-status",
+  },
   device_sync_bootstrap_overwrite_check: {
     method: "GET",
     path: "/connect/device/bootstrap-overwrite-check",
@@ -458,44 +524,106 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "calculate_performance_history": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "calculate_performance_summary": {
-      const { itemType, itemId, startDate, endDate } = payload as {
+      const { itemType, itemId, startDate, endDate, trackingMode } = payload as {
         itemType: string;
         itemId: string;
         startDate?: string;
         endDate?: string;
+        trackingMode?: string;
       };
-      body = JSON.stringify({ itemType, itemId, startDate, endDate });
+      body = JSON.stringify({ itemType, itemId, startDate, endDate, trackingMode });
       break;
     }
     case "check_update": {
-      const { currentVersion, target, arch } = (payload ?? {}) as {
+      const { currentVersion, target, arch, force } = (payload ?? {}) as {
         currentVersion?: string;
         target?: string;
         arch?: string;
+        force?: boolean;
       };
       const params = new URLSearchParams();
       if (currentVersion) params.set("currentVersion", currentVersion);
       if (target) params.set("target", target);
       if (arch) params.set("arch", arch);
+      if (force) params.set("force", "true");
       const qs = params.toString();
       if (qs) url += `?${qs}`;
       break;
     }
-    case "get_income_summary":
+    case "get_income_summary": {
+      const { accountId: incomeAccountId } = payload as { accountId?: string };
+      if (incomeAccountId) {
+        url += `?accountId=${encodeURIComponent(incomeAccountId)}`;
+      }
       break;
+    }
+    case "get_goal":
     case "delete_goal": {
       const { goalId } = payload as { goalId: string };
       url += `/${encodeURIComponent(goalId)}`;
+      break;
+    }
+    case "get_goal_funding": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      break;
+    }
+    case "save_goal_funding": {
+      const { goalId, rules } = payload as { goalId: string; rules: unknown[] };
+      url += `/${encodeURIComponent(goalId)}/funding`;
+      body = JSON.stringify(rules);
+      break;
+    }
+    case "get_goal_plan":
+    case "delete_goal_plan": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/plan`;
+      break;
+    }
+    case "save_goal_plan": {
+      const { plan } = payload as { plan: Record<string, unknown> };
+      body = JSON.stringify(plan);
+      break;
+    }
+    case "refresh_goal_summary": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/refresh-summary`;
+      break;
+    }
+    case "get_retirement_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/retirement/overview`;
+      break;
+    }
+    case "get_save_up_overview": {
+      const { goalId } = payload as { goalId: string };
+      url += `/${encodeURIComponent(goalId)}/save-up/overview`;
+      break;
+    }
+    case "preview_save_up_overview": {
+      const { input } = payload as { input: Record<string, unknown> };
+      body = JSON.stringify(input);
+      break;
+    }
+    // Retirement plan simulation commands
+    case "calculate_retirement_projection":
+    case "run_retirement_monte_carlo":
+    case "run_retirement_stress_tests":
+    case "run_retirement_scenario_analysis":
+    case "run_retirement_decision_sensitivity_map":
+    case "run_retirement_sorr": {
+      body = JSON.stringify(payload);
       break;
     }
     case "create_goal": {
@@ -506,11 +634,6 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "update_goal": {
       const { goal } = payload as { goal: Record<string, unknown> };
       body = JSON.stringify(goal);
-      break;
-    }
-    case "update_goal_allocations": {
-      const { allocations } = payload as { allocations: Record<string, unknown> };
-      body = JSON.stringify(allocations);
       break;
     }
     case "update_exchange_rate": {
@@ -555,15 +678,33 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       url += `/${encodeURIComponent(activityId)}`;
       break;
     }
+    case "link_transfer_activities": {
+      const { activityAId, activityBId } = payload as {
+        activityAId: string;
+        activityBId: string;
+      };
+      body = JSON.stringify({ activityAId, activityBId });
+      break;
+    }
+    case "unlink_transfer_activities": {
+      const { activityAId, activityBId } = payload as {
+        activityAId: string;
+        activityBId: string;
+      };
+      body = JSON.stringify({ activityAId, activityBId });
+      break;
+    }
     case "check_activities_import":
+    case "preview_import_assets":
     case "import_activities": {
       body = JSON.stringify(payload);
       break;
     }
     case "get_account_import_mapping": {
-      const { accountId } = payload as { accountId: string };
+      const { accountId, contextKind } = payload as { accountId: string; contextKind?: string };
       const params = new URLSearchParams();
       params.set("accountId", accountId);
+      if (contextKind) params.set("contextKind", contextKind);
       url += `?${params.toString()}`;
       break;
     }
@@ -572,8 +713,54 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify({ mapping });
       break;
     }
+    case "get_import_template":
+    case "delete_import_template": {
+      const { id } = payload as { id: string };
+      const params = new URLSearchParams();
+      params.set("id", id);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "save_import_template": {
+      const { template } = payload as { template: Record<string, unknown> };
+      body = JSON.stringify({ template });
+      break;
+    }
+    case "link_account_template": {
+      const { accountId, templateId, contextKind } = payload as {
+        accountId: string;
+        templateId: string;
+        contextKind?: string;
+      };
+      body = JSON.stringify({ accountId, templateId, contextKind });
+      break;
+    }
     case "update_market_data_provider_settings": {
       body = JSON.stringify(payload);
+      break;
+    }
+    case "create_custom_provider": {
+      const { payload: cp } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(cp);
+      break;
+    }
+    case "update_custom_provider": {
+      const { providerId, payload: cp } = payload as {
+        providerId: string;
+        payload: Record<string, unknown>;
+      };
+      url += `/${encodeURIComponent(providerId)}`;
+      body = JSON.stringify(cp);
+      break;
+    }
+    case "delete_custom_provider": {
+      const { providerId } = payload as { providerId: string };
+      url += `/${encodeURIComponent(providerId)}`;
+      break;
+    }
+    case "test_custom_provider_source": {
+      const { payload: tp } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(tp);
       break;
     }
     case "create_contribution_limit": {
@@ -590,6 +777,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "delete_contribution_limit": {
       const { id } = payload as { id: string };
       url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_asset": {
+      const { payload: assetPayload } = payload as { payload: Record<string, unknown> };
+      body = JSON.stringify(assetPayload);
       break;
     }
     case "delete_asset": {
@@ -632,15 +824,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "resolve_symbol_quote": {
-      const { symbol, exchangeMic, instrumentType } = payload as {
+      const { symbol, exchangeMic, instrumentType, providerId, quoteCcy } = payload as {
         symbol: string;
         exchangeMic?: string;
         instrumentType?: string;
+        providerId?: string;
+        quoteCcy?: string;
       };
       const params = new URLSearchParams();
       params.set("symbol", symbol);
       if (exchangeMic) params.set("exchangeMic", exchangeMic);
       if (instrumentType) params.set("instrumentType", instrumentType);
+      if (providerId) params.set("providerId", providerId);
+      if (quoteCcy) params.set("quoteCcy", quoteCcy);
       url += `?${params.toString()}`;
       break;
     }
@@ -1029,9 +1225,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     }
     case "reset_team_sync": {
       const { reason } = (payload ?? {}) as { reason?: string };
-      if (reason) {
-        body = JSON.stringify({ reason });
-      }
+      body = reason ? JSON.stringify({ reason }) : JSON.stringify({});
       break;
     }
     // Device Sync commands - Pairing (Issuer - Trusted Device)
@@ -1084,18 +1278,40 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "confirm_pairing": {
-      const { pairingId, proof } = payload as { pairingId: string; proof?: string };
+      const { pairingId, proof, minSnapshotCreatedAt } = payload as {
+        pairingId: string;
+        proof?: string;
+        minSnapshotCreatedAt?: string;
+      };
       url += `/${encodeURIComponent(pairingId)}/confirm`;
-      body = JSON.stringify({ proof });
+      body = JSON.stringify({ proof, minSnapshotCreatedAt });
+      break;
+    }
+    case "complete_pairing_with_transfer": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "confirm_pairing_with_bootstrap": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "begin_pairing_confirm":
+    case "get_pairing_flow_state":
+    case "approve_pairing_overwrite":
+    case "cancel_pairing_flow": {
+      body = JSON.stringify(payload);
+      break;
+    }
+    case "device_sync_reconcile_ready_state": {
+      body = JSON.stringify(payload ?? {});
       break;
     }
     // Wealthfolio Connect commands
     case "store_sync_session": {
-      const { accessToken, refreshToken } = payload as {
-        accessToken?: string;
+      const { refreshToken } = payload as {
         refreshToken: string;
       };
-      body = JSON.stringify({ accessToken, refreshToken });
+      body = JSON.stringify({ refreshToken });
       break;
     }
     case "list_devices":
@@ -1103,6 +1319,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     case "rotate_team_keys":
     case "clear_sync_session":
     case "get_sync_session_status":
+    case "restore_sync_session":
     case "list_broker_connections":
     case "list_broker_accounts":
     case "sync_broker_data":
@@ -1137,6 +1354,19 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       if (offset !== undefined) params.set("offset", String(offset));
       const qs = params.toString();
       if (qs) url += `?${qs}`;
+      break;
+    }
+    case "get_broker_sync_profile": {
+      const { accountId, sourceSystem } = payload as { accountId: string; sourceSystem: string };
+      const params = new URLSearchParams();
+      params.set("accountId", accountId);
+      params.set("sourceSystem", sourceSystem);
+      url += `?${params.toString()}`;
+      break;
+    }
+    case "save_broker_sync_profile_rules": {
+      const { request } = payload as { request: Record<string, unknown> };
+      body = JSON.stringify(request);
       break;
     }
     // Net Worth commands
@@ -1189,12 +1419,14 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "update_alternative_asset_metadata": {
-      const { assetId, metadata } = payload as {
+      const { assetId, metadata, name, notes } = payload as {
         assetId: string;
         metadata: Record<string, string>;
+        name?: string;
+        notes?: string | null;
       };
       url += `/${encodeURIComponent(assetId)}/metadata`;
-      body = JSON.stringify(metadata);
+      body = JSON.stringify({ metadata, name, notes });
       break;
     }
     case "get_alternative_holdings":
@@ -1288,51 +1520,27 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (command === "get_health_status" || command === "run_health_checks") {
+    const payloadTimezone =
+      typeof payload === "object" && payload !== null && "clientTimezone" in payload
+        ? String((payload as { clientTimezone?: string }).clientTimezone ?? "").trim()
+        : "";
+    const clientTimezone = payloadTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (clientTimezone) {
+      headers["X-Client-Timezone"] = clientTimezone;
+    }
   }
 
   const res = await fetch(url, {
     method: config.method,
     headers,
     body,
+    credentials: "same-origin",
+    signal: AbortSignal.timeout(INVOKE_TIMEOUT_OVERRIDES_MS[command] ?? DEFAULT_INVOKE_TIMEOUT_MS),
   });
 
-  // Only notify unauthorized for app auth failures, not for connect cloud token issues
-  // Connect endpoints return 401 when cloud token isn't configured - that's not an app auth failure
-  const connectCommands = [
-    "get_subscription_plans",
-    "get_subscription_plans_public",
-    "get_user_info",
-    "get_connect_portal",
-    "sync_broker_connections",
-    "sync_broker_accounts",
-    "sync_broker_activities",
-    "list_broker_connections",
-    "list_broker_accounts",
-    "get_broker_sync_states",
-    "get_broker_ingest_states",
-    "get_import_runs",
-    "get_data_import_runs",
-    "get_synced_accounts",
-    "get_platforms",
-    "sync_broker_data",
-    "broker_ingest_run",
-    "device_sync_engine_status",
-    "device_sync_bootstrap_overwrite_check",
-    "device_sync_reconcile_ready_state",
-    "device_sync_bootstrap_snapshot_if_needed",
-    "device_sync_trigger_cycle",
-    "device_sync_start_background_engine",
-    "device_sync_stop_background_engine",
-    "device_sync_generate_snapshot_now",
-    "device_sync_cancel_snapshot_upload",
-    "store_sync_session",
-    "clear_sync_session",
-    "get_sync_session_status",
-  ];
-  if (res.status === 401 && !connectCommands.includes(command)) {
+  // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.
+  if (res.status === 401) {
     notifyUnauthorized();
   }
   if (!res.ok) {

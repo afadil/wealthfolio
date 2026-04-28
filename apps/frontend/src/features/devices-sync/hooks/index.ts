@@ -1,3 +1,6 @@
 // Sync hooks barrel export
-export { useCurrentDevice, useDevices, useRenameDevice, useRevokeDevice } from "./use-devices";
-export { usePairing, type PairingStep } from "./use-pairing";
+export { useDevices, useRenameDevice, useRevokeDevice } from "./use-devices";
+export { useSyncStatus } from "./use-sync-status";
+export { useSyncActions } from "./use-sync-actions";
+export { usePairingIssuer, type IssuerStep } from "./use-pairing-issuer";
+export { usePairingClaimer, type ClaimerStep } from "./use-pairing-claimer";

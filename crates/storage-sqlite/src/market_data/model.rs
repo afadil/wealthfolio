@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use wealthfolio_core::quotes::{
-    DataSource, MarketDataProviderSetting, ProviderCapabilities, Quote, QuoteSyncState,
+    MarketDataProviderSetting, ProviderCapabilities, Quote, QuoteSyncState,
 };
 
 /// Database model for quotes
@@ -89,6 +89,8 @@ pub struct MarketDataProviderSettingDB {
     pub last_synced_at: Option<String>,
     pub last_sync_status: Option<String>,
     pub last_sync_error: Option<String>,
+    pub provider_type: String,
+    pub config: Option<String>,
 }
 
 /// Database model for updating market data provider settings
@@ -171,7 +173,7 @@ impl From<QuoteDB> for Quote {
             close: Decimal::from_str(&db.close).unwrap_or_default(),
             adjclose: parse_optional_decimal(&db.adjclose),
             volume: parse_optional_decimal(&db.volume),
-            data_source: DataSource::from(db.source.as_ref()),
+            data_source: db.source.clone(),
             created_at: parse_datetime(&db.created_at),
             currency: db.currency,
             notes: db.notes,
@@ -197,7 +199,7 @@ impl From<&Quote> for QuoteDB {
             id: quote.id.clone(),
             asset_id: quote.asset_id.clone(),
             day,
-            source: quote.data_source.as_str().to_string(),
+            source: quote.data_source.clone(),
             open: decimal_to_optional(&quote.open),
             high: decimal_to_optional(&quote.high),
             low: decimal_to_optional(&quote.low),
@@ -227,6 +229,7 @@ impl From<MarketDataProviderSettingDB> for MarketDataProviderSetting {
             last_sync_status: db.last_sync_status,
             last_sync_error: db.last_sync_error,
             capabilities,
+            provider_type: Some(db.provider_type),
         }
     }
 }
@@ -244,6 +247,10 @@ impl From<MarketDataProviderSetting> for MarketDataProviderSettingDB {
             last_synced_at: domain.last_synced_at,
             last_sync_status: domain.last_sync_status,
             last_sync_error: domain.last_sync_error,
+            provider_type: domain
+                .provider_type
+                .unwrap_or_else(|| "builtin".to_string()),
+            config: None,
         }
     }
 }

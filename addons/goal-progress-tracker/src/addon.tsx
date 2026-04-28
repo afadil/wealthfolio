@@ -124,7 +124,7 @@ function InvestmentTargetTracker({ ctx }: { ctx: AddonContext }) {
                   You haven&apos;t created any investment goals yet. Create your first goal to start
                   tracking your progress.
                 </EmptyPlaceholder.Description>
-                <Button onClick={() => ctx.api.navigation.navigate("/settings/goals")}>
+                <Button onClick={() => ctx.api.navigation.navigate("/goals/new")}>
                   <Icons.Plus className="mr-2 h-4 w-4" />
                   Create Your First Goal
                 </Button>

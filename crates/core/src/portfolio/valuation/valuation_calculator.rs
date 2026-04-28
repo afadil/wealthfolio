@@ -136,7 +136,8 @@ fn calculate_investment_market_value_acct(
                 )? // Propagate error if FX rate is missing
             };
 
-            let market_value = position.quantity * normalized_price * quote_fx_rate;
+            let market_value =
+                position.quantity * normalized_price * position.contract_multiplier * quote_fx_rate;
             total_position_market_value += market_value;
 
             // Only include non-alternative assets in performance-eligible value
@@ -221,5 +222,87 @@ fn get_rate_from_map(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::portfolio::snapshot::{Position, SnapshotSource};
+    use crate::quotes::Quote;
+    use rust_decimal_macros::dec;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn test_calculate_valuation_with_zero_cost_basis_position() {
+        let target_date = NaiveDate::from_ymd_opt(2024, 6, 4).unwrap();
+
+        let mut positions = HashMap::new();
+        positions.insert(
+            "SOL".to_string(),
+            Position {
+                id: "POS-SOL-acc_1".to_string(),
+                account_id: "acc_1".to_string(),
+                asset_id: "SOL".to_string(),
+                quantity: dec!(0.000000329),
+                average_cost: dec!(0),
+                total_cost_basis: dec!(0),
+                currency: "CAD".to_string(),
+                inception_date: Utc::now(),
+                lots: VecDeque::new(),
+                created_at: Utc::now(),
+                last_updated: Utc::now(),
+                is_alternative: false,
+                contract_multiplier: Decimal::ONE,
+            },
+        );
+
+        let snapshot = AccountStateSnapshot {
+            id: "acc_1_2024-06-04".to_string(),
+            account_id: "acc_1".to_string(),
+            snapshot_date: target_date,
+            currency: "CAD".to_string(),
+            positions,
+            cash_balances: HashMap::new(),
+            cost_basis: dec!(0),
+            net_contribution: dec!(0),
+            net_contribution_base: dec!(0),
+            cash_total_account_currency: dec!(0),
+            cash_total_base_currency: dec!(0),
+            calculated_at: Utc::now().naive_utc(),
+            source: SnapshotSource::Calculated,
+        };
+
+        let quote = Quote {
+            id: "quote-sol".to_string(),
+            asset_id: "SOL".to_string(),
+            timestamp: Utc::now(),
+            open: dec!(100),
+            high: dec!(100),
+            low: dec!(100),
+            close: dec!(100),
+            adjclose: dec!(100),
+            volume: dec!(0),
+            currency: "CAD".to_string(),
+            data_source: "MANUAL".to_string(),
+            created_at: Utc::now(),
+            notes: None,
+        };
+        let quotes_today = HashMap::from([("SOL".to_string(), quote)]);
+        let fx_rates_today = HashMap::new();
+
+        let result = calculate_valuation(
+            &snapshot,
+            &quotes_today,
+            &fx_rates_today,
+            target_date,
+            "CAD",
+        )
+        .unwrap();
+
+        assert_eq!(result.investment_market_value, dec!(0.0000329));
+        assert_eq!(result.total_value, dec!(0.0000329));
+        assert_eq!(result.cost_basis, dec!(0));
+        assert_eq!(result.fx_rate_to_base, dec!(1));
     }
 }

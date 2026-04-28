@@ -9,14 +9,16 @@ import { resolveSymbolQuote } from "@/adapters";
 
 /**
  * Strip exchange suffix from symbol (e.g., "VFV.TO" -> "VFV")
- * Yahoo and other providers add exchange suffixes like .TO, .L, .PA, .DE
+ * Yahoo and other providers add exchange suffixes like .TO, .L, .PA, .DE, .XC.
  * Since we capture exchangeMic separately, we should use the base symbol
  */
 function stripExchangeSuffix(symbol: string): string {
-  // Common exchange suffixes from Yahoo Finance
-  const suffixPattern =
-    /\.(TO|L|PA|DE|SW|AS|MI|MC|BR|HK|T|SI|AX|NZ|TA|JO|SA|SN|MX|VI|ST|OL|CO|HE|IC|PR|WA|AT|LI|LS|IR|KQ|KS|TW|TWO|V|CN|F|BE|DU|HA|HM|MU|SG)$/i;
-  return symbol.replace(suffixPattern, "");
+  // Strip any terminal dotted exchange suffix with 2-5 letters.
+  // Keep 1-letter dotted suffixes (e.g., BRK.B share class).
+  const match = /^(.*)\.([A-Za-z]{2,5})$/.exec(symbol.trim());
+  if (!match) return symbol;
+  const base = match[1]?.trim();
+  return base || symbol;
 }
 
 /**
@@ -34,6 +36,26 @@ function stripCryptoQuoteSuffix(symbol: string, currencyHint?: string): string {
     return trimmed;
   }
   return base || trimmed;
+}
+
+function shouldApplyResolvedQuoteCurrency(searchResult: SymbolSearchResult | undefined): boolean {
+  if (!searchResult || searchResult.isExisting || searchResult.dataSource === DataSource.MANUAL) {
+    return false;
+  }
+  return (
+    !searchResult.currency?.trim() ||
+    searchResult.currencySource === "exchange_inferred" ||
+    !searchResult.currencySource
+  );
+}
+
+function shouldApplyResolvedActivityCurrency(
+  searchResult: SymbolSearchResult | undefined,
+): boolean {
+  if (!searchResult || searchResult.isExisting || searchResult.dataSource === DataSource.MANUAL) {
+    return false;
+  }
+  return !searchResult.currency?.trim() || searchResult.currencySource === "exchange_inferred";
 }
 
 interface SymbolSearchProps<TFieldValues extends FieldValues = FieldValues> {
@@ -139,35 +161,47 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
 
     // Background quote resolution: confirm inferred currency and show display quote
     // For existing assets, currency is already established — never override it
+    // Update activity currency when:
+    // - currency was exchange-inferred (needs provider confirmation)
+    // - search result had no currency at all (e.g., OpenFIGI bonds)
+    const shouldUseResolvedQuoteCurrency = shouldApplyResolvedQuoteCurrency(searchResult);
     const needsCurrencyConfirmation =
-      currencyName &&
-      searchResult?.currencySource === "exchange_inferred" &&
-      !searchResult?.isExisting;
+      currencyName && shouldApplyResolvedActivityCurrency(searchResult);
 
     if (searchResult) {
       setQuoteDisplay({ price: null, isLoading: true });
       const provisionalCurrency = searchResult.currency?.trim();
-      resolveSymbolQuote(searchResult.symbol, searchResult.exchangeMic, searchResult.quoteType)
+      resolveSymbolQuote(
+        searchResult.symbol,
+        searchResult.exchangeMic,
+        searchResult.quoteType,
+        undefined,
+        searchResult.currency,
+      )
         .then((resolved) => {
           if (requestId !== latestResolveRequestId.current) return;
           setQuoteDisplay({ price: resolved?.price ?? null, isLoading: false });
 
-          // Update currency if it was exchange-inferred and user hasn't changed it
-          if (needsCurrencyConfirmation && resolved?.currency) {
-            const confirmedCurrency = resolved.currency?.trim();
-            if (confirmedCurrency) {
-              const current = getValues(currencyName!);
-              if (current === provisionalCurrency) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                setValue(currencyName!, confirmedCurrency as any, {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
-                if (quoteCcyName) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  setValue(quoteCcyName, resolved.currency as any);
-                }
-              }
+          const confirmedCurrency = resolved?.currency?.trim();
+          if (confirmedCurrency && quoteCcyName && shouldUseResolvedQuoteCurrency) {
+            // Only replace provisional hints; existing assets and selected pairs already
+            // carry stronger quote-currency identity.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setValue(quoteCcyName, confirmedCurrency as any);
+          }
+
+          // Update activity currency when:
+          // - provisional (inferred) currency exists and user hasn't changed it
+          // - no currency was known at selection time (e.g., OpenFIGI bonds)
+          if (needsCurrencyConfirmation && confirmedCurrency) {
+            const current = getValues(currencyName!);
+            const shouldUpdate = provisionalCurrency ? current === provisionalCurrency : true;
+            if (shouldUpdate) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              setValue(currencyName!, confirmedCurrency as any, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
             }
           }
         })
@@ -184,17 +218,21 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
       setValue(instrumentTypeName, (searchResult?.quoteType ?? undefined) as any);
     }
 
-    // Capture asset name and kind for custom assets (backend uses this when creating the asset)
-    // Set the nested fields directly so they match the registered hidden input paths
-    if (isManualAsset && assetMetadataName) {
-      if (searchResult?.longName) {
+    // Persist selected symbol name as a create hint for new assets.
+    if (assetMetadataName) {
+      const selectedName = searchResult?.longName?.trim() || searchResult?.shortName?.trim();
+      if (selectedName) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setValue(`${assetMetadataName}.name` as any, searchResult.longName as any, {
+        setValue(`${assetMetadataName}.name` as any, selectedName as any, {
           shouldValidate: true,
           shouldDirty: true,
           shouldTouch: true,
         });
       }
+    }
+
+    // Capture asset kind only for manual/custom assets.
+    if (isManualAsset && assetMetadataName) {
       if (searchResult?.assetKind) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setValue(`${assetMetadataName}.kind` as any, searchResult.assetKind as any, {
@@ -214,6 +252,10 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
     if (currencyName) setValue(currencyName, "" as any);
     if (quoteCcyName) setValue(quoteCcyName, undefined as any);
     if (instrumentTypeName) setValue(instrumentTypeName, undefined as any);
+    if (assetMetadataName) {
+      setValue(`${assetMetadataName}.name` as any, undefined as any);
+      setValue(`${assetMetadataName}.kind` as any, undefined as any);
+    }
     setQuoteDisplay(null);
   };
 

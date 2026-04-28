@@ -11,12 +11,18 @@ interface PairingResultProps {
   error?: string | null;
   onRetry?: () => void;
   onDone?: () => void;
+  retryLabel?: string;
+  doneLabel?: string;
 }
 
 function formatError(error: string | null | undefined): string {
   if (!error) return "Something went wrong. Please try again.";
   const e = error.toLowerCase();
 
+  if (e.includes("sync_source_restore_required"))
+    return "Sync needs to be restored from this device before you can connect another device.";
+  if (e.includes("snapshot") && e.includes("failed"))
+    return "Devices paired but data sync failed. Please try pairing again.";
   if (e.includes("invalid") && e.includes("code")) return "Invalid code. Check and try again.";
   if (e.includes("expired")) return "Session expired. Please start again.";
   if (e.includes("cancel")) return "Pairing was canceled.";
@@ -28,7 +34,14 @@ function formatError(error: string | null | undefined): string {
   return error.length > 100 ? error.slice(0, 97) + "..." : error;
 }
 
-export function PairingResult({ success, error, onRetry, onDone }: PairingResultProps) {
+export function PairingResult({
+  success,
+  error,
+  onRetry,
+  onDone,
+  retryLabel,
+  doneLabel,
+}: PairingResultProps) {
   const hasCalledDone = useRef(false);
 
   // Auto-close on success - call immediately
@@ -70,11 +83,11 @@ export function PairingResult({ success, error, onRetry, onDone }: PairingResult
       <div className="flex gap-3">
         {onRetry && (
           <Button variant="outline" onClick={onRetry}>
-            Try Again
+            {retryLabel ?? "Try Again"}
           </Button>
         )}
         <Button variant={onRetry ? "ghost" : "default"} onClick={onDone}>
-          {onRetry ? "Cancel" : "Close"}
+          {doneLabel ?? (onRetry ? "Cancel" : "Close")}
         </Button>
       </div>
     </div>

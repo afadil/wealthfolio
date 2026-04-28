@@ -252,6 +252,13 @@ pub trait BrokerSyncStateRepositoryTrait: Send + Sync {
         error: String,
         import_run_id: Option<String>,
     ) -> Result<()>;
+    async fn upsert_needs_review(
+        &self,
+        account_id: String,
+        provider: String,
+        warning: String,
+        import_run_id: Option<String>,
+    ) -> Result<()>;
     fn get_all(&self) -> Result<Vec<BrokerSyncState>>;
 }
 

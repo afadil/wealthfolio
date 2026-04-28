@@ -1,15 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import {
-  ImportFormat,
-  ActivityType,
-  ImportMappingData,
-  type SymbolSearchResult,
-} from "@/lib/types";
-import { ACTIVITY_TYPE_PREFIX_LENGTH } from "@/lib/types";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAccountImportMapping, saveAccountImportMapping, logger } from "@/adapters";
+import { useState, useCallback } from "react";
+import { ImportFormat, ImportMappingData, type SymbolSearchResult } from "@/lib/types";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { saveAccountImportMapping, logger } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
+import { createDefaultActivityMapping } from "../utils/default-activity-template";
+import { normalizeActivityLabel } from "../utils/activity-type-mapping";
 
 /**
  * Common column name aliases for each ImportFormat field.
@@ -71,10 +67,21 @@ const COLUMN_ALIASES: Record<string, string[]> = {
     "asset id",
     "asset_id",
     "instrument",
-    "isin",
     "cusip",
-    "security id",
-    "securityid",
+  ],
+  [ImportFormat.ISIN]: ["isin", "security id", "securityid"],
+  [ImportFormat.INSTRUMENT_TYPE]: [
+    "instrumenttype",
+    "instrument type",
+    "instrument_type",
+    "assettype",
+    "asset type",
+    "asset_type",
+    "securitytype",
+    "security type",
+    "security_type",
+    "type hint",
+    "type_hint",
   ],
   [ImportFormat.QUANTITY]: [
     "quantity",
@@ -164,6 +171,10 @@ const COLUMN_ALIASES: Record<string, string[]> = {
     "brokerage fee",
     "brokerage_fee",
     "charges",
+    "fees & comm",
+    "fees & commission",
+    "fees and commissions",
+    "fees and comm",
   ],
   [ImportFormat.ACCOUNT]: [
     "account",
@@ -221,13 +232,14 @@ function normalizeHeader(header: string): string {
   return header
     .toLowerCase()
     .trim()
-    .replace(/[_\-.]/g, " ") // Replace underscores, hyphens, dots with spaces
-    .replace(/\s+/g, " "); // Collapse multiple spaces
+    .replace(/[_\-.&]/g, " ") // Replace underscores, hyphens, dots, ampersands with spaces
+    .replace(/\s+/g, " ") // Collapse multiple spaces
+    .trim();
 }
 
 /**
  * Initialize column mapping by matching CSV headers to ImportFormat fields.
- * Uses smart matching with common aliases and variations.
+ * Uses tiered matching: exact → word-boundary contains → substring contains.
  */
 export function initializeColumnMapping(
   headerRow: string[],
@@ -235,72 +247,122 @@ export function initializeColumnMapping(
   const initialMapping: Partial<Record<ImportFormat, string>> = {};
   const usedHeaders = new Set<string>();
 
-  // For each ImportFormat field, try to find a matching header
-  for (const field of Object.values(ImportFormat)) {
+  const fields = Object.values(ImportFormat);
+
+  // Pass 1: Exact match (normalized alias === normalized header)
+  for (const field of fields) {
+    if (initialMapping[field as ImportFormat]) continue;
     const aliases = COLUMN_ALIASES[field] ?? [field];
 
-    // Find the first header that matches any alias
-    const matchingHeader = headerRow.find((header) => {
+    const match = headerRow.find((header) => {
       if (usedHeaders.has(header)) return false;
+      const nh = normalizeHeader(header);
+      return aliases.some((alias) => nh === normalizeHeader(alias));
+    });
 
-      const normalizedHeader = normalizeHeader(header);
+    if (match) {
+      initialMapping[field as ImportFormat] = match;
+      usedHeaders.add(match);
+    }
+  }
 
+  // Pass 2: Word-boundary contains (catches "Trade Date (UTC)" → alias "trade date")
+  for (const field of fields) {
+    if (initialMapping[field as ImportFormat]) continue;
+    const aliases = COLUMN_ALIASES[field] ?? [field];
+
+    const match = headerRow.find((header) => {
+      if (usedHeaders.has(header)) return false;
+      const nh = normalizeHeader(header);
       return aliases.some((alias) => {
-        const normalizedAlias = normalizeHeader(alias);
-        // Exact match only - avoid false positives from partial matches
-        // e.g., "id" should not match "assetid"
-        return normalizedHeader === normalizedAlias;
+        const na = normalizeHeader(alias);
+        // Only use word-boundary for multi-word aliases to avoid false positives
+        if (na.length < 4) return false;
+        const escaped = na.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(`\\b${escaped.replace(/\s+/g, "\\s+")}\\b`);
+        return pattern.test(nh);
       });
     });
 
-    if (matchingHeader) {
-      initialMapping[field as ImportFormat] = matchingHeader;
-      usedHeaders.add(matchingHeader);
+    if (match) {
+      initialMapping[field as ImportFormat] = match;
+      usedHeaders.add(match);
+    }
+  }
+
+  // Pass 3: Substring contains for aliases ≥ 4 chars (catches "transactiondate_utc")
+  for (const field of fields) {
+    if (initialMapping[field as ImportFormat]) continue;
+    const aliases = COLUMN_ALIASES[field] ?? [field];
+
+    const match = headerRow.find((header) => {
+      if (usedHeaders.has(header)) return false;
+      const nh = normalizeHeader(header).replace(/\s/g, "");
+      return aliases.some((alias) => {
+        const na = normalizeHeader(alias).replace(/\s/g, "");
+        return na.length >= 4 && nh.includes(na);
+      });
+    });
+
+    if (match) {
+      initialMapping[field as ImportFormat] = match;
+      usedHeaders.add(match);
     }
   }
 
   return initialMapping;
 }
 
-const initialMapping: ImportMappingData = {
-  accountId: "",
-  name: "",
-  fieldMappings: {},
-  activityMappings: {},
-  symbolMappings: {},
-  accountMappings: {},
-  symbolMappingMeta: {},
-};
+/**
+ * Pure computation: auto-detect field mappings from headers, then merge with saved mappings.
+ * Saved mappings take precedence; stale entries (pointing to missing headers) are filtered out.
+ */
+export function computeFieldMappings(
+  headers: string[],
+  savedFieldMappings?: Record<string, string | string[]>,
+): Record<string, string | string[]> {
+  const autoDetected = initializeColumnMapping(headers);
+  const headerSet = new Set(headers);
+
+  // Start with auto-detected (all values are defined)
+  const result: Record<string, string | string[]> = {};
+  for (const [field, header] of Object.entries(autoDetected)) {
+    if (header) result[field] = header;
+  }
+
+  // Merge saved mappings on top (only entries pointing to headers that still exist)
+  if (savedFieldMappings) {
+    for (const [field, header] of Object.entries(savedFieldMappings)) {
+      if (!header) continue;
+      if (Array.isArray(header)) {
+        // Keep fallback array if at least one header exists in the CSV
+        if (header.some((h) => headerSet.has(h))) {
+          result[field] = header;
+        }
+      } else if (headerSet.has(header)) {
+        result[field] = header;
+      }
+    }
+  }
+
+  return result;
+}
+
+const emptyMapping: ImportMappingData = createDefaultActivityMapping();
 
 interface UseImportMappingProps {
   defaultMapping?: ImportMappingData;
-  headers?: string[];
-  fetchedMapping?: ImportMappingData | null;
   accountId?: string;
   onSaveSuccess?: (mapping: ImportMappingData) => void;
 }
 
 export function useImportMapping({
   defaultMapping,
-  headers,
-  fetchedMapping,
   accountId,
   onSaveSuccess,
 }: UseImportMappingProps = {}) {
-  const [mapping, setMapping] = useState<ImportMappingData>(defaultMapping ?? initialMapping);
-  const [hasInitializedFromHeaders, setHasInitializedFromHeaders] = useState(false);
+  const [mapping, setMapping] = useState<ImportMappingData>(defaultMapping ?? emptyMapping);
   const queryClient = useQueryClient();
-
-  // Track whether we were initialized with a populated mapping (e.g. returning from review step).
-  // When true, skip the backend fetch merge to avoid overwriting the user's in-session work.
-  const hadExistingMappingRef = useRef(Object.keys(defaultMapping?.fieldMappings || {}).length > 0);
-
-  // Fetch import mapping query
-  const { data: fetchedMappingData, isLoading: isMappingLoading } = useQuery({
-    queryKey: [QueryKeys.IMPORT_MAPPING, accountId],
-    queryFn: () => (accountId ? getAccountImportMapping(accountId) : null),
-    enabled: !!accountId,
-  });
 
   // Save mapping mutation
   const saveMappingMutation = useMutation({
@@ -335,46 +397,6 @@ export function useImportMapping({
     [mapping, accountId, saveMappingMutation],
   );
 
-  useEffect(() => {
-    // Skip backend merge when returning to mapping step with an already-populated context mapping.
-    // This prevents overwriting the user's in-session edits with stale backend data.
-    if (fetchedMappingData && !hadExistingMappingRef.current) {
-      setMapping((prev) => ({
-        ...prev,
-        ...fetchedMappingData,
-        fieldMappings: { ...prev.fieldMappings, ...(fetchedMappingData.fieldMappings || {}) },
-        activityMappings: {
-          ...prev.activityMappings,
-          ...(fetchedMappingData.activityMappings || {}),
-        },
-        symbolMappings: { ...prev.symbolMappings, ...(fetchedMappingData.symbolMappings || {}) },
-        accountMappings: { ...prev.accountMappings, ...(fetchedMappingData.accountMappings || {}) },
-        symbolMappingMeta: {
-          ...prev.symbolMappingMeta,
-          ...(fetchedMappingData.symbolMappingMeta || {}),
-        },
-      }));
-      setHasInitializedFromHeaders(false);
-    }
-  }, [fetchedMappingData]);
-
-  useEffect(() => {
-    if (headers && headers.length > 0 && !hasInitializedFromHeaders && !fetchedMapping) {
-      const initialFieldMapping = initializeColumnMapping(headers);
-      setMapping((prev) => ({
-        ...prev,
-        fieldMappings: {
-          ...initialFieldMapping,
-          ...prev.fieldMappings,
-        },
-      }));
-      setHasInitializedFromHeaders(true);
-    }
-    if (!headers || headers.length === 0) {
-      setHasInitializedFromHeaders(false);
-    }
-  }, [headers, hasInitializedFromHeaders, fetchedMapping]);
-
   const updateMapping = useCallback((updates: Partial<ImportMappingData>) => {
     setMapping((prev) => ({ ...prev, ...updates }));
   }, []);
@@ -386,29 +408,33 @@ export function useImportMapping({
     }));
   }, []);
 
-  const handleActivityTypeMapping = useCallback(
-    (csvActivity: string, activityType: ActivityType) => {
-      const trimmedCsvType = csvActivity.trim().toUpperCase();
-      const compareValue = trimmedCsvType.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH);
+  const handleActivityTypeMapping = useCallback((csvActivity: string, activityType: string) => {
+    const normalizedCsvType = normalizeActivityLabel(csvActivity);
+    const legacyPrefix = normalizedCsvType.slice(0, 12);
 
-      setMapping((prev) => {
-        const updatedMappings = { ...prev.activityMappings };
-        Object.keys(updatedMappings).forEach((key) => {
-          updatedMappings[key] = (updatedMappings[key] ?? []).filter(
-            (type) => type.substring(0, ACTIVITY_TYPE_PREFIX_LENGTH) !== compareValue,
-          );
-        });
-        if (!updatedMappings[activityType]) {
-          updatedMappings[activityType] = [];
-        }
-        if (!updatedMappings[activityType]?.includes(compareValue)) {
-          updatedMappings[activityType]?.push(compareValue);
-        }
+    setMapping((prev) => {
+      const updatedMappings = Object.fromEntries(
+        Object.entries(prev.activityMappings).flatMap(([key, values]) => {
+          const nextValues = (values ?? []).filter((value) => {
+            const normalizedValue = normalizeActivityLabel(value);
+            return normalizedValue !== normalizedCsvType && normalizedValue !== legacyPrefix;
+          });
+          return nextValues.length > 0 ? [[key, nextValues]] : [];
+        }),
+      );
+
+      if (!activityType.trim()) {
         return { ...prev, activityMappings: updatedMappings };
-      });
-    },
-    [],
-  );
+      }
+
+      const nextValues = updatedMappings[activityType] ?? [];
+      if (!nextValues.includes(normalizedCsvType)) {
+        updatedMappings[activityType] = [...nextValues, normalizedCsvType];
+      }
+
+      return { ...prev, activityMappings: updatedMappings };
+    });
+  }, []);
 
   const handleSymbolMapping = useCallback(
     (csvSymbol: string, newSymbol: string, searchResult?: SymbolSearchResult) => {
@@ -463,7 +489,6 @@ export function useImportMapping({
     handleSymbolMapping,
     handleAccountIdMapping,
     saveMapping,
-    isMappingLoading,
     saveMappingMutation,
   };
 }

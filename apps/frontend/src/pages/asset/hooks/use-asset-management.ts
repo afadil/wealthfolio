@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { logger, deleteAsset, updateAssetProfile } from "@/adapters";
+import { logger, createAsset, deleteAsset, updateAssetProfile } from "@/adapters";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { QueryKeys } from "@/lib/query-keys";
-import { UpdateAssetProfile } from "@/lib/types";
+import { NewAsset, UpdateAssetProfile } from "@/lib/types";
 
 interface UpdateAssetArgs {
   payload: UpdateAssetProfile;
@@ -18,6 +18,27 @@ export const useAssetManagement = () => {
     queryClient.invalidateQueries({ queryKey: [QueryKeys.HOLDINGS] });
     queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITY_DATA] });
   };
+
+  const createAssetMutation = useMutation({
+    mutationFn: (payload: NewAsset) => createAsset(payload),
+    onSuccess: (asset) => {
+      invalidateCaches(asset.id);
+      toast({
+        title: "Security created",
+        description: `${asset.displayCode ?? asset.name ?? "New security"} has been added.`,
+        variant: "success",
+      });
+    },
+    onError: (error) => {
+      logger.error(`Error creating asset: ${error}`);
+      toast({
+        title: "Creation failed",
+        description:
+          error instanceof Error ? error.message : "There was a problem creating the security.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const updateAssetMutation = useMutation({
     mutationFn: async ({ payload }: UpdateAssetArgs) => {
@@ -70,5 +91,5 @@ export const useAssetManagement = () => {
     },
   });
 
-  return { updateAssetMutation, deleteAssetMutation };
+  return { createAssetMutation, updateAssetMutation, deleteAssetMutation };
 };

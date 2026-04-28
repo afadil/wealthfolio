@@ -9,18 +9,20 @@ import {
   Progress,
   Skeleton,
 } from "@wealthfolio/ui";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { CompactToolCard } from "./shared";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-// No required args for get_goals
-type GetGoalsArgs = Record<string, never>;
+interface GetGoalsArgs {
+  displayMode?: "compact" | "full";
+}
 
 interface GoalDto {
   id: string;
@@ -333,7 +335,7 @@ function ErrorState({ message }: { message?: string }) {
 
 type GoalsToolUIContentProps = ToolCallMessagePartProps<GetGoalsArgs, GetGoalsResult>;
 
-function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
+function GoalsToolUIContentImpl({ args, result, status }: GoalsToolUIContentProps) {
   const { settings } = useSettingsContext();
   const baseCurrency = settings?.baseCurrency ?? "USD";
   const { isBalanceHidden } = useBalancePrivacy();
@@ -341,6 +343,15 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
 
   const isLoading = status?.type === "running";
   const isIncomplete = status?.type === "incomplete";
+
+  // Compact mode — just show a one-liner when used as a prerequisite
+  if (args?.displayMode === "compact" && parsed && !isLoading) {
+    return (
+      <CompactToolCard
+        label={`Fetched ${parsed.goals.length} goal${parsed.goals.length !== 1 ? "s" : ""}`}
+      />
+    );
+  }
 
   // Currency formatter - default to base currency
   const formatter = useMemo(
@@ -410,6 +421,8 @@ function GoalsToolUIContent({ result, status }: GoalsToolUIContentProps) {
 // ============================================================================
 // Export
 // ============================================================================
+
+const GoalsToolUIContent = memo(GoalsToolUIContentImpl);
 
 export const GoalsToolUI = makeAssistantToolUI<GetGoalsArgs, GetGoalsResult>({
   toolName: "get_goals",

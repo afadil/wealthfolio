@@ -8,12 +8,14 @@ use crate::{
 };
 use axum::middleware;
 use axum::{routing::get, Json, Router};
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{
     cors::{Any, CorsLayer},
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     timeout::TimeoutLayer,
-    trace::TraceLayer,
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
 };
+use tracing::Level;
 use utoipa::OpenApi;
 
 mod accounts;
@@ -25,6 +27,7 @@ mod alternative_assets;
 mod assets;
 #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod connect;
+mod custom_providers;
 #[cfg(feature = "device-sync")]
 mod device_sync;
 #[cfg(feature = "device-sync")]
@@ -74,7 +77,9 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
             .iter()
             .map(|o| o.parse().unwrap())
             .collect::<Vec<_>>();
-        CorsLayer::new().allow_origin(origins)
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_credentials(true)
     };
 
     let openapi = ApiDoc::openapi();
@@ -102,7 +107,8 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         .merge(alternative_assets::router())
         .merge(ai_providers::router())
         .merge(ai_chat::router())
-        .merge(health::router());
+        .merge(health::router())
+        .merge(custom_providers::router());
 
     #[cfg(feature = "device-sync")]
     {
@@ -116,6 +122,14 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         protected_api = protected_api.merge(connect::router());
     }
 
+    let protected_api = protected_api.route(
+        "/openapi.json",
+        get({
+            let openapi = openapi.clone();
+            move || async { Json(openapi) }
+        }),
+    );
+
     let protected_api = if requires_auth {
         protected_api.layer(middleware::from_fn_with_state(
             state.clone(),
@@ -125,21 +139,43 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> Router {
         protected_api
     };
 
+    // Rate limit login: 5 requests per 60 seconds per peer IP
+    let login_governor = GovernorConfigBuilder::default()
+        .per_second(12) // replenish 1 token every 12s → 5 per 60s
+        .burst_size(5)
+        .finish()
+        .expect("valid governor config");
+
     let api = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
         .route("/auth/status", get(auth::auth_status))
-        .route("/auth/login", axum::routing::post(auth::login))
+        .route(
+            "/auth/login",
+            axum::routing::post(auth::login).layer(GovernorLayer::new(login_governor)),
+        )
+        .route("/auth/logout", axum::routing::post(auth::logout))
+        .route("/auth/me", get(auth::auth_me))
         .merge(protected_api)
         .with_state(state.clone());
 
     Router::new()
         .nest("/api/v1", api)
-        .route("/openapi.json", get(|| async { Json(openapi) }))
         .with_state(state)
         .layer(cors)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(TimeoutLayer::new(config.request_timeout))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|request: &axum::http::Request<_>| {
+                    tracing::info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        path = %request.uri().path(),
+                    )
+                })
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
 }

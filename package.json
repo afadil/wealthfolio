@@ -1,7 +1,7 @@
 {
   "name": "wealthfolio-app",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.2.1",
   "type": "module",
   "workspaces": [
     "apps/frontend",
@@ -16,6 +16,7 @@
     "build": "pnpm --filter frontend build",
     "build:tauri": "pnpm --filter frontend build:tauri",
     "build:types": "pnpm -r run build:types",
+    "hooks:install": "git config core.hooksPath .githooks",
     "build:addons": "pnpm -r --filter './addons/*' build",
     "bundle:addons": "pnpm -r --filter './addons/*' bundle",
     "preview": "pnpm --filter frontend preview",

@@ -1,18 +1,21 @@
 //! Centralized sync-entity mappings for projected outbox models.
 
 use crate::accounts::AccountDB;
-use crate::activities::{ActivityDB, ImportMappingDB};
+use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
 use crate::assets::AssetDB;
-use crate::goals::{GoalDB, GoalsAllocationDB};
+use crate::custom_provider::CustomProviderDB;
+use crate::goals::{GoalDB, GoalPlanDB, GoalsAllocationDB};
 use crate::limits::ContributionLimitDB;
 use crate::market_data::QuoteDB;
 use crate::portfolio::snapshot::AccountStateSnapshotDB;
+use crate::sync::import_run::ImportRunDB;
 use crate::sync::platform::PlatformDB;
 use crate::sync::SyncOutboxModel;
 use crate::sync::{
     should_sync_outbox_for_account_create, should_sync_outbox_for_activity,
-    should_sync_outbox_for_platform, should_sync_outbox_for_snapshot_source,
+    should_sync_outbox_for_import_run, should_sync_outbox_for_platform,
+    should_sync_outbox_for_snapshot_source,
 };
 use crate::taxonomies::AssetTaxonomyAssignmentDB;
 use uuid::Uuid;
@@ -77,15 +80,25 @@ impl SyncOutboxModel for ActivityDB {
     }
 }
 
-impl SyncOutboxModel for ImportMappingDB {
+impl SyncOutboxModel for ImportAccountTemplateDB {
     const ENTITY: SyncEntity = SyncEntity::ActivityImportProfile;
 
     fn sync_entity_id(&self) -> &str {
-        &self.account_id
+        &self.id
+    }
+}
+
+impl SyncOutboxModel for ImportTemplateDB {
+    const ENTITY: SyncEntity = SyncEntity::ImportTemplate;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
     }
 
-    fn delete_payload(entity_id: &str) -> serde_json::Value {
-        serde_json::json!({ "accountId": entity_id })
+    fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
+        // System templates are seeded by migrations — identical on every device.
+        // Only user-created templates need to travel over sync.
+        !self.scope.eq_ignore_ascii_case("SYSTEM")
     }
 }
 
@@ -94,6 +107,14 @@ impl SyncOutboxModel for GoalDB {
 
     fn sync_entity_id(&self) -> &str {
         &self.id
+    }
+}
+
+impl SyncOutboxModel for GoalPlanDB {
+    const ENTITY: SyncEntity = SyncEntity::GoalPlan;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.goal_id
     }
 }
 
@@ -157,6 +178,18 @@ impl SyncOutboxModel for PlatformDB {
     }
 }
 
+impl SyncOutboxModel for ImportRunDB {
+    const ENTITY: SyncEntity = SyncEntity::ImportRun;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
+    }
+
+    fn should_sync_outbox(&self, _op: SyncOperation) -> bool {
+        should_sync_outbox_for_import_run(&self.run_type, &self.source_system)
+    }
+}
+
 impl SyncOutboxModel for AccountStateSnapshotDB {
     const ENTITY: SyncEntity = SyncEntity::Snapshot;
 
@@ -173,5 +206,13 @@ impl SyncOutboxModel for AccountStateSnapshotDB {
             _ => SnapshotSource::Calculated,
         };
         should_sync_outbox_for_snapshot_source(source) && Uuid::parse_str(&self.id).is_ok()
+    }
+}
+
+impl SyncOutboxModel for CustomProviderDB {
+    const ENTITY: SyncEntity = SyncEntity::CustomProvider;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.id
     }
 }

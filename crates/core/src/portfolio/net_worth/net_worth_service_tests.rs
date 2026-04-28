@@ -11,8 +11,9 @@ use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource,
 };
-use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
-use crate::quotes::DataSource;
+use crate::portfolio::valuation::{
+    DailyAccountValuation, NegativeBalanceInfo, ValuationRepositoryTrait,
+};
 use crate::quotes::{
     LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
     QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
@@ -561,6 +562,10 @@ impl QuoteServiceTrait for MockMarketDataRepository {
         Ok(Vec::new())
     }
 
+    async fn reset_sync_errors(&self, _asset_ids: &[String]) -> Result<()> {
+        Ok(())
+    }
+
     // =========================================================================
     // Provider Settings
     // =========================================================================
@@ -752,7 +757,11 @@ impl ValuationRepositoryTrait for MockValuationRepository {
         Ok(latest)
     }
 
-    async fn delete_valuations_for_account(&self, _account_id: &str) -> Result<()> {
+    async fn delete_valuations_for_account(
+        &self,
+        _account_id: &str,
+        _since_date: Option<NaiveDate>,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -783,6 +792,13 @@ impl ValuationRepositoryTrait for MockValuationRepository {
             .cloned()
             .collect();
         Ok(filtered)
+    }
+
+    fn get_accounts_with_negative_balance(
+        &self,
+        _account_ids: &[String],
+    ) -> Result<Vec<NegativeBalanceInfo>> {
+        Ok(Vec::new())
     }
 }
 
@@ -859,6 +875,7 @@ fn create_test_position(
         created_at: Utc::now(),
         last_updated: Utc::now(),
         is_alternative: false,
+        contract_multiplier: Decimal::ONE,
     }
 }
 
@@ -901,7 +918,7 @@ fn create_test_quote(symbol: &str, price: Decimal, date: NaiveDate, currency: &s
         adjclose: price,
         volume: dec!(0),
         currency: currency.to_string(),
-        data_source: DataSource::Manual,
+        data_source: "MANUAL".to_string(),
         created_at: Utc::now(),
         notes: None,
     }

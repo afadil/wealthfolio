@@ -1,9 +1,10 @@
 import { TickerAvatar } from "@/components/ticker-avatar";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { PORTFOLIO_ACCOUNT_ID } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { Account, Holding } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AmountDisplay, FacetedSearchInput, GainPercent, Separator } from "@wealthfolio/ui";
+import { AmountDisplay, GainPercent, Input, Separator } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -27,6 +28,7 @@ interface HoldingsTableMobileProps {
   setSortBy?: (value: "symbol" | "marketValue") => void;
   showTotalReturn?: boolean;
   setShowTotalReturn?: (value: boolean) => void;
+  typeOptions?: { value: string; label: string }[];
 }
 
 export const HoldingsTableMobile = ({
@@ -44,6 +46,7 @@ export const HoldingsTableMobile = ({
   setSortBy: controlledSetSortBy,
   showTotalReturn: controlledShowTotalReturn,
   setShowTotalReturn: controlledSetShowTotalReturn,
+  typeOptions,
 }: HoldingsTableMobileProps) => {
   const { isBalanceHidden } = useBalancePrivacy();
   const navigate = useNavigate();
@@ -131,7 +134,12 @@ export const HoldingsTableMobile = ({
       {(showSearch || showFilterButton) && (
         <div className="flex items-center gap-2">
           {showSearch && (
-            <FacetedSearchInput value={searchQuery} onChange={setSearchQuery} className="flex-1" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-secondary/30 h-10 flex-1 rounded-full border-none"
+            />
           )}
           {showFilterButton && (
             <Button
@@ -153,8 +161,16 @@ export const HoldingsTableMobile = ({
           filteredHoldings.map((holding) => {
             const symbol = holding.instrument?.symbol ?? holding.id;
             const isCash = symbol.startsWith("$CASH");
-            const avatarSymbol = isCash ? "$CASH" : symbol;
-            const displaySymbol = isCash ? symbol.split("-")[0] : symbol;
+            const parsedOption = isCash ? null : parseOccSymbol(symbol);
+            const avatarSymbol = isCash ? "$CASH" : parsedOption ? parsedOption.underlying : symbol;
+            const displaySymbol = isCash
+              ? symbol.split("-")[0]
+              : parsedOption
+                ? parsedOption.underlying
+                : symbol;
+            const subtitle = parsedOption
+              ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+              : (holding.instrument?.name ?? null);
             const isNavigable = !isCash && holding.instrument?.symbol;
 
             return (
@@ -170,11 +186,11 @@ export const HoldingsTableMobile = ({
                   <div className="flex flex-1 items-center gap-3 overflow-hidden">
                     <TickerAvatar symbol={avatarSymbol} className="h-10 w-10" />
                     <div className="flex-1 overflow-hidden">
-                      <p className="truncate font-semibold">{displaySymbol}</p>
-                      {holding.instrument?.name && (
-                        <p className="text-muted-foreground truncate text-sm">
-                          {holding.instrument.name}
-                        </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate font-semibold">{displaySymbol}</p>
+                      </div>
+                      {subtitle && (
+                        <p className="text-muted-foreground truncate text-sm">{subtitle}</p>
                       )}
                     </div>
                   </div>
@@ -238,6 +254,7 @@ export const HoldingsTableMobile = ({
         setSortBy={setSortBy}
         showTotalReturn={showTotalReturn}
         setShowTotalReturn={setShowTotalReturn}
+        typeOptions={typeOptions}
       />
     </div>
   );

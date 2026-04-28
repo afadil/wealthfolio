@@ -7,6 +7,7 @@ use log::debug;
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use wealthfolio_core::utils::time_utils::{parse_user_timezone, DEFAULT_VALUATION_TZ};
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
@@ -237,241 +238,31 @@ impl<E: AiEnvironment> RecordActivityTool<E> {
         Self { env }
     }
 
-    /// Resolve account by name or ID with fuzzy matching.
-    /// Auto-selects if there's only one account and no hint provided.
-    fn resolve_account(
+    /// Build normalized tool output without side effects.
+    ///
+    /// Used by `record_activity` and the batch `record_activities` tool.
+    pub(crate) async fn build_output(
         &self,
-        account_hint: Option<&str>,
+        args: RecordActivityArgs,
+    ) -> Result<RecordActivityOutput, AiError> {
+        // Fetch accounts, then delegate to the shared implementation.
+        let accounts = self
+            .env
+            .account_service()
+            .get_active_accounts()
+            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
+
+        self.build_output_with_accounts(args, &accounts).await
+    }
+
+    /// Build normalized tool output using pre-fetched accounts.
+    ///
+    /// Avoids redundant DB calls when processing a batch.
+    pub(crate) async fn build_output_with_accounts(
+        &self,
+        args: RecordActivityArgs,
         accounts: &[wealthfolio_core::accounts::Account],
-    ) -> (Option<String>, Option<String>) {
-        // If no hint provided, auto-select if there's only one account
-        let Some(hint) = account_hint else {
-            if accounts.len() == 1 {
-                return (Some(accounts[0].id.clone()), Some(accounts[0].name.clone()));
-            }
-            return (None, None);
-        };
-
-        let hint_lower = hint.to_lowercase();
-
-        // First try exact ID match
-        if let Some(account) = accounts.iter().find(|a| a.id == hint) {
-            return (Some(account.id.clone()), Some(account.name.clone()));
-        }
-
-        // Try exact name match (case-insensitive)
-        if let Some(account) = accounts
-            .iter()
-            .find(|a| a.name.to_lowercase() == hint_lower)
-        {
-            return (Some(account.id.clone()), Some(account.name.clone()));
-        }
-
-        // Try partial name match (contains)
-        let matches: Vec<_> = accounts
-            .iter()
-            .filter(|a| a.name.to_lowercase().contains(&hint_lower))
-            .collect();
-
-        if matches.len() == 1 {
-            return (Some(matches[0].id.clone()), Some(matches[0].name.clone()));
-        }
-
-        // Ambiguous or not found
-        (None, None)
-    }
-
-    /// Validate activity type against canonical types.
-    fn validate_activity_type(&self, activity_type: &str) -> Option<String> {
-        let upper = activity_type.to_uppercase();
-        if ACTIVITY_TYPES.contains(&upper.as_str()) {
-            Some(upper)
-        } else {
-            None
-        }
-    }
-
-    /// Validate required fields based on activity type.
-    fn validate_draft(&self, draft: &ActivityDraft) -> ValidationResult {
-        let mut missing_fields = Vec::new();
-        let mut errors = Vec::new();
-
-        let activity_type = draft.activity_type.to_uppercase();
-
-        // Account is always required
-        if draft.account_id.is_none() {
-            missing_fields.push("account_id".to_string());
-        }
-
-        // Validate based on activity type
-        match activity_type.as_str() {
-            "BUY" | "SELL" => {
-                if draft.symbol.is_none() && draft.asset_id.is_none() {
-                    missing_fields.push("symbol".to_string());
-                }
-                if draft.quantity.is_none() {
-                    missing_fields.push("quantity".to_string());
-                }
-                // Either unit_price or amount is required
-                if draft.unit_price.is_none() && draft.amount.is_none() {
-                    missing_fields.push("unit_price".to_string());
-                }
-            }
-            "DEPOSIT" | "WITHDRAWAL" | "TAX" | "FEE" | "CREDIT" => {
-                if draft.amount.is_none() {
-                    missing_fields.push("amount".to_string());
-                }
-            }
-            "DIVIDEND" => {
-                if draft.symbol.is_none() && draft.asset_id.is_none() {
-                    missing_fields.push("symbol".to_string());
-                }
-                // Either amount or (quantity + unit_price) is required
-                if draft.amount.is_none()
-                    && (draft.quantity.is_none() || draft.unit_price.is_none())
-                {
-                    missing_fields.push("amount".to_string());
-                }
-            }
-            "INTEREST" => {
-                // Amount is required, symbol is optional
-                if draft.amount.is_none()
-                    && (draft.quantity.is_none() || draft.unit_price.is_none())
-                {
-                    missing_fields.push("amount".to_string());
-                }
-            }
-            "SPLIT" => {
-                if draft.symbol.is_none() && draft.asset_id.is_none() {
-                    missing_fields.push("symbol".to_string());
-                }
-                if draft.quantity.is_none() {
-                    missing_fields.push("quantity".to_string());
-                }
-            }
-            "TRANSFER_IN" | "TRANSFER_OUT" => {
-                // Either amount (for cash) or (symbol + quantity) for assets
-                if draft.amount.is_none() && draft.symbol.is_none() {
-                    missing_fields.push("amount".to_string());
-                }
-            }
-            _ => {}
-        }
-
-        // Validate date format
-        if chrono::NaiveDate::parse_from_str(&draft.activity_date, "%Y-%m-%d").is_err()
-            && chrono::DateTime::parse_from_rfc3339(&draft.activity_date).is_err()
-        {
-            errors.push(ValidationError {
-                field: "activity_date".to_string(),
-                message: "Invalid date format. Expected YYYY-MM-DD or ISO 8601".to_string(),
-            });
-        }
-
-        // Check for custom asset creation
-        if draft.is_custom_asset && draft.asset_kind.is_none() {
-            missing_fields.push("asset_kind".to_string());
-        }
-
-        ValidationResult {
-            is_valid: missing_fields.is_empty() && errors.is_empty(),
-            missing_fields,
-            errors,
-        }
-    }
-
-    /// Compute amount from quantity and unit_price if not provided.
-    fn compute_amount(
-        &self,
-        quantity: Option<f64>,
-        unit_price: Option<f64>,
-        fee: Option<f64>,
-        provided_amount: Option<f64>,
-    ) -> Option<f64> {
-        if let Some(amount) = provided_amount {
-            return Some(amount);
-        }
-
-        match (quantity, unit_price) {
-            (Some(qty), Some(price)) => {
-                let base = qty * price;
-                Some(base + fee.unwrap_or(0.0))
-            }
-            _ => None,
-        }
-    }
-}
-
-impl<E: AiEnvironment> Clone for RecordActivityTool<E> {
-    fn clone(&self) -> Self {
-        Self {
-            env: self.env.clone(),
-        }
-    }
-}
-
-impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
-    const NAME: &'static str = "record_activity";
-
-    type Error = AiError;
-    type Args = RecordActivityArgs;
-    type Output = RecordActivityOutput;
-
-    async fn definition(&self, _prompt: String) -> ToolDefinition {
-        ToolDefinition {
-            name: Self::NAME.to_string(),
-            description: "Record investment transactions from natural language. Creates a draft preview for user confirmation. Supports all activity types: BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, CREDIT, ADJUSTMENT.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "activityType": {
-                        "type": "string",
-                        "description": "Activity type: BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, CREDIT, ADJUSTMENT",
-                        "enum": ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "INTEREST", "FEE", "SPLIT", "TAX", "CREDIT", "ADJUSTMENT", "UNKNOWN"]
-                    },
-                    "symbol": {
-                        "type": "string",
-                        "description": "Symbol or ticker (e.g., 'AAPL', 'BTC', 'VTI'). Required for BUY/SELL/DIVIDEND/SPLIT"
-                    },
-                    "activityDate": {
-                        "type": "string",
-                        "description": "ISO 8601 date (e.g., '2026-01-17'). Parse relative dates like 'yesterday' or 'last Monday' to ISO format"
-                    },
-                    "quantity": {
-                        "type": "number",
-                        "description": "Number of shares or units. Required for BUY/SELL/SPLIT"
-                    },
-                    "unitPrice": {
-                        "type": "number",
-                        "description": "Price per unit. If omitted for BUY/SELL, user will need to provide it"
-                    },
-                    "amount": {
-                        "type": "number",
-                        "description": "Total amount. For DEPOSIT/WITHDRAWAL/DIVIDEND or when quantity*price doesn't apply"
-                    },
-                    "fee": {
-                        "type": "number",
-                        "description": "Transaction fee (optional)"
-                    },
-                    "account": {
-                        "type": "string",
-                        "description": "Account name or ID. If user has multiple accounts and doesn't specify, ask which account"
-                    },
-                    "subtype": {
-                        "type": "string",
-                        "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), DIVIDEND_IN_KIND (dividend paid in asset), STAKING_REWARD (crypto staking), BONUS (promotional credit)"
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "Optional notes for the transaction"
-                    }
-                },
-                "required": ["activityType", "activityDate"]
-            }),
-        }
-    }
-
-    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+    ) -> Result<RecordActivityOutput, AiError> {
         debug!(
             "record_activity called: type={}, symbol={:?}, account={:?}, date={}",
             args.activity_type, args.symbol, args.account, args.activity_date
@@ -482,13 +273,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
             .validate_activity_type(&args.activity_type)
             .unwrap_or_else(|| "UNKNOWN".to_string());
 
-        // 2. Get all active accounts
-        let accounts = self
-            .env
-            .account_service()
-            .get_active_accounts()
-            .map_err(|e| AiError::ToolExecutionFailed(e.to_string()))?;
-
+        // 2. Build account options from pre-fetched accounts
         debug!("Found {} active accounts", accounts.len());
 
         let available_accounts: Vec<AccountOption> = accounts
@@ -508,7 +293,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
             account_hint,
             accounts.len()
         );
-        let (account_id, account_name) = self.resolve_account(account_hint, &accounts);
+        let (account_id, account_name) = self.resolve_account(account_hint, accounts);
         debug!(
             "Account resolved: id={:?}, name={:?}",
             account_id, account_name
@@ -622,6 +407,266 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
             resolved_asset,
             available_subtypes,
         })
+    }
+
+    /// Resolve account by name or ID with fuzzy matching.
+    /// Auto-selects if there's only one account and no hint provided.
+    fn resolve_account(
+        &self,
+        account_hint: Option<&str>,
+        accounts: &[wealthfolio_core::accounts::Account],
+    ) -> (Option<String>, Option<String>) {
+        // If no hint provided, auto-select if there's only one account
+        let Some(hint) = account_hint else {
+            if accounts.len() == 1 {
+                return (Some(accounts[0].id.clone()), Some(accounts[0].name.clone()));
+            }
+            return (None, None);
+        };
+
+        let hint_lower = hint.to_lowercase();
+
+        // First try exact ID match
+        if let Some(account) = accounts.iter().find(|a| a.id == hint) {
+            return (Some(account.id.clone()), Some(account.name.clone()));
+        }
+
+        // Try exact name match (case-insensitive)
+        if let Some(account) = accounts
+            .iter()
+            .find(|a| a.name.to_lowercase() == hint_lower)
+        {
+            return (Some(account.id.clone()), Some(account.name.clone()));
+        }
+
+        // Try partial name match (contains)
+        let matches: Vec<_> = accounts
+            .iter()
+            .filter(|a| a.name.to_lowercase().contains(&hint_lower))
+            .collect();
+
+        if matches.len() == 1 {
+            return (Some(matches[0].id.clone()), Some(matches[0].name.clone()));
+        }
+
+        // Ambiguous or not found
+        (None, None)
+    }
+
+    /// Validate activity type against canonical types.
+    fn validate_activity_type(&self, activity_type: &str) -> Option<String> {
+        let upper = activity_type.to_uppercase();
+        if ACTIVITY_TYPES.contains(&upper.as_str()) {
+            Some(upper)
+        } else {
+            None
+        }
+    }
+
+    /// Validate required fields based on activity type.
+    fn validate_draft(&self, draft: &ActivityDraft) -> ValidationResult {
+        let mut missing_fields = Vec::new();
+        let mut errors = Vec::new();
+
+        let activity_type = draft.activity_type.to_uppercase();
+
+        // Account is always required
+        if draft.account_id.is_none() {
+            missing_fields.push("account_id".to_string());
+        }
+
+        // Validate based on activity type
+        match activity_type.as_str() {
+            "BUY" | "SELL" => {
+                if draft.symbol.is_none() && draft.asset_id.is_none() {
+                    missing_fields.push("symbol".to_string());
+                }
+                if draft.quantity.is_none() {
+                    missing_fields.push("quantity".to_string());
+                }
+                // Either unit_price or amount is required
+                if draft.unit_price.is_none() && draft.amount.is_none() {
+                    missing_fields.push("unit_price".to_string());
+                }
+            }
+            "DEPOSIT" | "WITHDRAWAL" | "TAX" | "FEE" | "CREDIT" if draft.amount.is_none() => {
+                missing_fields.push("amount".to_string());
+            }
+            "DIVIDEND" => {
+                if draft.symbol.is_none() && draft.asset_id.is_none() {
+                    missing_fields.push("symbol".to_string());
+                }
+                // Either amount or (quantity + unit_price) is required
+                if draft.amount.is_none()
+                    && (draft.quantity.is_none() || draft.unit_price.is_none())
+                {
+                    missing_fields.push("amount".to_string());
+                }
+            }
+            // Amount is required, symbol is optional
+            "INTEREST"
+                if draft.amount.is_none()
+                    && (draft.quantity.is_none() || draft.unit_price.is_none()) =>
+            {
+                missing_fields.push("amount".to_string());
+            }
+            "SPLIT" => {
+                if draft.symbol.is_none() && draft.asset_id.is_none() {
+                    missing_fields.push("symbol".to_string());
+                }
+                if draft.quantity.is_none() {
+                    missing_fields.push("quantity".to_string());
+                }
+            }
+            // Either amount (for cash) or (symbol + quantity) for assets
+            "TRANSFER_IN" | "TRANSFER_OUT" if draft.amount.is_none() && draft.symbol.is_none() => {
+                missing_fields.push("amount".to_string());
+            }
+            _ => {}
+        }
+
+        // Validate date format
+        if chrono::NaiveDate::parse_from_str(&draft.activity_date, "%Y-%m-%d").is_err()
+            && chrono::DateTime::parse_from_rfc3339(&draft.activity_date).is_err()
+        {
+            errors.push(ValidationError {
+                field: "activity_date".to_string(),
+                message: "Invalid date format. Expected YYYY-MM-DD or ISO 8601".to_string(),
+            });
+        }
+
+        // Check for custom asset creation
+        if draft.is_custom_asset && draft.asset_kind.is_none() {
+            missing_fields.push("asset_kind".to_string());
+        }
+
+        ValidationResult {
+            is_valid: missing_fields.is_empty() && errors.is_empty(),
+            missing_fields,
+            errors,
+        }
+    }
+
+    /// Compute amount from quantity and unit_price if not provided.
+    fn compute_amount(
+        &self,
+        quantity: Option<f64>,
+        unit_price: Option<f64>,
+        fee: Option<f64>,
+        provided_amount: Option<f64>,
+    ) -> Option<f64> {
+        if let Some(amount) = provided_amount {
+            return Some(amount);
+        }
+
+        match (quantity, unit_price) {
+            (Some(qty), Some(price)) => {
+                let base = qty * price;
+                Some(base + fee.unwrap_or(0.0))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl<E: AiEnvironment> Clone for RecordActivityTool<E> {
+    fn clone(&self) -> Self {
+        Self {
+            env: self.env.clone(),
+        }
+    }
+}
+
+impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
+    const NAME: &'static str = "record_activity";
+
+    type Error = AiError;
+    type Args = RecordActivityArgs;
+    type Output = RecordActivityOutput;
+
+    async fn definition(&self, _prompt: String) -> ToolDefinition {
+        let configured_timezone = self
+            .env
+            .settings_service()
+            .get_settings()
+            .map(|settings| settings.timezone)
+            .unwrap_or_default();
+        let timezone =
+            parse_user_timezone(configured_timezone.trim()).unwrap_or(DEFAULT_VALUATION_TZ);
+        let now = chrono::Utc::now().with_timezone(&timezone);
+        let current_date = now.format("%Y-%m-%d").to_string();
+        let current_weekday = now.format("%A").to_string();
+        let timezone_name = timezone.name();
+
+        ToolDefinition {
+            name: Self::NAME.to_string(),
+            description: format!(
+                "Record investment transactions from natural language. Creates a draft preview \
+                for user confirmation. Supports all activity types: BUY, SELL, DIVIDEND, \
+                DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, \
+                CREDIT, ADJUSTMENT. User timezone is {timezone_name}; current date there is \
+                {current_date} ({current_weekday}). Resolve all relative date phrases yourself \
+                before calling this tool. If the user has multiple accounts and did not specify \
+                which account to use, ask which account before calling this tool."
+            ),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "activityType": {
+                        "type": "string",
+                        "description": "Activity type: BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, CREDIT, ADJUSTMENT",
+                        "enum": ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "INTEREST", "FEE", "SPLIT", "TAX", "CREDIT", "ADJUSTMENT", "UNKNOWN"]
+                    },
+                    "symbol": {
+                        "type": "string",
+                        "description": "Symbol or ticker (e.g., 'AAPL', 'BTC', 'VTI'). Required for BUY/SELL/DIVIDEND/SPLIT"
+                    },
+                    "activityDate": {
+                        "type": "string",
+                        "description": format!(
+                            "Concrete ISO 8601 date only, e.g. '2026-01-17'. Do not pass \
+                            relative phrases like 'yesterday', 'today', 'last Friday', or \
+                            'next Monday'. Resolve them relative to current local date \
+                            {current_date} ({current_weekday}) in timezone {timezone_name} \
+                            before calling this tool."
+                        )
+                    },
+                    "quantity": {
+                        "type": "number",
+                        "description": "Number of shares or units. Required for BUY/SELL/SPLIT"
+                    },
+                    "unitPrice": {
+                        "type": "number",
+                        "description": "Price per unit. If omitted for BUY/SELL, user will need to provide it"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "description": "Total amount. For DEPOSIT/WITHDRAWAL/DIVIDEND or when quantity*price doesn't apply"
+                    },
+                    "fee": {
+                        "type": "number",
+                        "description": "Transaction fee (optional)"
+                    },
+                    "account": {
+                        "type": "string",
+                        "description": "Account name or ID. Required before calling this tool when the user has multiple accounts. If the user did not specify an account, ask which account first instead of calling this tool with an empty account."
+                    },
+                    "subtype": {
+                        "type": "string",
+                        "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), DIVIDEND_IN_KIND (dividend paid in asset), STAKING_REWARD (crypto staking), BONUS (promotional credit)"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Optional notes for the transaction"
+                    }
+                },
+                "required": ["activityType", "activityDate"]
+            }),
+        }
+    }
+
+    async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
+        self.build_output(args).await
     }
 }
 

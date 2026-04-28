@@ -12,6 +12,7 @@ const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-
     size: {
       default: "gap-1 p-0.5",
       xs: "gap-0.5 md:gap-0.5 p-0.5",
+      compact: "gap-px p-0.5",
       sm: "gap-0.5 p-0.5",
       md: "gap-1 p-0.5",
       lg: "gap-1.5 p-1",
@@ -38,6 +39,7 @@ const animatedToggleItemVariants = cva(
       size: {
         default: "h-8 px-4 text-sm",
         xs: "h-7 px-2.5 md:px-3 text-xs",
+        compact: "h-8 px-3 text-xs",
         sm: "h-8 px-3.5 text-xs",
         md: "h-9 px-4.5 text-sm",
         lg: "h-10 px-5 text-base",
@@ -61,6 +63,7 @@ interface ToggleGroupItem<T extends string = string> {
   value: T;
   label: ReactNode;
   title?: string;
+  "data-testid"?: string;
 }
 
 interface AnimatedToggleGroupProps<T extends string = string> extends VariantProps<typeof animatedToggleVariants> {
@@ -104,6 +107,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
           key={item.value}
           onClick={() => handleSelect(item.value)}
           title={item.title}
+          data-testid={item["data-testid"]}
           className={cn(
             animatedToggleItemVariants({ size, rounded }),
             selected === item.value ? "text-foreground" : "text-foreground/90 hover:text-foreground/80",

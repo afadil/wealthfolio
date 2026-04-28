@@ -96,7 +96,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     id: 'market-data',
     name: 'Market Data',
     description: 'Access to market prices, quotes, and financial data',
-    functions: ['searchTicker', 'syncHistory', 'sync', 'getProviders'],
+    functions: ['searchTicker', 'syncHistory', 'sync', 'getProviders', 'fetchDividends'],
     riskLevel: 'low',
   },
   {
@@ -128,10 +128,18 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     riskLevel: 'low',
   },
   {
-    id: 'goals',
-    name: 'Goals Management',
+    id: 'financial-planning',
+    name: 'Financial Planning',
     description: 'Access to financial goals and allocations',
-    functions: ['getAll', 'create', 'update', 'updateAllocations', 'getAllocations'],
+    functions: [
+      'getAll',
+      'create',
+      'update',
+      'getFunding',
+      'saveFunding',
+      'updateAllocations',
+      'getAllocations',
+    ],
     riskLevel: 'medium',
   },
   {
@@ -160,6 +168,20 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     name: 'Secrets Management',
     description: 'Access to secure storage for addon secrets',
     functions: ['set', 'get', 'delete'],
+    riskLevel: 'high',
+  },
+  {
+    id: 'snapshots',
+    name: 'Snapshot Management',
+    description: 'Access to holdings snapshots for accounts with holdings tracking mode',
+    functions: [
+      'getAll',
+      'getByDate',
+      'save',
+      'checkImport',
+      'importSnapshots',
+      'delete',
+    ],
     riskLevel: 'high',
   },
   {

@@ -7,7 +7,8 @@ use std::sync::Arc;
 use tauri::State;
 
 use crate::commands::device_sync::{
-    ensure_background_engine_started, ensure_background_engine_stopped,
+    clear_min_snapshot_created_at_from_store, ensure_background_engine_started,
+    ensure_background_engine_stopped,
 };
 use crate::context::ServiceContext;
 
@@ -20,9 +21,10 @@ pub use wealthfolio_device_sync::{EnableSyncResult, SyncState, SyncStateResult};
 pub async fn get_device_sync_state(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<SyncStateResult, String> {
+    let token = context.connect_service().get_valid_access_token().await?;
     context
         .device_enroll_service()
-        .get_sync_state()
+        .get_sync_state(&token)
         .await
         .map_err(|e| e.message)
 }
@@ -33,13 +35,26 @@ pub async fn get_device_sync_state(
 pub async fn enable_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
+    let token = context.connect_service().get_valid_access_token().await?;
     let result = context
         .device_enroll_service()
-        .enable_sync()
+        .enable_sync(&token)
         .await
         .map_err(|e| e.message)?;
+    clear_min_snapshot_created_at_from_store();
+    let _ = context
+        .app_sync_repository()
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
+        // Clear stale outbox/metadata from any previous sync session before
+        // the bg engine starts pushing events.
+        let _ = context
+            .app_sync_repository()
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let engine_context = Arc::clone(context.inner());
         tauri::async_runtime::spawn(async move {
             if let Err(err) = ensure_background_engine_started(engine_context).await {
@@ -59,10 +74,22 @@ pub async fn enable_device_sync(
 #[tauri::command]
 pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> Result<(), String> {
     ensure_background_engine_stopped(Arc::clone(context.inner())).await?;
-    context
+    let result = context
         .device_enroll_service()
         .clear_sync_data()
-        .map_err(|e| e.message)
+        .map_err(|e| e.message);
+    if result.is_ok() {
+        let _ = context
+            .app_sync_repository()
+            .reset_local_sync_session()
+            .await;
+        clear_min_snapshot_created_at_from_store();
+        let _ = context
+            .app_sync_repository()
+            .clear_all_min_snapshot_created_at()
+            .await;
+    }
+    result
 }
 
 /// Reinitialize device sync - resets server data and enables sync in one operation.
@@ -71,13 +98,24 @@ pub async fn clear_device_sync_data(context: State<'_, Arc<ServiceContext>>) -> 
 pub async fn reinitialize_device_sync(
     context: State<'_, Arc<ServiceContext>>,
 ) -> Result<EnableSyncResult, String> {
+    let token = context.connect_service().get_valid_access_token().await?;
     let result = context
         .device_enroll_service()
-        .reinitialize_sync()
+        .reinitialize_sync(&token)
         .await
         .map_err(|e| e.message)?;
+    clear_min_snapshot_created_at_from_store();
+    let _ = context
+        .app_sync_repository()
+        .clear_all_min_snapshot_created_at()
+        .await;
 
     if result.state == SyncState::Ready {
+        let _ = context
+            .app_sync_repository()
+            .reset_and_mark_bootstrap_complete(result.device_id.clone(), result.key_version)
+            .await;
+
         let engine_context = Arc::clone(context.inner());
         tauri::async_runtime::spawn(async move {
             if let Err(err) = ensure_background_engine_started(engine_context).await {

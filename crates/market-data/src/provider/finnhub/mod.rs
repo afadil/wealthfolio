@@ -13,16 +13,17 @@ use std::time::Duration;
 use crate::SymbolResolver;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
+use log::{debug, warn};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use tracing::{debug, warn};
 
 use crate::errors::MarketDataError;
 use crate::models::{
     AssetProfile, Coverage, InstrumentKind, ProviderInstrument, Quote, QuoteContext, SearchResult,
 };
 use crate::provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
+use crate::resolver::yahoo_suffix_to_mic;
 use crate::resolver::ResolverChain;
 
 const BASE_URL: &str = "https://finnhub.io/api/v1";
@@ -88,6 +89,7 @@ struct SearchItem {
     /// Full description/name
     description: String,
     /// Display symbol
+    #[allow(dead_code)]
     display_symbol: String,
     /// Symbol for API calls
     symbol: String,
@@ -275,6 +277,9 @@ impl FinnhubProvider {
             ProviderInstrument::MetalSymbol { .. } => Err(MarketDataError::UnsupportedAssetType(
                 "Finnhub does not support metals directly".to_string(),
             )),
+            ProviderInstrument::BondIsin { .. } => Err(MarketDataError::UnsupportedAssetType(
+                "Finnhub does not support bonds directly".to_string(),
+            )),
         }
     }
 
@@ -430,7 +435,7 @@ impl FinnhubProvider {
         }
 
         // Sort by timestamp ascending
-        quotes.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        quotes.sort_by_key(|a| a.timestamp);
 
         debug!(
             "Finnhub: fetched {} historical quotes for {} ({} to {})",
@@ -487,6 +492,7 @@ impl FinnhubProvider {
             dividend_yield: None,
             week_52_high: None,
             week_52_low: None,
+            isin: None,
         })
     }
 
@@ -506,12 +512,16 @@ impl FinnhubProvider {
             .into_iter()
             .map(|item| {
                 let asset_type = map_security_type(&item.security_type);
-                SearchResult::new(
-                    &item.symbol,
-                    &item.description,
-                    &item.display_symbol, // Use display_symbol as exchange hint
-                    &asset_type,
-                )
+                let mut result =
+                    SearchResult::new(&item.symbol, &item.description, "", &asset_type);
+                // Derive MIC from Finnhub symbol suffix (same convention as Yahoo)
+                if let Some(dot_pos) = item.symbol.rfind('.') {
+                    let suffix = &item.symbol[dot_pos + 1..];
+                    if let Some(mic) = yahoo_suffix_to_mic(suffix) {
+                        result = result.with_exchange_mic(mic);
+                    }
+                }
+                result
             })
             .collect();
 
@@ -658,6 +668,8 @@ mod tests {
             overrides: None,
             currency_hint: currency_hint.map(Cow::Borrowed),
             preferred_provider: None,
+            bond_metadata: None,
+            custom_provider_code: None,
         }
     }
 
@@ -679,7 +691,7 @@ mod tests {
         let caps = provider.capabilities();
         assert!(caps.instrument_kinds.contains(&InstrumentKind::Equity));
         assert!(caps.supports_latest);
-        assert!(!caps.supports_historical); // Historical candles require premium subscription
+        assert!(caps.supports_historical);
         assert!(caps.supports_search);
         assert!(caps.supports_profile);
     }

@@ -1,6 +1,6 @@
 {
   "name": "investment-fees-tracker-addon",
-  "version": "3.0.0",
+  "version": "3.2.1",
   "description": "An addon for tracking and analyzing investment fees across your portfolio",
   "type": "module",
   "main": "dist/addon.js",
@@ -40,6 +40,7 @@
     "@types/node": "^20.19.33",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
     "@wealthfolio/addon-dev-tools": "workspace:*",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

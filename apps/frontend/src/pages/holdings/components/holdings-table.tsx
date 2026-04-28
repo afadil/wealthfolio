@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@wealthfolio/ui/components/ui/dropdown-menu";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import { safeDivide } from "@/lib/utils";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GainPercent, Badge } from "@wealthfolio/ui";
@@ -186,6 +187,15 @@ const getColumns = (
       const holding = row.original;
       const symbol = holding.instrument?.symbol ?? holding.id;
 
+      // Parse OCC symbol for options
+      const parsedOption = parseOccSymbol(symbol);
+      const displaySymbol = parsedOption ? parsedOption.underlying : symbol;
+
+      // Option subtitle: "Mar 29 $150 CALL"
+      const optionSubtitle = parsedOption
+        ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
+        : null;
+
       const handleNavigate = () => {
         // Use instrument.id (asset ID) for navigation, not symbol (which may be stripped)
         const navSymbol = holding.instrument?.id ?? holding.id;
@@ -195,21 +205,22 @@ const getColumns = (
       const isManual = holding.instrument?.quoteMode === "MANUAL";
       const content = (
         <div className="flex items-center">
-          <TickerAvatar symbol={symbol} className="mr-2 h-8 w-8" />
+          <TickerAvatar
+            symbol={parsedOption ? parsedOption.underlying : symbol}
+            className="mr-2 h-8 w-8"
+          />
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="font-medium">{symbol}</span>
+              <span className="font-medium">{displaySymbol}</span>
               {isManual && (
                 <Badge variant="secondary" className="h-4 px-1 py-0 text-[10px]">
                   Manual
                 </Badge>
               )}
             </div>
-            {holding.instrument?.name ? (
-              <span className="text-muted-foreground line-clamp-1 text-xs">
-                {holding.instrument.name}
-              </span>
-            ) : null}
+            <span className="text-muted-foreground line-clamp-1 text-xs">
+              {optionSubtitle ?? holding.instrument?.name ?? null}
+            </span>
           </div>
         </div>
       );
@@ -228,12 +239,14 @@ const getColumns = (
     filterFn: (row, _columnId, filterValue) => {
       const holding = row.original;
       const searchTerm = filterValue as string;
-      const nameMatch = holding.instrument?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const symbolMatch = holding.instrument?.symbol
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const idMatch = holding.id.toLowerCase().includes(searchTerm.toLowerCase());
-      return !!(symbolMatch || nameMatch || idMatch);
+      const lowerSearch = searchTerm.toLowerCase();
+      const nameMatch = holding.instrument?.name?.toLowerCase().includes(lowerSearch);
+      const symbolMatch = holding.instrument?.symbol?.toLowerCase().includes(lowerSearch);
+      const idMatch = holding.id.toLowerCase().includes(lowerSearch);
+      // Also match on the underlying symbol for options
+      const parsed = parseOccSymbol(holding.instrument?.symbol ?? "");
+      const underlyingMatch = parsed?.underlying.toLowerCase().includes(lowerSearch);
+      return !!(symbolMatch || nameMatch || idMatch || underlyingMatch);
     },
     enableHiding: false,
   },
@@ -250,17 +263,28 @@ const getColumns = (
     accessorKey: "quantity",
     enableHiding: true,
     header: ({ column }) => (
-      <DataTableColumnHeader className="justify-end text-right" column={column} title="Shares" />
+      <DataTableColumnHeader className="justify-end text-right" column={column} title="Qty" />
     ),
     meta: {
-      label: "Shares",
+      label: "Quantity",
     },
-    cell: ({ row }) => (
-      <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
-        <QuantityDisplay value={row.original.quantity} isHidden={isHidden} />
-        <div className="text-xs text-transparent">-</div>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const symbol = row.original.instrument?.symbol ?? row.original.id;
+      const isOption = !!parseOccSymbol(symbol);
+      const assetTypeKey = row.original.instrument?.classifications?.assetType?.key ?? "";
+      const isBond =
+        assetTypeKey.startsWith("BOND_") ||
+        assetTypeKey === "DEBT_SECURITY" ||
+        assetTypeKey === "MONEY_MARKET_DEBT";
+      return (
+        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <QuantityDisplay value={row.original.quantity} isHidden={isHidden} />
+          <span className="text-muted-foreground text-xs">
+            {isOption ? "contracts" : isBond ? "bonds" : "shares"}
+          </span>
+        </div>
+      );
+    },
     sortingFn: (rowA, rowB) => rowA.original.quantity - rowB.original.quantity,
   },
   {
@@ -362,11 +386,11 @@ const getColumns = (
       <DataTableColumnHeader
         className="justify-end"
         column={column}
-        title={showTotalReturn ? "Total Gain/Loss" : "Day Change"}
+        title={showTotalReturn ? "Unrealized Gain" : "Day Change"}
       />
     ),
     meta: {
-      label: "Total Gain/Loss",
+      label: "Unrealized Gain",
     },
     cell: ({ row }) => {
       const holding = row.original;

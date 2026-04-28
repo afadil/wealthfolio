@@ -61,6 +61,12 @@ impl Coverage {
             InstrumentId::Metal { quote, .. } => self
                 .metal_quote_ccy_allow
                 .is_none_or(|a| slice_contains(a, quote.as_ref())),
+
+            // Options: No geographic filtering (OCC symbols are US-only for now)
+            InstrumentId::Option { .. } => true,
+
+            // Bonds: No geographic filtering (ISIN-based routing handled by resolver)
+            InstrumentId::Bond { .. } => true,
         }
     }
 
@@ -118,6 +124,17 @@ impl Coverage {
     pub const fn global_best_effort() -> Self {
         Self {
             equity_mic_allow: None,
+            equity_mic_deny: None,
+            allow_unknown_mic: true,
+            metal_quote_ccy_allow: None,
+        }
+    }
+
+    /// Deutsche Boerse exchanges (Xetra + Frankfurt floor).
+    /// Accepts mic=None so ISIN-only entries (no exchange set) can fall back to BF.
+    pub const fn dach_exchanges() -> Self {
+        Self {
+            equity_mic_allow: Some(&["XETR", "XFRA"]),
             equity_mic_deny: None,
             allow_unknown_mic: true,
             metal_quote_ccy_allow: None,
@@ -220,6 +237,26 @@ mod tests {
             quote: Cow::Borrowed("GBP"),
         };
         assert!(coverage.supports(&inst));
+    }
+
+    #[test]
+    fn test_dach_allows_unknown_mic() {
+        let coverage = Coverage::dach_exchanges();
+        let inst = InstrumentId::Equity {
+            ticker: Arc::from("DE0007164600"),
+            mic: None,
+        };
+        assert!(coverage.supports(&inst));
+    }
+
+    #[test]
+    fn test_dach_rejects_non_dach_mic() {
+        let coverage = Coverage::dach_exchanges();
+        let inst = InstrumentId::Equity {
+            ticker: Arc::from("AAPL"),
+            mic: Some(Cow::Borrowed("XNAS")),
+        };
+        assert!(!coverage.supports(&inst));
     }
 
     #[test]

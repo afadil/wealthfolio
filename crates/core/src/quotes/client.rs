@@ -32,15 +32,16 @@ use log::{debug, info, warn};
 use crate::assets::{Asset, ProviderProfile};
 use crate::errors::Result;
 use crate::quotes::constants::*;
-use crate::quotes::model::{DataSource, SymbolSearchResult};
+use crate::quotes::model::SymbolSearchResult;
 use crate::quotes::Quote;
 use crate::secrets::SecretStore;
 
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_exchange_to_mic, yahoo_suffix_to_mic,
-    AlphaVantageProvider, AssetProfile as MarketAssetProfile, FinnhubProvider,
-    MarketDataAppProvider, MetalPriceApiProvider, ProviderId, ProviderRegistry,
-    Quote as MarketQuote, QuoteContext, ResolverChain, SearchResult as MarketSearchResult,
+    AlphaVantageProvider, AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider,
+    BondQuoteMetadata, FinnhubProvider, MarketDataAppProvider, MetalPriceApiProvider,
+    OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext,
+    ResolverChain, SearchResult as MarketSearchResult, SplitEvent, UsTreasuryCalcProvider,
     YahooProvider,
 };
 
@@ -54,6 +55,12 @@ pub enum MarketDataClientError {
 
     #[error("Invalid data: {0}")]
     InvalidData(String),
+}
+
+#[derive(Debug)]
+pub struct HistoricalQuoteFetchError {
+    pub error: crate::Error,
+    pub provider_id: Option<String>,
 }
 
 impl From<MarketDataClientError> for crate::Error {
@@ -107,6 +114,15 @@ impl MarketDataClient {
         secret_store: Arc<dyn SecretStore>,
         enabled_providers: Vec<ProviderConfig>,
     ) -> Result<Self> {
+        Self::new_with_extra(secret_store, enabled_providers, vec![]).await
+    }
+
+    /// Create a new market data client with extra pre-built providers (e.g., CustomScraperProvider).
+    pub async fn new_with_extra(
+        secret_store: Arc<dyn SecretStore>,
+        enabled_providers: Vec<ProviderConfig>,
+        extra_providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>>,
+    ) -> Result<Self> {
         use std::collections::HashMap;
 
         let mut providers: Vec<Arc<dyn wealthfolio_market_data::MarketDataProvider>> = Vec::new();
@@ -132,6 +148,12 @@ impl MarketDataClient {
                     init_errors.push(msg);
                 }
             }
+        }
+
+        // Append extra providers (e.g., CustomScraperProvider)
+        for ep in extra_providers {
+            info!("Registered extra provider: {}", ep.id());
+            providers.push(ep);
         }
 
         if providers.is_empty() {
@@ -205,6 +227,18 @@ impl MarketDataClient {
                 }
                 Ok(None)
             }
+            DATA_SOURCE_OPENFIGI => {
+                // OpenFIGI doesn't need an API key (free tier)
+                Ok(Some(Arc::new(OpenFigiProvider::new())))
+            }
+            DATA_SOURCE_US_TREASURY_CALC => {
+                // Calculates bond prices from US Treasury yield curve data (no API key)
+                Ok(Some(Arc::new(UsTreasuryCalcProvider::new())))
+            }
+            DATA_SOURCE_BOERSE_FRANKFURT => {
+                // European bond pricing via Börse Frankfurt (no API key)
+                Ok(Some(Arc::new(BoerseFrankfurtProvider::new())))
+            }
             _ => {
                 warn!("Unknown provider ID: {}", provider_id);
                 Ok(None)
@@ -229,8 +263,24 @@ impl MarketDataClient {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
     ) -> Result<Vec<Quote>> {
+        self.fetch_historical_quotes_with_context(asset, start, end)
+            .await
+            .map_err(|ctx| ctx.error)
+    }
+
+    pub async fn fetch_historical_quotes_with_context(
+        &self,
+        asset: &Asset,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> std::result::Result<Vec<Quote>, HistoricalQuoteFetchError> {
         // Convert Asset to QuoteContext
-        let context = self.build_quote_context(asset)?;
+        let context =
+            self.build_quote_context(asset)
+                .map_err(|error| HistoricalQuoteFetchError {
+                    error,
+                    provider_id: None,
+                })?;
 
         debug!(
             "Fetching quotes for {:?} from {} to {}",
@@ -239,12 +289,25 @@ impl MarketDataClient {
             end.format("%Y-%m-%d")
         );
 
-        // Fetch from registry
-        let market_quotes = self
+        let (market_result, diagnostics) = self
             .registry
-            .fetch_quotes(&context, start, end)
-            .await
-            .map_err(MarketDataClientError::from)?;
+            .fetch_quotes_with_diagnostics(&context, start, end)
+            .await;
+
+        let market_quotes = match market_result {
+            Ok(quotes) => quotes,
+            Err(error) => {
+                let provider_id = diagnostics
+                    .errors()
+                    .into_iter()
+                    .last()
+                    .map(|(provider_id, _)| provider_id.to_string());
+                return Err(HistoricalQuoteFetchError {
+                    error: MarketDataClientError::MarketData(error).into(),
+                    provider_id,
+                });
+            }
+        };
 
         // Convert to core Quote format
         let core_quotes: Vec<Quote> = market_quotes
@@ -303,28 +366,41 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
+        // Convert bond spec to market-data BondQuoteMetadata when available.
+        // coupon_rate defaults to 0 for zero-coupon instruments (T-bills).
+        // maturity_date is still required — without it we can't price.
+        let bond_metadata = match asset.bond_spec() {
+            Some(spec) if spec.maturity_date.is_some() => Some(BondQuoteMetadata {
+                coupon_rate: spec.coupon_rate.unwrap_or(rust_decimal::Decimal::ZERO),
+                maturity_date: spec.maturity_date.unwrap(),
+                face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
+                coupon_frequency: spec
+                    .coupon_frequency
+                    .unwrap_or_else(|| "SEMI_ANNUAL".to_string()),
+            }),
+            _ => None,
+        };
+
+        // Extract custom_provider_code from provider_config if present
+        let custom_provider_code = asset
+            .provider_config
+            .as_ref()
+            .and_then(|c| c.get("custom_provider_code"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Ok(QuoteContext {
             instrument,
             overrides,
             currency_hint,
             preferred_provider,
+            bond_metadata,
+            custom_provider_code,
         })
     }
 
     /// Convert a market-data Quote to a core Quote.
     fn convert_quote(market_quote: MarketQuote, asset_id: &str) -> Quote {
-        let data_source = match market_quote.source.as_str() {
-            DATA_SOURCE_YAHOO => DataSource::Yahoo,
-            DATA_SOURCE_ALPHA_VANTAGE => DataSource::AlphaVantage,
-            DATA_SOURCE_MARKET_DATA_APP => DataSource::MarketDataApp,
-            DATA_SOURCE_METAL_PRICE_API => DataSource::MetalPriceApi,
-            DATA_SOURCE_FINNHUB => DataSource::Finnhub,
-            DATA_SOURCE_MANUAL => DataSource::Manual,
-            _ => DataSource::Yahoo, // Default fallback
-        };
-
-        // Generate deterministic quote ID: {asset_id}_{YYYY-MM-DD}_{source}
-        // This format matches types::quote_id() for consistency
         let id = format!(
             "{}_{}_{}",
             asset_id,
@@ -335,7 +411,7 @@ impl MarketDataClient {
         Quote {
             id,
             created_at: Utc::now(),
-            data_source,
+            data_source: market_quote.source,
             timestamp: market_quote.timestamp,
             asset_id: asset_id.to_string(),
             open: market_quote.open.unwrap_or(market_quote.close),
@@ -362,6 +438,22 @@ impl MarketDataClient {
     /// Get the number of available providers.
     pub fn provider_count(&self) -> usize {
         self.registry.providers().len()
+    }
+
+    /// Fetch split history for an asset over the given date range.
+    ///
+    /// Returns empty vec if no provider supports splits for this asset.
+    pub async fn fetch_splits(
+        &self,
+        asset: &Asset,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> Vec<SplitEvent> {
+        let context = match self.build_quote_context(asset) {
+            Ok(ctx) => ctx,
+            Err(_) => return vec![],
+        };
+        self.registry.fetch_splits(&context, start, end).await
     }
 
     /// Fetch historical quotes for multiple assets.
@@ -469,10 +561,13 @@ impl MarketDataClient {
     /// 3. Look up friendly exchange name from MIC
     /// 4. Preserve provider-reported currency only (do NOT infer from MIC)
     fn convert_search_result(result: MarketSearchResult) -> SymbolSearchResult {
-        // Try to determine MIC from Yahoo's exchange code first
-        let mut exchange_mic = yahoo_exchange_to_mic(&result.exchange).map(|mic| mic.to_string());
+        // Prefer provider-supplied MIC (e.g., BF sets this directly).
+        // Fall back to Yahoo-specific helpers when the provider didn't set it.
+        let mut exchange_mic = result.exchange_mic.clone();
 
-        // If no MIC from exchange code, try extracting from symbol suffix
+        if exchange_mic.is_none() {
+            exchange_mic = yahoo_exchange_to_mic(&result.exchange).map(|mic| mic.to_string());
+        }
         if exchange_mic.is_none() {
             if let Some(dot_pos) = result.symbol.rfind('.') {
                 let suffix = &result.symbol[dot_pos + 1..];
@@ -580,7 +675,7 @@ impl MarketDataClient {
 
         ProviderProfile {
             id: Some(symbol.to_string()),
-            isin: None,
+            isin: profile.isin,
             name: profile.name,
             asset_type: profile.quote_type, // Maps to AssetKind during enrichment
             symbol: symbol.to_string(),
@@ -645,7 +740,7 @@ mod tests {
         assert_eq!(core_quote.adjclose, dec!(102)); // Defaults to close
         assert_eq!(core_quote.volume, dec!(1000000));
         assert_eq!(core_quote.currency, "USD");
-        assert!(matches!(core_quote.data_source, DataSource::Yahoo));
+        assert_eq!(core_quote.data_source, "YAHOO");
     }
 
     #[test]
@@ -668,7 +763,7 @@ mod tests {
         assert_eq!(core_quote.low, dec!(150.50));
         assert_eq!(core_quote.close, dec!(150.50));
         assert_eq!(core_quote.volume, dec!(0));
-        assert!(matches!(core_quote.data_source, DataSource::AlphaVantage));
+        assert_eq!(core_quote.data_source, "ALPHA_VANTAGE");
     }
 
     #[test]
@@ -676,16 +771,16 @@ mod tests {
         let timestamp = Utc::now();
 
         let test_cases = [
-            ("YAHOO", DataSource::Yahoo),
-            ("ALPHA_VANTAGE", DataSource::AlphaVantage),
-            ("MARKETDATA_APP", DataSource::MarketDataApp),
-            ("METAL_PRICE_API", DataSource::MetalPriceApi),
-            ("FINNHUB", DataSource::Finnhub),
-            ("MANUAL", DataSource::Manual),
-            ("UNKNOWN_SOURCE", DataSource::Yahoo), // Fallback
+            "YAHOO",
+            "ALPHA_VANTAGE",
+            "MARKETDATA_APP",
+            "METAL_PRICE_API",
+            "FINNHUB",
+            "MANUAL",
+            "CUSTOM_SCRAPER:coingecko", // Custom provider with code
         ];
 
-        for (source_str, expected_source) in test_cases {
+        for source_str in test_cases {
             let market_quote = MarketQuote::new(
                 timestamp,
                 dec!(100),
@@ -694,12 +789,10 @@ mod tests {
             );
 
             let core_quote = MarketDataClient::convert_quote(market_quote, "TEST");
-            assert!(
-                std::mem::discriminant(&core_quote.data_source)
-                    == std::mem::discriminant(&expected_source),
-                "Source '{}' should map to {:?}",
-                source_str,
-                expected_source
+            assert_eq!(
+                core_quote.data_source, source_str,
+                "Source string '{}' should be preserved verbatim",
+                source_str
             );
         }
     }
@@ -753,6 +846,27 @@ mod tests {
         assert_eq!(result.exchange_mic.as_deref(), Some("XLON"));
         assert_eq!(result.currency.as_deref(), Some("GBp"));
         assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
+    }
+
+    #[test]
+    fn test_convert_search_result_maps_cxe_to_cboe_mic() {
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "CXE", "ETF").with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.symbol, "VWRPL.XC");
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
+        assert_eq!(result.currency.as_deref(), Some("GBP"));
+        assert_eq!(result.currency_source.as_deref(), Some("exchange_inferred"));
+    }
+
+    #[test]
+    fn test_convert_search_result_maps_lowercase_exchange_code() {
+        let provider_result =
+            MarketSearchResult::new("VWRPL.XC", "Vanguard ETF", "cxe", "ETF").with_score(20001.0);
+
+        let result = MarketDataClient::convert_search_result(provider_result);
+        assert_eq!(result.exchange_mic.as_deref(), Some("CXE"));
     }
 
     // =========================================================================
@@ -886,6 +1000,58 @@ mod tests {
         assert_eq!(context.currency_hint.as_deref(), Some("CAD"));
     }
 
+    #[test]
+    fn test_build_quote_context_bond_metadata_populated() {
+        use crate::assets::InstrumentType;
+        use chrono::NaiveDate;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TD00", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912810TD00".to_string());
+        // Set bond metadata via the JSON metadata field (camelCase per BondSpec serde)
+        asset.metadata = Some(serde_json::json!({
+            "bond": {
+                "couponRate": 0.04375,
+                "maturityDate": "2040-11-15",
+                "faceValue": 1000,
+                "couponFrequency": "SEMI_ANNUAL"
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        let bond_meta = context
+            .bond_metadata
+            .expect("bond_metadata should be populated");
+        assert_eq!(bond_meta.coupon_rate, dec!(0.04375));
+        assert_eq!(
+            bond_meta.maturity_date,
+            NaiveDate::from_ymd_opt(2040, 11, 15).unwrap()
+        );
+        assert_eq!(bond_meta.face_value, dec!(1000));
+        assert_eq!(bond_meta.coupon_frequency, "SEMI_ANNUAL");
+    }
+
+    #[test]
+    fn test_build_quote_context_bond_metadata_none_when_missing() {
+        use crate::assets::InstrumentType;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TD00", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912810TD00".to_string());
+        // Bond with no metadata — bond_metadata should be None
+        asset.metadata = None;
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        assert!(
+            context.bond_metadata.is_none(),
+            "bond_metadata should be None when no bond spec exists"
+        );
+    }
+
     // =========================================================================
     // Edge Case Tests
     // =========================================================================
@@ -972,5 +1138,38 @@ mod tests {
         let core_quote = MarketDataClient::convert_quote(market_quote, "SHIB-USD");
 
         assert_eq!(core_quote.close, precise_price);
+    }
+
+    #[test]
+    fn test_build_quote_context_bond_zero_coupon() {
+        use crate::assets::InstrumentType;
+        use chrono::NaiveDate;
+
+        let mut asset = create_test_asset(AssetKind::Investment, "US912797NQ65", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912797NQ65".to_string());
+        // Zero-coupon T-bill: couponRate is 0
+        asset.metadata = Some(serde_json::json!({
+            "bond": {
+                "couponRate": 0,
+                "maturityDate": "2025-12-18",
+                "faceValue": 1000,
+                "couponFrequency": "ZERO"
+            }
+        }));
+
+        let client = create_test_client();
+        let context = client.build_quote_context(&asset).unwrap();
+
+        let bond_meta = context
+            .bond_metadata
+            .expect("bond_metadata should be Some for zero-coupon bond");
+        assert_eq!(bond_meta.coupon_rate, dec!(0));
+        assert_eq!(
+            bond_meta.maturity_date,
+            NaiveDate::from_ymd_opt(2025, 12, 18).unwrap()
+        );
+        assert_eq!(bond_meta.face_value, dec!(1000));
+        assert_eq!(bond_meta.coupon_frequency, "ZERO");
     }
 }

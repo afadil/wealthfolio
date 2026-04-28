@@ -13,6 +13,9 @@ export { LoginForm } from "./components/login-form";
 export { SubscriptionPlans } from "./components/subscription-plans";
 export { ProviderButton } from "./components/provider-button";
 
+// Plan capabilities
+export { hasBrokerSync } from "./lib/plan-capabilities";
+
 // Services
 export {
   syncBrokerData,

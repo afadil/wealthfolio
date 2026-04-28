@@ -44,7 +44,7 @@ function CalendarDot({
 
   const dotContent = isPartial ? (
     <div
-      className="border-primary h-4 w-4 shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5"
+      className="border-primary aspect-square w-5 shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:w-6"
       style={{
         background: `conic-gradient(var(--primary) ${partialPercent * 3.6}deg, var(--muted) 0deg)`,
       }}
@@ -54,7 +54,7 @@ function CalendarDot({
     />
   ) : (
     <div
-      className={`h-4 w-4 shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:h-5 sm:w-5 ${
+      className={`aspect-square w-5 shrink-0 cursor-pointer rounded-full border-2 transition-all duration-200 hover:scale-110 sm:w-6 ${
         filled
           ? "border-primary bg-primary scale-105"
           : "border-muted-foreground/30 bg-muted hover:bg-muted-foreground/10"
@@ -64,7 +64,7 @@ function CalendarDot({
       onClick={(e) => onClick(e, dotData)}
     />
   );
-  return <div className="relative inline-block">{dotContent}</div>;
+  return <div className="relative flex items-center justify-center">{dotContent}</div>;
 }
 
 // Shared tooltip component
@@ -236,7 +236,7 @@ function InvestmentCalendar({
           <div className="w-full">
             <div className="mb-4 flex flex-col items-center justify-center sm:mb-6">
               <div
-                className="grid w-full justify-items-center gap-2 sm:gap-3 md:gap-4"
+                className="grid w-full items-center justify-items-center gap-2 sm:gap-3 md:gap-4"
                 style={{
                   gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
                 }}

@@ -3,7 +3,7 @@ ARG RUST_IMAGE=rust:1.91-alpine
 
 # Stage 1: build frontend
 # Use --platform=$BUILDPLATFORM to run on the native runner (fast)
-FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
 
 # Wealthfolio Connect configuration (baked into JS bundle at build time)
 # Pass via --build-arg to enable; omit to build without Connect.
@@ -28,6 +28,13 @@ FROM --platform=$BUILDPLATFORM ${RUST_IMAGE} AS backend
 # Copy xx scripts to handle cross-compilation
 COPY --from=xx / /
 ARG TARGETPLATFORM
+
+# Wealthfolio Connect configuration (baked into server binary at build time)
+ARG CONNECT_AUTH_URL=
+ARG CONNECT_AUTH_PUBLISHABLE_KEY=
+ENV CONNECT_AUTH_URL=${CONNECT_AUTH_URL}
+ENV CONNECT_AUTH_PUBLISHABLE_KEY=${CONNECT_AUTH_PUBLISHABLE_KEY}
+
 WORKDIR /app
 
 # Install build tools for the HOST (to run cargo, build scripts)

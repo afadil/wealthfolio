@@ -18,13 +18,18 @@ mod activities_model_tests;
 
 pub use activities_constants::*;
 pub use activities_errors::ActivityError;
+pub use activities_model::import_type;
 pub use activities_model::{
-    parse_decimal_string_tolerant, Activity, ActivityBulkIdentifierMapping,
-    ActivityBulkMutationError, ActivityBulkMutationRequest, ActivityBulkMutationResult,
-    ActivityDetails, ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta,
-    ActivityStatus, ActivityType, ActivityUpdate, ActivityUpsert, BulkUpsertResult,
-    ImportActivitiesResult, ImportActivitiesSummary, ImportMapping, ImportMappingData, IncomeData,
-    NewActivity, PrepareActivitiesResult, Sort, SymbolInput,
+    into_field_mapping_values, normalize_context_kind_value, parse_decimal_string_tolerant,
+    Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationError,
+    ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails, ActivityImport,
+    ActivitySearchResponse, ActivitySearchResponseMeta, ActivityStatus, ActivityType,
+    ActivityUpdate, ActivityUpsert, BrokerActivityProfileConfig, BrokerProfileScope,
+    BrokerSyncProfileData, BulkUpsertResult, FieldMappingValue, ImportActivitiesResult,
+    ImportActivitiesSummary, ImportAssetCandidate, ImportAssetPreviewItem,
+    ImportAssetPreviewStatus, ImportMapping, ImportMappingData, ImportTemplate, ImportTemplateData,
+    ImportTemplateScope, IncomeData, NewActivity, PrepareActivitiesResult,
+    SaveBrokerSyncProfileRulesRequest, Sort, SymbolInput, TemplateKind,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};

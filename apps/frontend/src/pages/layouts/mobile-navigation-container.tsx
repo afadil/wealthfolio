@@ -1,10 +1,19 @@
+import { syncTriggerCycle, updatePortfolio } from "@/adapters";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useQueryClient } from "@tanstack/react-query";
 import { Icons, PageScrollContainer } from "@wealthfolio/ui";
 import { AnimatePresence } from "motion/react";
+import { useCallback } from "react";
 import { Outlet } from "react-router-dom";
 
 export function MobileNavigationContainer() {
-  const [isRefreshing, pullToRefreshHandlers, ptr] = usePullToRefresh();
+  const queryClient = useQueryClient();
+  const onRefresh = useCallback(async () => {
+    await updatePortfolio();
+    await queryClient.invalidateQueries();
+    await syncTriggerCycle().catch(() => undefined);
+  }, [queryClient]);
+  const [isRefreshing, pullToRefreshHandlers, ptr] = usePullToRefresh({ onRefresh });
 
   return (
     <div className="relative flex min-h-0 w-full flex-1">

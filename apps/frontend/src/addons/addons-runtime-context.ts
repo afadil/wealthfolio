@@ -1,5 +1,6 @@
 import type { AddonContext, SidebarItemHandle } from "@wealthfolio/addon-sdk";
 import React from "react";
+import { toast } from "sonner";
 import { createSDKHostAPIBridge } from "./type-bridge";
 
 // Import all command functions
@@ -28,19 +29,14 @@ import {
   updateContributionLimit,
 } from "@/adapters";
 import { openCsvFileDialog, openFileSaveDialog } from "@/adapters";
-import {
-  createGoal,
-  getGoals,
-  getGoalsAllocation,
-  updateGoal,
-  updateGoalsAllocations,
-} from "@/adapters";
+import { createGoal, getGoals, getGoalFunding, saveGoalFunding, updateGoal } from "@/adapters";
 import {
   listenFileDrop as listenImportFileDrop,
   listenFileDropCancelled as listenImportFileDropCancelled,
   listenFileDropHover as listenImportFileDropHover,
 } from "@/adapters";
 import {
+  fetchYahooDividends,
   getAssetProfile,
   getMarketDataProviders,
   getQuoteHistory,
@@ -62,6 +58,12 @@ import {
   getLatestValuations,
   recalculatePortfolio,
   updatePortfolio,
+  getSnapshots,
+  getSnapshotByDate,
+  saveManualHoldings,
+  checkHoldingsImport,
+  importHoldingsCsv,
+  deleteSnapshot,
 } from "@/adapters";
 import {
   listenMarketSyncComplete,
@@ -235,11 +237,12 @@ export function createAddonContext(addonId: string): AddonContext {
           getGoals,
           createGoal,
           updateGoal,
-          updateGoalsAllocations,
-          getGoalsAllocation,
+          getGoalFunding,
+          saveGoalFunding,
 
           // Market data
           searchTicker,
+          fetchYahooDividends,
           syncHistoryQuotes,
           getAssetProfile,
           updateAssetProfile,
@@ -297,6 +300,14 @@ export function createAddonContext(addonId: string): AddonContext {
           getAccountImportMapping,
           saveAccountImportMapping,
 
+          // Snapshots
+          getSnapshots,
+          getSnapshotByDate,
+          saveManualHoldings,
+          checkHoldingsImport,
+          importHoldingsCsv,
+          deleteSnapshot,
+
           // Logger functions
           logError: logger.error,
           logInfo: logger.info,
@@ -329,7 +340,7 @@ export function createAddonContext(addonId: string): AddonContext {
           },
           invalidateQueries: (queryKey: string | string[]) => {
             interface QueryClientLike {
-              invalidateQueries: (opts: { queryKey: string[] }) => unknown;
+              invalidateQueries: (opts: { queryKey: string[]; exact?: boolean }) => unknown;
             }
             const queryClient = (
               window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
@@ -337,12 +348,13 @@ export function createAddonContext(addonId: string): AddonContext {
             if (queryClient) {
               queryClient.invalidateQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+                exact: false,
               });
             }
           },
           refetchQueries: (queryKey: string | string[]) => {
             interface QueryClientLike {
-              refetchQueries: (opts: { queryKey: string[] }) => unknown;
+              refetchQueries: (opts: { queryKey: string[]; exact?: boolean }) => unknown;
             }
             const queryClient = (
               window as unknown as { __wealthfolio_query_client__?: QueryClientLike }
@@ -350,9 +362,16 @@ export function createAddonContext(addonId: string): AddonContext {
             if (queryClient) {
               queryClient.refetchQueries({
                 queryKey: Array.isArray(queryKey) ? queryKey : [queryKey],
+                exact: false,
               });
             }
           },
+
+          // Toast functions (backed by host's sonner instance)
+          toastSuccess: (message: string) => toast.success(message),
+          toastError: (message: string) => toast.error(message),
+          toastWarning: (message: string) => toast.warning(message),
+          toastInfo: (message: string) => toast.info(message),
         },
         addonId,
       );

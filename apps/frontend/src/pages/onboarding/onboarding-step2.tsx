@@ -12,7 +12,7 @@ import {
 } from "@wealthfolio/ui/components/ui/form";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { worldCurrencies } from "@wealthfolio/ui/lib/currencies";
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 
@@ -20,6 +20,9 @@ const onboardingSettingsSchema = z.object({
   baseCurrency: z
     .string({ required_error: "Please select a base currency." })
     .min(1, "Please select a base currency."),
+  timezone: z
+    .string({ required_error: "Please select a timezone." })
+    .min(1, "Please select a timezone."),
 });
 
 function detectDefaultCurrency(): string | undefined {
@@ -49,6 +52,59 @@ function detectDefaultCurrency(): string | undefined {
 
 const popularCurrencies = ["USD", "CAD", "EUR", "GBP", "AUD", "CHF", "JPY"];
 
+const TIMEZONE_FALLBACKS = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+  "Asia/Singapore",
+  "Australia/Sydney",
+];
+
+function getSupportedTimezones(): string[] {
+  const supportedValuesOf = (
+    Intl as unknown as { supportedValuesOf?: (key: "timeZone") => string[] }
+  ).supportedValuesOf;
+  const rawValues: string[] =
+    typeof supportedValuesOf === "function" ? supportedValuesOf("timeZone") : TIMEZONE_FALLBACKS;
+  const merged = rawValues.includes("UTC") ? rawValues : ["UTC", ...rawValues];
+  return Array.from(new Set(merged)).sort((a, b) => a.localeCompare(b));
+}
+
+function detectBrowserTimezone(): string {
+  try {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+    if (detected) {
+      new Intl.DateTimeFormat("en-US", { timeZone: detected }).format(new Date());
+      return detected;
+    }
+  } catch {
+    // ignore
+  }
+  return "UTC";
+}
+
+function formatTimezoneLabel(tz: string): string {
+  const parts = tz.split("/");
+  return parts[parts.length - 1].replace(/_/g, " ");
+}
+
+const popularTimezones = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Paris",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
 type OnboardingSettingsValues = z.infer<typeof onboardingSettingsSchema>;
 
 export interface OnboardingStep2Handle {
@@ -66,6 +122,8 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
     const [initialValuesSet, setInitialValuesSet] = useState(false);
     const [showCurrencySearch, setShowCurrencySearch] = useState(false);
     const [currencySearch, setCurrencySearch] = useState("");
+    const [showTimezoneSearch, setShowTimezoneSearch] = useState(false);
+    const [timezoneSearch, setTimezoneSearch] = useState("");
 
     const form = useForm<OnboardingSettingsValues>({
       resolver: zodResolver(onboardingSettingsSchema),
@@ -90,6 +148,34 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       setCurrencySearch("");
     }
 
+    const allTimezones = useMemo(() => getSupportedTimezones(), []);
+    const detectedTimezone = useMemo(() => detectBrowserTimezone(), []);
+    const currentTimezone = form.watch("timezone");
+
+    const filteredTimezones = allTimezones.filter((tz) =>
+      tz.toLowerCase().includes(timezoneSearch.toLowerCase()),
+    );
+
+    const timezoneOptions = useMemo(() => {
+      const base = popularTimezones.includes(detectedTimezone)
+        ? [detectedTimezone, ...popularTimezones.filter((tz) => tz !== detectedTimezone)]
+        : [detectedTimezone, ...popularTimezones.slice(0, -1)];
+      if (
+        currentTimezone &&
+        currentTimezone !== detectedTimezone &&
+        !base.includes(currentTimezone)
+      ) {
+        return [...base.slice(0, -1), currentTimezone];
+      }
+      return base;
+    }, [detectedTimezone, currentTimezone]);
+
+    function handleTimezoneSelect(timezone: string) {
+      form.setValue("timezone", timezone, { shouldValidate: true, shouldDirty: true });
+      setShowTimezoneSearch(false);
+      setTimezoneSearch("");
+    }
+
     useEffect(() => {
       onValidityChange(form.formState.isValid);
     }, [form.formState.isValid, onValidityChange]);
@@ -102,9 +188,14 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     useEffect(() => {
       if (!initialValuesSet) {
-        form.reset({
-          baseCurrency: settings?.baseCurrency ?? detectDefaultCurrency() ?? "",
-        });
+        const defaultCurrency = settings?.baseCurrency || detectDefaultCurrency() || "";
+        const defaultTimezone = settings?.timezone || detectBrowserTimezone();
+        form.reset(
+          { baseCurrency: defaultCurrency, timezone: defaultTimezone },
+          { keepDefaultValues: false },
+        );
+        // Trigger validation after reset so the form is immediately valid
+        void form.trigger();
         setInitialValuesSet(true);
       }
     }, [form, settings, initialValuesSet]);
@@ -113,6 +204,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
       try {
         await updateSettings({
           baseCurrency: data.baseCurrency,
+          timezone: data.timezone,
         });
         onNext();
       } catch (error) {
@@ -122,7 +214,7 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
 
     return (
       <>
-        <div className="w-full max-w-xl space-y-4">
+        <div className="w-full max-w-2xl space-y-4">
           <div className="text-center">
             <p className="text-muted-foreground">Just a couple preferences to get you started</p>
           </div>
@@ -163,6 +255,53 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                             <button
                               type="button"
                               onClick={() => setShowCurrencySearch(true)}
+                              className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+                            >
+                              <Icons.Search className="size-5" />
+                              Other
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="bg-muted rounded-lg p-2">
+                            <Icons.Globe className="text-muted-foreground h-5 w-5" />
+                          </div>
+                          <FormLabel className="text-xl font-semibold">Timezone</FormLabel>
+                        </div>
+                        <FormControl>
+                          <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                            {timezoneOptions.map((tz) => (
+                              <button
+                                key={tz}
+                                type="button"
+                                data-testid={`timezone-${tz.toLowerCase().replace(/\//g, "-")}-button`}
+                                onClick={() => field.onChange(tz)}
+                                className={`rounded-lg border-2 p-4 font-semibold transition-all ${
+                                  field.value === tz
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50 hover:bg-accent"
+                                }`}
+                              >
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className="whitespace-nowrap font-semibold">
+                                    {formatTimezoneLabel(tz)}
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => setShowTimezoneSearch(true)}
                               className="border-border hover:border-primary/50 hover:bg-accent ring-offset-background focus-visible:ring-ring inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg border-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
                             >
                               <Icons.Search className="size-5" />
@@ -233,6 +372,64 @@ export const OnboardingStep2 = forwardRef<OnboardingStep2Handle, OnboardingStep2
                     <div className="text-muted-foreground py-8 text-center">
                       No currencies found
                     </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {showTimezoneSearch && (
+          <div className="bg-background/80 animate-in fade-in fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm duration-200">
+            <Card className="w-full max-w-md border shadow-lg">
+              <div className="p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-xl font-bold">Select Timezone</h3>
+                  <button
+                    onClick={() => {
+                      setShowTimezoneSearch(false);
+                      setTimezoneSearch("");
+                    }}
+                    className="hover:bg-accent rounded-lg p-2 transition-colors"
+                  >
+                    <Icons.Close className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="relative mb-4">
+                  <Icons.Search className="text-muted-foreground absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform" />
+                  <Input
+                    type="text"
+                    placeholder="Search timezones..."
+                    value={timezoneSearch}
+                    onChange={(e) => setTimezoneSearch(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="max-h-96 space-y-1 overflow-y-auto pr-2">
+                  {filteredTimezones.map((tz) => (
+                    <button
+                      key={tz}
+                      onClick={() => handleTimezoneSelect(tz)}
+                      className={`flex w-full items-center justify-between rounded-lg p-3 transition-all ${
+                        currentTimezone === tz ? "bg-primary/10" : "hover:bg-accent"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-left">
+                          <div className="font-semibold">{formatTimezoneLabel(tz)}</div>
+                          <div className="text-muted-foreground text-sm">{tz}</div>
+                        </div>
+                      </div>
+                      {currentTimezone === tz && (
+                        <Icons.CheckCircle className="text-primary h-5 w-5" />
+                      )}
+                    </button>
+                  ))}
+                  {filteredTimezones.length === 0 && (
+                    <div className="text-muted-foreground py-8 text-center">No timezones found</div>
                   )}
                 </div>
               </div>

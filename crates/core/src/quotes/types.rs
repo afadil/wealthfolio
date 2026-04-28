@@ -75,6 +75,11 @@ impl ProviderId {
     pub const MARKETDATA_APP: &'static str = "MARKETDATA_APP";
     pub const METAL_PRICE_API: &'static str = "METAL_PRICE_API";
     pub const FINNHUB: &'static str = "FINNHUB";
+    pub const US_TREASURY_CALC: &'static str = "US_TREASURY_CALC";
+    pub const BOERSE_FRANKFURT: &'static str = "BOERSE_FRANKFURT";
+    pub const OPENFIGI: &'static str = "OPENFIGI";
+    pub const BROKER: &'static str = "BROKER";
+    pub const CUSTOM_SCRAPER: &'static str = "CUSTOM_SCRAPER";
 
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
@@ -98,6 +103,22 @@ impl ProviderId {
 
     pub fn finnhub() -> Self {
         Self(Self::FINNHUB.to_string())
+    }
+
+    pub fn us_treasury_calc() -> Self {
+        Self(Self::US_TREASURY_CALC.to_string())
+    }
+
+    pub fn boerse_frankfurt() -> Self {
+        Self(Self::BOERSE_FRANKFURT.to_string())
+    }
+
+    pub fn openfigi() -> Self {
+        Self(Self::OPENFIGI.to_string())
+    }
+
+    pub fn broker() -> Self {
+        Self(Self::BROKER.to_string())
     }
 
     pub fn as_str(&self) -> &str {
@@ -324,40 +345,6 @@ impl AsRef<str> for Currency {
 }
 
 // =============================================================================
-// Compatibility with old DataSource
-// =============================================================================
-
-use super::model::DataSource;
-
-impl From<DataSource> for QuoteSource {
-    fn from(ds: DataSource) -> Self {
-        match ds {
-            DataSource::Manual => QuoteSource::Manual,
-            DataSource::Yahoo => QuoteSource::Provider(ProviderId::yahoo()),
-            DataSource::AlphaVantage => QuoteSource::Provider(ProviderId::alpha_vantage()),
-            DataSource::MarketDataApp => QuoteSource::Provider(ProviderId::marketdata_app()),
-            DataSource::MetalPriceApi => QuoteSource::Provider(ProviderId::metal_price_api()),
-            DataSource::Finnhub => QuoteSource::Provider(ProviderId::finnhub()),
-        }
-    }
-}
-
-impl From<QuoteSource> for DataSource {
-    fn from(qs: QuoteSource) -> Self {
-        match qs {
-            QuoteSource::Manual => DataSource::Manual,
-            QuoteSource::Provider(id) => match id.as_str() {
-                ProviderId::YAHOO => DataSource::Yahoo,
-                ProviderId::ALPHA_VANTAGE => DataSource::AlphaVantage,
-                ProviderId::MARKETDATA_APP => DataSource::MarketDataApp,
-                ProviderId::METAL_PRICE_API => DataSource::MetalPriceApi,
-                _ => DataSource::Manual, // Unknown providers default to Manual for compatibility
-            },
-        }
-    }
-}
-
-// =============================================================================
 // Tests
 // =============================================================================
 
@@ -442,22 +429,5 @@ mod tests {
 
         let eur: Currency = "EUR".into();
         assert_eq!(eur.as_str(), "EUR");
-    }
-
-    #[test]
-    fn test_data_source_conversion() {
-        // DataSource -> QuoteSource
-        assert_eq!(QuoteSource::from(DataSource::Manual), QuoteSource::Manual);
-        assert_eq!(
-            QuoteSource::from(DataSource::Yahoo),
-            QuoteSource::Provider(ProviderId::yahoo())
-        );
-
-        // QuoteSource -> DataSource
-        assert_eq!(DataSource::from(QuoteSource::Manual), DataSource::Manual);
-        assert_eq!(
-            DataSource::from(QuoteSource::Provider(ProviderId::yahoo())),
-            DataSource::Yahoo
-        );
     }
 }

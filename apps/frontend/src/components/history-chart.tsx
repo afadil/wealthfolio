@@ -1,10 +1,15 @@
+import { useHapticFeedback } from "@/hooks";
 import { ChartConfig, ChartContainer } from "@wealthfolio/ui/components/ui/chart";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { formatDate } from "@/lib/utils";
 import { AmountDisplay } from "@wealthfolio/ui";
-import { useState, useMemo } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, ReferenceDot, Tooltip, XAxis, YAxis } from "recharts";
+import type { MouseHandlerDataParam } from "recharts/types/synchronisation/types";
+import { getAutomaticHistoryChartScale } from "./history-chart-scale";
+
+const CHART_SCRUB_HAPTIC_INTERVAL_MS = 80;
 
 export interface HistoryChartData {
   date: string;
@@ -65,13 +70,16 @@ const CustomTooltip = ({
     return null;
   }
 
+  const netContributionPayload = ncPayload ?? tvPayload;
+  const tooltipColor = tvPayload.totalValue >= 0 ? "var(--success)" : "var(--destructive)";
+
   return (
     <div className="bg-popover pointer-events-none grid grid-cols-1 gap-1.5 rounded-md border p-2 shadow-md">
       <p className="text-muted-foreground text-xs">{formatDate(tvPayload.date)}</p>
 
       <div className="flex items-center justify-between space-x-2">
         <div className="flex items-center space-x-1.5">
-          <span className="block h-0.5 w-3" style={{ backgroundColor: "var(--success)" }} />
+          <span className="block h-0.5 w-3" style={{ backgroundColor: tooltipColor }} />
           <span className="text-muted-foreground text-xs">Total Value:</span>
         </div>
         <AmountDisplay
@@ -81,7 +89,7 @@ const CustomTooltip = ({
           className="text-xs font-semibold"
         />
       </div>
-      {isChartHovered && ncPayload && (
+      {isChartHovered && netContributionPayload && (
         <div className="flex items-center justify-between space-x-2">
           <div className="flex items-center space-x-1.5">
             <span
@@ -91,8 +99,8 @@ const CustomTooltip = ({
             <span className="text-muted-foreground text-xs">Net Deposit:</span>
           </div>
           <AmountDisplay
-            value={ncPayload.netContribution}
-            currency={ncPayload.currency}
+            value={netContributionPayload.netContribution}
+            currency={netContributionPayload.currency}
             isHidden={isBalanceHidden}
             className="text-xs font-semibold"
           />
@@ -109,9 +117,18 @@ export function HistoryChart({
   showMarkers,
   onMarkerClick,
 }: HistoryChartProps) {
+  const { triggerHaptic } = useHapticFeedback();
   const { isBalanceHidden } = useBalancePrivacy();
   const [isChartHovered, setIsChartHovered] = useState(false);
+  const [hoveredMarker, setHoveredMarker] = useState(false);
   const isMobile = useIsMobileViewport();
+  const isTouchScrubbingRef = useRef(false);
+  const lastHapticLabelRef = useRef<string | number | undefined>(undefined);
+  const lastHapticAtRef = useRef(0);
+  const id = useId();
+  const fillGradientId = `historyFill-${id}`;
+  const strokeGradientId = `historyStroke-${id}`;
+  const scaleConfig = useMemo(() => getAutomaticHistoryChartScale(data), [data]);
 
   const chartConfig = {
     totalValue: {
@@ -121,6 +138,23 @@ export function HistoryChart({
       label: "Net Contribution",
     },
   } satisfies ChartConfig;
+
+  // Compute where y=0 falls in the gradient (0=top, 1=bottom)
+  // to split green (positive) / red (negative) fill & stroke
+  const { zeroOffset, allPositive, allNegative } = useMemo(() => {
+    if (data.length === 0) return { zeroOffset: 0, allPositive: true, allNegative: false };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const d of data) {
+      if (d.totalValue < min) min = d.totalValue;
+      if (d.totalValue > max) max = d.totalValue;
+    }
+    if (min >= 0) return { zeroOffset: 1, allPositive: true, allNegative: false };
+    if (max <= 0) return { zeroOffset: 0, allPositive: false, allNegative: true };
+    const [domainMin, domainMax] = scaleConfig.domain;
+    const offset = domainMax / (domainMax - domainMin);
+    return { zeroOffset: offset, allPositive: false, allNegative: false };
+  }, [data, scaleConfig.domain]);
 
   // Build a map of date -> index for efficient lookup
   const dateToIndexMap = useMemo(() => {
@@ -151,15 +185,62 @@ export function HistoryChart({
       .filter((item): item is { date: string; index: number; value: number } => item !== null);
   }, [showMarkers, snapshotDates, dateToIndexMap, data]);
 
+  // Set for efficient marker date lookup (used by chart onClick)
+  const markerDateSet = useMemo(
+    () => new Set(markerDataPoints.map((p) => p.date)),
+    [markerDataPoints],
+  );
+
   if (isLoading && data.length === 0) {
     return null;
   }
 
+  // Gradient stops for fill and stroke based on zero crossing
+  const zeroPercent = `${(zeroOffset * 100).toFixed(1)}%`;
+
+  const maybeTriggerScrubHaptic = (chartState: MouseHandlerDataParam) => {
+    if (!isMobile || !isTouchScrubbingRef.current || !chartState.isTooltipActive) {
+      return;
+    }
+
+    const activeLabel = chartState.activeLabel;
+    if (activeLabel == null || activeLabel === lastHapticLabelRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastHapticAtRef.current < CHART_SCRUB_HAPTIC_INTERVAL_MS) {
+      return;
+    }
+
+    lastHapticLabelRef.current = activeLabel;
+    lastHapticAtRef.current = now;
+    triggerHaptic();
+  };
+
+  const resetTouchScrubState = () => {
+    isTouchScrubbingRef.current = false;
+    lastHapticLabelRef.current = undefined;
+  };
+
+  const handleChartMove = (chartState: MouseHandlerDataParam) => {
+    if (!showMarkers || chartState.activeLabel == null) {
+      setHoveredMarker(false);
+    } else {
+      setHoveredMarker(markerDateSet.has(String(chartState.activeLabel)));
+    }
+
+    maybeTriggerScrubHaptic(chartState);
+  };
+
   return (
-    <ChartContainer config={chartConfig} className="h-full w-full">
+    <ChartContainer config={chartConfig} className="h-full w-full" data-no-swipe-drag>
       <AreaChart
         data={data}
         stackOffset="sign"
+        style={{
+          cursor: showMarkers && isChartHovered && hoveredMarker ? "pointer" : undefined,
+        }}
         margin={{
           top: 0,
           right: 0,
@@ -167,12 +248,65 @@ export function HistoryChart({
           bottom: 0,
         }}
         onMouseEnter={() => setIsChartHovered(true)}
-        onMouseLeave={() => setIsChartHovered(false)}
+        onMouseLeave={() => {
+          setIsChartHovered(false);
+          setHoveredMarker(false);
+          resetTouchScrubState();
+        }}
+        onMouseMove={handleChartMove}
+        onClick={(chartState) => {
+          if (!showMarkers || chartState?.activeLabel == null) return;
+          const clickedDate = String(chartState.activeLabel);
+          if (markerDateSet.has(clickedDate)) {
+            onMarkerClick?.(clickedDate);
+          }
+        }}
+        onTouchStart={(chartState) => {
+          isTouchScrubbingRef.current = true;
+          setIsChartHovered(true);
+          handleChartMove(chartState);
+        }}
+        onTouchMove={handleChartMove}
+        onTouchEnd={() => {
+          setIsChartHovered(false);
+          setHoveredMarker(false);
+          resetTouchScrubState();
+        }}
       >
         <defs>
-          <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="var(--success)" stopOpacity={0.1} />
+          <linearGradient id={fillGradientId} x1="0" y1="0" x2="0" y2="1">
+            {allNegative ? (
+              <>
+                <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.2} />
+                <stop offset="70%" stopColor="var(--destructive)" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0} />
+              </>
+            ) : allPositive ? (
+              <>
+                <stop offset="5%" stopColor="var(--success)" stopOpacity={0.2} />
+                <stop offset="70%" stopColor="var(--success)" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="var(--success)" stopOpacity={0} />
+              </>
+            ) : (
+              <>
+                <stop offset="0%" stopColor="var(--success)" stopOpacity={0.2} />
+                <stop offset={zeroPercent} stopColor="var(--success)" stopOpacity={0.05} />
+                <stop offset={zeroPercent} stopColor="var(--destructive)" stopOpacity={0.05} />
+                <stop offset="100%" stopColor="var(--destructive)" stopOpacity={0.2} />
+              </>
+            )}
+          </linearGradient>
+          <linearGradient id={strokeGradientId} x1="0" y1="0" x2="0" y2="1">
+            {allNegative ? (
+              <stop offset="0%" stopColor="var(--destructive)" />
+            ) : allPositive ? (
+              <stop offset="0%" stopColor="var(--success)" />
+            ) : (
+              <>
+                <stop offset={zeroPercent} stopColor="var(--success)" />
+                <stop offset={zeroPercent} stopColor="var(--destructive)" />
+              </>
+            )}
           </linearGradient>
         </defs>
         <Tooltip
@@ -191,7 +325,8 @@ export function HistoryChart({
         <YAxis
           hide
           type="number"
-          domain={[(dataMin: number) => dataMin - Math.abs(dataMin) * 0.02, "auto"]}
+          scale={scaleConfig.scale === "log" ? "log" : "auto"}
+          domain={scaleConfig.domain}
         />
         <Area
           isAnimationActive={true}
@@ -200,24 +335,26 @@ export function HistoryChart({
           connectNulls={true}
           type="monotone"
           dataKey="totalValue"
-          stroke="var(--success)"
+          stroke={`url(#${strokeGradientId})`}
           fillOpacity={1}
-          fill="url(#colorUv)"
+          fill={`url(#${fillGradientId})`}
           style={{ pointerEvents: "none" }}
         />
-        <Area
-          isAnimationActive={true}
-          animationDuration={300}
-          animationEasing="ease-out"
-          connectNulls={true}
-          type="monotone"
-          dataKey="netContribution"
-          stroke="var(--muted-foreground)"
-          fill="transparent"
-          strokeDasharray="5 5"
-          strokeOpacity={isChartHovered ? 0.8 : 0}
-          style={{ pointerEvents: "none" }}
-        />
+        {scaleConfig.showNetContribution && (
+          <Area
+            isAnimationActive={true}
+            animationDuration={300}
+            animationEasing="ease-out"
+            connectNulls={true}
+            type="monotone"
+            dataKey="netContribution"
+            stroke="var(--muted-foreground)"
+            fill="transparent"
+            strokeDasharray="5 5"
+            strokeOpacity={isChartHovered ? 0.8 : 0}
+            style={{ pointerEvents: "none" }}
+          />
+        )}
         {/* Snapshot markers - diamond shape */}
         {showMarkers &&
           markerDataPoints.map((point) => (
@@ -225,27 +362,18 @@ export function HistoryChart({
               key={`marker-${point.date}`}
               x={point.date}
               y={point.value}
-              zIndex={1300}
               shape={(props: { cx?: number; cy?: number }) => {
                 const cx = props.cx ?? 0;
                 const cy = props.cy ?? 0;
                 const size = 8;
-                const hitAreaSize = 16;
                 return (
-                  <g
-                    style={{ cursor: "pointer", pointerEvents: "all" }}
-                    onClick={() => onMarkerClick?.(point.date)}
-                  >
-                    {/* Invisible larger hit area for easier clicking */}
-                    <circle cx={cx} cy={cy} r={hitAreaSize} fill="transparent" />
-                    {/* Diamond shape */}
-                    <polygon
-                      points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
-                      fill="var(--success)"
-                      stroke="hsl(var(--background))"
-                      strokeWidth={2}
-                    />
-                  </g>
+                  <polygon
+                    points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
+                    fill={point.value >= 0 ? "var(--success)" : "var(--destructive)"}
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                    style={{ pointerEvents: "none" }}
+                  />
                 );
               }}
             />

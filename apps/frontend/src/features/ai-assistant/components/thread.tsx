@@ -52,6 +52,8 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
               AssistantMessage,
             }}
           />
+          {/* Spacer to prevent last message from being hidden behind sticky composer + mobile nav */}
+          <div className="h-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))] shrink-0 md:h-0" />
           <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) sticky bottom-[calc(var(--mobile-nav-ui-height)+max(var(--mobile-nav-gap),env(safe-area-inset-bottom)))] z-10 mx-auto mt-auto flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:bottom-0 md:pb-6">
             <ThreadScrollToBottom />
             <Composer composerActions={composerActions} />
@@ -219,12 +221,29 @@ const MessageError: FC = () => {
   );
 };
 
-const TypingIndicator: FC = () => {
+interface MessagePartWithResult {
+  type?: string;
+  result?: unknown;
+}
+
+interface TypingIndicatorProps {
+  position: "initial" | "continuation";
+}
+
+const TypingIndicator: FC<TypingIndicatorProps> = ({ position }) => {
   const showIndicator = useAssistantState(({ message }) => {
-    // Show indicator when message is running and has no text/tool content yet
     if (message.status?.type !== "running") return false;
-    // Hide if there are any parts (text started streaming or tools are being called)
-    return message.parts.length === 0;
+
+    if (position === "initial") {
+      return message.parts.length === 0;
+    }
+
+    const lastPart = message.parts[message.parts.length - 1] as MessagePartWithResult | undefined;
+    return (
+      lastPart?.type === "tool-call" &&
+      Object.prototype.hasOwnProperty.call(lastPart, "result") &&
+      lastPart.result !== undefined
+    );
   });
 
   if (!showIndicator) return null;
@@ -245,7 +264,7 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div className="aui-assistant-message-content text-foreground wrap-break-word mx-2 text-sm leading-6">
-        <TypingIndicator />
+        <TypingIndicator position="initial" />
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
@@ -257,6 +276,7 @@ const AssistantMessage: FC = () => {
             },
           }}
         />
+        <TypingIndicator position="continuation" />
         <MessageError />
       </div>
 

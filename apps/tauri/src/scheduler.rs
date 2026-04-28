@@ -22,26 +22,26 @@ use crate::context::ServiceContext;
 /// Runs broker sync once on startup (async, non-blocking).
 ///
 /// This function:
-/// - Checks if user has an active subscription
+/// - Checks if user's plan includes broker sync
 /// - Performs the sync silently (no toast - user didn't request it)
 /// - Triggers portfolio update if activities were synced
 #[cfg(feature = "connect-sync")]
 pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>) {
     info!("Running startup broker sync...");
 
-    // Check subscription status first using ConnectService
-    match context.connect_service().has_active_subscription().await {
+    // Check if user's plan includes broker sync
+    match context.connect_service().has_broker_sync().await {
         Ok(true) => {
-            // User has active subscription, proceed
+            // User has broker sync, proceed
         }
         Ok(false) => {
-            debug!("Startup sync skipped: no active subscription");
+            debug!("Startup sync skipped: plan does not include broker sync");
             return;
         }
         Err(e) => {
-            // If we can't check subscription (no token, network error, etc.), skip silently
+            // If we can't check (no token, network error, etc.), skip silently
             debug!(
-                "Startup sync skipped: could not verify subscription ({})",
+                "Startup sync skipped: could not verify broker sync access ({})",
                 e
             );
             return;

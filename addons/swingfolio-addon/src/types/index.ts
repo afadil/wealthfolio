@@ -13,6 +13,7 @@ export interface SwingTradePreferences {
 export interface ClosedTrade {
   id: string;
   symbol: string;
+  assetId: string;
   assetName?: string;
   entryDate: Date;
   exitDate: Date;
@@ -34,6 +35,7 @@ export interface ClosedTrade {
 export interface OpenPosition {
   id: string;
   symbol: string;
+  assetId: string;
   assetName?: string;
   quantity: number;
   averageCost: number;

@@ -4,10 +4,12 @@ import {
   ActivityStatus,
   ActivityType,
   ActivityTypeNames,
+  INSTRUMENT_TYPE_OPTIONS,
   getExchangeDisplayName,
   SUBTYPE_DISPLAY_NAMES,
   SUBTYPES_BY_ACTIVITY_TYPE,
 } from "@/lib/constants";
+import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { Account, ActivityDetails } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Badge, Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
@@ -26,6 +28,10 @@ const STATUS_DISPLAY: Record<
   [ActivityStatus.PENDING]: { label: "Pending", variant: "secondary" },
   [ActivityStatus.DRAFT]: { label: "Draft", variant: "outline" },
   [ActivityStatus.VOID]: { label: "Void", variant: "destructive" },
+};
+
+const isTransferActivity = (activityType: string | undefined): boolean => {
+  return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
 };
 
 interface UseActivityColumnsOptions {
@@ -77,8 +83,11 @@ export function useActivityColumns({
       exchange: result.exchange,
       exchangeMic: result.exchangeMic,
       currency: result.currency,
+      currencySource: result.currencySource,
+      quoteType: result.quoteType,
       score: result.score,
       dataSource: result.dataSource,
+      assetKind: result.assetKind,
     }));
   }, []);
 
@@ -218,19 +227,30 @@ export function useActivityColumns({
       {
         accessorKey: "assetSymbol",
         header: "Symbol",
-        size: 140,
+        size: 160,
         meta: {
           cell: {
             variant: "symbol",
             isDisabled: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
-              return isCashActivity(row.activityType ?? "");
+              return (
+                isCashActivity(row.activityType ?? "") && !isTransferActivity(row.activityType)
+              );
             },
             getDisplayContext: (rowData: unknown) => {
               const row = rowData as LocalTransaction;
               const symbol = (row.assetSymbol ?? "").trim().toUpperCase();
               if (!symbol || symbol === "CASH" || symbol.startsWith("$CASH")) {
                 return undefined;
+              }
+              // Show contract description for options
+              const parsed = row.instrumentType === "OPTION" ? parseOccSymbol(symbol) : null;
+              if (parsed) {
+                const expDisplay = new Date(parsed.expiration + "T12:00:00").toLocaleDateString(
+                  "en-US",
+                  { month: "short", day: "numeric" },
+                );
+                return `${expDisplay} $${parsed.strikePrice} ${parsed.optionType}`;
               }
               return getExchangeDisplayName(row.exchangeMic);
             },
@@ -251,8 +271,29 @@ export function useActivityColumns({
         },
       },
 
+      // 9. Instrument Type (hidden by default, editable select)
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 120,
+        enableSorting: false,
+        enableHiding: true,
+        meta: {
+          cell: {
+            variant: "select",
+            options: INSTRUMENT_TYPE_OPTIONS.map((opt) => ({
+              value: opt.value,
+              label: opt.label,
+            })),
+            allowEmpty: true,
+            emptyLabel: "Auto",
+          },
+        },
+      },
+
       // === Numbers (grouped, right-aligned) ===
-      // 8. Quantity
+      // 10. Quantity
       {
         accessorKey: "quantity",
         header: "Quantity",

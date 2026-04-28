@@ -7,24 +7,20 @@ use std::str::FromStr;
 use crate::constants::{DECIMAL_PRECISION, DISPLAY_DECIMAL_PRECISION};
 
 // Custom serializer/deserializer for Decimal (rounds on serialization)
-pub mod decimal_serde {
-    use super::*; // Import parent scope items (Decimal, Error, etc.)
+pub fn serialize<S>(value: &Decimal, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let rounded = value.round_dp(DECIMAL_PRECISION); // Use imported constant
+    serializer.serialize_str(&rounded.to_string())
+}
 
-    pub fn serialize<S>(value: &Decimal, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let rounded = value.round_dp(DECIMAL_PRECISION); // Use imported constant
-        serializer.serialize_str(&rounded.to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: String = String::deserialize(deserializer)?;
-        Decimal::from_str(&s).map_err(|_| D::Error::custom("Invalid Decimal"))
-    }
+pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    Decimal::from_str(&s).map_err(|_| D::Error::custom("Invalid Decimal"))
 }
 
 // Custom serializer/deserializer for Option<Decimal>
@@ -51,8 +47,7 @@ pub mod decimal_serde_option {
         let s: Option<String> = Option::deserialize(deserializer)?;
         match s {
             Some(s) => {
-                let d = Decimal::from_str(&s)
-                    .map_err(|_| D::Error::custom("Invalid Decimal"))?;
+                let d = Decimal::from_str(&s).map_err(|_| D::Error::custom("Invalid Decimal"))?;
                 Ok(Some(d))
             }
             None => Ok(None),
@@ -71,7 +66,7 @@ pub mod decimal_serde_round_display {
         let rounded = value.round_dp(DISPLAY_DECIMAL_PRECISION); // Use imported constant
         serializer.serialize_str(&rounded.to_string())
     }
-    
+
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Decimal, D::Error>
     where
         D: Deserializer<'de>,
@@ -79,4 +74,4 @@ pub mod decimal_serde_round_display {
         let s: String = String::deserialize(deserializer)?;
         Decimal::from_str(&s).map_err(|_| D::Error::custom("Invalid Decimal"))
     }
-} 
+}

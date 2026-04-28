@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { format } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import type { BrokerAccount } from "../types";
 
 interface BrokerAccountCardProps {
@@ -35,13 +35,8 @@ function getLastSyncDate(account: BrokerAccount): string | null {
  * Format the last sync date for display
  */
 function formatLastSyncDate(dateStr: string | null): string {
-  if (!dateStr) return "Never synced";
-  try {
-    const date = new Date(dateStr);
-    return `Last data: ${format(date, "MMM d, yyyy")}`;
-  } catch {
-    return "Never synced";
-  }
+  if (!dateStr) return "No data yet";
+  return `Data as of ${formatDate(dateStr)}`;
 }
 
 export function BrokerAccountCard({ account }: BrokerAccountCardProps) {

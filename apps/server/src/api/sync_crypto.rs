@@ -63,6 +63,13 @@ pub struct ComputeSasRequest {
     pub shared_secret: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HmacSha256Request {
+    pub key: String,
+    pub data: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StringResponse {
@@ -150,6 +157,14 @@ async fn compute_sas(
     Ok(Json(StringResponse { value }))
 }
 
+async fn hmac_sha256(
+    State(_state): State<Arc<AppState>>,
+    Json(body): Json<HmacSha256Request>,
+) -> ApiResult<Json<StringResponse>> {
+    let value = crypto::hmac_sha256(&body.key, &body.data).map_err(ApiError::BadRequest)?;
+    Ok(Json(StringResponse { value }))
+}
+
 async fn generate_device_id(
     State(_state): State<Arc<AppState>>,
 ) -> ApiResult<Json<StringResponse>> {
@@ -178,6 +193,7 @@ pub fn router() -> Router<Arc<AppState>> {
             post(generate_pairing_code),
         )
         .route("/sync/crypto/hash-pairing-code", post(hash_pairing_code))
+        .route("/sync/crypto/hmac-sha256", post(hmac_sha256))
         .route("/sync/crypto/compute-sas", post(compute_sas))
         .route("/sync/crypto/generate-device-id", post(generate_device_id))
 }

@@ -21,12 +21,16 @@ import { usePersistentState } from "../../../hooks/use-persistent-state";
 import type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
 import { DataTableToolbar } from "./data-table-toolbar";
 
+export { DataTableColumnHeader } from "./data-table-column-header";
+export type { DataTableFacetedFilterProps } from "./data-table-faceted-filter";
+
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   searchBy?: string;
   filters?: DataTableFacetedFilterProps<TData, TValue>[];
   defaultColumnVisibility?: VisibilityState;
   defaultSorting?: SortingState;
+  defaultColumnFilters?: ColumnFiltersState;
   storageKey?: string;
   data: TData[];
   manualPagination?: boolean;
@@ -43,6 +47,7 @@ export function DataTable<TData, TValue>({
   manualPagination = false,
   defaultColumnVisibility,
   defaultSorting,
+  defaultColumnFilters,
   storageKey,
   scrollable = false,
   showColumnToggle = false,
@@ -53,9 +58,11 @@ export function DataTable<TData, TValue>({
     ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
     : React.useState<VisibilityState>(defaultColumnVisibility || {});
   const [columnFilters, setColumnFilters] = storageKey
-    ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, [])
-    : React.useState<ColumnFiltersState>([]);
-  const [sorting, setSorting] = React.useState<SortingState>(defaultSorting || []);
+    ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, defaultColumnFilters || [])
+    : React.useState<ColumnFiltersState>(defaultColumnFilters || []);
+  const [sorting, setSorting] = storageKey
+    ? usePersistentState<SortingState>(`${storageKey}:sorting`, defaultSorting || [])
+    : React.useState<SortingState>(defaultSorting || []);
 
   const table = useReactTable({
     data,

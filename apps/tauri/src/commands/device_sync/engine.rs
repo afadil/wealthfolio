@@ -37,8 +37,8 @@ fn transport_err_permanent(message: String) -> TransportError {
 use wealthfolio_storage_sqlite::sync::SqliteSyncEngineDbPorts;
 
 use super::{
-    create_client, decrypt_sync_payload, encrypt_sync_payload, get_access_token,
-    get_sync_identity_from_store, persist_device_config_from_identity, SyncCycleResult,
+    create_client, decrypt_sync_payload, encrypt_sync_payload, get_sync_identity_from_store,
+    persist_device_config_from_identity, SyncCycleResult,
 };
 
 struct TauriEnginePorts {
@@ -242,13 +242,21 @@ impl CredentialStore for TauriEnginePorts {
     }
 
     fn get_access_token(&self) -> Result<String, String> {
-        get_access_token()
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(self.context.connect_service().get_valid_access_token())
+        })
     }
 
     async fn get_sync_state(&self) -> Result<SyncState, String> {
+        let token = self
+            .context
+            .connect_service()
+            .get_valid_access_token()
+            .await?;
         self.context
             .device_enroll_service()
-            .get_sync_state()
+            .get_sync_state(&token)
             .await
             .map(|value| value.state)
             .map_err(|err| err.message)
@@ -288,10 +296,11 @@ impl CredentialStore for TauriEnginePorts {
 
 pub(super) async fn run_sync_cycle(
     context: Arc<ServiceContext>,
+    post_bootstrap: bool,
 ) -> Result<SyncCycleResult, String> {
     let runtime = context.device_sync_runtime();
     let ports = TauriEnginePorts::new(Arc::clone(&context));
-    let result = runtime.run_cycle(&ports).await?;
+    let result = runtime.run_cycle(&ports, post_bootstrap).await?;
 
     // Note: on_pull_complete is now called by the engine itself via ReplayStore trait
 
@@ -304,6 +313,7 @@ pub(super) async fn run_sync_cycle(
         needs_bootstrap: result.needs_bootstrap,
         bootstrap_snapshot_id: result.bootstrap_snapshot_id,
         bootstrap_snapshot_seq: result.bootstrap_snapshot_seq,
+        dead_letter_count: result.dead_letter_count,
     })
 }
 

@@ -14,10 +14,11 @@ import {
 import {
   ActivityType,
   ActivityTypeNames,
+  INSTRUMENT_TYPE_OPTIONS,
   SUBTYPES_BY_ACTIVITY_TYPE,
   SUBTYPE_DISPLAY_NAMES,
 } from "@/lib/constants";
-import { isSymbolRequired } from "@/lib/activity-utils";
+import { needsImportAssetResolution } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
 import type { DraftActivity, DraftActivityStatus } from "../context";
 import { ImportToolbar, ImportContextMenu } from "./import-toolbar";
@@ -30,19 +31,20 @@ import { useSettingsContext } from "@/lib/settings-provider";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ImportReviewFilter = "all" | "errors" | "warnings" | "duplicates" | "skipped";
-
 export interface ImportReviewGridProps {
   drafts: DraftActivity[];
+  nonSelectableRowIndexes?: number[];
   onDraftUpdate: (rowIndex: number, updates: Partial<DraftActivity>) => void;
   selectedRows: number[];
   onSelectionChange: (selectedRows: number[]) => void;
-  filter?: ImportReviewFilter;
   // Bulk action handlers
   onBulkSkip?: (rowIndexes: number[]) => void;
   onBulkUnskip?: (rowIndexes: number[]) => void;
+  onBulkForceImport?: (rowIndexes: number[]) => void;
   onBulkSetCurrency?: (rowIndexes: number[], currency: string) => void;
   onBulkSetAccount?: (rowIndexes: number[], accountId: string) => void;
+  /** Override the grid height (default: "calc(100vh - 360px)"). */
+  gridHeight?: string | number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +96,7 @@ function getStatusTitle(
   if (typeof duplicateOfLineNumber === "number") {
     return `Duplicate of line ${duplicateOfLineNumber} in this import batch`;
   }
-  if (duplicateOfId) return `Duplicate of existing activity: ${duplicateOfId}`;
+  if (duplicateOfId) return "Duplicate of an existing activity in your portfolio";
   if (errors) {
     const errorDetails = Object.entries(errors)
       .flatMap(([field, msgs]) => msgs.map((msg) => `${field}: ${msg}`))
@@ -106,7 +108,7 @@ function getStatusTitle(
   if (warnings) {
     const warningDetails = Object.entries(warnings)
       .flatMap(([field, msgs]) =>
-        msgs.map((msg) => `${field === "_duplicate" ? "duplicate" : field}: ${msg}`),
+        msgs.map((msg) => (field.startsWith("_") ? msg : `${field}: ${msg}`)),
       )
       .join("\n");
     if (warningDetails) {
@@ -123,14 +125,6 @@ const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   duplicate: "bg-blue-500",
   skipped: "bg-gray-400",
 };
-
-function hasDuplicateWarning(draft: DraftActivity): boolean {
-  const hasDuplicateLineNumber = typeof draft.duplicateOfLineNumber === "number";
-  return (
-    draft.status === "duplicate" ||
-    Boolean(draft.duplicateOfId || hasDuplicateLineNumber || draft.warnings?._duplicate?.length)
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column Definitions
@@ -188,6 +182,7 @@ function useImportReviewColumns({
         id: "select",
         header: ({ table }) => (
           <Checkbox
+            disabled={!table.getRowModel().rows.some((row) => row.getCanSelect())}
             checked={
               table.getIsAllRowsSelected() || (table.getIsSomeRowsSelected() && "indeterminate")
             }
@@ -197,6 +192,7 @@ function useImportReviewColumns({
         ),
         cell: ({ row }) => (
           <Checkbox
+            disabled={!row.getCanSelect()}
             checked={row.getIsSelected()}
             onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))}
             aria-label="Select row"
@@ -223,22 +219,26 @@ function useImportReviewColumns({
             errors,
             warnings,
             rowIndex,
+            forceImport,
           } = row.original;
-          const title = getStatusTitle(
-            status,
-            skipReason,
-            duplicateOfId,
-            duplicateOfLineNumber,
-            errors,
-            warnings,
-          );
-          const dotColor = STATUS_DOT_COLOR[status];
+          const isForcedDuplicate = status === "duplicate" && forceImport;
+          const title = isForcedDuplicate
+            ? "Will be imported – overrides duplicate detection"
+            : getStatusTitle(
+                status,
+                skipReason,
+                duplicateOfId,
+                duplicateOfLineNumber,
+                errors,
+                warnings,
+              );
+          const dotColor = isForcedDuplicate ? "bg-amber-500" : STATUS_DOT_COLOR[status];
           const dot = dotColor ? (
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
           ) : null;
           return (
             <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground w-5 text-xs">{rowIndex + 1}</span>
+              <span className="text-muted-foreground shrink-0 text-xs">{rowIndex + 1}</span>
               {dot && title ? (
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
@@ -359,14 +359,31 @@ function useImportReviewColumns({
             onCreateCustomAsset,
             isClearable: (rowData: unknown) => {
               const row = rowData as DraftActivity;
-              return !isSymbolRequired(row.activityType ?? "");
+              return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
             },
+          },
+        },
+      },
+      // 9. Instrument Type
+      {
+        id: "instrumentType",
+        accessorKey: "instrumentType",
+        header: "Instrument",
+        size: 120,
+        enableSorting: false,
+        enableHiding: true,
+        meta: {
+          cell: {
+            variant: "select",
+            options: [...INSTRUMENT_TYPE_OPTIONS],
+            allowEmpty: true,
+            emptyLabel: "Auto",
           },
         },
       },
 
       // === Numbers (grouped, right-aligned) ===
-      // 8. Quantity
+      // 10. Quantity
       {
         id: "quantity",
         accessorKey: "quantity",
@@ -444,45 +461,28 @@ function useImportReviewColumns({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Filter Logic
-// ─────────────────────────────────────────────────────────────────────────────
-
-function filterDrafts(drafts: DraftActivity[], filter: ImportReviewFilter): DraftActivity[] {
-  if (filter === "all") return drafts;
-
-  return drafts.filter((draft) => {
-    switch (filter) {
-      case "errors":
-        return draft.status === "error";
-      case "warnings":
-        return draft.status === "warning" || draft.status === "duplicate";
-      case "duplicates":
-        return hasDuplicateWarning(draft);
-      case "skipped":
-        return draft.status === "skipped";
-      default:
-        return true;
-    }
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ImportReviewGrid({
   drafts,
+  nonSelectableRowIndexes = [],
   onDraftUpdate,
   selectedRows,
   onSelectionChange,
-  filter = "all",
   onBulkSkip,
   onBulkUnskip,
+  onBulkForceImport,
   onBulkSetCurrency,
   onBulkSetAccount,
+  gridHeight,
 }: ImportReviewGridProps) {
   const { settings } = useSettingsContext();
   const fallbackCurrency = settings?.baseCurrency ?? "USD";
+  const nonSelectableRowIndexSet = useMemo(
+    () => new Set(nonSelectableRowIndexes),
+    [nonSelectableRowIndexes],
+  );
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -545,6 +545,10 @@ export function ImportReviewGrid({
     onBulkUnskip?.(selectedRows);
   }, [onBulkUnskip, selectedRows]);
 
+  const handleForceImport = useCallback(() => {
+    onBulkForceImport?.(selectedRows);
+  }, [onBulkForceImport, selectedRows]);
+
   const handleSetCurrency = useCallback(
     (currency: string) => {
       onBulkSetCurrency?.(selectedRows, currency);
@@ -568,17 +572,7 @@ export function ImportReviewGrid({
 
   // Symbol search handler
   const handleSymbolSearch = useCallback(async (query: string): Promise<SymbolSearchResult[]> => {
-    const results = await searchTicker(query);
-    return results.map((result) => ({
-      symbol: result.symbol,
-      shortName: result.shortName,
-      longName: result.longName,
-      exchange: result.exchange,
-      exchangeMic: result.exchangeMic,
-      currency: result.currency,
-      score: result.score,
-      dataSource: result.dataSource,
-    }));
+    return searchTicker(query);
   }, []);
 
   // Symbol selection handler - update draft with symbol and currency from search result
@@ -596,6 +590,13 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
     },
     [drafts, fallbackCurrency, onDraftUpdate],
@@ -621,15 +622,19 @@ export function ImportReviewGrid({
       onDraftUpdate(rowIndex, {
         symbol: result.symbol,
         currency,
+        exchangeMic: result.exchangeMic,
+        quoteCcy: result.currency ?? draft.quoteCcy,
+        instrumentType: result.quoteType,
+        quoteMode: result.dataSource === "MANUAL" ? "MANUAL" : undefined,
+        symbolName: result.longName || result.shortName || draft.symbolName,
+        assetId: undefined,
+        importAssetKey: undefined,
       });
 
       setCustomAssetDialog({ open: false, rowIndex: -1, symbol: "" });
     },
     [customAssetDialog, drafts, fallbackCurrency, onDraftUpdate],
   );
-
-  // Filter drafts based on current filter
-  const filteredDrafts = useMemo(() => filterDrafts(drafts, filter), [drafts, filter]);
 
   // Column definitions
   const columns = useImportReviewColumns({
@@ -657,7 +662,7 @@ export function ImportReviewGrid({
       // Find which rows changed and dispatch updates
       for (let i = 0; i < nextData.length; i++) {
         const nextRow = nextData[i];
-        const prevRow = filteredDrafts[i];
+        const prevRow = drafts[i];
 
         if (nextRow !== prevRow) {
           // Something changed in this row
@@ -666,6 +671,7 @@ export function ImportReviewGrid({
             "activityDate",
             "activityType",
             "symbol",
+            "instrumentType",
             "quantity",
             "unitPrice",
             "amount",
@@ -690,8 +696,13 @@ export function ImportReviewGrid({
         }
       }
     },
-    [filteredDrafts, onDraftUpdate],
+    [drafts, onDraftUpdate],
   );
+
+  // Keep a synchronously-updated ref so getCellState always reads the latest
+  // drafts even when the DataGrid's internal propsRef lags by one layout-effect.
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
 
   // Cell state callback for error/warning highlighting with messages
   const getCellState = useCallback(
@@ -699,7 +710,7 @@ export function ImportReviewGrid({
       rowIndex: number,
       columnId: string,
     ): { type: "error" | "warning"; messages: string[] } | null => {
-      const draft = filteredDrafts[rowIndex];
+      const draft = draftsRef.current[rowIndex];
       if (!draft) return null;
 
       // Skip non-data columns
@@ -719,15 +730,15 @@ export function ImportReviewGrid({
 
       return null;
     },
-    [filteredDrafts],
+    [],
   );
 
   // Initialize data grid
   const dataGrid = useDataGrid<DraftActivity>({
-    data: filteredDrafts,
+    data: drafts,
     columns,
     getRowId: (row) => String(row.rowIndex),
-    enableRowSelection: true,
+    enableRowSelection: (row) => !nonSelectableRowIndexSet.has(row.original.rowIndex),
     enableMultiRowSelection: true,
     enableSorting: false,
     enableColumnFilters: false,
@@ -751,6 +762,15 @@ export function ImportReviewGrid({
   // Sync selection changes to parent
   const tableSelectedRows = dataGrid.table.getSelectedRowModel().rows;
   const prevSelectedRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    const selectableRows = selectedRows.filter(
+      (rowIndex) => !nonSelectableRowIndexSet.has(rowIndex),
+    );
+    if (selectableRows.length !== selectedRows.length) {
+      onSelectionChange(selectableRows);
+    }
+  }, [selectedRows, onSelectionChange, nonSelectableRowIndexSet]);
 
   useEffect(() => {
     if (isSyncingRef.current) return;
@@ -804,6 +824,7 @@ export function ImportReviewGrid({
         selectedCount={selectedRows.length}
         onSkip={handleSkip}
         onUnskip={handleUnskip}
+        onForceImport={onBulkForceImport ? handleForceImport : undefined}
         onSetCurrency={handleSetCurrency}
         onSetAccount={handleSetAccount}
         onClearSelection={handleClearSelection}
@@ -811,7 +832,12 @@ export function ImportReviewGrid({
 
       {/* Data grid with context menu support */}
       <div className="min-h-0 flex-1" onContextMenu={handleContextMenu} onWheel={handleWheel}>
-        <DataGrid {...dataGrid} stretchColumns height="calc(100vh - 360px)" className="text-sm" />
+        <DataGrid
+          {...dataGrid}
+          stretchColumns
+          height={gridHeight ?? "calc(100vh - 360px)"}
+          className="text-sm"
+        />
       </div>
 
       {/* Context menu */}
@@ -822,6 +848,7 @@ export function ImportReviewGrid({
         selectedCount={selectedRows.length}
         onSkip={handleSkip}
         onUnskip={handleUnskip}
+        onForceImport={onBulkForceImport ? handleForceImport : undefined}
         onSetCurrency={handleSetCurrency}
         onSetAccount={handleSetAccount}
       />

@@ -58,7 +58,7 @@ export function RateCell({ rate, onUpdate }: RateCellProps) {
             className="w-full"
           />
         ) : (
-          <span>{rate.rate ? rate.rate : "-"}</span>
+          <span>{rate.rate ? Number(rate.rate).toFixed(4) : "-"}</span>
         )}
       </div>
       {isManual && (

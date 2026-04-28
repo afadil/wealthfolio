@@ -38,14 +38,21 @@ wealthfolio-market-data = { path = "../market-data" }
 yahoo_finance_api = "4.1"
 regex = "1.10"
 rand = { workspace = true }
+rand_distr = "0.4"
+rayon = "1"
 dashmap = "6.1"
 serde_with = "3"
 urlencoding = "2"
 csv = "1.4.0"
+chardetng = "0.1"
+encoding_rs = "0.8"
 zip = "2.2.0"
+jsonpath-rust = "0.7"
+scraper = "0.22"
 sha2 = "0.10"
 hex = "0.4"
 chrono-tz = "0.10"
+url = "2"
 
 [dev-dependencies]
 tempfile = "3"

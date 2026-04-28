@@ -22,15 +22,12 @@ export function useUpdateMarketDataProviderSettings() {
     mutationFn: async (variables: { providerId: string; priority: number; enabled: boolean }) =>
       updateMarketDataProviderSettings(variables),
     onMutate: async (variables) => {
-      // Cancel any outgoing refetches to avoid overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
 
-      // Snapshot the previous value
       const previousProviders = queryClient.getQueryData<MarketDataProviderSetting[]>([
         QueryKeys.MARKET_DATA_PROVIDER_SETTINGS,
       ]);
 
-      // Optimistically update the cache
       queryClient.setQueryData<MarketDataProviderSetting[]>(
         [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS],
         (old) => {
@@ -43,14 +40,9 @@ export function useUpdateMarketDataProviderSettings() {
         },
       );
 
-      // Return a context object with the snapshotted value
       return { previousProviders };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
-    },
     onError: (error, variables, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousProviders) {
         queryClient.setQueryData(
           [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS],
@@ -64,7 +56,6 @@ export function useUpdateMarketDataProviderSettings() {
       });
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [QueryKeys.MARKET_DATA_PROVIDER_SETTINGS] });
     },
   });

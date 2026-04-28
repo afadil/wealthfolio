@@ -29,6 +29,7 @@ pub struct Instrument {
     pub notes: Option<String>,
     pub pricing_mode: String,
     pub preferred_provider: Option<String>,
+    pub exchange_mic: Option<String>,
 
     // Taxonomy-based classifications
     pub classifications: Option<AssetClassifications>,
@@ -87,6 +88,9 @@ pub struct Holding {
     pub quantity: Decimal,
     pub open_date: Option<DateTime<Utc>>,
     pub lots: Option<VecDeque<Lot>>,
+
+    /// Contract multiplier for derivatives (e.g., 100 for equity options). Defaults to 1.
+    pub contract_multiplier: Decimal,
 
     // Currency info
     pub local_currency: String,

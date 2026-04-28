@@ -207,14 +207,22 @@ pub async fn resolve_symbol_quote(
     symbol: String,
     exchange_mic: Option<String>,
     instrument_type: Option<String>,
+    quote_ccy: Option<String>,
+    provider_id: Option<String>,
     state: State<'_, Arc<ServiceContext>>,
 ) -> Result<wealthfolio_core::quotes::ResolvedQuote, String> {
     let inst_type = instrument_type
         .as_deref()
-        .and_then(wealthfolio_core::assets::InstrumentType::from_db_str);
+        .and_then(wealthfolio_core::assets::InstrumentType::from_external_str);
     state
         .quote_service()
-        .resolve_symbol_quote(&symbol, exchange_mic.as_deref(), inst_type.as_ref())
+        .resolve_symbol_quote(
+            &symbol,
+            exchange_mic.as_deref(),
+            inst_type.as_ref(),
+            quote_ccy.as_deref(),
+            provider_id.as_deref(),
+        )
         .await
         .map_err(|e| format!("Failed to resolve symbol quote: {}", e))
 }
@@ -222,4 +230,19 @@ pub async fn resolve_symbol_quote(
 #[tauri::command]
 pub fn get_exchanges() -> Vec<ExchangeInfo> {
     wealthfolio_market_data::get_exchange_list()
+}
+
+/// Fetch dividend events for a symbol from Yahoo Finance.
+/// Routes through the Rust backend to avoid CORS restrictions in the webview.
+#[tauri::command]
+pub async fn fetch_yahoo_dividends(
+    symbol: String,
+) -> Result<Vec<wealthfolio_market_data::YahooDividend>, String> {
+    let provider = wealthfolio_market_data::YahooProvider::new()
+        .await
+        .map_err(|e| e.to_string())?;
+    provider
+        .fetch_dividends(&symbol)
+        .await
+        .map_err(|e| e.to_string())
 }

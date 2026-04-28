@@ -50,6 +50,11 @@ vi.mock("../fields", () => ({
     </div>
   ),
   AdvancedOptionsSection: () => <div data-testid="advanced-options-section" />,
+  AssetTypeSelector: ({ name }: { name: string }) => (
+    <div data-testid={`asset-type-selector-${name}`} />
+  ),
+  OptionContractFields: () => <div data-testid="option-contract-fields" />,
+  createValidatedSubmit: vi.fn((_form, handler) => handler),
 }));
 
 // Mock UI components

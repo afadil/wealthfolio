@@ -1,3 +1,6 @@
+# Claude worktrees
+.claude/
+
 # Build outputs
 dist/
 coverage/

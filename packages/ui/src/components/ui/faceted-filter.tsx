@@ -20,6 +20,7 @@ export interface FacetedFilterProps {
   options: {
     label: string;
     value: string;
+    count?: number;
     icon?: React.ComponentType<{ className?: string }>;
   }[];
   selectedValues: Set<string>;
@@ -100,6 +101,9 @@ export function FacetedFilter({ title, options, selectedValues, onFilterChange }
                     </div>
                     {option.icon && <option.icon className="text-muted-foreground mr-2 h-4 w-4" />}
                     <span>{option.label}</span>
+                    {option.count !== undefined && (
+                      <span className="text-muted-foreground ml-auto text-xs">{option.count}</span>
+                    )}
                   </CommandItem>
                 );
               })}

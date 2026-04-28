@@ -16,6 +16,17 @@ import {
 } from "date-fns";
 import { cn } from "../lib/utils";
 
+function formatCompactAmount(value: number) {
+  const sign = value >= 0 ? "+" : "";
+  return (
+    sign +
+    new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value)
+  );
+}
+
 interface AdaptiveCalendarViewProps {
   calendar: CalendarMonth[];
   selectedPeriod: "1M" | "3M" | "6M" | "YTD" | "1Y" | "ALL";
@@ -131,17 +142,16 @@ function DailyCalendarView({
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Daily Trading Calendar</h3>
-          <div className="text-muted-foreground flex items-center gap-1 text-sm">
-            <span>Monthly P/L:</span>
-            <GainAmount value={monthlyPL} currency={currency} />
-            <span>•</span>
+      <div className="mb-2 flex items-start justify-between gap-2 sm:mb-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold sm:text-base">Daily Calendar</h3>
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
             <span>{monthlyTrades} trades</span>
+            <span>·</span>
+            <GainAmount value={monthlyPL} currency={currency} className="text-xs" />
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="outline"
             size="sm"
@@ -150,19 +160,18 @@ function DailyCalendarView({
           >
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, "MMM yyyy")}</span>
+          <span className="px-2 text-xs font-medium sm:px-3 sm:text-sm">
+            {format(selectedYear, "MMM yyyy")}
+          </span>
           <Button variant="outline" size="sm" onClick={handleNextMonth} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="p-4">
-        {/* Calendar table - bulletproof layout with centering */}
+      <div className="pt-2 sm:p-4">
         <div className="flex w-full justify-center">
           <div className="w-full max-w-2xl">
-            {" "}
-            {/* Max width to prevent over-stretching */}
             <table className="border-border/50 w-full table-fixed border-collapse overflow-hidden rounded-lg border">
               {/* Header row */}
               <thead>
@@ -201,7 +210,7 @@ function DailyCalendarView({
                           <td
                             key={dayIndex}
                             className={cn(
-                              "bg-background h-20 w-[14.28%] p-0 align-top",
+                              "bg-background h-14 w-[14.28%] p-0 align-top sm:h-20",
                               dayIndex < 6 && "border-border/50 border-r",
                             )}
                           ></td>
@@ -217,7 +226,7 @@ function DailyCalendarView({
                         <td
                           key={dayIndex}
                           className={cn(
-                            "relative h-20 w-[14.28%] p-0 align-top",
+                            "relative h-14 w-[14.28%] p-0 align-top sm:h-20",
                             dayIndex < 6 && "border-border/50 border-r",
                           )}
                         >
@@ -243,14 +252,14 @@ function DailyCalendarView({
                             {/* Trading data - only show for current month */}
                             {isCurrentMonthDay && dayData && dayData.tradeCount > 0 ? (
                               <div className="flex flex-col items-center space-y-0.5 text-center">
-                                <div className="text-[10px] leading-tight">
-                                  <GainAmount
-                                    value={dayData.realizedPL}
-                                    currency={currency}
-                                    className="text-[10px]"
-                                    displayDecimal={false}
-                                  />
-                                </div>
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-medium leading-tight",
+                                    dayData.realizedPL >= 0 ? "text-success" : "text-destructive",
+                                  )}
+                                >
+                                  {formatCompactAmount(dayData.realizedPL)}
+                                </span>
                                 <div className="text-muted-foreground text-[9px] leading-tight">
                                   {dayData.tradeCount}
                                 </div>
@@ -282,8 +291,24 @@ function YearlyCalendarView({
   onYearChange,
   currency,
 }: Omit<AdaptiveCalendarViewProps, "selectedPeriod">) {
-  // Filter calendar data for the selected year
-  const yearlyData = calendar.filter((cal) => cal.year === selectedYear.getFullYear());
+  // Build 12 months for the selected year, using calendar data when available
+  const year = selectedYear.getFullYear();
+  const calendarMap = new Map(
+    calendar.filter((cal) => cal.year === year).map((cal) => [cal.month, cal]),
+  );
+  const yearlyData: CalendarMonth[] = Array.from({ length: 12 }, (_, i) => {
+    const month = i + 1;
+    return (
+      calendarMap.get(month) ?? {
+        year,
+        month,
+        monthlyPL: 0,
+        monthlyReturnPercent: 0,
+        totalTrades: 0,
+        days: [],
+      }
+    );
+  });
 
   const yearlyPL = yearlyData.reduce((sum, month) => sum + month.monthlyPL, 0);
   const yearlyTrades = yearlyData.reduce((sum, month) => sum + month.totalTrades, 0);
@@ -308,29 +333,29 @@ function YearlyCalendarView({
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Yearly Trading Calendar</h3>
-          <div className="text-muted-foreground flex items-center gap-1 text-sm">
-            <span>Yearly P/L:</span>
-            <GainAmount value={yearlyPL} currency={currency} />
-            <span>•</span>
+      <div className="mb-2 flex items-start justify-between gap-2 sm:mb-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold sm:text-base">Yearly Calendar</h3>
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
             <span>{yearlyTrades} trades</span>
+            <span>·</span>
+            <GainAmount value={yearlyPL} currency={currency} className="text-xs" />
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <Button variant="outline" size="sm" onClick={handlePreviousYear} className="rounded-full">
             <Icons.ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="px-3 text-sm font-medium">{format(selectedYear, "yyyy")}</span>
+          <span className="px-2 text-xs font-medium sm:px-3 sm:text-sm">
+            {format(selectedYear, "yyyy")}
+          </span>
           <Button variant="outline" size="sm" onClick={handleNextYear} className="rounded-full">
             <Icons.ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="p-4">
-        {/* Yearly Calendar Table - same design as daily calendar */}
+      <div className="pt-2 sm:p-4">
         <div className="flex w-full justify-center">
           <div className="w-full max-w-2xl">
             <table className="border-border/50 w-full table-fixed border-collapse overflow-hidden rounded-lg border">
@@ -353,7 +378,7 @@ function YearlyCalendarView({
                           <td
                             key={colIndex}
                             className={cn(
-                              "h-32 w-[33.33%] p-0 align-top",
+                              "h-24 w-[33.33%] p-0 align-top sm:h-32",
                               colIndex < 2 && "border-border/50 border-r",
                             )}
                           ></td>
@@ -382,7 +407,7 @@ function YearlyCalendarView({
                         <td
                           key={colIndex}
                           className={cn(
-                            "relative h-32 w-[33.33%] p-0 align-top",
+                            "relative h-24 w-[33.33%] p-0 align-top sm:h-32",
                             colIndex < 2 && "border-border/50 border-r",
                           )}
                         >

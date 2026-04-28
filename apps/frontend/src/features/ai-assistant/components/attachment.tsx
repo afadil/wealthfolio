@@ -7,7 +7,7 @@ import {
 } from "@assistant-ui/react";
 import { PropsWithChildren, useEffect, useState, type FC } from "react";
 
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Icons, type Icon } from "@wealthfolio/ui/components/ui/icons";
 import { useShallow } from "zustand/shallow";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
@@ -115,6 +115,79 @@ const AttachmentThumb: FC = () => {
   );
 };
 
+const getAttachmentExtension = (name: string) => {
+  const fileName = name.split(/[\\/]/).pop() ?? name;
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === fileName.length - 1) return "FILE";
+  return fileName
+    .slice(dotIndex + 1)
+    .slice(0, 5)
+    .toUpperCase();
+};
+
+const getAttachmentIcon = (name: string, contentType: string): Icon => {
+  const normalizedName = name.toLowerCase();
+  const normalizedType = contentType.toLowerCase();
+
+  if (normalizedType.includes("csv") || normalizedName.endsWith(".csv")) return Icons.FileCsv;
+  if (
+    normalizedType.includes("spreadsheet") ||
+    normalizedType.includes("excel") ||
+    normalizedName.endsWith(".xls") ||
+    normalizedName.endsWith(".xlsx") ||
+    normalizedName.endsWith(".ods")
+  ) {
+    return Icons.FileSpreadsheet;
+  }
+  if (normalizedType.includes("json") || normalizedName.endsWith(".json")) return Icons.FileJson;
+  if (normalizedType.startsWith("image/")) return Icons.FileImage;
+  if (normalizedType.startsWith("audio/")) return Icons.FileAudio;
+  if (normalizedType.startsWith("video/")) return Icons.FileVideo;
+  if (
+    normalizedType.includes("zip") ||
+    normalizedType.includes("archive") ||
+    normalizedName.endsWith(".zip")
+  ) {
+    return Icons.FileArchive;
+  }
+  if (
+    normalizedType.startsWith("text/") ||
+    normalizedType.includes("pdf") ||
+    normalizedName.endsWith(".txt") ||
+    normalizedName.endsWith(".pdf")
+  ) {
+    return Icons.FileText;
+  }
+
+  return Icons.File;
+};
+
+const ComposerFileAttachment: FC = () => {
+  const name = useAssistantState(({ attachment }) => attachment.name);
+  const contentType = useAssistantState(({ attachment }) => attachment.contentType);
+  const FileIcon = getAttachmentIcon(name, contentType);
+  const extension = getAttachmentExtension(name);
+
+  return (
+    <div
+      className="aui-attachment-file-chip bg-muted/60 border-border/70 hover:bg-muted flex h-11 max-w-[18rem] cursor-pointer items-center gap-2 rounded-xl border py-1.5 pl-2.5 pr-8 text-left transition-colors"
+      role="button"
+      id="attachment-tile"
+      aria-label={`File attachment: ${name}`}
+    >
+      <span className="aui-attachment-file-chip-icon bg-background/80 text-foreground/75 flex size-7 shrink-0 items-center justify-center rounded-lg border">
+        <FileIcon className="size-4" />
+      </span>
+      <span className="aui-attachment-file-chip-name min-w-0 flex-1 truncate text-sm font-medium">
+        {name}
+      </span>
+      <span className="aui-attachment-file-chip-extension text-muted-foreground shrink-0 text-[10px] font-semibold uppercase leading-none">
+        {extension}
+      </span>
+    </div>
+  );
+};
+
 const AttachmentUI: FC = () => {
   const api = useAssistantApi();
   const isComposer = api.attachment.source === "composer";
@@ -145,20 +218,24 @@ const AttachmentUI: FC = () => {
       >
         <AttachmentPreviewDialog>
           <TooltipTrigger asChild>
-            <div
-              className={cn(
-                "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[14px] border transition-opacity hover:opacity-75",
-                isComposer && "aui-attachment-tile-composer border-foreground/20",
-              )}
-              role="button"
-              id="attachment-tile"
-              aria-label={`${typeLabel} attachment`}
-            >
-              <AttachmentThumb />
-            </div>
+            {isComposer && !isImage ? (
+              <ComposerFileAttachment />
+            ) : (
+              <div
+                className={cn(
+                  "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[14px] border transition-opacity hover:opacity-75",
+                  isComposer && "aui-attachment-tile-composer border-foreground/20",
+                )}
+                role="button"
+                id="attachment-tile"
+                aria-label={`${typeLabel} attachment`}
+              >
+                <AttachmentThumb />
+              </div>
+            )}
           </TooltipTrigger>
         </AttachmentPreviewDialog>
-        {isComposer && <AttachmentRemove />}
+        {isComposer && <AttachmentRemove variant={isImage ? "tile" : "chip"} />}
       </AttachmentPrimitive.Root>
       <TooltipContent side="top">
         <AttachmentPrimitive.Name />
@@ -167,15 +244,29 @@ const AttachmentUI: FC = () => {
   );
 };
 
-const AttachmentRemove: FC = () => {
+interface AttachmentRemoveProps {
+  variant?: "tile" | "chip";
+}
+
+const AttachmentRemove: FC<AttachmentRemoveProps> = ({ variant = "tile" }) => {
   return (
     <AttachmentPrimitive.Remove asChild>
       <TooltipIconButton
         tooltip="Remove file"
-        className="aui-attachment-tile-remove text-muted-foreground hover:[&_svg]:text-destructive hover:bg-white! absolute right-1.5 top-1.5 size-3.5 rounded-full bg-white opacity-100 shadow-sm [&_svg]:text-black"
+        className={cn(
+          "aui-attachment-tile-remove text-muted-foreground hover:[&_svg]:text-destructive hover:bg-white! absolute rounded-full bg-white opacity-100 shadow-sm [&_svg]:text-black",
+          variant === "chip"
+            ? "right-1.5 top-1/2 size-5 -translate-y-1/2"
+            : "right-1.5 top-1.5 size-3.5",
+        )}
         side="top"
       >
-        <Icons.Close className="aui-attachment-remove-icon size-3 dark:stroke-[2.5px]" />
+        <Icons.Close
+          className={cn(
+            "aui-attachment-remove-icon dark:stroke-[2.5px]",
+            variant === "chip" ? "size-3.5" : "size-3",
+          )}
+        />
       </TooltipIconButton>
     </AttachmentPrimitive.Remove>
   );

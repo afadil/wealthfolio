@@ -25,6 +25,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
 use futures::stream::{self, StreamExt};
 use log::{debug, error, info, warn};
+use rust_decimal::Decimal;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::RwLock;
@@ -32,13 +33,14 @@ use tokio::sync::RwLock;
 use super::client::MarketDataClient;
 use super::constants::*;
 use super::errors::MarketDataError;
+use super::model::Quote;
 use super::store::QuoteStore;
 use super::sync_state::{
     calculate_sync_window, determine_sync_category, QuoteSyncState, SymbolSyncPlan, SyncCategory,
     SyncMode, SyncPlanningInputs, SyncStateStore,
 };
 use super::types::{AssetId, Day, ProviderId};
-use crate::activities::ActivityRepositoryTrait;
+use crate::activities::{ActivityRepositoryTrait, ActivityUpsert};
 use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
 use crate::errors::Error;
 use crate::errors::Result;
@@ -87,6 +89,18 @@ fn market_fetch_end_date(now: DateTime<Utc>, exchange_mic: Option<&str>) -> Naiv
     time_utils::market_calendar_date(now, exchange_mic)
 }
 
+/// Determine the effective data provider for an asset.
+///
+/// Priority: sync state `data_source` (if non-empty) → asset `preferred_provider` → Yahoo default.
+fn effective_provider(state: Option<&QuoteSyncState>, asset: &Asset) -> String {
+    state
+        .map(|s| &s.data_source)
+        .filter(|ds| !ds.is_empty())
+        .cloned()
+        .or_else(|| asset.preferred_provider())
+        .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string())
+}
+
 fn extends_to_fetch_end(category: &SyncCategory) -> bool {
     matches!(
         category,
@@ -117,6 +131,24 @@ fn should_treat_backfill_error_as_non_fatal(category: &SyncCategory, error: &Err
             | Error::MarketData(MarketDataError::NotFound(_))
             | Error::MarketData(MarketDataError::ProviderExhausted(_))
     )
+}
+
+fn error_message_contains_provider_id(message: &str) -> bool {
+    super::constants::MARKET_DATA_PROVIDER_IDS
+        .iter()
+        .any(|provider_id| message.contains(provider_id))
+}
+
+fn format_sync_failure_message(error: &Error, provider_id: Option<&str>) -> String {
+    let message = error.to_string();
+    if error_message_contains_provider_id(&message) {
+        return message;
+    }
+
+    match provider_id {
+        Some(provider_id) if !provider_id.is_empty() => format!("{}: {}", provider_id, message),
+        _ => message,
+    }
 }
 
 // Test helpers - expose lock functions for testing
@@ -178,6 +210,10 @@ pub enum AssetSkipReason {
     SyncInProgress,
     /// Too many consecutive sync failures (exceeds MAX_SYNC_ERRORS).
     TooManyErrors,
+    /// Bond has matured — price is par, no further sync needed.
+    MaturedBond,
+    /// Option has expired — no further quotes available.
+    ExpiredOption,
 }
 
 impl std::fmt::Display for AssetSkipReason {
@@ -190,6 +226,8 @@ impl std::fmt::Display for AssetSkipReason {
             AssetSkipReason::NotFound => write!(f, "Asset not found"),
             AssetSkipReason::SyncInProgress => write!(f, "Sync already in progress"),
             AssetSkipReason::TooManyErrors => write!(f, "Too many consecutive sync failures"),
+            AssetSkipReason::MaturedBond => write!(f, "Bond has matured (price is par)"),
+            AssetSkipReason::ExpiredOption => write!(f, "Option has expired"),
         }
     }
 }
@@ -391,11 +429,7 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in assets.iter().filter(|a| self.should_sync_asset(a)) {
-            let provider = existing_states
-                .get(&asset.id)
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let provider = effective_provider(existing_states.get(&asset.id), asset);
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -434,7 +468,89 @@ where
             return Some(AssetSkipReason::Inactive);
         }
 
+        // Skip matured bonds — price is par, no sync needed
+        if asset.is_bond() {
+            if let Some(spec) = asset.bond_spec() {
+                if let Some(maturity) = spec.maturity_date {
+                    if maturity < Utc::now().date_naive() {
+                        return Some(AssetSkipReason::MaturedBond);
+                    }
+                }
+            }
+        }
+
+        // Skip expired options — no further quotes available
+        if asset.is_option() {
+            if let Some(spec) = asset.option_spec() {
+                if spec.expiration < Utc::now().date_naive() {
+                    return Some(AssetSkipReason::ExpiredOption);
+                }
+            }
+        }
+
         None
+    }
+
+    /// Ensure a matured bond has a par-value quote so it doesn't show as "no data"
+    /// in health checks. If the bond has never been successfully synced, we write
+    /// a single quote at par (1.0 as fraction-of-par) dated at maturity and reset
+    /// the error counter.
+    async fn ensure_matured_bond_par_quote(&self, asset: &Asset) {
+        let spec = match asset.bond_spec() {
+            Some(s) => s,
+            None => return,
+        };
+        let maturity = match spec.maturity_date {
+            Some(d) => d,
+            None => return,
+        };
+
+        // Check if any quote already exists for this asset
+        if let Ok(Some(_)) = self.quote_store.latest(&AssetId(asset.id.clone()), None) {
+            return;
+        }
+
+        // No quote exists — write a par-value quote at the maturity date
+        let timestamp = maturity
+            .and_hms_opt(16, 0, 0)
+            .map(|dt| Utc.from_utc_datetime(&dt))
+            .unwrap_or_else(Utc::now);
+
+        let par = Decimal::ONE;
+        let quote = Quote {
+            id: format!("{}_{}_{}", asset.id, maturity.format("%Y-%m-%d"), "MANUAL"),
+            asset_id: asset.id.clone(),
+            timestamp,
+            open: par,
+            high: par,
+            low: par,
+            close: par,
+            adjclose: par,
+            volume: Decimal::ZERO,
+            currency: asset.quote_ccy.clone(),
+            data_source: DATA_SOURCE_MANUAL.to_string(),
+            created_at: Utc::now(),
+            notes: Some("Par value at maturity (auto-generated)".to_string()),
+        };
+
+        match self.quote_store.upsert_quotes(&[quote]).await {
+            Ok(_) => {
+                info!(
+                    "Wrote par-value quote for matured bond {} (matured {})",
+                    asset.id, maturity
+                );
+                // Reset error count so health check stops flagging this asset
+                if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await {
+                    warn!("Failed to reset sync state for {}: {:?}", asset.id, e);
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to write par-value quote for matured bond {}: {:?}",
+                    asset.id, e
+                );
+            }
+        }
     }
 
     /// Build sync plan for a single asset.
@@ -585,6 +701,103 @@ where
         }
     }
 
+    /// Fetch and upsert split activities for a single asset over the given date range.
+    ///
+    /// Non-fatal: any failure is logged as a warning and does not affect quote sync.
+    /// NOT USED FOR NOW - Yahoo returns weird splits for some assets, need to investigate further before enabling this.
+    async fn _sync_splits(&self, asset: &Asset, start: NaiveDate, end: NaiveDate) {
+        use crate::activities::compute_idempotency_key;
+
+        let start_dt = Utc.from_utc_datetime(&start.and_hms_opt(0, 0, 0).unwrap());
+        let end_dt = Utc.from_utc_datetime(&end.and_hms_opt(23, 59, 59).unwrap());
+
+        let client = self.client.read().await;
+        let splits = client.fetch_splits(asset, start_dt, end_dt).await;
+        drop(client);
+
+        if splits.is_empty() {
+            return;
+        }
+
+        let (account_ids, _) = match self
+            .activity_repo
+            .get_activity_accounts_and_currencies_by_asset_id(&asset.id)
+            .await
+        {
+            Ok(result) => result,
+            Err(e) => {
+                warn!(
+                    "Split sync: failed to get accounts for {}: {:?}",
+                    asset.id, e
+                );
+                return;
+            }
+        };
+
+        if account_ids.is_empty() {
+            return;
+        }
+
+        // Splits are asset-level events; use the asset's quote currency for a stable idempotency key.
+        let currency = asset.quote_ccy.as_str();
+
+        let mut upserts: Vec<ActivityUpsert> = Vec::new();
+        for split in &splits {
+            let split_dt = Utc.from_utc_datetime(&split.date.and_hms_opt(12, 0, 0).unwrap());
+
+            for account_id in &account_ids {
+                let key = compute_idempotency_key(
+                    account_id,
+                    "SPLIT",
+                    &split_dt,
+                    Some(&asset.id),
+                    None,
+                    None,
+                    Some(split.ratio),
+                    currency,
+                    None,
+                    None,
+                );
+                upserts.push(ActivityUpsert {
+                    id: key.clone(),
+                    account_id: account_id.clone(),
+                    asset_id: Some(asset.id.clone()),
+                    activity_type: "SPLIT".to_string(),
+                    activity_date: split.date.to_string(),
+                    amount: Some(split.ratio),
+                    currency: currency.to_string(),
+                    idempotency_key: Some(key),
+                    quantity: None,
+                    unit_price: None,
+                    fee: None,
+                    notes: Some(format!("Auto-imported split ({})", split.ratio)),
+                    subtype: None,
+                    status: None,
+                    fx_rate: None,
+                    metadata: None,
+                    needs_review: None,
+                    source_system: Some("yahoo".to_string()),
+                    source_record_id: None,
+                    source_group_id: None,
+                    import_run_id: None,
+                });
+            }
+        }
+
+        if let Err(e) = self.activity_repo.bulk_upsert(upserts).await {
+            warn!(
+                "Split sync: failed to upsert splits for {}: {:?}",
+                asset.id, e
+            );
+        } else {
+            debug!(
+                "Split sync: upserted {} split activities for {}",
+                splits.len() * account_ids.len(),
+                asset.id
+            );
+        }
+    }
+
     /// Sync a single asset according to its sync plan.
     ///
     /// Uses per-asset locking (US-012) to prevent duplicate sync work when multiple
@@ -621,7 +834,7 @@ where
         // Fetch quotes via MarketDataClient
         let client = self.client.read().await;
         match client
-            .fetch_historical_quotes(asset, start_dt, end_dt)
+            .fetch_historical_quotes_with_context(asset, start_dt, end_dt)
             .await
         {
             Ok(mut quotes) => {
@@ -648,6 +861,10 @@ where
                         Ok(_) => {
                             debug!("Saved {} quotes for {}", quotes_count, asset.id);
 
+                            // Sync splits for this asset over the same date range. Disabled for Now Yahoo Returns weired splits for some assets
+                            // self.sync_splits(asset, plan.start_date, plan.end_date)
+                            //     .await;
+
                             // Update sync state after a successful sync attempt.
                             if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await
                             {
@@ -656,7 +873,7 @@ where
 
                             // Persist the actual provider used so future planning reads correct quote bounds.
                             if let Some(actual_source) =
-                                quotes.first().map(|q| q.data_source.as_str().to_string())
+                                quotes.first().map(|q| q.data_source.clone())
                             {
                                 match self.sync_state_store.get_by_asset_id(&asset.id) {
                                     Ok(Some(mut state)) if state.data_source != actual_source => {
@@ -718,13 +935,12 @@ where
                     }
                 }
             }
-            Err(e) => {
-                if should_treat_backfill_error_as_non_fatal(&plan.category, &e) {
-                    info!(
-                        "Backfill reached provider data boundary for {} ({}). Treating as complete.",
-                        asset.id, e
-                    );
+            Err(fetch_error) => {
+                let error = fetch_error.error;
+                let sync_failure_message =
+                    format_sync_failure_message(&error, fetch_error.provider_id.as_deref());
 
+                if should_treat_backfill_error_as_non_fatal(&plan.category, &error) {
                     if let Err(state_err) = self.sync_state_store.update_after_sync(&asset.id).await
                     {
                         warn!(
@@ -741,12 +957,12 @@ where
                     };
                 }
 
-                error!("Failed to fetch quotes for {}: {:?}", asset.id, e);
+                error!("Failed to fetch quotes for {}: {:?}", asset.id, error);
 
                 // Update sync state with failure
                 if let Err(state_err) = self
                     .sync_state_store
-                    .update_after_failure(&asset.id, &e.to_string())
+                    .update_after_failure(&asset.id, &sync_failure_message)
                     .await
                 {
                     warn!(
@@ -759,7 +975,7 @@ where
                     asset_id,
                     quotes_added: 0,
                     status: SyncStatus::Failed,
-                    error: Some(e.to_string()),
+                    error: Some(sync_failure_message),
                 }
             }
         }
@@ -1036,7 +1252,7 @@ where
         }
 
         // Sort by priority (highest first)
-        plans.sort_by(|a, b| b.priority.cmp(&a.priority));
+        plans.sort_by_key(|b| std::cmp::Reverse(b.priority));
         Ok(plans)
     }
 
@@ -1102,6 +1318,19 @@ where
         for asset in &assets {
             if let Some(reason) = self.get_skip_reason(asset) {
                 debug!("Skipping asset {} for sync: {}", asset.id, reason);
+                if matches!(reason, AssetSkipReason::MaturedBond) {
+                    self.ensure_matured_bond_par_quote(asset).await;
+                }
+                if matches!(reason, AssetSkipReason::ExpiredOption) {
+                    // Clear any lingering sync errors so expired options
+                    // don't show up in health checks
+                    if let Err(e) = self.sync_state_store.update_after_sync(&asset.id).await {
+                        warn!(
+                            "Failed to reset sync state for expired option {}: {:?}",
+                            asset.id, e
+                        );
+                    }
+                }
                 result.add_skipped(asset.id.clone(), reason);
             } else {
                 syncable.push(asset);
@@ -1128,11 +1357,7 @@ where
         let mut quote_bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
         let mut assets_by_provider: HashMap<String, Vec<String>> = HashMap::new();
         for asset in &syncable {
-            let provider = existing_states
-                .get(&asset.id)
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let provider = effective_provider(existing_states.get(&asset.id), asset);
             assets_by_provider
                 .entry(provider)
                 .or_default()
@@ -1148,11 +1373,7 @@ where
         let mut plans: Vec<SymbolSyncPlan> = Vec::new();
         for asset in &syncable {
             let state = existing_states.get(&asset.id).cloned();
-            let data_source = state
-                .as_ref()
-                .map(|s| s.data_source.clone())
-                .or_else(|| asset.preferred_provider())
-                .unwrap_or_else(|| DATA_SOURCE_YAHOO.to_string());
+            let data_source = effective_provider(state.as_ref(), asset);
             let effective_today =
                 effective_market_today(now, asset.instrument_exchange_mic.as_deref());
             let fetch_end_date =
@@ -1463,6 +1684,35 @@ mod tests {
             &SyncCategory::Active,
             &err
         ));
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_adds_provider_when_missing() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        let message = format_sync_failure_message(&err, Some("FINNHUB"));
+        assert_eq!(
+            message,
+            "FINNHUB: Market data operation failed: No data found"
+        );
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_keeps_existing_provider() {
+        let err = Error::MarketData(MarketDataError::ProviderError(
+            "FINNHUB: Access forbidden".to_string(),
+        ));
+        let message = format_sync_failure_message(&err, Some("YAHOO"));
+        assert_eq!(
+            message,
+            "Market data operation failed: Provider error: FINNHUB: Access forbidden"
+        );
+    }
+
+    #[test]
+    fn test_format_sync_failure_message_without_provider_hint() {
+        let err = Error::MarketData(MarketDataError::NoData);
+        let message = format_sync_failure_message(&err, None);
+        assert_eq!(message, "Market data operation failed: No data found");
     }
 
     // =========================================================================
@@ -2080,6 +2330,89 @@ mod tests {
                 SyncCategory::RecentlyClosed.default_priority()
                     > SyncCategory::Closed.default_priority()
             );
+        }
+    }
+
+    // =========================================================================
+    // effective_provider Tests
+    // =========================================================================
+
+    mod effective_provider_tests {
+        use super::*;
+
+        fn test_asset() -> Asset {
+            Asset {
+                id: "test-id".to_string(),
+                kind: AssetKind::Investment,
+                ..Default::default()
+            }
+        }
+
+        fn test_asset_with_preferred(provider: &str) -> Asset {
+            Asset {
+                id: "test-id".to_string(),
+                kind: AssetKind::Investment,
+                provider_config: Some(serde_json::json!({
+                    "preferred_provider": provider
+                })),
+                ..Default::default()
+            }
+        }
+
+        fn test_sync_state(data_source: &str) -> QuoteSyncState {
+            QuoteSyncState {
+                asset_id: "test-id".to_string(),
+                is_active: true,
+                position_closed_date: None,
+                last_synced_at: None,
+                data_source: data_source.to_string(),
+                sync_priority: 0,
+                error_count: 0,
+                last_error: None,
+                profile_enriched_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }
+        }
+
+        #[test]
+        fn uses_sync_state_data_source_when_present() {
+            let state = test_sync_state("ALPHA_VANTAGE");
+            let asset = test_asset();
+            assert_eq!(effective_provider(Some(&state), &asset), "ALPHA_VANTAGE");
+        }
+
+        #[test]
+        fn empty_data_source_falls_through_to_preferred_provider() {
+            let state = test_sync_state("");
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(Some(&state), &asset), "METAL_PRICE_API");
+        }
+
+        #[test]
+        fn no_state_uses_preferred_provider() {
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(None, &asset), "METAL_PRICE_API");
+        }
+
+        #[test]
+        fn no_state_no_preferred_defaults_to_yahoo() {
+            let asset = test_asset();
+            assert_eq!(effective_provider(None, &asset), DATA_SOURCE_YAHOO);
+        }
+
+        #[test]
+        fn empty_data_source_no_preferred_defaults_to_yahoo() {
+            let state = test_sync_state("");
+            let asset = test_asset();
+            assert_eq!(effective_provider(Some(&state), &asset), DATA_SOURCE_YAHOO);
+        }
+
+        #[test]
+        fn data_source_takes_priority_over_preferred_provider() {
+            let state = test_sync_state("YAHOO");
+            let asset = test_asset_with_preferred("METAL_PRICE_API");
+            assert_eq!(effective_provider(Some(&state), &asset), "YAHOO");
         }
     }
 

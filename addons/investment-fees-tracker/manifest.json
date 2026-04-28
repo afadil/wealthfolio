@@ -1,11 +1,11 @@
 {
   "id": "investment-fees-tracker-addon",
   "name": "Investment Fees Tracker",
-  "version": "1.2.0",
+  "version": "3.2.1",
   "description": "Track and analyze investment fees across your portfolio with detailed analytics and insights",
   "author": "Wealthfolio",
   "main": "dist/addon.js",
-  "sdkVersion": "2.0.0",
+  "sdkVersion": "3.2.1",
   "enabled": true,
   "permissions": [
     {
@@ -27,6 +27,11 @@
       "category": "settings",
       "functions": ["get"],
       "purpose": "Access settings to get base currency for fees calculation"
+    },
+    {
+      "category": "financial-planning",
+      "functions": ["getAll", "getFunding"],
+      "purpose": "Access goals to integrate investment fee analysis with goal progress"
     },
     {
       "category": "ui",

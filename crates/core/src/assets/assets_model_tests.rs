@@ -233,6 +233,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_instrument_type_external_aliases() {
+        assert_eq!(
+            InstrumentType::from_external_str("CRYPTOCURRENCY"),
+            Some(InstrumentType::Crypto)
+        );
+        assert_eq!(
+            InstrumentType::from_external_str("ETF"),
+            Some(InstrumentType::Equity)
+        );
+        assert_eq!(
+            InstrumentType::from_external_str("FOREX"),
+            Some(InstrumentType::Fx)
+        );
+    }
+
     // Test AssetKind db roundtrip
     #[test]
     fn test_asset_kind_db_roundtrip() {
@@ -341,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_quote_ccy_precedence_prefers_explicit_hint() {
+    fn test_resolve_quote_ccy_precedence_prefers_explicit_quote_ccy() {
         let resolved = resolve_quote_ccy_precedence(
             Some("GBp"),
             Some("GBP"),
@@ -352,7 +368,7 @@ mod tests {
 
         assert_eq!(
             resolved,
-            Some(("GBp".to_string(), QuoteCcyResolutionSource::ExplicitHint))
+            Some(("GBp".to_string(), QuoteCcyResolutionSource::ExplicitInput))
         );
     }
 
@@ -365,6 +381,55 @@ mod tests {
             resolved,
             Some(("GBP".to_string(), QuoteCcyResolutionSource::ProviderQuote))
         );
+    }
+
+    // =========================================================================
+    // Metal domain model tests
+    // =========================================================================
+
+    #[test]
+    fn test_metal_instrument_type_maps_to_investment_kind() {
+        // Market-tracked metals (XAU, XAG spot) should be AssetKind::Investment,
+        // not PreciousMetal (which is reserved for physical/alternative metals).
+        let asset = Asset {
+            kind: AssetKind::Investment,
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAU".to_string()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: "USD".to_string(),
+            ..create_test_asset(AssetKind::Investment)
+        };
+
+        assert_eq!(asset.kind, AssetKind::Investment);
+        assert_eq!(asset.instrument_type, Some(InstrumentType::Metal));
+        assert!(!asset.kind.is_alternative());
+    }
+
+    #[test]
+    fn test_precious_metal_kind_remains_alternative() {
+        // Physical precious metals stay as PreciousMetal (alternative asset).
+        let asset = create_test_asset(AssetKind::PreciousMetal);
+
+        assert_eq!(asset.kind, AssetKind::PreciousMetal);
+        assert!(asset.kind.is_alternative());
+    }
+
+    #[test]
+    fn test_metal_to_instrument_id_uses_bare_symbol() {
+        let asset = Asset {
+            instrument_type: Some(InstrumentType::Metal),
+            instrument_symbol: Some("XAU".to_string()),
+            quote_ccy: "USD".to_string(),
+            ..create_test_asset(AssetKind::Investment)
+        };
+
+        let id = asset.to_instrument_id().unwrap();
+        match id {
+            crate::assets::InstrumentId::Metal { ref code, .. } => {
+                assert_eq!(code.as_ref(), "XAU");
+            }
+            _ => panic!("expected InstrumentId::Metal"),
+        }
     }
 
     // Helper function

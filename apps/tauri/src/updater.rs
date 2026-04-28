@@ -1,8 +1,7 @@
 use chrono::DateTime;
 use log::{error, info, warn};
 use serde::Serialize;
-use tauri::AppHandle;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_updater::UpdaterExt;
 
 // Helper function to detect if this is an App Store build
@@ -113,44 +112,34 @@ pub async fn check_for_update(
     }
 }
 
+/// Progress payload emitted during update download/install.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct UpdateDownloadProgress {
+    downloaded: u64,
+    total: Option<u64>,
+    /// "downloading" or "installing"
+    phase: String,
+}
+
 /// Download and install an available update, then restart the app.
-/// Shows native dialogs for success/failure and handles restart.
-pub async fn install_update(app_handle: AppHandle) {
+/// Emits `app:update-download-progress` events so the frontend can show progress.
+/// Returns `Err` on failure so the frontend can display the error inline.
+pub async fn install_update(app_handle: AppHandle) -> Result<(), String> {
     info!("Starting update download and installation");
 
-    // Check for updates
     let update = match app_handle.updater_builder().build() {
         Ok(updater) => match updater.check().await {
             Ok(Some(update)) => update,
-            Ok(None) => {
-                app_handle
-                    .dialog()
-                    .message("No update available.")
-                    .title("Update")
-                    .kind(MessageDialogKind::Info)
-                    .blocking_show();
-                return;
-            }
+            Ok(None) => return Err("No update available.".to_string()),
             Err(e) => {
                 error!("Failed to check for updates: {}", e);
-                app_handle
-                    .dialog()
-                    .message(format!("Failed to check for updates: {}", e))
-                    .title("Update Failed")
-                    .kind(MessageDialogKind::Error)
-                    .blocking_show();
-                return;
+                return Err(format!("Failed to check for updates: {}", e));
             }
         },
         Err(e) => {
             error!("Failed to build updater: {}", e);
-            app_handle
-                .dialog()
-                .message(format!("Failed to initialize updater: {}", e))
-                .title("Update Failed")
-                .kind(MessageDialogKind::Error)
-                .blocking_show();
-            return;
+            return Err(format!("Failed to initialize updater: {}", e));
         }
     };
 
@@ -159,29 +148,45 @@ pub async fn install_update(app_handle: AppHandle) {
         update.current_version, update.version
     );
 
-    // Download and install
-    match update.download_and_install(|_, _| {}, || {}).await {
+    let handle_chunk = app_handle.clone();
+    let handle_finish = app_handle.clone();
+    let mut downloaded: u64 = 0;
+
+    match update
+        .download_and_install(
+            move |chunk_len, content_len| {
+                downloaded += chunk_len as u64;
+                let _ = handle_chunk.emit(
+                    "app:update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded,
+                        total: content_len,
+                        phase: "downloading".to_string(),
+                    },
+                );
+            },
+            move || {
+                let _ = handle_finish.emit(
+                    "app:update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded: 0,
+                        total: None,
+                        phase: "installing".to_string(),
+                    },
+                );
+            },
+        )
+        .await
+    {
         Ok(_) => {
-            info!("Update installed successfully, showing dialog and restarting");
-
-            app_handle
-                .dialog()
-                .message("Update installed successfully. The application will now restart.")
-                .title("Update Complete")
-                .kind(MessageDialogKind::Info)
-                .blocking_show();
-
+            info!("Update installed successfully, restarting");
             app_handle.restart();
+            #[allow(unreachable_code)]
+            Ok(())
         }
         Err(e) => {
             error!("Failed to download and install update: {}", e);
-
-            app_handle
-                .dialog()
-                .message(format!("Failed to install update: {}", e))
-                .title("Update Failed")
-                .kind(MessageDialogKind::Error)
-                .blocking_show();
+            Err(format!("Failed to install update: {}", e))
         }
     }
 }

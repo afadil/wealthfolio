@@ -1,19 +1,21 @@
-import { useMemo } from "react";
-import { useForm, FormProvider, type Resolver } from "react-hook-form";
+import { useSettings } from "@/hooks/use-settings";
+import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { ActivityType } from "@/lib/constants";
-import { useSettings } from "@/hooks/use-settings";
+import { useMemo } from "react";
+import { FormProvider, useForm, type Resolver } from "react-hook-form";
+import { z } from "zod";
 import {
   AccountSelect,
-  SymbolSearch,
-  DatePicker,
-  AmountInput,
-  NotesInput,
   AdvancedOptionsSection,
+  AmountInput,
+  createValidatedSubmit,
+  DatePicker,
+  NotesInput,
+  QuantityInput,
+  SymbolSearch,
   type AccountSelectOption,
 } from "./fields";
 
@@ -21,7 +23,7 @@ import {
 export const dividendFormSchema = z.object({
   accountId: z.string().min(1, { message: "Please select an account." }),
   symbol: z.string().min(1, { message: "Please enter a symbol." }),
-  exchangeMic: z.string().optional(),
+  exchangeMic: z.string().nullable().optional(),
   activityDate: z.date({ required_error: "Please select a date." }),
   amount: z.coerce
     .number({
@@ -39,8 +41,21 @@ export const dividendFormSchema = z.object({
     .positive({ message: "FX Rate must be positive." })
     .optional(),
   subtype: z.string().optional().nullable(),
-  symbolQuoteCcy: z.string().optional(),
-  symbolInstrumentType: z.string().optional(),
+  // DRIP fields (price & quantity of reinvested shares)
+  unitPrice: z.coerce
+    .number({
+      invalid_type_error: "Price must be a number.",
+    })
+    .positive({ message: "Price must be greater than 0." })
+    .optional(),
+  quantity: z.coerce
+    .number({
+      invalid_type_error: "Quantity must be a number.",
+    })
+    .positive({ message: "Quantity must be greater than 0." })
+    .optional(),
+  symbolQuoteCcy: z.string().nullable().optional(),
+  symbolInstrumentType: z.string().nullable().optional(),
 });
 
 export type DividendFormValues = z.infer<typeof dividendFormSchema>;
@@ -97,6 +112,8 @@ export function DividendForm({
   const { watch } = form;
   const accountId = watch("accountId");
   const currency = watch("currency");
+  const subtype = watch("subtype");
+  const isDrip = subtype === ACTIVITY_SUBTYPES.DRIP;
 
   // Get account currency from selected account
   const selectedAccount = useMemo(
@@ -105,7 +122,7 @@ export function DividendForm({
   );
   const accountCurrency = selectedAccount?.currency;
 
-  const handleSubmit = form.handleSubmit(async (data) => {
+  const handleSubmit = createValidatedSubmit(form, async (data) => {
     await onSubmit(data);
   });
 
@@ -145,7 +162,21 @@ export function DividendForm({
               assetCurrency={assetCurrency}
               accountCurrency={accountCurrency}
               baseCurrency={baseCurrency}
+              defaultOpen={isDrip}
             />
+
+            {/* DRIP: Price & Quantity of reinvested shares */}
+            {isDrip && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <AmountInput
+                  name="unitPrice"
+                  label="Price"
+                  maxDecimalPlaces={4}
+                  currency={currency}
+                />
+                <QuantityInput name="quantity" label="Quantity" />
+              </div>
+            )}
 
             {/* Notes */}
             <NotesInput name="comment" label="Notes" placeholder="Add an optional note..." />

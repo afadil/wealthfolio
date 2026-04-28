@@ -14,16 +14,17 @@
 #[cfg(test)]
 mod tests {
     use crate::errors::{DatabaseError, Result};
+    use crate::quotes::service::{append_historical_seed_quotes, fill_missing_quotes};
     use crate::quotes::{
-        model::{DataSource, LatestQuotePair, Quote},
+        model::{LatestQuotePair, Quote},
         store::QuoteStore,
         types::{AssetId, Day, QuoteSource},
     };
     use async_trait::async_trait;
-    use chrono::{NaiveDate, TimeZone, Utc};
+    use chrono::{Duration, NaiveDate, TimeZone, Utc};
     use rust_decimal::Decimal;
     use rust_decimal_macros::dec;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::sync::{Arc, Mutex};
 
     // =========================================================================
@@ -107,10 +108,7 @@ mod tests {
         async fn delete_provider_quotes_for_asset(&self, asset_id: &AssetId) -> Result<usize> {
             let mut quotes = self.quotes.lock().unwrap();
             let original_len = quotes.len();
-            quotes.retain(|q| {
-                q.asset_id != asset_id.as_str()
-                    || q.data_source == crate::quotes::model::DataSource::Manual
-            });
+            quotes.retain(|q| q.asset_id != asset_id.as_str() || q.data_source == "MANUAL");
             Ok(original_len - quotes.len())
         }
 
@@ -301,7 +299,7 @@ mod tests {
         Quote {
             id: format!("{}_{}", symbol, date),
             created_at: Utc::now(),
-            data_source: DataSource::Yahoo,
+            data_source: "YAHOO".to_string(),
             timestamp: Utc.from_utc_datetime(&date.and_hms_opt(16, 0, 0).unwrap()),
             asset_id: symbol.to_string(),
             open: close,
@@ -412,6 +410,45 @@ mod tests {
         let closes: Vec<_> = quotes.iter().map(|q| q.close).collect();
         assert!(closes.contains(&dec!(155)));
         assert!(closes.contains(&dec!(160)));
+    }
+
+    #[test]
+    fn test_stale_manual_quote_is_seeded_for_gap_fill() {
+        let store = MockQuoteStore::new();
+        let symbol = "ETF:MANUAL";
+        let start = date(2026, 3, 1);
+        let end = date(2026, 3, 3);
+        let stale_quote_date = start - Duration::days(45);
+
+        let stale_manual_quote = Quote {
+            data_source: "MANUAL".to_string(),
+            ..create_quote(symbol, stale_quote_date, dec!(123.45))
+        };
+        store.add_quote(stale_manual_quote);
+
+        let lookback_start = start - Duration::days(30);
+        let mut all_quotes = store
+            .get_quotes_in_range(symbol, lookback_start, end)
+            .unwrap();
+        assert!(
+            all_quotes.is_empty(),
+            "lookback window should not include stale manual quote"
+        );
+
+        let symbols = HashSet::from([symbol.to_string()]);
+        append_historical_seed_quotes(&store, &symbols, start, &HashMap::new(), &mut all_quotes)
+            .unwrap();
+
+        let filled_quotes = fill_missing_quotes(&all_quotes, &symbols, start, end);
+        let expected_days = [date(2026, 3, 1), date(2026, 3, 2), date(2026, 3, 3)];
+        assert_eq!(filled_quotes.len(), expected_days.len());
+
+        for (quote, expected_day) in filled_quotes.iter().zip(expected_days.iter()) {
+            assert_eq!(quote.asset_id, symbol);
+            assert_eq!(quote.close, dec!(123.45));
+            assert_eq!(quote.data_source, "MANUAL");
+            assert_eq!(quote.timestamp.date_naive(), *expected_day);
+        }
     }
 
     // =========================================================================

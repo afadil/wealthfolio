@@ -1,12 +1,12 @@
 import {
   deleteSecret,
-  getSecret,
   isDesktop,
   listenDeepLink,
   logger,
   openUrlInBrowser,
   setSecret,
 } from "@/adapters";
+import { useAuth } from "@/context/auth-context";
 import { getPlatform } from "@/hooks/use-platform";
 import { CONNECT_ENABLED } from "@/lib/connect-config";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
@@ -21,14 +21,16 @@ import {
   type ReactNode,
 } from "react";
 import { authenticate as authenticateWithASWebAuth } from "tauri-plugin-web-auth-api";
-import { clearSyncSession, storeSyncSession } from "../services/auth-service";
+import { clearSyncSession, restoreSyncSession, storeSyncSession } from "../services/auth-service";
 import { getUserInfo } from "../services/broker-service";
 import type { UserInfo } from "../types";
 
-// Auth configuration - these are public keys (safe for client-side)
-// Set via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
-const SUPABASE_URL = import.meta.env.CONNECT_AUTH_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string;
+// Auth configuration - these are public/publishable keys (safe for client-side)
+// Can be overridden via environment variables: CONNECT_AUTH_URL and CONNECT_AUTH_PUBLISHABLE_KEY
+const AUTH_URL = (import.meta.env.CONNECT_AUTH_URL as string) || "https://auth.wealthfolio.app";
+const AUTH_PUBLISHABLE_KEY =
+  (import.meta.env.CONNECT_AUTH_PUBLISHABLE_KEY as string) ||
+  "sb_publishable_ZSZbXNtWtnh9i2nqJ2UL4A_NV8ZVutd";
 
 // Key for storing refresh token in keyring/localStorage (for session restoration)
 // Note: For keyring (Tauri), the "wealthfolio_" prefix is added automatically by SecretStore
@@ -196,13 +198,13 @@ function createHybridPkceStorage(storageKey: string) {
 
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
-  const storageKey = getAuthStorageKey(SUPABASE_URL);
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const storageKey = getAuthStorageKey(AUTH_URL);
+  return createClient(AUTH_URL, AUTH_PUBLISHABLE_KEY, {
     auth: {
       storageKey,
       storage: createHybridPkceStorage(storageKey),
       flowType: "pkce",
-      autoRefreshToken: true,
+      autoRefreshToken: false,
       // Must be true for auth-js to use the provided `storage` (PKCE code_verifier lives there).
       // Our custom storage keeps sessions in-memory (non-persistent) while allowing PKCE to work
       // across full-page redirects.
@@ -214,6 +216,7 @@ const createSupabaseClient = () => {
 
 // Internal provider used when Connect is enabled
 function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
@@ -247,8 +250,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     // Store tokens in backend's encrypted secret store (backend can mint fresh access tokens if needed)
     if (session.refresh_token) {
       try {
-        await storeSyncSession(session.refresh_token, session.access_token);
-        logger.info("Tokens stored in backend successfully");
+        await storeSyncSession(session.refresh_token);
       } catch (err) {
         logger.error(`Failed to store tokens in backend: ${err}`);
       }
@@ -259,9 +261,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     if (session.refresh_token) {
       try {
         await setSecret(REFRESH_TOKEN_KEY, session.refresh_token);
-        logger.info(
-          isDesktop ? "Refresh token stored in keyring" : "Refresh token stored in backend",
-        );
       } catch (err) {
         logger.error(`setSecret failed: ${err}`);
         // Fallback to localStorage only on desktop where keyring might fail
@@ -272,33 +271,15 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     }
   }, []);
 
-  // Retrieve refresh token from secret store (keyring on desktop, FileSecretStore on web)
-  const retrieveRefreshToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const token = await getSecret(REFRESH_TOKEN_KEY);
-      if (token) return token;
-    } catch (err) {
-      logger.debug(`getSecret failed: ${err}`);
-    }
-    // Fallback to localStorage for desktop (legacy tokens or keyring failures)
-    if (isDesktop) {
-      return localStorage.getItem(REFRESH_TOKEN_KEY);
-    }
-    return null;
-  }, []);
-
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
-      logger.info(`handleAuthCallback called with URL: ${url.substring(0, 100)}...`);
       const payload = parseAuthCallbackUrl(url);
 
       if (!payload) {
         logger.error("Failed to parse auth callback URL - no payload");
         return;
       }
-
-      logger.info(`Parsed payload type: ${payload.type}`);
 
       if (payload.type === "error") {
         logger.error(`Auth callback error: ${payload.message}`);
@@ -307,7 +288,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       }
 
       try {
-        logger.info("Exchanging code for session...");
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
           payload.code,
         );
@@ -324,12 +304,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           return;
         }
 
-        logger.info("Session received, storing tokens...");
-        logger.info(`Access token length: ${data.session.access_token?.length ?? 0}`);
-        logger.info(`Refresh token length: ${data.session.refresh_token?.length ?? 0}`);
         // Store tokens BEFORE setting session to avoid race condition
         await storeTokens(data.session);
-        logger.info("storeTokens function returned, setting session state...");
         setSession(data.session);
         setUser(data.session.user);
         logger.info("Auth callback completed successfully");
@@ -347,24 +323,26 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
     const restoreSession = async () => {
       try {
-        const refreshToken = await retrieveRefreshToken();
-
-        if (refreshToken) {
-          // Use the refresh token to get a new session
-          const { data, error: refreshError } = await supabase.auth.refreshSession({
+        // Ask the backend for fresh tokens. The backend is the single owner of
+        // the refresh token and will rotate it via Supabase when needed, avoiding
+        // the race condition where both the JS client and backend independently
+        // rotate the same refresh token.
+        try {
+          const { accessToken, refreshToken } = await restoreSyncSession();
+          const { data, error: setErr } = await supabase.auth.setSession({
+            access_token: accessToken,
             refresh_token: refreshToken,
           });
-
-          if (refreshError) {
-            logger.debug("Failed to refresh session.");
-            // Clear invalid tokens
+          if (setErr) {
+            logger.debug("Failed to set session from backend tokens.");
             await storeTokens(null);
           } else if (data.session && !cancelled) {
-            // Store tokens BEFORE setting session to avoid race condition
-            await storeTokens(data.session);
             setSession(data.session);
             setUser(data.session.user);
           }
+        } catch (_err) {
+          // No backend session (not logged in or backend unreachable) — that's fine
+          logger.debug("No backend session to restore.");
         }
       } catch (_err) {
         logger.error("Error restoring session.");
@@ -400,7 +378,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [supabase, storeTokens, retrieveRefreshToken]);
+  }, [supabase, storeTokens, isAuthenticated]);
 
   // Listen for deep link events on desktop
   useEffect(() => {
@@ -562,21 +540,14 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         // This opens a secure Safari sheet that Google accepts for OAuth
         if (useASWebAuth && data.url) {
           try {
-            logger.info("Starting ASWebAuth flow...");
-            logger.info(`OAuth URL: ${data.url.substring(0, 100)}...`);
-
             const result = await authenticateWithASWebAuth({
               url: data.url,
               callbackScheme: "wealthfolio",
             });
 
-            logger.info(`ASWebAuth result: ${JSON.stringify(result)}`);
-
             // The plugin returns the full callback URL with the auth code
             if (result?.callbackUrl) {
-              logger.info(`Callback URL received: ${result.callbackUrl.substring(0, 100)}...`);
               await handleAuthCallback(result.callbackUrl);
-              logger.info("handleAuthCallback completed");
             } else {
               logger.error("No callbackUrl in ASWebAuth result");
             }
@@ -689,16 +660,22 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     setError(null);
 
     try {
+      // Server-side invalidation may fail if the access token expired (since
+      // autoRefreshToken is off). That's acceptable — the session will expire
+      // naturally on the server. Always clear local state regardless.
       const { error: signOutError } = await supabase.auth.signOut();
-
       if (signOutError) {
-        throw signOutError;
+        logger.warn(`Server-side sign out failed (token may be expired): ${signOutError.message}`);
       }
 
       setSession(null);
       setUser(null);
       await storeTokens(null);
     } catch (err) {
+      // Still clear local state even on unexpected errors
+      setSession(null);
+      setUser(null);
+      await storeTokens(null).catch(() => {});
       const message = err instanceof Error ? err.message : "Sign out failed";
       setError(message);
       throw err;

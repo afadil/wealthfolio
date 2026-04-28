@@ -1,5 +1,26 @@
 use crate::addons::models::*;
 use crate::addons::service::*;
+use std::io::Write;
+use zip::write::SimpleFileOptions;
+
+fn build_test_addon_zip(entries: &[(&str, &str)]) -> Vec<u8> {
+    let mut cursor = std::io::Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut cursor);
+        let options = SimpleFileOptions::default();
+
+        for (name, content) in entries {
+            zip.start_file(name, options)
+                .expect("failed to start zip file");
+            zip.write_all(content.as_bytes())
+                .expect("failed to write zip file");
+        }
+
+        zip.finish().expect("failed to finish zip");
+    }
+
+    cursor.into_inner()
+}
 
 #[test]
 fn test_detect_addon_permissions_hello_world() {
@@ -610,9 +631,111 @@ fn test_parse_manifest_json_metadata_service() {
     assert!(!permissions[0].functions[0].is_detected);
 }
 
+#[test]
+fn test_extract_addon_zip_rejects_parent_traversal_path() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("../evil.js", "console.log('bad');"),
+    ]);
+
+    let err = match extract_addon_zip_internal(zip_data) {
+        Ok(_) => panic!("zip should be rejected"),
+        Err(err) => err,
+    };
+    assert!(err.contains("Unsafe addon archive path"));
+}
+
+#[test]
+fn test_extract_addon_zip_rejects_nested_parent_traversal_path() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("dist/../../evil.js", "console.log('bad');"),
+    ]);
+
+    let err = match extract_addon_zip_internal(zip_data) {
+        Ok(_) => panic!("zip should be rejected"),
+        Err(err) => err,
+    };
+    assert!(err.contains("Unsafe addon archive path"));
+}
+
+#[test]
+fn test_extract_addon_zip_rejects_absolute_path() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("/tmp/evil.js", "console.log('bad');"),
+    ]);
+
+    let err = match extract_addon_zip_internal(zip_data) {
+        Ok(_) => panic!("zip should be rejected"),
+        Err(err) => err,
+    };
+    assert!(err.contains("Unsafe addon archive path"));
+}
+
+#[test]
+fn test_extract_addon_zip_rejects_windows_drive_path() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("C:/evil.js", "console.log('bad');"),
+    ]);
+
+    let err = match extract_addon_zip_internal(zip_data) {
+        Ok(_) => panic!("zip should be rejected"),
+        Err(err) => err,
+    };
+    assert!(err.contains("Unsafe addon archive path"));
+}
+
+#[test]
+fn test_extract_addon_zip_accepts_valid_nested_paths() {
+    let zip_data = build_test_addon_zip(&[
+        (
+            "manifest.json",
+            r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+        ),
+        ("dist/addon.js", "console.log('ok');"),
+        ("dist/helpers/util.js", "export const value = 1;"),
+    ]);
+
+    let extracted = extract_addon_zip_internal(zip_data).expect("zip should extract");
+    assert_eq!(extracted.metadata.id, "test-addon");
+    assert!(
+        extracted
+            .files
+            .iter()
+            .any(|file| file.name == "dist/addon.js" && file.is_main),
+        "main file should be preserved"
+    );
+    assert!(
+        extracted
+            .files
+            .iter()
+            .any(|file| file.name == "dist/helpers/util.js"),
+        "nested helper file should be preserved"
+    );
+}
+
 #[cfg(test)]
 mod service_tests {
     use super::*;
+    use crate::addons::addon_traits::AddonServiceTrait;
     use std::env;
 
     #[test]
@@ -660,6 +783,91 @@ mod service_tests {
         assert_eq!(parent.file_name().unwrap(), "addons");
 
         // Clean up
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_addon_service_load_manifest() {
+        // Test that AddonService can load an installed addo
+        let temp_dir = env::temp_dir().join("wealthfolio_test_manifest_service");
+        let app_data_path = temp_dir.to_str().unwrap();
+
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+
+        let service = AddonService::new(app_data_path, "test-instance");
+
+        // Create addon directory structure manually
+        let addon_dir = temp_dir.join("addons").join("addon");
+        std::fs::create_dir_all(&addon_dir).expect("Failed to create addon dir");
+
+        let manifest_json = r#"{
+            "id": "addon",
+            "name": "Addon",
+            "version": "1.0.0",
+            "main": "addon.js",
+            "permissions": [
+                {
+                    "category": "api",
+                    "purpose": "Network calls",
+                    "functions": ["fetch"]
+                }
+            ]
+        }"#;
+
+        std::fs::write(addon_dir.join("manifest.json"), manifest_json)
+            .expect("Failed to write manifest");
+        std::fs::write(addon_dir.join("addon.js"), "console.log('test')")
+            .expect("Failed to write js");
+
+        let installed = service
+            .list_installed_addons()
+            .expect("Failed to list installed addons");
+        assert_eq!(installed.len(), 1, "AddonService should load the manifest");
+
+        let permissions = installed[0].metadata.permissions.as_ref().unwrap();
+        assert_eq!(permissions.len(), 1);
+        assert_eq!(permissions[0].functions[0].name, "fetch");
+        assert!(permissions[0].functions[0].is_declared);
+
+        // Clean up
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn test_install_addon_zip_rejects_unsafe_paths_without_writing_files() {
+        let temp_dir = env::temp_dir().join("wealthfolio_test_addon_zip_traversal");
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+
+        let zip_data = build_test_addon_zip(&[
+            (
+                "manifest.json",
+                r#"{"id":"test-addon","name":"Test Addon","version":"1.0.0","main":"dist/addon.js"}"#,
+            ),
+            ("dist/addon.js", "console.log('ok');"),
+            ("../evil.js", "console.log('bad');"),
+        ]);
+
+        let service = AddonService::new(&temp_dir, "test-instance");
+        let result = service.install_addon_zip(zip_data, true).await;
+        let addon_dir = temp_dir.join("addons").join("test-addon");
+
+        assert!(result.is_err(), "unsafe zip install should fail");
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("Unsafe addon archive path"),
+            "install should fail with unsafe path error"
+        );
+        assert!(
+            !addon_dir.exists(),
+            "addon directory should not be populated on failed install"
+        );
+
         std::fs::remove_dir_all(&temp_dir).ok();
     }
 }
