@@ -600,6 +600,7 @@ export interface HoldingSummary {
   marketValue: number; // Base currency value
   currency: string;
   weightInCategory: number; // Percentage weight within the category (0-100)
+  instrumentTypeCategory?: string | null; // Instrument type taxonomy category (e.g., "Stock", "ETF")
 }
 
 /**
@@ -1981,6 +1982,134 @@ export interface CheckHoldingsImportResult {
   symbols: SymbolCheckResult[];
   /** Validation errors found in the import data */
   validationErrors: string[];
+}
+
+// ============================================================================
+// Portfolio Target Allocation Types
+// ============================================================================
+
+export type RebalanceMode = "buy_only" | "buy_and_sell";
+
+export interface PortfolioTarget {
+  id: string;
+  name: string;
+  accountId: string;
+  taxonomyId: string;
+  isActive: boolean;
+  rebalanceMode: RebalanceMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewPortfolioTarget {
+  id?: string;
+  name: string;
+  accountId: string;
+  taxonomyId: string;
+  isActive: boolean;
+  rebalanceMode?: RebalanceMode;
+}
+
+export interface TargetAllocation {
+  id: string;
+  targetId: string;
+  categoryId: string;
+  targetPercent: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewTargetAllocation {
+  id?: string;
+  targetId: string;
+  categoryId: string;
+  targetPercent: number;
+  isLocked: boolean;
+}
+
+export interface HoldingTarget {
+  id: string;
+  allocationId: string;
+  assetId: string;
+  targetPercent: number;
+  isLocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewHoldingTarget {
+  id?: string;
+  allocationId: string;
+  assetId: string;
+  targetPercent: number;
+  isLocked: boolean;
+}
+
+export interface AllocationDeviation {
+  categoryId: string;
+  categoryName: string;
+  color: string;
+  targetPercent: number;
+  currentPercent: number;
+  deviationPercent: number;
+  currentValue: number;
+  targetValue: number;
+  valueDelta: number;
+  isLocked: boolean;
+}
+
+export interface DeviationReport {
+  targetId: string;
+  targetName: string;
+  accountId: string;
+  taxonomyId: string;
+  totalValue: number;
+  deviations: AllocationDeviation[];
+}
+
+// Rebalancing types
+export interface RebalancingInput {
+  targetId: string;
+  availableCash: number;
+  baseCurrency: string;
+}
+
+export interface TradeRecommendation {
+  assetId: string;
+  symbol: string;
+  name: string | null;
+  isin: string | null;
+  categoryId: string;
+  categoryName: string;
+  action: string; // "BUY"
+  shares: number;
+  pricePerShare: number;
+  totalAmount: number;
+  impactPercent: number;
+  currentPercentOfClass: number;
+  targetPercentOfClass: number;
+  residualAmount: number;
+}
+
+export interface CategoryBudget {
+  categoryId: string;
+  budget: number;
+  hasPartialTargets: boolean;
+}
+
+export interface RebalancingPlan {
+  targetId: string;
+  targetName: string;
+  accountId: string;
+  taxonomyId: string;
+  availableCash: number;
+  totalAllocated: number;
+  remainingCash: number;
+  additionalCashNeeded: number;
+  totalSellAmount: number;
+  categoryBudgets: CategoryBudget[];
+  recommendations: TradeRecommendation[];
 }
 
 // ─── Planning DTOs (backend-computed overviews) ──────────────────

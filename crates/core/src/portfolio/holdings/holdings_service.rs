@@ -163,6 +163,13 @@ impl HoldingsService {
                         let purchase_price: Option<Decimal> =
                             metadata.as_ref().and_then(extract_purchase_price);
 
+                        let isin = metadata
+                            .as_ref()
+                            .and_then(|m| m.get("identifiers"))
+                            .and_then(|i| i.get("isin"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+
                         let instrument = Instrument {
                             id: asset.id.clone(),
                             symbol: asset.display_code.clone().unwrap_or_default(),
@@ -172,6 +179,7 @@ impl HoldingsService {
                             pricing_mode: asset.quote_mode.as_db_str().to_string(),
                             preferred_provider: asset.preferred_provider(),
                             exchange_mic: asset.instrument_exchange_mic.clone(),
+                            isin,
                             classifications: None,
                         };
 
@@ -287,6 +295,7 @@ impl HoldingsService {
                 pricing_mode: "MANUAL".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                isin: None,
                 classifications: None,
             };
 
@@ -783,6 +792,13 @@ impl HoldingsServiceTrait for HoldingsService {
                 pricing_mode: asset.quote_mode.as_db_str().to_string(),
                 preferred_provider: asset.preferred_provider(),
                 exchange_mic: asset.instrument_exchange_mic.clone(),
+                isin: asset
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.get("identifiers"))
+                    .and_then(|i| i.get("isin"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
                 classifications: None,
             };
 
@@ -1316,6 +1332,7 @@ mod tests {
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                isin: None,
                 classifications: None,
             }),
             asset_kind: None,

@@ -623,7 +623,7 @@ export function AppLauncher() {
       <CommandList
         className={cn(
           "flex-1",
-          isMobileViewport ? "max-h-[calc(80vh-160px)] px-2 pb-8" : "max-h-[420px]",
+          isMobileViewport ? "max-h-[calc(80vh-160px)] px-2 pb-8" : "max-h-105",
         )}
       >
         {!hasResults && <CommandEmpty>No matches found.</CommandEmpty>}
@@ -757,10 +757,10 @@ export function AppLauncher() {
           <Command
             className={cn(
               "flex flex-1 flex-col bg-transparent",
-              "[&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:font-medium",
-              "[&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2",
-              "[&_[cmdk-input-wrapper]]:px-5 [&_[cmdk-input]]:h-14 [&_[cmdk-input]]:text-base",
-              "[&_[cmdk-item]]:px-4 [&_[cmdk-item]]:py-4 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5",
+              "**:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:font-medium",
+              "**:[[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0",
+              "**:[[cmdk-input-wrapper]]:px-5 **:[[cmdk-input]]:h-14 **:[[cmdk-input]]:text-base",
+              "**:[[cmdk-item]]:px-4 `**:[[cmdk-item]]:py-4 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5",
               "[&_[data-cmdk-input-wrapper]_svg]:h-5 [&_[data-cmdk-input-wrapper]_svg]:w-5",
             )}
           >

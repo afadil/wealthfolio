@@ -28,6 +28,7 @@ use wealthfolio_core::{
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
     portfolio::allocation::{AllocationService, AllocationServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
+    portfolio::targets::{PortfolioTargetService, PortfolioTargetServiceTrait},
     portfolio::{
         holdings::{
             holdings_valuation_service::HoldingsValuationService, HoldingsService,
@@ -54,7 +55,10 @@ use wealthfolio_storage_sqlite::{
     health::HealthDismissalRepository,
     limits::ContributionLimitRepository,
     market_data::{MarketDataRepository, QuoteSyncStateRepository},
-    portfolio::{snapshot::SnapshotRepository, valuation::ValuationRepository},
+    portfolio::{
+        snapshot::SnapshotRepository, targets::repository::PortfolioTargetRepository,
+        valuation::ValuationRepository,
+    },
     settings::SettingsRepository,
     sync::{AppSyncRepository, BrokerSyncStateRepository, ImportRunRepository, PlatformRepository},
     taxonomies::TaxonomyRepository,
@@ -85,6 +89,9 @@ pub struct AppState {
     pub activity_service: Arc<dyn ActivityServiceTrait + Send + Sync>,
     pub asset_service: Arc<dyn AssetServiceTrait + Send + Sync>,
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
+    pub portfolio_target_service: Arc<dyn PortfolioTargetServiceTrait + Send + Sync>,
+    pub rebalancing_service:
+        Arc<dyn wealthfolio_core::portfolio::rebalancing::RebalancingService + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
     pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
@@ -280,6 +287,21 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         AllocationService::new(holdings_service.clone(), taxonomy_service.clone()),
     );
 
+    let portfolio_target_repository =
+        Arc::new(PortfolioTargetRepository::new(pool.clone(), writer.clone()));
+    let portfolio_target_service: Arc<dyn PortfolioTargetServiceTrait + Send + Sync> = Arc::new(
+        PortfolioTargetService::new(portfolio_target_repository, allocation_service.clone()),
+    );
+
+    let rebalancing_service: Arc<
+        dyn wealthfolio_core::portfolio::rebalancing::RebalancingService + Send + Sync,
+    > = Arc::new(
+        wealthfolio_core::portfolio::rebalancing::RebalancingServiceImpl::new(
+            portfolio_target_service.clone(),
+            allocation_service.clone(),
+        ),
+    );
+
     let performance_service = Arc::new(
         wealthfolio_core::portfolio::performance::PerformanceService::new_with_timezone(
             valuation_service.clone(),
@@ -470,6 +492,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         activity_service,
         asset_service,
         taxonomy_service,
+        portfolio_target_service,
+        rebalancing_service,
         net_worth_service,
         alternative_asset_service,
         addon_service,

@@ -80,6 +80,8 @@ import {
   ListFilter,
   Loader,
   Loader2,
+  Lock,
+  LockOpen,
   Mail,
   Minus,
   MinusCircle,
@@ -288,6 +290,8 @@ const IconsInternal = {
   Moon: Moon,
   Sun: Sun,
   ListFilter: ListFilter,
+  Lock: Lock,
+  LockOpen: LockOpen,
   Undo: Undo2,
   Fullscreen: Fullscreen,
   RectangleEllipsis: RectangleEllipsis,
@@ -836,6 +840,8 @@ export type IconName =
   | "Moon"
   | "Sun"
   | "ListFilter"
+  | "Lock"
+  | "LockOpen"
   | "Undo"
   | "Fullscreen"
   | "RectangleEllipsis"

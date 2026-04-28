@@ -32,9 +32,11 @@ import AiProvidersPage from "./pages/settings/ai-providers/ai-providers-page";
 import ContributionLimitPage from "./pages/settings/contribution-limits/contribution-limits-page";
 import ExportSettingsPage from "./pages/settings/exports/exports-page";
 import GeneralSettingsPage from "./pages/settings/general/general-page";
+import AllocationStrategyPage from "./pages/settings/allocation-strategy/allocation-strategy-page";
 import MarketDataImportPage from "./pages/settings/market-data/market-data-import-page";
 import MarketDataSettingsPage from "./pages/settings/market-data/market-data-settings";
 import TaxonomiesPage from "./pages/settings/taxonomies/taxonomies-page";
+import AllocationsPage from "./pages/allocations/allocations-page";
 import ConnectSettingsPage from "./pages/settings/wealthfolio-connect/connect-settings-page";
 import GoalsDashboardPage from "@/features/goals/pages/goals-dashboard-page";
 import GoalNewPage from "@/features/goals/pages/goal-new-page";
@@ -85,6 +87,7 @@ export function AppRoutes() {
           <Route path="activities/manage" element={<ActivityManagerPage />} />
           <Route path="holdings" element={<HoldingsPage />} />
           <Route path="holdings-insights" element={<HoldingsInsightsPage />} />
+          <Route path="allocations" element={<AllocationsPage />} />
           <Route path="holdings/:assetId" element={<AssetProfilePage />} />
           <Route path="import" element={<ActivityImportPage />} />
           <Route path="accounts/:id" element={<AccountPage />} />
@@ -116,6 +119,7 @@ export function AppRoutes() {
             <Route index element={<GeneralSettingsPage />} />
             <Route path="general" element={<GeneralSettingsPage />} />
             <Route path="accounts" element={<SettingsAccountsPage />} />
+            <Route path="allocation-strategy" element={<AllocationStrategyPage />} />
             <Route path="appearance" element={<SettingsAppearancePage />} />
             <Route path="about" element={<AboutSettingsPage />} />
             <Route path="exports" element={<ExportSettingsPage />} />

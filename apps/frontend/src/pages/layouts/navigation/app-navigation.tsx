@@ -40,6 +40,13 @@ const staticNavigation: NavigationProps = {
       label: "View Holdings",
     },
     {
+      icon: <Icons.Target className="size-6" />,
+      title: "Allocations",
+      href: "/allocations",
+      keywords: ["allocations", "targets", "rebalance", "rebalancing"],
+      label: "View Allocations",
+    },
+    {
       icon: <Icons.Activity className="size-6" />,
       title: "Activities",
       href: "/activities",

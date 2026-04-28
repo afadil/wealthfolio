@@ -47,6 +47,14 @@ CREATE TABLE goal_plans (
 INSERT INTO sync_table_state (table_name, enabled) VALUES ('goal_plans', 1);
 
 -- Rebuild goals_allocation with share-based schema
+-- Guard: create old-schema table for databases that predated goals_allocation
+CREATE TABLE IF NOT EXISTS goals_allocation (
+    id TEXT NOT NULL PRIMARY KEY,
+    percent_allocation INTEGER NOT NULL DEFAULT 0,
+    goal_id TEXT NOT NULL,
+    account_id TEXT NOT NULL
+);
+
 CREATE TABLE goals_allocation_new (
     id TEXT NOT NULL PRIMARY KEY,
     goal_id TEXT NOT NULL,

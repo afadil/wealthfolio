@@ -263,6 +263,7 @@ mod tests {
                 pricing_mode: "MANUAL".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                isin: None,
                 classifications: None,
             }),
             asset_kind: None,

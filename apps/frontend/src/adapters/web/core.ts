@@ -168,6 +168,21 @@ export const COMMANDS: CommandMap = {
   remove_asset_taxonomy_assignment: { method: "DELETE", path: "/taxonomies/assignments" },
   get_migration_status: { method: "GET", path: "/taxonomies/migration/status" },
   migrate_legacy_classifications: { method: "POST", path: "/taxonomies/migration/run" },
+  // Portfolio Targets
+  get_portfolio_targets: { method: "GET", path: "/portfolio-targets/account" },
+  get_portfolio_target: { method: "GET", path: "/portfolio-targets" },
+  create_portfolio_target: { method: "POST", path: "/portfolio-targets" },
+  update_portfolio_target: { method: "PUT", path: "/portfolio-targets" },
+  delete_portfolio_target: { method: "DELETE", path: "/portfolio-targets" },
+  get_target_allocations: { method: "GET", path: "/portfolio-targets" },
+  upsert_target_allocation: { method: "POST", path: "/portfolio-targets/allocations" },
+  batch_save_target_allocations: { method: "POST", path: "/portfolio-targets/allocations/batch" },
+  delete_target_allocation: { method: "DELETE", path: "/portfolio-targets/allocations" },
+  get_allocation_deviations: { method: "GET", path: "/portfolio-targets" },
+  get_holding_targets: { method: "GET", path: "/portfolio-targets/allocations" },
+  upsert_holding_target: { method: "POST", path: "/portfolio-targets/holdings" },
+  batch_save_holding_targets: { method: "POST", path: "/portfolio-targets/holdings/batch" },
+  delete_holding_target: { method: "DELETE", path: "/portfolio-targets/holdings" },
   // Health Center
   get_health_status: { method: "GET", path: "/health/status" },
   run_health_checks: { method: "POST", path: "/health/check" },
@@ -961,6 +976,77 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     case "migrate_legacy_classifications":
       break;
+    // Portfolio Target commands
+    case "get_portfolio_targets": {
+      const { accountId } = payload as { accountId: string };
+      url += `/${encodeURIComponent(accountId)}`;
+      break;
+    }
+    case "get_portfolio_target": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "create_portfolio_target": {
+      const { target } = payload as { target: Record<string, unknown> };
+      body = JSON.stringify(target);
+      break;
+    }
+    case "update_portfolio_target": {
+      const { target } = payload as { target: Record<string, unknown> };
+      body = JSON.stringify(target);
+      break;
+    }
+    case "delete_portfolio_target": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "get_target_allocations": {
+      const { targetId } = payload as { targetId: string };
+      url += `/${encodeURIComponent(targetId)}/allocations`;
+      break;
+    }
+    case "upsert_target_allocation": {
+      const { allocation } = payload as { allocation: Record<string, unknown> };
+      body = JSON.stringify(allocation);
+      break;
+    }
+    case "batch_save_target_allocations": {
+      const { allocations } = payload as { allocations: Record<string, unknown>[] };
+      body = JSON.stringify(allocations);
+      break;
+    }
+    case "delete_target_allocation": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
+    case "get_allocation_deviations": {
+      const { targetId } = payload as { targetId: string };
+      url += `/${encodeURIComponent(targetId)}/deviations`;
+      break;
+    }
+    case "get_holding_targets": {
+      const { allocationId } = payload as { allocationId: string };
+      url += `/${encodeURIComponent(allocationId)}/holdings`;
+      break;
+    }
+    case "upsert_holding_target": {
+      const { target } = payload as { target: Record<string, unknown> };
+      body = JSON.stringify(target);
+      break;
+    }
+    case "batch_save_holding_targets": {
+      const { targets } = payload as { targets: Record<string, unknown>[] };
+      body = JSON.stringify(targets);
+      break;
+    }
+    case "delete_holding_target": {
+      const { id } = payload as { id: string };
+      url += `/${encodeURIComponent(id)}`;
+      break;
+    }
     // Health Center commands
     case "get_health_status":
     case "run_health_checks":
