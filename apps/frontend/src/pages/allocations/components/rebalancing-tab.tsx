@@ -5,6 +5,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { formatAmount } from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { cn } from "@wealthfolio/ui/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 
 import type { Account, PortfolioTarget, DeviationReport, RebalancingPlan } from "@/lib/types";
 import { calculateRebalancingPlan } from "@/adapters";
@@ -210,9 +211,18 @@ export function RebalancingTab({
   }, [plan, sortKey, sortDir]);
 
   // Hide zero-share BUY rows by default (budget too small for 1 full share)
+  // BUT always keep category-level budget rows visible so the total adds up
   const visibleRows = useMemo(() => {
     if (showZeroShares) return flatRows;
-    return flatRows.filter((r) => r.shares > 0 || r.action === "SELL");
+    return flatRows.filter((r) => {
+      if (r.shares > 0 || r.action === "SELL") return true;
+      // Category-level rec (assetId === categoryId): always show, it contributes to Total Deployed
+      const isCategoryLevel =
+        r.assetId === r.categoryId &&
+        r.categoryId !== "CASH" &&
+        r.categoryId !== "CASH_BANK_DEPOSITS";
+      return isCategoryLevel;
+    });
   }, [flatRows, showZeroShares]);
 
   const handleSortColumn = (key: SortKey) => {
@@ -612,9 +622,18 @@ export function RebalancingTab({
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm font-medium">{s.categoryName}</span>
                           {s.hasNoHoldingTargets && (
-                            <span title="No holding-level targets — configure them in the Overview tab">
-                              <Icons.Info className="h-3 w-3 text-amber-600 dark:text-amber-500" />
-                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Icons.Info className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>
+                                  No holding-level targets — budget is reserved but no specific
+                                  trades can be suggested. Configure holding targets in the Overview
+                                  tab.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                         <div className="text-muted-foreground text-right font-mono text-xs">
@@ -708,23 +727,37 @@ export function RebalancingTab({
               {visibleRows.map((rec, idx) => {
                 const isSell = rec.action === "SELL";
                 const isCash = rec.categoryId === "CASH" || rec.categoryId === "CASH_BANK_DEPOSITS";
-                // Cash actions use different labels: SELL → DEPLOY, BUY → SAVE
-                const badgeLabel = isCash ? (isSell ? "DEPLOY" : "SAVE") : rec.action;
-                const badgeClass = isCash
-                  ? "bg-muted text-muted-foreground"
-                  : isSell
-                    ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                    : "bg-green-500/10 text-green-600 dark:text-green-400";
-                const indicatorClass = isCash
-                  ? "bg-muted-foreground/40"
-                  : isSell
-                    ? "bg-orange-500"
-                    : "bg-green-500";
-                const amountColor = isCash
-                  ? "text-muted-foreground"
-                  : isSell
-                    ? "text-orange-600 dark:text-orange-400"
-                    : "text-green-600 dark:text-green-400";
+                // Category-level rec: assetId === categoryId, no holding targets configured
+                const isCategoryLevel = !isCash && rec.assetId === rec.categoryId;
+
+                const badgeLabel = isCategoryLevel
+                  ? "BUDGET"
+                  : isCash
+                    ? isSell
+                      ? "DEPLOY"
+                      : "SAVE"
+                    : rec.action;
+                const badgeClass = isCategoryLevel
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-500"
+                  : isCash
+                    ? "bg-muted text-muted-foreground"
+                    : isSell
+                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                      : "bg-green-500/10 text-green-600 dark:text-green-400";
+                const indicatorClass = isCategoryLevel
+                  ? "bg-amber-500/60"
+                  : isCash
+                    ? "bg-muted-foreground/40"
+                    : isSell
+                      ? "bg-orange-500"
+                      : "bg-green-500";
+                const amountColor = isCategoryLevel
+                  ? "text-amber-600 dark:text-amber-500"
+                  : isCash
+                    ? "text-muted-foreground"
+                    : isSell
+                      ? "text-orange-600 dark:text-orange-400"
+                      : "text-green-600 dark:text-green-400";
                 const dev = deviationReport.deviations.find((d) => d.categoryId === rec.categoryId);
                 const catColor = dev?.color ?? "#888888";
                 const isHovered = hoveredAssetId === rec.assetId;
@@ -767,12 +800,20 @@ export function RebalancingTab({
                           {rec.name || ""}
                         </span>
                       </Link>
-                      {!isCash && rec.targetPercentOfClass > 0 && (
-                        <p className="text-muted-foreground/60 font-mono text-[10px]">
-                          {rec.currentPercentOfClass.toFixed(1)}%<span className="mx-1">→</span>
-                          {rec.targetPercentOfClass.toFixed(1)}%
-                          <span className="ml-1 opacity-50">within class</span>
+                      {isCategoryLevel ? (
+                        <p className="text-[10px] text-amber-600/70 dark:text-amber-500/70">
+                          No holding targets set — budget reserved but no specific trades can be
+                          suggested. Configure holding targets in the Overview tab.
                         </p>
+                      ) : (
+                        !isCash &&
+                        rec.targetPercentOfClass > 0 && (
+                          <p className="text-muted-foreground/60 font-mono text-[10px]">
+                            {rec.currentPercentOfClass.toFixed(1)}%<span className="mx-1">→</span>
+                            {rec.targetPercentOfClass.toFixed(1)}%
+                            <span className="ml-1 opacity-50">within class</span>
+                          </p>
+                        )
                       )}
                     </div>
 
@@ -789,13 +830,13 @@ export function RebalancingTab({
                     </div>
 
                     {/* Shares */}
-                    <div className="text-center font-mono text-sm font-semibold">
-                      {rec.shares.toFixed(0)}
+                    <div className="text-muted-foreground text-center font-mono text-sm font-semibold">
+                      {isCategoryLevel ? "—" : rec.shares.toFixed(0)}
                     </div>
 
                     {/* Price */}
                     <div className="text-muted-foreground text-right font-mono text-sm">
-                      {formatAmount(rec.pricePerShare, baseCurrency)}
+                      {isCategoryLevel ? "—" : formatAmount(rec.pricePerShare, baseCurrency)}
                     </div>
 
                     {/* Amount */}
