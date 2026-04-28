@@ -16,6 +16,7 @@ use crate::provider_model::{
     AiProviderSettings, CapabilityInfo, ConnectionField, ModelCapabilities, ProviderDefaultConfig,
     ProviderTuning, AI_PROVIDER_SETTINGS_KEY,
 };
+use crate::types::normalize_tools_allowlist;
 
 // ============================================================================
 // Provider Catalog (Static JSON)
@@ -373,7 +374,7 @@ impl<E: AiEnvironment> ProviderService<E> {
         stored
             .providers
             .get(provider_id)
-            .and_then(|p| p.tools_allowlist.clone())
+            .and_then(|p| normalize_tools_allowlist(p.tools_allowlist.clone()))
     }
 
     /// Resolve effective provider tuning: catalog defaults merged with any

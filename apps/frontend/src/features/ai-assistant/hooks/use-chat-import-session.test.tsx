@@ -124,4 +124,81 @@ describe("useChatImportSession", () => {
       ],
     });
   });
+
+  it("replaces stale backend errors after the user changes account", async () => {
+    const mappingWithTwoAccounts: ImportCsvMappingOutput = {
+      ...mapping,
+      availableAccounts: [
+        { id: "acct-1", name: "Brokerage", currency: "USD" },
+        { id: "acct-2", name: "Test", currency: "USD" },
+      ],
+    };
+    adapterMocks.checkActivitiesImport
+      .mockResolvedValueOnce([
+        {
+          lineNumber: 1,
+          isValid: false,
+          errors: { general: ["Validation failed: Record not found"] },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          lineNumber: 1,
+          isValid: true,
+          warnings: {},
+          errors: {},
+        },
+      ]);
+
+    const { result } = renderHook(() => useChatImportSession({ mapping: mappingWithTwoAccounts }));
+
+    await waitFor(() => expect(result.current.stats.errors).toBe(1));
+
+    act(() => {
+      result.current.setAccountId("acct-2");
+    });
+
+    await waitFor(() => expect(result.current.stats.errors).toBe(0));
+    expect(result.current.stats.valid).toBe(1);
+  });
+
+  it("allows confirm when CSV rows carry valid per-row accounts", async () => {
+    adapterMocks.parseCsv.mockResolvedValueOnce({
+      headers: ["Date", "Symbol", "Quantity", "Price", "Type", "Account"],
+      rows: [["2024-01-15", "NEWCO", "2", "10", "Buy", "Test"]],
+      detectedConfig: {
+        defaultCurrency: "USD",
+        dateFormat: "auto",
+        decimalSeparator: ".",
+        thousandsSeparator: ",",
+      },
+      errors: [],
+      rowCount: 1,
+    });
+
+    const mappingWithRowAccount: ImportCsvMappingOutput = {
+      ...mapping,
+      accountId: null,
+      appliedMapping: {
+        ...mapping.appliedMapping,
+        accountId: "",
+        fieldMappings: {
+          ...mapping.appliedMapping.fieldMappings,
+          account: "Account",
+        },
+      },
+      availableAccounts: [
+        { id: "acct-1", name: "Brokerage", currency: "USD" },
+        { id: "acct-2", name: "Test", currency: "USD" },
+      ],
+    };
+
+    const { result } = renderHook(() => useChatImportSession({ mapping: mappingWithRowAccount }));
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    expect(result.current.accountId).toBe("");
+    expect(result.current.drafts[0]?.accountId).toBe("acct-2");
+    expect(result.current.canConfirm).toBe(true);
+  });
 });

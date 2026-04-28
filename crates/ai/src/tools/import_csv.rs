@@ -61,6 +61,7 @@ fn has_usable_llm_mappings(args: &ImportCsvArgs) -> bool {
         || has_usable_string_map(&args.account_mappings)
 }
 
+use wealthfolio_core::accounts::Account;
 use wealthfolio_core::activities::{
     import_type, into_field_mapping_values, ImportMappingData, ParseConfig,
 };
@@ -482,6 +483,39 @@ fn estimate_confidence(mapping: &ImportMappingData) -> MappingConfidence {
 
 const MAX_SAMPLE_ROWS: usize = 10;
 
+fn valid_account_id(value: &str, accounts: &[Account]) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    accounts
+        .iter()
+        .find(|account| account.id == trimmed)
+        .map(|account| account.id.clone())
+}
+
+fn clean_account_mappings(
+    map: Option<HashMap<String, String>>,
+    accounts: &[Account],
+) -> HashMap<String, String> {
+    clean_string_map(map)
+        .into_iter()
+        .filter_map(|(key, value)| {
+            valid_account_id(&value, accounts).map(|account_id| (key, account_id))
+        })
+        .collect()
+}
+
+fn sanitize_mapping_accounts(
+    mut mapping: ImportMappingData,
+    accounts: &[Account],
+) -> ImportMappingData {
+    mapping.account_id = valid_account_id(&mapping.account_id, accounts).unwrap_or_default();
+    mapping.account_mappings = clean_account_mappings(Some(mapping.account_mappings), accounts);
+    mapping
+}
+
 // ============================================================================
 // Tool Implementation
 // ============================================================================
@@ -636,6 +670,10 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
                 currency: a.currency.clone(),
             })
             .collect();
+        let account_id = args
+            .account_id
+            .as_deref()
+            .and_then(|id| valid_account_id(id, &accounts));
 
         // Build the parse config from LLM input (unset fields fall back to auto-detect).
         let llm_parse_config = ParseConfig {
@@ -655,7 +693,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         // Fast path: saved template exists for this account.
         let mut used_saved_profile = false;
         let mut mapping: Option<ImportMappingData> = None;
-        if let Some(ref account_id) = args.account_id {
+        if let Some(ref account_id) = account_id {
             if !has_usable_llm_mappings(&args) {
                 if let Ok(saved) = self
                     .env
@@ -707,16 +745,17 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             };
 
             ImportMappingData {
-                account_id: args.account_id.clone().unwrap_or_default(),
+                account_id: account_id.clone().unwrap_or_default(),
                 context_kind: import_type::ACTIVITY.to_string(),
                 field_mappings: into_field_mapping_values(field_mappings),
                 activity_mappings: merge_activity_mappings(args.activity_mappings.clone()),
                 symbol_mappings: clean_string_map(args.symbol_mappings.clone()),
-                account_mappings: clean_string_map(args.account_mappings.clone()),
+                account_mappings: clean_account_mappings(args.account_mappings.clone(), &accounts),
                 parse_config: Some(effective_parse_config.clone()),
                 ..Default::default()
             }
         };
+        let applied_mapping = sanitize_mapping_accounts(applied_mapping, &accounts);
 
         let mapping_confidence = if used_saved_profile {
             MappingConfidence::High
@@ -727,7 +766,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
         Ok(ImportCsvMappingOutput {
             applied_mapping,
             parse_config: effective_parse_config,
-            account_id: args.account_id,
+            account_id,
             detected_headers: headers,
             sample_rows,
             total_rows,
@@ -741,7 +780,20 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::test_env::MockEnvironment;
+    use crate::env::test_env::{MockAccountService, MockEnvironment};
+    use chrono::Utc;
+
+    fn account(id: &str, name: &str, currency: &str) -> Account {
+        Account {
+            id: id.to_string(),
+            name: name.to_string(),
+            currency: currency.to_string(),
+            is_active: true,
+            created_at: Utc::now().naive_utc(),
+            updated_at: Utc::now().naive_utc(),
+            ..Account::default()
+        }
+    }
 
     #[test]
     fn test_auto_detect_field_mappings() {
@@ -931,6 +983,81 @@ mod tests {
         assert!(buy.iter().any(|v| v == "Kopen"));
         // Defaults are merged in alongside the LLM-provided CSV value.
         assert!(buy.iter().any(|v| v.to_uppercase() == "PURCHASE"));
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_drops_unknown_account_id() {
+        let mut env = MockEnvironment::new();
+        env.account_service = Arc::new(MockAccountService {
+            accounts: vec![account("acct-1", "Default", "USD")],
+        });
+        let tool = ImportCsvTool::new(Arc::new(env), "USD".to_string());
+
+        let args = ImportCsvArgs {
+            csv_content: "Date,Symbol,Quantity,Price,Type\n2024-01-15,AAPL,10,150.00,Buy"
+                .to_string(),
+            account_id: Some("stale-account".to_string()),
+            field_mappings: None,
+            activity_mappings: None,
+            symbol_mappings: None,
+            account_mappings: None,
+            delimiter: None,
+            skip_top_rows: None,
+            skip_bottom_rows: None,
+            date_format: None,
+            decimal_separator: None,
+            thousands_separator: None,
+            default_currency: None,
+        };
+
+        let result = tool.call(args).await.unwrap();
+        assert_eq!(result.account_id, None);
+        assert_eq!(result.applied_mapping.account_id, "");
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_keeps_valid_account_ids_and_drops_invalid_mappings() {
+        let mut env = MockEnvironment::new();
+        env.account_service = Arc::new(MockAccountService {
+            accounts: vec![account("acct-1", "Default", "USD")],
+        });
+        let tool = ImportCsvTool::new(Arc::new(env), "USD".to_string());
+
+        let mut account_mappings = HashMap::new();
+        account_mappings.insert("Broker Account".to_string(), "acct-1".to_string());
+        account_mappings.insert("Old Account".to_string(), "stale-account".to_string());
+
+        let args = ImportCsvArgs {
+            csv_content: "Date,Symbol,Quantity,Price,Type\n2024-01-15,AAPL,10,150.00,Buy"
+                .to_string(),
+            account_id: Some("acct-1".to_string()),
+            field_mappings: None,
+            activity_mappings: None,
+            symbol_mappings: None,
+            account_mappings: Some(account_mappings),
+            delimiter: None,
+            skip_top_rows: None,
+            skip_bottom_rows: None,
+            date_format: None,
+            decimal_separator: None,
+            thousands_separator: None,
+            default_currency: None,
+        };
+
+        let result = tool.call(args).await.unwrap();
+        assert_eq!(result.account_id, Some("acct-1".to_string()));
+        assert_eq!(result.applied_mapping.account_id, "acct-1");
+        assert_eq!(
+            result
+                .applied_mapping
+                .account_mappings
+                .get("Broker Account"),
+            Some(&"acct-1".to_string())
+        );
+        assert!(!result
+            .applied_mapping
+            .account_mappings
+            .contains_key("Old Account"));
     }
 
     #[tokio::test]

@@ -47,6 +47,44 @@ function createSingleDraftWithMapping(row: string[], activityMappings: Record<st
 }
 
 describe("createDraftActivities explicit activity mapping", () => {
+  it("falls back to the selected account when a CSV account value is not valid", () => {
+    const [draft] = createDraftActivities(
+      [["2024-03-15", "DEPOSIT", "1000.00", "USD", "stale-account"]],
+      [...headers, ImportFormat.ACCOUNT],
+      {
+        ...baseMapping,
+        fieldMappings: {
+          ...baseMapping.fieldMappings,
+          [ImportFormat.ACCOUNT]: ImportFormat.ACCOUNT,
+        },
+      },
+      parseConfig,
+      "account-1",
+      new Set(["account-1"]),
+    );
+
+    expect(draft.accountId).toBe("account-1");
+  });
+
+  it("keeps a CSV account value when it is a valid account id", () => {
+    const [draft] = createDraftActivities(
+      [["2024-03-15", "DEPOSIT", "1000.00", "USD", "account-2"]],
+      [...headers, ImportFormat.ACCOUNT],
+      {
+        ...baseMapping,
+        fieldMappings: {
+          ...baseMapping.fieldMappings,
+          [ImportFormat.ACCOUNT]: ImportFormat.ACCOUNT,
+        },
+      },
+      parseConfig,
+      "account-1",
+      new Set(["account-1", "account-2"]),
+    );
+
+    expect(draft.accountId).toBe("account-2");
+  });
+
   it("keeps explicitly mapped withdrawal labels when amount is positive", () => {
     const draft = createSingleDraftWithMapping(["2024-03-15", "WITHDRAWAL", "1000.00", "USD"], {
       [ActivityType.WITHDRAWAL]: ["WITHDRAWAL"],

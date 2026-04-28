@@ -7,6 +7,7 @@ use log::debug;
 use rig::{completion::ToolDefinition, tool::Tool};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use wealthfolio_core::utils::time_utils::{parse_user_timezone, DEFAULT_VALUATION_TZ};
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
@@ -584,9 +585,30 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
     type Output = RecordActivityOutput;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
+        let configured_timezone = self
+            .env
+            .settings_service()
+            .get_settings()
+            .map(|settings| settings.timezone)
+            .unwrap_or_default();
+        let timezone =
+            parse_user_timezone(configured_timezone.trim()).unwrap_or(DEFAULT_VALUATION_TZ);
+        let now = chrono::Utc::now().with_timezone(&timezone);
+        let current_date = now.format("%Y-%m-%d").to_string();
+        let current_weekday = now.format("%A").to_string();
+        let timezone_name = timezone.name();
+
         ToolDefinition {
             name: Self::NAME.to_string(),
-            description: "Record investment transactions from natural language. Creates a draft preview for user confirmation. Supports all activity types: BUY, SELL, DIVIDEND, DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, CREDIT, ADJUSTMENT.".to_string(),
+            description: format!(
+                "Record investment transactions from natural language. Creates a draft preview \
+                for user confirmation. Supports all activity types: BUY, SELL, DIVIDEND, \
+                DEPOSIT, WITHDRAWAL, TRANSFER_IN, TRANSFER_OUT, INTEREST, FEE, SPLIT, TAX, \
+                CREDIT, ADJUSTMENT. User timezone is {timezone_name}; current date there is \
+                {current_date} ({current_weekday}). Resolve all relative date phrases yourself \
+                before calling this tool. If the user has multiple accounts and did not specify \
+                which account to use, ask which account before calling this tool."
+            ),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -601,7 +623,13 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
                     },
                     "activityDate": {
                         "type": "string",
-                        "description": "ISO 8601 date (e.g., '2026-01-17'). Parse relative dates like 'yesterday' or 'last Monday' to ISO format"
+                        "description": format!(
+                            "Concrete ISO 8601 date only, e.g. '2026-01-17'. Do not pass \
+                            relative phrases like 'yesterday', 'today', 'last Friday', or \
+                            'next Monday'. Resolve them relative to current local date \
+                            {current_date} ({current_weekday}) in timezone {timezone_name} \
+                            before calling this tool."
+                        )
                     },
                     "quantity": {
                         "type": "number",
@@ -621,7 +649,7 @@ impl<E: AiEnvironment + 'static> Tool for RecordActivityTool<E> {
                     },
                     "account": {
                         "type": "string",
-                        "description": "Account name or ID. If user has multiple accounts and doesn't specify, ask which account"
+                        "description": "Account name or ID. Required before calling this tool when the user has multiple accounts. If the user did not specify an account, ask which account first instead of calling this tool with an empty account."
                     },
                     "subtype": {
                         "type": "string",

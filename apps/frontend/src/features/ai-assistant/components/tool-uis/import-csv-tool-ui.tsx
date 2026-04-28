@@ -180,20 +180,26 @@ function ErrorCard({ message }: { message: string }) {
 
 function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
   const fieldCount = Object.keys(mapping.appliedMapping?.fieldMappings ?? {}).length;
+  const account = mapping.availableAccounts.find((item) => item.id === mapping.accountId);
   return (
     <Card className="bg-muted/40 border-muted-foreground/20">
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
           <Icons.FileSpreadsheet className="text-muted-foreground h-5 w-5" />
-          <CardTitle className="text-muted-foreground text-base">
-            CSV import · {mapping.totalRows} row{mapping.totalRows === 1 ? "" : "s"}
+          <CardTitle className="text-base">
+            CSV import summary · {mapping.totalRows} row{mapping.totalRows === 1 ? "" : "s"}
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-2">
         <p className="text-muted-foreground text-sm">
           {fieldCount > 0 ? `Mapped ${fieldCount} columns. ` : ""}
-          This import was not completed. Attach the CSV again to start a new import.
+          {account ? `Target account: ${account.name}. ` : ""}
+          The file contents are no longer available in this chat session, so the review table cannot
+          be reopened.
+        </p>
+        <p className="text-muted-foreground text-xs">
+          Attach the CSV again to review, edit, or import these rows.
         </p>
       </CardContent>
     </Card>
@@ -206,7 +212,70 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
 // "tool call that just completed (initialize)" from "reloaded from DB (stale)".
 // ─────────────────────────────────────────────────────────────────────────────
 
+const MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES = 10;
+const MAX_LIVE_IMPORT_CSV_CACHE_BYTES = 100 * 1024 * 1024;
+
 const liveToolCalls = new Set<string>();
+const liveCsvContentByToolCall = new Map<string, string>();
+
+function getLiveCsvContentBytes(): number {
+  let bytes = 0;
+  for (const content of liveCsvContentByToolCall.values()) {
+    bytes += content.length;
+  }
+  return bytes;
+}
+
+function evictOldestLiveImportSession(): boolean {
+  const oldestToolCallId =
+    liveToolCalls.values().next().value ?? liveCsvContentByToolCall.keys().next().value;
+  if (!oldestToolCallId) return false;
+
+  liveToolCalls.delete(oldestToolCallId);
+  liveCsvContentByToolCall.delete(oldestToolCallId);
+  return true;
+}
+
+function pruneLiveImportSessionCache() {
+  while (
+    liveToolCalls.size > MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES ||
+    liveCsvContentByToolCall.size > MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES ||
+    getLiveCsvContentBytes() > MAX_LIVE_IMPORT_CSV_CACHE_BYTES
+  ) {
+    if (!evictOldestLiveImportSession()) break;
+  }
+}
+
+function rememberLiveToolCall(toolCallId: string) {
+  liveToolCalls.delete(toolCallId);
+  liveToolCalls.add(toolCallId);
+  pruneLiveImportSessionCache();
+}
+
+function rememberSessionCsvContent(toolCallId: string, content: string) {
+  liveCsvContentByToolCall.delete(toolCallId);
+  liveCsvContentByToolCall.set(toolCallId, content);
+  rememberLiveToolCall(toolCallId);
+}
+
+function isRedactedCsvContent(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    value.toLowerCase().includes("redacted") &&
+    value.toLowerCase().includes("session")
+  );
+}
+
+function getSessionCsvContent(toolCallId: string | undefined, value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim() && !isRedactedCsvContent(value)) {
+    if (toolCallId) {
+      rememberSessionCsvContent(toolCallId, value);
+    }
+    return value;
+  }
+
+  return toolCallId ? liveCsvContentByToolCall.get(toolCallId) : undefined;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main
@@ -226,9 +295,10 @@ function ImportCsvToolUIContentImpl({
   const runtime = useRuntimeContext();
   const threadId = runtime.currentThreadId;
 
-  // csvContent lives in the tool ARGS (what the LLM sent), not the result
-  // (the tool no longer echoes it back to avoid double-storing in the DB).
-  const csvContent = (args as Record<string, unknown>)?.csvContent as string | undefined;
+  // csvContent lives in live tool args only. Persisted tool args are redacted,
+  // so keep an in-memory copy for this page session.
+  const rawCsvContent = (args as Record<string, unknown>)?.csvContent;
+  const csvContent = getSessionCsvContent(toolCallId, rawCsvContent);
 
   const { mapping, errorMessage: normalizeError } = useMemo(
     () => normalizeMappingResult(result as RawResult, csvContent ?? ""),
@@ -240,12 +310,13 @@ function ImportCsvToolUIContentImpl({
   // so we show the stale card. During a live session, we add the ID when
   // status is "running" and it persists across thread switches.
   if (toolCallId && status?.type === "running") {
-    liveToolCalls.add(toolCallId);
+    rememberLiveToolCall(toolCallId);
   }
   const hasCsvContent = !!mapping?.csvContent;
   const isSubmitted = mapping?.submitted ?? false;
   const isLive = !!toolCallId && liveToolCalls.has(toolCallId);
-  const shouldInitSession = (isLive && hasCsvContent) || isSubmitted;
+  const canReviewImport = isLive && hasCsvContent;
+  const shouldInitSession = canReviewImport || isSubmitted;
 
   const session = useChatImportSession({
     mapping: shouldInitSession ? mapping : null,
@@ -269,8 +340,9 @@ function ImportCsvToolUIContentImpl({
   if (isSubmitted || session.submitted) {
     return <SuccessCard count={session.importedCount || mapping.importedCount || 0} />;
   }
-  // Not a live tool call from this page session → stale card
-  if (!isLive) {
+  // Historical imports can keep tool metadata but lose session-only CSV content.
+  // Without the CSV body we cannot rebuild the editable review grid.
+  if (!canReviewImport) {
     return <StaleImportCard mapping={mapping} />;
   }
   if (session.status === "initializing") {

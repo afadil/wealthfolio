@@ -61,28 +61,47 @@ interface ProviderSettingsCardProps {
   onRefreshModels?: () => void;
 }
 
-// Novice-friendly tool mapping for data access settings
+// Novice-friendly tool mapping for data access settings.
+// Each card can represent multiple backend tools that belong to the same user capability.
 const DATA_ACCESS_OPTIONS = [
-  { toolId: "get_accounts", label: "Accounts", description: "Account names, types, and balances" },
-  { toolId: "get_holdings", label: "Holdings", description: "Current positions and their values" },
   {
-    toolId: "search_activities",
-    label: "Transactions",
-    description: "Past transactions and activities",
+    toolIds: ["get_accounts", "get_cash_balances"],
+    label: "Accounts",
+    description: "Account details and cash balances",
   },
   {
-    toolId: "get_performance",
+    toolIds: ["get_holdings"],
+    label: "Holdings",
+    description: "Current positions and their values",
+  },
+  {
+    toolIds: ["search_activities", "record_activity", "record_activities", "import_csv"],
+    label: "Transactions",
+    description: "View, draft, and import activities",
+  },
+  {
+    toolIds: ["get_performance"],
     label: "Performance",
     description: "Returns and performance metrics",
   },
-  { toolId: "get_income", label: "Income", description: "Income summary and breakdown" },
-  { toolId: "get_goals", label: "Goals", description: "Investment goals and progress" },
+  { toolIds: ["get_income"], label: "Income", description: "Income summary and breakdown" },
+  { toolIds: ["get_goals"], label: "Goals", description: "Investment goals and progress" },
   {
-    toolId: "get_asset_allocation",
+    toolIds: ["get_asset_allocation"],
     label: "Allocation",
     description: "Portfolio allocation breakdown",
   },
-  { toolId: "get_valuation_history", label: "History", description: "Portfolio value over time" },
+  {
+    toolIds: ["get_valuation_history"],
+    label: "History",
+    description: "Portfolio value over time",
+  },
+];
+
+const HIDDEN_DEFAULT_TOOL_IDS = ["get_health_status"];
+const ALL_DATA_ACCESS_TOOL_IDS = [
+  ...DATA_ACCESS_OPTIONS.flatMap((option) => option.toolIds),
+  ...HIDDEN_DEFAULT_TOOL_IDS,
 ];
 
 export function ProviderSettingsCard({
@@ -249,41 +268,47 @@ export function ProviderSettingsCard({
     onSetCapabilityOverride(modelId, newOverrides);
   };
 
-  // Handle tool allowlist toggle
-  const handleToolToggle = (toolId: string, enabled: boolean) => {
-    if (!onToolsAllowlistChange) return;
-
-    const currentAllowlist = provider.toolsAllowlist;
-    const allToolIds = DATA_ACCESS_OPTIONS.map((opt) => opt.toolId);
-
-    if (currentAllowlist === null || currentAllowlist === undefined) {
-      // Currently all tools enabled (null = all). If disabling one, create allowlist with all except this one.
-      if (!enabled) {
-        const newAllowlist = allToolIds.filter((id) => id !== toolId);
-        onToolsAllowlistChange(newAllowlist);
-      }
-      // If enabling when already all enabled, no action needed
-    } else {
-      // We have an explicit allowlist
-      if (enabled) {
-        // Add tool to allowlist
-        const newAllowlist = [...currentAllowlist, toolId];
-        // Always send the list - don't use null to avoid serialization issues
-        onToolsAllowlistChange(newAllowlist);
-      } else {
-        // Remove tool from allowlist
-        const newAllowlist = currentAllowlist.filter((id) => id !== toolId);
-        onToolsAllowlistChange(newAllowlist);
-      }
-    }
-  };
-
-  // Check if a tool is enabled
-  const isToolEnabled = (toolId: string): boolean => {
+  // Check if a tool group is enabled. Some legacy settings only contain one
+  // tool from a group, so treat any matching tool as enabled and repair the
+  // full group the next time settings are saved.
+  const isToolGroupEnabled = (toolIds: string[]): boolean => {
     const allowlist = provider.toolsAllowlist;
     // null/undefined means all tools are enabled
     if (allowlist === null || allowlist === undefined) return true;
-    return allowlist.includes(toolId);
+    return toolIds.some((toolId) => allowlist.includes(toolId));
+  };
+
+  // Handle grouped tool allowlist toggle
+  const handleToolToggle = (toolIds: string[], enabled: boolean) => {
+    if (!onToolsAllowlistChange) return;
+
+    const enabledToolIds = new Set<string>();
+    for (const option of DATA_ACCESS_OPTIONS) {
+      const isTarget = option.toolIds.some((toolId) => toolIds.includes(toolId));
+      const nextEnabled = isTarget ? enabled : isToolGroupEnabled(option.toolIds);
+      if (nextEnabled) {
+        for (const toolId of option.toolIds) {
+          enabledToolIds.add(toolId);
+        }
+      }
+    }
+
+    const hasVisibleAccess = DATA_ACCESS_OPTIONS.some((option) =>
+      option.toolIds.some((toolId) => enabledToolIds.has(toolId)),
+    );
+    if (hasVisibleAccess) {
+      for (const toolId of HIDDEN_DEFAULT_TOOL_IDS) {
+        enabledToolIds.add(toolId);
+      }
+    }
+
+    const allEnabled = ALL_DATA_ACCESS_TOOL_IDS.every((toolId) => enabledToolIds.has(toolId));
+    if (allEnabled) {
+      onToolsAllowlistChange(null);
+      return;
+    }
+
+    onToolsAllowlistChange(ALL_DATA_ACCESS_TOOL_IDS.filter((toolId) => enabledToolIds.has(toolId)));
   };
 
   return (
@@ -691,12 +716,12 @@ export function ProviderSettingsCard({
                   </div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {DATA_ACCESS_OPTIONS.map((option) => {
-                      const isEnabled = isToolEnabled(option.toolId);
+                      const isEnabled = isToolGroupEnabled(option.toolIds);
                       return (
                         <button
-                          key={option.toolId}
+                          key={option.label}
                           type="button"
-                          onClick={() => handleToolToggle(option.toolId, !isEnabled)}
+                          onClick={() => handleToolToggle(option.toolIds, !isEnabled)}
                           className={cn(
                             "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-all",
                             isEnabled

@@ -221,12 +221,29 @@ const MessageError: FC = () => {
   );
 };
 
-const TypingIndicator: FC = () => {
+interface MessagePartWithResult {
+  type?: string;
+  result?: unknown;
+}
+
+interface TypingIndicatorProps {
+  position: "initial" | "continuation";
+}
+
+const TypingIndicator: FC<TypingIndicatorProps> = ({ position }) => {
   const showIndicator = useAssistantState(({ message }) => {
-    // Show indicator when message is running and has no text/tool content yet
     if (message.status?.type !== "running") return false;
-    // Hide if there are any parts (text started streaming or tools are being called)
-    return message.parts.length === 0;
+
+    if (position === "initial") {
+      return message.parts.length === 0;
+    }
+
+    const lastPart = message.parts[message.parts.length - 1] as MessagePartWithResult | undefined;
+    return (
+      lastPart?.type === "tool-call" &&
+      Object.prototype.hasOwnProperty.call(lastPart, "result") &&
+      lastPart.result !== undefined
+    );
   });
 
   if (!showIndicator) return null;
@@ -247,7 +264,7 @@ const AssistantMessage: FC = () => {
       data-role="assistant"
     >
       <div className="aui-assistant-message-content text-foreground wrap-break-word mx-2 text-sm leading-6">
-        <TypingIndicator />
+        <TypingIndicator position="initial" />
         <MessagePrimitive.Parts
           components={{
             Text: MarkdownText,
@@ -259,6 +276,7 @@ const AssistantMessage: FC = () => {
             },
           }}
         />
+        <TypingIndicator position="continuation" />
         <MessageError />
       </div>
 
