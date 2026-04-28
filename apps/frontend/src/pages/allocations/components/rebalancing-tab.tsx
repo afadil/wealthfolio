@@ -387,7 +387,7 @@ export function RebalancingTab({
 
       {/* ── TOP HEADER STRIP (mirrors HealthStrip in Overview) ── */}
       <div className="mb-4 flex items-stretch divide-x overflow-hidden rounded-lg border">
-        <div className="px-5 py-4">
+        <div className="w-[320px] shrink-0 px-4 py-3">
           <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wider">
             Portfolio Value
           </p>
@@ -396,7 +396,7 @@ export function RebalancingTab({
           </p>
           <p className="text-muted-foreground mt-1 text-xs">total</p>
         </div>
-        <div className="flex flex-1 flex-col justify-center px-5 py-4">
+        <div className="flex flex-1 flex-col justify-center px-4 py-3">
           <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wider">
             Rebalance Mode
           </p>
@@ -406,7 +406,7 @@ export function RebalancingTab({
                 "rounded-full px-2.5 py-0.5 text-xs font-semibold",
                 activeTarget.rebalanceMode === "buy_and_sell"
                   ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                  : "bg-muted text-muted-foreground",
+                  : "bg-green-500/10 text-green-600 dark:text-green-400",
               )}
             >
               {activeTarget.rebalanceMode === "buy_only" ? "Buy only" : "Buy & Sell"}
@@ -629,7 +629,7 @@ export function RebalancingTab({
                           {s.hasNoHoldingTargets && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Icons.Info className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+                                <Icons.Info className="h-3 w-3 text-orange-600 dark:text-orange-500" />
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
                                 <p>
