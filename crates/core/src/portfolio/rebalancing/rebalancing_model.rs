@@ -57,6 +57,8 @@ pub struct CategoryBudget {
     pub category_id: String,
     /// Budget allocated to this category (shortfall * scale_factor)
     pub budget: Decimal,
+    /// True when some portfolio holdings in this category have no holding target configured
+    pub has_partial_targets: bool,
 }
 
 /// Complete rebalancing plan with recommendations.
@@ -112,10 +114,16 @@ impl RebalancingPlan {
     }
 
     /// Adds a category budget to the plan.
-    pub fn add_category_budget(&mut self, category_id: String, budget: Decimal) {
+    pub fn add_category_budget(
+        &mut self,
+        category_id: String,
+        budget: Decimal,
+        has_partial_targets: bool,
+    ) {
         self.category_budgets.push(CategoryBudget {
             category_id,
             budget,
+            has_partial_targets,
         });
     }
 

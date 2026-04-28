@@ -1191,6 +1191,117 @@ mod tests {
         );
     }
 
+    /// Partial holding targets: some holdings have targets, some don't.
+    /// CategoryBudget.has_partial_targets should be true.
+    #[tokio::test]
+    async fn test_partial_holding_targets_detected() {
+        let total_value = dec!(10000);
+        // 3 portfolio holdings in EQUITY, but only 2 have targets configured
+        let holdings = vec![
+            make_holding_summary("aapl", "AAPL", dec!(10), dec!(1500)),
+            make_holding_summary("msft", "MSFT", dec!(5), dec!(1500)),
+            make_holding_summary("goog", "GOOG", dec!(2), dec!(1000)), // NO target
+        ];
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "EQUITY", 5000); // 50%
+        let deviation = make_deviation("EQUITY", dec!(50), dec!(40), dec!(4000), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        // Only AAPL and MSFT have holding targets — GOOG is excluded
+        let holding_targets = vec![
+            make_holding_target("alloc1", "aapl", 5000),
+            make_holding_target("alloc1", "msft", 5000),
+        ];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        let equity_budget = plan
+            .category_budgets
+            .iter()
+            .find(|b| b.category_id == "EQUITY")
+            .unwrap();
+
+        assert!(
+            equity_budget.has_partial_targets,
+            "Expected has_partial_targets=true when GOOG has no holding target"
+        );
+        // GOOG should NOT appear in recommendations (no target)
+        assert!(
+            !plan.recommendations.iter().any(|r| r.asset_id == "goog"),
+            "GOOG should not appear in recommendations (no target configured)"
+        );
+    }
+
+    /// All holdings have targets: has_partial_targets should be false.
+    #[tokio::test]
+    async fn test_full_holding_targets_not_flagged_as_partial() {
+        let total_value = dec!(10000);
+        let holdings = vec![
+            make_holding_summary("aapl", "AAPL", dec!(10), dec!(2000)),
+            make_holding_summary("msft", "MSFT", dec!(5), dec!(2000)),
+        ];
+        let target = make_target("t1", "acc1");
+        let alloc = make_allocation("alloc1", "t1", "EQUITY", 5000);
+        let deviation = make_deviation("EQUITY", dec!(50), dec!(40), dec!(4000), total_value);
+        let deviation_report = DeviationReport {
+            target_id: "t1".to_string(),
+            target_name: "Test".to_string(),
+            account_id: "acc1".to_string(),
+            taxonomy_id: "asset_classes".to_string(),
+            total_value,
+            deviations: vec![deviation],
+        };
+        let holding_targets = vec![
+            make_holding_target("alloc1", "aapl", 5000),
+            make_holding_target("alloc1", "msft", 5000),
+        ];
+
+        let svc = make_service(
+            target,
+            vec![alloc],
+            deviation_report,
+            holding_targets,
+            holdings,
+        );
+
+        let input = RebalancingInput {
+            target_id: "t1".to_string(),
+            available_cash: dec!(1000),
+            base_currency: "USD".to_string(),
+        };
+        let plan = svc.calculate_rebalancing_plan(input).await.unwrap();
+
+        let equity_budget = plan
+            .category_budgets
+            .iter()
+            .find(|b| b.category_id == "EQUITY")
+            .unwrap();
+
+        assert!(
+            !equity_budget.has_partial_targets,
+            "Expected has_partial_targets=false when all holdings have targets"
+        );
+    }
+
     /// buy_only mode: overweight category should NOT generate SELL recommendations.
     #[tokio::test]
     async fn test_buy_only_never_generates_sells() {
@@ -1360,12 +1471,9 @@ impl RebalancingService for RebalancingServiceImpl {
             .map(|(cat_id, shortfall)| (cat_id.clone(), shortfall * scale_factor))
             .collect();
 
-        // Add category budgets to plan
-        for (category_id, budget) in &category_budgets {
-            plan.add_category_budget(category_id.clone(), *budget);
-        }
-
         // Step 5: Generate BUY recommendations
+        // Note: add_category_budget is called here (not in step 4) so we can
+        // detect partial holding targets while we already have holdings + targets loaded.
         for (category_id, budget) in category_budgets {
             if budget <= Decimal::ZERO {
                 continue;
@@ -1385,12 +1493,22 @@ impl RebalancingService for RebalancingServiceImpl {
 
             let allocation = allocations.iter().find(|a| a.category_id == category_id);
             if allocation.is_none() {
+                plan.add_category_budget(category_id.clone(), budget, false);
                 continue;
             }
 
             let holding_targets = self
                 .target_service
                 .get_holding_targets_by_allocation(&allocation.unwrap().id)?;
+
+            // Partial targets: holding-level recs exist but some portfolio holdings
+            // have no target configured — those holdings are excluded from rebalancing.
+            let has_partial_targets = !holding_targets.is_empty()
+                && holdings
+                    .iter()
+                    .any(|h| !holding_targets.iter().any(|t| t.asset_id == h.id));
+
+            plan.add_category_budget(category_id.clone(), budget, has_partial_targets);
 
             let category_target_percent = deviation_report
                 .deviations

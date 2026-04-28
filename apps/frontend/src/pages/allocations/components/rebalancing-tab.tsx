@@ -138,6 +138,7 @@ export function RebalancingTab({
         newPercent: number;
         budget: number;
         hasNoHoldingTargets: boolean;
+        hasPartialHoldingTargets: boolean;
       }
     >();
 
@@ -151,12 +152,16 @@ export function RebalancingTab({
         newPercent: d.currentPercent,
         budget: 0,
         hasNoHoldingTargets: false,
+        hasPartialHoldingTargets: false,
       });
     }
 
     for (const cb of plan.categoryBudgets) {
       const s = summaries.get(cb.categoryId);
-      if (s) s.budget = cb.budget;
+      if (s) {
+        s.budget = cb.budget;
+        s.hasPartialHoldingTargets = cb.hasPartialTargets;
+      }
     }
 
     for (const rec of plan.recommendations) {
@@ -631,6 +636,20 @@ export function RebalancingTab({
                                   No holding-level targets — budget is reserved but no specific
                                   trades can be suggested. Configure holding targets in the Overview
                                   tab.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {s.hasPartialHoldingTargets && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Icons.Info className="h-3 w-3 text-yellow-600 dark:text-yellow-500" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p>
+                                  Some holdings in this class have no target set — the rebalancing
+                                  budget is concentrated on targeted holdings only. Untargeted
+                                  holdings are excluded.
                                 </p>
                               </TooltipContent>
                             </Tooltip>

@@ -1869,6 +1869,7 @@ export interface TradeRecommendation {
 export interface CategoryBudget {
   categoryId: string;
   budget: number;
+  hasPartialTargets: boolean;
 }
 
 export interface RebalancingPlan {
