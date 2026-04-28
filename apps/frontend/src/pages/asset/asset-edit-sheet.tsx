@@ -638,8 +638,11 @@ export function AssetEditSheet({
 
       try {
         // Merge ISIN into existing metadata without clobbering other fields
-        const existingMeta = (asset.metadata as Record<string, unknown>) ?? {};
-        const existingIdentifiers = (existingMeta.identifiers as Record<string, unknown>) ?? {};
+        const existingMeta: Record<string, unknown> = asset.metadata ?? {};
+        const existingIdentifiers: Record<string, unknown> =
+          typeof existingMeta.identifiers === "object" && existingMeta.identifiers !== null
+            ? (existingMeta.identifiers as Record<string, unknown>)
+            : {};
         const isinTrimmed = values.isin?.trim() ?? "";
         const newIdentifiers = isinTrimmed
           ? { ...existingIdentifiers, isin: isinTrimmed }
