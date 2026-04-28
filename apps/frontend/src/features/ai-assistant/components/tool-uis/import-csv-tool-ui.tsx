@@ -206,8 +206,51 @@ function StaleImportCard({ mapping }: { mapping: ImportCsvMappingOutput }) {
 // "tool call that just completed (initialize)" from "reloaded from DB (stale)".
 // ─────────────────────────────────────────────────────────────────────────────
 
+const MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES = 10;
+const MAX_LIVE_IMPORT_CSV_CACHE_BYTES = 100 * 1024 * 1024;
+
 const liveToolCalls = new Set<string>();
 const liveCsvContentByToolCall = new Map<string, string>();
+
+function getLiveCsvContentBytes(): number {
+  let bytes = 0;
+  for (const content of liveCsvContentByToolCall.values()) {
+    bytes += content.length;
+  }
+  return bytes;
+}
+
+function evictOldestLiveImportSession(): boolean {
+  const oldestToolCallId =
+    liveToolCalls.values().next().value ?? liveCsvContentByToolCall.keys().next().value;
+  if (!oldestToolCallId) return false;
+
+  liveToolCalls.delete(oldestToolCallId);
+  liveCsvContentByToolCall.delete(oldestToolCallId);
+  return true;
+}
+
+function pruneLiveImportSessionCache() {
+  while (
+    liveToolCalls.size > MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES ||
+    liveCsvContentByToolCall.size > MAX_LIVE_IMPORT_CSV_CACHE_ENTRIES ||
+    getLiveCsvContentBytes() > MAX_LIVE_IMPORT_CSV_CACHE_BYTES
+  ) {
+    if (!evictOldestLiveImportSession()) break;
+  }
+}
+
+function rememberLiveToolCall(toolCallId: string) {
+  liveToolCalls.delete(toolCallId);
+  liveToolCalls.add(toolCallId);
+  pruneLiveImportSessionCache();
+}
+
+function rememberSessionCsvContent(toolCallId: string, content: string) {
+  liveCsvContentByToolCall.delete(toolCallId);
+  liveCsvContentByToolCall.set(toolCallId, content);
+  rememberLiveToolCall(toolCallId);
+}
 
 function isRedactedCsvContent(value: unknown): boolean {
   return (
@@ -220,7 +263,7 @@ function isRedactedCsvContent(value: unknown): boolean {
 function getSessionCsvContent(toolCallId: string | undefined, value: unknown): string | undefined {
   if (typeof value === "string" && value.trim() && !isRedactedCsvContent(value)) {
     if (toolCallId) {
-      liveCsvContentByToolCall.set(toolCallId, value);
+      rememberSessionCsvContent(toolCallId, value);
     }
     return value;
   }
@@ -261,7 +304,7 @@ function ImportCsvToolUIContentImpl({
   // so we show the stale card. During a live session, we add the ID when
   // status is "running" and it persists across thread switches.
   if (toolCallId && status?.type === "running") {
-    liveToolCalls.add(toolCallId);
+    rememberLiveToolCall(toolCallId);
   }
   const hasCsvContent = !!mapping?.csvContent;
   const isSubmitted = mapping?.submitted ?? false;

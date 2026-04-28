@@ -315,13 +315,14 @@ fn validate_attachments_with_limits(
     Ok(total_size)
 }
 
+fn text_has_attachment_marker(text: &str) -> bool {
+    text.lines().any(|line| line.starts_with(ATTACHMENT_MARKER))
+}
+
 fn messages_have_attachment_markers(messages: &[ChatMessage]) -> bool {
     messages.iter().any(|message| {
         message.role == ChatMessageRole::User
-            && message
-                .content
-                .get_text_content()
-                .contains(ATTACHMENT_MARKER)
+            && text_has_attachment_marker(&message.content.get_text_content())
     })
 }
 
@@ -2382,6 +2383,18 @@ mod tests {
             max_total_attachments_bytes: 20,
             max_session_cache_bytes: 100,
         }
+    }
+
+    #[test]
+    fn test_text_has_attachment_marker_matches_stored_marker_lines_only() {
+        assert!(text_has_attachment_marker("import this\n📎 statement.csv"));
+        assert!(text_has_attachment_marker("📎 statement.csv"));
+        assert!(!text_has_attachment_marker(
+            "please explain 📎 statement.csv"
+        ));
+        assert!(!text_has_attachment_marker(
+            "not an attachment: 📎 statement.csv"
+        ));
     }
 
     #[tokio::test]
