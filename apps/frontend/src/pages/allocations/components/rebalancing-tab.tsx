@@ -306,17 +306,31 @@ export function RebalancingTab({
   const handleDownloadCSV = () => {
     if (!plan) return;
     const rows: string[][] = [
-      ["Category", "Symbol", "Name", "Action", "Shares", "Price", "Amount"],
+      [
+        "date",
+        "symbol",
+        "activityType",
+        "quantity",
+        "unitPrice",
+        "currency",
+        "accountId",
+        "accountName",
+        "fee",
+      ],
     ];
     for (const rec of flatRows) {
+      const isCategoryLevel = rec.assetId === rec.categoryId;
+      if (isCategoryLevel || rec.shares === 0) continue;
       rows.push([
-        rec.categoryName,
+        "",
         rec.symbol,
-        rec.name || rec.symbol,
         rec.action,
         rec.shares.toFixed(0),
         rec.pricePerShare.toFixed(2),
-        rec.totalAmount.toFixed(2),
+        "",
+        "",
+        "",
+        "0",
       ]);
     }
     const csvContent = rows
@@ -757,21 +771,21 @@ export function RebalancingTab({
                       : "SAVE"
                     : rec.action;
                 const badgeClass = isCategoryLevel
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-500"
+                  ? "bg-purple-500/10 text-purple-500 dark:text-purple-400"
                   : isCash
                     ? "bg-muted text-muted-foreground"
                     : isSell
                       ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
                       : "bg-green-500/10 text-green-600 dark:text-green-400";
                 const indicatorClass = isCategoryLevel
-                  ? "bg-amber-500/60"
+                  ? "bg-purple-500/60"
                   : isCash
                     ? "bg-muted-foreground/40"
                     : isSell
                       ? "bg-orange-500"
                       : "bg-green-500";
                 const amountColor = isCategoryLevel
-                  ? "text-amber-600 dark:text-amber-500"
+                  ? "text-purple-500 dark:text-purple-400"
                   : isCash
                     ? "text-muted-foreground"
                     : isSell
@@ -820,7 +834,7 @@ export function RebalancingTab({
                         </span>
                       </Link>
                       {isCategoryLevel ? (
-                        <p className="text-[10px] text-amber-600/70 dark:text-amber-500/70">
+                        <p className="text-[10px] text-purple-500/70 dark:text-purple-400/70">
                           No holding targets set — budget reserved but no specific trades can be
                           suggested. Configure holding targets in the Overview tab.
                         </p>
