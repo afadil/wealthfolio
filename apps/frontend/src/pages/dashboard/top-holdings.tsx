@@ -18,7 +18,7 @@ import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 
-const MAX_DISPLAYED_HOLDINGS = 5;
+const MAX_DISPLAYED_HOLDINGS = 7;
 const MAX_STACKED_AVATARS = 5;
 
 interface TopHoldingsProps {
@@ -32,6 +32,7 @@ interface HoldingRowProps {
   baseCurrency: string;
   isHidden?: boolean;
   showTotalReturn: boolean;
+  showName: boolean;
   onClick?: () => void;
 }
 
@@ -40,11 +41,14 @@ function HoldingRow({
   baseCurrency,
   isHidden,
   showTotalReturn,
+  showName,
   onClick,
 }: HoldingRowProps) {
   const symbol = holding.instrument?.symbol ?? holding.id;
   const parsedOption = parseOccSymbol(symbol);
-  const displayName = parsedOption ? parsedOption.underlying : symbol.split(".")[0];
+  const symbolLabel = parsedOption ? parsedOption.underlying : symbol.split(".")[0];
+  const nameLabel = holding.instrument?.name?.trim() || symbolLabel;
+  const title = showName ? nameLabel : symbolLabel;
   const subtitle = parsedOption
     ? `${new Date(parsedOption.expiration + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} $${parsedOption.strikePrice} ${parsedOption.optionType}`
     : `${(holding.quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} shares`;
@@ -59,20 +63,20 @@ function HoldingRow({
 
   return (
     <div
-      className="border-border hover:bg-muted/30 group flex cursor-pointer items-center justify-between border-b py-3 transition-colors last:border-0"
+      className="border-border hover:bg-muted/30 group flex cursor-pointer items-center justify-between gap-3 border-b py-3 transition-colors last:border-0"
       onClick={onClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && onClick?.()}
     >
-      <div className="flex items-center gap-3">
-        <TickerAvatar symbol={avatarSymbol} className="size-9" />
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold">{displayName}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <TickerAvatar symbol={avatarSymbol} className="size-9 shrink-0" />
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-semibold">{title}</span>
           <span className="text-muted-foreground text-xs">{subtitle}</span>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
+      <div className="flex shrink-0 flex-col items-end gap-1">
         <AmountDisplay
           value={marketValue}
           currency={baseCurrency}
@@ -212,6 +216,10 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
     "holdings-widget-sort-by",
     "value",
   );
+  const [displayMode, setDisplayMode] = usePersistentState<"symbol" | "name">(
+    "holdings-widget-display-mode",
+    "symbol",
+  );
 
   // Filter out cash holdings and alternative assets, then sort by market value
   // Dashboard shows only investment holdings (securities, crypto, etc.)
@@ -317,6 +325,29 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                   </span>
                 </button>
               ))}
+              <div className="bg-border/70 mx-2 my-1.5 h-px" />
+              <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
+                Display
+              </p>
+              {(["symbol", "name"] as const).map((v) => (
+                <button
+                  key={v}
+                  className="hover:bg-accent flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-medium transition-colors"
+                  onClick={() => setDisplayMode(v)}
+                >
+                  {v === "symbol" ? "Symbol" : "Name"}
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded-full border-2",
+                      displayMode === v ? "border-primary bg-primary" : "border-muted-foreground",
+                    )}
+                  >
+                    {displayMode === v && (
+                      <span className="bg-primary-foreground h-1.5 w-1.5 rounded-full" />
+                    )}
+                  </span>
+                </button>
+              ))}
             </PopoverContent>
           </Popover>
           <Button
@@ -342,6 +373,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                   baseCurrency={baseCurrency}
                   isHidden={isBalanceHidden}
                   showTotalReturn={showTotalReturn}
+                  showName={displayMode === "name"}
                   onClick={() => navigate(`/holdings/${encodeURIComponent(assetId)}`)}
                 />
               );
