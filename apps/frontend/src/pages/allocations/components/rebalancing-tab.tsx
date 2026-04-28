@@ -643,7 +643,7 @@ export function RebalancingTab({
                           {s.hasNoHoldingTargets && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Icons.Info className="h-3 w-3 text-orange-600 dark:text-orange-500" />
+                                <Icons.Info className="text-warning h-3 w-3" />
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
                                 <p>
@@ -657,7 +657,7 @@ export function RebalancingTab({
                           {s.hasPartialHoldingTargets && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Icons.Info className="h-3 w-3 text-yellow-600 dark:text-yellow-500" />
+                                <Icons.Info className="text-warning h-3 w-3" />
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
                                 <p>
@@ -771,21 +771,21 @@ export function RebalancingTab({
                       : "SAVE"
                     : rec.action;
                 const badgeClass = isCategoryLevel
-                  ? "bg-purple-500/10 text-purple-500 dark:text-purple-400"
+                  ? "bg-warning/10 text-warning"
                   : isCash
                     ? "bg-muted text-muted-foreground"
                     : isSell
                       ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
                       : "bg-green-500/10 text-green-600 dark:text-green-400";
                 const indicatorClass = isCategoryLevel
-                  ? "bg-purple-500/60"
+                  ? "bg-warning/60"
                   : isCash
                     ? "bg-muted-foreground/40"
                     : isSell
                       ? "bg-orange-500"
                       : "bg-green-500";
                 const amountColor = isCategoryLevel
-                  ? "text-purple-500 dark:text-purple-400"
+                  ? "text-warning"
                   : isCash
                     ? "text-muted-foreground"
                     : isSell
@@ -834,7 +834,7 @@ export function RebalancingTab({
                         </span>
                       </Link>
                       {isCategoryLevel ? (
-                        <p className="text-[10px] text-purple-500/70 dark:text-purple-400/70">
+                        <p className="text-warning/70 text-[10px]">
                           No holding targets set — budget reserved but no specific trades can be
                           suggested. Configure holding targets in the Overview tab.
                         </p>
