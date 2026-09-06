@@ -569,6 +569,8 @@ export default function SpendingInsightsPage() {
         rangeStart={categorySheetRange.start}
         rangeEnd={categorySheetRange.end}
         buckets={categorySheetInsight?.byDayByCategory ?? EMPTY_BUCKETS}
+        rangeDays={categorySheetRange.days}
+        daysElapsed={categorySheetInsight?.headline.pace.daysElapsed ?? 0}
         isStatsLoading={stage === "changed" ? isWhatChangedLoading : isInsightLoading}
         currency={baseCurrency}
       />

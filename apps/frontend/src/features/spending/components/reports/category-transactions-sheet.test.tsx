@@ -99,7 +99,7 @@ function setSearchResult(items: CashActivity[]) {
   };
 }
 
-function sheet(rangeEnd = RANGE_END) {
+function sheet({ rangeEnd = RANGE_END, rangeDays = RANGE_DAYS, daysElapsed = RANGE_DAYS } = {}) {
   return (
     <MemoryRouter>
       <FormattingProvider locale="en-US" uiLocale="en" timezone="UTC">
@@ -111,6 +111,8 @@ function sheet(rangeEnd = RANGE_END) {
           rangeStart={RANGE_START}
           rangeEnd={rangeEnd}
           buckets={buckets}
+          rangeDays={rangeDays}
+          daysElapsed={daysElapsed}
           isStatsLoading={false}
           currency="USD"
         />
@@ -121,6 +123,8 @@ function sheet(rangeEnd = RANGE_END) {
 
 const RANGE_START = new Date("2026-01-01T00:00:00Z");
 const RANGE_END = new Date("2026-09-06T23:59:59.999Z");
+/** Jan 1 – Sep 6 inclusive. */
+const RANGE_DAYS = 249;
 
 /** Reads the value rendered beside a stat label in the header. */
 function statValue(label: string): string {
@@ -171,12 +175,25 @@ describe("CategoryTransactionsSheet", () => {
     // holds wherever the suite runs: the old code replaced the time of day
     // with the *browser's* 23:59:59.999.
     const end = new Date("2026-09-06T12:34:56.789Z");
-    render(sheet(end));
+    render(sheet({ rangeEnd: end }));
 
     expect(searchResult.lastRequest).toMatchObject({
       startDate: RANGE_START.toISOString(),
       endDate: end.toISOString(),
     });
+  });
+
+  it("labels the window with its calendar length", () => {
+    render(sheet());
+
+    expect(screen.getByText(/249 days/)).toBeInTheDocument();
+  });
+
+  it("paces over elapsed days, not the whole window", () => {
+    // A month-to-date window: 30 days long, 6 of them behind us.
+    render(sheet({ rangeDays: 30, daysElapsed: 6 }));
+
+    expect(amountOf(statValue("Daily pace"))).toBeCloseTo(BUCKET_TOTAL / 6, -3);
   });
 
   it("builds the subcategory mix from the aggregate", () => {

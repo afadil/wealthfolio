@@ -46,6 +46,13 @@ interface CategoryTransactionsSheetProps {
    * paginated list below, which only ever holds the pages loaded so far.
    */
   buckets: DrilldownBucket[];
+  /** Calendar length of the window, from `ReportsRange.days`. Deriving it
+   *  from the two boundary instants overcounts by a day. */
+  rangeDays: number;
+  /** `insight.headline.pace.daysElapsed` — days of the window that have
+   *  actually happened, resolved in the app timezone. The pace card on the
+   *  page behind the drawer divides by the same figure. */
+  daysElapsed: number;
   /** Loading state of the insight query that produced `buckets` — separate
    *  from the transaction list's own. */
   isStatsLoading: boolean;
@@ -80,6 +87,8 @@ export function CategoryTransactionsSheet({
   rangeStart,
   rangeEnd,
   buckets,
+  rangeDays,
+  daysElapsed,
   isStatsLoading,
   currency,
 }: CategoryTransactionsSheetProps) {
@@ -148,14 +157,12 @@ export function CategoryTransactionsSheet({
     [buckets, category, categoryMeta],
   );
 
-  const days = Math.max(
-    1,
-    Math.round((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000) + 1,
-  );
   // Divided by the same count shown in the TX tile, so the three figures
   // multiply out on screen.
   const avg = totalCount > 0 ? drilldown.spent / totalCount : 0;
-  const dailyPace = drilldown.spent / days;
+  // Elapsed days, not the calendar length: a live month-to-date window has
+  // most of its days still ahead of it.
+  const dailyPace = drilldown.spent / Math.max(1, daysElapsed);
 
   // Subcategory composition for top-level categories only. Names and colors
   // are resolved here; the arithmetic lives in `computeCategoryDrilldown`.
@@ -231,7 +238,7 @@ export function CategoryTransactionsSheet({
               </SheetTitle>
               <p className="text-muted-foreground mt-0.5 text-xs">
                 {formatRangeLabel(rangeStart, rangeEnd, dateFormatting)} ·{" "}
-                {t("spending:categorySheet.daysCount", { count: days })}
+                {t("spending:categorySheet.daysCount", { count: rangeDays })}
               </p>
             </div>
           </div>
