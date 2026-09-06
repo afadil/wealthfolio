@@ -572,7 +572,7 @@ export default function SpendingInsightsPage() {
         rangeDays={categorySheetRange.days}
         daysElapsed={categorySheetInsight?.headline.pace.daysElapsed ?? 0}
         isStatsLoading={stage === "changed" ? isWhatChangedLoading : isInsightLoading}
-        currency={baseCurrency}
+        currency={categorySheetInsight?.currency ?? baseCurrency}
       />
 
       <HeatmapCellSheet
