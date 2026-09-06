@@ -102,13 +102,12 @@ export function CategoryTransactionsSheet({
     [category, taxonomyCategories],
   );
 
+  // Both bounds are already resolved against the configured app timezone —
+  // `rangeEnd` is that day's inclusive end-of-day instant. Re-flooring it to
+  // the *browser's* 23:59:59 would shift the window whenever the two
+  // timezones differ, pulling in rows the insight never counted.
   const startIso = rangeStart.toISOString();
-  // Inclusive end-of-day so transactions on the final day are included.
-  const endIso = useMemo(() => {
-    const d = new Date(rangeEnd);
-    d.setHours(23, 59, 59, 999);
-    return d.toISOString();
-  }, [rangeEnd]);
+  const endIso = rangeEnd.toISOString();
 
   const searchRequest = useMemo(
     () => ({

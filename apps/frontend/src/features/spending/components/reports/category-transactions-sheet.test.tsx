@@ -27,10 +27,14 @@ vi.mock("@/hooks/use-accounts", () => ({
 
 const searchResult = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
+  lastRequest: null as Record<string, unknown> | null,
 }));
 
 vi.mock("../../hooks/use-cash-activity-search", () => ({
-  useCashActivitySearch: () => searchResult.current,
+  useCashActivitySearch: (request: Record<string, unknown>) => {
+    searchResult.lastRequest = request;
+    return searchResult.current;
+  },
 }));
 
 const categories: TaxonomyCategory[] = [
@@ -95,7 +99,7 @@ function setSearchResult(items: CashActivity[]) {
   };
 }
 
-function sheet() {
+function sheet(rangeEnd = RANGE_END) {
   return (
     <MemoryRouter>
       <FormattingProvider locale="en-US" uiLocale="en" timezone="UTC">
@@ -104,8 +108,8 @@ function sheet() {
           onOpenChange={() => {}}
           category={categories[0]}
           taxonomyCategories={categories}
-          rangeStart={new Date("2026-01-01T00:00:00Z")}
-          rangeEnd={new Date("2026-09-06T23:59:59.999Z")}
+          rangeStart={RANGE_START}
+          rangeEnd={rangeEnd}
           buckets={buckets}
           isStatsLoading={false}
           currency="USD"
@@ -114,6 +118,9 @@ function sheet() {
     </MemoryRouter>
   );
 }
+
+const RANGE_START = new Date("2026-01-01T00:00:00Z");
+const RANGE_END = new Date("2026-09-06T23:59:59.999Z");
 
 /** Reads the value rendered beside a stat label in the header. */
 function statValue(label: string): string {
@@ -157,6 +164,19 @@ describe("CategoryTransactionsSheet", () => {
 
     // 236K / 144 ≈ 1.64K. Dividing by the 50 loaded rows would give 4.7K.
     expect(amountOf(statValue("Avg / tx"))).toBeCloseTo(BUCKET_TOTAL / 144, -2);
+  });
+
+  it("queries the range it was given rather than re-flooring it locally", () => {
+    // Deliberately not a local midnight in any timezone, so the assertion
+    // holds wherever the suite runs: the old code replaced the time of day
+    // with the *browser's* 23:59:59.999.
+    const end = new Date("2026-09-06T12:34:56.789Z");
+    render(sheet(end));
+
+    expect(searchResult.lastRequest).toMatchObject({
+      startDate: RANGE_START.toISOString(),
+      endDate: end.toISOString(),
+    });
   });
 
   it("builds the subcategory mix from the aggregate", () => {
