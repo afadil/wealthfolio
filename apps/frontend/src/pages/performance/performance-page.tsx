@@ -1,3 +1,4 @@
+import { AccountScopeSelector } from "@/components/account-filter-selector";
 import { BenchmarkSymbolSelector } from "@/components/benchmark-symbol-selector";
 import {
   ANNUALIZED_RETURN_INFO as annualizedReturnInfo,
@@ -16,6 +17,7 @@ import { PerformanceChartMobile } from "@/components/performance-chart-mobile";
 import { PERFORMANCE_CHART_COLORS } from "@/components/performance-chart-colors";
 import { useAccounts } from "@/hooks/use-accounts";
 import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useAccountScopeStore } from "@/lib/account-scope-store";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { AccountPurpose, PORTFOLIO_SCOPE_ID } from "@/lib/constants";
 import {
@@ -77,9 +79,23 @@ import {
   ALL_PORTFOLIO_ITEM,
   migratePerformanceSelectedItemId,
   migratePerformanceSelectedItems,
+  prunePerformanceSelectedItems,
 } from "./performance-selection";
+import { usePerformanceScopeBridge } from "./hooks/use-performance-scope-bridge";
 
 type TFunction = ReturnType<typeof useTranslation>["t"];
+
+// Helper function to sort comparison items (accounts first, then symbols)
+function sortComparisonItems(items: TrackedItem[]): TrackedItem[] {
+  return [...items].sort((a, b) => {
+    // Sort by type first (accounts before symbols)
+    if (a.type !== b.type) {
+      return a.type === "account" ? -1 : 1;
+    }
+    // If same type, maintain original order
+    return 0;
+  });
+}
 
 function chartMetricForResult(result: PerformanceResult): PerformanceMetric {
   return result.mode === "valueReturn" ? "valueReturn" : "twr";
@@ -1012,91 +1028,72 @@ export default function PerformancePage() {
       setDateRange({ from: subDays(today, 7), to: today });
     }
   }, [dateRange, setDateRange]);
-  const { accounts, isLoading: isAccountsLoading } = useAccounts({
-    accountPurpose: AccountPurpose.PERFORMANCE,
+  // Scope selectors include hidden accounts and mixed account types. Resolve
+  // their names from the full inventory; the backend applies report eligibility.
+  const {
+    accounts,
+    isLoading: isAccountsLoading,
+    isError: isAccountsError,
+    error: accountsError,
+  } = useAccounts({
+    filterActive: false,
+    includeArchived: true,
   });
 
   // State for mobile dropdown menu
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
   const [benchmarkSheetOpen, setBenchmarkSheetOpen] = useState(false);
-  const selectedItems = useMemo(
-    () => migratePerformanceSelectedItems(storedSelectedItems),
-    [storedSelectedItems],
-  );
+  const selectedItems = useMemo(() => {
+    const migrated = migratePerformanceSelectedItems(storedSelectedItems);
+    if (isAccountsLoading || isAccountsError) return migrated;
+    // Reconcile before both fetching and bridging so neither can reuse stale IDs.
+    return prunePerformanceSelectedItems(migrated, new Set(accounts.map((account) => account.id)));
+  }, [accounts, isAccountsLoading, isAccountsError, storedSelectedItems]);
   const selectedItemId = migratePerformanceSelectedItemId(storedSelectedItemId);
 
   useEffect(() => {
     if (selectedItems !== storedSelectedItems) {
-      setSelectedItems(selectedItems);
+      // A bridge or user action may have replaced this snapshot already (also
+      // when StrictMode replays mount effects). Never overwrite that newer list.
+      setSelectedItems((current) => (current === storedSelectedItems ? selectedItems : current));
     }
   }, [selectedItems, setSelectedItems, storedSelectedItems]);
 
   useEffect(() => {
     if (selectedItemId !== storedSelectedItemId) {
-      setSelectedItemId(selectedItemId);
+      setSelectedItemId((current) => (current === storedSelectedItemId ? selectedItemId : current));
     }
   }, [selectedItemId, setSelectedItemId, storedSelectedItemId]);
 
   useEffect(() => {
-    if (isAccountsLoading) {
+    if (isAccountsLoading || isAccountsError) {
       return;
     }
-    const reportAccountIds = new Set(accounts.map((account) => account.id));
-    // User-created portfolios resolve to account ids at calc time, so we keep
-    // them regardless of `reportAccountIds`; the backend filter handles it.
-    const isPortfolioItem = (item: TrackedItem) => item.accountScope?.type === "portfolio";
-    setSelectedItems((current) => {
-      const next = current.filter(
-        (item) =>
-          item.type !== "account" ||
-          item.id === PORTFOLIO_SCOPE_ID ||
-          isPortfolioItem(item) ||
-          reportAccountIds.has(item.id),
-      );
-      if (next.length === current.length) {
-        return current;
-      }
-      return next.length > 0 ? next : [ALL_PORTFOLIO_ITEM];
-    });
     const selectedItemStillPresent =
-      !selectedItemId ||
-      selectedItems.some(
-        (item) =>
-          item.id === selectedItemId &&
-          (item.type !== "account" ||
-            item.id === PORTFOLIO_SCOPE_ID ||
-            isPortfolioItem(item) ||
-            reportAccountIds.has(item.id)),
-      );
+      !selectedItemId || selectedItems.some((item) => item.id === selectedItemId);
     if (!selectedItemStillPresent) {
-      setSelectedItemId(null);
+      setSelectedItemId((current) => (current === selectedItemId ? null : current));
     }
-  }, [
+  }, [isAccountsLoading, isAccountsError, selectedItemId, selectedItems, setSelectedItemId]);
+
+  const accountScope = useAccountScopeStore((state) => state.scope);
+  const setAccountScope = useAccountScopeStore((state) => state.setScope);
+  const releaseBridgedItem = useAccountScopeStore((state) => state.releaseBridgedItem);
+
+  usePerformanceScopeBridge({
     accounts,
-    isAccountsLoading,
-    selectedItemId,
+    isAccountsLoading: isAccountsLoading || isAccountsError,
     selectedItems,
-    setSelectedItemId,
     setSelectedItems,
-  ]);
+    setSelectedItemId,
+    sortItems: sortComparisonItems,
+  });
 
   const accountNamesById = useMemo(() => {
     const map = new Map<string, string>();
     for (const account of accounts) map.set(account.id.toLowerCase(), account.name);
     return map;
   }, [accounts]);
-
-  // Helper function to sort comparison items (accounts first, then symbols)
-  const sortComparisonItems = (items: TrackedItem[]): TrackedItem[] => {
-    return [...items].sort((a, b) => {
-      // Sort by type first (accounts before symbols)
-      if (a.type !== b.type) {
-        return a.type === "account" ? -1 : 1;
-      }
-      // If same type, maintain original order
-      return 0;
-    });
-  };
 
   // Use the custom hook for parallel data fetching with effective date calculation
   const {
@@ -1106,7 +1103,7 @@ export default function PerformancePage() {
     errorMessages,
     displayDateRange,
   } = useCalculatePerformanceHistory({
-    selectedItems,
+    selectedItems: isAccountsLoading || isAccountsError ? [] : selectedItems,
     dateRange: getPerformanceDateRangeForRequest(dateRange),
   });
 
@@ -1328,6 +1325,7 @@ export default function PerformancePage() {
     const exists = selectedItems.some((item) => item.id === accountId);
 
     if (exists) {
+      releaseBridgedItem(accountId);
       const nextItems = sortComparisonItems(selectedItems.filter((item) => item.id !== accountId));
       setSelectedItems(nextItems);
       if (selectedItemId === accountId) {
@@ -1353,6 +1351,7 @@ export default function PerformancePage() {
     const exists = selectedItems.some((item) => item.id === portfolioId);
 
     if (exists) {
+      releaseBridgedItem(portfolioId);
       const nextItems = sortComparisonItems(
         selectedItems.filter((item) => item.id !== portfolioId),
       );
@@ -1410,8 +1409,9 @@ export default function PerformancePage() {
 
   return (
     <>
-      {/* Date range selector - fixed position in header area */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden md:block lg:right-4">
+      {/* Account scope + date range selectors - fixed position in header area */}
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+        <AccountScopeSelector value={accountScope} onChange={setAccountScope} />
         <DateRangeSelector
           value={dateRange}
           onChange={setDateRange}
@@ -1420,7 +1420,8 @@ export default function PerformancePage() {
       </div>
 
       <div className="flex h-full flex-col space-y-4">
-        <div className="flex justify-end md:hidden">
+        <div className="flex items-center justify-end gap-2 md:hidden">
+          <AccountScopeSelector value={accountScope} onChange={setAccountScope} />
           <DateRangeSelector
             value={dateRange}
             onChange={setDateRange}
@@ -1811,9 +1812,11 @@ export default function PerformancePage() {
                 <div className="min-h-0 flex-1">
                   <PerformanceContent
                     chartData={chartData}
-                    isLoading={isLoadingPerformance}
-                    hasErrors={hasErrors}
-                    errorMessages={errorMessages}
+                    isLoading={isLoadingPerformance || isAccountsLoading}
+                    hasErrors={hasErrors || isAccountsError}
+                    errorMessages={
+                      accountsError ? [accountsError.message, ...errorMessages] : errorMessages
+                    }
                     isMobile={isMobile}
                   />
                 </div>
