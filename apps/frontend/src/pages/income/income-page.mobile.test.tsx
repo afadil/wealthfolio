@@ -1,13 +1,15 @@
 import { useAccountScopeStore } from "@/lib/account-scope-store";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import IncomePage from "./income-page";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryKeys } from "@/lib/query-keys";
+import type { IncomeSummary } from "@/lib/types";
 
-vi.mock("@/adapters", () => ({ getIncomeSummary: vi.fn() }));
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: [], isLoading: false, error: null }),
-}));
+const mocks = vi.hoisted(() => ({ getIncomeSummary: vi.fn() }));
+vi.mock("@/adapters", () => ({ getIncomeSummary: mocks.getIncomeSummary }));
+vi.mock("./income-history-chart", () => ({ IncomeHistoryChart: () => null }));
 vi.mock("@/hooks/use-balance-privacy", () => ({
   useBalancePrivacy: () => ({ isBalanceHidden: false }),
 }));
@@ -27,7 +29,15 @@ vi.mock("@/hooks/use-portfolios", () => ({
 const initialState = useAccountScopeStore.getState();
 
 async function openMobileSelector() {
-  const { container } = render(<IncomePage />);
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  client.setQueryData([QueryKeys.INCOME_SUMMARY, useAccountScopeStore.getState().scope], []);
+  const { container } = render(
+    <QueryClientProvider client={client}>
+      <IncomePage />
+    </QueryClientProvider>,
+  );
   const toolbar = container.querySelector<HTMLElement>(".md\\:hidden")!;
   await userEvent.click(within(toolbar).getByRole("combobox"));
   return within(screen.getByRole("dialog"));
@@ -40,6 +50,7 @@ function expectChecked(option: HTMLElement) {
 describe("IncomePage mobile account scope", () => {
   beforeEach(() => {
     useAccountScopeStore.setState(initialState, true);
+    mocks.getIncomeSummary.mockResolvedValue([]);
     vi.stubGlobal(
       "ResizeObserver",
       class {
@@ -73,6 +84,53 @@ describe("IncomePage mobile account scope", () => {
     expectChecked(sheet.getByRole("option", { name: /Retirement/ }));
     await userEvent.click(sheet.getByRole("option", { name: /Brokerage/ }));
     expect(useAccountScopeStore.getState().scope).toEqual({ type: "account", accountId: "a" });
+    expectChecked(sheet.getByRole("option", { name: /Brokerage/ }));
+  });
+
+  it("keeps the selector open while a new scope loads and transitions to populated income", async () => {
+    let resolveIncome!: (value: IncomeSummary[]) => void;
+    mocks.getIncomeSummary.mockReturnValue(
+      new Promise<IncomeSummary[]>((resolve) => {
+        resolveIncome = resolve;
+      }),
+    );
+    useAccountScopeStore.getState().setScope({ type: "accounts", accountIds: ["a", "b"] });
+    const sheet = await openMobileSelector();
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(sheet.getByRole("option", { name: /Brokerage/ }));
+    await waitFor(() =>
+      expect(mocks.getIncomeSummary).toHaveBeenCalledWith({ type: "account", accountId: "b" }),
+    );
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expectChecked(sheet.getByRole("option", { name: /TFSA/ }));
+    await act(async () =>
+      resolveIncome([
+        {
+          period: "ALL",
+          totalIncome: 100,
+          currency: "USD",
+          monthlyAverage: 10,
+          yoyGrowth: null,
+          byMonth: {},
+          byType: {},
+          byAsset: {},
+          byCurrency: {},
+          byAccount: {},
+        },
+      ]),
+    );
+    await waitFor(() => expect(screen.getByText("All Time Income")).toBeInTheDocument());
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expectChecked(sheet.getByRole("option", { name: /TFSA/ }));
+  });
+
+  it("keeps the selector available when a selected scope fails to load", async () => {
+    mocks.getIncomeSummary.mockRejectedValue(new Error("offline"));
+    const sheet = await openMobileSelector();
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(sheet.getByRole("option", { name: /Brokerage/ }));
+    await screen.findByText(/offline/);
+    expect(screen.getByRole("dialog")).toBe(dialog);
     expectChecked(sheet.getByRole("option", { name: /Brokerage/ }));
   });
 });

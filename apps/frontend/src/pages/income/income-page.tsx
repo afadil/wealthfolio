@@ -83,15 +83,38 @@ export default function IncomePage() {
     queryFn: () => getIncomeSummary(accountFilter),
   });
 
+  // Keep the selector mounted as queries change so multi-selection can continue
+  // through loading, empty, populated and error states.
+  const filters = (
+    <>
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      </div>
+      <div className="mb-6 flex items-center justify-end gap-2 md:hidden">
+        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+      </div>
+    </>
+  );
+
   if (isLoading) {
-    return <IncomeDashboardSkeleton />;
+    return (
+      <>
+        {filters}
+        <IncomeDashboardSkeleton />
+      </>
+    );
   }
 
   if (error || !incomeData) {
     return (
-      <div>
-        {t("income:failed_to_load", { error: error?.message || t("income:unknown_error") })}
-      </div>
+      <>
+        {filters}
+        <div>
+          {t("income:failed_to_load", { error: error?.message || t("income:unknown_error") })}
+        </div>
+      </>
     );
   }
 
@@ -101,20 +124,7 @@ export default function IncomePage() {
   if (!periodSummary || !totalSummary) {
     return (
       <>
-        <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
-          <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-        </div>
-        <div className="flex items-center justify-end gap-2 md:hidden">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-          <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-        </div>
+        {filters}
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
           icon={<Icons.DollarSign className="h-10 w-10" />}
@@ -188,21 +198,8 @@ export default function IncomePage() {
 
   return (
     <>
-      {/* Desktop: fixed header with account selector + period toggle */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
-        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
-      </div>
-
+      {filters}
       <div className="space-y-6">
-        {/* Mobile: account scope selector + period toggle */}
-        <div className="flex items-center justify-end gap-2 md:hidden">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-          <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-        </div>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
