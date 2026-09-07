@@ -1053,7 +1053,12 @@ export default function DashboardPage({
                   {
                     key: "lean",
                     label: t("goals:dashboard.milestone.lean_fire"),
-                    value: targetAtGoalDisplay * 0.7,
+                    value:
+                      retirementOverview?.leanRequiredCapitalAtGoalAge == null
+                        ? null
+                        : chartValueMode === "nominal"
+                          ? retirementOverview.leanRequiredCapitalAtGoalAge
+                          : retirementOverview.leanRequiredCapitalAtGoalAge / inflationFactorToGoal,
                     hint: t("goals:dashboard.milestone.lean_hint"),
                     tip: t("goals:dashboard.milestone.lean_tip"),
                   },
@@ -1067,16 +1072,26 @@ export default function DashboardPage({
                   {
                     key: "fat",
                     label: t("goals:dashboard.milestone.fat_fire"),
-                    value: targetAtGoalDisplay * 1.5,
+                    value:
+                      retirementOverview?.fatRequiredCapitalAtGoalAge == null
+                        ? null
+                        : chartValueMode === "nominal"
+                          ? retirementOverview.fatRequiredCapitalAtGoalAge
+                          : retirementOverview.fatRequiredCapitalAtGoalAge / inflationFactorToGoal,
                     hint: t("goals:dashboard.milestone.fat_hint"),
                     tip: t("goals:dashboard.milestone.fat_tip"),
                   },
                 ].map((m) => {
-                  const pct = m.value > 0 ? Math.min(1, milestonePortfolioDisplay / m.value) : 0;
-                  const reached = milestonePortfolioDisplay >= m.value && m.value > 0;
+                  const pct =
+                    m.value == null
+                      ? 0
+                      : m.value === 0
+                        ? 1
+                        : Math.min(1, milestonePortfolioDisplay / m.value);
+                  const reached = m.value != null && milestonePortfolioDisplay >= m.value;
                   return (
                     <div key={m.key} className="p-4">
-                      <div className="mb-1.5 flex items-center gap-1.5">
+                      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
                           {m.label}
                         </span>
@@ -1104,7 +1119,7 @@ export default function DashboardPage({
                         )}
                       </div>
                       <div className="text-[17px] font-semibold tabular-nums tracking-tight">
-                        {formatting.formatCompactAmount(m.value, currency)}
+                        {m.value == null ? "—" : formatting.formatCompactAmount(m.value, currency)}
                       </div>
                       <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
                         <div

@@ -2480,6 +2480,8 @@ export interface RetirementOverview {
   portfolioAtGoalAge: number;
   requiredCapitalReachable: boolean;
   requiredCapitalAtGoalAge: number;
+  leanRequiredCapitalAtGoalAge?: number | null;
+  fatRequiredCapitalAtGoalAge?: number | null;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
   fundedThroughAge: number | null;
