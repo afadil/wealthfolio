@@ -107,17 +107,17 @@
       "on_track": "進度正常",
       "fi_reached": "已達財務獨立",
       "at_risk": "可能無法達成",
-      "never_reaches_fi": "無法達到財務獨立",
+      "never_reaches_fi": "預計{{age}}歲前無法達到",
       "years_late_one": "晚 {{count}} 年",
       "years_late_other": "晚 {{count}} 年"
     },
     "verdict": {
       "age": "{{age}} 歲",
-      "spending_gap_prefix": "支出缺口開始於",
+      "spending_gap_prefix": "預計支出缺口開始於",
       "spending_gap_suffix": "，早於計畫涵蓋的 {{age}} 歲。",
-      "short_prefix": "在 {{age}} 歲時，你還差",
+      "short_prefix": "{{age}}歲時預計缺口為",
       "short_suffix": "才能支撐退休生活至 {{age}} 歲。",
-      "depleted_prefix": "投資組合資金將在此期間耗盡：",
+      "depleted_prefix": "預計投資組合資金不足的年齡為",
       "depleted_suffix": "即在 {{age}} 歲退休之後。",
       "surplus_prefix": "預計你將在 {{age}} 歲退休，並有",
       "surplus_suffix": "盈餘。",
@@ -126,33 +126,23 @@
       "fi_reached_prefix": "你已實現",
       "financial_independence": "財務獨立",
       "fi_reached_suffix": "，以上依目前假設計算。",
-      "fi_at_prefix": "預計達成財務獨立的年齡：",
-      "years_after_one": "晚 {{count}} 年",
-      "years_after_other": "晚 {{count}} 年",
-      "years_before_one": "早 {{count}} 年",
-      "years_before_other": "早 {{count}} 年",
-      "your_goal_of": "你 {{age}} 歲的目標。",
-      "right_on_goal": "恰好符合你 {{age}} 歲的目標。",
-      "not_reachable_prefix": "無法達成於",
-      "not_reachable_suffix": "按目前假設計算。"
+      "not_reachable_prefix": "預計無法達到的年齡上限為",
+      "not_reachable_suffix": "按目前假設計算。",
+      "fi_projected": "預計您將在<age>{{age}}歲</age>達到財務獨立。"
     },
     "summary": {
-      "at_your_current_prefix": "依你目前的",
-      "contribution": "投入金額，",
-      "capital_not_available": "依目前假設，無法計算所需資本目標。請檢查支出、通膨、報酬率與預期壽命。",
-      "projected_balance_is": "預計退休餘額為",
-      "vs_required_capital_of": "相較於所需資本",
       "at_age": "在 {{age}} 歲時。",
-      "the_plan_funds": "該計畫可支撐",
-      "per_yr_expenses_to_age": "／年支出，直到 {{age}} 歲。",
-      "youre_short": "你還差"
+      "youre_short": "預計缺口為",
+      "traditional": "根據目前假設及<contribution>{{contribution}}</contribution>的提撥，{{age}}歲時的預計餘額為<balance>{{balance}}</balance>，所需資金為<target>{{target}}</target>。",
+      "fire": "根據目前假設及<contribution>{{contribution}}</contribution>的提撥，計畫包括直至{{age}}歲的每年<budget>{{budget}}</budget>支出。",
+      "unavailable": "根據目前假設及<contribution>{{contribution}}</contribution>的提撥，無法估算資金目標。請在假設分析中比較假設。"
     },
     "progress": {
       "portfolio_today": "目前投資組合",
       "required_at_age": "{{age}} 歲時所需",
       "target_at_age": "{{age}} 歲時目標",
-      "capital_needed_tip_traditional": "退休時所需資本，已計入支出、收入、稅款、退休後報酬率與費用。以 {{valueLabel}} 顯示。",
-      "capital_needed_tip_fire": "預定退休時所需資本，已計入支出、收入、稅款、退休後報酬率與費用。以 {{valueLabel}} 顯示。",
+      "capital_needed_tip_traditional": "根據計畫的支出、收入、稅收、報酬率和費用假設，估算目標退休年齡所需的資金。以{{valueLabel}}顯示。",
+      "capital_needed_tip_fire": "根據計畫的支出、收入、稅收、報酬率和費用假設，估算目標退休年齡所需的資金。以{{valueLabel}}顯示。",
       "not_available": "無法計算",
       "funded_pct": "已達標 {{pct}}%"
     },
@@ -169,18 +159,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "停止投入，仍可按時退休",
-      "coast_tip_nominal": "Coast FIRE 所需金額，換算為預定退休年齡時的名目金額。",
-      "coast_tip_real": "今天所需的資本；即使不再投入，仍可在退休年齡成長至完全財務獨立所需的金額。",
+      "coast_hint": "目前所需資金估算",
+      "coast_tip_nominal": "按假設通膨率，將目前所需資金估算換算為退休年齡時的金額。這是價值換算，並非投資成長預測。",
+      "coast_tip_real": "將退休目標按扣除費用後的退休前假設報酬率折現，估算目前所需資金。退休金假設維持不變。",
       "lean_fire": "Lean FIRE",
       "lean_hint": "計畫支出的 70%",
-      "lean_tip": "以約為計畫支出 70% 的精簡預算退休。可以較早達成，但緩衝空間較小。",
+      "lean_tip": "在其他假設不變的情況下，為計畫支出的70%估算所需資金。這是本規劃工具的Lean FIRE情境。",
       "fi": "FI",
       "fi_hint": "完整的計畫支出",
       "fi_tip": "在整個退休期內支撐你計畫退休支出的資本。",
       "fat_fire": "Fat FIRE",
       "fat_hint": "計畫支出的 150%",
-      "fat_tip": "以比計畫高約 50% 的支出退休，為旅遊、贈與、市場波動與生活品質提升保留空間。",
+      "fat_tip": "在其他假設不變的情況下，為計畫支出的150%估算所需資金。這是本規劃工具的Fat FIRE情境。",
       "more_info_about": "關於 {{label}} 的更多資訊",
       "done": "已完成"
     },
@@ -217,11 +207,26 @@
       "unfunded": "未支應",
       "planned_spending_legend": "計畫支出",
       "showing": "顯示 {{valueLabel}}",
-      "projection_unavailable": "此計畫無法產生資金涵蓋預測。"
+      "projection_unavailable": "此計畫無法產生資金涵蓋預測。",
+      "age_range": "{{start}}歲 → {{end}}歲",
+      "starts_at": "{{age}}歲開始",
+      "ended_at": "{{age}}歲結束",
+      "not_active": "未生效"
     },
     "disclaimer": {
       "title": "請留意",
-      "body": "這不是財務建議。請將這些數字視為概略試算，而不是預測結果。所有內容都是依你輸入的報酬率、通膨、投入金額、稅款與預期壽命進行模擬。實際市場不會直線變動，稅務規定與政府制度也可能改變。你可以用這些結果測試不同想法並找出缺口；在做出難以復原的決定前，請先諮詢合格的專業人士。"
+      "body": "預測取決於您的假設。實際結果可能不同。不構成財務建議。"
+    },
+    "guidance": {
+      "unavailable": "目前假設下無法估算目標。請在假設分析中比較假設。",
+      "depleted": "預計投資組合在{{age}}歲時出現資金不足。請在假設分析中比較假設。",
+      "gap": "預計從{{age}}歲起出現支出缺口。請在假設分析中比較假設。",
+      "fund": "預計{{label}}在{{age}}歲時耗盡，模型中的付款隨後停止。請比較付款及收入假設。",
+      "shortfall": "預計退休時出現缺口。請在假設分析中比較假設。",
+      "reached": "目前投資組合已達到您的假設下估算的財務獨立目標。",
+      "not_reached": "預計{{age}}歲前無法實現財務獨立。請在假設分析中比較假設。",
+      "late_one": "預計在期望年齡的{{count}}年後實現財務獨立。請在假設分析中比較假設。",
+      "late_other": "預計在期望年齡的{{count}}年後實現財務獨立。請在假設分析中比較假設。"
     }
   },
   "sidebar": {
@@ -231,7 +236,8 @@
       "high_inflation": "通膨假設偏高。這個比率會讓長期支出需求更敏感。",
       "high_fee": "費用假設偏高，會明顯拉低長期報酬。",
       "high_volatility": "波動率假設偏高。結果區間可能變得非常寬。",
-      "high_contribution_growth": "投入成長假設偏高，代表儲蓄金額需要持續大幅增加。"
+      "high_contribution_growth": "投入成長假設偏高，代表儲蓄金額需要持續大幅增加。",
+      "high_return": "報酬率假設較高。預計餘額對這一比率較為敏感。"
     },
     "plan": {
       "kicker": "計畫",
@@ -252,14 +258,14 @@
       "desired_retirement_age_hint": "你希望實現財務獨立的年齡。",
       "retirement_age_hint": "你希望退休的年齡。",
       "horizon_age_fire": "計畫涵蓋至",
-      "horizon_age_traditional": "預期壽命",
+      "horizon_age_traditional": "計畫涵蓋至",
       "horizon_hint": "計畫應涵蓋至此年齡。",
       "monthly_contribution": "每月投入",
       "monthly_contribution_hint": "退休前每月投入的金額。",
-      "return_before_hint": "儲蓄期間的預期年報酬率。",
-      "return_during_hint": "開始提領後的預期年報酬率。",
+      "return_before_hint": "儲蓄期間的假設年報酬率，未扣除投資費用。",
+      "return_during_hint": "開始提領後的假設年報酬率，未扣除投資費用。",
       "annual_fee_hint": "預估的年度投資費用。",
-      "inflation_hint": "預期的物價年度漲幅。"
+      "inflation_hint": "假設的年度物價漲幅。"
     },
     "spending": {
       "kicker": "支出",
@@ -320,13 +326,13 @@
       "fund_return_before_payout": "給付前基金報酬率",
       "fund_payout_rate": "基金給付率",
       "fund_payout_mode": "給付方式",
-      "fund_payout_mode_help": "年金會終身給付；基金提領會持續從基金餘額提領，直到餘額用完。",
+      "fund_payout_mode_help": "年金模式假設付款持續至規劃期末；提領模式使用基金餘額直至耗盡。",
       "annuity": "年金",
       "drawdown": "基金提領",
       "fund_return_during_payout": "給付期間基金報酬率",
-      "drawdown_note": "基金提領會從起始年齡當年的期初餘額提領 {{pct}}%／年，之後依下方的成長設定計算，直到基金餘額用完。",
+      "drawdown_note": "提領金額按基金餘額的每年 {{pct}}% 估算。若已開始領取，則優先使用輸入的每月領取金額。此後按設定的成長率調整，直至資金用完。",
       "monthly_payout_after_tax": "稅後每月給付",
-      "payout_estimate_note": "除非你輸入每月給付，否則會以預計基金餘額的 {{pct}}%/年估算給付。",
+      "payout_estimate_note": "預估領取金額按基金餘額的每年 {{pct}}% 估算。若已開始領取，則優先使用輸入的每月領取金額。",
       "start_age": "起始年齡",
       "income_growth": "收入成長",
       "income_growth_help": "選取此收入是隨計畫通膨上漲還是保持固定。",
@@ -465,15 +471,15 @@
     "quick_start": {
       "title": "快速入門：5 個步驟",
       "step1_title": "設定計畫基礎",
-      "step1_desc": "在「計畫輸入」中，選取計畫類型、出生月份、退休年齡、預期壽命與每月投入。",
+      "step1_desc": "在計畫輸入中設定類型、出生月份、退休年齡、規劃結束年齡和每月提撥。",
       "step2_title": "輸入退休支出",
       "step2_desc": "在「退休支出」中，新增你希望計畫支撐的每月支出項。使用今天的金額；通膨由計畫假設處理。",
       "step3_title": "新增退休收入",
-      "step3_desc": "在「退休收入」中，新增每月收入來源，例如公共退休金（如加拿大的 CPP/OAS、美國的 Social Security）、職場退休金、兼職工作或年金收入。只有希望規劃工具依基金餘額的 3.5%/年估算給付時，才使用「新增退休基金」；你也可以自行輸入每月給付。",
+      "step3_desc": "新增退休金、兼職或年金等退休收入。對於退休基金，除非輸入每月付款額，否則會使用預計餘額及設定的年度支付率估算月付款額。",
       "step4_title": "檢查假設、稅款與帳戶占比",
       "step4_desc": "查看預計報酬率、費用、波動率、通膨、提領稅率、稅務類別，以及哪些帳戶為目標提供資金。",
       "step5_title": "先閱讀「概覽」，再開啟「假設分析」",
-      "step5_desc": "「概覽」會說明基礎計畫是否可行，並顯示投資組合走勢、支出資金涵蓋與計畫資料。「假設分析」則以市場路徑、壓力測試、決策圖與進階檢查測試同一套計畫。"
+      "step5_desc": "概覽顯示基礎預測、支出涵蓋和輸入。情境分析比較市場路徑、壓力情境和假設變化。"
     },
     "overview": {
       "title": "理解「概覽」",
@@ -493,13 +499,13 @@
     "what_if": {
       "title": "理解「假設分析」",
       "market_paths_title": "市場路徑",
-      "market_paths_desc": "使用你的報酬率、波動率與通膨假設，在多種可能的市場路徑中測試同一計畫。陰影區間顯示較差至較佳的結果；線條顯示中間路徑。「資金充足」表示計畫能支應必要支出，並在整個規劃期限內仍有餘額。在 FIRE 模式下，計畫還需先達成財務獨立。",
+      "market_paths_desc": "我們根據您的假設模擬不同市場路徑。陰影顯示各年齡的第10至第90百分位區間；線條顯示各路徑的中位數，並非單一路徑。 統計涵蓋必要支出且期末仍有結餘的路徑；FIRE路徑還必須達到財務獨立。",
       "base_case_title": "基準情形",
       "base_case_desc": "顯示與「概覽」相同、採用固定假設的基礎計畫，再指出影響最大的壓力測試結果。",
       "stress_tests_title": "壓力測試",
       "stress_tests_desc": "固定檢查項顯示當報酬率降低、通膨升高、支出增加、退休提前、儲蓄減少或退休前後發生市場崩盤時，計畫將如何變化。",
       "what_moves_title": "哪些因素影響計畫？",
-      "what_moves_desc": "決策圖會比較儲蓄、報酬率、退休年齡與支出。綠色儲存格代表最後留下較多餘額；紅色儲存格則仍有缺口或資金不足。",
+      "what_moves_desc": "比較儲蓄、報酬率、退休年齡和支出。綠色表示期末資金比基礎計畫多，黃色表示更少。紅色表示存在缺口或沒有剩餘資金。",
       "crash_paths_title": "早期市場崩盤路徑",
       "crash_paths_desc": "比較退休前後幾種市場崩盤時點。退休第一年發生崩盤，可能比之後發生相同跌幅造成更大影響，因為你會在投資組合下跌時提領。"
     },
@@ -508,25 +514,24 @@
       "yearly_spending_title": "年度支出如何建模",
       "yearly_spending_desc": "支出會決定提領金額。規劃工具每年會支應你輸入的支出計畫、扣除退休收入，並估算投資組合提領產生的稅負影響。",
       "target_calc_title": "目標如何計算",
-      "target_calc_desc": "規劃工具會計算退休至規劃期限內完整支出計畫的現值，並納入各支出類別的通膨率、不同年齡開始的收入來源與提領稅負。當投資組合達到此金額，基礎計畫便有足夠資本支應你輸入的支出計畫。這比單純使用支出倍數更準確，因為它會處理變動支出、延後開始的退休金與有限的規劃期限。",
+      "target_calc_desc": "規劃工具估算涵蓋退休支出安排直至規劃期末所需的初始投資組合。模型考慮支出通膨、收入時間、報酬率、費用及提領稅。目標取決於這些假設。",
       "inflation_title": "通膨率",
-      "inflation_desc": "所有預測都會依此通膨率，逐年調整支出與隨通膨調整的收入。預設的 2% 與歐洲央行的目標一致。",
-      "inflation_it_note": "若要採用較保守的義大利 CPI 假設，請使用 2.5–3%。",
+      "inflation_desc": "通膨假設使支出及與通膨連動的收入隨時間增加。各個項目可以使用各自的成長率。",
       "returns_title": "報酬率、費用與波動率",
       "returns_desc": "退休前報酬率影響資產累積，退休期間報酬率則影響提領階段與所需資本。年度投資費用會從兩者扣除。波動率只用於市場路徑檢查；數值越高，結果分布越寬。",
       "horizon_title": "規劃期限年齡",
-      "horizon_desc": "投資組合必須維持的期間。退休目標與「假設分析」都會計算至此年齡。可設為 90–95 歲，以測試長壽風險。早期市場崩盤路徑與「資金充足」也都以此期限衡量。"
+      "horizon_desc": "退休支出及假設分析結果建模到的年齡。這是規劃期間的假設，不是壽命預測。"
     },
     "italian": {
       "title": "義大利退休設定（fondo pensione、TFR、INPS）",
       "portfolio_title": "投資組合（Golden Butterfly、All-Weather……）",
       "portfolio_desc": "這是 Wealthfolio 追蹤的主要投資組合。請在這裡設定報酬率假設、費用影響與每月投入；它是退休計畫累積資產的主要來源。",
       "fondo_title": "Fondo pensione integrativo（補充退休基金）",
-      "fondo_desc": "使用「新增退休基金」。輸入目前基金餘額、每月提撥、預期基金報酬率與開始給付年齡。規劃工具會估算未來餘額；如果沒有輸入每月給付，則會從起始年齡起，以預計餘額的 3.5%/年估算給付。",
+      "fondo_desc": "使用新增退休基金，輸入餘額、提撥、假設報酬率及付款起始年齡。未輸入月付款額時，使用設定支付率估算。提領在基金耗盡時停止；年金付款建模至規劃期末。",
       "inps_title": "Pensione INPS（國家退休金：強制性社會保險）",
       "inps_desc": "使用「新增退休收入」。以今天的金額輸入預估每月淨退休金，並設定開始給付年齡。如果希望收入隨計畫通膨假設調升，請選「隨通膨調整」。",
       "tfr_title": "TFR（Trattamento di Fine Rapporto：離職補償累積）",
-      "tfr_desc": "如果 TFR 存入退休基金，請計入每月基金提撥。若另外保留，請將它設定成另一個退休基金，並輸入各自的餘額、提撥、報酬率與開始給付年齡。除非你自行輸入每月給付，否則同樣會採用 3.5%/年的給付估算。"
+      "tfr_desc": "若TFR轉入退休基金，請將其計入提撥。單獨儲蓄的TFR可用另一基金表示；模型付款按設定支付率或月付款額計算。"
     }
   },
   "type": {
@@ -774,7 +779,7 @@
       "retirement_gap": "退休缺口",
       "fi_moves_prefix": "財務獨立推遲",
       "fi_moves_suffix": "年",
-      "largest_risk": "{{label}} 影響最大",
+      "largest_risk": "在這些測試中，{{label}}的影響最大",
       "and": "與",
       "none": "無",
       "surplus": "盈餘",
@@ -796,8 +801,11 @@
       "money_lasts_definition_fire": "「資金充足」表示計畫已達成財務獨立、能支應必要支出，並在 {{horizonAge}} 歲前仍有餘額。",
       "money_lasts_summary_traditional": "在 {{horizonAge}} 歲前保持資金充足",
       "money_lasts_summary_fire": "實現財務獨立 + 在 {{horizonAge}} 歲前資金充足",
-      "money_lasts_prompt_traditional": "執行 10k 條路徑，查看計畫在 {{horizonAge}} 歲前保持資金充足的機率。",
-      "money_lasts_prompt_fire": "執行 10k 條路徑，查看計畫達成財務獨立，並在 {{horizonAge}} 歲前保持資金充足的機率。"
+      "money_lasts_prompt_traditional": "執行 1 萬條模擬路徑，查看有多少比例的路徑能讓計畫維持資金充足至 {{horizonAge}} 歲。",
+      "money_lasts_prompt_fire": "執行 1 萬條模擬路徑，查看有多少比例的路徑能達成財務獨立，並維持資金充足至 {{horizonAge}} 歲。",
+      "of_simulated_paths": "模擬路徑占比",
+      "simulation_tooltip_traditional": "{{percent}}%的模擬路徑涵蓋了必要支出，並在結束時仍有資金結餘。顏色採用參考區間：低於75%、75%至低於90%、90%及以上。這些是模型結果，不是現實機率。",
+      "simulation_tooltip_fire": "{{percent}}%的模擬路徑涵蓋了必要支出，並在結束時仍有資金結餘。路徑還必須達到財務獨立。顏色採用參考區間：低於75%、75%至低於90%、90%及以上。這些是模型結果，不是現實機率。"
     },
     "stress": {
       "eyebrow_with_count": "什麼情況可能使計畫失敗？ · {{count}} 個情境",
@@ -813,8 +821,8 @@
     },
     "montecarlo": {
       "eyebrow": "市場路徑",
-      "heading": "資金能維持多久的機率？",
-      "intro": "系統會以多種可能的市場路徑測試同一計畫。陰影區間顯示較差至較佳的結果；線條顯示中間路徑。",
+      "heading": "資金足夠的模擬路徑占比是多少？",
+      "intro": "我們根據您的假設模擬不同市場路徑。陰影顯示各年齡的第10至第90百分位區間；線條顯示各路徑的中位數，並非單一路徑。",
       "run_10k": "執行 10k 條路徑",
       "run_100k": "執行 100k 條路徑",
       "running_short": "正在執行……",
@@ -826,17 +834,17 @@
       "median_fi_age": "中位數財務獨立年齡",
       "withdrawals_start_detail": "開始提領",
       "vs_goal": "相較於目標 {{age}}",
-      "bad_path": "較差路徑",
-      "middle_path": "中間路徑",
-      "good_path": "較好路徑"
+      "bad_path": "較低結果",
+      "middle_path": "中位數",
+      "good_path": "較高結果"
     },
     "chart": {
       "age_label": "{{age}} 歲",
       "age_detail": "{{age}} 歲",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "中位數財務獨立 @{{age}}",
-      "bad_good_range": "較差至較佳區間",
-      "median_path": "中位數路徑",
+      "bad_good_range": "第10至第90百分位區間",
+      "median_path": "中位數",
       "retirement_age": "退休年齡",
       "goal_age": "目標年齡",
       "median_fi_age": "中位數財務獨立年齡",
@@ -844,12 +852,13 @@
       "retire": "退休",
       "goal": "目標",
       "market_paths_count_other": "{{count}} 條市場路徑",
-      "market_paths_count_one": "{{count}} 條市場路徑"
+      "market_paths_count_one": "{{count}} 條市場路徑",
+      "percentile_at_age": "第{{percentile}}百分位 · {{age}}歲"
     },
     "moves": {
       "eyebrow": "什麼對計畫影響最大？",
       "heading": "哪些因素影響計畫？",
-      "description": "顯示儲蓄、報酬率、退休年齡與支出如何改變結果。綠色代表剩餘資金較多；紅色代表仍有缺口或資金不足。",
+      "description": "比較儲蓄、報酬率、退休年齡和支出。綠色表示期末資金比基礎計畫多，黃色表示更少。紅色表示存在缺口或沒有剩餘資金。",
       "empty_title": "看看哪些改變最有幫助。",
       "empty_description": "比較多儲蓄、獲得不同報酬率、減少支出，或在不同年齡退休。",
       "building": "正在建立……",
@@ -878,6 +887,39 @@
       "unavailable_title": "崩盤路徑不可用。",
       "empty_description": "執行這五條路徑，查看哪一種市場變動順序會最早讓計畫承受壓力。",
       "unavailable_description": "此檢查需要退休開始時投資組合為正值。"
+    },
+    "labels": {
+      "crash_year_1": "第1年下跌（−30%）",
+      "crash_year_5": "第5年下跌（−30%）",
+      "double_crash": "兩次下跌",
+      "lost_decade": "失落的十年",
+      "after_fee_return": "扣費後報酬率"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "報酬率降低",
+        "description": "退休前和退休期間的報酬率降低2個百分點。"
+      },
+      "inflation-shock": {
+        "label": "通膨升高",
+        "description": "總體通膨率提高1.5個百分點。"
+      },
+      "spending-shock": {
+        "label": "支出增加",
+        "description": "所有退休支出金額增加10%。"
+      },
+      "retire-earlier": {
+        "label": "提前2年退休",
+        "description": "目標退休年齡提前兩年，受計畫目前年齡限制。"
+      },
+      "save-less": {
+        "label": "提撥減少",
+        "description": "每月提撥減少25%。"
+      },
+      "early-crash": {
+        "label": "退休初期市場下跌",
+        "description": "模型假設退休第一年市場下跌30%。"
+      }
     }
   }
 }

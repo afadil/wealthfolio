@@ -1,3 +1,4 @@
+import i18next, { type TFunction } from "i18next";
 import type { ExpenseBudget, ExpenseItem } from "../types";
 
 const DEFAULT_ITEM_LABELS = ["Living", "Healthcare", "Housing", "Travel", "Other spending"];
@@ -85,10 +86,17 @@ export function isExpenseActiveAtAge(item: ExpenseItem, age: number) {
   );
 }
 
-export function expenseAgeRangeLabel(item: ExpenseItem, horizonAge: number) {
+export function expenseAgeRangeLabel(
+  item: ExpenseItem,
+  horizonAge: number,
+  t: TFunction = i18next.t,
+) {
   const startAge = normalizeOptionalAge(item.startAge);
   const endAge = normalizeOptionalAge(item.endAge);
-  const start = startAge === undefined ? "Retirement" : `Age ${startAge}`;
+  const start =
+    startAge === undefined
+      ? t("goals:type.retirement")
+      : t("goals:dashboard.age_label", { age: startAge });
   const end = endAge === undefined ? horizonAge : endAge;
   return `${start} → ${end}`;
 }

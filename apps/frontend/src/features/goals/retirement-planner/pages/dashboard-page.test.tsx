@@ -59,7 +59,10 @@ describe("retirement spending milestones", () => {
     fireEvent.click(screen.getByText("Nominal", { exact: true }));
     expect(milestone("Lean FIRE").getByText("$120K")).toBeInTheDocument();
     expect(milestone("Fat FIRE").getByText("$800K")).toBeInTheDocument();
-
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "You're projected to reach financial independence at age 50.",
+    );
+    expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent("—");
   });
 
   it("distinguishes a valid zero target from an unavailable target", () => {

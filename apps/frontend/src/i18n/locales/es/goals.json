@@ -110,18 +110,18 @@
       "on_track": "En camino",
       "fi_reached": "IF alcanzada",
       "at_risk": "En riesgo",
-      "never_reaches_fi": "Nunca alcanza la IF",
+      "never_reaches_fi": "No se proyecta antes de los {{age}}",
       "years_late_one": "{{count}} año tarde",
       "years_late_other": "{{count}} años tarde",
       "years_late_many": "{{count}} años tarde"
     },
     "verdict": {
       "age": "edad {{age}}",
-      "spending_gap_prefix": "El déficit de gasto comienza a los",
+      "spending_gap_prefix": "Se proyecta un déficit de gastos desde",
       "spending_gap_suffix": "antes de que el plan alcance la edad {{age}}.",
-      "short_prefix": "A la edad {{age}}, te faltan",
+      "short_prefix": "A los {{age}} años, tu déficit proyectado es de",
       "short_suffix": "para financiar la jubilación hasta la edad {{age}}.",
-      "depleted_prefix": "La cartera se queda corta durante",
+      "depleted_prefix": "Se proyecta que la cartera sea insuficiente a",
       "depleted_suffix": "tras jubilarte a los {{age}}.",
       "surplus_prefix": "Se prevé que te jubiles a la edad {{age}} con",
       "surplus_suffix": "de superávit.",
@@ -130,35 +130,25 @@
       "fi_reached_prefix": "Has alcanzado la",
       "financial_independence": "independencia financiera",
       "fi_reached_suffix": "— con las suposiciones actuales.",
-      "fi_at_prefix": "Alcanzarás la independencia financiera a los",
-      "years_after_one": "{{count}} año después de",
-      "years_after_other": "{{count}} años después de",
       "years_after_many": "{{count}} años después de",
-      "years_before_one": "{{count}} año antes de",
-      "years_before_other": "{{count}} años antes de",
       "years_before_many": "{{count}} años antes de",
-      "your_goal_of": "tu objetivo de {{age}}.",
-      "right_on_goal": "justo en tu objetivo de {{age}}.",
-      "not_reachable_prefix": "No alcanzable para los",
-      "not_reachable_suffix": "con las suposiciones actuales."
+      "not_reachable_prefix": "No se proyecta antes de",
+      "not_reachable_suffix": "con las suposiciones actuales.",
+      "fi_projected": "Se proyecta que alcanzarás la independencia financiera a los <age>{{age}} años</age>."
     },
     "summary": {
-      "at_your_current_prefix": "Con tu",
-      "contribution": "aportación actual,",
-      "capital_not_available": "el capital objetivo requerido no es alcanzable con las suposiciones actuales. Revisa el gasto, la inflación, la rentabilidad y la esperanza de vida.",
-      "projected_balance_is": "el saldo de jubilación proyectado es",
-      "vs_required_capital_of": "frente al capital requerido de",
       "at_age": "a la edad {{age}}.",
-      "the_plan_funds": "el plan financia",
-      "per_yr_expenses_to_age": "/año de gastos hasta la edad {{age}}.",
-      "youre_short": "Te faltan"
+      "youre_short": "Tu déficit proyectado es de",
+      "traditional": "Según tus supuestos actuales y una aportación de <contribution>{{contribution}}</contribution>, el saldo proyectado a los {{age}} años es de <balance>{{balance}}</balance>, frente a un capital requerido de <target>{{target}}</target>.",
+      "fire": "Según tus supuestos actuales y una aportación de <contribution>{{contribution}}</contribution>, el plan incluye <budget>{{budget}}</budget>/año de gastos hasta los {{age}} años.",
+      "unavailable": "Con tus supuestos actuales y una aportación de <contribution>{{contribution}}</contribution>, no se puede estimar el objetivo de capital. Compara supuestos en Qué pasaría si."
     },
     "progress": {
       "portfolio_today": "Cartera hoy",
       "required_at_age": "Requerido a la edad {{age}}",
       "target_at_age": "Objetivo a la edad {{age}}",
-      "capital_needed_tip_traditional": "Capital necesario a tu edad de jubilación después de gastos, ingresos, impuestos, rentabilidad de la jubilación y comisiones. Mostrado en {{valueLabel}}.",
-      "capital_needed_tip_fire": "Capital necesario a tu edad de jubilación deseada después de gastos, ingresos, impuestos, rentabilidad de la jubilación y comisiones. Mostrado en {{valueLabel}}.",
+      "capital_needed_tip_traditional": "Capital estimado necesario a la edad objetivo según los supuestos de gastos, ingresos, impuestos, rentabilidades y comisiones. Se muestra en {{valueLabel}}.",
+      "capital_needed_tip_fire": "Capital estimado necesario a la edad objetivo según los supuestos de gastos, ingresos, impuestos, rentabilidades y comisiones. Se muestra en {{valueLabel}}.",
       "not_available": "No disponible",
       "funded_pct": "{{pct}}% financiado"
     },
@@ -175,18 +165,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "Deja de aportar y aun así te jubilas a tiempo",
-      "coast_tip_nominal": "Importe Coast convertido a euros nominales a tu edad de jubilación deseada.",
-      "coast_tip_real": "Capital que necesitas hoy que, sin más aportaciones, crece hasta la IF completa para tu edad de jubilación.",
+      "coast_hint": "Capital estimado necesario hoy",
+      "coast_tip_nominal": "Capital estimado necesario hoy, expresado en dinero a la edad de jubilación según la inflación supuesta. Es una conversión de valor, no crecimiento proyectado de la inversión.",
+      "coast_tip_real": "Capital estimado hoy al descontar el objetivo de jubilación con la rentabilidad supuesta antes de jubilarte, después de comisiones. Los supuestos de pensiones no cambian.",
       "lean_fire": "Lean FIRE",
       "lean_hint": "70% del gasto planificado",
-      "lean_tip": "Jubílate con un presupuesto frugal, aproximadamente el 70% de tu gasto planificado. Factible antes, pero deja poco margen.",
+      "lean_tip": "Capital estimado para el 70% de tus gastos previstos, sin cambiar los demás supuestos. Es el escenario Lean FIRE del planificador.",
       "fi": "IF",
       "fi_hint": "Gasto planificado completo",
       "fi_tip": "Capital que financia tu gasto de jubilación planificado durante todo el horizonte de jubilación.",
       "fat_fire": "Fat FIRE",
       "fat_hint": "150% del gasto planificado",
-      "fat_tip": "Jubílate con ~50% más de gasto del planificado: margen para viajes, regalos, volatilidad y mejoras en el estilo de vida.",
+      "fat_tip": "Capital estimado para el 150% de tus gastos previstos, sin cambiar los demás supuestos. Es el escenario Fat FIRE del planificador.",
       "more_info_about": "Más información sobre {{label}}",
       "done": "HECHO"
     },
@@ -223,11 +213,26 @@
       "unfunded": "Sin financiar",
       "planned_spending_legend": "Gasto planificado",
       "showing": "Mostrando {{valueLabel}}",
-      "projection_unavailable": "La proyección de cobertura no está disponible para este plan."
+      "projection_unavailable": "La proyección de cobertura no está disponible para este plan.",
+      "age_range": "Edad {{start}} → {{end}}",
+      "starts_at": "Comienza a los {{age}}",
+      "ended_at": "Terminó a los {{age}}",
+      "not_active": "No activo"
     },
     "disclaimer": {
       "title": "Algo a tener en cuenta",
-      "body": "Esto no es asesoramiento financiero. Considera estas cifras como un esbozo, no como una previsión. Todo lo que aquí aparece es una simulación construida sobre los datos que introdujiste: rentabilidad, inflación, aportaciones, impuestos y cuánto tiempo esperas vivir. Los mercados reales no se mueven en línea recta, las normas fiscales cambian y los programas gubernamentales se reescriben. Usa esto para poner a prueba ideas y detectar carencias, y luego consulta con un profesional cualificado antes de tomar decisiones difíciles de deshacer."
+      "body": "Las proyecciones dependen de tus supuestos. Los resultados reales pueden variar. No es asesoramiento financiero."
+    },
+    "guidance": {
+      "unavailable": "No se puede estimar el objetivo con los supuestos actuales. Compara supuestos en Qué pasaría si.",
+      "depleted": "Se proyecta que la cartera no alcance a partir de los {{age}} años. Compara supuestos en Qué pasaría si.",
+      "gap": "Se proyecta un déficit de gastos a partir de los {{age}} años. Compara supuestos en Qué pasaría si.",
+      "fund": "Se proyecta que {{label}} se agote a los {{age}} años; los pagos modelados cesan entonces. Compara los supuestos de pagos e ingresos.",
+      "shortfall": "Se proyecta un déficit al jubilarte. Compara supuestos en Qué pasaría si.",
+      "reached": "La cartera actual alcanza el objetivo estimado de independencia financiera según tus supuestos.",
+      "not_reached": "No se proyecta alcanzar la independencia financiera antes de los {{age}} años. Compara supuestos en Qué pasaría si.",
+      "late_one": "Se proyecta alcanzar la independencia financiera {{count}} año después de la edad deseada. Compara supuestos en Qué pasaría si.",
+      "late_other": "Se proyecta alcanzar la independencia financiera {{count}} años después de la edad deseada. Compara supuestos en Qué pasaría si."
     }
   },
   "sidebar": {
@@ -237,7 +242,8 @@
       "high_inflation": "Suposición de inflación alta. Las necesidades de gasto a largo plazo se vuelven más sensibles a esta tasa.",
       "high_fee": "Suposición de comisiones altas. El lastre de las comisiones reduce notablemente la rentabilidad a largo plazo.",
       "high_volatility": "Suposición de volatilidad alta. Los rangos de resultados pueden volverse muy amplios.",
-      "high_contribution_growth": "Suposición de crecimiento de aportación alto. Esto supone aumentos de ahorro grandes y sostenidos."
+      "high_contribution_growth": "Suposición de crecimiento de aportación alto. Esto supone aumentos de ahorro grandes y sostenidos.",
+      "high_return": "Supuesto de rentabilidad alta. Los saldos proyectados son sensibles a esta tasa."
     },
     "plan": {
       "kicker": "Plan",
@@ -258,14 +264,14 @@
       "desired_retirement_age_hint": "Edad a la que quieres ser financieramente independiente.",
       "retirement_age_hint": "Edad a la que quieres jubilarte.",
       "horizon_age_fire": "Horizonte del plan",
-      "horizon_age_traditional": "Esperanza de vida",
+      "horizon_age_traditional": "Horizonte del plan",
       "horizon_hint": "Edad hasta la que debe cubrir el plan.",
       "monthly_contribution": "Aportación mensual",
       "monthly_contribution_hint": "Cuánto añades cada mes hasta la jubilación.",
-      "return_before_hint": "Rentabilidad anual esperada mientras ahorras.",
-      "return_during_hint": "Rentabilidad anual esperada tras comenzar las retiradas.",
+      "return_before_hint": "Rentabilidad anual supuesta durante el ahorro, antes de comisiones.",
+      "return_during_hint": "Rentabilidad anual supuesta tras comenzar los retiros, antes de comisiones.",
       "annual_fee_hint": "Comisiones anuales estimadas de la cartera.",
-      "inflation_hint": "Aumento anual esperado de los precios."
+      "inflation_hint": "Aumento anual supuesto de los precios."
     },
     "spending": {
       "kicker": "Gasto",
@@ -326,13 +332,13 @@
       "fund_return_before_payout": "Rentabilidad del fondo antes del pago",
       "fund_payout_rate": "Tasa de pago",
       "fund_payout_mode": "Modo de pago",
-      "fund_payout_mode_help": "Una anualidad paga de por vida; un retiro programado consume el fondo hasta agotarlo.",
+      "fund_payout_mode_help": "La renta vitalicia modela pagos hasta el horizonte del plan; los retiros usan el saldo del fondo hasta agotarlo.",
       "annuity": "Anualidad",
       "drawdown": "Retiro programado",
       "fund_return_during_payout": "Rentabilidad del fondo durante el pago",
-      "drawdown_note": "El retiro utiliza el {{pct}}%/año del saldo a la edad de inicio y luego sigue el ajuste de crecimiento de abajo hasta agotar el fondo.",
+      "drawdown_note": "Los retiros se estiman en el {{pct}}% anual del saldo del fondo. Si los pagos ya han comenzado, prevalece el importe mensual introducido. Después, los pagos siguen el ajuste de crecimiento hasta agotar el fondo.",
       "monthly_payout_after_tax": "Pago mensual después de impuestos",
-      "payout_estimate_note": "El pago estimado utiliza el {{pct}}%/año del saldo proyectado del fondo salvo que introduzcas un pago mensual.",
+      "payout_estimate_note": "El pago estimado utiliza el {{pct}}% anual del saldo del fondo. Si los pagos ya han comenzado, prevalece el importe mensual introducido.",
       "start_age": "Edad de inicio",
       "income_growth": "Crecimiento del ingreso",
       "income_growth_help": "Elige si este ingreso crece con la inflación del plan o se mantiene fijo.",
@@ -471,15 +477,15 @@
     "quick_start": {
       "title": "Inicio rápido — 5 pasos",
       "step1_title": "Define los datos básicos del plan",
-      "step1_desc": "En Datos del plan, elige el tipo de plan, el mes de nacimiento, la edad de jubilación, la esperanza de vida y la aportación mensual.",
+      "step1_desc": "En los datos del plan, define el tipo, mes de nacimiento, edad de jubilación, horizonte y aportación mensual.",
       "step2_title": "Introduce el gasto de jubilación",
       "step2_desc": "En Gasto de jubilación, añade las líneas de gasto mensual que quieres que el plan financie. Usa dinero de hoy; la inflación la gestionan las suposiciones del plan.",
       "step3_title": "Añade ingresos de jubilación",
-      "step3_desc": "En Ingresos de jubilación, añade flujos de ingresos mensuales como pensiones públicas (p. ej. CPP/OAS en Canadá, Seguridad Social en EE. UU.), pensiones de empresa, trabajo a tiempo parcial o rentas vitalicias. Usa Añadir fondo de pensiones solo cuando el planificador deba estimar un pago a partir del saldo de un fondo al 3,5%/año salvo que introduzcas tú mismo un pago mensual.",
+      "step3_desc": "Añade ingresos de jubilación como pensiones, trabajo a tiempo parcial o rentas vitalicias. En un fondo de pensiones, el pago mensual estimado usa el saldo proyectado y la tasa anual configurada, salvo que introduzcas un pago mensual.",
       "step4_title": "Revisa suposiciones, impuestos y participaciones de cuenta",
       "step4_desc": "Revisa las rentabilidades proyectadas, las comisiones, la volatilidad, la inflación, las tasas impositivas por retirada, los bloques fiscales y qué cuentas financian el objetivo.",
       "step5_title": "Lee Resumen y luego abre Qué pasaría si",
-      "step5_desc": "Resumen responde si el plan base funciona y muestra la trayectoria, la cobertura del gasto y los datos del plan. Qué pasaría si prueba el mismo plan en distintas trayectorias de mercado, pruebas de estrés, mapas de decisiones y comprobaciones avanzadas."
+      "step5_desc": "La vista general muestra la proyección base, cobertura de gastos y datos. Las simulaciones comparan trayectorias de mercado, escenarios de estrés y cambios de supuestos."
     },
     "overview": {
       "title": "Entender Resumen",
@@ -499,13 +505,13 @@
     "what_if": {
       "title": "Entender Qué pasaría si",
       "market_paths_title": "Trayectorias de mercado",
-      "market_paths_desc": "Prueba el mismo plan en muchas trayectorias de mercado posibles utilizando tus suposiciones de rentabilidad, volatilidad e inflación. El rango sombreado muestra los resultados de malo a bueno; la línea muestra la trayectoria intermedia. El dinero dura significa que el plan cubre el gasto esencial y aún queda dinero durante el horizonte de planificación. En modo FIRE, el plan también debe alcanzar primero la independencia financiera.",
+      "market_paths_desc": "Modelamos distintas trayectorias de mercado con tus supuestos. El sombreado muestra los percentiles 10–90 a cada edad; la línea muestra la mediana entre trayectorias, no una trayectoria individual. Se cuentan las trayectorias que cubren gastos esenciales y terminan con dinero restante; las de FIRE también deben alcanzar la independencia financiera.",
       "base_case_title": "Caso base",
       "base_case_desc": "Muestra el mismo plan base determinista que Resumen, y luego señala el mayor resultado de estrés para que veas lo que más importa.",
       "stress_tests_title": "Pruebas de estrés",
       "stress_tests_desc": "Comprobaciones fijas que muestran cómo cambia el plan si las rentabilidades son más bajas, la inflación es más alta, el gasto sube, la jubilación empieza antes, el ahorro cae o ocurre una caída de mercado cerca de la jubilación.",
       "what_moves_title": "¿Qué mueve el plan?",
-      "what_moves_desc": "Los mapas de decisiones comparan el ahorro, las rentabilidades, la edad de jubilación y el gasto. Las celdas verdes dejan más dinero al final. Las celdas rojas siguen dejando un déficit o se quedan cortas.",
+      "what_moves_desc": "Compara ahorro, rentabilidades, edad de jubilación y gastos. Verde indica más dinero final que el plan base; ámbar, menos. Rojo indica un déficit o ningún dinero restante.",
       "crash_paths_title": "Trayectorias de caída temprana del mercado",
       "crash_paths_desc": "Compara varias trayectorias según el momento de la caída cerca de la jubilación. Una caída en el primer año de jubilación puede perjudicar más que la misma caída más tarde, porque las retiradas ocurren mientras la cartera está a la baja."
     },
@@ -514,25 +520,24 @@
       "yearly_spending_title": "Cómo se modela el gasto anual",
       "yearly_spending_desc": "Tus gastos impulsan la retirada. Cada año el planificador financia el plan de gasto que introdujiste, resta los ingresos de jubilación y estima cualquier lastre fiscal sobre las retiradas de la cartera.",
       "target_calc_title": "Cómo se calcula el objetivo",
-      "target_calc_desc": "El planificador calcula el valor presente de todo tu calendario de gastos desde la jubilación hasta tu horizonte de planificación, teniendo en cuenta la tasa de inflación de cada bloque de gasto, los flujos de ingresos que comienzan a distintas edades y el lastre fiscal sobre las retiradas. Cuando tu cartera alcanza este importe, el plan base tiene suficiente capital para el calendario que introdujiste. Esto es más preciso que un simple múltiplo de los gastos porque gestiona gastos variables, pensiones diferidas y horizontes finitos.",
+      "target_calc_desc": "El planificador estima la cartera inicial necesaria para financiar los gastos de jubilación hasta el horizonte del plan. Modela inflación de gastos, fechas de ingresos, rentabilidades, comisiones e impuestos sobre retiros. El objetivo depende de estos supuestos.",
       "inflation_title": "Tasa de inflación",
-      "inflation_desc": "Todas las proyecciones aumentan los gastos y los ingresos ligados a la inflación a esta tasa año tras año. El valor predeterminado del 2% coincide con el objetivo del BCE.",
-      "inflation_it_note": "Usa 2,5–3% para una suposición de IPC italiano más conservadora.",
+      "inflation_desc": "El supuesto de inflación aumenta los gastos y los ingresos indexados con el tiempo. Cada partida puede usar su propia tasa.",
       "returns_title": "Rentabilidades, comisiones y volatilidad",
       "returns_desc": "La rentabilidad antes de la jubilación impulsa la acumulación. La rentabilidad durante la jubilación impulsa la fase de retirada y el capital requerido. Las comisiones de inversión anuales se restan de ambas. La volatilidad solo se usa en las comprobaciones de trayectorias de mercado: valores más altos producen un abanico de resultados más amplio.",
       "horizon_title": "Edad del horizonte de planificación",
-      "horizon_desc": "Cuánto tiempo debe durar la cartera. El objetivo de jubilación y las comprobaciones de Qué pasaría si llegan hasta esta edad. Ponla en 90–95 para poner a prueba la longevidad. Las trayectorias de caída temprana del mercado y El dinero dura se miden ambas en este horizonte."
+      "horizon_desc": "Edad hasta la que se modelan los gastos de jubilación y los resultados de Qué pasaría si. Es un supuesto del periodo de planificación, no una predicción de longevidad."
     },
     "italian": {
       "title": "Configuración de jubilación italiana (fondo pensione, TFR, INPS)",
       "portfolio_title": "Cartera de inversión (Golden Butterfly, All-Weather…)",
       "portfolio_desc": "Esta es tu cartera principal, el valor que Wealthfolio sigue. Define aquí tus suposiciones de rentabilidad, el lastre de comisiones y la aportación mensual. Es el principal motor de acumulación de tu plan de jubilación.",
       "fondo_title": "Fondo pensione integrativo (fondo de pensiones complementario)",
-      "fondo_desc": "Usa Añadir fondo de pensiones. Introduce el saldo actual del fondo, la aportación mensual, la rentabilidad esperada del fondo y la edad de inicio del pago. El planificador estima el saldo futuro y, si no introduces un pago mensual, estima el pago como el 3,5%/año de ese saldo proyectado desde la edad de inicio.",
+      "fondo_desc": "Usa Añadir fondo de pensiones. Introduce saldo, aportación, rentabilidad supuesta y edad de inicio de pagos. La estimación usa la tasa de pago configurada salvo que indiques un importe mensual. Los retiros cesan al agotarse el fondo; las rentas vitalicias se modelan hasta el horizonte del plan.",
       "inps_title": "Pensione INPS (pensión estatal — previdenza obbligatoria)",
       "inps_desc": "Usa Añadir ingreso de jubilación. Introduce tu pensión neta mensual estimada en dinero de hoy y define la edad de inicio del pago. Usa Indexado si quieres que el ingreso aumente con la suposición de inflación del plan.",
       "tfr_title": "TFR (Trattamento di Fine Rapporto — indemnización acumulada)",
-      "tfr_desc": "Si tu TFR va a un fondo de pensiones, inclúyelo en la aportación mensual al fondo. Si lo mantienes por separado, modélalo como otro fondo de pensiones con su propio saldo, aportación, rentabilidad y edad de inicio del pago. Se aplica la misma estimación de pago del 3,5%/año salvo que introduzcas tú mismo un pago mensual."
+      "tfr_desc": "Si el TFR se destina a un fondo de pensiones, inclúyelo en la aportación. Un fondo separado puede representar el ahorro TFR independiente; sus pagos modelados siguen la tasa o el importe mensual configurado."
     }
   },
   "type": {
@@ -783,7 +788,7 @@
       "retirement_gap": "Déficit de jubilación",
       "fi_moves_prefix": "La IF se mueve",
       "fi_moves_suffix": "años más tarde",
-      "largest_risk": "{{label}} es el mayor riesgo",
+      "largest_risk": "{{label}} tiene el mayor efecto entre estas pruebas",
       "and": "y",
       "none": "Ninguno",
       "surplus": "superávit",
@@ -807,7 +812,10 @@
       "money_lasts_summary_traditional": "se mantiene financiado hasta la edad {{horizonAge}}",
       "money_lasts_summary_fire": "IF alcanzada + financiado hasta la edad {{horizonAge}}",
       "money_lasts_prompt_traditional": "Ejecuta 10k trayectorias para ver con qué frecuencia el plan se mantiene financiado hasta la edad {{horizonAge}}.",
-      "money_lasts_prompt_fire": "Ejecuta 10k trayectorias para ver con qué frecuencia el plan alcanza la IF y se mantiene financiado hasta la edad {{horizonAge}}."
+      "money_lasts_prompt_fire": "Ejecuta 10k trayectorias para ver con qué frecuencia el plan alcanza la IF y se mantiene financiado hasta la edad {{horizonAge}}.",
+      "of_simulated_paths": "de las trayectorias simuladas",
+      "simulation_tooltip_traditional": "El {{percent}}% de las trayectorias simuladas cubre los gastos esenciales y termina con dinero restante. Los colores usan bandas de referencia: menos del 75%, del 75% a menos del 90%, y 90% o más. Son resultados modelados, no probabilidades del mundo real.",
+      "simulation_tooltip_fire": "El {{percent}}% de las trayectorias simuladas cubre los gastos esenciales y termina con dinero restante. Las trayectorias también deben alcanzar la independencia financiera. Los colores usan bandas de referencia: menos del 75%, del 75% a menos del 90%, y 90% o más. Son resultados modelados, no probabilidades del mundo real."
     },
     "stress": {
       "eyebrow_with_count": "¿Qué podría romper este plan? · {{count}} escenarios",
@@ -825,7 +833,7 @@
     "montecarlo": {
       "eyebrow": "Trayectorias de mercado",
       "heading": "¿Con qué frecuencia podría durar el dinero?",
-      "intro": "Probamos el mismo plan en muchas trayectorias de mercado posibles. El rango sombreado muestra los resultados de malo a bueno; la línea muestra la trayectoria intermedia.",
+      "intro": "Modelamos distintas trayectorias de mercado con tus supuestos. El sombreado muestra los percentiles 10–90 a cada edad; la línea muestra la mediana entre trayectorias, no una trayectoria individual.",
       "run_10k": "Ejecutar 10k trayectorias",
       "run_100k": "Ejecutar 100k trayectorias",
       "running_short": "Ejecutando…",
@@ -837,17 +845,17 @@
       "median_fi_age": "Edad mediana de IF",
       "withdrawals_start_detail": "comienzan las retiradas",
       "vs_goal": "frente al objetivo {{age}}",
-      "bad_path": "Trayectoria mala",
-      "middle_path": "Trayectoria intermedia",
-      "good_path": "Trayectoria buena"
+      "bad_path": "Resultado inferior",
+      "middle_path": "Mediana",
+      "good_path": "Resultado superior"
     },
     "chart": {
       "age_label": "Edad {{age}}",
       "age_detail": "edad {{age}}",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "IF mediana @{{age}}",
-      "bad_good_range": "Rango malo-bueno",
-      "median_path": "Trayectoria mediana",
+      "bad_good_range": "Rango de percentiles 10–90",
+      "median_path": "Mediana",
       "retirement_age": "Edad de jubilación",
       "goal_age": "Edad objetivo",
       "median_fi_age": "Edad mediana de IF",
@@ -856,12 +864,13 @@
       "goal": "objetivo",
       "market_paths_count_one": "{{count}} trayectoria de mercado",
       "market_paths_count_other": "{{count}} trayectorias de mercado",
-      "market_paths_count_many": "{{count}} trayectorias de mercado"
+      "market_paths_count_many": "{{count}} trayectorias de mercado",
+      "percentile_at_age": "Percentil {{percentile}} · edad {{age}}"
     },
     "moves": {
       "eyebrow": "¿Qué cambia más el plan?",
       "heading": "¿Qué mueve el plan?",
-      "description": "Muestra cómo el ahorro, las rentabilidades, la edad de jubilación y el gasto cambian el resultado. Verde = más dinero restante; rojo = déficit o se queda corto.",
+      "description": "Compara ahorro, rentabilidades, edad de jubilación y gastos. Verde indica más dinero final que el plan base; ámbar, menos. Rojo indica un déficit o ningún dinero restante.",
       "empty_title": "Descubre qué cambios ayudarían más.",
       "empty_description": "Compara ahorrar más, obtener una rentabilidad diferente, gastar menos o jubilarte a una edad distinta.",
       "building": "Construyendo...",
@@ -890,6 +899,39 @@
       "unavailable_title": "Trayectorias de caída no disponibles.",
       "empty_description": "Ejecuta las cinco trayectorias para ver qué secuencia pondría el plan bajo presión antes.",
       "unavailable_description": "Esta comprobación necesita una cartera proyectada positiva al inicio de la jubilación."
+    },
+    "labels": {
+      "crash_year_1": "Caída en el año 1 (−30%)",
+      "crash_year_5": "Caída en el año 5 (−30%)",
+      "double_crash": "Dos caídas",
+      "lost_decade": "Década perdida",
+      "after_fee_return": "Rentabilidad tras comisiones"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "Menores rentabilidades",
+        "description": "Las rentabilidades antes y durante la jubilación son 2 puntos porcentuales menores."
+      },
+      "inflation-shock": {
+        "label": "Mayor inflación",
+        "description": "La inflación general es 1,5 puntos porcentuales mayor."
+      },
+      "spending-shock": {
+        "label": "Mayores gastos",
+        "description": "Todos los importes de gastos de jubilación son un 10% mayores."
+      },
+      "retire-earlier": {
+        "label": "Jubilación 2 años antes",
+        "description": "La edad objetivo se adelanta dos años, limitada por la edad actual del plan."
+      },
+      "save-less": {
+        "label": "Menores aportaciones",
+        "description": "Las aportaciones mensuales son un 25% menores."
+      },
+      "early-crash": {
+        "label": "Caída temprana del mercado",
+        "description": "Se modela una caída del mercado del 30% en el primer año de jubilación."
+      }
     }
   }
 }
