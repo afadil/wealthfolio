@@ -25,7 +25,7 @@ import { Link, useNavigate } from "react-router-dom";
 const MAX_DISPLAYED_HOLDINGS = 7;
 const MAX_STACKED_AVATARS = 5;
 const PERFORMANCE_MODE_KEY = "dashboard-holdings-widget-performance-mode";
-type PerformanceMode = "daily" | "pnl" | "return";
+type PerformanceMode = "daily" | "unrealized" | "pnl" | "return";
 
 interface TopHoldingsProps {
   holdings: Holding[];
@@ -77,7 +77,9 @@ function HoldingRow({
       ? (holding.totalReturn?.base ?? holding.totalGain?.base ?? 0)
       : performanceMode === "pnl"
         ? (holding.totalGain?.base ?? holding.unrealizedGain?.base ?? 0)
-        : (holding.dayChange?.base ?? 0);
+        : performanceMode === "unrealized"
+          ? (holding.unrealizedGain?.base ?? 0)
+          : (holding.dayChange?.base ?? 0);
   const gainPercent = getBaseHoldingPerformancePercentForMode(holding, performanceMode);
 
   return (
@@ -258,13 +260,17 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
               ? (a.totalReturn?.base ?? a.totalGain?.base ?? 0)
               : performanceMode === "pnl"
                 ? (a.totalGain?.base ?? a.unrealizedGain?.base ?? 0)
-                : (a.dayChange?.base ?? 0);
+                : performanceMode === "unrealized"
+                  ? (a.unrealizedGain?.base ?? 0)
+                  : (a.dayChange?.base ?? 0);
           const gainB =
             performanceMode === "return"
               ? (b.totalReturn?.base ?? b.totalGain?.base ?? 0)
               : performanceMode === "pnl"
                 ? (b.totalGain?.base ?? b.unrealizedGain?.base ?? 0)
-                : (b.dayChange?.base ?? 0);
+                : performanceMode === "unrealized"
+                  ? (b.unrealizedGain?.base ?? 0)
+                  : (b.dayChange?.base ?? 0);
           return gainB - gainA;
         }
         return (b.marketValue?.base ?? 0) - (a.marketValue?.base ?? 0);
@@ -311,7 +317,7 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
               <p className="text-muted-foreground px-2 py-1.5 text-xs font-medium uppercase tracking-wider">
                 {t("dashboard:holdings.filter_show")}
               </p>
-              {(["daily", "pnl", "return"] as const).map((v) => (
+              {(["daily", "unrealized", "pnl", "return"] as const).map((v) => (
                 <button
                   key={v}
                   className="hover:bg-accent flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm font-medium transition-colors"
@@ -321,7 +327,9 @@ export function TopHoldings({ holdings, isLoading, baseCurrency }: TopHoldingsPr
                     ? t("dashboard:holdings.perf_daily_change")
                     : v === "pnl"
                       ? t("dashboard:holdings.perf_total_pnl")
-                      : t("dashboard:holdings.perf_total_return")}
+                      : v === "unrealized"
+                        ? t("holdings:unrealized_pnl")
+                        : t("dashboard:holdings.perf_total_return")}
                   <span
                     className={cn(
                       "flex h-4 w-4 items-center justify-center rounded-full border-2",

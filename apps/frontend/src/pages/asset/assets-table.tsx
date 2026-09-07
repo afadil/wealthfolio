@@ -111,6 +111,7 @@ export function AssetsTable({
           return (
             <button
               type="button"
+              data-testid={`security-${asset.instrumentType}-${asset.displayCode}`}
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
