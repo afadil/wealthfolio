@@ -2069,6 +2069,252 @@ mod tests {
         assert_eq!(by_category.get(UNCATEGORIZED_CATEGORY_ID), Some(&50.0));
     }
 
+    // ── by_day_by_category ⟷ spending_by_top reconciliation ───────────────────
+
+    /// The category drill-down drawer reads `by_day_by_category` while the
+    /// breakdown table reads `spending_by_top`. They are produced by two
+    /// separate loops over the same activities — one keyed by leaf category,
+    /// one by root — so nothing but this test stops them drifting apart when
+    /// only one loop's classifier, FX date or split handling is changed.
+    #[test]
+    fn by_day_by_category_rolls_up_to_spending_by_top() {
+        use rust_decimal::Decimal;
+        use serde_json::Value;
+        use wealthfolio_core::accounts::account_types;
+        use wealthfolio_core::activities::{Activity, ActivityStatus};
+        use wealthfolio_core::taxonomies::Category;
+
+        use crate::activity_assignments::ActivityTaxonomyAssignment;
+        use crate::activity_splits::ActivitySplit;
+        use crate::budget::service::top_category_id;
+
+        fn activity(id: &str, activity_type: &str, amount: i64, currency: &str) -> Activity {
+            Activity {
+                id: id.to_string(),
+                account_id: "acct".to_string(),
+                asset_id: None,
+                activity_type: activity_type.to_string(),
+                activity_type_override: None,
+                source_type: None,
+                subtype: None,
+                status: ActivityStatus::Posted,
+                activity_date: dt(2026, 5, 10),
+                settlement_date: None,
+                quantity: None,
+                unit_price: None,
+                amount: Some(Decimal::new(amount, 0)),
+                fee: None,
+                tax: None,
+                currency: currency.to_string(),
+                fx_rate: None,
+                notes: None,
+                metadata: None::<Value>,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: None,
+                import_run_id: None,
+                is_user_modified: false,
+                needs_review: false,
+                created_at: dt(2026, 5, 10),
+                updated_at: dt(2026, 5, 10),
+            }
+        }
+
+        fn category(id: &str, parent: Option<&str>) -> Category {
+            Category {
+                id: id.to_string(),
+                taxonomy_id: SPENDING_TAXONOMY.to_string(),
+                parent_id: parent.map(str::to_string),
+                name: id.to_string(),
+                key: id.to_string(),
+                color: "#000".to_string(),
+                icon: None,
+                description: None,
+                sort_order: 0,
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            }
+        }
+
+        fn assignment(activity_id: &str, category_id: &str) -> ActivityTaxonomyAssignment {
+            ActivityTaxonomyAssignment {
+                id: format!("asg-{activity_id}"),
+                activity_id: activity_id.to_string(),
+                taxonomy_id: SPENDING_TAXONOMY.to_string(),
+                category_id: category_id.to_string(),
+                weight: 10_000,
+                source: "manual".to_string(),
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            }
+        }
+
+        fn split(activity_id: &str, category_id: &str, amount: i64, order: i32) -> ActivitySplit {
+            ActivitySplit {
+                id: format!("split-{activity_id}-{category_id}"),
+                activity_id: activity_id.to_string(),
+                taxonomy_id: SPENDING_TAXONOMY.to_string(),
+                category_id: category_id.to_string(),
+                amount: Decimal::new(amount, 0),
+                note: None,
+                sort_order: order,
+                created_at: chrono::Utc::now().naive_utc(),
+                updated_at: chrono::Utc::now().naive_utc(),
+            }
+        }
+
+        // housing → rent → deposit, and food → dining. Three levels, so a
+        // direct-children-only rollup would drop `cat_deposit`.
+        let meta: HashMap<String, Category> = [
+            category("cat_housing", None),
+            category("cat_rent", Some("cat_housing")),
+            category("cat_deposit", Some("cat_rent")),
+            category("cat_food", None),
+            category("cat_dining", Some("cat_food")),
+        ]
+        .into_iter()
+        .map(|c| (c.id.clone(), c))
+        .collect();
+
+        let on_subcategory = activity("a1", "WITHDRAWAL", 100, "USD");
+        let on_parent = activity("a2", "WITHDRAWAL", 40, "USD");
+        let split_within_one_parent = activity("a3", "WITHDRAWAL", 90, "USD");
+        let split_across_parents = activity("a4", "WITHDRAWAL", 50, "USD");
+        let refund = Activity {
+            subtype: Some("REFUND".to_string()),
+            ..activity("a5", "CREDIT", 25, "USD")
+        };
+        let foreign = activity("a6", "WITHDRAWAL", 70, "EUR");
+        let linked_transfer = Activity {
+            source_group_id: Some("grp-1".to_string()),
+            ..activity("a7", "TRANSFER_OUT", 500, "USD")
+        };
+        let unassigned = activity("a8", "WITHDRAWAL", 15, "USD");
+
+        let acts: Vec<&Activity> = vec![
+            &on_subcategory,
+            &on_parent,
+            &split_within_one_parent,
+            &split_across_parents,
+            &refund,
+            &foreign,
+            &linked_transfer,
+            &unassigned,
+        ];
+
+        let mut account_types = HashMap::new();
+        account_types.insert("acct".to_string(), account_types::CASH.to_string());
+
+        let assignments: AssignmentsByActivity = [
+            ("a1", "cat_rent"),
+            ("a2", "cat_housing"),
+            ("a5", "cat_rent"),
+            ("a6", "cat_dining"),
+            ("a7", "cat_rent"),
+        ]
+        .into_iter()
+        .map(|(a, c)| (a.to_string(), vec![assignment(a, c)]))
+        .collect();
+
+        let splits: SplitsByActivity = [
+            (
+                "a3".to_string(),
+                vec![
+                    split("a3", "cat_rent", 60, 0),
+                    split("a3", "cat_deposit", 30, 1),
+                ],
+            ),
+            (
+                "a4".to_string(),
+                vec![
+                    split("a4", "cat_rent", 20, 0),
+                    split("a4", "cat_dining", 30, 1),
+                ],
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        let fx_as_of = NaiveDate::from_ymd_opt(2026, 5, 31).unwrap();
+        let transfer_groups = within_spending_transfer_groups(&acts);
+
+        let agg = aggregate_spend_with_splits(
+            &acts,
+            &account_types,
+            &transfer_groups,
+            &assignments,
+            &splits,
+            &meta,
+            &fx(),
+            "USD",
+            fx_as_of,
+        );
+        let buckets = compute_by_day_by_category_with_splits(
+            &acts,
+            &account_types,
+            &assignments,
+            &splits,
+            "UTC",
+            &fx(),
+            "USD",
+            fx_as_of,
+        );
+
+        // Pin the fixture so a change in classification shows up as more than
+        // "both sides moved together".
+        //   housing: 100 + 40 + (60 + 30) + 20 − 25 = 225 over 6 allocations
+        //   food:    30 + 70 = 100 over 2 allocations
+        //   the linked transfer contributes nothing to either
+        assert_eq!(
+            agg.spending_by_top.get("cat_housing"),
+            Some(&(Decimal::new(225, 0), 6))
+        );
+        assert_eq!(
+            agg.spending_by_top.get("cat_food"),
+            Some(&(Decimal::new(100, 0), 2))
+        );
+        assert_eq!(agg.uncategorized_spend, Decimal::new(15, 0));
+
+        // The invariant the drill-down drawer depends on: rolling the leaf
+        // buckets up by `top_category_id` reproduces the table's figure.
+        let mut rolled: HashMap<String, (f64, u32)> = HashMap::new();
+        let mut uncategorized = (0.0_f64, 0_u32);
+        for bucket in &buckets {
+            assert_eq!(bucket.taxonomy_id, SPENDING_TAXONOMY);
+            if bucket.category_id == UNCATEGORIZED_CATEGORY_ID {
+                uncategorized.0 += bucket.amount;
+                uncategorized.1 += bucket.count;
+                continue;
+            }
+            let entry = rolled
+                .entry(top_category_id(&bucket.category_id, &meta))
+                .or_insert((0.0, 0));
+            entry.0 += bucket.amount;
+            entry.1 += bucket.count;
+        }
+
+        // Per-key, not set equality: a leaf rooted at a category that no
+        // longer exists is legitimately absent from the table.
+        for (top_id, (expected_amount, expected_count)) in &agg.spending_by_top {
+            let (amount, count) = rolled
+                .get(top_id)
+                .unwrap_or_else(|| panic!("no buckets rolled up to {top_id}"));
+            assert!(
+                (amount - decimal_to_f64(*expected_amount)).abs() < 1e-6,
+                "{top_id}: buckets summed to {amount}, table shows {expected_amount}",
+            );
+            assert_eq!(count, expected_count, "{top_id}: allocation count");
+        }
+        assert!(
+            (uncategorized.0 - decimal_to_f64(agg.uncategorized_spend)).abs() < 1e-6,
+            "uncategorized: buckets summed to {}, aggregate shows {}",
+            uncategorized.0,
+            agg.uncategorized_spend,
+        );
+        assert_eq!(uncategorized.1, agg.uncategorized_count);
+    }
+
     #[test]
     fn aggregate_emits_income_and_savings_breakdown_rows() {
         use rust_decimal::Decimal;
