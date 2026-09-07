@@ -1,5 +1,6 @@
 import { PORTFOLIO_SCOPE_ID } from "@/lib/constants";
-import type { TrackedItem } from "@/lib/types";
+import type { AccountScope, TrackedItem } from "@/lib/types";
+import { accountScopeKey } from "@/pages/allocation-targets/components/target-scope";
 
 const LEGACY_PORTFOLIO_ACCOUNT_ID = "TOTAL";
 
@@ -9,6 +10,51 @@ export const ALL_PORTFOLIO_ITEM: TrackedItem = {
   name: "All Portfolio",
   accountScope: { type: "all" },
 };
+
+interface NamedRecord {
+  id: string;
+  name: string;
+}
+
+/**
+ * Maps a shared account scope onto the single tracked series that represents it.
+ * Ids match what `handleAccountSelect`/`handlePortfolioSelect` produce, so an
+ * item the user already added is reused instead of duplicated. Returns null when
+ * the scope cannot be named yet (data still loading, or account deleted).
+ */
+export function trackedItemForScope(
+  scope: AccountScope,
+  accounts: readonly NamedRecord[],
+  portfolios: readonly NamedRecord[],
+): TrackedItem | null {
+  if (scope.type === "all") return ALL_PORTFOLIO_ITEM;
+
+  if (scope.type === "account") {
+    const account = accounts.find((candidate) => candidate.id === scope.accountId);
+    return account
+      ? { id: account.id, type: "account", name: account.name, accountScope: scope }
+      : null;
+  }
+
+  if (scope.type === "portfolio") {
+    const portfolio = portfolios.find((candidate) => candidate.id === scope.portfolioId);
+    return portfolio
+      ? { id: portfolio.id, type: "account", name: portfolio.name, accountScope: scope }
+      : null;
+  }
+
+  const names = scope.accountIds.map(
+    (accountId) => accounts.find((candidate) => candidate.id === accountId)?.name,
+  );
+  if (names.length === 0 || names.some((name) => !name)) return null;
+
+  return {
+    id: accountScopeKey(scope),
+    type: "account",
+    name: names.join(" + "),
+    accountScope: scope,
+  };
+}
 
 export function migratePerformanceSelectedItemId(itemId: string | null): string | null {
   return itemId === LEGACY_PORTFOLIO_ACCOUNT_ID ? PORTFOLIO_SCOPE_ID : itemId;
@@ -34,4 +80,23 @@ export function migratePerformanceSelectedItems(items: TrackedItem[]): TrackedIt
   });
 
   return changed ? migrated : items;
+}
+
+/** Drop comparisons with deleted members without silently changing their scope. */
+export function prunePerformanceSelectedItems(
+  items: TrackedItem[],
+  knownAccountIds: ReadonlySet<string>,
+): TrackedItem[] {
+  const next = items.filter((item) => {
+    if (item.type !== "account" || item.id === PORTFOLIO_SCOPE_ID) return true;
+    const scope = item.accountScope;
+    // Portfolio membership is resolved by the backend, rather than saved here.
+    if (scope?.type === "all" || scope?.type === "portfolio") return true;
+    if (scope?.type === "accounts") {
+      return scope.accountIds.length > 0 && scope.accountIds.every((id) => knownAccountIds.has(id));
+    }
+    return knownAccountIds.has(scope?.type === "account" ? scope.accountId : item.id);
+  });
+  if (next.length === items.length) return items;
+  return next.length > 0 ? next : [ALL_PORTFOLIO_ITEM];
 }

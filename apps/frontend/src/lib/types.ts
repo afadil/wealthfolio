@@ -1068,7 +1068,8 @@ export interface AccountValuation {
     | "ACTIVITY_DERIVED"
     | "STORED_GROSS"
     | "NET_CONTRIBUTION_FALLBACK"
-    | "MIXED";
+    | "MIXED"
+    | "MIXED_EXACT";
   performanceEligibleValueBase: number;
   valueStatus: ValuationStatus;
   basisStatus: BasisStatus;
@@ -2490,6 +2491,8 @@ export interface RetirementOverview {
   portfolioAtGoalAge: number;
   requiredCapitalReachable: boolean;
   requiredCapitalAtGoalAge: number;
+  leanRequiredCapitalAtGoalAge?: number | null;
+  fatRequiredCapitalAtGoalAge?: number | null;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
   fundedThroughAge: number | null;

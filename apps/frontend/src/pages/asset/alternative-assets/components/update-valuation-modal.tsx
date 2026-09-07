@@ -48,7 +48,7 @@ interface UpdateValuationModalProps {
   assetName: string;
   /** Current recorded value as decimal string */
   currentValue: string;
-  /** Last updated date as ISO string (YYYY-MM-DD) */
+  /** Last updated date as a calendar date or UTC ISO timestamp */
   lastUpdatedDate: string;
   /** Currency code (e.g., "USD") */
   currency: string;
@@ -233,7 +233,7 @@ function formatDisplayDate(
 ): string {
   if (!isoDate) return "N/A";
   try {
-    return formatting.formatCalendarDate(isoDate, {
+    return formatting.formatCalendarDate(isoDate.split("T")[0], {
       year: "numeric",
       month: "short",
       day: "numeric",

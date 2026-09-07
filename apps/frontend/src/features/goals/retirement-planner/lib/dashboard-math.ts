@@ -1,20 +1,15 @@
+import i18next, { type TFunction } from "i18next";
 import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "./constants";
 import { activeExpenseItems } from "./expense-items";
 import type { RetirementIncomeStream, RetirementPlan } from "../types";
 
 export type PlannerMode = "fire" | "traditional";
 
-export function modeLabel(mode: PlannerMode) {
+export function modeLabel(mode: PlannerMode, t: TFunction = i18next.t) {
   return {
-    target: mode === "fire" ? "FIRE Target" : "Retirement Target",
-    targetNet: mode === "fire" ? "FIRE Target (net)" : "Retirement Target (net)",
-    estAge: mode === "fire" ? "Projected FI Age" : "Target Retirement Age",
-    progress: mode === "fire" ? "FIRE Progress" : "Retirement Progress",
-    coast: "Coast FIRE",
-    budgetAt: "Retirement spending coverage",
-    prefix: mode === "fire" ? "FIRE" : "Retirement",
-    targetAge: mode === "fire" ? "Desired retirement age" : "Retirement age",
-    horizonAge: mode === "fire" ? "Plan through age" : "Life expectancy",
+    coast: t("goals:dashboard.milestone.coast_fire"),
+    budgetAt: t("goals:guide.overview.coverage_title"),
+    prefix: mode === "fire" ? "FIRE" : t("goals:type.retirement"),
   };
 }
 
@@ -148,8 +143,12 @@ export function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: Retireme
   return stream.monthlyAmount ?? 0;
 }
 
-export function incomeAgeRangeLabel(stream: RetirementIncomeStream, horizonAge: number) {
-  return `Age ${stream.startAge} → ${horizonAge}`;
+export function incomeAgeRangeLabel(
+  stream: RetirementIncomeStream,
+  horizonAge: number,
+  t: TFunction = i18next.t,
+) {
+  return t("goals:dashboard.coverage.age_range", { start: stream.startAge, end: horizonAge });
 }
 
 export function isIncomeActiveAtAge(stream: RetirementIncomeStream, age: number) {
@@ -161,11 +160,14 @@ export function coverageTimingLabel(
   startAge: number | undefined,
   endAge: number | undefined,
   age: number,
+  t: TFunction = i18next.t,
 ) {
   if (isActive) return null;
-  if (startAge !== undefined && age < startAge) return `Starts at ${startAge}`;
-  if (endAge !== undefined && age >= endAge) return `Ended at ${endAge}`;
-  return "Not active";
+  if (startAge !== undefined && age < startAge)
+    return t("goals:dashboard.coverage.starts_at", { age: startAge });
+  if (endAge !== undefined && age >= endAge)
+    return t("goals:dashboard.coverage.ended_at", { age: endAge });
+  return t("goals:dashboard.coverage.not_active");
 }
 
 interface CoverageSnapshotLike {
@@ -312,14 +314,17 @@ function earliestFundExhaustion(overview: RetirementOverviewLike) {
   );
 }
 
-export function deriveRetirementReadiness({
-  overview,
-  plannerMode,
-  isFinanciallyIndependent,
-  effectiveFiAge,
-  desiredAge,
-  horizonAge,
-}: DeriveRetirementReadinessInput): RetirementReadiness {
+export function deriveRetirementReadiness(
+  {
+    overview,
+    plannerMode,
+    isFinanciallyIndependent,
+    effectiveFiAge,
+    desiredAge,
+    horizonAge,
+  }: DeriveRetirementReadinessInput,
+  t: TFunction = i18next.t,
+): RetirementReadiness {
   if (!overview) {
     return { tone: "watch", problem: "loading", body: null };
   }
@@ -328,7 +333,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "unreachable-target",
-      body: "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon.",
+      body: t("goals:dashboard.guidance.unavailable"),
     };
   }
 
@@ -336,7 +341,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "portfolio-depletion",
-      body: `Projected portfolio runs short during age ${overview.failureAge ?? horizonAge}. Reduce spending, retire later, or add retirement income.`,
+      body: t("goals:dashboard.guidance.depleted", { age: overview.failureAge ?? horizonAge }),
     };
   }
 
@@ -344,7 +349,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "watch",
       problem: "spending-gap",
-      body: `Projected spending gap starts at age ${overview.spendingShortfallAge}. Increase contributions, retire later, reduce retirement spending, or add retirement income.`,
+      body: t("goals:dashboard.guidance.gap", { age: overview.spendingShortfallAge }),
     };
   }
 
@@ -353,7 +358,10 @@ export function deriveRetirementReadiness({
     return {
       tone: "watch",
       problem: "fund-exhaustion",
-      body: `${exhaustion.label} runs out at age ${exhaustion.exhaustedAge} and pays nothing after that. Lower its payout rate, switch it to an annuity, or plan for the portfolio to cover the gap.`,
+      body: t("goals:dashboard.guidance.fund", {
+        label: exhaustion.label,
+        age: exhaustion.exhaustedAge,
+      }),
     };
   }
 
@@ -362,7 +370,7 @@ export function deriveRetirementReadiness({
       return {
         tone: "watch",
         problem: "spending-gap",
-        body: "Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.",
+        body: t("goals:dashboard.guidance.shortfall"),
       };
     }
     return { tone: "good", problem: "on-track", body: null };
@@ -372,7 +380,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "good",
       problem: "on-track",
-      body: "You have reached financial independence with the current assumptions.",
+      body: t("goals:dashboard.guidance.reached"),
     };
   }
 
@@ -380,7 +388,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "not-reachable",
-      body: `Not reachable by age ${horizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`,
+      body: t("goals:dashboard.guidance.not_reached", { age: horizonAge }),
     };
   }
 
@@ -392,6 +400,6 @@ export function deriveRetirementReadiness({
   return {
     tone: yearsLate <= 3 ? "watch" : "bad",
     problem: "late",
-    body: `${yearsLate} year${yearsLate !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`,
+    body: t("goals:dashboard.guidance.late", { count: yearsLate }),
   };
 }
