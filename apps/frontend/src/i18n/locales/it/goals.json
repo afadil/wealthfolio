@@ -110,18 +110,18 @@
       "on_track": "In linea",
       "fi_reached": "IF raggiunta",
       "at_risk": "A rischio",
-      "never_reaches_fi": "Non raggiunge mai l'IF",
+      "never_reaches_fi": "Non prevista entro {{age}} anni",
       "years_late_one": "{{count}} anno di ritardo",
       "years_late_many": "{{count}} anni di ritardo",
       "years_late_other": "{{count}} anni di ritardo"
     },
     "verdict": {
       "age": "età {{age}}",
-      "spending_gap_prefix": "Il deficit di spesa inizia a",
+      "spending_gap_prefix": "Un deficit di spesa è previsto da",
       "spending_gap_suffix": "prima che il piano raggiunga l'età {{age}}.",
-      "short_prefix": "All'età {{age}}, ti mancano",
+      "short_prefix": "A {{age}} anni, il deficit previsto è",
       "short_suffix": "per finanziare la pensione fino all'età {{age}}.",
-      "depleted_prefix": "Il portafoglio si esaurisce durante",
+      "depleted_prefix": "Il portafoglio sarà presumibilmente insufficiente a",
       "depleted_suffix": "dopo esserti ritirato a {{age}}.",
       "surplus_prefix": "Si prevede che tu vada in pensione all'età {{age}} con",
       "surplus_suffix": "di surplus.",
@@ -130,35 +130,23 @@
       "fi_reached_prefix": "Hai raggiunto",
       "financial_independence": "l'indipendenza finanziaria",
       "fi_reached_suffix": "— con le ipotesi attuali.",
-      "fi_at_prefix": "Raggiungerai l'indipendenza finanziaria a",
-      "years_after_one": "{{count}} anno dopo",
-      "years_after_many": "{{count}} anni dopo",
-      "years_after_other": "{{count}} anni dopo",
-      "years_before_one": "{{count}} anno prima",
-      "years_before_many": "{{count}} anni prima",
-      "years_before_other": "{{count}} anni prima",
-      "your_goal_of": "il tuo obiettivo di {{age}}.",
-      "right_on_goal": "esattamente al tuo obiettivo di {{age}}.",
-      "not_reachable_prefix": "Non raggiungibile entro",
-      "not_reachable_suffix": "con le ipotesi attuali."
+      "not_reachable_prefix": "Non prevista entro",
+      "not_reachable_suffix": "con le ipotesi attuali.",
+      "fi_projected": "Secondo le proiezioni, raggiungerai l’indipendenza finanziaria a <age>{{age}} anni</age>."
     },
     "summary": {
-      "at_your_current_prefix": "Con il tuo",
-      "contribution": "contributo attuale,",
-      "capital_not_available": "il capitale obiettivo richiesto non è raggiungibile con le ipotesi attuali. Rivedi spesa, inflazione, rendimenti e aspettativa di vita.",
-      "projected_balance_is": "il saldo pensionistico proiettato è",
-      "vs_required_capital_of": "rispetto al capitale richiesto di",
       "at_age": "all'età {{age}}.",
-      "the_plan_funds": "il piano finanzia",
-      "per_yr_expenses_to_age": "/anno di spese fino all'età {{age}}.",
-      "youre_short": "Ti mancano"
+      "youre_short": "Il deficit previsto è",
+      "traditional": "Con le ipotesi attuali e un contributo di <contribution>{{contribution}}</contribution>, il saldo previsto a {{age}} anni è <balance>{{balance}}</balance>, rispetto a un capitale richiesto di <target>{{target}}</target>.",
+      "fire": "Con le ipotesi attuali e un contributo di <contribution>{{contribution}}</contribution>, il piano include <budget>{{budget}}</budget>/anno di spese fino a {{age}} anni.",
+      "unavailable": "Con le ipotesi attuali e un contributo di <contribution>{{contribution}}</contribution>, l’obiettivo di capitale non è stimabile. Confronta le ipotesi in Simulazioni."
     },
     "progress": {
       "portfolio_today": "Portafoglio oggi",
       "required_at_age": "Richiesto all'età {{age}}",
       "target_at_age": "Obiettivo all'età {{age}}",
-      "capital_needed_tip_traditional": "Capitale necessario alla tua età di pensionamento dopo spese, entrate, imposte, rendimenti in pensione e commissioni. Mostrato in {{valueLabel}}.",
-      "capital_needed_tip_fire": "Capitale necessario alla tua età di pensionamento desiderata dopo spese, entrate, imposte, rendimenti in pensione e commissioni. Mostrato in {{valueLabel}}.",
+      "capital_needed_tip_traditional": "Capitale stimato necessario all’età pensionabile obiettivo secondo le ipotesi di spesa, reddito, imposte, rendimenti e commissioni. Mostrato in {{valueLabel}}.",
+      "capital_needed_tip_fire": "Capitale stimato necessario all’età pensionabile obiettivo secondo le ipotesi di spesa, reddito, imposte, rendimenti e commissioni. Mostrato in {{valueLabel}}.",
       "not_available": "Non disponibile",
       "funded_pct": "{{pct}}% finanziato"
     },
@@ -175,18 +163,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "Smetti di versare e vai comunque in pensione in tempo",
-      "coast_tip_nominal": "Importo Coast convertito in euro nominali alla tua età di pensionamento desiderata.",
-      "coast_tip_real": "Capitale di cui hai bisogno oggi che, senza ulteriori contributi, cresce fino alla piena IF entro la tua età di pensionamento.",
+      "coast_hint": "Capitale stimato necessario oggi",
+      "coast_tip_nominal": "Capitale stimato necessario oggi, espresso in denaro all’età pensionabile usando l’inflazione ipotizzata. È una conversione di valore, non una crescita prevista degli investimenti.",
+      "coast_tip_real": "Capitale stimato oggi attualizzando l’obiettivo pensionistico al rendimento ipotizzato prima del pensionamento, al netto delle commissioni. Le ipotesi pensionistiche restano invariate.",
       "lean_fire": "Lean FIRE",
       "lean_hint": "70% della spesa pianificata",
-      "lean_tip": "Vai in pensione con un budget frugale, circa il 70% della tua spesa pianificata. Fattibile prima, ma lascia poco margine.",
+      "lean_tip": "Capitale stimato per il 70% delle spese pianificate, con le altre ipotesi invariate. È lo scenario Lean FIRE del pianificatore.",
       "fi": "IF",
       "fi_hint": "Spesa pianificata completa",
       "fi_tip": "Capitale che finanzia la tua spesa pensionistica pianificata per l'intero orizzonte di pensionamento.",
       "fat_fire": "Fat FIRE",
       "fat_hint": "150% della spesa pianificata",
-      "fat_tip": "Vai in pensione con circa il 50% di spesa in più rispetto al previsto: margine per viaggi, regali, volatilità e miglioramenti dello stile di vita.",
+      "fat_tip": "Capitale stimato per il 150% delle spese pianificate, con le altre ipotesi invariate. È lo scenario Fat FIRE del pianificatore.",
       "more_info_about": "Maggiori informazioni su {{label}}",
       "done": "FATTO"
     },
@@ -223,11 +211,27 @@
       "unfunded": "Non finanziato",
       "planned_spending_legend": "Spesa pianificata",
       "showing": "Visualizzazione di {{valueLabel}}",
-      "projection_unavailable": "La proiezione di copertura non è disponibile per questo piano."
+      "projection_unavailable": "La proiezione di copertura non è disponibile per questo piano.",
+      "age_range": "Età {{start}} → {{end}}",
+      "starts_at": "Inizia a {{age}} anni",
+      "ended_at": "Terminato a {{age}} anni",
+      "not_active": "Non attivo"
     },
     "disclaimer": {
       "title": "Una cosa da tenere a mente",
-      "body": "Questo non è consulenza finanziaria. Considera questi numeri come uno schizzo, non una previsione. Tutto ciò che vedi qui è una simulazione costruita sui dati che hai inserito: rendimenti, inflazione, contributi, imposte e quanto a lungo prevedi di vivere. I mercati reali non si muovono in linea retta, le norme fiscali cambiano e i programmi governativi vengono riscritti. Usa questo strumento per mettere alla prova le tue idee e individuare eventuali lacune, poi parla con un professionista qualificato prima di prendere decisioni difficili da annullare."
+      "body": "Le proiezioni dipendono dalle tue ipotesi. I risultati reali possono differire. Non è consulenza finanziaria."
+    },
+    "guidance": {
+      "unavailable": "L’obiettivo non è stimabile con le ipotesi attuali. Confronta le ipotesi in Simulazioni.",
+      "depleted": "Si prevede che il portafoglio non basti a partire da {{age}} anni. Confronta le ipotesi in Simulazioni.",
+      "gap": "Si prevede un deficit di spesa a partire da {{age}} anni. Confronta le ipotesi in Simulazioni.",
+      "fund": "Si prevede che {{label}} si esaurisca a {{age}} anni; i pagamenti modellati cessano da quel momento. Confronta le ipotesi sui pagamenti e sul reddito.",
+      "shortfall": "Si prevede un deficit al pensionamento. Confronta le ipotesi in Simulazioni.",
+      "reached": "Il portafoglio attuale raggiunge l’obiettivo stimato di indipendenza finanziaria secondo le tue ipotesi.",
+      "not_reached": "L’indipendenza finanziaria non è prevista entro {{age}} anni. Confronta le ipotesi in Simulazioni.",
+      "late_one": "L’indipendenza finanziaria è prevista {{count}} anno dopo l’età desiderata. Confronta le ipotesi in Simulazioni.",
+      "late_other": "L’indipendenza finanziaria è prevista {{count}} anni dopo l’età desiderata. Confronta le ipotesi in Simulazioni.",
+      "late_many": "L’indipendenza finanziaria è prevista {{count}} anni dopo l’età desiderata. Confronta le ipotesi in Simulazioni."
     }
   },
   "sidebar": {
@@ -237,7 +241,8 @@
       "high_inflation": "Ipotesi di inflazione elevata. Le esigenze di spesa a lungo termine diventano più sensibili a questo tasso.",
       "high_fee": "Ipotesi di commissioni elevate. Il costo delle commissioni riduce sensibilmente i rendimenti a lungo termine.",
       "high_volatility": "Ipotesi di volatilità elevata. Gli intervalli di risultato possono diventare molto ampi.",
-      "high_contribution_growth": "Ipotesi di crescita del contributo elevata. Questo presuppone aumenti di risparmio ampi e costanti nel tempo."
+      "high_contribution_growth": "Ipotesi di crescita del contributo elevata. Questo presuppone aumenti di risparmio ampi e costanti nel tempo.",
+      "high_return": "Ipotesi di rendimento elevato. I saldi previsti sono sensibili a questo tasso."
     },
     "plan": {
       "kicker": "Piano",
@@ -258,14 +263,14 @@
       "desired_retirement_age_hint": "Età in cui vuoi diventare finanziariamente indipendente.",
       "retirement_age_hint": "Età in cui vuoi andare in pensione.",
       "horizon_age_fire": "Orizzonte del piano",
-      "horizon_age_traditional": "Aspettativa di vita",
+      "horizon_age_traditional": "Orizzonte del piano",
       "horizon_hint": "Età fino alla quale il piano deve coprire.",
       "monthly_contribution": "Contributo mensile",
       "monthly_contribution_hint": "Quanto aggiungi ogni mese fino alla pensione.",
-      "return_before_hint": "Rendimento annuo atteso durante il periodo di risparmio.",
-      "return_during_hint": "Rendimento annuo atteso dopo l'inizio dei prelievi.",
+      "return_before_hint": "Rendimento annuo ipotizzato durante il risparmio, prima delle commissioni.",
+      "return_during_hint": "Rendimento annuo ipotizzato dopo l’inizio dei prelievi, prima delle commissioni.",
       "annual_fee_hint": "Commissioni annue stimate del portafoglio.",
-      "inflation_hint": "Aumento annuo atteso dei prezzi."
+      "inflation_hint": "Aumento annuo ipotizzato dei prezzi."
     },
     "spending": {
       "kicker": "Spesa",
@@ -326,13 +331,13 @@
       "fund_return_before_payout": "Rendimento del fondo prima dell'erogazione",
       "fund_payout_rate": "Tasso di erogazione",
       "fund_payout_mode": "Modalità di erogazione",
-      "fund_payout_mode_help": "La rendita paga a vita; il prelievo programmato attinge al fondo fino a esaurirlo.",
+      "fund_payout_mode_help": "La rendita modella pagamenti fino all’orizzonte del piano; i prelievi utilizzano il saldo del fondo fino all’esaurimento.",
       "annuity": "Rendita",
       "drawdown": "Prelievo programmato",
       "fund_return_during_payout": "Rendimento del fondo durante l'erogazione",
-      "drawdown_note": "Il prelievo programmato preleva il {{pct}}%/anno del saldo all'età di inizio, poi segue l'impostazione di crescita qui sotto fino a esaurire il fondo.",
+      "drawdown_note": "I prelievi sono stimati al {{pct}}% annuo del saldo del fondo. Per i pagamenti già iniziati, prevale l’importo mensile inserito. I pagamenti seguono poi il tasso di crescita impostato fino all’esaurimento del fondo.",
       "monthly_payout_after_tax": "Erogazione mensile netta",
-      "payout_estimate_note": "L'erogazione stimata utilizza il {{pct}}%/anno del saldo proiettato del fondo, salvo che tu inserisca un'erogazione mensile.",
+      "payout_estimate_note": "Il pagamento stimato è pari al {{pct}}% annuo del saldo del fondo. Per i pagamenti già iniziati, prevale l’importo mensile inserito.",
       "start_age": "Età di inizio",
       "income_growth": "Crescita dell'entrata",
       "income_growth_help": "Scegli se questa entrata cresce con l'inflazione del piano o resta fissa.",
@@ -471,15 +476,15 @@
     "quick_start": {
       "title": "Avvio rapido — 5 passaggi",
       "step1_title": "Imposta le basi del piano",
-      "step1_desc": "In Dati del piano, scegli il tipo di piano, il mese di nascita, l'età di pensionamento, l'aspettativa di vita e il contributo mensile.",
+      "step1_desc": "Nei dati del piano, imposta tipo, mese di nascita, età pensionabile, orizzonte e contributo mensile.",
       "step2_title": "Inserisci la spesa pensionistica",
       "step2_desc": "In Spesa pensionistica, aggiungi le voci di spesa mensile che vuoi che il piano finanzi. Usa il valore di oggi; l'inflazione è gestita dalle ipotesi del piano.",
       "step3_title": "Aggiungi entrate pensionistiche",
-      "step3_desc": "In Entrate pensionistiche, aggiungi flussi di entrate mensili come pensioni pubbliche (es. INPS in Italia, CPP/OAS in Canada, Social Security negli USA), pensioni aziendali, lavoro part-time o rendite. Usa Aggiungi fondo pensione solo quando il pianificatore deve stimare un'erogazione dal saldo di un fondo al 3,5%/anno, a meno che tu non inserisca tu stesso un'erogazione mensile.",
+      "step3_desc": "Aggiungi redditi pensionistici, lavoro part-time o rendite. Per un fondo pensione, il pagamento mensile stimato usa il saldo previsto e il tasso annuo configurato, salvo inserimento di un importo mensile.",
       "step4_title": "Verifica ipotesi, imposte e quote dei conti",
       "step4_desc": "Rivedi i rendimenti proiettati, le commissioni, la volatilità, l'inflazione, le aliquote fiscali sul prelievo, le categorie fiscali e quali conti finanziano l'obiettivo.",
       "step5_title": "Leggi Panoramica, poi apri Simulazioni",
-      "step5_desc": "Panoramica risponde se il piano base funziona e mostra la traiettoria, la copertura della spesa e i dati del piano. Simulazioni testa lo stesso piano su diverse traiettorie di mercato, stress test, mappe decisionali e verifiche avanzate."
+      "step5_desc": "La panoramica mostra proiezione base, copertura delle spese e dati. Le simulazioni confrontano percorsi di mercato, scenari di stress e modifiche delle ipotesi."
     },
     "overview": {
       "title": "Capire Panoramica",
@@ -499,13 +504,13 @@
     "what_if": {
       "title": "Capire Simulazioni",
       "market_paths_title": "Traiettorie di mercato",
-      "market_paths_desc": "Testa lo stesso piano su molte possibili traiettorie di mercato usando le tue ipotesi di rendimento, volatilità e inflazione. L'intervallo ombreggiato mostra i risultati da cattivo a buono; la linea mostra la traiettoria mediana. Il capitale dura significa che il piano copre la spesa essenziale e rimangono ancora soldi per tutto l'orizzonte di pianificazione. In modalità FIRE, il piano deve anche raggiungere prima l'indipendenza finanziaria.",
+      "market_paths_desc": "Modelliamo diversi percorsi di mercato con le tue ipotesi. L’area ombreggiata mostra il 10°–90° percentile a ogni età; la linea mostra la mediana tra i percorsi, non un percorso individuale. Si contano i percorsi che coprono le spese essenziali e terminano con capitale residuo; quelli FIRE devono anche raggiungere l’indipendenza finanziaria.",
       "base_case_title": "Caso base",
       "base_case_desc": "Mostra lo stesso piano base deterministico di Panoramica, poi indica il risultato di stress più rilevante così puoi vedere cosa conta di più.",
       "stress_tests_title": "Stress test",
       "stress_tests_desc": "Verifiche fisse mostrano come cambia il piano se i rendimenti sono più bassi, l'inflazione è più alta, la spesa aumenta, la pensione inizia prima, il risparmio diminuisce o si verifica un crollo di mercato vicino alla pensione.",
       "what_moves_title": "Cosa muove il piano?",
-      "what_moves_desc": "Le mappe decisionali confrontano risparmio, rendimenti, età di pensionamento e spesa. Le celle verdi lasciano più soldi alla fine. Le celle rosse lasciano comunque un deficit o si esauriscono.",
+      "what_moves_desc": "Confronta risparmio, rendimenti, età pensionabile e spese. Verde indica più capitale finale del piano base; ambra, meno. Rosso indica un deficit o nessun capitale residuo.",
       "crash_paths_title": "Traiettorie di crollo di mercato anticipato",
       "crash_paths_desc": "Confronta alcune traiettorie in base al momento del crollo vicino alla pensione. Un crollo nel primo anno di pensione può danneggiare più della stessa caduta più avanti, perché i prelievi avvengono mentre il portafoglio è in ribasso."
     },
@@ -514,25 +519,24 @@
       "yearly_spending_title": "Come viene modellata la spesa annuale",
       "yearly_spending_desc": "Le tue spese determinano il prelievo. Ogni anno il pianificatore finanzia il piano di spesa che hai inserito, sottrae le entrate pensionistiche e stima eventuali costi fiscali sui prelievi dal portafoglio.",
       "target_calc_title": "Come viene calcolato l'obiettivo",
-      "target_calc_desc": "Il pianificatore calcola il valore attuale dell'intero calendario di spesa dalla pensione fino al tuo orizzonte di pianificazione, tenendo conto del tasso di inflazione di ciascuna categoria di spesa, dei flussi di entrate che iniziano a età diverse e del costo fiscale sui prelievi. Quando il tuo portafoglio raggiunge questo importo, il piano base ha capitale sufficiente per il calendario che hai inserito. Questo è più accurato di un semplice multiplo delle spese perché gestisce spese variabili, pensioni differite e orizzonti finiti.",
+      "target_calc_desc": "Il pianificatore stima il portafoglio iniziale necessario a finanziare le spese pensionistiche fino all’orizzonte del piano. Modella inflazione delle spese, tempistiche dei redditi, rendimenti, commissioni e imposte sui prelievi. L’obiettivo dipende da queste ipotesi.",
       "inflation_title": "Tasso di inflazione",
-      "inflation_desc": "Tutte le proiezioni fanno crescere le spese e le entrate legate all'inflazione a questo tasso, anno dopo anno. Il valore predefinito del 2% corrisponde all'obiettivo della BCE.",
-      "inflation_it_note": "Usa il 2,5–3% per un'ipotesi più prudente basata sull'IPC italiano.",
+      "inflation_desc": "L’ipotesi di inflazione aumenta nel tempo spese e redditi indicizzati. Le singole voci possono usare tassi propri.",
       "returns_title": "Rendimenti, commissioni e volatilità",
       "returns_desc": "Il rendimento prima della pensione guida l'accumulo. Il rendimento durante la pensione guida la fase di prelievo e il capitale richiesto. Le commissioni di investimento annue vengono sottratte da entrambi. La volatilità viene usata solo nelle verifiche sulle traiettorie di mercato: valori più alti producono un ventaglio di risultati più ampio.",
       "horizon_title": "Età dell'orizzonte di pianificazione",
-      "horizon_desc": "Per quanto tempo deve durare il portafoglio. L'obiettivo pensionistico e le verifiche di Simulazioni arrivano fino a questa età. Impostala a 90–95 per mettere alla prova la longevità. Sia le traiettorie di crollo di mercato anticipato sia Il capitale dura vengono misurate su questo orizzonte."
+      "horizon_desc": "L’età fino alla quale vengono modellati spese pensionistiche e risultati Simulazioni. È un’ipotesi sul periodo di pianificazione, non una previsione della durata della vita."
     },
     "italian": {
       "title": "Impostazione pensionistica italiana (fondo pensione, TFR, INPS)",
       "portfolio_title": "Portafoglio di investimento (Golden Butterfly, All-Weather…)",
       "portfolio_desc": "Questo è il tuo portafoglio principale, il valore che Wealthfolio traccia. Imposta qui le tue ipotesi di rendimento, il costo delle commissioni e il contributo mensile. È il motore principale di accumulo del tuo piano pensionistico.",
       "fondo_title": "Fondo pensione integrativo",
-      "fondo_desc": "Usa Aggiungi fondo pensione. Inserisci il saldo attuale del fondo, il contributo mensile, il rendimento atteso del fondo e l'età di inizio erogazione. Il pianificatore stima il saldo futuro e, se non inserisci un'erogazione mensile, stima l'erogazione come il 3,5%/anno di quel saldo proiettato a partire dall'età di inizio.",
+      "fondo_desc": "Usa Aggiungi fondo pensione. Inserisci saldo, contributo, rendimento ipotizzato ed età di erogazione. La stima usa il tasso di erogazione configurato, salvo inserimento di un importo mensile. I prelievi cessano all’esaurimento del fondo; le rendite sono modellate fino all’orizzonte del piano.",
       "inps_title": "Pensione INPS (previdenza obbligatoria)",
       "inps_desc": "Usa Aggiungi entrata pensionistica. Inserisci la tua pensione netta mensile stimata in valore di oggi e imposta l'età di inizio erogazione. Usa Indicizzata se vuoi che l'entrata cresca secondo l'ipotesi di inflazione del piano.",
       "tfr_title": "TFR (Trattamento di Fine Rapporto)",
-      "tfr_desc": "Se il tuo TFR confluisce in un fondo pensione, includilo nel contributo mensile al fondo. Se lo mantieni separato, modellalo come un altro fondo pensione con proprio saldo, contributo, rendimento ed età di inizio erogazione. Si applica la stessa stima di erogazione del 3,5%/anno, a meno che tu non inserisca tu stesso un'erogazione mensile."
+      "tfr_desc": "Se il TFR confluisce in un fondo pensione, includilo nel contributo. Un fondo separato può rappresentare il TFR accantonato a parte; i pagamenti modellati seguono il tasso o l’importo mensile configurato."
     }
   },
   "type": {
@@ -783,7 +787,7 @@
       "retirement_gap": "Deficit pensionistico",
       "fi_moves_prefix": "L'IF si sposta",
       "fi_moves_suffix": "anni più tardi",
-      "largest_risk": "{{label}} è il rischio maggiore",
+      "largest_risk": "{{label}} ha l’effetto maggiore tra questi test",
       "and": "e",
       "none": "Nessuno",
       "surplus": "surplus",
@@ -807,7 +811,10 @@
       "money_lasts_summary_traditional": "resta finanziato fino all'età {{horizonAge}}",
       "money_lasts_summary_fire": "IF raggiunta + finanziato fino all'età {{horizonAge}}",
       "money_lasts_prompt_traditional": "Esegui 10k traiettorie per vedere con quale frequenza il piano resta finanziato fino all'età {{horizonAge}}.",
-      "money_lasts_prompt_fire": "Esegui 10k traiettorie per vedere con quale frequenza il piano raggiunge l'IF e resta finanziato fino all'età {{horizonAge}}."
+      "money_lasts_prompt_fire": "Esegui 10k traiettorie per vedere con quale frequenza il piano raggiunge l'IF e resta finanziato fino all'età {{horizonAge}}.",
+      "of_simulated_paths": "dei percorsi simulati",
+      "simulation_tooltip_traditional": "Il {{percent}}% dei percorsi simulati copre le spese essenziali e termina con capitale residuo. I colori usano fasce di riferimento: meno del 75%, dal 75% a meno del 90% e almeno il 90%. Sono risultati modellati, non probabilità reali.",
+      "simulation_tooltip_fire": "Il {{percent}}% dei percorsi simulati copre le spese essenziali e termina con capitale residuo. I percorsi devono anche raggiungere l’indipendenza finanziaria. I colori usano fasce di riferimento: meno del 75%, dal 75% a meno del 90% e almeno il 90%. Sono risultati modellati, non probabilità reali."
     },
     "stress": {
       "eyebrow_with_count": "Cosa potrebbe compromettere questo piano? · {{count}} scenari",
@@ -825,7 +832,7 @@
     "montecarlo": {
       "eyebrow": "Traiettorie di mercato",
       "heading": "Con quale frequenza potrebbe durare il capitale?",
-      "intro": "Testiamo lo stesso piano su molte possibili traiettorie di mercato. L'intervallo ombreggiato mostra i risultati da cattivo a buono; la linea mostra la traiettoria mediana.",
+      "intro": "Modelliamo diversi percorsi di mercato con le tue ipotesi. L’area ombreggiata mostra il 10°–90° percentile a ogni età; la linea mostra la mediana tra i percorsi, non un percorso individuale.",
       "run_10k": "Esegui 10k traiettorie",
       "run_100k": "Esegui 100k traiettorie",
       "running_short": "Esecuzione…",
@@ -837,17 +844,17 @@
       "median_fi_age": "Età mediana IF",
       "withdrawals_start_detail": "inizio dei prelievi",
       "vs_goal": "rispetto all'obiettivo {{age}}",
-      "bad_path": "Traiettoria negativa",
-      "middle_path": "Traiettoria mediana",
-      "good_path": "Traiettoria positiva"
+      "bad_path": "Esito inferiore",
+      "middle_path": "Mediana",
+      "good_path": "Esito superiore"
     },
     "chart": {
       "age_label": "Età {{age}}",
       "age_detail": "età {{age}}",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "IF mediana @{{age}}",
-      "bad_good_range": "Intervallo negativo-positivo",
-      "median_path": "Traiettoria mediana",
+      "bad_good_range": "Intervallo 10°–90° percentile",
+      "median_path": "Mediana",
       "retirement_age": "Età di pensionamento",
       "goal_age": "Età obiettivo",
       "median_fi_age": "Età mediana IF",
@@ -856,12 +863,13 @@
       "goal": "obiettivo",
       "market_paths_count_one": "{{count}} traiettoria di mercato",
       "market_paths_count_many": "{{count}} traiettorie di mercato",
-      "market_paths_count_other": "{{count}} traiettorie di mercato"
+      "market_paths_count_other": "{{count}} traiettorie di mercato",
+      "percentile_at_age": "Percentile {{percentile}} · età {{age}}"
     },
     "moves": {
       "eyebrow": "Cosa cambia di più il piano?",
       "heading": "Cosa muove il piano?",
-      "description": "Mostra come risparmio, rendimenti, età di pensionamento e spesa cambiano il risultato. Verde = più capitale residuo; rosso = deficit o esaurimento.",
+      "description": "Confronta risparmio, rendimenti, età pensionabile e spese. Verde indica più capitale finale del piano base; ambra, meno. Rosso indica un deficit o nessun capitale residuo.",
       "empty_title": "Scopri quali modifiche aiuterebbero di più.",
       "empty_description": "Confronta il risparmiare di più, ottenere un rendimento diverso, spendere meno o andare in pensione a un'età diversa.",
       "building": "Elaborazione...",
@@ -890,6 +898,39 @@
       "unavailable_title": "Traiettorie di crollo non disponibili.",
       "empty_description": "Esegui le cinque traiettorie per vedere quale sequenza metterebbe per prima il piano sotto pressione.",
       "unavailable_description": "Questa verifica richiede un portafoglio proiettato positivo all'inizio della pensione."
+    },
+    "labels": {
+      "crash_year_1": "Crollo nell’anno 1 (−30%)",
+      "crash_year_5": "Crollo nell’anno 5 (−30%)",
+      "double_crash": "Due crolli",
+      "lost_decade": "Decennio perduto",
+      "after_fee_return": "Rendimento netto delle commissioni"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "Rendimenti inferiori",
+        "description": "I rendimenti prima e durante il pensionamento sono inferiori di 2 punti percentuali."
+      },
+      "inflation-shock": {
+        "label": "Inflazione superiore",
+        "description": "L’inflazione generale è superiore di 1,5 punti percentuali."
+      },
+      "spending-shock": {
+        "label": "Spese superiori",
+        "description": "Tutti gli importi delle spese pensionistiche sono superiori del 10%."
+      },
+      "retire-earlier": {
+        "label": "Pensionamento 2 anni prima",
+        "description": "L’età obiettivo viene anticipata di due anni, entro i limiti dell’età attuale del piano."
+      },
+      "save-less": {
+        "label": "Contributi inferiori",
+        "description": "I contributi mensili sono inferiori del 25%."
+      },
+      "early-crash": {
+        "label": "Crollo iniziale del mercato",
+        "description": "Si modella un calo del mercato del 30% nel primo anno di pensionamento."
+      }
     }
   }
 }
