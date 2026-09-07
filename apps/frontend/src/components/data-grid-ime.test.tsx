@@ -20,7 +20,7 @@ type PortalCellVariant = "multi-select" | "symbol" | "currency";
 
 const compositionEventCases = [
   { label: "modern composition event", eventInit: { isComposing: true } },
-  { label: "legacy WebKit composition event", eventInit: { keyCode: 229 } },
+  { label: "legacy WebKit composition event", eventInit: { isComposing: false, keyCode: 229 } },
 ] as const;
 
 class ResizeObserverStub {
@@ -52,7 +52,7 @@ const gridColumns: ColumnDef<TestRow>[] = [
   { accessorKey: "name", meta: { cell: { variant: "short-text" } } },
 ];
 
-function GridHarness() {
+function GridHarness({ selectCell = false }: { selectCell?: boolean }) {
   const grid = useDataGrid<TestRow>({
     data: gridData,
     columns: gridColumns,
@@ -60,10 +60,19 @@ function GridHarness() {
 
   return (
     <>
-      <button type="button" onClick={() => grid.tableMeta?.onCellEditingStart?.(0, "name")}>
+      <button
+        type="button"
+        onClick={(event) => {
+          if (selectCell) grid.tableMeta?.onCellClick?.(0, "name", event);
+          grid.tableMeta?.onCellEditingStart?.(0, "name");
+        }}
+      >
         Edit cell
       </button>
-      <div ref={grid.dataGridRef} data-testid="grid" />
+      <div ref={grid.dataGridRef} data-testid="grid">
+        <input aria-label="Cell draft" defaultValue="候選" />
+      </div>
+      <output data-testid="selected">{grid.cellSelectionMap?.get(0)?.size ?? 0}</output>
       <output data-testid="editing">{grid.editingCell ? "editing" : "idle"}</output>
     </>
   );
@@ -121,6 +130,28 @@ async function renderPortalCell(variant: PortalCellVariant) {
 }
 
 describe("CJK IME composition", () => {
+  it.each(compositionEventCases)(
+    "preserves selected cells and the draft for composing Escape from a $label",
+    async ({ eventInit }) => {
+      render(<GridHarness selectCell />);
+      fireEvent.click(screen.getByRole("button", { name: "Edit cell" }), { ctrlKey: true });
+      const input = screen.getByRole("textbox", { name: "Cell draft" });
+      input.focus();
+      expect(screen.getByTestId("selected")).toHaveTextContent("1");
+
+      fireEvent.keyDown(input, { key: "Escape", ...eventInit });
+      await act(() => Promise.resolve());
+      expect(screen.getByTestId("selected")).toHaveTextContent("1");
+      expect(screen.getByTestId("editing")).toHaveTextContent("editing");
+      expect(input).toHaveValue("候選");
+
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(screen.getByTestId("selected")).toHaveTextContent("0"));
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(screen.getByTestId("editing")).toHaveTextContent("idle"));
+    },
+  );
+
   it.each(
     compositionEventCases.flatMap(({ label, eventInit }) =>
       (["Enter", "Escape", "Tab"] as const).map((key) => ({ label, eventInit, key })),

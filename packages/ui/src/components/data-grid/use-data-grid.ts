@@ -3015,6 +3015,8 @@ function useDataGrid<TData>({
 
   React.useEffect(() => {
     function onGlobalKeyDown(event: KeyboardEvent) {
+      if (isKeyboardEventComposing(event)) return;
+
       const dataGridElement = dataGridRef.current;
       if (!dataGridElement) return;
 
