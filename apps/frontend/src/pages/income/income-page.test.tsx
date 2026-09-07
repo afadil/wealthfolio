@@ -35,8 +35,6 @@ vi.mock("@/components/account-filter-selector", () => ({
   ),
 }));
 
-vi.mock("./income-mobile-filter-sheet", () => ({ IncomeMobileFilterSheet: () => null }));
-
 const initialState = useAccountScopeStore.getState();
 
 function renderPage() {
@@ -44,7 +42,7 @@ function renderPage() {
 }
 
 function selectorScope(): AccountScope {
-  return JSON.parse(screen.getByTestId("account-scope-selector").dataset.scope ?? "null");
+  return JSON.parse(screen.getAllByTestId("account-scope-selector")[0].dataset.scope ?? "null");
 }
 
 describe("IncomePage account scope", () => {
@@ -66,7 +64,7 @@ describe("IncomePage account scope", () => {
   it("publishes a scope change to the shared store", async () => {
     renderPage();
 
-    await userEvent.click(screen.getByTestId("account-scope-selector"));
+    await userEvent.click(screen.getAllByTestId("account-scope-selector")[0]);
 
     expect(useAccountScopeStore.getState().scope).toEqual({
       type: "account",
@@ -76,7 +74,7 @@ describe("IncomePage account scope", () => {
 
   it("keeps the scope when the page unmounts on a tab switch", async () => {
     const { unmount } = renderPage();
-    await userEvent.click(screen.getByTestId("account-scope-selector"));
+    await userEvent.click(screen.getAllByTestId("account-scope-selector")[0]);
 
     // Switching insights tabs unmounts the inactive view on desktop.
     unmount();
