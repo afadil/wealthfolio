@@ -1335,16 +1335,16 @@
     }
   },
   "suppressed": {
-    "summary_one": "已刪除的 {{count}} 筆券商活動正被排除在日後的同步之外。",
-    "summary_other": "已刪除的 {{count}} 筆券商活動正被排除在日後的同步之外。",
+    "summary_one": "已刪除的 {{count}} 筆券商交易紀錄正被排除在日後的同步之外。",
+    "summary_other": "已刪除的 {{count}} 筆券商交易紀錄正被排除在日後的同步之外。",
     "review": "檢視",
-    "title": "已刪除的券商活動",
-    "description": "您的券商仍會提供這些紀錄，因此每次同步都會把它們加回來。在您恢復它們之前，它們會一直被排除在外。",
+    "title": "已刪除的券商交易紀錄",
+    "description": "您的券商仍會提供這些紀錄，因此每次同步都會把它們加回來。在您還原它們之前，它們會一直被排除在外。",
     "deleted_on": "刪除於 {{date}}",
-    "restore": "恢復",
-    "restore_all": "全部恢復",
-    "restored_one": "已恢復 {{count}} 筆活動。下次同步會再次更新它。",
-    "restored_other": "已恢復 {{count}} 筆活動。下次同步會再次更新它們。",
-    "restore_failed": "無法恢復"
+    "restore": "還原",
+    "restore_all": "全部還原",
+    "restored_one": "已還原 {{count}} 筆交易紀錄。下次同步會再次更新它。",
+    "restored_other": "已還原 {{count}} 筆交易紀錄。下次同步會再次更新它們。",
+    "restore_failed": "無法還原"
   }
 }
