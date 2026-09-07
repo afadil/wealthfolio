@@ -8578,7 +8578,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-agent-tools"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8595,7 +8595,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-ai"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8626,7 +8626,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8683,7 +8683,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -8701,7 +8701,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-core"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8746,7 +8746,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -8770,7 +8770,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-market-data"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -8792,7 +8792,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-mcp"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "async-trait",
  "axum 0.8.9",
@@ -8817,7 +8817,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-server"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -8870,7 +8870,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-spending"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8890,7 +8890,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "3.8.0"
+version = "3.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
