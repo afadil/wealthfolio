@@ -130,8 +130,6 @@
       "fi_reached_prefix": "Você alcançou a",
       "financial_independence": "independência financeira",
       "fi_reached_suffix": "— com as premissas atuais.",
-      "years_after_many": "{{count}} anos depois de",
-      "years_before_many": "{{count}} anos antes de",
       "not_reachable_prefix": "Não projetada até",
       "not_reachable_suffix": "com as premissas atuais.",
       "fi_projected": "Pelas projeções, você alcançará a independência financeira aos <age>{{age}} anos</age>."
@@ -232,7 +230,8 @@
       "reached": "A carteira atual atinge a meta estimada de independência financeira segundo suas premissas.",
       "not_reached": "A independência financeira não é projetada até os {{age}} anos. Compare premissas em E se.",
       "late_one": "A independência financeira é projetada {{count}} ano após a idade desejada. Compare premissas em E se.",
-      "late_other": "A independência financeira é projetada {{count}} anos após a idade desejada. Compare premissas em E se."
+      "late_other": "A independência financeira é projetada {{count}} anos após a idade desejada. Compare premissas em E se.",
+      "late_many": "A independência financeira é projetada {{count}} anos após a idade desejada. Compare premissas em E se."
     }
   },
   "sidebar": {

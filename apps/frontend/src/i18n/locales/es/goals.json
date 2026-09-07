@@ -130,8 +130,6 @@
       "fi_reached_prefix": "Has alcanzado la",
       "financial_independence": "independencia financiera",
       "fi_reached_suffix": "— con las suposiciones actuales.",
-      "years_after_many": "{{count}} años después de",
-      "years_before_many": "{{count}} años antes de",
       "not_reachable_prefix": "No se proyecta antes de",
       "not_reachable_suffix": "con las suposiciones actuales.",
       "fi_projected": "Se proyecta que alcanzarás la independencia financiera a los <age>{{age}} años</age>."
@@ -232,7 +230,8 @@
       "reached": "La cartera actual alcanza el objetivo estimado de independencia financiera según tus supuestos.",
       "not_reached": "No se proyecta alcanzar la independencia financiera antes de los {{age}} años. Compara supuestos en Qué pasaría si.",
       "late_one": "Se proyecta alcanzar la independencia financiera {{count}} año después de la edad deseada. Compara supuestos en Qué pasaría si.",
-      "late_other": "Se proyecta alcanzar la independencia financiera {{count}} años después de la edad deseada. Compara supuestos en Qué pasaría si."
+      "late_other": "Se proyecta alcanzar la independencia financiera {{count}} años después de la edad deseada. Compara supuestos en Qué pasaría si.",
+      "late_many": "Se proyecta alcanzar la independencia financiera {{count}} años después de la edad deseada. Compara supuestos en Qué pasaría si."
     }
   },
   "sidebar": {

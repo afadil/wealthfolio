@@ -130,8 +130,6 @@
       "fi_reached_prefix": "Hai raggiunto",
       "financial_independence": "l'indipendenza finanziaria",
       "fi_reached_suffix": "— con le ipotesi attuali.",
-      "years_after_many": "{{count}} anni dopo",
-      "years_before_many": "{{count}} anni prima",
       "not_reachable_prefix": "Non prevista entro",
       "not_reachable_suffix": "con le ipotesi attuali.",
       "fi_projected": "Secondo le proiezioni, raggiungerai l’indipendenza finanziaria a <age>{{age}} anni</age>."
@@ -232,7 +230,8 @@
       "reached": "Il portafoglio attuale raggiunge l’obiettivo stimato di indipendenza finanziaria secondo le tue ipotesi.",
       "not_reached": "L’indipendenza finanziaria non è prevista entro {{age}} anni. Confronta le ipotesi in Simulazioni.",
       "late_one": "L’indipendenza finanziaria è prevista {{count}} anno dopo l’età desiderata. Confronta le ipotesi in Simulazioni.",
-      "late_other": "L’indipendenza finanziaria è prevista {{count}} anni dopo l’età desiderata. Confronta le ipotesi in Simulazioni."
+      "late_other": "L’indipendenza finanziaria è prevista {{count}} anni dopo l’età desiderata. Confronta le ipotesi in Simulazioni.",
+      "late_many": "L’indipendenza finanziaria è prevista {{count}} anni dopo l’età desiderata. Confronta le ipotesi in Simulazioni."
     }
   },
   "sidebar": {
