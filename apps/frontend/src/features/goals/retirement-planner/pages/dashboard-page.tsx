@@ -13,7 +13,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
 import { useCallback, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
   COVERAGE_COLORS,
   RetirementCoverageChart,
@@ -193,7 +193,7 @@ export default function DashboardPage({
   const formatting = useAmountFormatting();
   const numberFormatting = useNumberFormatting();
   const { t } = useTranslation();
-  const L = modeLabel(plannerMode);
+  const L = modeLabel(plannerMode, t);
   const isTraditionalMode = plannerMode === "traditional";
   const { totalValue, error } = portfolioData;
   const portfolioNow = retirementOverview?.portfolioNow ?? totalValue;
@@ -457,14 +457,17 @@ export default function DashboardPage({
           number | null
         >((earliest, age) => (earliest == null ? age : Math.min(earliest, age)), null)
     : null;
-  const readiness = deriveRetirementReadiness({
-    overview: retirementOverview,
-    plannerMode,
-    isFinanciallyIndependent,
-    effectiveFiAge,
-    desiredAge: plan.personal.targetRetirementAge,
-    horizonAge: plan.personal.planningHorizonAge,
-  });
+  const readiness = deriveRetirementReadiness(
+    {
+      overview: retirementOverview,
+      plannerMode,
+      isFinanciallyIndependent,
+      effectiveFiAge,
+      desiredAge: plan.personal.targetRetirementAge,
+      horizonAge: plan.personal.planningHorizonAge,
+    },
+    t,
+  );
   const heroHealth =
     readiness.tone === "good" ? "on_track" : readiness.tone === "watch" ? "at_risk" : "off_track";
   const heroGuidance = readiness.body;
@@ -539,7 +542,9 @@ export default function DashboardPage({
               retirementOverview.portfolioAtGoalAge;
             const portfolioAtTarget =
               chartValueMode === "nominal" ? portfolioAtTargetNominal : portfolioAtTargetToday;
-            const monthlyContribLabel = `${formatting.formatCompactAmount(plan.investment.monthlyContribution, currency)}/mo`;
+            const monthlyContribLabel = t("goals:dashboard.coverage.amount_per_mo", {
+              amount: formatting.formatCompactAmount(plan.investment.monthlyContribution, currency),
+            });
             const annualBudgetToday =
               targetReconciliation?.plannedAnnualExpensesTodayValue ?? totalBudget * 12;
             const annualBudgetNominal =
@@ -597,7 +602,9 @@ export default function DashboardPage({
                             ? traditionalBadge
                             : yearsFromDesired != null && yearsFromDesired > 0
                               ? t("goals:dashboard.badge.years_late", { count: yearsFromDesired })
-                              : t("goals:dashboard.badge.never_reaches_fi")}
+                              : t("goals:dashboard.badge.never_reaches_fi", {
+                                  age: plan.personal.planningHorizonAge,
+                                })}
                         </Badge>
                       )}
                     </div>
@@ -718,38 +725,14 @@ export default function DashboardPage({
                         </span>
                       </>
                     ) : effectiveFiAge != null ? (
-                      <>
-                        {t("goals:dashboard.verdict.fi_at_prefix")}{" "}
-                        <span className={`font-medium ${statusAccent} whitespace-nowrap`}>
-                          {t("goals:dashboard.verdict.age", { age: effectiveFiAge })}
-                        </span>
-                        {yearsFromDesired != null && yearsFromDesired !== 0 ? (
-                          <>
-                            {" — "}
-                            <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
-                              {yearsFromDesired > 0
-                                ? t("goals:dashboard.verdict.years_after", {
-                                    count: yearsFromDesired,
-                                  })
-                                : t("goals:dashboard.verdict.years_before", {
-                                    count: -yearsFromDesired,
-                                  })}{" "}
-                              {t("goals:dashboard.verdict.your_goal_of", {
-                                age: plan.personal.targetRetirementAge,
-                              })}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {" — "}
-                            <span className="text-muted-foreground font-sans text-[0.6em] font-normal italic">
-                              {t("goals:dashboard.verdict.right_on_goal", {
-                                age: plan.personal.targetRetirementAge,
-                              })}
-                            </span>
-                          </>
-                        )}
-                      </>
+                      <Trans
+                        t={t}
+                        i18nKey="goals:dashboard.verdict.fi_projected"
+                        values={{ age: effectiveFiAge }}
+                        components={{
+                          age: <span className={`font-medium ${statusAccent} whitespace-nowrap`} />,
+                        }}
+                      />
                     ) : (
                       <>
                         {t("goals:dashboard.verdict.not_reachable_prefix")}{" "}
@@ -766,56 +749,59 @@ export default function DashboardPage({
                     )}
                   </h1>
 
-                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
-                    {t("goals:dashboard.summary.at_your_current_prefix")}{" "}
-                    <span className="text-foreground tabular-nums">{monthlyContribLabel}</span>{" "}
-                    {t("goals:dashboard.summary.contribution")}{" "}
-                    {!requiredCapitalReachable ? (
-                      <>{t("goals:dashboard.summary.capital_not_available")}</>
-                    ) : isTraditionalMode ? (
-                      <>
-                        {t("goals:dashboard.summary.projected_balance_is")}{" "}
-                        <ValueModeTooltip
-                          valueMode={chartValueMode}
-                          currency={currency}
-                          todayValue={portfolioAtTargetToday}
-                          nominalValue={portfolioAtTargetNominal}
-                        >
-                          <span className="text-foreground tabular-nums">
-                            {formatting.formatCompactAmount(portfolioAtTarget, currency)}
-                          </span>
-                        </ValueModeTooltip>{" "}
-                        {t("goals:dashboard.summary.vs_required_capital_of")}{" "}
-                        <ValueModeTooltip
-                          valueMode={chartValueMode}
-                          currency={currency}
-                          todayValue={targetTodayAtGoal}
-                          nominalValue={targetNominalAtGoal}
-                        >
-                          <span className="text-foreground tabular-nums">
-                            {formatting.formatCompactAmount(targetAtGoalDisplay, currency)}
-                          </span>
-                        </ValueModeTooltip>{" "}
-                        {t("goals:dashboard.summary.at_age", {
-                          age: plan.personal.targetRetirementAge,
-                        })}
-                      </>
-                    ) : (
-                      <>
-                        {t("goals:dashboard.summary.the_plan_funds")}{" "}
-                        <ValueModeTooltip
-                          valueMode={chartValueMode}
-                          currency={currency}
-                          todayValue={annualBudgetToday}
-                          nominalValue={annualBudgetNominal}
-                        >
-                          <span className="text-foreground tabular-nums">{annualBudgetLabel}</span>
-                        </ValueModeTooltip>
-                        {t("goals:dashboard.summary.per_yr_expenses_to_age", {
-                          age: plan.personal.planningHorizonAge,
-                        })}
-                      </>
-                    )}
+                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
+                    <Trans
+                      t={t}
+                      i18nKey={
+                        !requiredCapitalReachable
+                          ? "goals:dashboard.summary.unavailable"
+                          : isTraditionalMode
+                            ? "goals:dashboard.summary.traditional"
+                            : "goals:dashboard.summary.fire"
+                      }
+                      values={{
+                        contribution: monthlyContribLabel,
+                        age: isTraditionalMode
+                          ? plan.personal.targetRetirementAge
+                          : plan.personal.planningHorizonAge,
+                        balance: formatting.formatCompactAmount(portfolioAtTarget, currency),
+                        target: formatting.formatCompactAmount(targetAtGoalDisplay, currency),
+                        budget: annualBudgetLabel,
+                      }}
+                      components={{
+                        contribution: <span className="text-foreground tabular-nums" />,
+                        balance: (
+                          <ValueModeTooltip
+                            valueMode={chartValueMode}
+                            currency={currency}
+                            todayValue={portfolioAtTargetToday}
+                            nominalValue={portfolioAtTargetNominal}
+                          >
+                            {null}
+                          </ValueModeTooltip>
+                        ),
+                        target: (
+                          <ValueModeTooltip
+                            valueMode={chartValueMode}
+                            currency={currency}
+                            todayValue={targetTodayAtGoal}
+                            nominalValue={targetNominalAtGoal}
+                          >
+                            {null}
+                          </ValueModeTooltip>
+                        ),
+                        budget: (
+                          <ValueModeTooltip
+                            valueMode={chartValueMode}
+                            currency={currency}
+                            todayValue={annualBudgetToday}
+                            nominalValue={annualBudgetNominal}
+                          >
+                            {null}
+                          </ValueModeTooltip>
+                        ),
+                      }}
+                    />
                     {requiredCapitalReachable &&
                       !isTraditionalMode &&
                       goalShortfall > 0 &&
@@ -1053,7 +1039,12 @@ export default function DashboardPage({
                   {
                     key: "lean",
                     label: t("goals:dashboard.milestone.lean_fire"),
-                    value: targetAtGoalDisplay * 0.7,
+                    value:
+                      retirementOverview?.leanRequiredCapitalAtGoalAge == null
+                        ? null
+                        : chartValueMode === "nominal"
+                          ? retirementOverview.leanRequiredCapitalAtGoalAge
+                          : retirementOverview.leanRequiredCapitalAtGoalAge / inflationFactorToGoal,
                     hint: t("goals:dashboard.milestone.lean_hint"),
                     tip: t("goals:dashboard.milestone.lean_tip"),
                   },
@@ -1067,16 +1058,26 @@ export default function DashboardPage({
                   {
                     key: "fat",
                     label: t("goals:dashboard.milestone.fat_fire"),
-                    value: targetAtGoalDisplay * 1.5,
+                    value:
+                      retirementOverview?.fatRequiredCapitalAtGoalAge == null
+                        ? null
+                        : chartValueMode === "nominal"
+                          ? retirementOverview.fatRequiredCapitalAtGoalAge
+                          : retirementOverview.fatRequiredCapitalAtGoalAge / inflationFactorToGoal,
                     hint: t("goals:dashboard.milestone.fat_hint"),
                     tip: t("goals:dashboard.milestone.fat_tip"),
                   },
                 ].map((m) => {
-                  const pct = m.value > 0 ? Math.min(1, milestonePortfolioDisplay / m.value) : 0;
-                  const reached = milestonePortfolioDisplay >= m.value && m.value > 0;
+                  const pct =
+                    m.value == null
+                      ? 0
+                      : m.value === 0
+                        ? 1
+                        : Math.min(1, milestonePortfolioDisplay / m.value);
+                  const reached = m.value != null && milestonePortfolioDisplay >= m.value;
                   return (
                     <div key={m.key} className="p-4">
-                      <div className="mb-1.5 flex items-center gap-1.5">
+                      <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                         <span className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">
                           {m.label}
                         </span>
@@ -1104,7 +1105,7 @@ export default function DashboardPage({
                         )}
                       </div>
                       <div className="text-[17px] font-semibold tabular-nums tracking-tight">
-                        {formatting.formatCompactAmount(m.value, currency)}
+                        {m.value == null ? "—" : formatting.formatCompactAmount(m.value, currency)}
                       </div>
                       <div className="bg-muted/60 mt-2 h-[3px] overflow-hidden rounded-sm">
                         <div
@@ -1371,7 +1372,7 @@ export default function DashboardPage({
                                     {s.label}
                                   </span>
                                   <span className="text-muted-foreground block truncate text-[11px]">
-                                    {incomeAgeRangeLabel(s, plan.personal.planningHorizonAge)}
+                                    {incomeAgeRangeLabel(s, plan.personal.planningHorizonAge, t)}
                                     {status ? ` · ${status}` : ""}
                                   </span>
                                 </span>

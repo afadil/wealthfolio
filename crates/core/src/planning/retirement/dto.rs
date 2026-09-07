@@ -296,6 +296,10 @@ pub struct RetirementOverview {
     pub portfolio_at_goal_age: f64,
     pub required_capital_reachable: bool,
     pub required_capital_at_goal_age: f64,
+    #[serde(default)]
+    pub lean_required_capital_at_goal_age: Option<f64>,
+    #[serde(default)]
+    pub fat_required_capital_at_goal_age: Option<f64>,
     pub shortfall_at_goal_age: f64,
     pub surplus_at_goal_age: f64,
     pub funded_through_age: Option<u32>,
@@ -886,6 +890,8 @@ pub fn compute_retirement_overview_with_mode(
         portfolio_at_goal_age: portfolio_at_goal,
         required_capital_reachable,
         required_capital_at_goal_age: required_capital_value,
+        lean_required_capital_at_goal_age: None,
+        fat_required_capital_at_goal_age: None,
         shortfall_at_goal_age: shortfall,
         surplus_at_goal_age: surplus,
         funded_through_age,

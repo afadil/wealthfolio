@@ -107,17 +107,17 @@
       "on_track": "Auf Kurs",
       "fi_reached": "FU erreicht",
       "at_risk": "Gefährdet",
-      "never_reaches_fi": "Erreicht FU nie",
+      "never_reaches_fi": "Bis Alter {{age}} nicht prognostiziert",
       "years_late_one": "{{count}} Jahr zu spät",
       "years_late_other": "{{count}} Jahre zu spät"
     },
     "verdict": {
       "age": "Alter {{age}}",
-      "spending_gap_prefix": "Die Ausgabenlücke beginnt bei",
+      "spending_gap_prefix": "Eine Ausgabenlücke wird prognostiziert ab",
       "spending_gap_suffix": "bevor der Plan das Alter von {{age}} erreicht.",
-      "short_prefix": "Mit {{age}} fehlen Ihnen",
+      "short_prefix": "Mit {{age}} Jahren beträgt Ihre prognostizierte Lücke",
       "short_suffix": "um den Ruhestand bis zum Alter von {{age}} zu finanzieren.",
-      "depleted_prefix": "Das Portfolio reicht nicht bis",
+      "depleted_prefix": "Das Portfolio reicht voraussichtlich nicht mehr ab",
       "depleted_suffix": "nach dem Ruhestandsbeginn mit {{age}}.",
       "surplus_prefix": "Sie gehen voraussichtlich mit {{age}} in den Ruhestand, mit",
       "surplus_suffix": "Überschuss.",
@@ -126,33 +126,23 @@
       "fi_reached_prefix": "Sie haben",
       "financial_independence": "finanzielle Unabhängigkeit",
       "fi_reached_suffix": "— unter den aktuellen Annahmen — erreicht.",
-      "fi_at_prefix": "Sie erreichen finanzielle Unabhängigkeit mit",
-      "years_after_one": "{{count}} Jahr danach",
-      "years_after_other": "{{count}} Jahre danach",
-      "years_before_one": "{{count}} Jahr davor",
-      "years_before_other": "{{count}} Jahre davor",
-      "your_goal_of": "Ihr Ziel von {{age}}.",
-      "right_on_goal": "genau auf Ihrem Ziel von {{age}}.",
-      "not_reachable_prefix": "Nicht erreichbar bis",
-      "not_reachable_suffix": "unter den aktuellen Annahmen."
+      "not_reachable_prefix": "Nicht prognostiziert bis",
+      "not_reachable_suffix": "unter den aktuellen Annahmen.",
+      "fi_projected": "Sie erreichen voraussichtlich mit <age>{{age}} Jahren</age> finanzielle Unabhängigkeit."
     },
     "summary": {
-      "at_your_current_prefix": "Bei Ihrer aktuellen",
-      "contribution": "Beitrag,",
-      "capital_not_available": "das erforderliche Kapitalziel ist unter den aktuellen Annahmen nicht erreichbar. Überprüfen Sie Ausgaben, Inflation, Renditen und Lebenserwartung.",
-      "projected_balance_is": "der prognostizierte Ruhestandssaldo beträgt",
-      "vs_required_capital_of": "gegenüber einem erforderlichen Kapital von",
       "at_age": "mit {{age}}.",
-      "the_plan_funds": "der Plan finanziert",
-      "per_yr_expenses_to_age": "/Jahr an Ausgaben bis zum Alter von {{age}}.",
-      "youre_short": "Ihnen fehlen"
+      "youre_short": "Ihre prognostizierte Lücke beträgt",
+      "traditional": "Bei Ihren aktuellen Annahmen und einem Beitrag von <contribution>{{contribution}}</contribution> beträgt das prognostizierte Guthaben mit {{age}} Jahren <balance>{{balance}}</balance>, gegenüber einem Kapitalbedarf von <target>{{target}}</target>.",
+      "fire": "Bei Ihren aktuellen Annahmen und einem Beitrag von <contribution>{{contribution}}</contribution> enthält der Plan Ausgaben von <budget>{{budget}}</budget>/Jahr bis Alter {{age}}.",
+      "unavailable": "Bei Ihren aktuellen Annahmen und einem Beitrag von <contribution>{{contribution}}</contribution> lässt sich das Kapitalziel nicht schätzen. Vergleichen Sie Annahmen unter Was wäre wenn."
     },
     "progress": {
       "portfolio_today": "Portfolio heute",
       "required_at_age": "Erforderlich mit {{age}}",
       "target_at_age": "Ziel mit {{age}}",
-      "capital_needed_tip_traditional": "Kapital, das in Ihrem Ruhestandsalter nach Ausgaben, Einkommen, Steuern, Ruhestandsrenditen und Gebühren benötigt wird. Angezeigt in {{valueLabel}}.",
-      "capital_needed_tip_fire": "Kapital, das in Ihrem gewünschten Ruhestandsalter nach Ausgaben, Einkommen, Steuern, Ruhestandsrenditen und Gebühren benötigt wird. Angezeigt in {{valueLabel}}.",
+      "capital_needed_tip_traditional": "Geschätzter Kapitalbedarf im Zielrentenalter anhand der Annahmen zu Ausgaben, Einkommen, Steuern, Renditen und Gebühren. Angezeigt in {{valueLabel}}.",
+      "capital_needed_tip_fire": "Geschätzter Kapitalbedarf im Zielrentenalter anhand der Annahmen zu Ausgaben, Einkommen, Steuern, Renditen und Gebühren. Angezeigt in {{valueLabel}}.",
       "not_available": "Nicht verfügbar",
       "funded_pct": "{{pct}} % finanziert"
     },
@@ -169,18 +159,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "Beiträge stoppen, trotzdem pünktlich in Rente",
-      "coast_tip_nominal": "Coast-Betrag in Nominalbeträge zu Ihrem gewünschten Ruhestandsalter umgerechnet.",
-      "coast_tip_real": "Kapital, das Sie heute benötigen und das — ohne weitere Beiträge — bis zu Ihrem Ruhestandsalter auf die volle FU anwächst.",
+      "coast_hint": "Geschätztes Kapital heute",
+      "coast_tip_nominal": "Das heute benötigte geschätzte Kapital, ausgedrückt im Geldwert zum Rentenalter anhand der angenommenen Inflation. Dies ist eine Wertumrechnung, kein prognostiziertes Anlagewachstum.",
+      "coast_tip_real": "Geschätztes heutiges Kapital: Das Rentenziel wird mit der angenommenen Rendite vor dem Ruhestand nach Gebühren abgezinst. Die Rentenannahmen bleiben unverändert.",
       "lean_fire": "Lean FIRE",
       "lean_hint": "70 % der geplanten Ausgaben",
-      "lean_tip": "In den Ruhestand mit einem sparsamen Budget — etwa 70 % Ihrer geplanten Ausgaben. Früher machbar, lässt aber wenig Spielraum.",
+      "lean_tip": "Geschätztes Kapital für 70 % Ihrer geplanten Ausgaben bei unveränderten übrigen Annahmen. Dies ist das Lean-FIRE-Szenario des Planers.",
       "fi": "FU",
       "fi_hint": "Volle geplante Ausgaben",
       "fi_tip": "Kapital, das Ihre geplanten Ruhestandsausgaben über den gesamten Ruhestandshorizont finanziert.",
       "fat_fire": "Fat FIRE",
       "fat_hint": "150 % der geplanten Ausgaben",
-      "fat_tip": "In den Ruhestand mit etwa 50 % mehr Ausgaben als geplant — Spielraum für Reisen, Geschenke, Schwankungen und einen höheren Lebensstandard.",
+      "fat_tip": "Geschätztes Kapital für 150 % Ihrer geplanten Ausgaben bei unveränderten übrigen Annahmen. Dies ist das Fat-FIRE-Szenario des Planers.",
       "more_info_about": "Mehr Infos zu {{label}}",
       "done": "ERREICHT"
     },
@@ -217,11 +207,26 @@
       "unfunded": "Nicht finanziert",
       "planned_spending_legend": "Geplante Ausgaben",
       "showing": "Anzeige in {{valueLabel}}",
-      "projection_unavailable": "Die Deckungsprognose ist für diesen Plan nicht verfügbar."
+      "projection_unavailable": "Die Deckungsprognose ist für diesen Plan nicht verfügbar.",
+      "age_range": "Alter {{start}} → {{end}}",
+      "starts_at": "Ab Alter {{age}}",
+      "ended_at": "Endete mit {{age}}",
+      "not_active": "Nicht aktiv"
     },
     "disclaimer": {
       "title": "Eines sollten Sie bedenken",
-      "body": "Dies ist keine Finanzberatung. Betrachten Sie diese Zahlen als Skizze, nicht als Prognose. Alles hier ist eine Simulation auf Basis der von Ihnen eingegebenen Daten: Renditen, Inflation, Beiträge, Steuern und wie lange Sie voraussichtlich leben. Reale Märkte verlaufen nicht geradlinig, Steuerregeln ändern sich und staatliche Programme werden neu geschrieben. Nutzen Sie dies, um Ideen zu prüfen und Lücken zu erkennen, und sprechen Sie dann mit einer qualifizierten Fachperson, bevor Sie schwer umkehrbare Entscheidungen treffen."
+      "body": "Projektionen beruhen auf Ihren Annahmen. Tatsächliche Ergebnisse können abweichen. Keine Finanzberatung."
+    },
+    "guidance": {
+      "unavailable": "Das Ziel lässt sich mit den aktuellen Annahmen nicht schätzen. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "depleted": "Das Portfolio reicht voraussichtlich ab Alter {{age}} nicht mehr aus. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "gap": "Ab Alter {{age}} wird eine Ausgabenlücke prognostiziert. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "fund": "{{label}} ist voraussichtlich mit {{age}} aufgebraucht; die modellierten Zahlungen enden dann. Vergleichen Sie Auszahlungs- und Einkommensannahmen.",
+      "shortfall": "Zum Ruhestand wird eine Lücke prognostiziert. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "reached": "Das aktuelle Portfolio erreicht unter Ihren Annahmen das geschätzte Ziel für finanzielle Unabhängigkeit.",
+      "not_reached": "Finanzielle Unabhängigkeit wird bis Alter {{age}} nicht prognostiziert. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "late_one": "Finanzielle Unabhängigkeit wird {{count}} Jahr nach Ihrem Wunschalter prognostiziert. Vergleichen Sie Annahmen unter Was wäre wenn.",
+      "late_other": "Finanzielle Unabhängigkeit wird {{count}} Jahre nach Ihrem Wunschalter prognostiziert. Vergleichen Sie Annahmen unter Was wäre wenn."
     }
   },
   "sidebar": {
@@ -231,7 +236,8 @@
       "high_inflation": "Hohe Inflationsannahme. Langfristige Ausgabenbedarfe reagieren bei diesem Satz empfindlicher.",
       "high_fee": "Hohe Gebührenannahme. Der Gebühreneffekt verringert die langfristigen Renditen erheblich.",
       "high_volatility": "Hohe Volatilitätsannahme. Die Ergebnisbandbreiten können sehr breit werden.",
-      "high_contribution_growth": "Hohe Annahme zum Beitragswachstum. Dies setzt anhaltend starke Sparsteigerungen voraus."
+      "high_contribution_growth": "Hohe Annahme zum Beitragswachstum. Dies setzt anhaltend starke Sparsteigerungen voraus.",
+      "high_return": "Hohe Renditeannahme. Die prognostizierten Guthaben reagieren empfindlich auf diesen Satz."
     },
     "plan": {
       "kicker": "Plan",
@@ -252,14 +258,14 @@
       "desired_retirement_age_hint": "Alter, in dem Sie finanziell unabhängig werden möchten.",
       "retirement_age_hint": "Alter, in dem Sie in Rente gehen möchten.",
       "horizon_age_fire": "Planhorizont (Alter)",
-      "horizon_age_traditional": "Lebenserwartung",
+      "horizon_age_traditional": "Planhorizont (Alter)",
       "horizon_hint": "Alter, bis zu dem der Plan reichen soll.",
       "monthly_contribution": "Monatlicher Beitrag",
       "monthly_contribution_hint": "Wie viel Sie jeden Monat bis zum Ruhestand hinzufügen.",
-      "return_before_hint": "Erwartete jährliche Rendite, während Sie sparen.",
-      "return_during_hint": "Erwartete jährliche Rendite nach Beginn der Entnahmen.",
+      "return_before_hint": "Angenommene jährliche Rendite während des Sparens, vor Anlagegebühren.",
+      "return_during_hint": "Angenommene jährliche Rendite nach Beginn der Entnahmen, vor Anlagegebühren.",
       "annual_fee_hint": "Geschätzte jährliche Portfoliogebühren.",
-      "inflation_hint": "Erwarteter jährlicher Preisanstieg."
+      "inflation_hint": "Angenommener jährlicher Preisanstieg."
     },
     "spending": {
       "kicker": "Ausgaben",
@@ -320,13 +326,13 @@
       "fund_return_before_payout": "Fondsrendite vor Auszahlung",
       "fund_payout_rate": "Auszahlungsrate",
       "fund_payout_mode": "Auszahlungsart",
-      "fund_payout_mode_help": "Eine Rente zahlt lebenslang; eine Entnahme zehrt den Fonds auf, bis er leer ist.",
+      "fund_payout_mode_help": "Die Rentenoption modelliert laufende Zahlungen bis zum Planungshorizont; Entnahmen verbrauchen das Fondsguthaben bis zur Erschöpfung.",
       "annuity": "Rente",
       "drawdown": "Entnahme",
       "fund_return_during_payout": "Fondsrendite während der Auszahlung",
-      "drawdown_note": "Die Entnahme verwendet {{pct}} %/Jahr des Saldos zum Startalter und folgt danach der Wachstumseinstellung unten, bis der Fonds leer ist.",
+      "drawdown_note": "Die geschätzte Entnahme beträgt {{pct}} % des Fondsguthabens pro Jahr. Bei bereits laufenden Auszahlungen hat ein eingegebener Monatsbetrag Vorrang. Danach folgen die Zahlungen der Wachstumseinstellung, bis das Guthaben aufgebraucht ist.",
       "monthly_payout_after_tax": "Monatliche Auszahlung nach Steuern",
-      "payout_estimate_note": "Die geschätzte Auszahlung verwendet {{pct}} %/Jahr des prognostizierten Fondssaldos, sofern Sie keine monatliche Auszahlung eingeben.",
+      "payout_estimate_note": "Die geschätzte Auszahlung beträgt {{pct}} % des Fondsguthabens pro Jahr. Bei bereits laufenden Auszahlungen hat ein eingegebener Monatsbetrag Vorrang.",
       "start_age": "Startalter",
       "income_growth": "Einkommenswachstum",
       "income_growth_help": "Wählen Sie, ob dieses Einkommen mit der Plan-Inflation steigt oder fest bleibt.",
@@ -465,15 +471,15 @@
     "quick_start": {
       "title": "Schnellstart — 5 Schritte",
       "step1_title": "Grundlagen des Plans festlegen",
-      "step1_desc": "Wählen Sie unter Plan-Eingaben den Plantyp, den Geburtsmonat, das Rentenalter, die Lebenserwartung und den monatlichen Beitrag.",
+      "step1_desc": "Legen Sie in den Planeingaben Plantyp, Geburtsmonat, Rentenalter, Planungshorizont und monatlichen Beitrag fest.",
       "step2_title": "Ausgaben im Ruhestand eingeben",
       "step2_desc": "Fügen Sie unter Ausgaben im Ruhestand die monatlichen Ausgabenposten hinzu, die der Plan finanzieren soll. Verwenden Sie heutiges Geld; die Inflation wird durch die Plan-Annahmen berücksichtigt.",
       "step3_title": "Renteneinkommen hinzufügen",
-      "step3_desc": "Fügen Sie unter Renteneinkommen monatliche Einkommensströme hinzu, wie z. B. staatliche Renten (z. B. CPP/OAS in Kanada, Social Security in den USA), Betriebsrenten, Teilzeitarbeit oder Rentenzahlungen. Verwenden Sie Pensionsfonds hinzufügen nur, wenn der Planer eine Auszahlung aus einem Fondsguthaben mit 3,5 %/Jahr schätzen soll, sofern Sie nicht selbst eine monatliche Auszahlung eingeben.",
+      "step3_desc": "Fügen Sie Ruhestandseinkommen wie Renten, Teilzeitarbeit oder Leibrenten hinzu. Bei einem Pensionsfonds basiert die geschätzte monatliche Auszahlung auf dem prognostizierten Guthaben und dem eingestellten jährlichen Auszahlungssatz, sofern kein Monatsbetrag eingegeben wird.",
       "step4_title": "Annahmen, Steuern und Kontoanteile prüfen",
       "step4_desc": "Überprüfen Sie prognostizierte Renditen, Gebühren, Volatilität, Inflation, Steuersätze für Entnahmen, Steuertöpfe und welche Konten das Ziel finanzieren.",
       "step5_title": "Übersicht lesen, dann Was-wäre-wenn öffnen",
-      "step5_desc": "Die Übersicht beantwortet, ob der Basisplan funktioniert, und zeigt die Entwicklung, die Ausgabendeckung und die Plan-Eingaben. Was-wäre-wenn testet denselben Plan über Marktpfade, Stresstests, Entscheidungskarten und erweiterte Prüfungen."
+      "step5_desc": "Die Übersicht zeigt Basisprojektion, Ausgabendeckung und Eingaben. Szenarien vergleichen modellierte Marktverläufe, Belastungen und geänderte Annahmen."
     },
     "overview": {
       "title": "Die Übersicht verstehen",
@@ -493,13 +499,13 @@
     "what_if": {
       "title": "Was-wäre-wenn verstehen",
       "market_paths_title": "Marktpfade",
-      "market_paths_desc": "Testet denselben Plan über viele mögliche Marktpfade unter Verwendung Ihrer Annahmen zu Rendite, Volatilität und Inflation. Der schattierte Bereich zeigt Ergebnisse von schlecht bis gut; die Linie zeigt den mittleren Pfad. Geld reicht bedeutet, dass der Plan die wesentlichen Ausgaben deckt und bis zum Planungshorizont noch Geld übrig ist. Im FIRE-Modus muss der Plan zudem zuerst die finanzielle Unabhängigkeit erreichen.",
+      "market_paths_desc": "Wir modellieren verschiedene Marktverläufe anhand Ihrer Annahmen. Die Schattierung zeigt das 10.–90. Perzentil je Alter; die Linie zeigt den Median aller Verläufe, keinen einzelnen Verlauf. Gezählt werden Verläufe, die notwendige Ausgaben decken und mit Restkapital enden; FIRE-Verläufe müssen auch finanzielle Unabhängigkeit erreichen.",
       "base_case_title": "Basisfall",
       "base_case_desc": "Zeigt denselben deterministischen Basisplan wie die Übersicht und verweist dann auf das größte Stresstest-Ergebnis, damit Sie sehen, was am wichtigsten ist.",
       "stress_tests_title": "Stresstests",
       "stress_tests_desc": "Feste Prüfungen zeigen, wie sich der Plan ändert, wenn die Renditen niedriger sind, die Inflation höher ist, die Ausgaben steigen, der Ruhestand früher beginnt, die Ersparnisse sinken oder ein Marktcrash kurz vor dem Ruhestand eintritt.",
       "what_moves_title": "Was beeinflusst den Plan?",
-      "what_moves_desc": "Entscheidungskarten vergleichen Ersparnisse, Renditen, Rentenalter und Ausgaben. Grüne Zellen lassen am Ende mehr Geld übrig. Rote Zellen lassen weiterhin eine Lücke oder werden knapp.",
+      "what_moves_desc": "Vergleichen Sie Sparen, Renditen, Rentenalter und Ausgaben. Grün bedeutet mehr Restkapital als im Basisplan, Gelb weniger. Rot zeigt eine Lücke oder kein Restkapital.",
       "crash_paths_title": "Pfade eines frühen Marktcrashs",
       "crash_paths_desc": "Vergleicht einige Crash-Zeitpunkt-Pfade kurz vor dem Ruhestand. Ein Crash im ersten Ruhestandsjahr kann mehr schaden als derselbe Crash später, da die Entnahmen erfolgen, während das Portfolio im Minus ist."
     },
@@ -508,25 +514,24 @@
       "yearly_spending_title": "Wie jährliche Ausgaben modelliert werden",
       "yearly_spending_desc": "Ihre Ausgaben bestimmen die Entnahme. Jedes Jahr finanziert der Planer den von Ihnen eingegebenen Ausgabenplan, zieht das Renteneinkommen ab und schätzt die Steuerlast auf Portfolio-Entnahmen.",
       "target_calc_title": "Wie das Ziel berechnet wird",
-      "target_calc_desc": "Der Planer berechnet den Barwert Ihres gesamten Ausgabenplans vom Ruhestand bis zu Ihrem Planungshorizont — unter Berücksichtigung der Inflationsrate jedes Ausgabentopfs, der Einkommensströme, die in unterschiedlichen Altersstufen beginnen, und der Steuerlast auf Entnahmen. Wenn Ihr Portfolio diesen Betrag erreicht, verfügt der Basisplan über genügend Kapital für den von Ihnen eingegebenen Plan. Das ist genauer als ein einfaches Vielfaches der Ausgaben, da es variable Ausgaben, aufgeschobene Renten und endliche Horizonte berücksichtigt.",
+      "target_calc_desc": "Der Planer schätzt das Startportfolio zur Finanzierung der Ruhestandsausgaben bis zum Planungshorizont. Er modelliert Ausgabeninflation, Einkommenszeitpunkte, Renditen, Gebühren und Entnahmesteuern. Das Ziel hängt von diesen Annahmen ab.",
       "inflation_title": "Inflationsrate",
-      "inflation_desc": "Alle Projektionen lassen Ausgaben und inflationsgebundenes Einkommen Jahr für Jahr mit dieser Rate wachsen. Der Standardwert von 2 % entspricht dem EZB-Ziel.",
-      "inflation_it_note": "Verwenden Sie 2,5–3 % für eine konservativere Annahme des italienischen VPI.",
+      "inflation_desc": "Die Inflationsannahme erhöht Ausgaben und inflationsgebundene Einnahmen im Zeitverlauf. Einzelne Posten können eigene Raten verwenden.",
       "returns_title": "Renditen, Gebühren und Volatilität",
       "returns_desc": "Die Rendite vor dem Ruhestand bestimmt die Ansparphase. Die Rendite während des Ruhestands bestimmt die Entnahmephase und das erforderliche Kapital. Jährliche Anlagegebühren werden von beiden abgezogen. Die Volatilität wird nur bei Marktpfad-Prüfungen verwendet — höhere Werte erzeugen eine breitere Spanne von Ergebnissen.",
       "horizon_title": "Alter des Planungshorizonts",
-      "horizon_desc": "Wie lange das Portfolio reichen muss. Das Rentenziel und die Was-wäre-wenn-Prüfungen laufen bis zu diesem Alter. Setzen Sie es auf 90–95, um die Langlebigkeit zu testen. Pfade eines frühen Marktcrashs und Geld reicht werden beide an diesem Horizont gemessen."
+      "horizon_desc": "Das Alter, bis zu dem Ruhestandsausgaben und Was-wäre-wenn-Ergebnisse modelliert werden. Eine Annahme über den Planungszeitraum, keine Vorhersage der Lebensdauer."
     },
     "italian": {
       "title": "Italienische Ruhestandseinrichtung (fondo pensione, TFR, INPS)",
       "portfolio_title": "Anlageportfolio (Golden Butterfly, All-Weather…)",
       "portfolio_desc": "Dies ist Ihr Hauptportfolio — der Wert, den Wealthfolio verfolgt. Legen Sie hier Ihre Renditeannahmen, die Gebührenlast und den monatlichen Beitrag fest. Es ist der primäre Ansparmotor Ihres Ruhestandsplans.",
       "fondo_title": "Fondo pensione integrativo (zusätzlicher Pensionsfonds)",
-      "fondo_desc": "Verwenden Sie Pensionsfonds hinzufügen. Geben Sie das aktuelle Fondsguthaben, den monatlichen Beitrag, die erwartete Fondsrendite und das Alter des Auszahlungsbeginns ein. Der Planer schätzt das künftige Guthaben und schätzt, falls Sie keine monatliche Auszahlung eingeben, die Auszahlung auf 3,5 %/Jahr dieses prognostizierten Guthabens ab dem Startalter.",
+      "fondo_desc": "Verwenden Sie Pensionsfonds hinzufügen. Geben Sie Guthaben, Beitrag, angenommene Rendite und Auszahlungsalter ein. Die Schätzung verwendet den eingestellten Auszahlungssatz, sofern kein Monatsbetrag eingegeben wird. Entnahmen enden bei Erschöpfung des Fonds; Rentenzahlungen werden bis zum Planungshorizont modelliert.",
       "inps_title": "Pensione INPS (staatliche Rente — previdenza obbligatoria)",
       "inps_desc": "Verwenden Sie Renteneinkommen hinzufügen. Geben Sie Ihre geschätzte monatliche Nettorente in heutigem Geld ein und legen Sie das Alter des Auszahlungsbeginns fest. Verwenden Sie Indexiert, wenn das Einkommen mit der Inflationsannahme des Plans steigen soll.",
       "tfr_title": "TFR (Trattamento di Fine Rapporto — Abfindungsansammlung)",
-      "tfr_desc": "Wenn Ihr TFR in einen Pensionsfonds fließt, berücksichtigen Sie es im monatlichen Fondsbeitrag. Wenn Sie es getrennt halten, modellieren Sie es als weiteren Pensionsfonds mit eigenem Guthaben, Beitrag, Rendite und Alter des Auszahlungsbeginns. Dieselbe Auszahlungsschätzung von 3,5 %/Jahr gilt, sofern Sie nicht selbst eine monatliche Auszahlung eingeben."
+      "tfr_desc": "Fließt die TFR in einen Pensionsfonds, berücksichtigen Sie sie im Beitrag. Ein separater Fonds kann getrennte TFR-Ersparnisse abbilden; seine modellierten Auszahlungen folgen dem eingestellten Satz oder Monatsbetrag."
     }
   },
   "type": {
@@ -774,7 +779,7 @@
       "retirement_gap": "Rentenlücke",
       "fi_moves_prefix": "FU verschiebt sich um",
       "fi_moves_suffix": "Jahre später",
-      "largest_risk": "{{label}} ist das größte Risiko",
+      "largest_risk": "{{label}} hat unter diesen Tests den größten Effekt",
       "and": "und",
       "none": "Keine",
       "surplus": "Überschuss",
@@ -797,7 +802,10 @@
       "money_lasts_summary_traditional": "bleibt bis zum Alter von {{horizonAge}} finanziert",
       "money_lasts_summary_fire": "FU erreicht + finanziert bis zum Alter von {{horizonAge}}",
       "money_lasts_prompt_traditional": "Führen Sie 10k Pfade aus, um zu sehen, wie oft der Plan bis zum Alter von {{horizonAge}} finanziert bleibt.",
-      "money_lasts_prompt_fire": "Führen Sie 10k Pfade aus, um zu sehen, wie oft der Plan FU erreicht und bis zum Alter von {{horizonAge}} finanziert bleibt."
+      "money_lasts_prompt_fire": "Führen Sie 10k Pfade aus, um zu sehen, wie oft der Plan FU erreicht und bis zum Alter von {{horizonAge}} finanziert bleibt.",
+      "of_simulated_paths": "der simulierten Verläufe",
+      "simulation_tooltip_traditional": "{{percent}} % der simulierten Verläufe decken notwendige Ausgaben und enden mit verbleibendem Kapital. Die Farben verwenden Referenzbereiche: unter 75 %, 75 % bis unter 90 % und mindestens 90 %. Dies sind Modellergebnisse, keine realen Wahrscheinlichkeiten.",
+      "simulation_tooltip_fire": "{{percent}} % der simulierten Verläufe decken notwendige Ausgaben und enden mit verbleibendem Kapital. Sie müssen auch finanzielle Unabhängigkeit erreichen. Die Farben verwenden Referenzbereiche: unter 75 %, 75 % bis unter 90 % und mindestens 90 %. Dies sind Modellergebnisse, keine realen Wahrscheinlichkeiten."
     },
     "stress": {
       "eyebrow_with_count": "Was könnte diesen Plan gefährden? · {{count}} Szenarien",
@@ -814,7 +822,7 @@
     "montecarlo": {
       "eyebrow": "Marktpfade",
       "heading": "Wie oft könnte das Geld reichen?",
-      "intro": "Wir testen denselben Plan über viele mögliche Marktpfade. Der schattierte Bereich zeigt Ergebnisse von schlecht bis gut; die Linie zeigt den mittleren Pfad.",
+      "intro": "Wir modellieren verschiedene Marktverläufe anhand Ihrer Annahmen. Die Schattierung zeigt das 10.–90. Perzentil je Alter; die Linie zeigt den Median aller Verläufe, keinen einzelnen Verlauf.",
       "run_10k": "10k Pfade ausführen",
       "run_100k": "100k Pfade ausführen",
       "running_short": "Wird ausgeführt…",
@@ -826,17 +834,17 @@
       "median_fi_age": "Median-FU-Alter",
       "withdrawals_start_detail": "Auszahlungen beginnen",
       "vs_goal": "vs. Ziel {{age}}",
-      "bad_path": "Schlechter Pfad",
-      "middle_path": "Mittlerer Pfad",
-      "good_path": "Guter Pfad"
+      "bad_path": "Unteres Ergebnis",
+      "middle_path": "Median",
+      "good_path": "Oberes Ergebnis"
     },
     "chart": {
       "age_label": "Alter {{age}}",
       "age_detail": "Alter {{age}}",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "Median-FU @{{age}}",
-      "bad_good_range": "Schlecht-gut-Bereich",
-      "median_path": "Mittlerer Pfad",
+      "bad_good_range": "10.–90. Perzentil",
+      "median_path": "Median",
       "retirement_age": "Renteneintrittsalter",
       "goal_age": "Zielalter",
       "median_fi_age": "Median-FU-Alter",
@@ -844,12 +852,13 @@
       "retire": "Rente",
       "goal": "Ziel",
       "market_paths_count_one": "{{count}} Marktpfad",
-      "market_paths_count_other": "{{count}} Marktpfade"
+      "market_paths_count_other": "{{count}} Marktpfade",
+      "percentile_at_age": "Perzentil {{percentile}} · Alter {{age}}"
     },
     "moves": {
       "eyebrow": "Was verändert den Plan am meisten?",
       "heading": "Was bewegt den Plan?",
-      "description": "Zeigt, wie Ersparnisse, Renditen, Renteneintrittsalter und Ausgaben das Ergebnis verändern. Grün = mehr verbleibendes Geld; Rot = Fehlbetrag oder wird knapp.",
+      "description": "Vergleichen Sie Sparen, Renditen, Rentenalter und Ausgaben. Grün bedeutet mehr Restkapital als im Basisplan, Gelb weniger. Rot zeigt eine Lücke oder kein Restkapital.",
       "empty_title": "Sehen Sie, welche Änderungen am meisten helfen würden.",
       "empty_description": "Vergleichen Sie mehr zu sparen, eine andere Rendite zu erzielen, weniger auszugeben oder in einem anderen Alter in Rente zu gehen.",
       "building": "Wird erstellt...",
@@ -878,6 +887,39 @@
       "unavailable_title": "Crash-Pfade nicht verfügbar.",
       "empty_description": "Führen Sie die fünf Pfade aus, um zu sehen, welche Abfolge den Plan zuerst unter Druck setzen würde.",
       "unavailable_description": "Diese Prüfung erfordert ein positives prognostiziertes Portfolio zu Beginn des Ruhestands."
+    },
+    "labels": {
+      "crash_year_1": "Crash im 1. Jahr (−30 %)",
+      "crash_year_5": "Crash im 5. Jahr (−30 %)",
+      "double_crash": "Zwei Crashs",
+      "lost_decade": "Verlorenes Jahrzehnt",
+      "after_fee_return": "Rendite nach Gebühren"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "Niedrigere Renditen",
+        "description": "Die Renditen vor und während des Ruhestands sind 2 Prozentpunkte niedriger."
+      },
+      "inflation-shock": {
+        "label": "Höhere Inflation",
+        "description": "Die allgemeine Inflation ist 1,5 Prozentpunkte höher."
+      },
+      "spending-shock": {
+        "label": "Höhere Ausgaben",
+        "description": "Alle Ruhestandsausgaben sind 10 % höher."
+      },
+      "retire-earlier": {
+        "label": "Ruhestand 2 Jahre früher",
+        "description": "Das Zielalter wird um zwei Jahre vorgezogen, begrenzt durch das aktuelle Alter im Plan."
+      },
+      "save-less": {
+        "label": "Niedrigere Beiträge",
+        "description": "Die monatlichen Beiträge sind 25 % niedriger."
+      },
+      "early-crash": {
+        "label": "Früher Markteinbruch",
+        "description": "Im ersten Ruhestandsjahr wird ein Marktrückgang von 30 % modelliert."
+      }
     }
   }
 }

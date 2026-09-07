@@ -206,7 +206,7 @@ export function AlternativeHoldingsTable({
         ),
         cell: ({ row }) => {
           const holding = row.original;
-          const formatted = formatting.formatDate(holding.valuationDate, {
+          const formatted = formatting.formatCalendarDate(holding.valuationDate.split("T")[0], {
             year: "numeric",
             month: "short",
             day: "numeric",

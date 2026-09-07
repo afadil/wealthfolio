@@ -222,12 +222,12 @@ export default function GoalDetailPage() {
       </Button>
     ) : null;
   const mobileRetirementTabs = hasRetirementTabs ? (
-    <div className="mb-4 overflow-x-auto pb-1 md:hidden">
+    <div className="mb-4 flex overflow-x-auto pb-1 md:hidden">
       <AnimatedToggleGroup
         variant="default"
         size="sm"
         rounded="full"
-        className="bg-muted/60 p-1"
+        className="bg-muted/60 mx-auto shrink-0 p-1"
         items={retirementTabItems}
         value={activeTab}
         onValueChange={setActiveTab}
