@@ -1,5 +1,6 @@
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import type { Quote } from "@/lib/types";
+import { parseLocalDate } from "@/lib/utils";
 import { createColumnHelper } from "@tanstack/react-table";
 import {
   Button,
@@ -22,7 +23,7 @@ import { toQuoteEntry, type QuoteEntry } from "./quote-history-utils";
 // Helper to normalize date values (handles both Date objects and strings from DateCell)
 const normalizeDate = (value: Date | string): Date => {
   if (value instanceof Date) return value;
-  return new Date(value);
+  return parseLocalDate(value);
 };
 
 const QUOTE_DECIMAL_PRECISION = 8;
@@ -54,7 +55,7 @@ const toQuote = (entry: QuoteEntry, assetId: string): Quote => {
     id: entry.id.startsWith("temp-") ? `${datePart}_${assetId.toUpperCase()}` : entry.id,
     createdAt: new Date().toISOString(),
     dataSource: "MANUAL",
-    timestamp: entry.date.toISOString(),
+    timestamp: format(entry.date, "yyyy-MM-dd'T'00:00:00'Z'"),
     assetId: assetId,
     open: entry.open,
     high: entry.high,

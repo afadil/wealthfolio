@@ -108,6 +108,34 @@ describe("ValueHistoryDataGrid mobile", () => {
     mockUseIsMobileViewport.mockReturnValue(true);
   });
 
+  it.each(["2026-09-06T12:00:00+00:00", "2026-09-06T00:00:00+00:00"])(
+    "preserves the saved day when editing a valuation at %s",
+    async (timestamp) => {
+      const onSaveQuote = vi.fn().mockResolvedValue(undefined);
+      renderGrid({
+        data: [{ ...createQuote("2026-09-06", 495_000), timestamp }],
+        onSaveQuote,
+      });
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: `Edit ${displayDate("2026-09-06")}, $495,000.00`,
+        }),
+      );
+      fireEvent.change(screen.getByRole("textbox", { name: "Balance" }), {
+        target: { value: "510000" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() =>
+        expect(onSaveQuote).toHaveBeenCalledWith(
+          expect.objectContaining({
+            timestamp: "2026-09-06T00:00:00Z",
+            close: 510_000,
+          }),
+        ),
+      );
+    },
+  );
+
   it("provides contextual row actions and a labelled notes field", () => {
     renderGrid();
 
