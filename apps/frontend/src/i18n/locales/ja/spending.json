@@ -361,9 +361,8 @@
     "spent": "支出",
     "allSubcategories": "すべてのサブカテゴリ",
     "tx": "件数",
-    "outflowsCount": "出金{{count}}件",
     "avgPerTx": "1件あたり平均",
-    "outflowsOnly": "出金のみ",
+    "acrossAllTx": "全取引が対象",
     "dailyPace": "1日あたりのペース",
     "inThisPeriod": "この期間",
     "subcategoryMix": "サブカテゴリの内訳",
@@ -375,7 +374,6 @@
     "noTransactions": "この期間に取引はありません。",
     "loadMore": "さらに{{count}}件読み込む",
     "openInTransactions": "取引一覧で開く",
-    "outflowsCount_other": "出金{{count}}件",
     "totalCount_other": "合計{{count}}件",
     "loadMore_other": "さらに{{count}}件読み込む"
   },

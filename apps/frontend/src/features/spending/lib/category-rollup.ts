@@ -44,6 +44,59 @@ export function topCategoryId(categoryId: string, meta: Map<string, RollupMeta>)
 }
 
 /**
+ * Walk a category's parent chain and return it in full: `[self, parent, …,
+ * root]`. `topCategoryId` is the last element; this variant is for callers
+ * that need the intermediate steps — e.g. attributing a leaf's amount to
+ * whichever ancestor is the *immediate child* of a category being drilled
+ * into.
+ *
+ * Same fallbacks as `topCategoryId`: a category missing from `meta` ends the
+ * chain (treat-as-top), and a cycle terminates at the repeated node.
+ */
+export function ancestorChain(categoryId: string, meta: Map<string, RollupMeta>): string[] {
+  const chain = [categoryId];
+  const seen = new Set<string>([categoryId]);
+  for (let i = 0; i < MAX_PARENT_DEPTH; i++) {
+    const parentId = meta.get(chain[chain.length - 1])?.parentId;
+    if (!parentId || seen.has(parentId)) return chain;
+    seen.add(parentId);
+    chain.push(parentId);
+  }
+  return chain;
+}
+
+/**
+ * A category id plus every id beneath it, transitively. Use this — not a
+ * direct-children scan — whenever a filter has to cover a whole subtree, so
+ * a grandchild's activities aren't silently dropped.
+ */
+export function descendantCategoryIds(
+  categoryId: string,
+  categories: { id: string; parentId?: string | null }[],
+): string[] {
+  const childrenByParent = new Map<string, string[]>();
+  for (const c of categories) {
+    if (!c.parentId) continue;
+    const siblings = childrenByParent.get(c.parentId);
+    if (siblings) siblings.push(c.id);
+    else childrenByParent.set(c.parentId, [c.id]);
+  }
+  const out: string[] = [];
+  const pending = [categoryId];
+  const seen = new Set<string>([categoryId]);
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    out.push(current);
+    for (const child of childrenByParent.get(current) ?? []) {
+      if (seen.has(child)) continue;
+      seen.add(child);
+      pending.push(child);
+    }
+  }
+  return out;
+}
+
+/**
  * Sum a list of `{ categoryId, amount }` rows by their top-level parent.
  * Returns a `Map<topId, total>` with rows whose total is `<= 0` filtered out
  * (matches the prior `where-i-am-stage` behavior; the no-budget case).
