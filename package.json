@@ -25,6 +25,7 @@
     "test:ui": "pnpm --filter frontend test:ui",
     "test:coverage": "pnpm --filter frontend test:coverage",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:net-worth": "playwright test --config playwright.net-worth.config.ts",
     "test:e2e:addon-sandbox": "node scripts/run-addon-sandbox-e2e.mjs",
     "test:e2e:ui": "node scripts/run-e2e.mjs --ui",
     "lint": "pnpm --filter frontend lint && pnpm -r lint",
