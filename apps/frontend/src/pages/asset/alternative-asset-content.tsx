@@ -603,7 +603,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t("asset:altContent.last_updated")}</span>
               <span className="font-medium">
-                {dateFormatting.formatDate(holding.valuationDate)}
+                {dateFormatting.formatCalendarDate(holding.valuationDate.split("T")[0])}
               </span>
             </div>
           )}

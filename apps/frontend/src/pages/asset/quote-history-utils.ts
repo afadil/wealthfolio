@@ -1,4 +1,5 @@
 import type { Quote } from "@/lib/types";
+import { parseLocalDate } from "@/lib/utils";
 
 export interface QuoteEntry {
   id: string;
@@ -16,7 +17,7 @@ export interface QuoteEntry {
 export function toQuoteEntry(quote: Quote): QuoteEntry {
   return {
     id: quote.id,
-    date: new Date(quote.timestamp),
+    date: parseLocalDate(quote.timestamp),
     open: quote.open,
     high: quote.high,
     low: quote.low,
