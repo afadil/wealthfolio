@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { FormattingProvider } from "@wealthfolio/ui";
+import { createAmountFormatting, FormattingProvider } from "@wealthfolio/ui";
 import { TooltipProvider } from "@wealthfolio/ui/components/ui/tooltip";
 import { describe, expect, it, vi } from "vitest";
 import type { RetirementOverview } from "@/lib/types";
@@ -53,12 +53,21 @@ function milestone(name: string) {
 
 describe("retirement spending milestones", () => {
   it("uses calculated scenario targets and converts their value basis", () => {
+    const formatting = createAmountFormatting("en-US");
     renderOverview(120_000, 800_000);
-    expect(milestone("Lean FIRE").getByText("$60K")).toBeInTheDocument();
-    expect(milestone("Fat FIRE").getByText("$400K")).toBeInTheDocument();
+    expect(
+      milestone("Lean FIRE").getByText(formatting.formatCompactAmount(60_000, "USD")),
+    ).toBeInTheDocument();
+    expect(
+      milestone("Fat FIRE").getByText(formatting.formatCompactAmount(400_000, "USD")),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Nominal", { exact: true }));
-    expect(milestone("Lean FIRE").getByText("$120K")).toBeInTheDocument();
-    expect(milestone("Fat FIRE").getByText("$800K")).toBeInTheDocument();
+    expect(
+      milestone("Lean FIRE").getByText(formatting.formatCompactAmount(120_000, "USD")),
+    ).toBeInTheDocument();
+    expect(
+      milestone("Fat FIRE").getByText(formatting.formatCompactAmount(800_000, "USD")),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "You're projected to reach financial independence at age 50.",
     );
