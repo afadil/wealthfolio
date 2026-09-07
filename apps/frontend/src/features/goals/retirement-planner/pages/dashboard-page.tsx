@@ -749,7 +749,7 @@ export default function DashboardPage({
                     )}
                   </h1>
 
-                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
                     <Trans
                       t={t}
                       i18nKey={

@@ -396,12 +396,6 @@ function PlanResilienceHero({
     <Card className="overflow-hidden shadow-sm">
       <CardContent className="space-y-4 p-5 md:p-6">
         <div className="flex gap-4">
-          <div
-            className={cn(
-              "mt-2 h-14 w-1.5 shrink-0 rounded-full",
-              isBaselineHealthy ? "bg-[hsl(111,25%,48%)]" : "bg-destructive",
-            )}
-          />
           <div className="min-w-0 space-y-3">
             <div>
               <p className="text-muted-foreground text-[9px] font-semibold uppercase tracking-[0.22em]">
@@ -419,7 +413,7 @@ function PlanResilienceHero({
                 </span>
                 .
               </h2>
-              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
                 {risk}
               </p>
             </div>
@@ -523,12 +517,6 @@ function severityBadgeClass(severity: StressSeverity) {
   return "bg-muted text-muted-foreground";
 }
 
-function severityRailClass(severity: StressSeverity) {
-  if (severity === "high") return "bg-destructive";
-  if (severity === "medium") return "bg-amber-500";
-  return "bg-border";
-}
-
 function impactTextClass(value: number, badWhenPositive = true) {
   if (Math.abs(value) < 1) return "text-foreground";
   const isBad = badWhenPositive ? value > 0 : value < 0;
@@ -536,7 +524,7 @@ function impactTextClass(value: number, badWhenPositive = true) {
 }
 
 function StressIcon({ id }: { id: StressTestResult["id"] }) {
-  const className = "mt-0.5 size-3.5 shrink-0 text-muted-foreground";
+  const className = "size-3.5 shrink-0 text-muted-foreground";
   switch (id) {
     case "return-drag":
       return <Icons.TrendingDown className={className} />;
@@ -680,17 +668,16 @@ function StressTestsSection({
               key={stress.id}
               className="bg-card relative overflow-hidden rounded-xl border shadow-sm"
             >
-              <div
-                className={cn(
-                  "absolute inset-y-5 left-0 w-0.5 rounded-r-full",
-                  severityRailClass(stress.severity),
-                )}
-              />
               <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <StressIcon id={stress.id} />
+                      <span
+                        aria-hidden="true"
+                        className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full"
+                      >
+                        <StressIcon id={stress.id} />
+                      </span>
                       <h3 className="text-base font-semibold leading-none">
                         {t(`goals:risk_lab.scenarios.${stress.id}.label`)}
                       </h3>
