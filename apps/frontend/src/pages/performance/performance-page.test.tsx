@@ -143,4 +143,64 @@ describe("PerformancePage shared scope", () => {
     await act(async () => resolveAccounts(accounts));
     await waitFor(() => expect(savedItems().some((item) => item.id === "b")).toBe(true));
   });
+
+  it("removes a saved multi-account comparison after a member is deleted, including on remount", async () => {
+    const deletedScope: TrackedItem = {
+      id: "accounts:a,deleted",
+      type: "account",
+      name: "Brokerage + Deleted",
+      accountScope: { type: "accounts", accountIds: ["a", "deleted"] },
+    };
+    localStorage.setItem(
+      "performance:selectedItems",
+      JSON.stringify([ALL_PORTFOLIO_ITEM, deletedScope]),
+    );
+    localStorage.setItem("performance:selectedItemId", JSON.stringify(deletedScope.id));
+    const page = renderPage();
+    await waitFor(() => expect(savedItems()).toEqual([ALL_PORTFOLIO_ITEM]));
+    expect(JSON.parse(localStorage.getItem("performance:selectedItemId")!)).toBeNull();
+    expect(mocks.performance).toHaveBeenLastCalledWith(
+      expect.objectContaining({ selectedItems: [ALL_PORTFOLIO_ITEM] }),
+    );
+    page.unmount();
+    renderPage();
+    expect(savedItems()).toEqual([ALL_PORTFOLIO_ITEM]);
+  });
+
+  it("prunes a deleted member before requesting performance after inventory refresh", async () => {
+    setScope({ type: "accounts", accountIds: ["a", "b"] });
+    const { client } = renderPage();
+    await waitFor(() => expect(savedItems().at(-1)?.id).toBe("accounts:a,b"));
+    mocks.performance.mockClear();
+    act(() =>
+      client.setQueryData(
+        [QueryKeys.ACCOUNTS, true],
+        accounts.filter((account) => account.id !== "b"),
+      ),
+    );
+    await waitFor(() => expect(savedItems()).toEqual([ALL_PORTFOLIO_ITEM]));
+    for (const [request] of mocks.performance.mock.calls) {
+      expect(request.selectedItems).toEqual([ALL_PORTFOLIO_ITEM]);
+    }
+    expect(JSON.parse(localStorage.getItem("performance:selectedItemId")!)).toBeNull();
+  });
+
+  it("keeps archived members for the backend to filter rather than treating them as deleted", async () => {
+    setScope({ type: "accounts", accountIds: ["a", "b"] });
+    const { client } = renderPage();
+    await waitFor(() => expect(savedItems().at(-1)?.id).toBe("accounts:a,b"));
+    const before = savedItems();
+    act(() =>
+      client.setQueryData(
+        [QueryKeys.ACCOUNTS, true],
+        accounts.map((account) => ({ ...account, isArchived: account.id === "b" })),
+      ),
+    );
+    await waitFor(() =>
+      expect(mocks.performance).toHaveBeenLastCalledWith(
+        expect.objectContaining({ selectedItems: before }),
+      ),
+    );
+    expect(savedItems()).toEqual(before);
+  });
 });

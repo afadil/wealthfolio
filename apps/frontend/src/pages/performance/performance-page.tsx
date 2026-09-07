@@ -79,6 +79,7 @@ import {
   ALL_PORTFOLIO_ITEM,
   migratePerformanceSelectedItemId,
   migratePerformanceSelectedItems,
+  prunePerformanceSelectedItems,
 } from "./performance-selection";
 import { usePerformanceScopeBridge } from "./hooks/use-performance-scope-bridge";
 
@@ -1041,10 +1042,12 @@ export default function PerformancePage() {
   // State for mobile dropdown menu
   const [accountSheetOpen, setAccountSheetOpen] = useState(false);
   const [benchmarkSheetOpen, setBenchmarkSheetOpen] = useState(false);
-  const selectedItems = useMemo(
-    () => migratePerformanceSelectedItems(storedSelectedItems),
-    [storedSelectedItems],
-  );
+  const selectedItems = useMemo(() => {
+    const migrated = migratePerformanceSelectedItems(storedSelectedItems);
+    if (isAccountsLoading || isAccountsError) return migrated;
+    // Reconcile before both fetching and bridging so neither can reuse stale IDs.
+    return prunePerformanceSelectedItems(migrated, new Set(accounts.map((account) => account.id)));
+  }, [accounts, isAccountsLoading, isAccountsError, storedSelectedItems]);
   const selectedItemId = migratePerformanceSelectedItemId(storedSelectedItemId);
 
   useEffect(() => {
@@ -1063,49 +1066,12 @@ export default function PerformancePage() {
     if (isAccountsLoading || isAccountsError) {
       return;
     }
-    const knownAccountIds = new Set(accounts.map((account) => account.id));
-    // User-created portfolios resolve to account ids at calc time, so we keep
-    // them regardless of `knownAccountIds`; the backend filter handles it.
-    const isPortfolioItem = (item: TrackedItem) => item.accountScope?.type === "portfolio";
-    // Multi-account scopes carry their member ids in the scope, not in `item.id`.
-    const isMultiAccountItem = (item: TrackedItem) => item.accountScope?.type === "accounts";
-    setSelectedItems((current) => {
-      const next = current.filter(
-        (item) =>
-          item.type !== "account" ||
-          item.id === PORTFOLIO_SCOPE_ID ||
-          isPortfolioItem(item) ||
-          isMultiAccountItem(item) ||
-          knownAccountIds.has(item.id),
-      );
-      if (next.length === current.length) {
-        return current;
-      }
-      return next.length > 0 ? next : [ALL_PORTFOLIO_ITEM];
-    });
     const selectedItemStillPresent =
-      !selectedItemId ||
-      selectedItems.some(
-        (item) =>
-          item.id === selectedItemId &&
-          (item.type !== "account" ||
-            item.id === PORTFOLIO_SCOPE_ID ||
-            isPortfolioItem(item) ||
-            isMultiAccountItem(item) ||
-            knownAccountIds.has(item.id)),
-      );
+      !selectedItemId || selectedItems.some((item) => item.id === selectedItemId);
     if (!selectedItemStillPresent) {
       setSelectedItemId(null);
     }
-  }, [
-    accounts,
-    isAccountsLoading,
-    isAccountsError,
-    selectedItemId,
-    selectedItems,
-    setSelectedItemId,
-    setSelectedItems,
-  ]);
+  }, [isAccountsLoading, isAccountsError, selectedItemId, selectedItems, setSelectedItemId]);
 
   const accountScope = useAccountScopeStore((state) => state.scope);
   const setAccountScope = useAccountScopeStore((state) => state.setScope);

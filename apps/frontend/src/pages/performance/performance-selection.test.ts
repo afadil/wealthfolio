@@ -6,6 +6,7 @@ import {
   migratePerformanceSelectedItemId,
   migratePerformanceSelectedItems,
   trackedItemForScope,
+  prunePerformanceSelectedItems,
 } from "./performance-selection";
 
 describe("performance selection migration", () => {
@@ -105,5 +106,47 @@ describe("trackedItemForScope", () => {
     expect(
       trackedItemForScope({ type: "accounts", accountIds: [] }, accounts, portfolios),
     ).toBeNull();
+  });
+});
+
+describe("prunePerformanceSelectedItems", () => {
+  const known = new Set(["a", "hidden", "archived"]);
+
+  it("preserves valid scopes, symbols and intentionally empty comparisons", () => {
+    const items = [
+      ALL_PORTFOLIO_ITEM,
+      { id: "a", type: "account" as const, name: "Legacy account" },
+      { id: "symbol", type: "symbol" as const, name: "Benchmark" },
+      trackedItemForScope(
+        { type: "portfolio", portfolioId: "p" },
+        [],
+        [{ id: "p", name: "Portfolio" }],
+      )!,
+      trackedItemForScope(
+        { type: "accounts", accountIds: ["hidden", "archived"] },
+        [
+          { id: "hidden", name: "Hidden" },
+          { id: "archived", name: "Archived" },
+        ],
+        [],
+      )!,
+    ];
+    expect(prunePerformanceSelectedItems(items, known)).toBe(items);
+    const empty: typeof items = [];
+    expect(prunePerformanceSelectedItems(empty, known)).toBe(empty);
+  });
+
+  it("drops the entire scope if any member was deleted and falls back when nothing remains", () => {
+    const item = trackedItemForScope(
+      { type: "accounts", accountIds: ["a", "deleted"] },
+      [
+        { id: "a", name: "A" },
+        { id: "deleted", name: "Deleted" },
+      ],
+      [],
+    )!;
+    expect(prunePerformanceSelectedItems([item], known)).toEqual([ALL_PORTFOLIO_ITEM]);
+    const benchmark = { id: "symbol", type: "symbol" as const, name: "Benchmark" };
+    expect(prunePerformanceSelectedItems([item, benchmark], known)).toEqual([benchmark]);
   });
 });

@@ -81,3 +81,22 @@ export function migratePerformanceSelectedItems(items: TrackedItem[]): TrackedIt
 
   return changed ? migrated : items;
 }
+
+/** Drop comparisons with deleted members without silently changing their scope. */
+export function prunePerformanceSelectedItems(
+  items: TrackedItem[],
+  knownAccountIds: ReadonlySet<string>,
+): TrackedItem[] {
+  const next = items.filter((item) => {
+    if (item.type !== "account" || item.id === PORTFOLIO_SCOPE_ID) return true;
+    const scope = item.accountScope;
+    // Portfolio membership is resolved by the backend, rather than saved here.
+    if (scope?.type === "all" || scope?.type === "portfolio") return true;
+    if (scope?.type === "accounts") {
+      return scope.accountIds.length > 0 && scope.accountIds.every((id) => knownAccountIds.has(id));
+    }
+    return knownAccountIds.has(scope?.type === "account" ? scope.accountId : item.id);
+  });
+  if (next.length === items.length) return items;
+  return next.length > 0 ? next : [ALL_PORTFOLIO_ITEM];
+}
