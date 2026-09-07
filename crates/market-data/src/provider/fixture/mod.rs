@@ -138,11 +138,21 @@ impl FixtureProvider {
         catalog: &FixtureCatalog,
         symbol: &str,
     ) -> Result<FixtureInstrument, MarketDataError> {
+        let symbol = symbol.trim();
+        let bare_symbol = symbol.rsplit_once(':').map_or(symbol, |(_, bare)| bare);
         catalog
             .instruments
             .iter()
+            // An alias on an earlier fixture must not shadow a real ticker.
             .find(|instrument| {
-                instrument.provider == self.provider_id && instrument.matches_symbol(symbol)
+                instrument.provider == self.provider_id
+                    && (instrument.symbol.eq_ignore_ascii_case(symbol)
+                        || instrument.symbol.eq_ignore_ascii_case(bare_symbol))
+            })
+            .or_else(|| {
+                catalog.instruments.iter().find(|instrument| {
+                    instrument.provider == self.provider_id && instrument.matches_symbol(symbol)
+                })
             })
             .cloned()
             .or_else(|| self.synthetic_fx_instrument(symbol))
@@ -958,6 +968,46 @@ mod tests {
         assert!(reciprocal.volume.is_none());
 
         remove_dir_all(dir).unwrap();
+    }
+
+    #[tokio::test]
+    async fn exact_symbol_beats_another_instruments_alias() {
+        let provider = FixtureProvider::new(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../e2e/fixtures/quotes"),
+        );
+
+        // APC.DE (Apple) appears first and aliases APC, which also identifies ARKO.
+        for symbol in ["APC", "apc", " APC ", "XNAS:APC"] {
+            let profile = provider.get_profile(symbol).await.unwrap();
+            assert_eq!(profile.name.as_deref(), Some("ARKO Petroleum Corp."));
+            let instrument = ProviderInstrument::EquitySymbol {
+                symbol: Arc::from(symbol),
+            };
+            let quote = provider
+                .get_latest_quote(&quote_context(), instrument.clone())
+                .await
+                .unwrap();
+            assert_eq!(quote.currency, "USD");
+            let history = provider
+                .get_historical_quotes(
+                    &quote_context(),
+                    instrument,
+                    Utc.with_ymd_and_hms(2026, 5, 11, 0, 0, 0).unwrap(),
+                    Utc.with_ymd_and_hms(2026, 5, 12, 23, 59, 59).unwrap(),
+                )
+                .await
+                .unwrap();
+            assert!(history.iter().all(|quote| quote.currency == "USD"));
+        }
+        assert_eq!(
+            provider
+                .get_profile("APC.DE")
+                .await
+                .unwrap()
+                .name
+                .as_deref(),
+            Some("Apple Inc.")
+        );
     }
 
     #[tokio::test]
