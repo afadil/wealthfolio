@@ -2,7 +2,8 @@ import { useAccountScopeStore } from "@/lib/account-scope-store";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, AccountScope, TrackedItem } from "@/lib/types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { StrictMode, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PerformancePage from "./performance-page";
@@ -10,13 +11,32 @@ import { ALL_PORTFOLIO_ITEM } from "./performance-selection";
 
 const mocks = vi.hoisted(() => ({ performance: vi.fn(), getAccounts: vi.fn() }));
 vi.mock("@/adapters", () => ({ getAccounts: mocks.getAccounts }));
-vi.mock("@/hooks/use-portfolios", () => ({ usePortfolios: () => ({ data: [] }) }));
+vi.mock("@/hooks/use-portfolios", () => ({
+  usePortfolios: () => ({ data: [{ id: "p", name: "Retirement" }] }),
+}));
 vi.mock("@/hooks/use-platform", () => ({ useIsMobileViewport: () => false }));
 vi.mock("./hooks/use-performance-data", () => ({
   useCalculatePerformanceHistory: mocks.performance,
 }));
 vi.mock("@/components/account-filter-selector", () => ({ AccountScopeSelector: () => null }));
-vi.mock("@/components/account-selector", () => ({ AccountSelector: () => null }));
+vi.mock("@/components/account-selector", () => ({
+  AccountSelector: ({
+    setSelectedAccount,
+    onPortfolioSelect,
+  }: {
+    setSelectedAccount: (account: { id: string; name: string }) => void;
+    onPortfolioSelect: (portfolio: { id: string; name: string }) => void;
+  }) => (
+    <>
+      <button onClick={() => setSelectedAccount({ id: "a", name: "Brokerage" })}>
+        Toggle comparison account
+      </button>
+      <button onClick={() => onPortfolioSelect({ id: "p", name: "Retirement" })}>
+        Toggle comparison portfolio
+      </button>
+    </>
+  ),
+}));
 vi.mock("@/components/account-selector-mobile", () => ({ AccountSelectorMobile: () => null }));
 vi.mock("@/components/benchmark-symbol-selector", () => ({ BenchmarkSymbolSelector: () => null }));
 vi.mock("@/components/benchmark-symbol-selector-mobile", () => ({
@@ -203,4 +223,62 @@ describe("PerformancePage shared scope", () => {
     );
     expect(savedItems()).toEqual(before);
   });
+
+  it.each([
+    {
+      scope: { type: "account", accountId: "a" } as AccountScope,
+      id: "a",
+      picker: "Toggle comparison account",
+      name: "Brokerage",
+    },
+    {
+      scope: { type: "portfolio", portfolioId: "p" } as AccountScope,
+      id: "p",
+      picker: "Toggle comparison portfolio",
+      name: "Retirement",
+    },
+  ])(
+    "preserves a manually re-added $scope.type after removal through its picker",
+    async ({ scope, id, picker }) => {
+      setScope(scope);
+      renderPage();
+      await waitFor(() => expect(savedItems().some((item) => item.id === id)).toBe(true));
+      await userEvent.click(screen.getByRole("button", { name: picker }));
+      expect(useAccountScopeStore.getState().bridgedItemId).toBeNull();
+      expect(useAccountScopeStore.getState().scope).toEqual(scope);
+      await userEvent.click(screen.getByRole("button", { name: picker }));
+      setScope({ type: "account", accountId: "card" });
+      expect(savedItems().map((item) => item.id)).toEqual([ALL_PORTFOLIO_ITEM.id, id, "card"]);
+    },
+  );
+
+  it.each([
+    {
+      scope: { type: "account", accountId: "a" } as AccountScope,
+      id: "a",
+      picker: "Toggle comparison account",
+      name: "Brokerage",
+    },
+    {
+      scope: { type: "portfolio", portfolioId: "p" } as AccountScope,
+      id: "p",
+      picker: "Toggle comparison portfolio",
+      name: "Retirement",
+    },
+  ])(
+    "preserves a manually re-added $scope.type after badge removal and remount",
+    async ({ scope, id, picker, name }) => {
+      setScope(scope);
+      const page = renderPage();
+      await waitFor(() => expect(savedItems().some((item) => item.id === id)).toBe(true));
+      await userEvent.click(screen.getAllByRole("button", { name: `Remove ${name}` })[0]);
+      expect(useAccountScopeStore.getState().bridgedItemId).toBeNull();
+      page.unmount();
+      renderPage();
+      expect(savedItems().some((item) => item.id === id)).toBe(false);
+      await userEvent.click(screen.getByRole("button", { name: picker }));
+      setScope({ type: "account", accountId: "card" });
+      expect(savedItems().map((item) => item.id)).toEqual([ALL_PORTFOLIO_ITEM.id, id, "card"]);
+    },
+  );
 });

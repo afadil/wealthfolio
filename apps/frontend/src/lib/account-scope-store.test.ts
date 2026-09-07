@@ -37,4 +37,14 @@ describe("account scope store", () => {
 
     expect(setItem).not.toHaveBeenCalled();
   });
+
+  it("only releases ownership of the item removed by the user", () => {
+    const { setBridged, releaseBridgedItem } = useAccountScopeStore.getState();
+    setBridged("account:a", "a");
+    releaseBridgedItem("b");
+    expect(useAccountScopeStore.getState().bridgedItemId).toBe("a");
+    releaseBridgedItem("a");
+    expect(useAccountScopeStore.getState().bridgedItemId).toBeNull();
+    expect(useAccountScopeStore.getState().bridgedScopeKey).toBe("account:a");
+  });
 });

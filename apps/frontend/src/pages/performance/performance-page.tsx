@@ -1075,6 +1075,7 @@ export default function PerformancePage() {
 
   const accountScope = useAccountScopeStore((state) => state.scope);
   const setAccountScope = useAccountScopeStore((state) => state.setScope);
+  const releaseBridgedItem = useAccountScopeStore((state) => state.releaseBridgedItem);
 
   usePerformanceScopeBridge({
     accounts,
@@ -1321,6 +1322,7 @@ export default function PerformancePage() {
     const exists = selectedItems.some((item) => item.id === accountId);
 
     if (exists) {
+      releaseBridgedItem(accountId);
       const nextItems = sortComparisonItems(selectedItems.filter((item) => item.id !== accountId));
       setSelectedItems(nextItems);
       if (selectedItemId === accountId) {
@@ -1346,6 +1348,7 @@ export default function PerformancePage() {
     const exists = selectedItems.some((item) => item.id === portfolioId);
 
     if (exists) {
+      releaseBridgedItem(portfolioId);
       const nextItems = sortComparisonItems(
         selectedItems.filter((item) => item.id !== portfolioId),
       );
