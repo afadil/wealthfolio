@@ -40,8 +40,8 @@ export function usePerformanceScopeBridge({
     // rewrites a list the user curated here.
     if (scopeKey === bridgedScopeKey) return;
 
-    // Scopes the performance view cannot chart (e.g. an account outside the
-    // performance purpose, or a deleted one) are skipped; retried when data settles.
+    // Missing accounts/portfolios may still be loading or have been deleted.
+    // Retry when the inventory changes; eligibility is handled by the backend.
     const item = trackedItemForScope(scope, accounts, portfolios);
     if (!item) return;
 

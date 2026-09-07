@@ -1027,8 +1027,15 @@ export default function PerformancePage() {
       setDateRange({ from: subDays(today, 7), to: today });
     }
   }, [dateRange, setDateRange]);
-  const { accounts, isLoading: isAccountsLoading } = useAccounts({
-    accountPurpose: AccountPurpose.PERFORMANCE,
+  // Scope selectors include hidden accounts and mixed account types. Resolve
+  // their names from the full inventory; the backend applies report eligibility.
+  const {
+    accounts,
+    isLoading: isAccountsLoading,
+    isError: isAccountsError,
+  } = useAccounts({
+    filterActive: false,
+    includeArchived: true,
   });
 
   // State for mobile dropdown menu
@@ -1053,12 +1060,12 @@ export default function PerformancePage() {
   }, [selectedItemId, setSelectedItemId, storedSelectedItemId]);
 
   useEffect(() => {
-    if (isAccountsLoading) {
+    if (isAccountsLoading || isAccountsError) {
       return;
     }
-    const reportAccountIds = new Set(accounts.map((account) => account.id));
+    const knownAccountIds = new Set(accounts.map((account) => account.id));
     // User-created portfolios resolve to account ids at calc time, so we keep
-    // them regardless of `reportAccountIds`; the backend filter handles it.
+    // them regardless of `knownAccountIds`; the backend filter handles it.
     const isPortfolioItem = (item: TrackedItem) => item.accountScope?.type === "portfolio";
     // Multi-account scopes carry their member ids in the scope, not in `item.id`.
     const isMultiAccountItem = (item: TrackedItem) => item.accountScope?.type === "accounts";
@@ -1069,7 +1076,7 @@ export default function PerformancePage() {
           item.id === PORTFOLIO_SCOPE_ID ||
           isPortfolioItem(item) ||
           isMultiAccountItem(item) ||
-          reportAccountIds.has(item.id),
+          knownAccountIds.has(item.id),
       );
       if (next.length === current.length) {
         return current;
@@ -1085,7 +1092,7 @@ export default function PerformancePage() {
             item.id === PORTFOLIO_SCOPE_ID ||
             isPortfolioItem(item) ||
             isMultiAccountItem(item) ||
-            reportAccountIds.has(item.id)),
+            knownAccountIds.has(item.id)),
       );
     if (!selectedItemStillPresent) {
       setSelectedItemId(null);
@@ -1093,6 +1100,7 @@ export default function PerformancePage() {
   }, [
     accounts,
     isAccountsLoading,
+    isAccountsError,
     selectedItemId,
     selectedItems,
     setSelectedItemId,
@@ -1104,7 +1112,7 @@ export default function PerformancePage() {
 
   usePerformanceScopeBridge({
     accounts,
-    isAccountsLoading,
+    isAccountsLoading: isAccountsLoading || isAccountsError,
     selectedItems,
     setSelectedItems,
     setSelectedItemId,
