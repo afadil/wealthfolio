@@ -634,7 +634,7 @@ export function AppLauncher() {
           "flex-1",
           isMobileViewport
             ? "max-h-[calc(80vh-160px)] px-2 pb-8"
-            : "h-[min(420px,calc(100dvh_-_6rem))] flex-none max-h-none",
+            : "h-[min(420px,calc(100dvh_-_6rem))] max-h-none flex-none",
         )}
       >
         {!hasResults && <CommandEmpty>{t("common:component.no_matches_found")}</CommandEmpty>}
