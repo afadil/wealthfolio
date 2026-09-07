@@ -1034,6 +1034,7 @@ export default function PerformancePage() {
     accounts,
     isLoading: isAccountsLoading,
     isError: isAccountsError,
+    error: accountsError,
   } = useAccounts({
     filterActive: false,
     includeArchived: true,
@@ -1052,13 +1053,15 @@ export default function PerformancePage() {
 
   useEffect(() => {
     if (selectedItems !== storedSelectedItems) {
-      setSelectedItems(selectedItems);
+      // A bridge or user action may have replaced this snapshot already (also
+      // when StrictMode replays mount effects). Never overwrite that newer list.
+      setSelectedItems((current) => (current === storedSelectedItems ? selectedItems : current));
     }
   }, [selectedItems, setSelectedItems, storedSelectedItems]);
 
   useEffect(() => {
     if (selectedItemId !== storedSelectedItemId) {
-      setSelectedItemId(selectedItemId);
+      setSelectedItemId((current) => (current === storedSelectedItemId ? selectedItemId : current));
     }
   }, [selectedItemId, setSelectedItemId, storedSelectedItemId]);
 
@@ -1069,7 +1072,7 @@ export default function PerformancePage() {
     const selectedItemStillPresent =
       !selectedItemId || selectedItems.some((item) => item.id === selectedItemId);
     if (!selectedItemStillPresent) {
-      setSelectedItemId(null);
+      setSelectedItemId((current) => (current === selectedItemId ? null : current));
     }
   }, [isAccountsLoading, isAccountsError, selectedItemId, selectedItems, setSelectedItemId]);
 
@@ -1100,7 +1103,7 @@ export default function PerformancePage() {
     errorMessages,
     displayDateRange,
   } = useCalculatePerformanceHistory({
-    selectedItems,
+    selectedItems: isAccountsLoading || isAccountsError ? [] : selectedItems,
     dateRange: getPerformanceDateRangeForRequest(dateRange),
   });
 
@@ -1809,9 +1812,11 @@ export default function PerformancePage() {
                 <div className="min-h-0 flex-1">
                   <PerformanceContent
                     chartData={chartData}
-                    isLoading={isLoadingPerformance}
-                    hasErrors={hasErrors}
-                    errorMessages={errorMessages}
+                    isLoading={isLoadingPerformance || isAccountsLoading}
+                    hasErrors={hasErrors || isAccountsError}
+                    errorMessages={
+                      accountsError ? [accountsError.message, ...errorMessages] : errorMessages
+                    }
                     isMobile={isMobile}
                   />
                 </div>

@@ -281,4 +281,56 @@ describe("PerformancePage shared scope", () => {
       expect(savedItems().map((item) => item.id)).toEqual([ALL_PORTFOLIO_ITEM.id, id, "card"]);
     },
   );
+
+  it("keeps a newly bridged selection when StrictMode replays mount-time pruning", async () => {
+    localStorage.setItem(
+      "performance:selectedItems",
+      JSON.stringify([
+        ALL_PORTFOLIO_ITEM,
+        {
+          id: "accounts:a,deleted",
+          type: "account",
+          name: "Deleted scope",
+          accountScope: { type: "accounts", accountIds: ["a", "deleted"] },
+        },
+      ]),
+    );
+    localStorage.setItem("performance:selectedItemId", JSON.stringify("accounts:a,deleted"));
+    setScope({ type: "account", accountId: "b" });
+    renderPage();
+    await waitFor(() =>
+      expect(savedItems().map((item) => item.id)).toEqual([ALL_PORTFOLIO_ITEM.id, "b"]),
+    );
+    expect(JSON.parse(localStorage.getItem("performance:selectedItemId")!)).toBe("b");
+    expect(useAccountScopeStore.getState().bridgedItemId).toBe("b");
+  });
+
+  it("does not request unvalidated persisted scopes during a cold load", async () => {
+    const staleItem: TrackedItem = {
+      id: "accounts:a,deleted",
+      type: "account",
+      name: "Deleted scope",
+      accountScope: { type: "accounts", accountIds: ["a", "deleted"] },
+    };
+    localStorage.setItem("performance:selectedItems", JSON.stringify([staleItem]));
+    let resolveAccounts!: (value: Account[]) => void;
+    mocks.getAccounts.mockReturnValue(
+      new Promise<Account[]>((resolve) => {
+        resolveAccounts = resolve;
+      }),
+    );
+    mocks.performance.mockClear();
+    renderPage(false);
+    expect(savedItems()).toEqual([staleItem]);
+    expect(mocks.performance).toHaveBeenLastCalledWith(
+      expect.objectContaining({ selectedItems: [] }),
+    );
+    await act(async () => resolveAccounts(accounts));
+    await waitFor(() => expect(savedItems()).toEqual([ALL_PORTFOLIO_ITEM]));
+    for (const [request] of mocks.performance.mock.calls) {
+      expect(request.selectedItems.some((item: TrackedItem) => item.id === staleItem.id)).toBe(
+        false,
+      );
+    }
+  });
 });
