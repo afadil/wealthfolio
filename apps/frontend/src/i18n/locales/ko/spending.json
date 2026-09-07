@@ -361,9 +361,8 @@
     "spent": "지출액",
     "allSubcategories": "모든 하위 카테고리",
     "tx": "Tx",
-    "outflowsCount": "지출 {{count}}건",
     "avgPerTx": "건당 평균",
-    "outflowsOnly": "지출만",
+    "acrossAllTx": "전체 거래 기준",
     "dailyPace": "일일 페이스",
     "inThisPeriod": "이 기간 동안",
     "subcategoryMix": "하위 카테고리 구성",
@@ -375,7 +374,6 @@
     "noTransactions": "이 기간에 거래가 없습니다.",
     "loadMore": "{{count}}건 더 불러오기",
     "openInTransactions": "거래 내역에서 열기",
-    "outflowsCount_other": "지출 {{count}}건",
     "totalCount_other": "총 {{count}}건",
     "loadMore_other": "{{count}}건 더 불러오기"
   },
