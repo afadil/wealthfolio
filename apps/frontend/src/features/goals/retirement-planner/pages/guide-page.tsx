@@ -114,7 +114,6 @@ export default function GuidePage({ country }: { country?: string }) {
           </Term>
           <Term t={t("goals:guide.concepts.inflation_title")}>
             {t("goals:guide.concepts.inflation_desc")}
-            {isIT && ` ${t("goals:guide.concepts.inflation_it_note")}`}
           </Term>
           <Term t={t("goals:guide.concepts.returns_title")}>
             {t("goals:guide.concepts.returns_desc")}

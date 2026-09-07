@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Quote } from "@/lib/types";
+import { format } from "date-fns";
 import { toQuoteEntry } from "./quote-history-utils";
 
 describe("quote history edit state", () => {
@@ -19,6 +20,8 @@ describe("quote history edit state", () => {
       volume: 0,
       currency: "CNY",
     };
+
+    expect(format(toQuoteEntry(quote).date, "yyyy-MM-dd")).toBe("2026-07-11");
 
     expect(toQuoteEntry(quote)).toMatchObject({
       open: 1.4018,

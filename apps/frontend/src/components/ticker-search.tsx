@@ -29,6 +29,7 @@ interface QuoteInfo {
 }
 
 interface SearchProps {
+  id?: string;
   selectedResult?: SymbolSearchResult;
   defaultValue?: string;
   value?: string;
@@ -207,6 +208,7 @@ function focusRelativeTo(anchor: HTMLElement, direction: "next" | "prev") {
 const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
   (
     {
+      id,
       selectedResult,
       defaultValue,
       value,
@@ -478,6 +480,7 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
         <Popover open={open} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
+              id={id}
               variant="outline"
               role="combobox"
               className={cn(
