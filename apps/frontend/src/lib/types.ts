@@ -1745,6 +1745,7 @@ export interface LiabilityMetadata {
   originalAmount?: string;
   originationDate?: string;
   interestRate?: string;
+  endDate?: string;
 }
 
 /**

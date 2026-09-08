@@ -541,7 +541,11 @@
       "oz": "Onça troy",
       "g": "Grama",
       "kg": "Quilograma"
-    }
+    },
+    "monthly_payment": "Prestação mensal",
+    "per_month": "/ mês",
+    "end_date": "Data de vencimento",
+    "end_date_estimated": "Venc. estimado"
   },
   "quickAdd": {
     "add_new_asset": "Adicionar novo ativo",
@@ -603,7 +607,11 @@
       "liability_description": "Empréstimos e dívidas",
       "other_label": "Outro ativo",
       "other_description": "Ativos personalizados"
-    }
+    },
+    "end_date": "Data de vencimento",
+    "interest_rate": "Taxa de juros (%)",
+    "loan_term": "Prazo do empréstimo",
+    "years": "anos"
   },
   "detailsSheet": {
     "details_saved": "Detalhes salvos com sucesso",
@@ -679,7 +687,8 @@
       "precious_metal": "Metal precioso",
       "liability": "Passivo",
       "other": "Outro"
-    }
+    },
+    "end_date": "Data de vencimento"
   },
   "updateValuation": {
     "title": "Atualizar valor: {{name}}",
@@ -752,5 +761,28 @@
     "error_encode_failed": "Não foi possível converter a imagem para PNG.",
     "error_too_large_output": "A imagem é detalhada demais para caber em 150 KB. Tente uma imagem mais simples ou menor.",
     "error_save_failed": "Não foi possível salvar o logotipo."
+  },
+  "loanActions": {
+    "early_repayment": "Amortização antecipada",
+    "early_repayment_description": "Registre um pagamento antecipado e recalcule o seu empréstimo.",
+    "close_loan": "Encerrar empréstimo",
+    "close_loan_description": "Marque este empréstimo como totalmente pago. Será inserida uma entrada com saldo zero.",
+    "repayment_date": "Data do pagamento",
+    "repayment_amount": "Valor do pagamento",
+    "reduce_duration": "Reduzir duração",
+    "reduce_payment": "Reduzir prestação",
+    "reduce_duration_description": "Manter a prestação mensal, encurtar o prazo",
+    "reduce_payment_description": "Manter o prazo restante, reduzir a prestação",
+    "new_end_date": "Nova data de vencimento",
+    "new_monthly_payment": "Nova prestação mensal",
+    "confirm_repayment": "Confirmar pagamento",
+    "closure_date": "Data de encerramento",
+    "confirm_close": "Encerrar empréstimo",
+    "recalculate_schedule": "Recalcular plano",
+    "recalculate_description": "Recalcula os pagamentos futuros com base no saldo e taxa atuais.",
+    "recalculate_current_balance": "Saldo atual",
+    "recalculate_remaining_months": "Meses restantes",
+    "recalculate_new_rate": "Nova taxa anual (%)",
+    "recalculate_confirm": "Recalcular"
   }
 }

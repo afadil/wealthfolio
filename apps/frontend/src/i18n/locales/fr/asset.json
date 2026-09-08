@@ -541,7 +541,11 @@
       "oz": "Once troy",
       "g": "Gramme",
       "kg": "Kilogramme"
-    }
+    },
+    "monthly_payment": "Mensualité",
+    "per_month": "/ mois",
+    "end_date": "Date de fin",
+    "end_date_estimated": "Fin estimée"
   },
   "quickAdd": {
     "add_new_asset": "Ajouter un nouvel actif",
@@ -603,7 +607,11 @@
       "liability_description": "Prêts et dettes",
       "other_label": "Autre actif",
       "other_description": "Actifs personnalisés"
-    }
+    },
+    "end_date": "Date de fin",
+    "interest_rate": "Taux d'intérêt (%)",
+    "loan_term": "Durée du prêt",
+    "years": "ans"
   },
   "detailsSheet": {
     "details_saved": "Détails enregistrés avec succès",
@@ -679,7 +687,8 @@
       "precious_metal": "Métal précieux",
       "liability": "Passif",
       "other": "Autre"
-    }
+    },
+    "end_date": "Date de fin"
   },
   "updateValuation": {
     "title": "Mettre à jour la valeur : {{name}}",
@@ -752,5 +761,28 @@
     "error_encode_failed": "L'image n'a pas pu être convertie en PNG.",
     "error_too_large_output": "L'image est trop détaillée pour tenir dans 150 Ko. Essayez une image plus simple ou plus petite.",
     "error_save_failed": "Le logo n'a pas pu être enregistré."
+  },
+  "loanActions": {
+    "early_repayment": "Remboursement anticipé",
+    "early_repayment_description": "Enregistrez un remboursement partiel et recalculez votre prêt.",
+    "close_loan": "Clôturer le prêt",
+    "close_loan_description": "Marquez ce prêt comme entièrement remboursé. Cela ajoutera une entrée de solde nul.",
+    "repayment_date": "Date de remboursement",
+    "repayment_amount": "Montant du remboursement",
+    "reduce_duration": "Réduire la durée",
+    "reduce_payment": "Réduire la mensualité",
+    "reduce_duration_description": "Conserver la mensualité, raccourcir la durée",
+    "reduce_payment_description": "Conserver la durée restante, réduire la mensualité",
+    "new_end_date": "Nouvelle date de fin",
+    "new_monthly_payment": "Nouvelle mensualité",
+    "confirm_repayment": "Confirmer le remboursement",
+    "closure_date": "Date de clôture",
+    "confirm_close": "Clôturer le prêt",
+    "recalculate_schedule": "Recalculer le planning",
+    "recalculate_description": "Recalcule les paiements futurs à partir du solde et du taux actuels.",
+    "recalculate_current_balance": "Solde actuel",
+    "recalculate_remaining_months": "Mois restants",
+    "recalculate_new_rate": "Nouveau taux annuel (%)",
+    "recalculate_confirm": "Recalculer"
   }
 }

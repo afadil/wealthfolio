@@ -89,6 +89,7 @@ export const alternativeAssetQuickAddSchema = z
       ])
       .optional(),
     linkedAssetId: z.string().optional(),
+    endDate: z.date().optional(),
   })
   .refine(
     (data) => {
@@ -119,4 +120,5 @@ export const getDefaultFormValues = (): AlternativeAssetQuickAddFormValues => ({
   weightUnit: "oz",
   liabilityType: undefined,
   linkedAssetId: undefined,
+  endDate: undefined,
 });
