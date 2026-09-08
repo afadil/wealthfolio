@@ -250,7 +250,14 @@ export function AlternativeAssetQuickAddModal({
       return formData.name.trim() && formData.purchasePrice && formData.purchaseDate;
     }
     return formData.name.trim() && formData.currentValue;
-  }, [step, formData.name, formData.currentValue, formData.kind, formData.purchasePrice, formData.purchaseDate]);
+  }, [
+    step,
+    formData.name,
+    formData.currentValue,
+    formData.kind,
+    formData.purchasePrice,
+    formData.purchaseDate,
+  ]);
 
   const handleSubmit = async () => {
     if (!canProceed) return;
@@ -277,9 +284,10 @@ export function AlternativeAssetQuickAddModal({
     }
 
     // For liabilities: if no current balance entered, default to original amount
-    const currentValue = isLiability && !formData.currentValue
-      ? (formData.purchasePrice ?? formData.currentValue)
-      : formData.currentValue;
+    const currentValue =
+      isLiability && !formData.currentValue
+        ? (formData.purchasePrice ?? formData.currentValue)
+        : formData.currentValue;
 
     const request: CreateAlternativeAssetRequest = {
       kind: kindToApiKind[formData.kind],
@@ -300,12 +308,7 @@ export function AlternativeAssetQuickAddModal({
 
     const response = await createMutation.mutateAsync(request);
 
-    if (
-      isLiability &&
-      formData.purchasePrice &&
-      formData.purchaseDate &&
-      formData.loanTerm
-    ) {
+    if (isLiability && formData.purchasePrice && formData.purchaseDate && formData.loanTerm) {
       const computedEndDate = addYears(formData.purchaseDate, parseFloat(formData.loanTerm));
       const schedule = buildAmortizationSchedule(
         formData.purchaseDate,
@@ -806,10 +809,7 @@ function buildAmortizationSchedule(
   if (N <= 0 || originalAmount <= 0) return [];
 
   const r = annualRate / 100 / 12;
-  const P =
-    r > 0
-      ? (originalAmount * r) / (1 - Math.pow(1 + r, -N))
-      : originalAmount / N;
+  const P = r > 0 ? (originalAmount * r) / (1 - Math.pow(1 + r, -N)) : originalAmount / N;
 
   const quotes: QuoteImport[] = [];
   let balance = originalAmount;
