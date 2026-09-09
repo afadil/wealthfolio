@@ -611,7 +611,11 @@
     "end_date": "Data de vencimento",
     "interest_rate": "Taxa de juros (%)",
     "loan_term": "Prazo do empréstimo",
-    "years": "anos"
+    "years": "anos",
+    "validation": {
+      "invalid": "Introduza dados de empréstimo válidos.",
+      "balance_date_before_origination": "A data do saldo não pode ser anterior à data de origem."
+    }
   },
   "detailsSheet": {
     "details_saved": "Detalhes salvos com sucesso",
@@ -783,6 +787,12 @@
     "recalculate_current_balance": "Saldo atual",
     "recalculate_remaining_months": "Meses restantes",
     "recalculate_new_rate": "Nova taxa anual (%)",
-    "recalculate_confirm": "Recalcular"
+    "recalculate_confirm": "Recalcular",
+    "validation": {
+      "invalid": "Introduza um valor de reembolso válido.",
+      "amount_exceeds_balance": "O reembolso não pode exceder o saldo atual.",
+      "date_outside_loan": "A data de reembolso deve estar dentro do período do empréstimo.",
+      "closure_date_invalid": "A data de encerramento deve estar entre a origem e hoje."
+    }
   }
 }

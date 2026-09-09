@@ -611,7 +611,11 @@
     "end_date": "Date de fin",
     "interest_rate": "Taux d'intérêt (%)",
     "loan_term": "Durée du prêt",
-    "years": "ans"
+    "years": "ans",
+    "validation": {
+      "invalid": "Saisissez des informations de prêt valides.",
+      "balance_date_before_origination": "La date du solde ne peut pas précéder la date d'octroi."
+    }
   },
   "detailsSheet": {
     "details_saved": "Détails enregistrés avec succès",
@@ -783,6 +787,12 @@
     "recalculate_current_balance": "Solde actuel",
     "recalculate_remaining_months": "Mois restants",
     "recalculate_new_rate": "Nouveau taux annuel (%)",
-    "recalculate_confirm": "Recalculer"
+    "recalculate_confirm": "Recalculer",
+    "validation": {
+      "invalid": "Saisissez un montant de remboursement valide.",
+      "amount_exceeds_balance": "Le remboursement ne peut pas dépasser le solde actuel.",
+      "date_outside_loan": "La date de remboursement doit appartenir à la période du prêt.",
+      "closure_date_invalid": "La clôture doit être comprise entre l'octroi et aujourd'hui."
+    }
   }
 }

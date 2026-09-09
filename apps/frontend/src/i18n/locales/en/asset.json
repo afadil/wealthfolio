@@ -607,7 +607,11 @@
       "other_description": "Custom assets"
     },
     "loan_term": "Loan Term",
-    "years": "yrs"
+    "years": "yrs",
+    "validation": {
+      "invalid": "Enter valid loan details.",
+      "balance_date_before_origination": "The balance date cannot be before the origination date."
+    }
   },
   "detailsSheet": {
     "details_saved": "Details saved successfully",
@@ -732,7 +736,13 @@
     "recalculate_current_balance": "Current Balance",
     "recalculate_remaining_months": "Remaining Months",
     "recalculate_new_rate": "New Annual Rate (%)",
-    "recalculate_confirm": "Recalculate"
+    "recalculate_confirm": "Recalculate",
+    "validation": {
+      "invalid": "Enter a valid repayment amount.",
+      "amount_exceeds_balance": "The repayment cannot exceed the current balance.",
+      "date_outside_loan": "The repayment date must be within the loan period.",
+      "closure_date_invalid": "The closure date must be between origination and today."
+    }
   },
   "valueToolbar": {
     "add_balance": "Add Balance",

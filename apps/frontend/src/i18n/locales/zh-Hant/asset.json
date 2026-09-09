@@ -607,7 +607,11 @@
     "end_date": "結束日期",
     "interest_rate": "利率 (%)",
     "loan_term": "貸款期限",
-    "years": "年"
+    "years": "年",
+    "validation": {
+      "invalid": "請輸入有效的貸款資料。",
+      "balance_date_before_origination": "餘額日期不能早於貸款發放日期。"
+    }
   },
   "detailsSheet": {
     "details_saved": "詳細資訊儲存成功",
@@ -776,6 +780,12 @@
     "recalculate_current_balance": "目前餘額",
     "recalculate_remaining_months": "剩餘月數",
     "recalculate_new_rate": "新年利率 (%)",
-    "recalculate_confirm": "重新計算"
+    "recalculate_confirm": "重新計算",
+    "validation": {
+      "invalid": "請輸入有效的還款金額。",
+      "amount_exceeds_balance": "還款金額不能超過目前餘額。",
+      "date_outside_loan": "還款日期必須在貸款期間內。",
+      "closure_date_invalid": "結清日期必須在貸款發放日至今天之間。"
+    }
   }
 }

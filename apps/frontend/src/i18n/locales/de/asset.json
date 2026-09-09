@@ -607,7 +607,11 @@
     "end_date": "Enddatum",
     "interest_rate": "Zinssatz (%)",
     "loan_term": "Laufzeit",
-    "years": "J."
+    "years": "J.",
+    "validation": {
+      "invalid": "Gültige Kreditdaten eingeben.",
+      "balance_date_before_origination": "Das Saldodatum darf nicht vor dem Auszahlungsdatum liegen."
+    }
   },
   "detailsSheet": {
     "details_saved": "Details erfolgreich gespeichert",
@@ -776,6 +780,12 @@
     "recalculate_current_balance": "Aktueller Saldo",
     "recalculate_remaining_months": "Verbleibende Monate",
     "recalculate_new_rate": "Neuer Jahreszinssatz (%)",
-    "recalculate_confirm": "Neu berechnen"
+    "recalculate_confirm": "Neu berechnen",
+    "validation": {
+      "invalid": "Gültigen Rückzahlungsbetrag eingeben.",
+      "amount_exceeds_balance": "Die Rückzahlung darf den aktuellen Saldo nicht überschreiten.",
+      "date_outside_loan": "Das Rückzahlungsdatum muss innerhalb der Kreditlaufzeit liegen.",
+      "closure_date_invalid": "Das Abschlussdatum muss zwischen Auszahlung und heute liegen."
+    }
   }
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { addMonths, addYears, differenceInCalendarMonths } from "date-fns";
+import { addMonths, addYears } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -23,10 +23,22 @@ import {
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
 
-import { METAL_TYPES, LIABILITY_TYPES, WEIGHT_UNITS } from "./alternative-asset-quick-add-schema";
+import {
+  METAL_TYPES,
+  LIABILITY_TYPES,
+  WEIGHT_UNITS,
+  liabilityQuickAddSchema,
+} from "./alternative-asset-quick-add-schema";
 import { useAlternativeAssetMutations } from "../hooks/use-alternative-asset-mutations";
-import { deleteQuote, importManualQuotes } from "@/adapters";
-import type { QuoteImport } from "@/lib/types/quote-import";
+import { importManualQuotes, updateQuote } from "@/adapters";
+import {
+  buildLoanSchedule,
+  calculateBalanceAfterPayments,
+  calculateMonthlyPayment,
+  getRemainingScheduleWindow,
+  splitLoanScheduleForPersistence,
+  type RemainingScheduleWindow,
+} from "../lib/loan-schedule";
 import {
   AlternativeAssetKind,
   type CreateAlternativeAssetRequest,
@@ -166,6 +178,7 @@ export function AlternativeAssetQuickAddModal({
   const [hasMortgageChecked, setHasMortgageChecked] = useState(false);
   const [savedPurchaseDate, setSavedPurchaseDate] = useState<Date | undefined>(undefined);
   const [savedPropertyName, setSavedPropertyName] = useState<string | undefined>(undefined);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     kind: defaultKind || AlternativeAssetKind.PROPERTY,
     name: "",
@@ -201,6 +214,7 @@ export function AlternativeAssetQuickAddModal({
       setHasMortgageChecked(false);
       setSavedPurchaseDate(undefined);
       setSavedPropertyName(undefined);
+      setValidationError(null);
       setFormData({
         kind: defaultKind || AlternativeAssetKind.PROPERTY,
         name: defaultName || "",
@@ -264,6 +278,33 @@ export function AlternativeAssetQuickAddModal({
 
     const metadata: Record<string, string> = {};
     const isLiability = formData.kind === AlternativeAssetKind.LIABILITY;
+    let currentValue =
+      isLiability && !formData.currentValue
+        ? (formData.purchasePrice ?? formData.currentValue)
+        : formData.currentValue;
+    let remainingSchedule: RemainingScheduleWindow | null = null;
+    let completedPaymentCount = 0;
+    let totalPaymentCount = 0;
+    let balanceQuoteDate = formData.valueDate;
+
+    if (isLiability) {
+      const validation = liabilityQuickAddSchema.safeParse({
+        originalAmount: formData.purchasePrice,
+        currentBalance: formData.currentValue || undefined,
+        originationDate: formData.purchaseDate,
+        balanceDate: formData.valueDate,
+        loanTerm: formData.loanTerm || undefined,
+        interestRate: formData.interestRate || undefined,
+      });
+      if (!validation.success) {
+        const issue = validation.error.issues[0]?.message;
+        setValidationError(
+          issue?.startsWith("asset:") ? issue : "asset:quickAdd.validation.invalid",
+        );
+        return;
+      }
+    }
+    setValidationError(null);
 
     // Use unified 'sub_type' field for all asset types
     if (formData.kind === AlternativeAssetKind.PRECIOUS_METAL) {
@@ -280,21 +321,47 @@ export function AlternativeAssetQuickAddModal({
       if (formData.loanTerm && formData.purchaseDate) {
         const computedEndDate = addYears(formData.purchaseDate, parseFloat(formData.loanTerm));
         metadata.end_date = formatDateToISO(computedEndDate);
+        remainingSchedule = getRemainingScheduleWindow(
+          formData.purchaseDate,
+          formData.valueDate,
+          computedEndDate,
+        );
+        totalPaymentCount = parseFloat(formData.loanTerm) * 12;
+        completedPaymentCount = remainingSchedule
+          ? totalPaymentCount - remainingSchedule.paymentCount
+          : totalPaymentCount;
+        if (!formData.currentValue) {
+          const scheduledBalance = calculateBalanceAfterPayments(
+            parseFloat(formData.purchasePrice ?? "0"),
+            formData.interestRate ? parseFloat(formData.interestRate) : 0,
+            totalPaymentCount,
+            completedPaymentCount,
+          );
+          if (scheduledBalance !== null) currentValue = String(scheduledBalance);
+          balanceQuoteDate =
+            completedPaymentCount > 0
+              ? addMonths(formData.purchaseDate, completedPaymentCount)
+              : formData.purchaseDate;
+        }
+        const effectivePayment = remainingSchedule
+          ? calculateMonthlyPayment(
+              parseFloat(currentValue),
+              formData.interestRate ? parseFloat(formData.interestRate) : 0,
+              remainingSchedule.paymentCount,
+            )
+          : null;
+        if (effectivePayment !== null) {
+          metadata.current_monthly_payment = String(Math.round(effectivePayment * 100) / 100);
+        }
       }
     }
-
-    // For liabilities: if no current balance entered, default to original amount
-    const currentValue =
-      isLiability && !formData.currentValue
-        ? (formData.purchasePrice ?? formData.currentValue)
-        : formData.currentValue;
 
     const request: CreateAlternativeAssetRequest = {
       kind: kindToApiKind[formData.kind],
       name: formData.name,
       currency: formData.currency,
       currentValue,
-      valueDate: formatDateToISO(formData.valueDate),
+      valueDate: formatDateToISO(balanceQuoteDate),
       // Pass purchasePrice/purchaseDate for all asset types (including liabilities) to create historical quotes
       purchasePrice: formData.purchasePrice || undefined,
       purchaseDate: formData.purchaseDate ? formatDateToISO(formData.purchaseDate) : undefined,
@@ -308,19 +375,50 @@ export function AlternativeAssetQuickAddModal({
 
     const response = await createMutation.mutateAsync(request);
 
-    if (isLiability && formData.purchasePrice && formData.purchaseDate && formData.loanTerm) {
-      const computedEndDate = addYears(formData.purchaseDate, parseFloat(formData.loanTerm));
-      const schedule = buildAmortizationSchedule(
-        formData.purchaseDate,
-        parseFloat(formData.purchasePrice),
-        formData.interestRate ? parseFloat(formData.interestRate) : 0,
-        computedEndDate,
-        formData.currency,
-        response.assetId,
-      );
-      if (schedule.length > 0) {
-        await deleteQuote(response.quoteId);
-        await importManualQuotes(schedule);
+    if (isLiability && formData.purchaseDate && formData.loanTerm) {
+      const annualRate = formData.interestRate ? parseFloat(formData.interestRate) : 0;
+      const balanceDay = formatDateToISO(balanceQuoteDate);
+      const contractualSchedule = buildLoanSchedule({
+        assetId: response.assetId,
+        currency: formData.currency,
+        startingBalance: parseFloat(formData.purchasePrice ?? "0"),
+        annualRate,
+        paymentCount: totalPaymentCount,
+        firstPaymentDate: addMonths(formData.purchaseDate, 1),
+      });
+      const historicalSchedule = contractualSchedule.filter((quote) => quote.date < balanceDay);
+      const futureSchedule = remainingSchedule
+        ? formData.currentValue
+          ? buildLoanSchedule({
+              assetId: response.assetId,
+              currency: formData.currency,
+              startingBalance: parseFloat(currentValue),
+              annualRate,
+              paymentCount: remainingSchedule.paymentCount,
+              firstPaymentDate: remainingSchedule.firstPaymentDate,
+            })
+          : contractualSchedule.filter((quote) => quote.date > balanceDay)
+        : [];
+      const fullSchedule = [...historicalSchedule, ...futureSchedule];
+      if (fullSchedule.length > 0) {
+        const { importableQuotes, payoffQuote } = splitLoanScheduleForPersistence(fullSchedule);
+        if (importableQuotes.length > 0) await importManualQuotes(importableQuotes);
+        if (payoffQuote) {
+          await updateQuote(response.assetId, {
+            id: "",
+            assetId: response.assetId,
+            createdAt: new Date().toISOString(),
+            dataSource: "MANUAL",
+            timestamp: `${payoffQuote.date}T00:00:00Z`,
+            open: 0,
+            high: 0,
+            low: 0,
+            close: 0,
+            adjclose: 0,
+            volume: 0,
+            currency: payoffQuote.currency,
+          });
+        }
       }
     }
   };
@@ -703,6 +801,12 @@ export function AlternativeAssetQuickAddModal({
                   </div>
                 )}
 
+                {validationError && (
+                  <p className="text-destructive text-sm" role="alert">
+                    {t(validationError)}
+                  </p>
+                )}
+
                 {/* Mortgage checkbox for property */}
                 {formData.kind === AlternativeAssetKind.PROPERTY && (
                   <div className="flex items-center space-x-3 pt-2">
@@ -793,38 +897,4 @@ function formatDateToISO(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-// French constant-payment amortization schedule.
-// Returns N quotes: quote k is at addMonths(originationDate, k) with the balance after payment k+1.
-function buildAmortizationSchedule(
-  originationDate: Date,
-  originalAmount: number,
-  annualRate: number,
-  endDate: Date,
-  currency: string,
-  assetId: string,
-): QuoteImport[] {
-  const N = differenceInCalendarMonths(endDate, originationDate);
-  if (N <= 0 || originalAmount <= 0) return [];
-
-  const r = annualRate / 100 / 12;
-  const P = r > 0 ? (originalAmount * r) / (1 - Math.pow(1 + r, -N)) : originalAmount / N;
-
-  const quotes: QuoteImport[] = [];
-  let balance = originalAmount;
-
-  for (let k = 0; k < N; k++) {
-    const interest = balance * r;
-    balance = Math.max(0, balance - (P - interest));
-    quotes.push({
-      symbol: assetId,
-      date: formatDateToISO(addMonths(originationDate, k)),
-      close: Math.round(balance * 100) / 100,
-      currency,
-      validationStatus: "valid",
-    });
-  }
-
-  return quotes;
 }

@@ -611,7 +611,11 @@
     "end_date": "Data di scadenza",
     "interest_rate": "Tasso d'interesse (%)",
     "loan_term": "Durata del prestito",
-    "years": "anni"
+    "years": "anni",
+    "validation": {
+      "invalid": "Inserisci dati del prestito validi.",
+      "balance_date_before_origination": "La data del saldo non può precedere la data di erogazione."
+    }
   },
   "detailsSheet": {
     "details_saved": "Dettagli salvati correttamente",
@@ -783,6 +787,12 @@
     "recalculate_current_balance": "Saldo attuale",
     "recalculate_remaining_months": "Mesi rimanenti",
     "recalculate_new_rate": "Nuovo tasso annuo (%)",
-    "recalculate_confirm": "Ricalcola"
+    "recalculate_confirm": "Ricalcola",
+    "validation": {
+      "invalid": "Inserisci un importo di rimborso valido.",
+      "amount_exceeds_balance": "Il rimborso non può superare il saldo corrente.",
+      "date_outside_loan": "La data di rimborso deve rientrare nel periodo del prestito.",
+      "closure_date_invalid": "La data di chiusura deve essere compresa tra l'erogazione e oggi."
+    }
   }
 }

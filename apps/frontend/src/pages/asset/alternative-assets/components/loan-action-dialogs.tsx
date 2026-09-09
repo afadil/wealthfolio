@@ -9,10 +9,11 @@ import {
 } from "@wealthfolio/ui/components/ui/dialog";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { addMonths, differenceInCalendarMonths, format } from "date-fns";
-import { useState } from "react";
+import { addMonths, differenceInCalendarMonths } from "date-fns";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { calculateMonthlyPayment, calculateRemainingPaymentCount } from "../lib/loan-schedule";
 
 interface EarlyRepaymentDialogProps {
   open: boolean;
@@ -22,6 +23,8 @@ interface EarlyRepaymentDialogProps {
   interestRate: number;
   remainingMonths: number;
   monthlyPayment: number | null;
+  originationDate: Date | null;
+  endDate: Date | null;
   onSubmit: (
     date: Date,
     amount: number,
@@ -37,39 +40,36 @@ export function EarlyRepaymentDialog({
   interestRate,
   remainingMonths,
   monthlyPayment,
+  originationDate,
+  endDate,
   onSubmit,
 }: EarlyRepaymentDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [date, setDate] = useState<Date>(() => new Date());
   const [amount, setAmount] = useState<number>(0);
   const [mode, setMode] = useState<"reduce_duration" | "reduce_payment">("reduce_duration");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isDateInvalid =
+    (originationDate !== null && date < originationDate) || (endDate !== null && date > endDate);
+  const isAmountInvalid = amount <= 0 || amount > currentBalance;
 
-  const r = interestRate / 100 / 12;
+  useEffect(() => {
+    if (!open) return;
+    setDate(new Date());
+    setAmount(0);
+    setMode("reduce_duration");
+  }, [open]);
+
   const bNew = Math.max(0, currentBalance - amount);
-  const P = monthlyPayment;
 
   let newEndDate: Date | null = null;
-  if (mode === "reduce_duration" && P !== null && P > 0) {
-    let nNew: number;
-    if (r > 0) {
-      nNew = -Math.log(1 - (bNew * r) / P) / Math.log(1 + r);
-    } else {
-      nNew = bNew / P;
-    }
-    if (isFinite(nNew) && nNew > 0) {
-      newEndDate = addMonths(date, Math.ceil(nNew));
-    }
+  if (mode === "reduce_duration" && monthlyPayment !== null) {
+    const paymentCount = calculateRemainingPaymentCount(bNew, interestRate, monthlyPayment);
+    if (paymentCount !== null && paymentCount > 0) newEndDate = addMonths(date, paymentCount);
   }
 
-  let newMonthlyPayment: number | null = null;
-  if (mode === "reduce_payment" && remainingMonths > 0) {
-    if (r > 0) {
-      newMonthlyPayment = (bNew * r) / (1 - Math.pow(1 + r, -remainingMonths));
-    } else {
-      newMonthlyPayment = bNew / remainingMonths;
-    }
-  }
+  const newMonthlyPayment =
+    mode === "reduce_payment" ? calculateMonthlyPayment(bNew, interestRate, remainingMonths) : null;
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -157,8 +157,24 @@ export function EarlyRepaymentDialog({
           {mode === "reduce_duration" && newEndDate && (
             <div className="bg-muted rounded-md px-3 py-2 text-sm">
               <span className="text-muted-foreground">{t("asset:loanActions.new_end_date")}: </span>
-              <span className="font-medium">{format(newEndDate, "MMM yyyy")}</span>
+              <span className="font-medium">
+                {newEndDate.toLocaleDateString(i18n.language, {
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
             </div>
+          )}
+          {(isAmountInvalid || isDateInvalid) && (
+            <p className="text-destructive text-sm" role="alert">
+              {t(
+                amount > currentBalance
+                  ? "asset:loanActions.validation.amount_exceeds_balance"
+                  : isDateInvalid
+                    ? "asset:loanActions.validation.date_outside_loan"
+                    : "asset:loanActions.validation.invalid",
+              )}
+            </p>
           )}
           {mode === "reduce_payment" && newMonthlyPayment !== null && (
             <div className="bg-muted rounded-md px-3 py-2 text-sm">
@@ -175,7 +191,10 @@ export function EarlyRepaymentDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             {t("common:cancel")}
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || amount <= 0}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || isAmountInvalid || isDateInvalid}
+          >
             {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
             {t("asset:loanActions.confirm_repayment")}
           </Button>
@@ -189,12 +208,23 @@ interface CloseLoanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (date: Date) => Promise<void>;
+  originationDate: Date | null;
 }
 
-export function CloseLoanDialog({ open, onOpenChange, onSubmit }: CloseLoanDialogProps) {
+export function CloseLoanDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  originationDate,
+}: CloseLoanDialogProps) {
   const { t } = useTranslation();
   const [date, setDate] = useState<Date>(() => new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isDateInvalid = (originationDate !== null && date < originationDate) || date > new Date();
+
+  useEffect(() => {
+    if (open) setDate(new Date());
+  }, [open]);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -223,12 +253,21 @@ export function CloseLoanDialog({ open, onOpenChange, onSubmit }: CloseLoanDialo
               disabled={isSubmitting}
             />
           </div>
+          {isDateInvalid && (
+            <p className="text-destructive text-sm" role="alert">
+              {t("asset:loanActions.validation.closure_date_invalid")}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             {t("common:cancel")}
           </Button>
-          <Button variant="destructive" onClick={handleSubmit} disabled={isSubmitting}>
+          <Button
+            variant="destructive"
+            onClick={handleSubmit}
+            disabled={isSubmitting || isDateInvalid}
+          >
             {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
             {t("asset:loanActions.confirm_close")}
           </Button>
@@ -257,19 +296,19 @@ export function RecalculateScheduleDialog({
   endDate,
   onSubmit,
 }: RecalculateScheduleDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [newRate, setNewRate] = useState<string>(() => String(interestRate));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (open) setNewRate(String(interestRate));
+  }, [interestRate, open]);
+
   const today = new Date();
   const remainingMonths = endDate ? Math.max(1, differenceInCalendarMonths(endDate, today)) : 0;
-  const r = parseFloat(newRate || "0") / 100 / 12;
-  const newMonthlyPayment =
-    remainingMonths > 0 && currentBalance > 0
-      ? r > 0
-        ? (currentBalance * r) / (1 - Math.pow(1 + r, -remainingMonths))
-        : currentBalance / remainingMonths
-      : null;
+  const parsedRate = parseFloat(newRate);
+  const isRateInvalid = !Number.isFinite(parsedRate) || parsedRate < 0 || parsedRate > 100;
+  const newMonthlyPayment = calculateMonthlyPayment(currentBalance, parsedRate, remainingMonths);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -303,7 +342,12 @@ export function RecalculateScheduleDialog({
             {endDate && (
               <>
                 <span className="text-muted-foreground">{t("asset:altContent.end_date")}</span>
-                <span className="text-right font-medium">{format(endDate, "MMM yyyy")}</span>
+                <span className="text-right font-medium">
+                  {endDate.toLocaleDateString(i18n.language, {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
               </>
             )}
           </div>
@@ -328,12 +372,20 @@ export function RecalculateScheduleDialog({
               </span>
             </div>
           )}
+          {isRateInvalid && (
+            <p className="text-destructive text-sm" role="alert">
+              {t("asset:quickAdd.validation.invalid")}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             {t("common:cancel")}
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || remainingMonths <= 0}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || remainingMonths <= 0 || isRateInvalid}
+          >
             {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
             {t("asset:loanActions.recalculate_confirm")}
           </Button>

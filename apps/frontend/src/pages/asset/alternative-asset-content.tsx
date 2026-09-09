@@ -50,8 +50,14 @@ import {
   RecalculateScheduleDialog,
 } from "./alternative-assets/components/loan-action-dialogs";
 import { importManualQuotes } from "@/adapters";
-import type { QuoteImport } from "@/lib/types/quote-import";
 import { useAlternativeAssetMutations } from "./alternative-assets/hooks/use-alternative-asset-mutations";
+import {
+  buildLoanSchedule,
+  calculateMonthlyPayment,
+  calculateRemainingPaymentCount,
+  getObsoleteFutureQuoteIds,
+  splitLoanScheduleForPersistence,
+} from "./alternative-assets/lib/loan-schedule";
 import { useQuoteMutations } from "./hooks/use-quote-mutations";
 import { LinkedAssetSection, LinkedLiabilitiesSection } from "./linked-liabilities-card";
 
@@ -113,7 +119,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
   // Loan-specific computations (used in history tab and handlers)
   const currentBalance = Math.abs(parseFloat(holding.marketValue));
-  const metadata = holding.metadata || {};
+  const metadata = useMemo(() => holding.metadata || {}, [holding.metadata]);
   const interestRate = metadata.interest_rate ? parseFloat(metadata.interest_rate as string) : 0;
   const endDate = (metadata.end_date as string | undefined)
     ? parseISO(metadata.end_date as string)
@@ -123,7 +129,6 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
         holding.marketValue,
       );
   const remainingMonths = endDate ? Math.max(1, differenceInMonths(endDate, new Date())) : 0;
-  const r = interestRate / 100 / 12;
   // Monthly payment uses original amount + total term (French amortization constant installment)
   const loanOriginationDate = (metadata.origination_date ?? metadata.purchase_date) as
     | string
@@ -135,19 +140,39 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     endDate && loanOriginationDate
       ? differenceInCalendarMonths(endDate, parseISO(loanOriginationDate))
       : remainingMonths;
-  const monthlyPayment =
-    totalMonths > 0 && loanOriginalAmount > 0
-      ? r > 0
-        ? (loanOriginalAmount * r) / (1 - Math.pow(1 + r, -totalMonths))
-        : loanOriginalAmount / totalMonths
-      : null;
+  const monthlyPayment = metadata.current_monthly_payment
+    ? parseFloat(metadata.current_monthly_payment as string)
+    : calculateMonthlyPayment(loanOriginalAmount, interestRate, totalMonths);
+
+  const persistLoanSchedule = async (schedule: ReturnType<typeof buildLoanSchedule>) => {
+    const { importableQuotes, payoffQuote } = splitLoanScheduleForPersistence(schedule);
+    if (importableQuotes.length > 0) await importManualQuotes(importableQuotes);
+    if (payoffQuote) {
+      await saveQuoteMutation.mutateAsync({
+        id: "",
+        assetId,
+        createdAt: new Date().toISOString(),
+        dataSource: "MANUAL",
+        timestamp: `${payoffQuote.date}T00:00:00Z`,
+        open: 0,
+        high: 0,
+        low: 0,
+        close: 0,
+        adjclose: 0,
+        volume: 0,
+        currency: payoffQuote.currency,
+        notes: "scheduled_payoff",
+      });
+    }
+  };
 
   const handleEarlyRepayment = async (
     date: Date,
     amount: number,
     mode: "reduce_duration" | "reduce_payment",
   ) => {
-    const newBalance = Math.max(0, currentBalance - amount);
+    const appliedAmount = Math.min(amount, currentBalance);
+    const newBalance = currentBalance - appliedAmount;
     const quote: Quote = {
       id: "",
       createdAt: new Date().toISOString(),
@@ -161,34 +186,66 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
       adjclose: newBalance,
       volume: 0,
       currency: holding.currency,
-      notes: `early_repayment:${amount.toFixed(2)}`,
+      notes: `early_repayment:${appliedAmount.toFixed(2)}`,
     };
     await saveQuoteMutation.mutateAsync(quote);
-    if (mode === "reduce_duration" && monthlyPayment !== null && monthlyPayment > 0) {
-      let nNew: number;
-      if (r > 0) {
-        nNew = -Math.log(1 - (newBalance * r) / monthlyPayment) / Math.log(1 + r);
-      } else {
-        nNew = newBalance / monthlyPayment;
-      }
-      if (isFinite(nNew) && nNew > 0) {
-        const newEndDate = addMonths(date, Math.ceil(nNew));
-        const existingMetadata = Object.fromEntries(
-          Object.entries(holding.metadata || {}).map(([k, v]) => [k, String(v)]),
+
+    if (endDate && loanOriginationDate) {
+      const originationDate = parseISO(loanOriginationDate);
+      // Index of the first monthly quote strictly after the repayment date
+      const startIndex = differenceInCalendarMonths(date, originationDate) + 1;
+      let totalN = differenceInCalendarMonths(endDate, originationDate);
+      const existingMetadata = Object.fromEntries(
+        Object.entries(holding.metadata || {}).map(([k, v]) => [k, String(v)]),
+      );
+      const metaUpdates: Record<string, string> = { ...existingMetadata };
+
+      if (mode === "reduce_duration" && monthlyPayment !== null && monthlyPayment > 0) {
+        const remainingPaymentCount = calculateRemainingPaymentCount(
+          newBalance,
+          interestRate,
+          monthlyPayment,
         );
-        await updateMetadataMutation.mutateAsync({
-          assetId,
-          metadata: { ...existingMetadata, end_date: formatDateISO(newEndDate) },
-        });
+        if (remainingPaymentCount !== null && remainingPaymentCount > 0) {
+          totalN = startIndex + remainingPaymentCount;
+          metaUpdates.end_date = formatDateISO(addMonths(originationDate, totalN - 1));
+        }
       }
+
+      const remainingN = totalN - startIndex;
+      if (remainingN > 0) {
+        const P = calculateMonthlyPayment(newBalance, interestRate, remainingN);
+        if (P === null) return;
+
+        // Persist the new effective monthly payment so the overview stat stays accurate
+        metaUpdates.current_monthly_payment = String(Math.round(P * 100) / 100);
+
+        const quotes = buildLoanSchedule({
+          assetId,
+          currency: holding.currency,
+          startingBalance: newBalance,
+          annualRate: interestRate,
+          paymentCount: remainingN,
+          firstPaymentDate: addMonths(originationDate, startIndex),
+        });
+        if (quotes.length > 0) {
+          await persistLoanSchedule(quotes);
+        }
+        const obsoleteQuoteIds = getObsoleteFutureQuoteIds(quoteHistory, date, quotes);
+        await Promise.all(
+          obsoleteQuoteIds.map((quoteId) => deleteQuoteMutation.mutateAsync(quoteId)),
+        );
+      }
+
+      await updateMetadataMutation.mutateAsync({ assetId, metadata: metaUpdates });
     }
+
     await invalidateQuoteQueries();
     setEarlyRepaymentOpen(false);
   };
 
   const handleCloseLoan = async (date: Date) => {
-    const today = new Date();
-    const cappedDate = date > today ? today : date;
+    const cappedDate = date;
     const quote: Quote = {
       id: "",
       createdAt: new Date().toISOString(),
@@ -205,11 +262,8 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
       notes: "loan_closed",
     };
     await saveQuoteMutation.mutateAsync(quote);
-    quoteHistory
-      .filter((q) => new Date(q.timestamp) > cappedDate)
-      .forEach((q) => {
-        void deleteQuoteMutation.mutateAsync(q.id);
-      });
+    const futureQuoteIds = getObsoleteFutureQuoteIds(quoteHistory, cappedDate, []);
+    await Promise.all(futureQuoteIds.map((quoteId) => deleteQuoteMutation.mutateAsync(quoteId)));
     const existingMetadata = Object.fromEntries(
       Object.entries(holding.metadata || {}).map(([k, v]) => [k, String(v)]),
     );
@@ -227,53 +281,51 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     const N = differenceInCalendarMonths(endDate, originationDate);
     if (N <= 0) return;
 
-    // Determine where the schedule currently stands (how many past quotes exist)
     const today = new Date();
-    const pastQuotes = [...quoteHistory]
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .filter((q) => new Date(q.timestamp) <= today);
-
-    const startIndex = pastQuotes.length;
+    // Use calendar months to find the next scheduled slot, regardless of any
+    // out-of-schedule quotes (e.g. early repayment entries on non-payment dates).
+    const startIndex = differenceInCalendarMonths(today, originationDate) + 1;
     if (startIndex >= N) return;
 
+    // Latest balance: last quote at or before today, sorted chronologically.
+    const sortedPast = [...quoteHistory]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .filter((q) => new Date(q.timestamp) <= today);
     const latestBalance =
-      pastQuotes.length > 0 ? Math.abs(pastQuotes[pastQuotes.length - 1].close) : currentBalance;
+      sortedPast.length > 0 ? Math.abs(sortedPast[sortedPast.length - 1].close) : currentBalance;
 
     const remainingN = N - startIndex;
-    const rNew = newRate / 100 / 12;
-    const P =
-      rNew > 0
-        ? (latestBalance * rNew) / (1 - Math.pow(1 + rNew, -remainingN))
-        : latestBalance / remainingN;
+    const P = calculateMonthlyPayment(latestBalance, newRate, remainingN);
+    if (P === null) return;
 
-    const quotes: QuoteImport[] = [];
-    let balance = latestBalance;
-    for (let k = 0; k < remainingN; k++) {
-      const interest = balance * rNew;
-      balance = Math.max(0, balance - (P - interest));
-      quotes.push({
-        symbol: assetId,
-        date: formatDateISO(addMonths(originationDate, startIndex + k)),
-        close: Math.round(balance * 100) / 100,
-        currency: holding.currency,
-        validationStatus: "valid",
-      });
-    }
-
-    // Update interest rate in metadata if it changed
-    if (newRate !== interestRate) {
-      const existingMetadata = Object.fromEntries(
-        Object.entries(holding.metadata || {}).map(([k, v]) => [k, String(v)]),
-      );
-      await updateMetadataMutation.mutateAsync({
-        assetId,
-        metadata: { ...existingMetadata, interest_rate: String(newRate) },
-      });
-    }
+    const quotes = buildLoanSchedule({
+      assetId,
+      currency: holding.currency,
+      startingBalance: latestBalance,
+      annualRate: newRate,
+      paymentCount: remainingN,
+      firstPaymentDate: addMonths(originationDate, startIndex),
+    });
 
     if (quotes.length > 0) {
-      await importManualQuotes(quotes);
+      await persistLoanSchedule(quotes);
     }
+    const obsoleteQuoteIds = getObsoleteFutureQuoteIds(quoteHistory, today, quotes);
+    await Promise.all(obsoleteQuoteIds.map((quoteId) => deleteQuoteMutation.mutateAsync(quoteId)));
+
+    // Always persist the new effective payment; also update rate if it changed
+    const existingMetadata = Object.fromEntries(
+      Object.entries(holding.metadata || {}).map(([k, v]) => [k, String(v)]),
+    );
+    const metaUpdates: Record<string, string> = {
+      ...existingMetadata,
+      current_monthly_payment: String(Math.round(P * 100) / 100),
+    };
+    if (newRate !== interestRate) {
+      metaUpdates.interest_rate = String(newRate);
+    }
+    await updateMetadataMutation.mutateAsync({ assetId, metadata: metaUpdates });
+
     await invalidateQuoteQueries();
     setRecalculateScheduleOpen(false);
   };
@@ -447,16 +499,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                 <>
                   {isLiability ? (
                     <LiabilityHistoryChart
-                      data={[...quoteHistory]
-                        .sort(
-                          (a, b) =>
-                            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-                        )
-                        .map((q) => ({
-                          timestamp: q.timestamp,
-                          totalValue: q.close,
-                          currency: holding.currency,
-                        }))}
+                      data={filteredChartData}
                       endDate={
                         (holding.metadata?.end_date as string | undefined) ??
                         estimateEndDate(
@@ -580,12 +623,15 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
             interestRate={interestRate}
             remainingMonths={remainingMonths}
             monthlyPayment={monthlyPayment}
+            originationDate={loanOriginationDate ? parseISO(loanOriginationDate) : null}
+            endDate={endDate}
             onSubmit={handleEarlyRepayment}
           />
           <CloseLoanDialog
             open={closeLoanOpen}
             onOpenChange={setCloseLoanOpen}
             onSubmit={handleCloseLoan}
+            originationDate={loanOriginationDate ? parseISO(loanOriginationDate) : null}
           />
           <RecalculateScheduleDialog
             open={recalculateScheduleOpen}
@@ -736,7 +782,7 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
 
-  const metadata = holding.metadata || {};
+  const metadata = useMemo(() => holding.metadata || {}, [holding.metadata]);
   const kind = holding.kind.toLowerCase();
 
   // Calculate liability progress
@@ -771,23 +817,27 @@ const AlternativeAssetDetailCard: React.FC<AlternativeAssetDetailCardProps> = ({
           ? Math.max(1, differenceInMonths(endDate, new Date()))
           : null;
     let monthlyPayment: number | null = null;
-    if (totalMonths && totalMonths > 0) {
+    const storedMonthlyPayment = metadata.current_monthly_payment
+      ? parseFloat(metadata.current_monthly_payment as string)
+      : null;
+    if (storedMonthlyPayment !== null && Number.isFinite(storedMonthlyPayment)) {
+      monthlyPayment = storedMonthlyPayment;
+    } else if (totalMonths && totalMonths > 0) {
       const annualRate = metadata.interest_rate ? parseFloat(metadata.interest_rate as string) : 0;
-      if (annualRate > 0) {
-        const r = annualRate / 100 / 12;
-        monthlyPayment = (originalAmount * r) / (1 - Math.pow(1 + r, -totalMonths));
-      } else {
-        monthlyPayment = originalAmount / totalMonths;
-      }
+      monthlyPayment = calculateMonthlyPayment(originalAmount, annualRate, totalMonths);
     }
 
     return { amountPaid, percentPaid, originalAmount, currentBalance, monthlyPayment };
   }, [
     isLiability,
     holding.marketValue,
-    holding.metadata,
     metadata.original_amount,
     metadata.purchase_price,
+    metadata.current_monthly_payment,
+    metadata.end_date,
+    metadata.interest_rate,
+    metadata.origination_date,
+    metadata.purchase_date,
   ]);
 
   // Build detail rows based on asset type

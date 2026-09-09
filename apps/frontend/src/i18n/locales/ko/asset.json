@@ -607,7 +607,11 @@
     "end_date": "종료일",
     "interest_rate": "금리 (%)",
     "loan_term": "대출 기간",
-    "years": "년"
+    "years": "년",
+    "validation": {
+      "invalid": "유효한 대출 정보를 입력하세요.",
+      "balance_date_before_origination": "잔액 날짜는 대출 실행일보다 빠를 수 없습니다."
+    }
   },
   "detailsSheet": {
     "details_saved": "세부정보가 저장되었습니다",
@@ -776,6 +780,12 @@
     "recalculate_current_balance": "현재 잔액",
     "recalculate_remaining_months": "남은 개월",
     "recalculate_new_rate": "새 연 이율 (%)",
-    "recalculate_confirm": "재계산"
+    "recalculate_confirm": "재계산",
+    "validation": {
+      "invalid": "유효한 상환 금액을 입력하세요.",
+      "amount_exceeds_balance": "상환액은 현재 잔액을 초과할 수 없습니다.",
+      "date_outside_loan": "상환일은 대출 기간 내여야 합니다.",
+      "closure_date_invalid": "완제일은 대출 실행일부터 오늘 사이여야 합니다."
+    }
   }
 }

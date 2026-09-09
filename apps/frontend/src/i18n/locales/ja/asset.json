@@ -607,7 +607,11 @@
     "end_date": "終了日",
     "interest_rate": "金利 (%)",
     "loan_term": "返済期間",
-    "years": "年"
+    "years": "年",
+    "validation": {
+      "invalid": "有効なローン情報を入力してください。",
+      "balance_date_before_origination": "残高日は借入日より前にできません。"
+    }
   },
   "detailsSheet": {
     "details_saved": "詳細を保存しました",
@@ -776,6 +780,12 @@
     "recalculate_current_balance": "現在の残高",
     "recalculate_remaining_months": "残り月数",
     "recalculate_new_rate": "新しい年率 (%)",
-    "recalculate_confirm": "再計算"
+    "recalculate_confirm": "再計算",
+    "validation": {
+      "invalid": "有効な返済額を入力してください。",
+      "amount_exceeds_balance": "返済額は現在残高を超えることができません。",
+      "date_outside_loan": "返済日はローン期間内である必要があります。",
+      "closure_date_invalid": "完済日は借入日から今日までの範囲にしてください。"
+    }
   }
 }
