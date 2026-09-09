@@ -459,7 +459,8 @@
       "student_loan": "Student Loan",
       "credit_card": "Credit Card",
       "personal_loan": "Personal Loan",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "Other"
     }
   },
   "altContent": {
@@ -535,7 +536,8 @@
       "student_loan": "Student Loan",
       "credit_card": "Credit Card",
       "personal_loan": "Personal Loan",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "Other"
     },
     "weightUnit": {
       "oz": "Troy Ounce",

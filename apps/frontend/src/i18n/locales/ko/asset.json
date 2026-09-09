@@ -459,7 +459,8 @@
       "student_loan": "학자금 대출",
       "credit_card": "신용카드",
       "personal_loan": "개인 대출",
-      "heloc": "주택담보 신용한도(HELOC)"
+      "heloc": "주택담보 신용한도(HELOC)",
+      "other": "기타"
     }
   },
   "altContent": {
@@ -531,7 +532,8 @@
       "student_loan": "학자금 대출",
       "credit_card": "신용카드",
       "personal_loan": "개인 대출",
-      "heloc": "주택담보 신용한도(HELOC)"
+      "heloc": "주택담보 신용한도(HELOC)",
+      "other": "기타"
     },
     "weightUnit": {
       "oz": "트로이온스",

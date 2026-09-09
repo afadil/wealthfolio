@@ -459,7 +459,8 @@
       "student_loan": "就學貸款",
       "credit_card": "信用卡",
       "personal_loan": "個人貸款",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "其他"
     }
   },
   "altContent": {
@@ -531,7 +532,8 @@
       "student_loan": "就學貸款",
       "credit_card": "信用卡",
       "personal_loan": "個人貸款",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "其他"
     },
     "weightUnit": {
       "oz": "金衡盎司",

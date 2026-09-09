@@ -175,9 +175,6 @@ export function AlternativeAssetQuickAddModal({
   const baseCurrency = settings?.baseCurrency ?? "USD";
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [hasMortgageChecked, setHasMortgageChecked] = useState(false);
-  const [savedPurchaseDate, setSavedPurchaseDate] = useState<Date | undefined>(undefined);
-  const [savedPropertyName, setSavedPropertyName] = useState<string | undefined>(undefined);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     kind: defaultKind || AlternativeAssetKind.PROPERTY,
@@ -188,32 +185,13 @@ export function AlternativeAssetQuickAddModal({
     linkedAssetId: initialLinkedAssetId,
   });
 
-  const { createMutation } = useAlternativeAssetMutations({
-    onCreateSuccess: (response) => {
-      onAssetCreated?.(response);
-
-      // If mortgage checkbox was checked, chain to liability creation
-      // Don't close the modal - the callback will reopen it for liability
-      if (hasMortgageChecked && onOpenLiabilityQuickAdd) {
-        onOpenChange(false);
-        // Use setTimeout to ensure modal closes before reopening
-        setTimeout(() => {
-          onOpenLiabilityQuickAdd(response.assetId, savedPurchaseDate, savedPropertyName);
-        }, 100);
-      } else {
-        onOpenChange(false);
-      }
-    },
-  });
+  const { createMutation } = useAlternativeAssetMutations();
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       // Skip step 1 if a defaultKind is provided
       setStep(defaultKind ? 2 : 1);
-      setHasMortgageChecked(false);
-      setSavedPurchaseDate(undefined);
-      setSavedPropertyName(undefined);
       setValidationError(null);
       setFormData({
         kind: defaultKind || AlternativeAssetKind.PROPERTY,
@@ -369,10 +347,6 @@ export function AlternativeAssetQuickAddModal({
       linkedAssetId: formData.linkedAssetId || undefined,
     };
 
-    setHasMortgageChecked(formData.hasMortgage ?? false);
-    setSavedPurchaseDate(formData.purchaseDate);
-    setSavedPropertyName(formData.name);
-
     const response = await createMutation.mutateAsync(request);
 
     if (isLiability && formData.purchaseDate && formData.loanTerm) {
@@ -417,9 +391,18 @@ export function AlternativeAssetQuickAddModal({
             adjclose: 0,
             volume: 0,
             currency: payoffQuote.currency,
+            notes: "scheduled_payoff",
           });
         }
       }
+    }
+
+    onAssetCreated?.(response);
+    onOpenChange(false);
+    if (formData.hasMortgage && onOpenLiabilityQuickAdd) {
+      setTimeout(() => {
+        onOpenLiabilityQuickAdd(response.assetId, formData.purchaseDate, formData.name);
+      }, 100);
     }
   };
 

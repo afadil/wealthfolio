@@ -16,6 +16,7 @@ interface BuildLoanScheduleParams {
   annualRate: number;
   paymentCount: number;
   firstPaymentDate: Date;
+  monthlyPayment?: number;
 }
 
 export interface RemainingScheduleWindow {
@@ -109,12 +110,14 @@ export function buildLoanSchedule({
   annualRate,
   paymentCount,
   firstPaymentDate,
+  monthlyPayment,
 }: BuildLoanScheduleParams): QuoteImport[] {
   if (startingBalance < 0 || annualRate < 0 || paymentCount <= 0) return [];
 
   const monthlyRate = annualRate / 100 / 12;
-  const payment = calculateMonthlyPayment(startingBalance, annualRate, paymentCount);
-  if (payment === null) return [];
+  const payment =
+    monthlyPayment ?? calculateMonthlyPayment(startingBalance, annualRate, paymentCount);
+  if (payment === null || !Number.isFinite(payment) || payment <= 0) return [];
   let balance = startingBalance;
   const preserveEndOfMonth = isLastDayOfMonth(firstPaymentDate);
 
@@ -129,6 +132,7 @@ export function buildLoanSchedule({
       date: format(paymentDate, "yyyy-MM-dd"),
       close: index === paymentCount - 1 ? 0 : Math.round(balance * 100) / 100,
       currency,
+      notes: "loan_schedule",
       validationStatus: "valid" as const,
     };
   });
@@ -145,8 +149,8 @@ export function splitLoanScheduleForPersistence(schedule: QuoteImport[]): {
 }
 
 /**
- * Return only obsolete future quotes. Dates present in the replacement schedule
- * are overwritten by importManualQuotes and must not subsequently be deleted.
+ * Return only obsolete generated future quotes. User-entered values are never
+ * removed when a loan schedule is recalculated.
  */
 export function getObsoleteFutureQuoteIds(
   existingQuotes: Quote[],
@@ -159,7 +163,8 @@ export function getObsoleteFutureQuoteIds(
   return existingQuotes
     .filter((quote) => {
       const quoteDay = quote.timestamp.slice(0, 10);
-      return quoteDay > effectiveDay && !replacementDays.has(quoteDay);
+      const isGenerated = quote.notes === "loan_schedule" || quote.notes === "scheduled_payoff";
+      return isGenerated && quoteDay > effectiveDay && !replacementDays.has(quoteDay);
     })
     .map((quote) => quote.id);
 }

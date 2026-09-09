@@ -459,7 +459,8 @@
       "student_loan": "Studienkredit",
       "credit_card": "Kreditkarte",
       "personal_loan": "Privatkredit",
-      "heloc": "Immobilienkreditlinie"
+      "heloc": "Immobilienkreditlinie",
+      "other": "Sonstige"
     }
   },
   "altContent": {
@@ -531,7 +532,8 @@
       "student_loan": "Studienkredit",
       "credit_card": "Kreditkarte",
       "personal_loan": "Privatkredit",
-      "heloc": "Immobilienkreditlinie"
+      "heloc": "Immobilienkreditlinie",
+      "other": "Sonstige"
     },
     "weightUnit": {
       "oz": "Feinunze",

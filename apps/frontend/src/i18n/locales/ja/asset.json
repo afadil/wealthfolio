@@ -459,7 +459,8 @@
       "student_loan": "教育ローン",
       "credit_card": "クレジットカード",
       "personal_loan": "個人向けローン",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "その他"
     }
   },
   "altContent": {
@@ -531,7 +532,8 @@
       "student_loan": "教育ローン",
       "credit_card": "クレジットカード",
       "personal_loan": "個人向けローン",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "その他"
     },
     "weightUnit": {
       "oz": "トロイオンス",

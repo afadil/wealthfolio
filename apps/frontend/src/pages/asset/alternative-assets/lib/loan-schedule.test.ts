@@ -10,7 +10,7 @@ import {
   splitLoanScheduleForPersistence,
 } from "./loan-schedule";
 
-const quote = (id: string, day: string): Quote => ({
+const quote = (id: string, day: string, notes?: string): Quote => ({
   id,
   assetId: "loan",
   timestamp: `${day}T00:00:00Z`,
@@ -23,6 +23,7 @@ const quote = (id: string, day: string): Quote => ({
   adjclose: 100,
   volume: 0,
   currency: "EUR",
+  notes,
 });
 
 describe("loan schedule replacement", () => {
@@ -34,6 +35,20 @@ describe("loan schedule replacement", () => {
   it("calculates a shortened duration and rejects a payment below monthly interest", () => {
     expect(calculateRemainingPaymentCount(10_000, 0, 500)).toBe(20);
     expect(calculateRemainingPaymentCount(100_000, 12, 500)).toBeNull();
+  });
+
+  it("keeps the requested installment when reducing duration", () => {
+    const schedule = buildLoanSchedule({
+      assetId: "loan",
+      currency: "EUR",
+      startingBalance: 1_000,
+      annualRate: 0,
+      paymentCount: 3,
+      firstPaymentDate: new Date(2026, 1, 1),
+      monthlyPayment: 400,
+    });
+
+    expect(schedule.map(({ close }) => close)).toEqual([600, 200, 0]);
   });
 
   it("builds a replacement schedule ending at zero", () => {
@@ -51,6 +66,7 @@ describe("loan schedule replacement", () => {
       { date: "2026-03-01", close: 400 },
       { date: "2026-04-01", close: 0 },
     ]);
+    expect(schedule.every(({ notes }) => notes === "loan_schedule")).toBe(true);
   });
 
   it("separates the zero payoff quote from batch-importable values", () => {
@@ -218,12 +234,25 @@ describe("loan schedule replacement", () => {
     const existing = [
       quote("past", "2026-01-01"),
       quote("effective", "2026-02-15"),
-      quote("overwritten", "2026-03-01"),
-      quote("obsolete", "2026-05-01"),
+      quote("overwritten", "2026-03-01", "loan_schedule"),
+      quote("obsolete", "2026-05-01", "loan_schedule"),
+      quote("manual", "2026-06-01"),
     ];
 
     expect(getObsoleteFutureQuoteIds(existing, new Date(2026, 1, 15), replacement)).toEqual([
       "obsolete",
     ]);
+  });
+
+  it("includes every contractual payment through the maturity month", () => {
+    const window = getRemainingScheduleWindow(
+      new Date(2026, 0, 1),
+      new Date(2026, 8, 9),
+      new Date(2031, 0, 1),
+    );
+
+    expect(window?.firstPaymentDate).toEqual(new Date(2026, 9, 1));
+    expect(window?.paymentCount).toBe(52);
+    expect(calculateMonthlyPayment(15_503.24, 3, window?.paymentCount ?? 0)).toBeCloseTo(318.31, 2);
   });
 });

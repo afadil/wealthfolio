@@ -463,7 +463,8 @@
       "student_loan": "Préstamo estudiantil",
       "credit_card": "Tarjeta de crédito",
       "personal_loan": "Préstamo personal",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "Otro"
     }
   },
   "altContent": {
@@ -535,7 +536,8 @@
       "student_loan": "Préstamo estudiantil",
       "credit_card": "Tarjeta de crédito",
       "personal_loan": "Préstamo personal",
-      "heloc": "HELOC"
+      "heloc": "HELOC",
+      "other": "Otro"
     },
     "weightUnit": {
       "oz": "Onza troy",

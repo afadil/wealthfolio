@@ -463,7 +463,8 @@
       "student_loan": "Prêt étudiant",
       "credit_card": "Carte de crédit",
       "personal_loan": "Prêt personnel",
-      "heloc": "Marge de crédit hypothécaire"
+      "heloc": "Marge de crédit hypothécaire",
+      "other": "Autre"
     }
   },
   "altContent": {
@@ -535,7 +536,8 @@
       "student_loan": "Prêt étudiant",
       "credit_card": "Carte de crédit",
       "personal_loan": "Prêt personnel",
-      "heloc": "Marge de crédit hypothécaire"
+      "heloc": "Marge de crédit hypothécaire",
+      "other": "Autre"
     },
     "weightUnit": {
       "oz": "Once troy",

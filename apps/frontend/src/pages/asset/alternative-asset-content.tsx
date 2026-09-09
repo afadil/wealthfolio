@@ -177,7 +177,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
       id: "",
       createdAt: new Date().toISOString(),
       dataSource: "MANUAL",
-      timestamp: date.toISOString(),
+      timestamp: `${formatDateISO(date)}T00:00:00Z`,
       assetId,
       open: newBalance,
       high: newBalance,
@@ -200,6 +200,24 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
       );
       const metaUpdates: Record<string, string> = { ...existingMetadata };
 
+      if (newBalance === 0) {
+        const obsoleteQuoteIds = getObsoleteFutureQuoteIds(quoteHistory, date, []);
+        await Promise.all(
+          obsoleteQuoteIds.map((quoteId) => deleteQuoteMutation.mutateAsync(quoteId)),
+        );
+        await updateMetadataMutation.mutateAsync({
+          assetId,
+          metadata: {
+            ...metaUpdates,
+            end_date: formatDateISO(date),
+            current_monthly_payment: "0",
+          },
+        });
+        await invalidateQuoteQueries();
+        setEarlyRepaymentOpen(false);
+        return;
+      }
+
       if (mode === "reduce_duration" && monthlyPayment !== null && monthlyPayment > 0) {
         const remainingPaymentCount = calculateRemainingPaymentCount(
           newBalance,
@@ -212,9 +230,12 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
         }
       }
 
-      const remainingN = totalN - startIndex;
+      const remainingN = mode === "reduce_duration" ? totalN - startIndex : totalN - startIndex + 1;
       if (remainingN > 0) {
-        const P = calculateMonthlyPayment(newBalance, interestRate, remainingN);
+        const P =
+          mode === "reduce_duration"
+            ? monthlyPayment
+            : calculateMonthlyPayment(newBalance, interestRate, remainingN);
         if (P === null) return;
 
         // Persist the new effective monthly payment so the overview stat stays accurate
@@ -227,6 +248,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
           annualRate: interestRate,
           paymentCount: remainingN,
           firstPaymentDate: addMonths(originationDate, startIndex),
+          monthlyPayment: mode === "reduce_duration" ? P : undefined,
         });
         if (quotes.length > 0) {
           await persistLoanSchedule(quotes);
@@ -250,7 +272,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
       id: "",
       createdAt: new Date().toISOString(),
       dataSource: "MANUAL",
-      timestamp: cappedDate.toISOString(),
+      timestamp: `${formatDateISO(cappedDate)}T00:00:00Z`,
       assetId,
       open: 0,
       high: 0,
@@ -269,7 +291,11 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     );
     await updateMetadataMutation.mutateAsync({
       assetId,
-      metadata: { ...existingMetadata, end_date: formatDateISO(cappedDate) },
+      metadata: {
+        ...existingMetadata,
+        end_date: formatDateISO(cappedDate),
+        current_monthly_payment: "0",
+      },
     });
     await invalidateQuoteQueries();
     setCloseLoanOpen(false);
@@ -285,7 +311,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     // Use calendar months to find the next scheduled slot, regardless of any
     // out-of-schedule quotes (e.g. early repayment entries on non-payment dates).
     const startIndex = differenceInCalendarMonths(today, originationDate) + 1;
-    if (startIndex >= N) return;
+    if (startIndex > N) return;
 
     // Latest balance: last quote at or before today, sorted chronologically.
     const sortedPast = [...quoteHistory]
@@ -294,7 +320,7 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
     const latestBalance =
       sortedPast.length > 0 ? Math.abs(sortedPast[sortedPast.length - 1].close) : currentBalance;
 
-    const remainingN = N - startIndex;
+    const remainingN = N - startIndex + 1;
     const P = calculateMonthlyPayment(latestBalance, newRate, remainingN);
     if (P === null) return;
 
@@ -697,6 +723,7 @@ const LIABILITY_TYPE_LABEL_KEYS: Record<string, string> = {
   credit_card: "asset:altContent.liabilityType.credit_card",
   personal_loan: "asset:altContent.liabilityType.personal_loan",
   heloc: "asset:altContent.liabilityType.heloc",
+  other: "asset:altContent.liabilityType.other",
 };
 
 const WEIGHT_UNIT_LABEL_KEYS: Record<string, string> = {

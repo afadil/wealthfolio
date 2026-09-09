@@ -42,6 +42,7 @@ export const LIABILITY_TYPES = [
   { value: "credit_card", label: "Credit Card" },
   { value: "personal_loan", label: "Personal Loan" },
   { value: "heloc", label: "HELOC" },
+  { value: "other", label: "Other" },
 ] as const;
 
 // Vehicle types (optional, for future use)
@@ -112,7 +113,15 @@ export const preciousMetalDetailsSchema = baseSchema.extend({
 export const liabilityDetailsSchema = baseSchema.extend({
   kind: z.literal(AlternativeAssetKind.LIABILITY),
   liabilityType: z
-    .enum(["mortgage", "auto_loan", "student_loan", "credit_card", "personal_loan", "heloc"])
+    .enum([
+      "mortgage",
+      "auto_loan",
+      "student_loan",
+      "credit_card",
+      "personal_loan",
+      "heloc",
+      "other",
+    ])
     .optional()
     .nullable(),
   originalAmount: z.coerce

@@ -13,7 +13,11 @@ import { addMonths, differenceInCalendarMonths } from "date-fns";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { calculateMonthlyPayment, calculateRemainingPaymentCount } from "../lib/loan-schedule";
+import {
+  calculateMonthlyPayment,
+  calculateRemainingPaymentCount,
+  getRemainingScheduleWindow,
+} from "../lib/loan-schedule";
 
 interface EarlyRepaymentDialogProps {
   open: boolean;
@@ -61,6 +65,9 @@ export function EarlyRepaymentDialog({
   }, [open]);
 
   const bNew = Math.max(0, currentBalance - amount);
+  const selectedWindow =
+    originationDate && endDate ? getRemainingScheduleWindow(originationDate, date, endDate) : null;
+  const selectedRemainingMonths = selectedWindow?.paymentCount ?? remainingMonths;
 
   let newEndDate: Date | null = null;
   if (mode === "reduce_duration" && monthlyPayment !== null) {
@@ -69,7 +76,9 @@ export function EarlyRepaymentDialog({
   }
 
   const newMonthlyPayment =
-    mode === "reduce_payment" ? calculateMonthlyPayment(bNew, interestRate, remainingMonths) : null;
+    mode === "reduce_payment"
+      ? calculateMonthlyPayment(bNew, interestRate, selectedRemainingMonths)
+      : null;
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
