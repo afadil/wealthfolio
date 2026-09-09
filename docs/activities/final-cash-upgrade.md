@@ -1,9 +1,9 @@
 # Upgrade notes: authoritative final cash (v3.8)
 
-From this version, an activity's **amount** is the final cash that moved, including fees
-and taxes. Readers book it as-is; nothing re-derives it at read time.
-On first launch after upgrading, a one-shot migration rewrites legacy rows to
-this contract. Make a normal database backup before updating. The application
+From this version, an activity's **amount** is the final cash that moved,
+including fees and taxes. Readers book it as-is; nothing re-derives it at read
+time. On first launch after upgrading, a one-shot migration rewrites legacy rows
+to this contract. Make a normal database backup before updating. The application
 does not create a potentially large automatic startup backup. What you may
 notice:
 
