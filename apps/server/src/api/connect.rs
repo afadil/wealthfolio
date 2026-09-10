@@ -33,7 +33,7 @@ use wealthfolio_connect::{
     ConnectApiClient, PostLoginBootstrapReason, PostLoginBootstrapResult,
     PostLoginBootstrapSyncResult, PostLoginBrokerBootstrapDecision, SyncConfig, SyncOrchestrator,
     SyncProgressPayload, SyncProgressReporter, SyncResult, TokenLifecycleConfig,
-    TokenLifecycleError, CLOUD_ACCESS_TOKEN_KEY, CLOUD_REFRESH_TOKEN_KEY,
+    TokenLifecycleError, CLOUD_REFRESH_TOKEN_KEY,
 };
 #[cfg(feature = "device-sync")]
 use wealthfolio_device_sync::{EnableSyncResult, SyncState, SyncStateResult};
@@ -365,12 +365,10 @@ async fn store_sync_session(
 ) -> ApiResult<Json<()>> {
     ensure_cloud_sync_enabled()?;
     state
-        .secret_store
-        .set_secret(CLOUD_REFRESH_TOKEN_KEY, &body.refresh_token)
-        .map_err(|e| ApiError::Internal(format!("Failed to store refresh token: {}", e)))?;
-    // Best-effort cleanup for legacy versions that stored access tokens at rest.
-    let _ = state.secret_store.delete_secret(CLOUD_ACCESS_TOKEN_KEY);
-    state.token_lifecycle.clear_cache().await;
+        .token_lifecycle
+        .store_session(state.secret_store.as_ref(), &body.refresh_token)
+        .await
+        .map_err(map_token_lifecycle_error)?;
 
     Ok(Json(()))
 }
@@ -484,19 +482,29 @@ async fn clear_sync_session(State(state): State<Arc<AppState>>) -> ApiResult<Jso
     ensure_cloud_sync_enabled()?;
     info!("[Connect] Clearing sync session");
 
-    let _ = state.secret_store.delete_secret(CLOUD_REFRESH_TOKEN_KEY);
-    let _ = state.secret_store.delete_secret(CLOUD_ACCESS_TOKEN_KEY);
-
-    state.token_lifecycle.clear_cache().await;
-    #[cfg(feature = "device-sync")]
-    device_sync_engine::clear_min_snapshot_created_at_from_store();
-    let _ = state
-        .app_sync_repository
-        .clear_all_min_snapshot_created_at()
-        .await;
-
+    disconnect_cloud_session(&state)
+        .await
+        .map_err(ApiError::Internal)?;
     info!("[Connect] Sync session cleared");
     Ok(Json(()))
+}
+
+async fn disconnect_cloud_session(state: &AppState) -> Result<(), String> {
+    state
+        .token_lifecycle
+        .clear_session_with(state.secret_store.as_ref(), || async {
+            #[cfg(feature = "device-sync")]
+            device_sync_engine::clear_min_snapshot_created_at_from_store();
+            let _ = state
+                .app_sync_repository
+                .clear_all_min_snapshot_created_at()
+                .await;
+            #[cfg(feature = "device-sync")]
+            state.device_sync_runtime.ensure_background_stopped().await;
+        })
+        .await
+        .map(|_| ())
+        .map_err(|err| err.to_string())
 }
 
 async fn get_sync_session_status(
@@ -504,10 +512,9 @@ async fn get_sync_session_status(
 ) -> ApiResult<Json<SyncSessionStatus>> {
     ensure_cloud_sync_enabled()?;
     let is_configured = state
-        .secret_store
-        .get_secret(CLOUD_REFRESH_TOKEN_KEY)
-        .map(|t| t.is_some())
-        .unwrap_or(false);
+        .token_lifecycle
+        .is_session_configured(state.secret_store.as_ref())
+        .map_err(map_token_lifecycle_error)?;
 
     Ok(Json(SyncSessionStatus { is_configured }))
 }

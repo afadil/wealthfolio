@@ -90,8 +90,28 @@ impl ConnectService {
         .map_err(|err| err.to_string())
     }
 
-    pub async fn clear_cached_token(&self) {
-        self.token_lifecycle.clear_cache().await;
+    pub fn is_session_configured(&self) -> Result<bool, String> {
+        self.token_lifecycle
+            .is_session_configured(self.secret_store.as_ref())
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn store_session(&self, token: &str) -> Result<(), String> {
+        self.token_lifecycle
+            .store_session(self.secret_store.as_ref(), token)
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn clear_session_with<F, Fut>(&self, after_clear: F) -> Result<bool, String>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        self.token_lifecycle
+            .clear_session_with(self.secret_store.as_ref(), after_clear)
+            .await
+            .map_err(|err| err.to_string())
     }
 
     /// Get an authenticated API client using the stored access token.
