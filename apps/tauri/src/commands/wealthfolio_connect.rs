@@ -250,7 +250,6 @@ pub fn get_sync_session_status(
 }
 
 /// Clear explicit logout credentials and stop the worker in one transition.
-
 async fn disconnect_cloud_session(context: &ServiceContext) -> Result<(), String> {
     context
         .connect_service()
