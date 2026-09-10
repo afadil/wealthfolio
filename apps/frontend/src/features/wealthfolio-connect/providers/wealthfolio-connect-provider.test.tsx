@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { usePostLoginConnectSync } from "../hooks/use-post-login-connect-sync";
 import { WealthfolioConnectProvider, useWealthfolioConnect } from "./wealthfolio-connect-provider";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   account: "",
   onAuth: (_event: string) => {},
   onDeepLink: (_event: { payload: string }) => {},
+  bootstrap: vi.fn(),
+  toast: vi.fn(),
+  restore: vi.fn(),
+  setSession: vi.fn(),
+  verifyOtp: vi.fn(),
   signOut: vi.fn(),
   signIn: vi.fn(),
   exchange: vi.fn(),
@@ -43,6 +49,8 @@ vi.mock("@/adapters", () => ({
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     auth: {
+      setSession: mocks.setSession,
+      verifyOtp: mocks.verifyOtp,
       signOut: mocks.signOut,
       signInWithPassword: mocks.signIn,
       exchangeCodeForSession: mocks.exchange,
@@ -54,14 +62,15 @@ vi.mock("@supabase/supabase-js", () => ({
   }),
 }));
 vi.mock("../services/auth-service", () => ({
-  restoreSyncSession: async () => {
-    throw new Error("No stored session");
-  },
+  restoreSyncSession: mocks.restore,
+  postLoginBootstrap: mocks.bootstrap,
   getSyncSessionStatus: mocks.getStatus,
   clearSyncSession: mocks.clear,
   storeSyncSession: mocks.store,
 }));
 vi.mock("../services/broker-service", () => ({ getUserInfo: mocks.getUserInfo }));
+
+vi.mock("@wealthfolio/ui/components/ui/use-toast", () => ({ toast: { loading: mocks.toast } }));
 
 const session = (account: string) => ({
   user: { id: account },
@@ -92,6 +101,9 @@ async function setup() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.restore.mockRejectedValue(new Error("No stored session"));
+  mocks.setSession.mockResolvedValue({ data: { session: session("A") }, error: null });
+  mocks.verifyOtp.mockResolvedValue({ data: { session: session("A") }, error: null });
   mocks.configured = false;
   mocks.account = "";
   mocks.platform = "web";
@@ -196,7 +208,7 @@ describe("Cloud session lifecycle", () => {
     expect(result.current.isConnected).toBe(true);
     mocks.getUserInfo.mockResolvedValue(info("A", "active"));
     await act(() => result.current.refetchUserInfo());
-    expect(result.current.postLoginSyncRequest?.source).toBe("subscription-activated");
+    expect(result.current.postLoginSyncRequest?.source).toBe("email-sign-in");
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
@@ -234,5 +246,61 @@ describe("Cloud session lifecycle", () => {
     await waitFor(() => expect(result.current.user?.id).toBe("B"));
     expect(mocks.account).toBe("B");
     expect(mocks.configured).toBe(true);
+  });
+});
+
+describe("Login and subscription bootstrap coordination", () => {
+  const started = {
+    brokerSync: { status: "started" },
+    deviceSync: { status: "started" },
+  };
+
+  it.each(["email", "otp", "oauth"])(
+    "preserves the in-flight %s bootstrap and its started toast",
+    async (method) => {
+      const userInfo = deferred<ReturnType<typeof info>>();
+      const bootstrap = deferred<typeof started>();
+      mocks.getUserInfo.mockReturnValue(userInfo.promise);
+      mocks.bootstrap.mockReturnValue(bootstrap.promise);
+      const { result } = renderHook(
+        () => {
+          usePostLoginConnectSync({ enabled: true });
+          return useWealthfolioConnect();
+        },
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current.isInitializing).toBe(false));
+      await act(async () => {
+        if (method === "email") await result.current.signInWithEmail("A", "password");
+        else if (method === "otp") await result.current.verifyOtp("A", "123456");
+        else mocks.onDeepLink({ payload: "wealthfolio://auth/callback?code=activation-test" });
+      });
+      await waitFor(() => expect(mocks.bootstrap).toHaveBeenCalledTimes(1));
+      const loginRequest = result.current.postLoginSyncRequest;
+      await act(async () => userInfo.resolve(info(mocks.account, "active")));
+      expect(result.current.postLoginSyncRequest).toBe(loginRequest);
+      expect(mocks.bootstrap).toHaveBeenCalledTimes(1);
+      await act(async () => bootstrap.resolve(started));
+      expect(mocks.toast).toHaveBeenCalledTimes(1);
+      expect(result.current.postLoginSyncRequest).toBeNull();
+    },
+  );
+
+  it("bootstraps a restored active session without an explicit login request", async () => {
+    mocks.configured = true;
+    mocks.account = "A";
+    mocks.restore.mockResolvedValue({ accessToken: "A-access", refreshToken: "A" });
+    mocks.bootstrap.mockResolvedValue(started);
+    const { result } = renderHook(
+      () => {
+        usePostLoginConnectSync({ enabled: true });
+        return useWealthfolioConnect();
+      },
+      { wrapper },
+    );
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledTimes(1));
+    expect(mocks.bootstrap).toHaveBeenCalledTimes(1);
+    expect(result.current.postLoginSyncRequest).toBeNull();
+    expect(mocks.signIn).not.toHaveBeenCalled();
   });
 });

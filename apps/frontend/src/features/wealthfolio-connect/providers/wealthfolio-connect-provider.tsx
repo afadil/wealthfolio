@@ -284,11 +284,17 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     const sequence = postLoginSyncRequestSequenceRef.current + 1;
     postLoginSyncRequestSequenceRef.current = sequence;
 
-    setPostLoginSyncRequest({
-      id: `${session.user.id}:${now}:${sequence}`,
-      userId: session.user.id,
-      createdAt: now,
-      source,
+    setPostLoginSyncRequest((current) => {
+      // Keep pending login work and its result handler when subscription info arrives.
+      if (source === "subscription-activated" && current?.userId === session.user.id) {
+        return current;
+      }
+      return {
+        id: `${session.user.id}:${now}:${sequence}`,
+        userId: session.user.id,
+        createdAt: now,
+        source,
+      };
     });
   }, []);
 
