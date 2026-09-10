@@ -231,11 +231,7 @@ impl AgentTool for SearchActivities {
                 let unit_price = a.unit_price.as_ref().and_then(|v| v.parse::<f64>().ok());
                 let fee = a.fee.as_ref().and_then(|v| v.parse::<f64>().ok());
                 let fx_rate = a.fx_rate.as_ref().and_then(|v| v.parse::<f64>().ok());
-                let amount = a
-                    .amount
-                    .as_ref()
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .or_else(|| Some(quantity? * unit_price?));
+                let amount = a.amount.as_ref().and_then(|s| s.parse::<f64>().ok());
 
                 ActivityDto {
                     id: a.id,

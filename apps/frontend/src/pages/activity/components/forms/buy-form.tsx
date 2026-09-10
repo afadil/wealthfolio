@@ -27,9 +27,11 @@ import {
   QuantityInput,
   StockTradeIntentSelector,
   SymbolSearch,
+  TradeTotalInput,
   type AccountSelectOption,
   type AssetType,
 } from "./fields";
+import { useTradeTotal } from "./use-trade-total";
 
 // Asset metadata schema for custom assets
 const assetMetadataSchema = z
@@ -82,6 +84,7 @@ export const createBuyFormSchema = (t?: TFunction) =>
         .positive({
           message: msg(t, "activity:form.err_price_gt_zero", "Price must be greater than 0."),
         }),
+      amount: z.coerce.number().min(0).optional(),
       fee: z.coerce
         .number({
           invalid_type_error: msg(t, "activity:form.err_fee_number", "Fee must be a number."),
@@ -250,6 +253,7 @@ export function BuyForm({
       })(),
       quantity: undefined,
       unitPrice: undefined,
+      amount: undefined,
       fee: 0,
       tax: 0,
       comment: null,
@@ -312,22 +316,22 @@ export function BuyForm({
     ? t("activity:form.button_buy_to_cover")
     : t("activity:form.button_add_buy");
 
-  // Option total premium calculation
+  // Trade total calculation
+  const symbolInstrumentType = watch("symbolInstrumentType");
   const optQuantity = watch("quantity");
-  const optUnitPrice = watch("unitPrice");
-  const optFee = watch("fee");
-  const optTax = watch("tax");
   const optMultiplier = watch("contractMultiplier");
-
-  const optionTotal = useMemo(() => {
-    if (!isOption) return 0;
-    const q = Number(optQuantity) || 0;
-    const p = Number(optUnitPrice) || 0;
-    const f = Number(optFee) || 0;
-    const tx = Number(optTax) || 0;
-    const m = Number(optMultiplier) || 100;
-    return q * p * m + f + tx;
-  }, [isOption, optQuantity, optUnitPrice, optFee, optTax, optMultiplier]);
+  const { isCustomAmount, onCustomChange, calculatedAmount, applyTradeTotal } = useTradeTotal({
+    side: "buy",
+    isEditing,
+    defaultAmount: defaultValues?.amount,
+    instrumentType: symbolInstrumentType ?? assetType,
+    quantity: optQuantity,
+    unitPrice: watch("unitPrice"),
+    fee: watch("fee"),
+    tax: watch("tax"),
+    isOption,
+    contractMultiplier: optMultiplier,
+  });
 
   const handleAssetTypeChange = (value: AssetType) => {
     if (value === "option") {
@@ -394,6 +398,7 @@ export function BuyForm({
     Number(optQuantity) > currentShortQuantity;
 
   const handleSubmit = createValidatedSubmit(form, async (data) => {
+    applyTradeTotal(data as { amount?: number | null; needsReview?: boolean });
     // Ensure currency is set (required by backend) — fall back to account currency
     if (!data.currency && accountId) {
       data.currency = accounts.find((a) => a.value === accountId)?.currency ?? data.currency;
@@ -520,6 +525,7 @@ export function BuyForm({
                   <input
                     type="number"
                     {...form.register("contractMultiplier", { valueAsNumber: true })}
+                    readOnly={isEditing}
                     className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
                     aria-label={t("activity:form.contract_multiplier")}
                   />
@@ -543,60 +549,13 @@ export function BuyForm({
             <AmountInput name="tax" label={t("activity:form.label_tax")} currency={currency} />
           </div>
 
-          {/* Option Total Premium with formula breakdown */}
-          {isOption && optQuantity && optUnitPrice && (
-            <div className="bg-muted/50 border-border rounded-md border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-muted-foreground text-xs font-medium uppercase">
-                    {t("activity:form.total_debit")}
-                  </span>
-                  <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">
-                    {Number(optQuantity)} ×{" "}
-                    {currency
-                      ? formatting.formatDecimal(Number(optUnitPrice), {
-                          style: "currency",
-                          currency,
-                        })
-                      : Number(optUnitPrice)}{" "}
-                    × {Number(optMultiplier) || 100}
-                    {Number(optFee) > 0 && (
-                      <>
-                        {" "}
-                        +{" "}
-                        {currency
-                          ? formatting.formatDecimal(Number(optFee), {
-                              style: "currency",
-                              currency,
-                            })
-                          : Number(optFee)}
-                      </>
-                    )}
-                    {Number(optTax) > 0 && (
-                      <>
-                        {" "}
-                        +{" "}
-                        {currency
-                          ? formatting.formatDecimal(Number(optTax), {
-                              style: "currency",
-                              currency,
-                            })
-                          : Number(optTax)}
-                      </>
-                    )}
-                  </p>
-                </div>
-                <span className="text-lg font-semibold tabular-nums">
-                  {formatting.formatDecimal(optionTotal, {
-                    style: currency ? "currency" : "decimal",
-                    currency: currency || undefined,
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            </div>
-          )}
+          <TradeTotalInput
+            side="buy"
+            calculatedAmount={calculatedAmount}
+            isCustom={isCustomAmount}
+            onCustomChange={onCustomChange}
+            currency={currency}
+          />
 
           {isBuyWhileShortWithoutCover && (
             <Alert variant="default" className="border-warning bg-warning/10">

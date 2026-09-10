@@ -7,6 +7,7 @@ pub mod ai_providers;
 pub mod allocation_targets;
 pub mod alternative_assets;
 pub mod asset;
+pub mod asset_logo;
 #[cfg(feature = "connect-sync")]
 pub mod brokers_sync;
 pub mod custom_provider;

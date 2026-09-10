@@ -2,6 +2,7 @@
   "app_name": "Wealthfolio",
   "welcome": "Welcome",
   "loading": "Loading...",
+  "load_more": "Load more...",
   "error": "Error",
   "success": "Success",
   "cancel": "Cancel",
@@ -363,5 +364,6 @@
   "navStyle": {
     "sidebar": "Sidebar",
     "floating": "Floating Bar"
-  }
+  },
+  "allocation_other_in_category": "Other {{category}}"
 }

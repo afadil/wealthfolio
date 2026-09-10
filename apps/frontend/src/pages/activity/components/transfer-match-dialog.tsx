@@ -167,6 +167,7 @@ function assetKey(activity: NormalizedTransferActivity): string | undefined {
 function amountValue(activity: NormalizedTransferActivity): number | undefined {
   const amount = parseNumber(activity.amount);
   if (amount != null) return amount;
+  if (!isSecurityTransfer(activity)) return undefined;
   const quantity = parseNumber(activity.quantity);
   const unitPrice = parseNumber(activity.unitPrice);
   if (quantity != null && unitPrice != null) return quantity * unitPrice;

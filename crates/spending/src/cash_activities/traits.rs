@@ -16,7 +16,10 @@ pub trait CashActivityServiceTrait: Send + Sync {
 #[async_trait]
 impl CashActivityServiceTrait for CashActivityService {
     async fn search(&self, req: CashActivitySearchRequest) -> Result<CashActivitySearchResponse> {
-        CashActivityService::search(self, req).await
+        // `None`: the agent surface reads rows, not a headline figure, so it has
+        // no base currency to convert into and skips FX entirely — which also
+        // makes the timezone moot, since nothing is dated for a rate lookup.
+        CashActivityService::search(self, req, None, "").await
     }
 
     async fn get_by_activity_ids(&self, activity_ids: &[String]) -> Result<Vec<CashActivity>> {

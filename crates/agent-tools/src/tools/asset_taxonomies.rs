@@ -46,6 +46,7 @@ pub struct ResolvedAssetDto {
     pub symbol: Option<String>,
     pub name: Option<String>,
     pub exchange_mic: Option<String>,
+    pub instrument_type: Option<wealthfolio_core::assets::InstrumentType>,
     pub currency: String,
     pub matched_by: String,
 }
@@ -550,6 +551,7 @@ pub fn asset_to_dto(asset: &Asset, matched_by: &str) -> ResolvedAssetDto {
         symbol: asset.instrument_symbol.clone(),
         name: asset.name.clone(),
         exchange_mic: asset.instrument_exchange_mic.clone(),
+        instrument_type: asset.instrument_type.clone(),
         currency: asset.quote_ccy.clone(),
         matched_by: matched_by.to_string(),
     }

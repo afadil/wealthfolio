@@ -22,13 +22,19 @@ import {
   type SelectedCategory,
 } from "./utils";
 
-// name | % | value | Δ. Fixed widths so columns line up across rows (each row is
-// its own grid). On mobile the % column and the Δ-percent collapse.
-const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_4.5rem_5.75rem] md:grid-cols-[minmax(0,1fr)_3rem_7rem_9.5rem] items-center gap-x-3 md:gap-x-4";
+// Every section shares the same tracks, including the net-worth total. Layout
+// follows the card width, since a desktop dashboard can still have narrow cards.
+// Without subgrid, fractional tracks keep independently sized rows aligned.
+const SHARED_GRID =
+  "col-span-full grid grid-cols-(--breakdown-columns) gap-x-3 supports-[grid-template-columns:subgrid]:grid-cols-subgrid @min-[40rem]/breakdown:gap-x-4";
+const ROW_GRID = `${SHARED_GRID} items-baseline gap-y-1`;
+const NAME_CELL = "col-span-full min-w-0 @min-[28rem]/breakdown:col-span-1";
+const AMOUNT_CELL =
+  "min-w-0 text-right text-xs tabular-nums [overflow-wrap:anywhere] @min-[40rem]/breakdown:text-sm";
 
 function ChangeCell({ change, currency }: { change: Change; currency: string }) {
   const formatting = useNumberFormatting();
+  const { t } = useTranslation();
   const isZero = Math.abs(change.amount) < 0.005;
   const color = isZero
     ? "text-muted-foreground/60"
@@ -37,15 +43,13 @@ function ChangeCell({ change, currency }: { change: Change; currency: string }) 
       : "text-destructive";
   const sign = isZero ? "" : change.amount > 0 ? "+" : "-";
   return (
-    <div className="flex items-baseline justify-end gap-1.5 md:gap-2">
-      <span
-        className={`inline-flex shrink-0 items-baseline whitespace-nowrap text-xs tabular-nums md:text-sm ${color}`}
-      >
+    <div className="@min-[48rem]/breakdown:flex-row @min-[48rem]/breakdown:flex-wrap @min-[48rem]/breakdown:items-baseline @min-[48rem]/breakdown:justify-end flex min-w-0 flex-col items-end gap-x-2 gap-y-0.5 text-right">
+      <span className={`${AMOUNT_CELL} ${color} inline-flex items-baseline justify-end`}>
         {sign}
-        <CompactAmount value={Math.abs(change.amount)} currency={currency} />
+        <CompactAmount className="min-w-0" value={Math.abs(change.amount)} currency={currency} />
       </span>
-      <span className="text-muted-foreground/60 hidden w-12 shrink-0 text-right text-sm tabular-nums md:block">
-        {formatChangePercent(change.percent, formatting)}
+      <span className={`text-muted-foreground/60 ${AMOUNT_CELL}`}>
+        {formatChangePercent(change, t("insights:networth.breakdown_table.new"), formatting)}
       </span>
     </div>
   );
@@ -92,16 +96,18 @@ function BreakdownRow({
           : undefined
       }
     >
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className={`${NAME_CELL} flex items-center gap-2.5`}>
         <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
-        <span className="text-foreground truncate text-xs md:text-sm">{name}</span>
+        <span className="text-foreground @min-[40rem]/breakdown:text-sm min-w-0 text-xs [overflow-wrap:anywhere]">
+          {name}
+        </span>
       </div>
-      <span className="text-muted-foreground/70 hidden text-right text-sm tabular-nums md:block">
+      <span className="text-muted-foreground/70 @min-[40rem]/breakdown:block hidden text-right text-sm tabular-nums">
         {percentOfSection.toFixed(1)}%
       </span>
-      <span className="text-foreground justify-self-end text-xs tabular-nums md:text-sm">
+      <span className={`text-foreground ${AMOUNT_CELL} inline-flex items-baseline justify-end`}>
         {negative && value !== 0 ? "-" : ""}
-        <CompactAmount value={value} currency={currency} />
+        <CompactAmount className="min-w-0" value={value} currency={currency} />
       </span>
       <ChangeCell change={change} currency={currency} />
     </div>
@@ -133,144 +139,167 @@ export function BreakdownTable({
   const [liabilitiesOpen, setLiabilitiesOpen] = useState(true);
 
   return (
-    <DashboardCard
-      title={t("insights:networth.breakdown")}
-      meta={t("insights:networth.breakdown_table.change_over", { period: periodLabel })}
-    >
-      {/* Assets — collapsible */}
-      <Collapsible open={assetsOpen} onOpenChange={setAssetsOpen}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
-          <span className="flex items-center gap-1.5 text-sm font-semibold">
-            <Icons.ChevronRight
-              className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${assetsOpen ? "rotate-90" : ""}`}
-            />
-            {t("insights:networth.breakdown_table.assets")}
-          </span>
-          <span className="text-success text-sm font-semibold tabular-nums">
-            <CompactAmount value={data.assets.total} currency={currency} />
-          </span>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          {/* Composition — proportion of assets (the rows below are its legend) */}
-          <div className="border-border/60 mb-1 mt-2.5 border-b pb-3">
-            <CompositionBar data={data} />
-          </div>
+    <div className="@container/breakdown min-w-0">
+      <DashboardCard
+        title={t("insights:networth.breakdown")}
+        meta={t("insights:networth.breakdown_table.change_over", { period: periodLabel })}
+      >
+        <div className="grid-cols-(--breakdown-columns) @min-[28rem]/breakdown:[--breakdown-fallback-columns:repeat(3,minmax(0,1fr))] @min-[40rem]/breakdown:[--breakdown-fallback-columns:minmax(0,2fr)_4rem_minmax(0,1.5fr)_minmax(0,2fr)] supports-[grid-template-columns:subgrid]:@min-[28rem]/breakdown:[--breakdown-columns:minmax(0,1fr)_minmax(0,max-content)_minmax(0,max-content)] supports-[grid-template-columns:subgrid]:@min-[40rem]/breakdown:[--breakdown-columns:minmax(0,1fr)_max-content_minmax(0,max-content)_minmax(0,max-content)] @min-[40rem]/breakdown:gap-x-4 grid gap-x-3 [--breakdown-columns:var(--breakdown-fallback-columns)] [--breakdown-fallback-columns:repeat(2,minmax(0,1fr))]">
+          {/* Assets — collapsible */}
+          <Collapsible className={SHARED_GRID} open={assetsOpen} onOpenChange={setAssetsOpen}>
+            <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-left">
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Icons.ChevronRight
+                  className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${assetsOpen ? "rotate-90" : ""}`}
+                />
+                {t("insights:networth.breakdown_table.assets")}
+              </span>
+              <span className="text-success min-w-0 text-sm font-semibold tabular-nums [overflow-wrap:anywhere]">
+                <CompactAmount value={data.assets.total} currency={currency} />
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className={SHARED_GRID}>
+              {/* Composition — proportion of assets (the rows below are its legend) */}
+              <div className="border-border/60 col-span-full mb-1 mt-2.5 border-b pb-3">
+                <CompositionBar data={data} />
+              </div>
 
-          {/* Column labels */}
-          <div className={`${ROW_GRID} pt-2`}>
-            <span className={CARD_LABEL}>{t("insights:networth.breakdown_table.category")}</span>
-            <span className={`${CARD_LABEL} hidden text-right md:block`}>%</span>
-            <span className={`${CARD_LABEL} justify-self-end`}>
-              {t("insights:networth.breakdown_table.value")}
-            </span>
-            <span className={`${CARD_LABEL} justify-self-end`}>
-              {t("insights:networth.breakdown_table.delta_period", { period: periodLabel })}
-            </span>
-          </div>
+              {/* Column labels */}
+              <div className={`${ROW_GRID} pt-2`}>
+                <span className={`${CARD_LABEL} ${NAME_CELL}`}>
+                  {t("insights:networth.breakdown_table.category")}
+                </span>
+                <span className={`${CARD_LABEL} @min-[40rem]/breakdown:block hidden text-right`}>
+                  %
+                </span>
+                <span className={`${CARD_LABEL} min-w-0 text-right [overflow-wrap:anywhere]`}>
+                  {t("insights:networth.breakdown_table.value")}
+                </span>
+                <span className={`${CARD_LABEL} min-w-0 text-right [overflow-wrap:anywhere]`}>
+                  {t("insights:networth.breakdown_table.delta_period", { period: periodLabel })}
+                </span>
+              </div>
 
-          <div className="divide-border/40 divide-y">
-            {data.assets.breakdown.map((item) => (
-              <BreakdownRow
-                key={item.category}
-                name={item.name}
-                dotColor={CATEGORY_CSS_COLORS[item.category] ?? "var(--muted-foreground)"}
-                value={item.value}
-                percentOfSection={
-                  data.assets.total > 0 ? (item.value / data.assets.total) * 100 : 0
-                }
-                change={deriveChange(seriesFor(history, item.category), false)}
-                currency={currency}
-                onClick={() =>
-                  onSelect({
-                    key: item.category,
-                    name: item.name,
-                    value: item.value,
-                    isLiability: false,
-                    isInvestment: item.category === "investments",
-                    children: item.children ?? [],
-                  })
-                }
-              />
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Separator carrying the "−" operator (Assets − Liabilities), aligned to the icon column */}
-      {hasLiabilities && (
-        <div className="my-3 flex items-center gap-1.5">
-          <span className="text-muted-foreground w-3.5 shrink-0 text-center text-sm font-normal">
-            −
-          </span>
-          <div className="border-border/60 flex-1 border-t" />
-        </div>
-      )}
-
-      {/* Liabilities — collapsible */}
-      {hasLiabilities && (
-        <Collapsible open={liabilitiesOpen} onOpenChange={setLiabilitiesOpen}>
-          <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
-            <span className="flex items-center gap-1.5 text-sm font-semibold">
-              <Icons.ChevronRight
-                className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${liabilitiesOpen ? "rotate-90" : ""}`}
-              />
-              {t("insights:networth.breakdown_table.liabilities")}
-            </span>
-            <span className="text-destructive text-sm font-semibold tabular-nums">
-              -<CompactAmount value={data.liabilities.total} currency={currency} />
-            </span>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="divide-border/40 divide-y pt-1">
-              {data.liabilities.breakdown.map((item, index) => {
-                const key = item.assetId ?? `${item.category}-${index}`;
-                const series = item.assetId ? seriesFor(history, item.assetId) : [];
-                return (
+              <div className={`${SHARED_GRID} divide-border/40 divide-y`}>
+                {data.assets.breakdown.map((item) => (
                   <BreakdownRow
-                    key={key}
+                    key={item.category}
                     name={item.name}
-                    dotColor={CATEGORY_CSS_COLORS.liabilities}
+                    dotColor={CATEGORY_CSS_COLORS[item.category] ?? "var(--muted-foreground)"}
                     value={item.value}
-                    negative
                     percentOfSection={
-                      data.liabilities.total > 0 ? (item.value / data.liabilities.total) * 100 : 0
+                      data.assets.total > 0 ? (item.value / data.assets.total) * 100 : 0
                     }
-                    change={deriveChange(series, true)}
+                    change={deriveChange(seriesFor(history, item.category), false)}
                     currency={currency}
-                    onClick={
-                      item.assetId
-                        ? () =>
-                            onSelect({
-                              key: item.assetId!,
-                              name: item.name,
-                              value: item.value,
-                              isLiability: true,
-                              isInvestment: false,
-                              children: [],
-                            })
-                        : undefined
+                    onClick={() =>
+                      onSelect({
+                        key: item.category,
+                        name: item.name,
+                        value: item.value,
+                        isLiability: false,
+                        isInvestment: item.category === "investments",
+                        children: item.children ?? [],
+                      })
                     }
                   />
-                );
-              })}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
-      {/* Net Worth total — label indented (chevron-sized spacer) to align with the
+          {/* Separator carrying the "−" operator (Assets − Liabilities), aligned to the icon column */}
+          {hasLiabilities && (
+            <div className="col-span-full my-3 flex items-center gap-1.5">
+              <span className="text-muted-foreground w-3.5 shrink-0 text-center text-sm font-normal">
+                −
+              </span>
+              <div className="border-border/60 flex-1 border-t" />
+            </div>
+          )}
+
+          {/* Liabilities — collapsible */}
+          {hasLiabilities && (
+            <Collapsible
+              className={SHARED_GRID}
+              open={liabilitiesOpen}
+              onOpenChange={setLiabilitiesOpen}
+            >
+              <CollapsibleTrigger className="col-span-full flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-left">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Icons.ChevronRight
+                    className={`text-muted-foreground h-3.5 w-3.5 transition-transform ${liabilitiesOpen ? "rotate-90" : ""}`}
+                  />
+                  {t("insights:networth.breakdown_table.liabilities")}
+                </span>
+                <span className="text-destructive inline-flex min-w-0 items-baseline justify-end text-sm font-semibold tabular-nums [overflow-wrap:anywhere]">
+                  -
+                  <CompactAmount
+                    className="min-w-0"
+                    value={data.liabilities.total}
+                    currency={currency}
+                  />
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className={SHARED_GRID}>
+                <div className={`${SHARED_GRID} divide-border/40 divide-y pt-1`}>
+                  {data.liabilities.breakdown.map((item, index) => {
+                    const key = item.assetId ?? `${item.category}-${index}`;
+                    const series = item.assetId ? seriesFor(history, item.assetId) : [];
+                    return (
+                      <BreakdownRow
+                        key={key}
+                        name={item.name}
+                        dotColor={CATEGORY_CSS_COLORS.liabilities}
+                        value={item.value}
+                        negative
+                        percentOfSection={
+                          data.liabilities.total > 0
+                            ? (item.value / data.liabilities.total) * 100
+                            : 0
+                        }
+                        change={deriveChange(series, true)}
+                        currency={currency}
+                        onClick={
+                          item.assetId
+                            ? () =>
+                                onSelect({
+                                  key: item.assetId!,
+                                  name: item.name,
+                                  value: item.value,
+                                  isLiability: true,
+                                  isInvestment: false,
+                                  children: [],
+                                })
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Net Worth total — label indented (chevron-sized spacer) to align with the
           Assets/Liabilities section labels; value/Δ stay in the grid columns. */}
-      <div className={`${ROW_GRID} border-border/60 mt-3 border-t pt-3`}>
-        <span className="flex items-center gap-1.5 text-sm font-bold">
-          <span className="text-muted-foreground w-3.5 shrink-0 text-center font-normal">=</span>
-          {t("insights:networth.breakdown_table.net_worth")}
-        </span>
-        <span className="hidden md:block" />
-        <span className="justify-self-end text-sm font-bold tabular-nums">
-          <CompactAmount value={data.netWorth} currency={currency} />
-        </span>
-        <ChangeCell change={netWorthChange} currency={currency} />
-      </div>
-    </DashboardCard>
+          <div className={`${ROW_GRID} border-border/60 mt-3 border-t pt-3`}>
+            <span
+              className={`${NAME_CELL} flex items-baseline gap-1.5 text-sm font-bold [overflow-wrap:anywhere]`}
+            >
+              <span className="text-muted-foreground w-3.5 shrink-0 text-center font-normal">
+                =
+              </span>
+              {t("insights:networth.breakdown_table.net_worth")}
+            </span>
+            <span className="@min-[40rem]/breakdown:block hidden" />
+            <span className={`${AMOUNT_CELL} font-bold`}>
+              <CompactAmount value={data.netWorth} currency={currency} />
+            </span>
+            <ChangeCell change={netWorthChange} currency={currency} />
+          </div>
+        </div>
+      </DashboardCard>
+    </div>
   );
 }

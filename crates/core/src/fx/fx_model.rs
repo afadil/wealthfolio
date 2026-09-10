@@ -1,6 +1,6 @@
 use crate::quotes::Quote;
 use crate::utils::decimal_serde;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -92,4 +92,53 @@ pub struct NewExchangeRate {
     #[serde(serialize_with = "decimal_serde::serialize")]
     pub rate: Decimal,
     pub source: String,
+}
+
+/// One (currency pair, date) lookup requested as part of a batch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeRateDateQuery {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub date: NaiveDate,
+}
+
+/// Result of one batched lookup. Carries either a rate or an error so a
+/// single unresolvable pair doesn't fail the whole batch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeRateDateResult {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub date: NaiveDate,
+    pub rate: Option<Decimal>,
+    pub error: Option<String>,
+}
+
+/// Request payload for batch historical FX rate lookups.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeRateDateBatchRequest {
+    pub pairs: Vec<ExchangeRateDateQuery>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exchange_rate_date_result_serializes_rate_as_number() {
+        let result = ExchangeRateDateResult {
+            from_currency: "USD".to_string(),
+            to_currency: "EUR".to_string(),
+            date: NaiveDate::from_ymd_opt(2026, 5, 18).unwrap(),
+            rate: Some(Decimal::new(9, 1)),
+            error: None,
+        };
+
+        let value = serde_json::to_value(result).unwrap();
+
+        assert!(value["rate"].is_number());
+        assert_eq!(value["rate"], serde_json::json!(0.9));
+    }
 }

@@ -143,6 +143,34 @@ pub fn denormalization_multiplier(currency: &str) -> Decimal {
     }
 }
 
+pub fn currency_fraction_digits(currency: &str) -> u32 {
+    match normalize_currency_code(currency)
+        .to_ascii_uppercase()
+        .as_str()
+    {
+        "BIF" | "CLP" | "DJF" | "GNF" | "ISK" | "JPY" | "KMF" | "KRW" | "PYG" | "RWF" | "UGX"
+        | "UYI" | "VND" | "VUV" | "XAF" | "XOF" | "XPF" => 0,
+        "BHD" | "IQD" | "JOD" | "KWD" | "LYD" | "OMR" | "TND" => 3,
+        "CLF" | "UYW" => 4,
+        // Crypto currencies (mirrors `crypto_quotes`/`common_crypto` in
+        // assets_service): the two-decimal fiat default would make one
+        // "minor unit" worth real money and silently canonicalize genuine
+        // differences. Dollar-pegged stablecoins (USDT, USDC, DAI, ...)
+        // deliberately keep the fiat default - cent-level snapping is the
+        // desired behavior for them, exactly as for USD.
+        "BTC" | "ETH" | "XRP" | "LTC" | "BCH" | "ADA" | "DOT" | "LINK" | "XLM" | "DOGE" | "UNI"
+        | "SOL" | "AVAX" | "MATIC" | "ATOM" | "ALGO" | "VET" | "FIL" | "TRX" | "ETC" | "XMR"
+        | "AAVE" | "MKR" | "COMP" | "SNX" | "YFI" | "SUSHI" | "CRV" => 8,
+        _ => 2,
+    }
+}
+
+/// One minor unit of the currency (1 × 10^-fraction_digits). Callers derive
+/// their own tolerance from it - e.g. half a unit for rounding equivalence.
+pub fn currency_minor_unit(currency: &str) -> Decimal {
+    Decimal::new(1, currency_fraction_digits(currency))
+}
+
 /// Resolves currency from a priority list of candidates.
 /// Returns the first non-empty candidate, or "USD" as the ultimate fallback.
 pub fn resolve_currency(candidates: &[&str]) -> String {
@@ -156,6 +184,26 @@ pub fn resolve_currency(candidates: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn minor_unit_follows_currency_fraction_digits() {
+        assert_eq!(currency_minor_unit("USD"), dec!(0.01));
+        assert_eq!(currency_minor_unit("JPY"), dec!(1));
+        assert_eq!(currency_minor_unit("UYI"), dec!(1));
+        assert_eq!(currency_minor_unit("KWD"), dec!(0.001));
+        assert_eq!(currency_minor_unit("UYW"), dec!(0.0001));
+        // Crypto currencies must not inherit the fiat two-decimal default -
+        // a 0.005 BTC tolerance would silently rewrite totals.
+        assert_eq!(currency_minor_unit("BTC"), dec!(0.00000001));
+        assert_eq!(currency_minor_unit("ETH"), dec!(0.00000001));
+        assert_eq!(currency_minor_unit("SOL"), dec!(0.00000001));
+        assert_eq!(currency_minor_unit("DOGE"), dec!(0.00000001));
+        // Dollar-pegged stablecoins keep cent precision, like USD.
+        assert_eq!(currency_minor_unit("USDT"), dec!(0.01));
+        assert_eq!(currency_minor_unit("USDC"), dec!(0.01));
+        // Minor-unit aliases resolve to their major code first.
+        assert_eq!(currency_minor_unit("GBp"), dec!(0.01));
+    }
 
     #[test]
     fn normalizes_ila_to_ils() {

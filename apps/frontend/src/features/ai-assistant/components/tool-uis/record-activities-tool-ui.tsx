@@ -39,6 +39,7 @@ import {
 import {
   createActivityAmountFormatter,
   createActivityQuantityFormatter,
+  estimateDraftAmount,
   formatActivityAmount,
   formatActivityDate,
   formatActivityQuantity,
@@ -83,7 +84,9 @@ function RecordActivitiesLoadingSkeleton() {
         <Table>
           <TableHeader>
             <TableRow>
-              {Array.from({ length: 9 }).map((_, i) => (
+              {/* Matches the 10 real columns: date, type, symbol, qty,
+                  price, amount, fee, tax, account, status. */}
+              {Array.from({ length: 10 }).map((_, i) => (
                 <TableHead key={i}>
                   <Skeleton className="h-3 w-12" />
                 </TableHead>
@@ -93,7 +96,7 @@ function RecordActivitiesLoadingSkeleton() {
           <TableBody>
             {Array.from({ length: 4 }).map((_, row) => (
               <TableRow key={row}>
-                {Array.from({ length: 9 }).map((_, col) => (
+                {Array.from({ length: 10 }).map((_, col) => (
                   <TableCell key={col}>
                     <Skeleton className="h-4 w-full" />
                   </TableCell>
@@ -325,6 +328,7 @@ function RecordActivitiesToolUIContentImpl({
                   {t("ai:recordActivities.amount")}
                 </TableHead>
                 <TableHead className="text-right text-xs">{t("ai:recordActivities.fee")}</TableHead>
+                <TableHead className="text-right text-xs">{t("ai:recordActivities.tax")}</TableHead>
                 <TableHead className="text-xs">{t("ai:recordActivities.account")}</TableHead>
                 <TableHead className="pr-4 text-xs">{t("ai:recordActivities.status")}</TableHead>
               </TableRow>
@@ -365,7 +369,9 @@ function RecordActivitiesToolUIContentImpl({
                     </TableCell>
                     <TableCell className="py-2 text-right tabular-nums">
                       {formatActivityAmount(
-                        row.draft.amount,
+                        // Stated amounts verbatim; trade totals preview the
+                        // mirror calc (the backend derives them at commit).
+                        estimateDraftAmount(row.draft, row.resolvedAsset?.instrumentType),
                         amountFormatter,
                         isBalanceHidden,
                         row.draft.currency,
@@ -374,6 +380,14 @@ function RecordActivitiesToolUIContentImpl({
                     <TableCell className="py-2 text-right tabular-nums">
                       {formatActivityAmount(
                         row.draft.fee,
+                        amountFormatter,
+                        isBalanceHidden,
+                        row.draft.currency,
+                      )}
+                    </TableCell>
+                    <TableCell className="py-2 text-right tabular-nums">
+                      {formatActivityAmount(
+                        row.draft.tax,
                         amountFormatter,
                         isBalanceHidden,
                         row.draft.currency,

@@ -1,4 +1,5 @@
 import type { ActivityDetails, AssetResolutionInput } from "@/lib/types";
+import type { ActivityStatus } from "@/lib/constants";
 
 /**
  * Represents a local transaction that extends ActivityDetails with draft state
@@ -30,6 +31,10 @@ export interface LocalTransaction extends ActivityDetails {
   _originalInstrumentType?: string;
   /** Original asset ID from server - sent for updates when symbol hasn't changed */
   _originalAssetId?: string;
+  /** Original review flag from server - an update only sends needsReview when it changed */
+  _originalNeedsReview?: boolean;
+  /** Session-only: direct Total edit disables further automatic calculation. */
+  _amountEdited?: boolean;
 }
 
 /**
@@ -58,15 +63,33 @@ export function toLocalTransaction(activity: ActivityDetails): LocalTransaction 
     _originalExchangeMic: activity.exchangeMic,
     _originalInstrumentType: activity.instrumentType,
     _originalAssetId: activity.assetId,
+    _originalNeedsReview: activity.needsReview,
+    _amountEdited: false,
   };
 }
 
 /**
- * Checks if a transaction is pending review (synced but not yet approved)
- * A transaction is pending review if needsReview=true AND it's not a locally created new row
+ * Checks if a persisted transaction needs user review.
  */
 export function isPendingReview(transaction: LocalTransaction): boolean {
   return transaction.needsReview === true && transaction.isNew !== true;
+}
+
+/**
+ * Returns the review reasons supplied by the broker mapping service.
+ */
+export function getProviderMappingReasons(activity: Pick<ActivityDetails, "metadata">): string[] {
+  const reasons = activity.metadata?.mapping_reasons;
+  if (!Array.isArray(reasons)) {
+    return [];
+  }
+
+  const normalizedReasons = reasons
+    .filter((reason): reason is string => typeof reason === "string")
+    .map((reason) => reason.trim())
+    .filter(Boolean);
+
+  return [...new Set(normalizedReasons)];
 }
 
 /**
@@ -143,6 +166,7 @@ interface ActivityBasePayload {
   currency?: string;
   fee?: string | null;
   tax?: string | null;
+  status?: ActivityStatus;
   fxRate?: string | null;
   notes?: string | null;
   /** JSON blob for metadata, including explicit transfer and credit boundaries. */
@@ -161,6 +185,8 @@ export interface ActivityCreatePayload extends ActivityBasePayload {
   idempotencyKey?: string;
   /** Asset resolution input - id plus natural identity and creation hints */
   asset?: AssetResolutionInput;
+  /** Attestation: false marks a user-typed custom total as already reviewed. */
+  needsReview?: boolean;
 }
 
 /**
@@ -171,8 +197,10 @@ export interface ActivityCreatePayload extends ActivityBasePayload {
  * - Or send asset.symbol + asset.exchangeMic to re-resolve the asset
  */
 export interface ActivityUpdatePayload extends ActivityBasePayload {
-  /** Asset resolution input - id plus natural identity and creation hints */
+  /** Omit to preserve, provide identity to replace, or pass {} to clear. */
   asset?: AssetResolutionInput;
+  /** Explicit review patch; false approves a flagged activity. */
+  needsReview?: boolean;
 }
 
 /**

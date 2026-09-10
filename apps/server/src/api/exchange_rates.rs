@@ -8,10 +8,12 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
-use wealthfolio_core::fx::{ExchangeRate, NewExchangeRate};
+use wealthfolio_core::fx::{
+    ExchangeRate, ExchangeRateDateBatchRequest, ExchangeRateDateResult, NewExchangeRate,
+};
 use wealthfolio_core::quotes::DATA_SOURCE_MANUAL;
 
 async fn get_latest_exchange_rates(
@@ -19,6 +21,14 @@ async fn get_latest_exchange_rates(
 ) -> ApiResult<Json<Vec<ExchangeRate>>> {
     let rates = state.fx_service.get_latest_exchange_rates()?;
     Ok(Json(rates))
+}
+
+async fn get_exchange_rates_for_dates(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<ExchangeRateDateBatchRequest>,
+) -> ApiResult<Json<Vec<ExchangeRateDateResult>>> {
+    let results = state.fx_service.get_exchange_rates_for_dates(request.pairs);
+    Ok(Json(results))
 }
 
 async fn update_exchange_rate(
@@ -66,4 +76,8 @@ pub fn router() -> Router<Arc<AppState>> {
             put(update_exchange_rate).post(add_exchange_rate),
         )
         .route("/exchange-rates/{id}", delete(delete_exchange_rate))
+        .route(
+            "/exchange-rates/historical",
+            post(get_exchange_rates_for_dates),
+        )
 }

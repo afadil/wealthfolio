@@ -11,6 +11,9 @@ use crate::errors::{CalculatorError, Error, Result};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::fx::FxServiceTrait;
 use crate::lots::{check_lot_quantity_consistency, LotRepositoryTrait};
+use crate::portfolio::recalculation_gate::{
+    PortfolioRecalculationGate, PortfolioRecalculationPermit,
+};
 use crate::portfolio::snapshot::{
     validate_snapshot_read_date, validate_snapshot_write_date, AccountStateSnapshot,
     HoldingsCalculationWarning, HoldingsTimeline, SnapshotMetadata, SnapshotSource,
@@ -156,6 +159,7 @@ pub struct SnapshotService {
     /// positions JSON. Reads of the lots table happen elsewhere (or not at
     /// all in this PR — this is groundwork, not a read-path switchover).
     lot_repository: Option<Arc<dyn LotRepositoryTrait>>,
+    recalculation_gate: Option<Arc<PortfolioRecalculationGate>>,
 }
 
 // Type aliases to simplify function signatures
@@ -208,6 +212,7 @@ impl SnapshotService {
             holdings_calculator,
             event_sink: Arc::new(NoOpDomainEventSink),
             lot_repository: None,
+            recalculation_gate: None,
         }
     }
 
@@ -216,6 +221,14 @@ impl SnapshotService {
     /// snapshot pipeline.
     pub fn with_lot_repository(mut self, lot_repository: Arc<dyn LotRepositoryTrait>) -> Self {
         self.lot_repository = Some(lot_repository);
+        self
+    }
+
+    pub fn with_recalculation_gate(
+        mut self,
+        recalculation_gate: Arc<PortfolioRecalculationGate>,
+    ) -> Self {
+        self.recalculation_gate = Some(recalculation_gate);
         self
     }
 
@@ -384,6 +397,30 @@ impl SnapshotService {
             account_ids_param, mode
         );
 
+        // Enter the shared gate before reading activities. Acquiring after
+        // `fetch_required_data` would serialize the writes while still allowing
+        // a queued recalculation to run from data fetched before the prior one
+        // completed.
+        let recalculation_permit: Option<PortfolioRecalculationPermit> =
+            match &self.recalculation_gate {
+                Some(gate) => {
+                    // Only the gate needs the id list; skip the account
+                    // listing entirely on gate-less deployments.
+                    let gate_account_ids: Vec<String> = match account_ids_param {
+                        Some(account_ids) => account_ids.to_vec(),
+                        None => self
+                            .account_repository
+                            .list(None, Some(false), None)?
+                            .into_iter()
+                            .filter(|account| account.tracking_mode != TrackingMode::Holdings)
+                            .map(|account| account.id)
+                            .collect(),
+                    };
+                    Some(gate.acquire(&gate_account_ids).await)
+                }
+                None => None,
+            };
+
         let (accounts_to_process, all_activities, min_activity_date, calculation_end_date) =
             self.fetch_required_data(account_ids_param)?;
 
@@ -391,6 +428,15 @@ impl SnapshotService {
             warn!("No accounts found to process.");
             return Ok(0);
         }
+
+        let mode = if recalculation_permit
+            .as_ref()
+            .is_some_and(PortfolioRecalculationPermit::force_full)
+        {
+            SnapshotRecalcMode::Full
+        } else {
+            mode
+        };
 
         // Enforce the append-only seeding contract before any mode-dependent
         // logic runs. A `SinceDate` recalc resumes from the snapshot just

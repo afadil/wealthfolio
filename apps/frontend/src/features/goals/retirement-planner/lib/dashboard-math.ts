@@ -1,25 +1,58 @@
+import i18next, { type TFunction } from "i18next";
 import { DEFAULT_DC_PAYOUT_ESTIMATE_RATE } from "./constants";
 import { activeExpenseItems } from "./expense-items";
 import type { RetirementIncomeStream, RetirementPlan } from "../types";
 
 export type PlannerMode = "fire" | "traditional";
 
-export function modeLabel(mode: PlannerMode) {
+export function modeLabel(mode: PlannerMode, t: TFunction = i18next.t) {
   return {
-    target: mode === "fire" ? "FIRE Target" : "Retirement Target",
-    targetNet: mode === "fire" ? "FIRE Target (net)" : "Retirement Target (net)",
-    estAge: mode === "fire" ? "Projected FI Age" : "Target Retirement Age",
-    progress: mode === "fire" ? "FIRE Progress" : "Retirement Progress",
-    coast: "Coast FIRE",
-    budgetAt: "Retirement spending coverage",
-    prefix: mode === "fire" ? "FIRE" : "Retirement",
-    targetAge: mode === "fire" ? "Desired retirement age" : "Retirement age",
-    horizonAge: mode === "fire" ? "Plan through age" : "Life expectancy",
+    coast: t("goals:dashboard.milestone.coast_fire"),
+    budgetAt: t("goals:guide.overview.coverage_title"),
+    prefix: mode === "fire" ? "FIRE" : t("goals:type.retirement"),
   };
 }
 
 export function boundedInflationFactor(rate: number, years: number) {
   return Math.max(0.01, Math.pow(1 + rate, Math.max(0, years)));
+}
+
+/** Mirror of the engine's `net_annual_return`: the fee comes off the assumption. */
+export function netAnnualReturn(grossReturn: number, annualFeeRate: number) {
+  return Math.max(-0.99, grossReturn - annualFeeRate);
+}
+
+/**
+ * Mirror of the engine's `plan_accumulation_return`, and the rate a fund with no
+ * `accumulationReturn` of its own grows at. The plan's stated return is gross of
+ * the investment fee everywhere the engine consumes it.
+ */
+export function planAccumulationReturn(plan: RetirementPlan) {
+  return netAnnualReturn(
+    plan.investment.preRetirementAnnualReturn,
+    plan.investment.annualInvestmentFeeRate,
+  );
+}
+
+/** Mirror of the engine's `plan_retirement_return`. */
+export function planRetirementReturn(plan: RetirementPlan) {
+  return netAnnualReturn(
+    plan.investment.retirementAnnualReturn,
+    plan.investment.annualInvestmentFeeRate,
+  );
+}
+
+/**
+ * The return a drawdown fund's remaining balance earns during its payout phase, and
+ * the rate a fund with no `postPayoutReturn` of its own draws against. Showing the
+ * gross assumption instead would make touching the control save a higher number than
+ * the projection had been using.
+ */
+export function payoutPhaseReturn(
+  stream: Pick<RetirementIncomeStream, "postPayoutReturn">,
+  plan: RetirementPlan,
+) {
+  return stream.postPayoutReturn ?? planRetirementReturn(plan);
 }
 
 export function projectedAnnualExpenseNominalAtAge(plan: RetirementPlan, age: number) {
@@ -36,8 +69,9 @@ function projectedDcMonthlyPayout(
   retirementAge: number,
   defaultAccumulationReturn: number,
 ) {
+  const payoutRate = Math.max(0, stream.payoutRate ?? DEFAULT_DC_PAYOUT_ESTIMATE_RATE);
   if (stream.startAge <= currentAge) {
-    const fallback = (Math.max(0, stream.currentValue ?? 0) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
+    const fallback = (Math.max(0, stream.currentValue ?? 0) * payoutRate) / 12;
     return Math.max(0, stream.monthlyAmount ?? fallback);
   }
   const totalYears = Math.max(0, stream.startAge - currentAge);
@@ -54,11 +88,11 @@ function projectedDcMonthlyPayout(
       ? monthly * 12
       : (monthly * (Math.pow(monthlyGrowth, 12) - 1)) / monthlyReturn;
   const fvAnnuityAtStop =
-    r > 1e-9
+    Math.abs(r) > 1e-9
       ? (annualContributionEndValue * (Math.pow(1 + r, contribYears) - 1)) / r
       : monthly * 12 * contribYears;
   const fvAnnuity = fvAnnuityAtStop * Math.pow(1 + r, growthOnlyYears);
-  return ((fvLump + fvAnnuity) * DEFAULT_DC_PAYOUT_ESTIMATE_RATE) / 12;
+  return ((fvLump + fvAnnuity) * payoutRate) / 12;
 }
 
 export function projectedAnnualIncomeNominalAtAge(
@@ -71,22 +105,27 @@ export function projectedAnnualIncomeNominalAtAge(
   return plan.incomeStreams.reduce((sum, stream) => {
     if (age < stream.startAge) return sum;
 
+    const growthYears =
+      stream.streamType === "dc" && stream.payoutMode === "drawdown"
+        ? Math.max(0, age - Math.max(stream.startAge, plan.personal.currentAge))
+        : yearsFromNow;
+
     const baseMonthly =
       stream.streamType === "dc"
         ? projectedDcMonthlyPayout(
             stream,
             plan.personal.currentAge,
             retirementAge,
-            plan.investment.preRetirementAnnualReturn,
+            planAccumulationReturn(plan),
           )
         : (stream.monthlyAmount ?? 0);
     const annual = baseMonthly * 12;
 
     if (stream.annualGrowthRate !== undefined) {
-      return sum + annual * Math.pow(1 + stream.annualGrowthRate, yearsFromNow);
+      return sum + annual * Math.pow(1 + stream.annualGrowthRate, growthYears);
     }
     if (stream.adjustForInflation) {
-      return sum + annual * Math.pow(1 + plan.investment.inflationRate, yearsFromNow);
+      return sum + annual * Math.pow(1 + plan.investment.inflationRate, growthYears);
     }
     return sum + annual;
   }, 0);
@@ -98,14 +137,18 @@ export function incomeStreamMonthlyAmount(plan: RetirementPlan, stream: Retireme
       stream,
       plan.personal.currentAge,
       plan.personal.targetRetirementAge,
-      plan.investment.preRetirementAnnualReturn,
+      planAccumulationReturn(plan),
     );
   }
   return stream.monthlyAmount ?? 0;
 }
 
-export function incomeAgeRangeLabel(stream: RetirementIncomeStream, horizonAge: number) {
-  return `Age ${stream.startAge} → ${horizonAge}`;
+export function incomeAgeRangeLabel(
+  stream: RetirementIncomeStream,
+  horizonAge: number,
+  t: TFunction = i18next.t,
+) {
+  return t("goals:dashboard.coverage.age_range", { start: stream.startAge, end: horizonAge });
 }
 
 export function isIncomeActiveAtAge(stream: RetirementIncomeStream, age: number) {
@@ -117,11 +160,14 @@ export function coverageTimingLabel(
   startAge: number | undefined,
   endAge: number | undefined,
   age: number,
+  t: TFunction = i18next.t,
 ) {
   if (isActive) return null;
-  if (startAge !== undefined && age < startAge) return `Starts at ${startAge}`;
-  if (endAge !== undefined && age >= endAge) return `Ended at ${endAge}`;
-  return "Not active";
+  if (startAge !== undefined && age < startAge)
+    return t("goals:dashboard.coverage.starts_at", { age: startAge });
+  if (endAge !== undefined && age >= endAge)
+    return t("goals:dashboard.coverage.ended_at", { age: endAge });
+  return t("goals:dashboard.coverage.not_active");
 }
 
 interface CoverageSnapshotLike {
@@ -230,6 +276,7 @@ interface RetirementOverviewLike {
   successStatus?: string;
   failureAge?: number | null;
   spendingShortfallAge?: number | null;
+  incomeStreamExhaustion?: { label: string; exhaustedAge: number }[] | null;
 }
 
 interface DeriveRetirementReadinessInput {
@@ -248,20 +295,36 @@ export interface RetirementReadiness {
     | "unreachable-target"
     | "spending-gap"
     | "portfolio-depletion"
+    | "fund-exhaustion"
     | "on-track"
     | "late"
     | "not-reachable";
   body: string | null;
 }
 
-export function deriveRetirementReadiness({
-  overview,
-  plannerMode,
-  isFinanciallyIndependent,
-  effectiveFiAge,
-  desiredAge,
-  horizonAge,
-}: DeriveRetirementReadinessInput): RetirementReadiness {
+/** The first drawdown fund to run out, which is the one worth naming. */
+function earliestFundExhaustion(overview: RetirementOverviewLike) {
+  return (overview.incomeStreamExhaustion ?? []).reduce<{
+    label: string;
+    exhaustedAge: number;
+  } | null>(
+    (earliest, entry) =>
+      earliest && earliest.exhaustedAge <= entry.exhaustedAge ? earliest : entry,
+    null,
+  );
+}
+
+export function deriveRetirementReadiness(
+  {
+    overview,
+    plannerMode,
+    isFinanciallyIndependent,
+    effectiveFiAge,
+    desiredAge,
+    horizonAge,
+  }: DeriveRetirementReadinessInput,
+  t: TFunction = i18next.t,
+): RetirementReadiness {
   if (!overview) {
     return { tone: "watch", problem: "loading", body: null };
   }
@@ -270,7 +333,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "unreachable-target",
-      body: "Target cannot be sized with the current assumptions. Check spending, inflation, returns, and retirement horizon.",
+      body: t("goals:dashboard.guidance.unavailable"),
     };
   }
 
@@ -278,7 +341,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "portfolio-depletion",
-      body: `Projected portfolio runs short during age ${overview.failureAge ?? horizonAge}. Reduce spending, retire later, or add retirement income.`,
+      body: t("goals:dashboard.guidance.depleted", { age: overview.failureAge ?? horizonAge }),
     };
   }
 
@@ -286,7 +349,19 @@ export function deriveRetirementReadiness({
     return {
       tone: "watch",
       problem: "spending-gap",
-      body: `Projected spending gap starts at age ${overview.spendingShortfallAge}. Increase contributions, retire later, reduce retirement spending, or add retirement income.`,
+      body: t("goals:dashboard.guidance.gap", { age: overview.spendingShortfallAge }),
+    };
+  }
+
+  const exhaustion = earliestFundExhaustion(overview);
+  if (exhaustion) {
+    return {
+      tone: "watch",
+      problem: "fund-exhaustion",
+      body: t("goals:dashboard.guidance.fund", {
+        label: exhaustion.label,
+        age: exhaustion.exhaustedAge,
+      }),
     };
   }
 
@@ -295,7 +370,7 @@ export function deriveRetirementReadiness({
       return {
         tone: "watch",
         problem: "spending-gap",
-        body: "Short at retirement. Increase contributions, retire later, reduce retirement spending, or add retirement income.",
+        body: t("goals:dashboard.guidance.shortfall"),
       };
     }
     return { tone: "good", problem: "on-track", body: null };
@@ -305,7 +380,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "good",
       problem: "on-track",
-      body: "You have reached financial independence with the current assumptions.",
+      body: t("goals:dashboard.guidance.reached"),
     };
   }
 
@@ -313,7 +388,7 @@ export function deriveRetirementReadiness({
     return {
       tone: "bad",
       problem: "not-reachable",
-      body: `Not reachable by age ${horizonAge} with current assumptions. Consider increasing contributions, extending the desired retirement age, reducing retirement spending, or adding retirement income.`,
+      body: t("goals:dashboard.guidance.not_reached", { age: horizonAge }),
     };
   }
 
@@ -325,6 +400,6 @@ export function deriveRetirementReadiness({
   return {
     tone: yearsLate <= 3 ? "watch" : "bad",
     problem: "late",
-    body: `${yearsLate} year${yearsLate !== 1 ? "s" : ""} after your desired age. Consider increasing contributions, extending the desired retirement age, or reducing retirement spending.`,
+    body: t("goals:dashboard.guidance.late", { count: yearsLate }),
   };
 }

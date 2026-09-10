@@ -1,0 +1,8 @@
+date,symbol,instrumentType,quantity,activityType,unitPrice,currency,fee,tax,amount,comment
+2024-03-01,MSFT,EQUITY,10,BUY,50,USD,5,0,,P1 derive-missing-final
+2024-03-02,MSFT,EQUITY,10,BUY,50,USD,5,0,505,P2 exact-final
+2024-03-03,MSFT,EQUITY,10,BUY,50,USD,5,0,500,P3 gross-to-final
+2024-03-04,MSFT,EQUITY,10,BUY,50,USD,5,0,999,P4 contradicting-total
+2024-03-05,MSFT,EQUITY,5,SELL,60,USD,3,1,,P5 sell-derive
+2024-03-06,,,,DEPOSIT,,USD,,,1000,P6 plain-deposit
+2024-03-07,,,,FEE,,USD,9.99,,0,P7 fee-zero-amount

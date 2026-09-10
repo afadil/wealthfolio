@@ -110,7 +110,7 @@ export function PermissionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex flex-col gap-3 md:flex-row md:items-center">
             <Icons.Settings className="hidden h-5 w-5 md:block" />
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
@@ -129,7 +129,7 @@ export function PermissionDialog({
           <DialogDescription>{manifest.description}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 space-y-6 overflow-hidden">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
           {/* Function Count Warning */}
           <div className="pt-8">
             <AlertFeedback variant={getWarningVariantByFunctionCount(totalFunctionCount)}>
@@ -141,8 +141,8 @@ export function PermissionDialog({
             </AlertFeedback>
           </div>
 
-          {/* Data Access Permissions using shared component - Make scrollable */}
-          <div className="flex-1 overflow-auto">
+          {/* Data Access Permissions */}
+          <div>
             <PermissionCategoriesDisplay permissions={permissionsToDisplay} />
           </div>
 
@@ -183,7 +183,7 @@ export function PermissionDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-3">
+        <DialogFooter className="shrink-0 gap-3">
           {isViewOnly ? (
             canManageNetworkHosts ? (
               <>

@@ -502,6 +502,7 @@ mod tests {
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                instrument_type: None,
                 classifications: None,
             })
         } else {
@@ -2254,5 +2255,63 @@ mod tests {
             .await;
         assert!(result.is_ok());
         assert!(holdings.is_empty()); // Should remain empty
+    }
+    #[tokio::test]
+    async fn test_security_valuation_applies_contract_multiplier() {
+        // Every other fixture in this suite uses multiplier 1, which hides
+        // any wrong multiplier completely (x1 is a no-op). Lock the actual
+        // multiplication: market value = price x qty x contract_multiplier,
+        // for a standard option (100) and a mini (10) - PR #1571 review, T2.
+        let (_fx_service, market_data_service, valuation_service) = setup_test_env();
+
+        let latest_quote = create_quote("2024-01-10", dec!(5.5), "USD");
+        market_data_service.add_quote_pair("OPT100", latest_quote.clone(), None);
+        market_data_service.add_quote_pair("OPT10", latest_quote, None);
+
+        let mut standard = create_holding(
+            "h-opt-100",
+            HoldingType::Security,
+            "OPT100",
+            dec!(2),
+            "USD",
+            "USD",
+            Some(dec!(1000.0)),
+            Some("Standard option"),
+        );
+        standard.contract_multiplier = dec!(100);
+        let mut mini = create_holding(
+            "h-opt-10",
+            HoldingType::Security,
+            "OPT10",
+            dec!(2),
+            "USD",
+            "USD",
+            Some(dec!(100.0)),
+            Some("Mini option"),
+        );
+        mini.contract_multiplier = dec!(10);
+
+        let mut holdings = vec![standard, mini];
+        valuation_service
+            .calculate_holdings_live_valuation(&mut holdings)
+            .await
+            .expect("valuation");
+
+        // 2 contracts x $5.50 x 100 = $1,100
+        assert_monetary_value_approx(
+            Some(&holdings[0].market_value),
+            dec!(1100.0),
+            dec!(1100.0),
+            TOLERANCE,
+            "Standard option market value",
+        );
+        // 2 contracts x $5.50 x 10 = $110 - NOT $1,100
+        assert_monetary_value_approx(
+            Some(&holdings[1].market_value),
+            dec!(110.0),
+            dec!(110.0),
+            TOLERANCE,
+            "Mini option market value",
+        );
     }
 }

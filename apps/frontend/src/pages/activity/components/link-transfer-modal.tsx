@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
 import { useTranslation } from "react-i18next";
+import { nonCashTransferAssetKey } from "./transfer-link-utils";
 
 interface LinkTransferModalProps {
   isOpen: boolean;
@@ -29,7 +30,8 @@ function ActivityRow({ activity, label }: { activity: ActivityDetails; label: st
   const formatting = useAmountFormatting();
   const { t } = useTranslation();
   const date = formatDateTime(activity.date, dateFormatting).date;
-  const value = activity.amount ?? activity.unitPrice;
+  const value =
+    activity.amount ?? (nonCashTransferAssetKey(activity) ? activity.unitPrice : undefined);
   return (
     <div className="bg-muted/30 flex flex-col gap-1 rounded-md border px-3 py-2 text-sm">
       <div className="text-muted-foreground flex items-center justify-between text-xs uppercase">

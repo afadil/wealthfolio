@@ -6,7 +6,7 @@ export type HoldingPerformanceMetric =
   | "totalGain"
   | "totalReturn";
 
-export type HoldingPerformanceMode = "daily" | "pnl" | "return";
+export type HoldingPerformanceMode = "daily" | "unrealized" | "pnl" | "return";
 
 type HoldingPerformanceValues = Pick<
   Holding,
@@ -47,6 +47,9 @@ export function getBaseHoldingPerformancePercentForMode(
   holding: HoldingPerformanceModeValues,
   mode: HoldingPerformanceMode,
 ): number | null {
+  if (mode === "unrealized") {
+    return getBaseHoldingPerformancePercent(holding, "unrealizedGain");
+  }
   if (mode === "daily") return holding.dayChangePct ?? null;
   if (mode === "return") {
     return (

@@ -1,6 +1,6 @@
 import { getAccounts, logger } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
-import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { canImportCSV } from "@/lib/activity-restrictions";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
@@ -247,10 +247,7 @@ function useStepValidation(
                   csvActivityType,
                   mapping.activityMappings || {},
                 );
-                if (
-                  mappedType &&
-                  (!needsImportAssetResolution(mappedType, csvSubtype) || isCashSymbol(symbol))
-                ) {
+                if (mappedType && !shouldResolveImportAsset(mappedType, csvSubtype, symbol)) {
                   return;
                 }
               }

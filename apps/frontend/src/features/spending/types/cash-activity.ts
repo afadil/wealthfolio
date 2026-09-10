@@ -81,9 +81,50 @@ export interface CashActivity extends Activity {
   eventId?: string | null;
   /** Transfer pair validity for effective TRANSFER_IN / TRANSFER_OUT rows. */
   transferLinkStatus?: TransferLinkStatus | null;
+  /**
+   * Signed cash movement in this row's own currency — positive when money
+   * entered the account, negative when it left, zero when the row moved none.
+   * Never converted. Produced by the same resolver that builds account cash
+   * balances, so summing these agrees with the account page.
+   */
+  netAmount: number;
+  /**
+   * `netAmount` in the base currency, converted at this row's own date.
+   * Absent when no conversion was asked for, or this currency has no rate.
+   */
+  netAmountBase?: number | null;
+}
+
+/** A signed net in one currency. */
+export interface CurrencyNet {
+  currency: string;
+  amount: number;
+}
+
+/** The net of a set of rows: always per currency, optionally also converted. */
+export interface NetSummary {
+  /** Uses no exchange rates, so it cannot be wrong. */
+  byCurrency: CurrencyNet[];
+  /**
+   * One figure in the base currency. Absent when a single currency contributes
+   * (the breakdown already is the total) or when some currency had no rate, so
+   * a converted total would silently omit its rows.
+   */
+  converted?: CurrencyNet | null;
 }
 
 export interface CashActivitySearchResponse {
   items: CashActivity[];
   totalCount: number;
+  /**
+   * Net over the whole filtered set, summed server-side before pagination so it
+   * covers rows this page does not carry. Only the first page has it.
+   */
+  net?: NetSummary | null;
+  /**
+   * Currency `netAmountBase` and `net.converted` are denominated in. Reported
+   * by the server so a cached response stays correctly labelled even after the
+   * base-currency setting changes.
+   */
+  baseCurrency?: string | null;
 }

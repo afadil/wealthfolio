@@ -20,7 +20,7 @@ import { ActivityFormRenderer } from "./activity-form-renderer";
 import type { AccountSelectOption } from "./forms/fields";
 import { useActivityForm } from "../hooks/use-activity-form";
 import { mapActivityTypeToPicker } from "../utils/activity-form-utils";
-import type { PickerActivityType } from "../config/activity-form-config";
+import { hasActivityForm, type PickerActivityType } from "../config/activity-form-config";
 
 // Re-export for consumers
 export type { AccountSelectOption };
@@ -56,15 +56,34 @@ export function ActivityForm({
   hidePicker,
 }: ActivityFormProps) {
   const { t } = useTranslation();
-  // Derive the editing state and initial type from activity prop
+  // Derive the editing state and stored type from activity prop
   const isEditing = !!activity?.id;
-  const initialType = mapActivityTypeToPicker(activity?.activityType);
+  const storedType: PickerActivityType | undefined = mapActivityTypeToPicker(
+    activity?.activityType,
+  );
 
-  // Local state for selected type (only used when creating new activity)
-  const [selectedType, setSelectedType] = useState<PickerActivityType | undefined>(initialType);
+  // Not every persisted type has an editor. Sync stores a needs-review row as
+  // UNKNOWN, which carries no classification and so has no fields to edit, so
+  // pinning the stored type would leave uneditable exactly the rows whose whole
+  // point is that a user has to reclassify them. Offer the picker for those.
+  const storedTypeIsEditable = hasActivityForm(storedType);
 
-  // For editing, always use the activity's type; for new, use local state
-  const effectiveSelectedType = isEditing ? initialType : selectedType;
+  // A picked replacement type belongs to the row it was picked for: scoping it
+  // to the activity means opening a different row starts unpicked instead of
+  // inheriting the previous row's choice.
+  const [pick, setPick] = useState<
+    { activityId: string | undefined; type: PickerActivityType } | undefined
+  >(undefined);
+  const pickedType = pick && pick.activityId === activity?.id ? pick.type : undefined;
+  const handleSelectType = useCallback(
+    (type: PickerActivityType) => setPick({ activityId: activity?.id, type }),
+    [activity?.id],
+  );
+
+  // The stored type stands unless it has no editor, in which case the user's
+  // pick stands in for it.
+  const effectiveSelectedType = pickedType ?? (storedTypeIsEditable ? storedType : undefined);
+  const showPicker = !hidePicker && (!isEditing || !storedTypeIsEditable);
 
   // Filter accounts by selected activity type (exclude HOLDINGS accounts for unsupported types).
   // Transfers use the full account list so spending/saving accounts are valid counterparties.
@@ -72,11 +91,18 @@ export function ActivityForm({
     const base =
       effectiveSelectedType === "TRANSFER" && transferAccounts ? transferAccounts : accounts;
     if (!effectiveSelectedType) return base;
+    const currentAccountId = isEditing ? activity?.accountId : undefined;
     if (effectiveSelectedType === "TRANSFER") {
-      return base.filter(transferAllowsAccount);
+      return base.filter(
+        (account) => account.value === currentAccountId || transferAllowsAccount(account),
+      );
     }
-    return base.filter((acc) => restrictionAllowsType(acc.restrictionLevel, effectiveSelectedType));
-  }, [accounts, transferAccounts, effectiveSelectedType]);
+    return base.filter(
+      (account) =>
+        account.value === currentAccountId ||
+        restrictionAllowsType(account.restrictionLevel, effectiveSelectedType),
+    );
+  }, [accounts, transferAccounts, effectiveSelectedType, isEditing, activity?.accountId]);
 
   // Use the activity form hook with the effective type
   const { defaultValues, isLoading, isError, error, handleSubmit } = useActivityForm({
@@ -90,8 +116,8 @@ export function ActivityForm({
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
       if (!isOpen) {
-        // Reset selected type when sheet closes
-        setSelectedType(undefined);
+        // Reset the picked type when sheet closes
+        setPick(undefined);
         onClose?.();
       }
     },
@@ -122,24 +148,32 @@ export function ActivityForm({
         </SheetHeader>
 
         <div className="flex-1 space-y-6 overflow-y-auto py-4">
-          {/* Activity Type Picker - only show when creating new activity and not locked to a type */}
-          {!isEditing && !hidePicker && (
-            <ActivityTypePicker value={effectiveSelectedType} onSelect={setSelectedType} />
-          )}
-
-          {/* When editing, show the activity type as a badge */}
-          {isEditing && effectiveSelectedType && (
+          {/* When editing, report the type the activity is stored under. Shown
+              alongside the picker for a row that still needs one, so it is clear
+              what is being reclassified. */}
+          {isEditing && (storedType ?? activity?.activityType) && (
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">{t("activity:activity_type")}:</span>
               <span className="bg-primary/10 text-primary rounded-md px-2 py-1 font-medium">
-                {effectiveSelectedType}
+                {storedType ?? activity?.activityType}
               </span>
             </div>
+          )}
+
+          {/* Activity Type Picker - when creating, and when editing a row whose
+              stored type has no editor of its own */}
+          {showPicker && (
+            <ActivityTypePicker
+              value={pickedType}
+              onSelect={handleSelectType}
+              includeReclassificationTypes={isEditing && !storedTypeIsEditable}
+            />
           )}
 
           {/* Render the appropriate form */}
           <ActivityFormRenderer
             selectedType={effectiveSelectedType}
+            formIdentity={activity?.id}
             accounts={filteredAccounts}
             defaultValues={defaultValues}
             onSubmit={handleSubmit}

@@ -12,7 +12,7 @@ import {
   type SymbolSearchResult,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import {
   Badge,
   SearchableSelect,
@@ -440,7 +440,7 @@ export function MappingCell({
     const csvType = getMappedValue(row, ImportFormat.ACTIVITY_TYPE)?.trim();
     const csvSubtype = getMappedValue(row, ImportFormat.SUBTYPE)?.trim();
     const appType = csvType ? findMappedActivityType(csvType, mapping.activityMappings) : null;
-    if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(symbol))) {
+    if (appType && !shouldResolveImportAsset(appType, csvSubtype, symbol)) {
       return <span className="text-muted-foreground text-xs">-</span>;
     }
 

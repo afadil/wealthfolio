@@ -345,6 +345,7 @@ pub async fn compute_categorization_state(
             notes,
             act.effective_type(),
             &act.account_id,
+            act.amount.map(|d| d.abs()),
         );
         if let Some(m) = rule_match {
             if let (Some(tax_id), Some(cat_id)) =
@@ -888,6 +889,8 @@ mod tests {
             splits: Vec::new(),
             event_id: None,
             transfer_link_status: None,
+            net_amount: -10.0,
+            net_amount_base: None,
         }
     }
 

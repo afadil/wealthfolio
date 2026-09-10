@@ -1,5 +1,38 @@
+import { calculateTradeFinalAmount } from "@/lib/activity-final-amount";
+import { ActivityType } from "@/lib/constants";
 import type { FormattingApi } from "@wealthfolio/ui";
 import { parseISO } from "date-fns";
+
+/**
+ * Display estimate for an AI draft's total. A stated amount shows verbatim;
+ * BUY/SELL totals are previewed with the shared trade-final mirror. Drafts
+ * deliberately never synthesize a persisted amount (see record_activity.rs) -
+ * the backend derives the real value at commit - so this is preview-only.
+ */
+export function estimateDraftAmount(
+  draft: {
+    activityType: string;
+    quantity?: number;
+    unitPrice?: number;
+    fee?: number;
+    tax?: number;
+    amount?: number;
+  },
+  instrumentType?: string,
+): number | undefined {
+  if (draft.amount != null) return draft.amount;
+  if (draft.activityType !== ActivityType.BUY && draft.activityType !== ActivityType.SELL) {
+    return undefined;
+  }
+  return calculateTradeFinalAmount({
+    activityType: draft.activityType as ActivityType,
+    instrumentType: instrumentType ?? "",
+    quantity: draft.quantity,
+    unitPrice: draft.unitPrice,
+    fee: draft.fee,
+    tax: draft.tax,
+  });
+}
 
 export function getActivityTypeBadge(activityType: string): {
   variant: "default" | "secondary" | "destructive" | "success";

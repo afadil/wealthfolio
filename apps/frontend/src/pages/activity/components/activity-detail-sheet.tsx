@@ -7,6 +7,7 @@ import {
   Button,
   Icons,
   PriceDisplay,
+  QuantityDisplay,
   Separator,
   Sheet,
   SheetContent,
@@ -17,6 +18,23 @@ import {
 } from "@wealthfolio/ui";
 import { AmountDisplay } from "@wealthfolio/ui/components/financial/amount-display";
 import { useTranslation } from "react-i18next";
+import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { getProviderMappingReasons } from "./activity-data-grid/types";
+
+/** An activity with no stored amount booked no cash; rendering `Number(null)`
+ * would claim it moved exactly zero. */
+function StoredAmount({ activity, isHidden }: { activity: ActivityDetails; isHidden: boolean }) {
+  if (activity.amount === null || activity.amount.trim() === "") {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <AmountDisplay
+      value={Number(activity.amount)}
+      currency={activity.currency}
+      isHidden={isHidden}
+    />
+  );
+}
 
 interface ActivityDetailSheetProps {
   activity: ActivityDetails | null;
@@ -71,10 +89,37 @@ function DetailSection({ title, icon, children }: DetailSectionProps) {
   );
 }
 
+export function ActivityReviewReasons({
+  activity,
+}: {
+  activity: Pick<ActivityDetails, "metadata" | "needsReview">;
+}) {
+  const { t } = useTranslation();
+  const reviewReasons = getProviderMappingReasons(activity);
+
+  if (!activity.needsReview || reviewReasons.length === 0) {
+    return null;
+  }
+
+  return (
+    <DetailSection
+      title={t("activity:detail.needs_review")}
+      icon={<Icons.AlertCircle className="text-warning h-4 w-4" />}
+    >
+      <ul className="list-disc space-y-1 pl-5 text-sm">
+        {reviewReasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+    </DetailSection>
+  );
+}
+
 export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDetailSheetProps) {
   const { t } = useTranslation();
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
+  const { isBalanceHidden } = useBalancePrivacy();
 
   if (!activity) return null;
 
@@ -175,11 +220,13 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               <div className="text-right">
                 <div className="text-muted-foreground text-xs">{t("activity:field_amount")}</div>
                 <div className="text-lg font-bold">
-                  <AmountDisplay value={Number(activity.amount)} currency={activity.currency} />
+                  <StoredAmount activity={activity} isHidden={isBalanceHidden} />
                 </div>
               </div>
             </div>
           </div>
+
+          <ActivityReviewReasons activity={activity} />
 
           {/* Transaction Details */}
           <DetailSection
@@ -231,7 +278,9 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
             {Number(activity.quantity) !== 0 && (
               <DetailRow
                 label={isOption ? t("activity:detail.contracts") : t("activity:activity_quantity")}
-                value={numberFormatting.formatQuantity(Number(activity.quantity))}
+                value={
+                  <QuantityDisplay value={Number(activity.quantity)} isHidden={isBalanceHidden} />
+                }
               />
             )}
             {Number(activity.unitPrice) !== 0 && (
@@ -240,18 +289,28 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                   isOption ? t("activity:detail.premium_share") : t("activity:activity_unit_price")
                 }
                 value={
-                  <PriceDisplay value={Number(activity.unitPrice)} currency={activity.currency} />
+                  <PriceDisplay
+                    value={Number(activity.unitPrice)}
+                    currency={activity.currency}
+                    isHidden={isBalanceHidden}
+                  />
                 }
               />
             )}
             <DetailRow
               label={isOption ? t("activity:detail.total_premium") : t("activity:field_amount")}
-              value={<AmountDisplay value={Number(activity.amount)} currency={activity.currency} />}
+              value={<StoredAmount activity={activity} isHidden={isBalanceHidden} />}
             />
             {Number(activity.fee) !== 0 && (
               <DetailRow
                 label={t("activity:field_fee")}
-                value={<AmountDisplay value={Number(activity.fee)} currency={activity.currency} />}
+                value={
+                  <AmountDisplay
+                    value={Number(activity.fee)}
+                    currency={activity.currency}
+                    isHidden={isBalanceHidden}
+                  />
+                }
               />
             )}
             {Number(activity.tax ?? 0) !== 0 && (
@@ -262,7 +321,11 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
                     : t("activity:type_tax")
                 }
                 value={
-                  <AmountDisplay value={Number(activity.tax ?? 0)} currency={activity.currency} />
+                  <AmountDisplay
+                    value={Number(activity.tax ?? 0)}
+                    currency={activity.currency}
+                    isHidden={isBalanceHidden}
+                  />
                 }
               />
             )}

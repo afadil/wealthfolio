@@ -1,7 +1,8 @@
 import { getExchanges, resolveSymbolQuote } from "@/adapters";
 import { MultiSelectTaxonomy } from "@/components/classification/multi-select-taxonomy";
 import { SingleSelectTaxonomy } from "@/components/classification/single-select-taxonomy";
-import { TickerAvatar } from "@/components/ticker-avatar";
+import { AssetLogoDialog } from "@/components/asset-logo/asset-logo-dialog";
+import { EditableTickerAvatar } from "@/components/asset-logo/editable-ticker-avatar";
 import { useCustomProviders } from "@/hooks/use-custom-providers";
 import { useMarketDataProviders } from "@/hooks/use-market-data-providers";
 import { useTaxonomies } from "@/hooks/use-taxonomies";
@@ -12,10 +13,12 @@ import {
   Alert,
   AlertDescription,
   CurrencyInput,
+  DatePickerInput,
   Label,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  QuantityInput,
   ResponsiveSelect,
   type ResponsiveSelectOption,
   SearchableSelect,
@@ -58,6 +61,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Path, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
+import {
+  applyBondSpec,
+  BOND_INSTRUMENT_TYPE,
+  COUPON_FREQUENCIES,
+  extractBondSpec,
+} from "./asset-bond-spec";
+import {
+  applyContractMultiplier,
+  explicitContractMultiplier,
+  instrumentDefaultMultiplier,
+} from "./asset-contract-multiplier";
 import { serializeProviderConfig } from "./asset-provider-config";
 import { useAssetProfileMutations } from "./hooks/use-asset-profile-mutations";
 
@@ -86,6 +100,14 @@ const assetFormSchema = (t: TFunction) =>
     quoteMode: z.enum([QuoteMode.MARKET, QuoteMode.MANUAL]),
     preferredProvider: z.string().optional(),
     providerConfig: z.array(providerOverrideSchema).optional(),
+    // Optional/nullable is load-bearing: the Market Data tab submits this same
+    // form, and a blocking error here would fail that save with no visible
+    // FormMessage on that tab.
+    contractMultiplier: z.coerce.number().positive().optional().nullable(),
+    maturityDate: z.date().optional().nullable(),
+    // min(0), not positive(): zero-coupon T-bills are valid and common.
+    couponRate: z.coerce.number().min(0).optional().nullable(),
+    couponFrequency: z.string().optional(),
   });
 
 type AssetFormValues = z.infer<ReturnType<typeof assetFormSchema>>;
@@ -451,6 +473,7 @@ export function AssetEditSheet({
     [t],
   );
   const [activeTab, setActiveTab] = useState<EditTab>(defaultTab);
+  const [logoDialogOpen, setLogoDialogOpen] = useState(false);
   const [symbolValidations, setSymbolValidations] = useState<
     Record<string, SymbolValidationStatus>
   >({});
@@ -547,6 +570,8 @@ export function AssetEditSheet({
       providerConfig: parseProviderOverrides(
         asset?.providerConfig as Record<string, unknown> | null,
       ),
+      contractMultiplier: explicitContractMultiplier(asset?.metadata, asset?.instrumentType),
+      ...extractBondSpec(asset?.metadata),
     },
   });
 
@@ -558,6 +583,11 @@ export function AssetEditSheet({
     control: form.control,
     name: "providerConfig",
   });
+
+  // Instrument type drives the multiplier default (100 for options, 1 otherwise),
+  // so read the live form value rather than the persisted one.
+  const watchedInstrumentType = form.watch("instrumentType");
+  const defaultMultiplier = instrumentDefaultMultiplier(watchedInstrumentType);
 
   // Reset form when asset changes
   useEffect(() => {
@@ -576,6 +606,8 @@ export function AssetEditSheet({
         providerConfig: parseProviderOverrides(
           asset.providerConfig as Record<string, unknown> | null,
         ),
+        contractMultiplier: explicitContractMultiplier(asset.metadata, asset.instrumentType),
+        ...extractBondSpec(asset.metadata),
       });
     }
   }, [asset, form]);
@@ -616,12 +648,32 @@ export function AssetEditSheet({
         const newIdentifiers = isinTrimmed
           ? { ...existingIdentifiers, isin: isinTrimmed }
           : Object.fromEntries(Object.entries(existingIdentifiers).filter(([k]) => k !== "isin"));
-        const newMetadata = {
+        const effectiveInstrumentType = values.instrumentType || asset.instrumentType;
+        const baseMetadata = {
           ...existingMeta,
           ...(Object.keys(newIdentifiers).length > 0
             ? { identifiers: newIdentifiers }
             : { identifiers: undefined }),
         };
+
+        // The field holds only an explicit override — null means "use the
+        // instrument default", which is what the placeholder shows. So an
+        // untouched field cannot pin a stale value across an instrument-type
+        // change; applyContractMultiplier just clears the key.
+        const withMultiplier = applyContractMultiplier(
+          baseMetadata,
+          effectiveInstrumentType,
+          values.contractMultiplier,
+        );
+
+        const newMetadata =
+          effectiveInstrumentType === BOND_INSTRUMENT_TYPE
+            ? applyBondSpec(withMultiplier, {
+                maturityDate: values.maturityDate ?? null,
+                couponRate: values.couponRate ?? null,
+                couponFrequency: values.couponFrequency ?? "",
+              })
+            : withMultiplier;
 
         // Update profile with all fields including quote mode
         await updateAssetProfileMutation.mutateAsync({
@@ -659,7 +711,23 @@ export function AssetEditSheet({
       <SheetContent side="right" className="pb-safe flex h-full w-full flex-col sm:max-w-2xl">
         <SheetHeader className="shrink-0 pb-4">
           <div className="flex items-center gap-3">
-            <TickerAvatar symbol={asset.displayCode ?? ""} className="size-10" />
+            <EditableTickerAvatar
+              symbol={asset.displayCode ?? ""}
+              exchangeMic={asset.instrumentExchangeMic}
+              instrumentType={asset.instrumentType}
+              assetId={asset.id}
+              className="size-10"
+              onEdit={() => setLogoDialogOpen(true)}
+            />
+            <AssetLogoDialog
+              open={logoDialogOpen}
+              onOpenChange={setLogoDialogOpen}
+              assetId={asset.id}
+              symbol={asset.displayCode ?? asset.name ?? ""}
+              exchangeMic={asset.instrumentExchangeMic}
+              instrumentType={asset.instrumentType}
+              name={asset.name}
+            />
             <div className="min-w-0 flex-1">
               <SheetTitle className="truncate text-lg">
                 {asset.displayCode ?? asset.name ?? t("asset:editSheet.unknown")}
@@ -925,6 +993,107 @@ export function AssetEditSheet({
                           )}
                         />
                       </div>
+
+                      {/* Contract multiplier: underlying units per position unit.
+                          Shown for every non-FX asset because futures and CFDs
+                          arrive as EQUITY and cannot be told apart by type. */}
+                      <FormField
+                        control={form.control}
+                        name="contractMultiplier"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("asset:editSheet.contract_multiplier")}</FormLabel>
+                            <FormControl>
+                              <QuantityInput
+                                ref={field.ref}
+                                name={field.name}
+                                value={field.value ?? ""}
+                                onValueChange={(value) => field.onChange(value ?? null)}
+                                placeholder={String(defaultMultiplier)}
+                                data-testid="asset-contract-multiplier"
+                              />
+                            </FormControl>
+                            <p className="text-muted-foreground text-xs">
+                              {t("asset:editSheet.contract_multiplier_hint", {
+                                default: defaultMultiplier,
+                              })}
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {watchedInstrumentType === BOND_INSTRUMENT_TYPE && (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <FormField
+                            control={form.control}
+                            name="maturityDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t("asset:editSheet.maturity_date")}</FormLabel>
+                                <FormControl>
+                                  <DatePickerInput
+                                    value={field.value ?? undefined}
+                                    onChange={(date) => field.onChange(date ?? null)}
+                                    data-testid="asset-maturity-date"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="couponFrequency"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t("asset:editSheet.coupon_frequency")}</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-11">
+                                      <SelectValue
+                                        placeholder={t("asset:editSheet.select_frequency")}
+                                      />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {COUPON_FREQUENCIES.map((frequency) => (
+                                      <SelectItem key={frequency} value={frequency}>
+                                        {t(`asset:editSheet.couponFrequency.${frequency}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="couponRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{t("asset:editSheet.coupon_rate")}</FormLabel>
+                                <FormControl>
+                                  {/* Shown as a percent; stored as a fraction. */}
+                                  <QuantityInput
+                                    ref={field.ref}
+                                    name={field.name}
+                                    value={field.value ?? ""}
+                                    onValueChange={(value) => field.onChange(value ?? null)}
+                                    maxDecimalPlaces={4}
+                                    placeholder="4.375"
+                                    data-testid="asset-coupon-rate"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
 
                       <div className="flex justify-end gap-3 pt-4">
                         <Button

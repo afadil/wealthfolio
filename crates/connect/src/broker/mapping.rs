@@ -118,6 +118,18 @@ fn normalize_source_system(value: Option<&str>) -> Option<String> {
 pub fn build_activity_metadata(activity: &AccountUniversalActivity) -> Option<String> {
     let mut metadata = serde_json::Map::new();
 
+    // Mini options represent 10 underlying units rather than the standard
+    // 100. Carry the exact multiplier through the existing asset-creation
+    // metadata path so cash and valuation share one instrument fact.
+    if activity
+        .option_symbol
+        .as_ref()
+        .and_then(|option| option.is_mini_option)
+        == Some(true)
+    {
+        metadata.insert("contract_multiplier".to_string(), serde_json::json!(10));
+    }
+
     // Preserve an explicit performance-boundary classification from the provider.
     if let Some(ref mapping_meta) = activity.mapping_metadata {
         if let Some(ref flow) = mapping_meta.flow {
@@ -377,32 +389,6 @@ pub fn normalize_broker_symbol(
     })
 }
 
-fn normalized_trade_amount(
-    activity_type: &str,
-    quantity: Option<Decimal>,
-    unit_price: Option<Decimal>,
-    amount: Option<Decimal>,
-    is_option_activity: bool,
-    is_crypto: bool,
-    is_bond: bool,
-) -> Option<Decimal> {
-    if matches!(
-        activity_type,
-        activities::ACTIVITY_TYPE_BUY | activities::ACTIVITY_TYPE_SELL
-    ) && !is_option_activity
-        && !is_crypto
-        && !is_bond
-    {
-        if let (Some(quantity), Some(unit_price)) = (quantity, unit_price) {
-            if !quantity.is_zero() && !unit_price.is_zero() {
-                return Some(quantity * unit_price);
-            }
-        }
-    }
-
-    amount
-}
-
 /// Maps a broker API activity into a `NewActivity` with unresolved `AssetResolutionInput`.
 ///
 /// The returned `NewActivity` has `AssetResolutionInput { symbol, exchange_mic, kind }` set
@@ -449,7 +435,7 @@ pub fn map_broker_activity(
         NewActivity::canonicalize_subtype_for_activity(&activity_type, subtype.as_deref());
 
     // Calculate needs_review flag
-    let needs_review_flag = needs_review(activity);
+    let mut needs_review_flag = needs_review(activity);
 
     // Build metadata JSON
     let metadata = build_activity_metadata(activity);
@@ -590,16 +576,25 @@ pub fn map_broker_activity(
     let quantity = activity.units.and_then(Decimal::from_f64).map(|d| d.abs());
     let unit_price = activity.price.and_then(Decimal::from_f64).map(|d| d.abs());
     let fee = activity.fee.and_then(Decimal::from_f64).map(|d| d.abs());
+    // Preserve provider provenance: preparation derives a missing total only
+    // after resolving the asset's multiplier and quote currency.
     let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
-    let amount = normalized_trade_amount(
-        &activity_type,
-        quantity,
-        unit_price,
-        amount,
-        is_option_activity,
-        is_crypto,
-        is_bond,
+    let is_trade = matches!(
+        activity_type.as_str(),
+        activities::ACTIVITY_TYPE_BUY | activities::ACTIVITY_TYPE_SELL
     );
+    let can_compile_trade_final = quantity.is_some_and(|value| !value.is_zero())
+        && unit_price.is_some_and(|value| !value.is_zero());
+    if is_trade
+        && !can_compile_trade_final
+        && amount.is_some()
+        && fee.is_some_and(|value| !value.is_zero())
+    {
+        // With incomplete trade economics, a charged provider amount cannot be
+        // proven gross or final. Preserve it as final and keep it calculated,
+        // but surface the ambiguity for user review.
+        needs_review_flag = true;
+    }
     let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
 
     // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
@@ -620,13 +615,6 @@ pub fn map_broker_activity(
             (unit_price, quantity, fee, amount, currency_code)
         };
 
-    // Determine status
-    let status = if needs_review_flag {
-        wealthfolio_core::activities::ActivityStatus::Draft
-    } else {
-        wealthfolio_core::activities::ActivityStatus::Posted
-    };
-
     Some(NewActivity {
         id: Some(activity_id),
         account_id: account_id.to_string(),
@@ -640,7 +628,9 @@ pub fn map_broker_activity(
         fee,
         tax: None,
         amount,
-        status: Some(status),
+        // Review confidence is orthogonal to lifecycle. A review flag must not
+        // silently remove an otherwise posted broker event from calculations.
+        status: Some(wealthfolio_core::activities::ActivityStatus::Posted),
         notes: activity
             .description
             .clone()
@@ -652,11 +642,15 @@ pub fn map_broker_activity(
         source_system: normalize_source_system(activity.source_system.as_deref())
             .or_else(|| normalize_source_system(activity.provider_type.as_deref()))
             .or_else(|| Some("SNAPTRADE".to_string())),
-        source_record_id: activity
-            .source_record_id
-            .clone()
-            .or(activity.external_reference_id.clone())
-            .or(activity.id.clone()),
+        source_record_id: [
+            activity.source_record_id.as_ref(),
+            activity.provider_activity_id.as_ref(),
+            activity.id.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        .find(|value| !value.trim().is_empty())
+        .cloned(),
         source_group_id: activity.source_group_id.clone(),
         idempotency_key: None,
         import_run_id: None,
@@ -747,6 +741,25 @@ mod tests {
     }
 
     #[test]
+    fn review_flag_does_not_change_broker_activity_lifecycle() {
+        let activity = AccountUniversalActivity {
+            id: Some("review-activity".to_string()),
+            activity_type: Some(activities::ACTIVITY_TYPE_DEPOSIT.to_string()),
+            amount: Some(100.0),
+            needs_review: true,
+            ..Default::default()
+        };
+
+        let mapped = map_test_activity(&activity);
+
+        assert_eq!(
+            mapped.status,
+            Some(wealthfolio_core::activities::ActivityStatus::Posted)
+        );
+        assert_eq!(mapped.needs_review, Some(true));
+    }
+
+    #[test]
     fn test_needs_review_high_confidence() {
         let activity = AccountUniversalActivity {
             activity_type: Some("BUY".to_string()),
@@ -771,7 +784,7 @@ mod tests {
     }
 
     #[test]
-    fn test_map_broker_activity_uses_provider_and_external_reference_fallbacks() {
+    fn test_map_broker_activity_preserves_external_reference_without_using_it_as_identity() {
         let activity = AccountUniversalActivity {
             id: Some("act-1".to_string()),
             activity_type: Some("BUY".to_string()),
@@ -783,7 +796,7 @@ mod tests {
         let mapped = map_test_activity(&activity);
 
         assert_eq!(mapped.source_system.as_deref(), Some("SNAPTRADE"));
-        assert_eq!(mapped.source_record_id.as_deref(), Some("ext-123"));
+        assert_eq!(mapped.source_record_id.as_deref(), Some("act-1"));
 
         let metadata_json = mapped.metadata.expect("metadata should be present");
         let metadata: serde_json::Value = serde_json::from_str(&metadata_json).unwrap();
@@ -792,7 +805,61 @@ mod tests {
     }
 
     #[test]
-    fn test_map_broker_activity_trade_amount_policy_recomputes_plain_trade_amount() {
+    fn source_identity_uses_first_nonblank_candidate() {
+        for source in [
+            None,
+            Some(""),
+            Some(" \t\n"),
+            Some("kraken:composite:1"),
+            Some("external-1"),
+            Some(" supplied-id "),
+        ] {
+            for provider in [None, Some(""), Some(" \t\n"), Some("provider-1")] {
+                let activity: AccountUniversalActivity =
+                    serde_json::from_value(serde_json::json!({
+                        "id": "act-1",
+                        "type": "BUY",
+                        "source_record_id": source,
+                        "provider_activity_id": provider,
+                        "source_group_id": "group-1",
+                        "external_reference_id": "external-1",
+                    }))
+                    .unwrap();
+                let mapped = map_test_activity(&activity);
+                let expected = source
+                    .filter(|s| !s.trim().is_empty())
+                    .or(provider.filter(|s| !s.trim().is_empty()))
+                    .unwrap_or("act-1");
+                assert_eq!(mapped.source_record_id.as_deref(), Some(expected));
+                assert_eq!(mapped.id.as_deref(), Some("act-1"));
+                assert_eq!(mapped.source_group_id.as_deref(), Some("group-1"));
+                let metadata: serde_json::Value =
+                    serde_json::from_str(mapped.metadata.as_deref().unwrap()).unwrap();
+                assert_eq!(metadata["source_group_id"], "group-1");
+                assert_eq!(metadata["external_reference_id"], "external-1");
+                if let Some(source) = source {
+                    assert_eq!(metadata["source_record_id"], source);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn source_identity_does_not_replace_required_incoming_id() {
+        for id in [None, Some(""), Some(" \t\n")] {
+            let activity: AccountUniversalActivity = serde_json::from_value(serde_json::json!({
+                "id": id,
+                "source_record_id": "composite-1",
+                "provider_activity_id": "provider-1",
+                "external_reference_id": "external-1",
+            }))
+            .unwrap();
+            assert!(map_broker_activity(&activity, "acct-1", Some("USD"), Some("USD")).is_none());
+        }
+    }
+
+    #[test]
+    fn test_map_broker_activity_preserves_explicit_final_trade_amount() {
         let activity = AccountUniversalActivity {
             id: Some("act-equity-buy".to_string()),
             activity_type: Some("BUY".to_string()),
@@ -806,7 +873,7 @@ mod tests {
 
         let mapped = map_test_activity(&activity);
 
-        assert_eq!(mapped.amount.unwrap().round_dp(4), decimal("997.6000"));
+        assert_eq!(mapped.amount.unwrap().round_dp(4), decimal("9976.0000"));
         assert_eq!(mapped.fee.unwrap().round_dp(4), decimal("4.9000"));
         assert_eq!(mapped.tax, None);
     }
@@ -832,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn test_map_broker_activity_trade_amount_policy_preserves_option_amount() {
+    fn test_map_broker_activity_leaves_missing_standard_option_amount_for_preparation() {
         let activity = AccountUniversalActivity {
             id: Some("act-option-buy".to_string()),
             activity_type: Some("BUY".to_string()),
@@ -842,13 +909,58 @@ mod tests {
             }),
             units: Some(2.0),
             price: Some(3.0),
-            amount: Some(600.0),
+            amount: None,
             ..Default::default()
         };
 
         let mapped = map_test_activity(&activity);
 
-        assert_eq!(mapped.amount.unwrap().round_dp(2), decimal("600.00"));
+        assert_eq!(mapped.amount, None);
+    }
+
+    #[test]
+    fn test_map_broker_activity_leaves_missing_mini_option_amount_for_preparation() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-mini-option-buy".to_string()),
+            activity_type: Some("BUY".to_string()),
+            option_symbol: Some(AccountUniversalActivityOptionSymbol {
+                ticker: Some("AAPL7 260116C00200000".to_string()),
+                is_mini_option: Some(true),
+                ..Default::default()
+            }),
+            units: Some(2.0),
+            price: Some(3.0),
+            amount: None,
+            fee: Some(1.0),
+            ..Default::default()
+        };
+
+        let mapped = map_test_activity(&activity);
+
+        assert_eq!(mapped.amount, None);
+        let metadata: serde_json::Value =
+            serde_json::from_str(mapped.metadata.as_deref().unwrap()).unwrap();
+        assert_eq!(metadata["contract_multiplier"], 10);
+    }
+
+    #[test]
+    fn incomplete_charged_trade_preserves_amount_and_needs_review() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-incomplete-buy".to_string()),
+            activity_type: Some("BUY".to_string()),
+            amount: Some(100.0),
+            fee: Some(5.0),
+            ..Default::default()
+        };
+
+        let mapped = map_test_activity(&activity);
+
+        assert_eq!(mapped.amount, Some(decimal("100")));
+        assert_eq!(mapped.needs_review, Some(true));
+        assert_eq!(
+            mapped.status,
+            Some(wealthfolio_core::activities::ActivityStatus::Posted)
+        );
     }
 
     #[test]

@@ -117,6 +117,7 @@ export function useDeleteAlternativeAsset(options?: UseAlternativeAssetMutations
       // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
       queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSETS] });
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_LOGO_INDEX] });
       invalidatePerformanceCaches(queryClient);
 
       toast({

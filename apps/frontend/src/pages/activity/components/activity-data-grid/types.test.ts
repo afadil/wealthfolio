@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ActivityDetails } from "@/lib/types";
 
-import { toLocalTransaction } from "./types";
+import { getProviderMappingReasons, toLocalTransaction } from "./types";
 
 function activityWithBoundary(isExternal?: boolean): ActivityDetails {
   return {
@@ -34,5 +34,32 @@ describe("toLocalTransaction", () => {
 
   it("keeps a missing boundary distinct from explicit false", () => {
     expect(toLocalTransaction(activityWithBoundary()).isExternal).toBeUndefined();
+  });
+});
+
+describe("getProviderMappingReasons", () => {
+  it("returns provider-supplied mapping reasons", () => {
+    expect(
+      getProviderMappingReasons({
+        metadata: {
+          mapping_reasons: ["Ambiguous activity type", "Manual review requested"],
+        },
+      }),
+    ).toEqual(["Ambiguous activity type", "Manual review requested"]);
+  });
+
+  it("ignores malformed, blank, and duplicate reasons", () => {
+    expect(
+      getProviderMappingReasons({
+        metadata: {
+          mapping_reasons: [" Unknown mapping ", "Unknown mapping", "", null, 42],
+        },
+      }),
+    ).toEqual(["Unknown mapping"]);
+  });
+
+  it("returns no reasons when the provider supplied none", () => {
+    expect(getProviderMappingReasons({})).toEqual([]);
+    expect(getProviderMappingReasons({ metadata: { mapping_reasons: "Unknown" } })).toEqual([]);
   });
 });

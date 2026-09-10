@@ -45,6 +45,7 @@ interface ActivityDateListProps {
   endingCashBalance?: number;
   cashCurrency?: string;
   cashAuditTarget?: CashAuditReviewTarget;
+  isCreditCardAccount?: boolean;
 }
 
 export function ActivityDateList({
@@ -52,6 +53,7 @@ export function ActivityDateList({
   endingCashBalance,
   cashCurrency,
   cashAuditTarget,
+  isCreditCardAccount = false,
 }: ActivityDateListProps) {
   const { t } = useTranslation();
   const { settings } = useSettingsContext();
@@ -59,8 +61,8 @@ export function ActivityDateList({
   const [cashAuditFilter, setCashAuditFilter] = useState<CashAuditFilter>("all");
 
   const cashLedger = useMemo(
-    () => buildCashLedger(activities, endingCashBalance),
-    [activities, endingCashBalance],
+    () => buildCashLedger(activities, endingCashBalance, isCreditCardAccount),
+    [activities, endingCashBalance, isCreditCardAccount],
   );
   const hasCashContext =
     cashLedger.startingCashBalance !== undefined &&
@@ -211,7 +213,13 @@ function ActivityDateListItem({
   const content = (
     <>
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <TickerAvatar symbol={avatarSymbol} className="h-10 w-10 flex-shrink-0" />
+        <TickerAvatar
+          symbol={avatarSymbol}
+          exchangeMic={activity.exchangeMic}
+          instrumentType={activity.instrumentType}
+          assetId={activity.assetId}
+          className="h-10 w-10 flex-shrink-0"
+        />
         <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
           <p className="truncate text-base font-semibold leading-5">{displaySymbol}</p>
           {activity.activityType !== ActivityType.SPLIT ? (
@@ -460,13 +468,16 @@ function getActivityTone(type: ActivityType) {
 function buildCashLedger(
   activities: ActivityDetails[],
   endingCashBalance?: number,
+  isCreditCardAccount = false,
 ): {
   rows: ActivityCashLedgerRow[];
   startingCashBalance?: number;
   totalCashImpact: number;
 } {
   const sortedActivities = [...activities].sort(compareActivitiesForCashLedger);
-  const impacts = sortedActivities.map((activity) => calculateActivityCashImpact(activity));
+  const impacts = sortedActivities.map((activity) =>
+    calculateActivityCashImpact(activity, isCreditCardAccount),
+  );
   const totalCashImpact = impacts.reduce((sum, impact) => sum + impact, 0);
   const startingCashBalance =
     endingCashBalance === undefined ? undefined : endingCashBalance - totalCashImpact;

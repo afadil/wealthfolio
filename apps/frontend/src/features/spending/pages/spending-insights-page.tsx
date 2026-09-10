@@ -75,6 +75,7 @@ const INCOME_TAXONOMY = "income_sources";
 const SAVINGS_TAXONOMY = "savings_categories";
 const STAGE_STORAGE_KEY = "spending-insights-stage";
 const EMPTY_TAXONOMY: never[] = [];
+const EMPTY_BUCKETS: never[] = [];
 /** Heatmap window — last 12 weeks regardless of selected period. */
 const HEATMAP_WEEKS = 12;
 const HEATMAP_DAY_KEYS = [
@@ -366,6 +367,10 @@ export default function SpendingInsightsPage() {
   const whatChangedRange = whatChangedWindow?.current ?? range;
   const whatChangedPriorRange = whatChangedWindow?.prior;
   const categorySheetRange = stage === "changed" ? whatChangedRange : range;
+  // Must be picked by the same expression as `categorySheetRange`: the two
+  // stages run different windows, and pairing one stage's range with the
+  // other's aggregate would divide a partial-month total by a full month.
+  const categorySheetInsight = stage === "changed" ? whatChangedInsight : insight;
   const taxonomyCategoriesForWhereIAm = useMemo(() => {
     const base = taxonomy.data?.categories ?? [];
     if (!insight || insight.uncategorized.txnCount === 0) return base;
@@ -651,7 +656,11 @@ export default function SpendingInsightsPage() {
         taxonomyCategories={taxonomyCategories}
         rangeStart={categorySheetRange.start}
         rangeEnd={categorySheetRange.end}
-        currency={baseCurrency}
+        buckets={categorySheetInsight?.byDayByCategory ?? EMPTY_BUCKETS}
+        rangeDays={categorySheetRange.days}
+        daysElapsed={categorySheetInsight?.headline.pace.daysElapsed ?? 0}
+        isStatsLoading={stage === "changed" ? isWhatChangedLoading : isInsightLoading}
+        currency={categorySheetInsight?.currency ?? baseCurrency}
       />
 
       <HeatmapCellSheet

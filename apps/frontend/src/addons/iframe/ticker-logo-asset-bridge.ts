@@ -1,22 +1,22 @@
+import { assetLogoRegistry, type AssetLogoRegistry } from "@/lib/asset-logo-registry";
+import { normalizeTickerLogoSymbol, resolveTickerLogoFilenames } from "@wealthfolio/ui";
+
+export {
+  normalizeTickerLogoSymbol,
+  resolveTickerLogoFilename,
+  resolveTickerLogoFilenames,
+} from "@wealthfolio/ui";
+
 const MAX_TICKER_LOGO_BYTES = 512 * 1024;
 const DEFAULT_CACHE_SIZE = 256;
 
-export function normalizeTickerLogoSymbol(symbol: unknown) {
-  if (typeof symbol !== "string") {
-    return undefined;
-  }
-
-  const normalized = symbol.trim().toUpperCase();
-  if (
-    !normalized ||
-    normalized.includes("..") ||
-    normalized.includes("/") ||
-    normalized.includes("\\") ||
-    !/^[A-Z0-9$^._:-]+$/.test(normalized)
-  ) {
-    return undefined;
-  }
-  return normalized;
+function dataUriToBlob(dataUri: string): Blob {
+  const [header, payload = ""] = dataUri.split(",", 2);
+  const mimeType = header.slice("data:".length).split(";", 1)[0] || "image/png";
+  const binary = atob(payload);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
 }
 
 export class TickerLogoAssetBridge {
@@ -26,30 +26,64 @@ export class TickerLogoAssetBridge {
   constructor(
     private readonly fetchAsset: typeof fetch = fetch,
     private readonly maxEntries = DEFAULT_CACHE_SIZE,
+    private readonly registry: AssetLogoRegistry = assetLogoRegistry,
   ) {}
 
-  load(symbol: unknown): Promise<Blob | null> {
+  load(symbol: unknown, exchangeMic?: unknown, instrumentType?: unknown): Promise<Blob | null> {
     const normalized = normalizeTickerLogoSymbol(symbol);
-    if (!normalized) {
+    const filenames = resolveTickerLogoFilenames(symbol, exchangeMic, instrumentType);
+    if (!normalized || filenames.length === 0) {
       return Promise.resolve(null);
     }
 
-    const cached = this.cache.get(normalized);
+    // Custom logos are consulted before the bundled LRU on every call, including
+    // the base-symbol fallback historically performed by SandboxTickerAvatar.
+    // Limitation: an already mounted avatar only picks up a new upload on remount
+    // (host→sandbox broadcast is a follow-up).
+    const fallbackFilename = filenames.length > 1 ? filenames.at(-1) : undefined;
+    const fallbackSymbol = fallbackFilename?.replace(/^crypto\//, "");
+    const customSymbols = [normalized, fallbackSymbol].filter(
+      (candidate, index, candidates): candidate is string =>
+        !!candidate && candidates.indexOf(candidate) === index,
+    );
+    return this.loadCustomCandidates(customSymbols).then(
+      (logo) => logo ?? this.loadBundledCandidates(filenames),
+    );
+  }
+
+  private async loadCustomCandidates(symbols: string[]): Promise<Blob | null> {
+    for (const symbol of symbols) {
+      const uri = await this.registry.load({ symbol });
+      if (uri) return dataUriToBlob(uri);
+    }
+    return null;
+  }
+
+  private async loadBundledCandidates(filenames: string[]): Promise<Blob | null> {
+    for (const filename of filenames) {
+      const logo = await this.loadBundled(filename);
+      if (logo) return logo;
+    }
+    return null;
+  }
+
+  private loadBundled(filename: string): Promise<Blob | null> {
+    const cached = this.cache.get(filename);
     if (cached !== undefined) {
-      this.cache.delete(normalized);
-      this.cache.set(normalized, cached);
+      this.cache.delete(filename);
+      this.cache.set(filename, cached);
       return Promise.resolve(cached);
     }
 
-    const inFlight = this.pending.get(normalized);
+    const inFlight = this.pending.get(filename);
     if (inFlight) {
       return inFlight;
     }
 
-    const request = this.fetchLogo(normalized).finally(() => {
-      this.pending.delete(normalized);
+    const request = this.fetchLogo(filename).finally(() => {
+      this.pending.delete(filename);
     });
-    this.pending.set(normalized, request);
+    this.pending.set(filename, request);
     return request;
   }
 
@@ -61,7 +95,10 @@ export class TickerLogoAssetBridge {
     try {
       const basePath = import.meta.env.BASE_URL || "/";
       const url = new URL(
-        `${basePath.replace(/\/?$/, "/")}ticker-logos/${encodeURIComponent(symbol)}.png`,
+        `${basePath.replace(/\/?$/, "/")}ticker-logos/${symbol
+          .split("/")
+          .map(encodeURIComponent)
+          .join("/")}.png`,
         window.location.href,
       );
       // WebKit brand-checks Window.fetch; a normal class-field call uses this bridge as receiver.

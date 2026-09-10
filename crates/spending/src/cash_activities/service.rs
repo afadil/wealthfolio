@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use wealthfolio_core::accounts::{
     account_supports_purpose, account_types, AccountPurpose, AccountRepositoryTrait,
@@ -11,12 +12,13 @@ use wealthfolio_core::activities::{
     Activity, ActivityRepositoryTrait, TransferPairResolution, ACTIVITY_TYPE_TRANSFER_IN,
     ACTIVITY_TYPE_TRANSFER_OUT,
 };
+use wealthfolio_core::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
 
 use super::{
     model::{
         CashActivity, CashActivityFilter, CashActivitySearchRequest, CashActivitySearchResponse,
-        CashActivitySortField, CashActivityStatusFilter, CashFlowBucket, SortDirection,
-        TransferLinkStatus,
+        CashActivitySortField, CashActivityStatusFilter, CashFlowBucket, CurrencyNet, NetSummary,
+        SortDirection, TransferLinkStatus,
     },
     CASH_ACTIVITY_TYPES,
 };
@@ -27,8 +29,8 @@ use crate::activity_assignments::{
     ActivityTaxonomyAssignment, ActivityTaxonomyAssignmentService, BulkCategoryAssignment,
 };
 use crate::activity_classification::{
-    activity_abs_amount, classify_activity, classify_activity_for_aggregation,
-    within_spending_transfer_groups, SpendingClassification,
+    activity_abs_amount, classify_activity, classify_activity_for_aggregation, decimal_to_f64,
+    net_amount, within_spending_transfer_groups, SpendingClassification,
 };
 use crate::activity_splits::{ActivitySplit, ActivitySplitRepositoryTrait, NewActivitySplit};
 use crate::error::SpendingError;
@@ -51,9 +53,28 @@ pub struct CashActivityService {
     splits: Arc<dyn ActivitySplitRepositoryTrait>,
     activity_events: Arc<dyn crate::activity_events::ActivityEventsRepositoryTrait>,
     events: Arc<EventsService>,
+    fx: Arc<dyn wealthfolio_core::fx::FxServiceTrait>,
+}
+
+/// Accounts in scope for a spending query, with the two lookups callers need.
+/// A named struct rather than a tuple: `types` and `currencies` are both
+/// `HashMap<String, String>` and would be silently transposable by position.
+/// Running per-currency net while summarising a filtered set.
+struct CurrencyTally {
+    currency: String,
+    native: Decimal,
+    /// `None` once a row in this currency could not be converted.
+    converted: Option<Decimal>,
+}
+
+struct TargetAccounts {
+    ids: Vec<String>,
+    types: HashMap<String, String>,
+    currencies: HashMap<String, String>,
 }
 
 impl CashActivityService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         activity_repo: Arc<dyn ActivityRepositoryTrait>,
         account_repo: Arc<dyn AccountRepositoryTrait>,
@@ -62,6 +83,7 @@ impl CashActivityService {
         splits: Arc<dyn ActivitySplitRepositoryTrait>,
         activity_events: Arc<dyn crate::activity_events::ActivityEventsRepositoryTrait>,
         events: Arc<EventsService>,
+        fx: Arc<dyn wealthfolio_core::fx::FxServiceTrait>,
     ) -> Self {
         Self {
             activity_repo,
@@ -71,6 +93,7 @@ impl CashActivityService {
             splits,
             activity_events,
             events,
+            fx,
         }
     }
 
@@ -91,8 +114,11 @@ impl CashActivityService {
             return Ok(Vec::new());
         }
 
-        let (all_spending_accounts, account_types) =
-            self.resolve_target_accounts(None, &s.account_ids)?;
+        let TargetAccounts {
+            ids: all_spending_accounts,
+            types: account_types,
+            ..
+        } = self.resolve_target_accounts(None, &s.account_ids)?;
         if all_spending_accounts.is_empty() {
             return Ok(Vec::new());
         }
@@ -149,6 +175,7 @@ impl CashActivityService {
                 let event_id = tag_map.remove(&a.id);
                 let cash_flow_bucket = cash_flow_bucket_for(&a, &account_types, &transfer_groups);
                 let transfer_link_status = transfer_link_status_for(&a, &transfer_link_resolution);
+                let net_amount = decimal_to_f64(net_amount(&a, &account_types));
                 CashActivity {
                     activity: a,
                     cash_flow_bucket,
@@ -156,32 +183,179 @@ impl CashActivityService {
                     splits,
                     event_id,
                     transfer_link_status,
+                    net_amount,
+                    net_amount_base: None,
                 }
             })
             .collect();
         Ok(items)
     }
 
+    /// `net_amount` in `base`, converted at the activity's own date.
+    ///
+    /// A transaction list reports what a row cost at the time, so each row uses
+    /// its own date rather than one snapshot rate for the whole set — see the
+    /// note on [`crate::fx::convert`]. That date is resolved in the user's
+    /// timezone, matching how the row is grouped on screen and how the holdings
+    /// engine picks an acquisition-date rate.
+    ///
+    /// A rate stored on the activity wins over a lookup, matching how lots
+    /// prefer their stored acquisition FX: it is the rate actually applied to
+    /// this transaction, not a market rate for the day. It converts into the
+    /// *account's* currency though, so it only answers this question when the
+    /// account is denominated in the base currency; otherwise it would need
+    /// chaining and the lookup is the simpler truth.
+    fn net_amount_in_base(
+        &self,
+        activity: &Activity,
+        net: Decimal,
+        base: &str,
+        account_currency: Option<&str>,
+        timezone: Tz,
+    ) -> Option<Decimal> {
+        if account_currency == Some(base) && activity.currency != base {
+            if let Some(rate) = activity.fx_rate.filter(|rate| !rate.is_zero()) {
+                return Some(net * rate);
+            }
+        }
+        crate::fx::convert(
+            self.fx.as_ref(),
+            net,
+            &activity.currency,
+            base,
+            // The user's day, not UTC: a late-evening activity is displayed
+            // under — and valued by the holdings engine on — its local date, so
+            // taking `.date_naive()` here would price it a day out for anything
+            // either side of midnight.
+            activity_date_in_tz(activity.activity_date, timezone),
+        )
+    }
+
+    /// Nets `activities` per currency, and adds a single converted figure when
+    /// one is both useful and trustworthy.
+    ///
+    /// Rows that move no cash contribute nothing and never introduce a currency
+    /// of their own. Currencies that net to nothing are dropped.
+    fn net_summary(
+        &self,
+        activities: &[Activity],
+        account_types: &HashMap<String, String>,
+        account_currencies: &HashMap<String, String>,
+        base_currency: Option<&str>,
+        timezone: Tz,
+    ) -> NetSummary {
+        // One pass, tallied per currency: the resolver runs once per activity and
+        // the conversion reuses that result rather than recomputing it.
+        let mut tallies: Vec<CurrencyTally> = Vec::new();
+
+        for activity in activities {
+            let net = net_amount(activity, account_types);
+            if net.is_zero() {
+                continue;
+            }
+
+            let index = match tallies
+                .iter()
+                .position(|tally| tally.currency == activity.currency)
+            {
+                Some(index) => index,
+                None => {
+                    tallies.push(CurrencyTally {
+                        currency: activity.currency.clone(),
+                        native: Decimal::ZERO,
+                        converted: Some(Decimal::ZERO),
+                    });
+                    tallies.len() - 1
+                }
+            };
+            tallies[index].native += net;
+
+            // Once a currency has failed to convert the answer cannot change, so
+            // stop asking: every further attempt is a repository round-trip and a
+            // warning for a figure already known to be unavailable.
+            if let (Some(base), Some(running)) = (base_currency, tallies[index].converted) {
+                let account_currency = account_currencies
+                    .get(&activity.account_id)
+                    .map(String::as_str);
+                tallies[index].converted = self
+                    .net_amount_in_base(activity, net, base, account_currency, timezone)
+                    .map(|converted| running + converted);
+            }
+        }
+
+        // A currency whose rows cancel out is not reported, and must not reach
+        // the converted total either: converting each row at its own date leaves
+        // a residual when the rate moved between them, which would put movement
+        // into the headline that appears in no pill.
+        let contributing: Vec<&CurrencyTally> = tallies
+            .iter()
+            .filter(|tally| !tally.native.is_zero())
+            .collect();
+
+        let by_currency: Vec<CurrencyNet> = contributing
+            .iter()
+            .map(|tally| CurrencyNet {
+                currency: tally.currency.clone(),
+                amount: decimal_to_f64(tally.native),
+            })
+            .collect();
+
+        // Withheld when a single currency contributes — `by_currency` already is
+        // the total, and converting it would only introduce FX drift into a
+        // figure that has an exact answer. Withheld when any contributing
+        // currency has no rate, since the total would silently omit its rows;
+        // `Sum for Option` collapses to `None` if any tally failed.
+        let converted = match base_currency {
+            Some(base) if contributing.len() > 1 => contributing
+                .iter()
+                .map(|tally| tally.converted)
+                .sum::<Option<Decimal>>()
+                .map(|amount| CurrencyNet {
+                    currency: base.to_string(),
+                    amount: decimal_to_f64(amount),
+                }),
+            _ => None,
+        };
+
+        NetSummary {
+            by_currency,
+            converted,
+        }
+    }
+
     /// Search/filter/paginate cash activities. Powers the spending Transactions page.
     /// Server-side pipeline: filters → sort → paginate → join assignments for the page slice.
+    /// `base_currency` is the currency the converted net is denominated in.
+    /// Injected by the app-level callers and never sent by the client; `None`
+    /// asks for the per-currency breakdown only.
     pub async fn search(
         &self,
         req: CashActivitySearchRequest,
+        base_currency: Option<&str>,
+        timezone: &str,
     ) -> Result<CashActivitySearchResponse> {
+        let timezone = parse_user_timezone_or_default(timezone);
         let s = self.settings.get().await?;
         if !s.enabled || s.account_ids.is_empty() {
             return Ok(CashActivitySearchResponse {
                 items: Vec::new(),
                 total_count: 0,
+                net: Some(NetSummary::default()),
+                base_currency: base_currency.map(str::to_string),
             });
         }
 
-        let (all_spending_accounts, account_types) =
-            self.resolve_target_accounts(None, &s.account_ids)?;
+        let TargetAccounts {
+            ids: all_spending_accounts,
+            types: account_types,
+            currencies: account_currencies,
+        } = self.resolve_target_accounts(None, &s.account_ids)?;
         if all_spending_accounts.is_empty() {
             return Ok(CashActivitySearchResponse {
                 items: Vec::new(),
                 total_count: 0,
+                net: Some(NetSummary::default()),
+                base_currency: base_currency.map(str::to_string),
             });
         }
         let all_spending_account_ids: HashSet<&str> =
@@ -197,6 +371,8 @@ impl CashActivityService {
             return Ok(CashActivitySearchResponse {
                 items: Vec::new(),
                 total_count: 0,
+                net: Some(NetSummary::default()),
+                base_currency: base_currency.map(str::to_string),
             });
         }
 
@@ -390,6 +566,21 @@ impl CashActivityService {
 
         let total_count = activities.len();
 
+        // Net the FULL filtered set before paginating, so the figure covers every
+        // matching row rather than the page about to be sliced out. Only the
+        // first page carries it — clients refetch page one whenever the filter
+        // changes, so recomputing it for later pages would answer the same
+        // question twice.
+        let net = (req.offset == 0).then(|| {
+            self.net_summary(
+                &activities,
+                &account_types,
+                &account_currencies,
+                base_currency,
+                timezone,
+            )
+        });
+
         // Paginate
         let offset = req.offset.min(total_count);
         let limit = req.limit.min(MAX_CASH_ACTIVITY_SEARCH_LIMIT);
@@ -415,6 +606,14 @@ impl CashActivityService {
                 let event_id = tag_map.remove(&a.id);
                 let cash_flow_bucket = cash_flow_bucket_for(&a, &account_types, &transfer_groups);
                 let transfer_link_status = transfer_link_status_for(&a, &transfer_link_resolution);
+                let net = net_amount(&a, &account_types);
+                let net_amount_base = base_currency
+                    .and_then(|base| {
+                        let account_currency =
+                            account_currencies.get(&a.account_id).map(String::as_str);
+                        self.net_amount_in_base(&a, net, base, account_currency, timezone)
+                    })
+                    .map(decimal_to_f64);
                 CashActivity {
                     activity: a,
                     cash_flow_bucket,
@@ -422,11 +621,18 @@ impl CashActivityService {
                     splits,
                     event_id,
                     transfer_link_status,
+                    net_amount: decimal_to_f64(net),
+                    net_amount_base,
                 }
             })
             .collect();
 
-        Ok(CashActivitySearchResponse { items, total_count })
+        Ok(CashActivitySearchResponse {
+            items,
+            total_count,
+            net,
+            base_currency: base_currency.map(str::to_string),
+        })
     }
 
     /// Fetch explicit activity ids without applying the normal status/date/limit
@@ -440,8 +646,11 @@ impl CashActivityService {
             return Ok(Vec::new());
         }
 
-        let (target_accounts, account_types) =
-            self.resolve_target_accounts(None, &s.account_ids)?;
+        let TargetAccounts {
+            ids: target_accounts,
+            types: account_types,
+            ..
+        } = self.resolve_target_accounts(None, &s.account_ids)?;
         if target_accounts.is_empty() {
             return Ok(Vec::new());
         }
@@ -478,6 +687,7 @@ impl CashActivityService {
                     cash_flow_bucket_for(&activity, &account_types, &transfer_groups);
                 let transfer_link_status =
                     transfer_link_status_for(&activity, &transfer_link_resolution);
+                let net_amount = decimal_to_f64(net_amount(&activity, &account_types));
                 CashActivity {
                     activity,
                     cash_flow_bucket,
@@ -485,6 +695,8 @@ impl CashActivityService {
                     splits,
                     event_id,
                     transfer_link_status,
+                    net_amount,
+                    net_amount_base: None,
                 }
             })
             .collect())
@@ -634,33 +846,48 @@ impl CashActivityService {
         &self,
         requested: Option<Vec<String>>,
         opted_in: &[String],
-    ) -> Result<(Vec<String>, HashMap<String, String>)> {
+    ) -> Result<TargetAccounts> {
         let target_accounts: Vec<String> = match requested {
             Some(ids) => ids.into_iter().filter(|id| opted_in.contains(id)).collect(),
             None => opted_in.to_vec(),
         };
         if target_accounts.is_empty() {
-            return Ok((target_accounts, HashMap::new()));
+            return Ok(TargetAccounts {
+                ids: target_accounts,
+                types: HashMap::new(),
+                currencies: HashMap::new(),
+            });
         }
 
         let accounts = self
             .account_repo
             .list(None, Some(false), Some(&target_accounts))
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        let account_types: HashMap<String, String> = accounts
+        let spending_accounts: Vec<_> = accounts
             .into_iter()
             .filter(|account| {
                 account_supports_purpose(&account.account_type, AccountPurpose::Spending)
             })
+            .collect();
+        let currencies: HashMap<String, String> = spending_accounts
+            .iter()
+            .map(|account| (account.id.clone(), account.currency.clone()))
+            .collect();
+        let types: HashMap<String, String> = spending_accounts
+            .into_iter()
             .map(|account| (account.id, account.account_type))
             .collect();
 
-        let target_accounts = target_accounts
+        let ids = target_accounts
             .into_iter()
-            .filter(|id| account_types.contains_key(id))
+            .filter(|id| types.contains_key(id))
             .collect();
 
-        Ok((target_accounts, account_types))
+        Ok(TargetAccounts {
+            ids,
+            types,
+            currencies,
+        })
     }
 
     fn transfer_link_resolution(&self) -> Result<TransferPairResolution> {
@@ -692,8 +919,11 @@ impl CashActivityService {
         }
 
         let s = self.settings.get().await?;
-        let (target_accounts, account_types) =
-            self.resolve_target_accounts(None, &s.account_ids)?;
+        let TargetAccounts {
+            ids: target_accounts,
+            types: account_types,
+            ..
+        } = self.resolve_target_accounts(None, &s.account_ids)?;
         let Some(account_type) = account_types.get(&activity.account_id) else {
             return Err(SpendingError::InvalidInput {
                 message: "Activity account does not support spending tracking".to_string(),
@@ -737,8 +967,11 @@ impl CashActivityService {
     ) -> Result<(Activity, &'static str)> {
         let activity = self.ensure_activity_in_spending_scope(activity_id).await?;
         let s = self.settings.get().await?;
-        let (target_accounts, account_types) =
-            self.resolve_target_accounts(None, &s.account_ids)?;
+        let TargetAccounts {
+            ids: target_accounts,
+            types: account_types,
+            ..
+        } = self.resolve_target_accounts(None, &s.account_ids)?;
         let Some(account_type) = account_types.get(&activity.account_id) else {
             return Err(SpendingError::InvalidInput {
                 message: "Activity account does not support spending tracking".to_string(),
@@ -982,7 +1215,7 @@ mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
-    use chrono::NaiveDateTime;
+    use chrono::{NaiveDate, NaiveDateTime};
     use rust_decimal::Decimal;
     use wealthfolio_core::accounts::{
         Account, AccountRepositoryTrait, AccountUpdate, NewAccount, TrackingMode,
@@ -1619,6 +1852,211 @@ mod tests {
         }
     }
 
+    /// Records the dates conversions were requested for, so a test can assert
+    /// which day's rate a row was priced at.
+    #[derive(Default)]
+    struct DateCapturingFx {
+        dates: std::sync::Mutex<Vec<chrono::NaiveDate>>,
+    }
+
+    #[async_trait]
+    impl wealthfolio_core::fx::FxServiceTrait for DateCapturingFx {
+        fn initialize(&self) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        fn get_historical_rates(
+            &self,
+            _: &str,
+            _: &str,
+            _: i64,
+        ) -> wealthfolio_core::Result<Vec<wealthfolio_core::fx::ExchangeRate>> {
+            Ok(vec![])
+        }
+        fn get_latest_exchange_rate(&self, _: &str, _: &str) -> wealthfolio_core::Result<Decimal> {
+            Ok(Decimal::ONE)
+        }
+        fn get_exchange_rate_for_date(
+            &self,
+            _: &str,
+            _: &str,
+            date: chrono::NaiveDate,
+        ) -> wealthfolio_core::Result<Decimal> {
+            self.dates.lock().unwrap().push(date);
+            Ok(Decimal::ONE)
+        }
+        fn convert_currency(
+            &self,
+            amount: Decimal,
+            _: &str,
+            _: &str,
+        ) -> wealthfolio_core::Result<Decimal> {
+            Ok(amount)
+        }
+        fn convert_currency_for_date(
+            &self,
+            amount: Decimal,
+            _: &str,
+            _: &str,
+            date: chrono::NaiveDate,
+        ) -> wealthfolio_core::Result<Decimal> {
+            self.dates.lock().unwrap().push(date);
+            Ok(amount)
+        }
+        fn get_latest_exchange_rates(
+            &self,
+        ) -> wealthfolio_core::Result<Vec<wealthfolio_core::fx::ExchangeRate>> {
+            Ok(vec![])
+        }
+        async fn add_exchange_rate(
+            &self,
+            _: wealthfolio_core::fx::NewExchangeRate,
+        ) -> wealthfolio_core::Result<wealthfolio_core::fx::ExchangeRate> {
+            unimplemented!("read-only")
+        }
+        async fn update_exchange_rate(
+            &self,
+            _: &str,
+            _: &str,
+            _: Decimal,
+        ) -> wealthfolio_core::Result<wealthfolio_core::fx::ExchangeRate> {
+            unimplemented!("read-only")
+        }
+        async fn delete_exchange_rate(&self, _: &str) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn register_currency_pair(&self, _: &str, _: &str) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn register_currency_pair_manual(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn ensure_fx_pairs(&self, _: Vec<(String, String)>) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// FX stub keyed by source currency. A currency absent from the map has no
+    /// rate at all, which is the only way `convert` fails once the real service
+    /// has exhausted its nearest-date and latest-rate fallbacks.
+    struct MockFx {
+        rates: HashMap<String, Decimal>,
+    }
+
+    impl MockFx {
+        fn none() -> Arc<Self> {
+            Arc::new(Self {
+                rates: HashMap::new(),
+            })
+        }
+
+        fn with(pairs: &[(&str, i64, u32)]) -> Arc<Self> {
+            Arc::new(Self {
+                rates: pairs
+                    .iter()
+                    .map(|(currency, mantissa, scale)| {
+                        (currency.to_string(), Decimal::new(*mantissa, *scale))
+                    })
+                    .collect(),
+            })
+        }
+
+        fn rate(&self, from: &str) -> wealthfolio_core::Result<Decimal> {
+            self.rates.get(from).copied().ok_or_else(|| {
+                wealthfolio_core::errors::Error::Validation(
+                    wealthfolio_core::errors::ValidationError::InvalidInput(format!(
+                        "no rate for {from}"
+                    )),
+                )
+            })
+        }
+    }
+
+    #[async_trait]
+    impl wealthfolio_core::fx::FxServiceTrait for MockFx {
+        fn initialize(&self) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        fn get_historical_rates(
+            &self,
+            _: &str,
+            _: &str,
+            _: i64,
+        ) -> wealthfolio_core::Result<Vec<wealthfolio_core::fx::ExchangeRate>> {
+            Ok(vec![])
+        }
+        fn get_latest_exchange_rate(
+            &self,
+            from: &str,
+            _: &str,
+        ) -> wealthfolio_core::Result<Decimal> {
+            self.rate(from)
+        }
+        fn get_exchange_rate_for_date(
+            &self,
+            from: &str,
+            _: &str,
+            _: chrono::NaiveDate,
+        ) -> wealthfolio_core::Result<Decimal> {
+            self.rate(from)
+        }
+        fn convert_currency(
+            &self,
+            amount: Decimal,
+            from: &str,
+            _: &str,
+        ) -> wealthfolio_core::Result<Decimal> {
+            Ok(amount * self.rate(from)?)
+        }
+        fn convert_currency_for_date(
+            &self,
+            amount: Decimal,
+            from: &str,
+            _: &str,
+            _: chrono::NaiveDate,
+        ) -> wealthfolio_core::Result<Decimal> {
+            Ok(amount * self.rate(from)?)
+        }
+        fn get_latest_exchange_rates(
+            &self,
+        ) -> wealthfolio_core::Result<Vec<wealthfolio_core::fx::ExchangeRate>> {
+            Ok(vec![])
+        }
+        async fn add_exchange_rate(
+            &self,
+            _: wealthfolio_core::fx::NewExchangeRate,
+        ) -> wealthfolio_core::Result<wealthfolio_core::fx::ExchangeRate> {
+            unimplemented!("MockFx is read-only")
+        }
+        async fn update_exchange_rate(
+            &self,
+            _: &str,
+            _: &str,
+            _: Decimal,
+        ) -> wealthfolio_core::Result<wealthfolio_core::fx::ExchangeRate> {
+            unimplemented!("MockFx is read-only")
+        }
+        async fn delete_exchange_rate(&self, _: &str) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn register_currency_pair(&self, _: &str, _: &str) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn register_currency_pair_manual(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+        async fn ensure_fx_pairs(&self, _: Vec<(String, String)>) -> wealthfolio_core::Result<()> {
+            Ok(())
+        }
+    }
+
     fn make_service(
         activity: Activity,
     ) -> (
@@ -1626,9 +2064,28 @@ mod tests {
         Arc<MockAssignmentRepo>,
         Arc<MockSplitRepo>,
     ) {
-        let activity_repo = Arc::new(MockActivityRepo {
-            activities: vec![activity],
-        });
+        make_service_with_fx(vec![activity], MockFx::none())
+    }
+
+    fn make_service_with(
+        activities: Vec<Activity>,
+    ) -> (
+        CashActivityService,
+        Arc<MockAssignmentRepo>,
+        Arc<MockSplitRepo>,
+    ) {
+        make_service_with_fx(activities, MockFx::none())
+    }
+
+    fn make_service_with_fx(
+        activities: Vec<Activity>,
+        fx: Arc<dyn wealthfolio_core::fx::FxServiceTrait>,
+    ) -> (
+        CashActivityService,
+        Arc<MockAssignmentRepo>,
+        Arc<MockSplitRepo>,
+    ) {
+        let activity_repo = Arc::new(MockActivityRepo { activities });
         let account_repo = Arc::new(MockAccountRepo {
             account: account(account_types::CASH),
         });
@@ -1655,8 +2112,484 @@ mod tests {
             split_repo.clone(),
             activity_events,
             events,
+            fx,
         );
         (service, assignment_repo, split_repo)
+    }
+
+    async fn search_net(service: &CashActivityService, base: Option<&str>) -> NetSummary {
+        service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                base,
+                "UTC",
+            )
+            .await
+            .unwrap()
+            .net
+            .unwrap()
+    }
+
+    /// Distinct ids keep the repo's rows separable; amounts drive the nets.
+    fn cash_row(id: &str, activity_type: &str, amount: i64, currency: &str) -> Activity {
+        Activity {
+            id: id.to_string(),
+            amount: Some(Decimal::new(amount, 0)),
+            currency: currency.to_string(),
+            ..activity(activity_type)
+        }
+    }
+
+    #[tokio::test]
+    async fn search_nets_the_filtered_set_in_its_own_currency() {
+        let (service, _, _) = make_service_with(vec![
+            cash_row("a", "DEPOSIT", 1000, "USD"),
+            cash_row("b", "WITHDRAWAL", 400, "USD"),
+        ]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.net.clone().unwrap().by_currency,
+            vec![CurrencyNet {
+                currency: "USD".to_string(),
+                amount: 600.0,
+            }]
+        );
+    }
+
+    /// The reported case: a transfer filter used to answer with nothing,
+    /// because transfers were treated as neither income nor expense.
+    #[tokio::test]
+    async fn search_nets_transfers_by_direction() {
+        let (service, _, _) = make_service_with(vec![
+            cash_row("a", "TRANSFER_IN", 900, "USD"),
+            cash_row("b", "TRANSFER_OUT", 250, "USD"),
+        ]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.net.clone().unwrap().by_currency,
+            vec![CurrencyNet {
+                currency: "USD".to_string(),
+                amount: 650.0,
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn search_reports_each_currency_separately_without_converting() {
+        let (service, _, _) = make_service_with(vec![
+            cash_row("a", "WITHDRAWAL", 60, "USD"),
+            cash_row("b", "DEPOSIT", 100, "EUR"),
+            cash_row("c", "WITHDRAWAL", 40, "EUR"),
+        ]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        let mut nets = response.net.unwrap().by_currency;
+        nets.sort_by(|a, b| a.currency.cmp(&b.currency));
+        assert_eq!(
+            nets,
+            vec![
+                CurrencyNet {
+                    currency: "EUR".to_string(),
+                    amount: 60.0,
+                },
+                CurrencyNet {
+                    currency: "USD".to_string(),
+                    amount: -60.0,
+                },
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn search_excludes_unposted_rows_from_the_net_and_the_row_figure() {
+        let mut draft = cash_row("a", "WITHDRAWAL", 500, "USD");
+        draft.status = ActivityStatus::Draft;
+        let (service, _, _) =
+            make_service_with(vec![draft, cash_row("b", "WITHDRAWAL", 60, "USD")]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.net.clone().unwrap().by_currency,
+            vec![CurrencyNet {
+                currency: "USD".to_string(),
+                amount: -60.0,
+            }]
+        );
+        let drafted = response
+            .items
+            .iter()
+            .find(|i| i.activity.id == "a")
+            .unwrap();
+        assert_eq!(drafted.net_amount, 0.0);
+    }
+
+    /// A single currency already is the total, so converting it would only add
+    /// FX drift to a figure that has an exact answer.
+    /// The rate actually applied to the transaction beats a market lookup — but
+    /// only when the account is denominated in the base currency, since that is
+    /// what the stored rate converts into.
+    #[tokio::test]
+    async fn search_prefers_a_rate_stored_on_the_activity() {
+        let mut row = cash_row("a", "WITHDRAWAL", 60, "EUR");
+        row.fx_rate = Some(Decimal::new(15, 1));
+        // The lookup would say 2.0; the stored rate says 1.5 and must win.
+        let (service, _, _) = make_service_with_fx(vec![row], MockFx::with(&[("EUR", 2, 0)]));
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                // MockAccountRepo's account is USD, matching the base currency.
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.items[0].net_amount_base, Some(-90.0));
+    }
+
+    #[tokio::test]
+    async fn search_ignores_a_zero_stored_rate() {
+        let mut row = cash_row("a", "WITHDRAWAL", 60, "EUR");
+        row.fx_rate = Some(Decimal::ZERO);
+        let (service, _, _) = make_service_with_fx(vec![row], MockFx::with(&[("EUR", 2, 0)]));
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.items[0].net_amount_base, Some(-120.0));
+    }
+
+    #[tokio::test]
+    async fn search_withholds_a_converted_net_when_one_currency_contributes() {
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                cash_row("a", "WITHDRAWAL", 60, "EUR"),
+                cash_row("b", "WITHDRAWAL", 40, "EUR"),
+            ],
+            MockFx::with(&[("EUR", 11, 1)]),
+        );
+
+        let net = search_net(&service, Some("USD")).await;
+
+        assert_eq!(net.by_currency.len(), 1);
+        assert!(net.converted.is_none());
+    }
+
+    #[tokio::test]
+    async fn search_converts_a_mixed_set_at_each_row_own_date() {
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                cash_row("a", "WITHDRAWAL", 60, "USD"),
+                cash_row("b", "WITHDRAWAL", 40, "EUR"),
+            ],
+            // USD is the base, so it passes through untouched; EUR doubles.
+            MockFx::with(&[("USD", 1, 0), ("EUR", 2, 0)]),
+        );
+
+        let net = search_net(&service, Some("USD")).await;
+
+        assert_eq!(
+            net.converted,
+            Some(CurrencyNet {
+                currency: "USD".to_string(),
+                amount: -140.0,
+            })
+        );
+        assert_eq!(net.by_currency.len(), 2);
+    }
+
+    /// The total would silently omit the unconvertible rows, so it is withheld
+    /// rather than reported short.
+    #[tokio::test]
+    async fn search_withholds_a_converted_net_when_a_currency_has_no_rate() {
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                cash_row("a", "WITHDRAWAL", 60, "USD"),
+                cash_row("b", "WITHDRAWAL", 40, "JPY"),
+            ],
+            MockFx::with(&[("USD", 1, 0)]),
+        );
+
+        let net = search_net(&service, Some("USD")).await;
+
+        assert!(net.converted.is_none());
+        assert_eq!(net.by_currency.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn search_omits_row_conversions_when_no_base_currency_is_asked_for() {
+        let (service, _, _) = make_service_with_fx(
+            vec![cash_row("a", "WITHDRAWAL", 60, "EUR")],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.items[0].net_amount, -60.0);
+        assert!(response.items[0].net_amount_base.is_none());
+    }
+
+    #[tokio::test]
+    async fn search_converts_each_row_into_the_base_currency() {
+        let (service, _, _) = make_service_with_fx(
+            vec![cash_row("a", "WITHDRAWAL", 60, "EUR")],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                Some("USD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.items[0].net_amount, -60.0);
+        assert_eq!(response.items[0].net_amount_base, Some(-120.0));
+    }
+
+    /// A currency whose rows cancel out is absent from the breakdown, so its
+    /// per-date conversion residual must not leak into the headline either.
+    #[tokio::test]
+    async fn search_keeps_a_cancelled_currency_out_of_the_converted_total() {
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                cash_row("a", "TRANSFER_IN", 900, "CAD"),
+                cash_row("b", "TRANSFER_OUT", 900, "CAD"),
+                cash_row("c", "WITHDRAWAL", 60, "USD"),
+                cash_row("d", "WITHDRAWAL", 40, "EUR"),
+            ],
+            MockFx::with(&[("CAD", 5, 1), ("USD", 1, 0), ("EUR", 2, 0)]),
+        );
+
+        let net = search_net(&service, Some("USD")).await;
+
+        // CAD nets to zero and is not reported, so only USD and EUR count.
+        assert_eq!(net.by_currency.len(), 2);
+        assert_eq!(
+            net.converted,
+            Some(CurrencyNet {
+                currency: "USD".to_string(),
+                amount: -140.0,
+            })
+        );
+    }
+
+    /// A currency that cannot convert but contributes nothing must not block a
+    /// headline the remaining currencies can support.
+    #[tokio::test]
+    async fn search_converts_despite_an_unrated_currency_that_cancels_out() {
+        let (service, _, _) = make_service_with_fx(
+            vec![
+                cash_row("a", "TRANSFER_IN", 900, "JPY"),
+                cash_row("b", "TRANSFER_OUT", 900, "JPY"),
+                cash_row("c", "WITHDRAWAL", 60, "USD"),
+                cash_row("d", "WITHDRAWAL", 40, "EUR"),
+            ],
+            MockFx::with(&[("USD", 1, 0), ("EUR", 2, 0)]),
+        );
+
+        let net = search_net(&service, Some("USD")).await;
+
+        assert_eq!(
+            net.converted,
+            Some(CurrencyNet {
+                currency: "USD".to_string(),
+                amount: -140.0,
+            })
+        );
+    }
+
+    /// The client labels `net_amount_base` with this, rather than its own
+    /// setting, so a cached response cannot be relabelled by a later change.
+    #[tokio::test]
+    async fn search_reports_the_currency_it_converted_into() {
+        let (service, _, _) = make_service_with_fx(
+            vec![cash_row("a", "WITHDRAWAL", 60, "EUR")],
+            MockFx::with(&[("EUR", 2, 0)]),
+        );
+
+        let converted = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                Some("CAD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+        assert_eq!(converted.base_currency.as_deref(), Some("CAD"));
+
+        let unconverted = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+        assert!(unconverted.base_currency.is_none());
+    }
+
+    /// The row is displayed under its local day and the holdings engine values
+    /// it on that day, so the rate must be picked for the same one. Taking the
+    /// UTC date instead priced anything either side of midnight a day out.
+    #[tokio::test]
+    async fn search_dates_the_rate_in_the_user_timezone() {
+        // 02:00 UTC on Jun 7 is still Jun 6 in New York.
+        let mut row = cash_row("a", "WITHDRAWAL", 60, "EUR");
+        row.activity_date = DateTime::parse_from_rfc3339("2026-06-07T02:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let fx = Arc::new(DateCapturingFx::default());
+        let (service, _, _) = make_service_with_fx(vec![row], fx.clone());
+
+        service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                Some("USD"),
+                "America/New_York",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *fx.dates.lock().unwrap().first().unwrap(),
+            NaiveDate::from_ymd_opt(2026, 6, 6).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn search_nets_only_on_the_first_page() {
+        let (service, _, _) = make_service_with(vec![
+            cash_row("a", "WITHDRAWAL", 60, "USD"),
+            cash_row("b", "WITHDRAWAL", 40, "USD"),
+        ]);
+
+        let later_page = service
+            .search(
+                CashActivitySearchRequest {
+                    offset: 1,
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert!(later_page.net.is_none());
+    }
+
+    #[tokio::test]
+    async fn search_signs_each_row_so_the_rows_add_up_to_the_net() {
+        let (service, _, _) = make_service_with(vec![
+            cash_row("a", "DEPOSIT", 1000, "USD"),
+            cash_row("b", "WITHDRAWAL", 400, "USD"),
+            cash_row("c", "TRANSFER_OUT", 250, "USD"),
+        ]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        let summed: f64 = response.items.iter().map(|i| i.net_amount).sum();
+        let net = response.net.clone().unwrap().by_currency[0].amount;
+        assert_eq!(summed, net);
+        assert_eq!(summed, 350.0);
     }
 
     #[test]

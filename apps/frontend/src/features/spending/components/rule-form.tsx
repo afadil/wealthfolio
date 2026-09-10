@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui";
 
-import type { CategorizationRule, RuleMatchType } from "../types/rule";
+import type { CategorizationRule, RuleAmountOp, RuleMatchType } from "../types/rule";
 import { QuickCategorizePopover } from "./quick-categorize-popover";
 
 export interface RuleFormValues {
@@ -32,10 +32,99 @@ export interface RuleFormValues {
   taxonomyId?: string;
   categoryId?: string;
   activityType?: string;
+  /** "" = no amount condition ("Any amount"). */
+  amountOp: "" | RuleAmountOp;
+  /** Raw input strings; converted to numbers by the save handler. */
+  amountValue: string;
+  amountValue2: string;
   priority: number;
   /** null applies the rule to every account; a value scopes it to that account. */
   accountId: string | null;
 }
+
+const parseAmount = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** Map form amount values to the wire payload. "" ("Any amount") sends
+ * explicit nulls so an existing condition is cleared on update. */
+export function ruleAmountPayload(
+  values: Pick<RuleFormValues, "amountOp" | "amountValue" | "amountValue2">,
+): {
+  amountOp: RuleAmountOp | null;
+  amountValue: number | null;
+  amountValue2: number | null;
+} {
+  const amountOp = values.amountOp || null;
+  return {
+    amountOp,
+    amountValue: amountOp ? parseAmount(values.amountValue) : null,
+    amountValue2: amountOp === "between" ? parseAmount(values.amountValue2) : null,
+  };
+}
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+export const buildRuleFormSchema = (t: Translate) =>
+  z
+    .object({
+      name: z.string().min(1, t("spending:rules.nameRequired")),
+      pattern: z.string().min(1, t("spending:rules.patternRequired")),
+      matchType: z.enum(["contains", "starts_with", "exact", "regex"]),
+      taxonomyId: z.string().optional(),
+      categoryId: z.string().optional(),
+      activityType: z.string().optional(),
+      amountOp: z.enum(["", "eq", "gt", "gte", "lt", "lte", "between"]),
+      amountValue: z.string(),
+      amountValue2: z.string(),
+      priority: z.coerce.number().int().min(0),
+      accountId: z.string().nullable(),
+    })
+    .refine((data) => data.categoryId || data.activityType, {
+      message: t("spending:rules.categoryOrTypeRequired"),
+      path: ["categoryId"],
+    })
+    .superRefine((data, ctx) => {
+      if (!data.amountOp) return;
+      const value = parseAmount(data.amountValue);
+      if (value === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("spending:rules.amountValueRequired"),
+          path: ["amountValue"],
+        });
+      } else if (value < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("spending:rules.amountValueInvalid"),
+          path: ["amountValue"],
+        });
+      }
+      if (data.amountOp !== "between") return;
+      const value2 = parseAmount(data.amountValue2);
+      if (value2 === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("spending:rules.amountValueRequired"),
+          path: ["amountValue2"],
+        });
+      } else if (value2 < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("spending:rules.amountValueInvalid"),
+          path: ["amountValue2"],
+        });
+      } else if (value !== null && value >= 0 && value > value2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t("spending:rules.amountFromToError"),
+          path: ["amountValue2"],
+        });
+      }
+    });
 
 export interface RuleFormCategoryOption {
   /** Composite "<taxonomyId>:<categoryId>" so the form can encode both. */
@@ -81,23 +170,17 @@ export function RuleForm({
 }: RuleFormProps) {
   const { t } = useTranslation();
 
-  const ruleFormSchema = useMemo(
-    () =>
-      z
-        .object({
-          name: z.string().min(1, t("spending:rules.nameRequired")),
-          pattern: z.string().min(1, t("spending:rules.patternRequired")),
-          matchType: z.enum(["contains", "starts_with", "exact", "regex"]),
-          taxonomyId: z.string().optional(),
-          categoryId: z.string().optional(),
-          activityType: z.string().optional(),
-          priority: z.coerce.number().int().min(0),
-          accountId: z.string().nullable(),
-        })
-        .refine((data) => data.categoryId || data.activityType, {
-          message: t("spending:rules.categoryOrTypeRequired"),
-          path: ["categoryId"],
-        }),
+  const ruleFormSchema = useMemo(() => buildRuleFormSchema(t), [t]);
+
+  const AMOUNT_OP_OPTIONS = useMemo<{ value: RuleAmountOp; label: string }[]>(
+    () => [
+      { value: "eq", label: t("spending:rules.amountExactly") },
+      { value: "gt", label: t("spending:rules.amountGreaterThan") },
+      { value: "gte", label: t("spending:rules.amountGreaterOrEqual") },
+      { value: "lt", label: t("spending:rules.amountLessThan") },
+      { value: "lte", label: t("spending:rules.amountLessOrEqual") },
+      { value: "between", label: t("spending:rules.amountBetween") },
+    ],
     [t],
   );
 
@@ -135,10 +218,15 @@ export function RuleForm({
       taxonomyId: rule?.taxonomyId ?? "",
       categoryId: composite(rule), // we encode taxonomyId:categoryId in this single field
       activityType: rule?.activityType ?? "",
+      amountOp: rule?.amountOp ?? "",
+      amountValue: rule?.amountValue != null ? String(rule.amountValue) : "",
+      amountValue2: rule?.amountValue2 != null ? String(rule.amountValue2) : "",
       priority: rule?.priority ?? 0,
       accountId: rule && !rule.isGlobal ? (rule.accountId ?? null) : null,
     },
   });
+
+  const amountOp = form.watch("amountOp");
 
   // A rule can reference an account that is no longer tracked (or is archived and
   // so absent from accountOptions). Keep it in the list so the trigger isn't blank
@@ -327,6 +415,98 @@ export function RuleForm({
               );
             }}
           />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-1.5">
+            <FormLabel>{t("spending:rules.amountLabel")}</FormLabel>
+            <span className="text-muted-foreground text-xs">
+              {t("spending:rules.amountOptional")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control as never}
+              name="amountOp"
+              render={({ field }) => (
+                <FormItem>
+                  <Select
+                    onValueChange={(val) => field.onChange(val === NONE ? "" : val)}
+                    value={field.value || NONE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NONE}>{t("spending:rules.amountAnyAmount")}</SelectItem>
+                      {AMOUNT_OP_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {amountOp && amountOp !== "between" && (
+              <FormField
+                control={form.control as never}
+                name="amountValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input type="number" min={0} step="any" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+          {amountOp === "between" && (
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control as never}
+                name="amountValue"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground text-xs font-normal">
+                      {t("spending:rules.amountFrom")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step="any" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control as never}
+                name="amountValue2"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-muted-foreground text-xs font-normal">
+                      {t("spending:rules.amountTo")}
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="number" min={0} step="any" inputMode="decimal" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+          {amountOp && (
+            <FormDescription>
+              {t("spending:rules.amountHint")}
+              {amountOp === "between" ? ` ${t("spending:rules.amountBetweenHint")}` : ""}
+            </FormDescription>
+          )}
         </div>
 
         <FormField

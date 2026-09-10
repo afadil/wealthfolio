@@ -99,6 +99,27 @@ export function RuleItem({
   const activityTypeLabel = rule.activityType
     ? (ACTIVITY_TYPE_LABELS[rule.activityType] ?? rule.activityType)
     : null;
+  const formatAmount = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 20 });
+  const amountLabel =
+    rule.amountOp && rule.amountValue != null
+      ? rule.amountOp === "between"
+        ? rule.amountValue2 != null
+          ? t("spending:rules.amountChipBetween", {
+              value: formatAmount(rule.amountValue),
+              value2: formatAmount(rule.amountValue2),
+            })
+          : null
+        : t(
+            {
+              eq: "spending:rules.amountChipEq",
+              gt: "spending:rules.amountChipGt",
+              gte: "spending:rules.amountChipGte",
+              lt: "spending:rules.amountChipLt",
+              lte: "spending:rules.amountChipLte",
+            }[rule.amountOp],
+            { value: formatAmount(rule.amountValue) },
+          )
+      : null;
   const matchLabel = MATCH_TYPE_LABELS[rule.matchType] ?? rule.matchType;
   const preset = rule.presetId ? (presetMeta?.[rule.presetId] ?? null) : null;
   const presetBadgeTitle = preset
@@ -180,6 +201,14 @@ export function RuleItem({
               {rule.pattern}
             </code>
           </button>
+
+          {/* Line 3: amount condition, spelled out in words */}
+          {amountLabel && (
+            <span className="border-border text-muted-foreground inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]">
+              <Icons.Coins className="h-3 w-3 shrink-0" aria-hidden="true" />
+              {amountLabel}
+            </span>
+          )}
         </div>
 
         {/* Right: target chip + actions */}

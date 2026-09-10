@@ -4,6 +4,7 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use wealthfolio_core::accounts::account_types;
 use wealthfolio_core::activities::Activity;
+use wealthfolio_core::portfolio::economic_events::ActivityEconomicsResolver;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SpendingClassification {
@@ -135,6 +136,31 @@ pub(crate) fn activity_abs_amount(activity: &Activity) -> Decimal {
 
 pub(crate) fn decimal_to_f64(amount: Decimal) -> f64 {
     amount.to_f64().unwrap_or(0.0)
+}
+
+/// Signed cash movement for one row, in its own currency. Positive is money
+/// entering the account, negative money leaving.
+///
+/// Delegates to the resolver the holdings engine uses to build account cash
+/// balances, rather than mapping activity types to signs a second time here:
+/// that keeps this list in agreement with the account page by construction, and
+/// picks up the cases a hand-rolled table gets wrong — credit-card interest is a
+/// charge rather than income, and a row that is not posted has not moved money
+/// at all.
+pub(crate) fn net_amount(activity: &Activity, account_types: &HashMap<String, String>) -> Decimal {
+    if !activity.is_posted() {
+        return Decimal::ZERO;
+    }
+    let is_credit_card = account_types
+        .get(&activity.account_id)
+        .is_some_and(|account_type| account_type == account_types::CREDIT_CARD);
+    ActivityEconomicsResolver::resolve_cash_with_account_context(
+        activity,
+        Decimal::ONE,
+        is_credit_card,
+    )
+    .signed_cash_effect
+    .unwrap_or(Decimal::ZERO)
 }
 
 #[cfg(test)]

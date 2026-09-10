@@ -13,6 +13,7 @@
   "map_to": "Zuordnen zu...",
   "search_all_currencies": "Alle Währungen durchsuchen...",
   "loading": "Wird geladen...",
+  "load_more": "Mehr laden",
   "error": "Fehler",
   "cancel": "Abbrechen",
   "save": "Speichern",
@@ -363,5 +364,6 @@
   "navStyle": {
     "sidebar": "Seitenleiste",
     "floating": "Schwebeleiste"
-  }
+  },
+  "allocation_other_in_category": "Sonstige ({{category}})"
 }

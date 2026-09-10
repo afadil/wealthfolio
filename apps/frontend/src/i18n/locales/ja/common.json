@@ -2,6 +2,7 @@
   "app_name": "Wealthfolio",
   "welcome": "ようこそ",
   "loading": "読み込み中...",
+  "load_more": "さらに読み込む...",
   "error": "エラー",
   "success": "成功",
   "cancel": "キャンセル",
@@ -354,5 +355,6 @@
   "navStyle": {
     "sidebar": "サイドバー",
     "floating": "フローティングバー"
-  }
+  },
+  "allocation_other_in_category": "その他の{{category}}"
 }

@@ -1,5 +1,5 @@
 // Exchange Rates Commands
-import type { ExchangeRate } from "@/lib/types";
+import type { ExchangeRate, ExchangeRateDateQuery, ExchangeRateDateResult } from "@/lib/types";
 
 import { invoke, logger } from "./platform";
 
@@ -8,6 +8,19 @@ export const getExchangeRates = async (): Promise<ExchangeRate[]> => {
     return await invoke<ExchangeRate[]>("get_latest_exchange_rates");
   } catch (err) {
     logger.error("Error fetching exchange rates.");
+    throw err;
+  }
+};
+
+export const getExchangeRatesForDates = async (
+  pairs: ExchangeRateDateQuery[],
+): Promise<ExchangeRateDateResult[]> => {
+  try {
+    return await invoke<ExchangeRateDateResult[]>("get_exchange_rates_for_dates", {
+      request: { pairs },
+    });
+  } catch (err) {
+    logger.error("Error fetching historical exchange rates.");
     throw err;
   }
 };

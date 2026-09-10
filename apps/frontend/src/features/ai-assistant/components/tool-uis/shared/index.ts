@@ -9,6 +9,7 @@ export {
   formatActivityDate,
   createActivityAmountFormatter,
   createActivityQuantityFormatter,
+  estimateDraftAmount,
   formatActivityAmount,
   formatActivityQuantity,
 } from "./activity-table-utils";

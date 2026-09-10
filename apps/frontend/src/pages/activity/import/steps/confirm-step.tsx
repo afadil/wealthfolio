@@ -19,6 +19,7 @@ import { ImportAlert } from "../components/import-alert";
 import { createAsset } from "@/adapters";
 import { draftToActivityImport } from "../utils/draft-utils";
 import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
+import type { ActivityType } from "@/lib/constants";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -34,6 +35,12 @@ interface ImportSummary {
   warnings: number;
   byType: Record<string, number>;
   bySkipReason: Record<string, number>;
+}
+
+interface ActivityTypeDisplayConfig {
+  labelKey: string;
+  icon: Icon;
+  color: string;
 }
 
 function hasDuplicateWarning(draft: DraftActivity): boolean {
@@ -114,7 +121,7 @@ function computeSummary(draftActivities: DraftActivity[]): ImportSummary {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ACTIVITY_TYPE_CONFIG: Record<string, { labelKey: string; icon: Icon; color: string }> = {
+const ACTIVITY_TYPE_CONFIG: Record<ActivityType, ActivityTypeDisplayConfig> = {
   BUY: {
     labelKey: "activity:import.confirm.typeBuy",
     icon: Icons.TrendingUp,
@@ -170,12 +177,26 @@ const ACTIVITY_TYPE_CONFIG: Record<string, { labelKey: string; icon: Icon; color
     icon: Icons.Split,
     color: "text-purple-600 dark:text-purple-400",
   },
+  CREDIT: {
+    labelKey: "activity:type_credit",
+    icon: Icons.RefreshCw,
+    color: "text-emerald-600 dark:text-emerald-400",
+  },
+  ADJUSTMENT: {
+    labelKey: "activity:type_adjustment",
+    icon: Icons.RefreshCw,
+    color: "text-purple-600 dark:text-purple-400",
+  },
   UNKNOWN: {
     labelKey: "activity:import.confirm.typeUnknown",
     icon: Icons.HelpCircle,
     color: "text-muted-foreground",
   },
 };
+
+function getActivityTypeConfig(type: string) {
+  return ACTIVITY_TYPE_CONFIG[type as ActivityType] ?? ACTIVITY_TYPE_CONFIG.UNKNOWN;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
@@ -476,7 +497,7 @@ export function ConfirmStep() {
               {Object.entries(summary.byType)
                 .sort((a, b) => b[1] - a[1])
                 .map(([type, count]) => {
-                  const config = ACTIVITY_TYPE_CONFIG[type] ?? ACTIVITY_TYPE_CONFIG.UNKNOWN;
+                  const config = getActivityTypeConfig(type);
                   const IconComponent = config.icon;
                   return (
                     <div

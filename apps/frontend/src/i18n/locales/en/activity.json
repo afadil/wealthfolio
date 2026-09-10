@@ -1,4 +1,10 @@
 {
+  "needs_review_alert": {
+    "title_one": "{{count}} activity needs review",
+    "title_other": "{{count}} activities need review",
+    "description": "Confirm each transaction's asset, type, and final amount.",
+    "action": "Review"
+  },
   "activities": "Activities",
   "add_activity": "Add Activity",
   "add_holdings": "Add Holdings",
@@ -129,7 +135,6 @@
   "duplicate": "Duplicate",
   "delete": "Delete",
   "loading": "Loading…",
-  "load_more": "Load more...",
   "search_placeholder": "Search...",
   "clear_search": "Clear search",
   "filter_account": "Account",
@@ -287,7 +292,7 @@
   "import_help_docs_activity_ref": "Activity Reference documentation",
   "import_help_how_to_title": "How to Import CSV?",
   "import_help_how_to_mobile": "How to Import CSV",
-  "pagination_count": "{{fetched}} / {{total}} activities",
+  "pagination_count": "{{fetched}}/{{total}} activities",
   "manager": {
     "add_to_account": "Add a new transaction to {{account}}",
     "create_transaction": "Create a new transaction or activity for your account",
@@ -340,7 +345,8 @@
     "status_all": "All Activities",
     "status_pending": "Pending Review",
     "status_validated": "Validated",
-    "instrument": "Instrument"
+    "instrument": "Instrument",
+    "instrument_all": "All Instruments"
   },
   "detail": {
     "status_posted": "Posted",
@@ -555,6 +561,9 @@
     "available_amount": "Available: {{amount}}",
     "total_debit": "Total Debit",
     "total_credit": "Total Credit",
+    "help_total_debit": "Final cash paid, including fees and taxes.",
+    "help_total_credit": "Final cash received, after fees and taxes.",
+    "use_calculated_total": "Use calculated total ({{amount}})",
     "warn_buy_while_short": "You currently have a short position in this stock. Use Buy to Cover to reduce it; enter a normal Buy only after the short position is closed.",
     "warn_cover_without_short": "Buy to Cover requires an existing short position for this stock in the selected account.",
     "warn_cover_quantity_excess": "You are covering {{covering}} shares, but the current short position is {{short}} shares. Enter any excess as a separate Buy activity.",
@@ -602,6 +611,7 @@
     "err_amount_number": "Amount must be a number.",
     "err_amount_positive_number": "Amount must be a positive number.",
     "err_amount_gt_zero": "Amount must be greater than 0.",
+    "err_amount_non_negative": "Amount must be non-negative.",
     "err_enter_quantity": "Please enter a quantity.",
     "err_quantity_number": "Quantity must be a number.",
     "err_quantity_gt_zero": "Quantity must be greater than 0.",
@@ -742,7 +752,10 @@
     "warn_dates_differ_one": "Dates differ by {{count}} day.",
     "warn_dates_differ_other": "Dates differ by {{count}} days.",
     "approve_count_one": "Approve {{count}}",
-    "approve_count_other": "Approve {{count}}"
+    "approve_count_other": "Approve {{count}}",
+    "approve_missing_amount_one": "{{count}} activity still needs a final cash amount",
+    "approve_missing_amount_other": "{{count}} activities still need final cash amounts",
+    "approve_missing_amount_description": "Enter the correct final cash amount for each blank or zero trade before approving it."
   },
   "table": {
     "cash": "Cash",
@@ -1200,7 +1213,9 @@
       "positionsCount_one": "{{count}} holding",
       "positionsCount_other": "{{count}} holdings",
       "readyRows_one": "{{count}} row",
-      "readyRows_other": "{{count}} rows"
+      "readyRows_other": "{{count}} rows",
+      "ambiguousDateTitle": "Date order is ambiguous",
+      "ambiguousDateHint": "Dates like {{example}} can be read as day/month or month/day, and nothing in this file settles it. Go back and choose a date format instead of Auto-detect."
     },
     "symbolPanel": {
       "unrecognized_one": "{{count}} unrecognized symbol",

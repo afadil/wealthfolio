@@ -195,6 +195,7 @@ export function useActivityMutations(
       const {
         assetId,
         currentAssetId,
+        clearAsset,
         exchangeMic,
         metadata,
         assetMetadata,
@@ -216,6 +217,7 @@ export function useActivityMutations(
         id: string;
         assetId?: string;
         currentAssetId?: string;
+        clearAsset?: boolean;
         exchangeMic?: string;
         metadata?: Record<string, unknown>;
         assetMetadata?: {
@@ -256,18 +258,20 @@ export function useActivityMutations(
         fee: toDecimalPayload(fee),
         tax: toDecimalPayload(tax),
         fxRate: toDecimalPayload(fxRate),
-        asset: buildActivityAssetInput({
-          assetId,
-          existingAssetId,
-          currentAssetId,
-          exchangeMic,
-          quoteMode,
-          assetKind,
-          assetMetadata,
-          symbolQuoteCcy,
-          symbolInstrumentType,
-          includeId: true,
-        }),
+        asset: clearAsset
+          ? {}
+          : buildActivityAssetInput({
+              assetId,
+              existingAssetId,
+              currentAssetId,
+              exchangeMic,
+              quoteMode,
+              assetKind,
+              assetMetadata,
+              symbolQuoteCcy,
+              symbolInstrumentType,
+              includeId: true,
+            }),
         // Serialize metadata object to JSON string for backend
         metadata: metadata ? JSON.stringify(metadata) : undefined,
       };

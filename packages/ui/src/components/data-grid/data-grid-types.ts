@@ -132,6 +132,10 @@ declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
     label?: string;
     helpText?: string;
+    /** Primitive dependency used to invalidate a memoized cell when display configuration changes. */
+    renderKey?: string | number | boolean;
+    /** Row-derived primitive used when a renderer depends on fields outside its accessor value. */
+    getRenderKey?: (rowData: TData) => string | number | boolean | null | undefined;
     cell?: CellOpts;
   }
 

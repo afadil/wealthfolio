@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useActivitySearch } from "./use-activity-search";
@@ -95,5 +95,30 @@ describe("useActivitySearch", () => {
       "",
       { id: "date", desc: true },
     );
+  });
+
+  it("exposes a next-page error without discarding the first page", async () => {
+    adapterMocks.searchActivities
+      .mockResolvedValueOnce({ data: [], meta: { totalRowCount: 100 } })
+      .mockRejectedValueOnce(new Error("page 2 failed"));
+
+    const { result } = renderHook(
+      () =>
+        useActivitySearch({
+          filters: { accountIds: undefined, activityTypes: [] },
+          searchQuery: "",
+          sorting: [],
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true));
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true));
+    expect(result.current.totalRowCount).toBe(100);
+    expect(result.current.hasNextPage).toBe(true);
   });
 });

@@ -452,14 +452,15 @@ impl RecordActivity {
             "none"
         };
 
-        // 6. Compute amount if not provided
-        let amount = compute_amount(
-            args.quantity,
-            args.unit_price,
-            args.fee,
-            args.tax,
-            args.amount,
-        );
+        // 6. The draft carries only an amount the caller explicitly stated.
+        // Trade/composite totals are deliberately NOT synthesized here: the
+        // activity service derives final cash at commit time from the
+        // resolved asset (SELL subtracts charges, options apply their
+        // contract multiplier), and a local qty x price + charges formula
+        // would drift from those semantics - then persist silently, because
+        // AI commits attest `needs_review: false`. UIs that want a preview
+        // compute one with the shared frontend mirror.
+        let amount = args.amount;
 
         // 7. Build draft
         // Use asset's currency for trading activities, otherwise use account currency
@@ -670,27 +671,6 @@ fn validate_draft(draft: &ActivityDraft) -> ValidationResult {
     }
 }
 
-/// Compute amount from quantity and unit_price if not provided.
-fn compute_amount(
-    quantity: Option<f64>,
-    unit_price: Option<f64>,
-    fee: Option<f64>,
-    tax: Option<f64>,
-    provided_amount: Option<f64>,
-) -> Option<f64> {
-    if let Some(amount) = provided_amount {
-        return Some(amount);
-    }
-
-    match (quantity, unit_price) {
-        (Some(qty), Some(price)) => {
-            let base = qty * price;
-            Some(base + fee.unwrap_or(0.0) + tax.unwrap_or(0.0))
-        }
-        _ => None,
-    }
-}
-
 #[async_trait::async_trait]
 impl AgentTool for RecordActivity {
     fn name(&self) -> &'static str {
@@ -760,34 +740,34 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_amount() {
-        // With quantity and price
-        assert_eq!(
-            compute_amount(Some(10.0), Some(100.0), None, None, None),
-            Some(1000.0)
-        );
-
-        // With fee
-        assert_eq!(
-            compute_amount(Some(10.0), Some(100.0), Some(5.0), None, None),
-            Some(1005.0)
-        );
-
-        // With fee and tax
-        assert_eq!(
-            compute_amount(Some(10.0), Some(100.0), Some(5.0), Some(2.0), None),
-            Some(1007.0)
-        );
-
-        // Provided amount takes precedence
-        assert_eq!(
-            compute_amount(Some(10.0), Some(100.0), None, None, Some(500.0)),
-            Some(500.0)
-        );
-
-        // Missing quantity or price
-        assert_eq!(compute_amount(Some(10.0), None, None, None, None), None);
-        assert_eq!(compute_amount(None, Some(100.0), None, None, None), None);
+    fn trade_draft_without_stated_amount_stays_valid() {
+        // A BUY draft with qty + price but no amount must validate: the
+        // total is derived canonically at commit, never synthesized in the
+        // draft (a local formula was wrong for SELL and blind to option
+        // multipliers).
+        let draft = ActivityDraft {
+            activity_type: "BUY".to_string(),
+            activity_date: "2024-01-15".to_string(),
+            symbol: Some("AAPL".to_string()),
+            asset_id: None,
+            asset_name: None,
+            quantity: Some(10.0),
+            unit_price: Some(100.0),
+            amount: None,
+            fee: Some(5.0),
+            tax: None,
+            currency: "USD".to_string(),
+            account_id: Some("acct-1".to_string()),
+            account_name: None,
+            subtype: None,
+            notes: None,
+            price_source: "user".to_string(),
+            pricing_mode: "MARKET".to_string(),
+            is_custom_asset: false,
+            asset_kind: None,
+        };
+        let validation = validate_draft(&draft);
+        assert!(validation.is_valid, "{:?}", validation);
     }
 
     #[test]

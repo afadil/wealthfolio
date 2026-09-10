@@ -26,6 +26,7 @@ interface ActivityDateSheetProps {
   endingCashBalance?: number;
   cashCurrency?: string;
   cashAuditTarget?: CashAuditReviewTarget;
+  isCreditCardAccount?: boolean;
 }
 
 export function ActivityDateSheet({
@@ -37,6 +38,7 @@ export function ActivityDateSheet({
   endingCashBalance,
   cashCurrency,
   cashAuditTarget,
+  isCreditCardAccount = false,
 }: ActivityDateSheetProps) {
   const { t } = useTranslation();
   const formatting = useDateFormatting();
@@ -64,6 +66,7 @@ export function ActivityDateSheet({
               endingCashBalance={endingCashBalance}
               cashCurrency={cashCurrency}
               cashAuditTarget={cashAuditTarget}
+              isCreditCardAccount={isCreditCardAccount}
             />
           )}
         </div>

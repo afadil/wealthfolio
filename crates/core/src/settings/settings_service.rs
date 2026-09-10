@@ -8,11 +8,44 @@ use log::{debug, error};
 use std::sync::Arc;
 
 const SUPPORTED_FORMATTING_REGIONS: &[&str] = &[
-    "system", "CA", "US", "GB", "FR", "DE", "ES", "MX", "CN", "JP", "KR",
+    "system", "CA", "US", "GB", "FR", "DE", "ES", "MX", "BR", "PT", "CN", "TW", "JP", "KR", "IT",
 ];
-const SUPPORTED_UI_LANGUAGES: &[&str] = &["en", "fr", "de", "es", "zh", "ja", "ko"];
+const SUPPORTED_UI_LANGUAGES: &[&str] = &[
+    "en", "fr", "de", "es", "pt", "zh", "zh-Hant", "ja", "ko", "it",
+];
+
+/// Traditional Chinese is written in Taiwan, Hong Kong and Macau. Match the
+/// script subtag (`Hant`) or any of those regions, so a bare `zh-HK` resolves
+/// the same way an explicit `zh-Hant-HK` already does.
+fn is_traditional_chinese_alias(language: &str) -> bool {
+    let mut parts = language.split(['-', '_']);
+    if !matches!(parts.next(), Some(part) if part.eq_ignore_ascii_case("zh")) {
+        return false;
+    }
+
+    let subtags: Vec<&str> = parts.collect();
+    // An explicit `Hans` script wins over a Traditional region, so `zh-Hans-TW`
+    // stays Simplified.
+    if subtags.iter().any(|part| part.eq_ignore_ascii_case("hans")) {
+        return false;
+    }
+
+    subtags.iter().any(|part| {
+        ["hant", "tw", "hk", "mo"]
+            .iter()
+            .any(|alias| part.eq_ignore_ascii_case(alias))
+    })
+}
 
 fn normalize_ui_language(language: &str) -> String {
+    if is_traditional_chinese_alias(language) {
+        return "zh-Hant".to_string();
+    }
+
+    if SUPPORTED_UI_LANGUAGES.contains(&language) {
+        return language.to_string();
+    }
+
     let base = language.split(['-', '_']).next().unwrap_or(language);
     if SUPPORTED_UI_LANGUAGES.contains(&base) {
         base.to_string()
@@ -22,6 +55,14 @@ fn normalize_ui_language(language: &str) -> String {
 }
 
 fn validate_ui_language(language: &str) -> Result<String> {
+    if is_traditional_chinese_alias(language) {
+        return Ok("zh-Hant".to_string());
+    }
+
+    if SUPPORTED_UI_LANGUAGES.contains(&language) {
+        return Ok(language.to_string());
+    }
+
     let base = language.split(['-', '_']).next().unwrap_or(language);
     if SUPPORTED_UI_LANGUAGES.contains(&base) {
         Ok(base.to_string())
@@ -230,6 +271,56 @@ mod tests {
     }
 
     #[test]
+    fn preserves_script_qualified_ui_language() {
+        assert_eq!(normalize_ui_language("zh-Hant"), "zh-Hant");
+        assert_eq!(validate_ui_language("zh-Hant").unwrap(), "zh-Hant");
+    }
+
+    #[test]
+    fn normalizes_traditional_chinese_aliases() {
+        // Taiwan, Hong Kong and Macau all write Traditional, with or without an
+        // explicit `Hant` subtag.
+        for language in [
+            "zh-Hant-TW",
+            "zh_TW",
+            "zh-Hant",
+            "ZH_hant_tw",
+            "zh-HK",
+            "zh-MO",
+            "zh_Hant_HK",
+        ] {
+            assert_eq!(normalize_ui_language(language), "zh-Hant", "{language}");
+            assert_eq!(
+                validate_ui_language(language).unwrap(),
+                "zh-Hant",
+                "{language}"
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_simplified_chinese_on_the_base_code() {
+        // An explicit `Hans` script wins over a Traditional region.
+        for language in [
+            "zh",
+            "zh-CN",
+            "zh_Hans_CN",
+            "zh-SG",
+            "zh-Hans",
+            "zh-Hans-TW",
+            "zh-Hans-HK",
+        ] {
+            assert_eq!(normalize_ui_language(language), "zh", "{language}");
+        }
+    }
+
+    #[test]
+    fn does_not_treat_a_traditional_region_on_another_language_as_chinese() {
+        assert_eq!(normalize_ui_language("en-HK"), "en");
+        assert_eq!(normalize_ui_language("pt-MO"), "pt");
+    }
+
+    #[test]
     fn falls_back_when_a_persisted_ui_language_is_invalid() {
         assert_eq!(normalize_ui_language("foo_bar"), "en");
     }
@@ -255,6 +346,8 @@ mod tests {
         assert!(validate_formatting_region("DE").is_ok());
         assert!(validate_formatting_region("JP").is_ok());
         assert!(validate_formatting_region("KR").is_ok());
+        assert!(validate_formatting_region("TW").is_ok());
+        assert!(validate_formatting_region("IT").is_ok());
         assert!(validate_formatting_region("de-DE").is_err());
     }
 }

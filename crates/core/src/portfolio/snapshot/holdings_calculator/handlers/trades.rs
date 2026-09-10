@@ -192,25 +192,14 @@ impl HoldingsCalculator {
             )?;
         }
 
-        let gross_cost = proportional_amount(
-            gross_trade_amount(activity, &asset_info),
+        let cash_effect = proportional_amount(
+            signed_cash_effect(activity, &asset_info),
             cash_quantity,
             quantity,
         );
-        let cash_fee = proportional_amount(activity.fee_amt(), cash_quantity, quantity);
-        let cash_tax = proportional_amount(activity.tax_amt(), cash_quantity, quantity);
-        let total_cost = gross_cost + cash_fee + cash_tax;
-        if activity_currency != account_currency {
-            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
-                // Broker converted at transaction time — book in account currency
-                add_cash(state, account_currency, -(total_cost * fx_rate));
-            } else {
-                // No fx_rate — book in activity currency (multi-currency account)
-                add_cash(state, activity_currency, -total_cost);
-            }
-        } else {
-            add_cash(state, activity_currency, -total_cost);
-        }
+        let (cash_currency, cash_effect) =
+            trade_cash_booking(activity, account_currency, cash_effect);
+        add_cash(state, &cash_currency, cash_effect);
 
         Ok(())
     }
@@ -290,19 +279,10 @@ impl HoldingsCalculator {
             }
         }
 
-        let total_proceeds =
-            gross_trade_amount(activity, &asset_info) - activity.fee_amt() - activity.tax_amt();
-        if activity_currency != account_currency {
-            if let Some(fx_rate) = activity.fx_rate.filter(|r| *r != Decimal::ZERO) {
-                // Broker converted at transaction time — book in account currency
-                add_cash(state, account_currency, total_proceeds * fx_rate);
-            } else {
-                // No fx_rate — book in activity currency (multi-currency account)
-                add_cash(state, activity_currency, total_proceeds);
-            }
-        } else {
-            add_cash(state, activity_currency, total_proceeds);
-        }
+        let total_proceeds = signed_cash_effect(activity, &asset_info);
+        let (cash_currency, cash_effect) =
+            trade_cash_booking(activity, account_currency, total_proceeds);
+        add_cash(state, &cash_currency, cash_effect);
 
         if asset_info.allows_negative_lots
             && (!asset_info.requires_explicit_short_intent || open_short_intent)

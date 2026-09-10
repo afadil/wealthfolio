@@ -7,6 +7,7 @@ import frHoldings from "@/i18n/locales/fr/holdings.json";
 import jaHoldings from "@/i18n/locales/ja/holdings.json";
 import koHoldings from "@/i18n/locales/ko/holdings.json";
 import zhHoldings from "@/i18n/locales/zh/holdings.json";
+import zhHantHoldings from "@/i18n/locales/zh-Hant/holdings.json";
 import { describe, expect, it } from "vitest";
 import {
   CASH_HOLDING_TYPE_KEY,
@@ -112,7 +113,15 @@ describe("holdings type filters", () => {
   it("defines the same system instrument types in every locale", () => {
     const englishKeys = Object.keys(enHoldings.instrument_types).sort();
 
-    for (const locale of [deHoldings, esHoldings, frHoldings, jaHoldings, koHoldings, zhHoldings]) {
+    for (const locale of [
+      deHoldings,
+      esHoldings,
+      frHoldings,
+      jaHoldings,
+      koHoldings,
+      zhHoldings,
+      zhHantHoldings,
+    ]) {
       expect(Object.keys(locale.instrument_types).sort()).toEqual(englishKeys);
     }
   });
@@ -128,6 +137,7 @@ describe("holdings type filters", () => {
       jaHoldings,
       koHoldings,
       zhHoldings,
+      zhHantHoldings,
     ]) {
       expect(locale.instrument_types.CASH).toBeTruthy();
       expect(locale.instrument_types.CASH).not.toBe(locale.cash);

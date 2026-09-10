@@ -6,6 +6,7 @@ import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import i18n from "i18next";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsMutation } from "./use-settings-mutation";
 
 vi.mock("@/adapters", () => ({
@@ -66,5 +67,82 @@ describe("useSettingsMutation", () => {
         description: "de:settings:settings_updated_description",
       }),
     );
+  });
+
+  /**
+   * Spending responses carry amounts the server converted into the base
+   * currency, so a change leaves every cached page denominated in the old one.
+   * Without this the transactions net kept reporting the previous currency's
+   * figures until some unrelated mutation happened to refetch.
+   */
+  it("refetches spending caches when the base currency changes", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      baseCurrency: "EUR",
+      onboardingCompleted: true,
+    } as Settings);
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSettingsMutation(vi.fn(), vi.fn()), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ baseCurrency: "EUR" });
+    });
+
+    const invalidated = invalidate.mock.calls.flatMap((call) => call[0]?.queryKey ?? []);
+    expect(invalidated).toContain(QueryKeys.SPENDING_TRANSACTIONS);
+  });
+
+  /**
+   * The server dates each conversion by the activity's day in the user's zone,
+   * so a row near midnight converts at a different rate once the zone moves.
+   * The timezone travels in no request and appears in no query key, so nothing
+   * else would evict the pages computed under the old one.
+   */
+  it("refetches spending caches when the timezone changes", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      timezone: "America/New_York",
+      onboardingCompleted: true,
+    } as Settings);
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSettingsMutation(vi.fn(), vi.fn()), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ timezone: "America/New_York" });
+    });
+
+    const invalidated = invalidate.mock.calls.flatMap((call) => call[0]?.queryKey ?? []);
+    expect(invalidated).toContain(QueryKeys.SPENDING_TRANSACTIONS);
+  });
+
+  it("leaves spending caches alone for an unrelated setting", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      onboardingCompleted: true,
+    } as Settings);
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSettingsMutation(vi.fn(), vi.fn()), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ theme: "dark" } as Partial<Settings>);
+    });
+
+    const invalidated = invalidate.mock.calls.flatMap((call) => call[0]?.queryKey ?? []);
+    expect(invalidated).not.toContain(QueryKeys.SPENDING_TRANSACTIONS);
   });
 });

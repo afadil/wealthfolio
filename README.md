@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/wealthfolio/wealthfolio">
-    <img src="apps/frontend/public/logo.svg" alt="Logo" width="80" height="80">
+    <img src="assets/brand/icon.png" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">Wealthfolio</h3>

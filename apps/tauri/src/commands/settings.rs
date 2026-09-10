@@ -4,7 +4,9 @@ use crate::context::ServiceContext;
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
 use tauri::{AppHandle, State};
-use wealthfolio_core::fx::{ExchangeRate, NewExchangeRate};
+use wealthfolio_core::fx::{
+    ExchangeRate, ExchangeRateDateBatchRequest, ExchangeRateDateResult, NewExchangeRate,
+};
 use wealthfolio_core::health::HealthServiceTrait;
 use wealthfolio_core::quotes::{MarketSyncMode, DATA_SOURCE_MANUAL};
 use wealthfolio_core::settings::{Settings, SettingsUpdate};
@@ -163,6 +165,17 @@ pub async fn get_latest_exchange_rates(
         .fx_service()
         .get_latest_exchange_rates()
         .map_err(|e| format!("Failed to load exchange rates: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_exchange_rates_for_dates(
+    request: ExchangeRateDateBatchRequest,
+    state: State<'_, Arc<ServiceContext>>,
+) -> Result<Vec<ExchangeRateDateResult>, String> {
+    debug!("Fetching historical exchange rates for dates...");
+    Ok(state
+        .fx_service()
+        .get_exchange_rates_for_dates(request.pairs))
 }
 
 #[tauri::command]

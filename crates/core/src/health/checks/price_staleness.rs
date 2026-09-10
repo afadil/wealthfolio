@@ -167,9 +167,12 @@ impl PriceStalenessCheck {
                     // Only check staleness for assets with positive market value
                     // (assets with 0 quantity are not actively held)
                     if holding.market_value > 0.0 {
+                        // TODO: pass is_continuous=true for crypto once AssetHoldingInfo
+                        // carries instrument_type; false is safe (conservative).
                         let effective_today = time_utils::market_effective_date(
                             ctx.now,
                             holding.exchange_mic.as_deref(),
+                            false,
                         );
                         let days_stale = trading_days_since(*quote_time, effective_today);
 

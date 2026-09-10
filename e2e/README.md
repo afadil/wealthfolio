@@ -111,19 +111,34 @@ npx playwright test && npx playwright show-report
 
 ## Test files
 
-| File                                   | What it tests                                                                                                    |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `01-happy-path.spec.ts`                | Onboarding, accounts, deposits, trades                                                                           |
-| `02-activities.spec.ts`                | All activity types                                                                                               |
-| `03-fx-cash-balance.spec.ts`           | FX cash balances                                                                                                 |
-| `04-csv-import.spec.ts`                | CSV activity import                                                                                              |
-| `05-form-validation.spec.ts`           | Form field validation errors                                                                                     |
-| `06-activity-data-grid.spec.ts`        | Activity data grid interactions                                                                                  |
-| `07-asset-creation.spec.ts`            | Manual asset creation and editing                                                                                |
-| `08-holdings-and-performance.spec.ts`  | Holdings and performance views                                                                                   |
-| `09-bulk-holdings.spec.ts`             | Bulk holdings CSV import                                                                                         |
-| `10-symbol-mapping-validation.spec.ts` | Symbol mapping real-time validation (Yahoo Finance, Börse Frankfurt)                                             |
-| `13-multi-exchange-import.spec.ts`     | Multi-exchange CSV import: XETRA/LSE/TSX/NASDAQ resolution, region & instrument-type classification (issue #855) |
+| File                                   | What it tests                                                                                                               |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `01-happy-path.spec.ts`                | Onboarding, accounts, deposits, trades                                                                                      |
+| `02-activities.spec.ts`                | All activity types                                                                                                          |
+| `03-fx-cash-balance.spec.ts`           | FX cash balances                                                                                                            |
+| `04-csv-import.spec.ts`                | CSV activity import                                                                                                         |
+| `05-form-validation.spec.ts`           | Form field validation errors                                                                                                |
+| `06-activity-data-grid.spec.ts`        | Activity data grid interactions                                                                                             |
+| `07-asset-creation.spec.ts`            | Manual asset creation and editing                                                                                           |
+| `08-holdings-and-performance.spec.ts`  | Holdings and performance views                                                                                              |
+| `09-bulk-holdings.spec.ts`             | Bulk holdings CSV import                                                                                                    |
+| `10-symbol-mapping-validation.spec.ts` | Symbol mapping real-time validation (Yahoo Finance, Börse Frankfurt)                                                        |
+| `13-multi-exchange-import.spec.ts`     | Multi-exchange CSV import: XETRA/LSE/TSX/NASDAQ resolution, region & instrument-type classification (issue #855)            |
+| `16-final-cash-policy.spec.ts`         | Final-cash writer policy through CSV import: persisted amounts + review flags per policy row, fixture-computed ledger total |
+
+---
+
+## Not in CI (tracked follow-up)
+
+None of the specs in this directory run in CI. `pr-check.yml` installs
+Playwright only for `pnpm test:e2e:addon-sandbox`, a standalone frontend-only
+harness; the app suite needs a built Rust backend on :8088, a seeded database,
+and serial execution against shared state.
+
+Standing that up is its own change — it should add the whole suite as one job,
+not smuggle individual specs in. Until then these specs are a local gate only:
+run `pnpm test:e2e` before merging anything that touches activities, import, or
+holdings.
 
 ---
 

@@ -63,7 +63,7 @@ export function PermissionCategoriesDisplay({ permissions }: PermissionCategorie
     <div className="space-y-4">
       <div className="space-y-3">
         <h4 className="font-medium">{t("settings:addon_permission_list_title")}</h4>
-        <div className="max-h-[400px] space-y-2 overflow-y-auto pr-2">
+        <div className="space-y-2">
           {displayPermissions.map((permission) => (
             <div
               key={permission.category}

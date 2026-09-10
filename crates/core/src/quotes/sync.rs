@@ -41,7 +41,7 @@ use super::sync_state::{
 };
 use super::types::{AssetId, Day, ProviderId};
 use crate::activities::{ActivityRepositoryTrait, ActivityUpsert};
-use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, QuoteMode};
+use crate::assets::{Asset, AssetKind, AssetRepositoryTrait, InstrumentType, QuoteMode};
 use crate::errors::Error;
 use crate::errors::Result;
 use crate::utils::time_utils;
@@ -81,12 +81,24 @@ impl Drop for SyncLockGuard {
     }
 }
 
-fn effective_market_today(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
-    time_utils::market_effective_date(now, exchange_mic)
+fn is_continuous_market(instrument_type: Option<&InstrumentType>) -> bool {
+    matches!(instrument_type, Some(InstrumentType::Crypto))
 }
 
-fn market_fetch_end_date(now: DateTime<Utc>, exchange_mic: Option<&str>) -> NaiveDate {
-    time_utils::market_calendar_date(now, exchange_mic)
+fn effective_market_today(
+    now: DateTime<Utc>,
+    exchange_mic: Option<&str>,
+    instrument_type: Option<&InstrumentType>,
+) -> NaiveDate {
+    time_utils::market_effective_date(now, exchange_mic, is_continuous_market(instrument_type))
+}
+
+fn market_fetch_end_date(
+    now: DateTime<Utc>,
+    exchange_mic: Option<&str>,
+    instrument_type: Option<&InstrumentType>,
+) -> NaiveDate {
+    time_utils::market_calendar_date(now, exchange_mic, is_continuous_market(instrument_type))
 }
 
 /// Determine the effective data provider for an asset.
@@ -1217,10 +1229,16 @@ where
                 quote_max,
             };
 
-            let effective_today =
-                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
-            let fetch_end_date =
-                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
+            let effective_today = effective_market_today(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
+            let fetch_end_date = market_fetch_end_date(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
             let category = determine_sync_category(
                 &inputs,
                 CLOSED_POSITION_GRACE_PERIOD_DAYS,
@@ -1462,10 +1480,16 @@ where
         for asset in &syncable {
             let state = existing_states.get(&asset.id).cloned();
             let data_source = effective_provider(state.as_ref(), asset);
-            let effective_today =
-                effective_market_today(now, asset.instrument_exchange_mic.as_deref());
-            let fetch_end_date =
-                market_fetch_end_date(now, asset.instrument_exchange_mic.as_deref());
+            let effective_today = effective_market_today(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
+            let fetch_end_date = market_fetch_end_date(
+                now,
+                asset.instrument_exchange_mic.as_deref(),
+                asset.instrument_type.as_ref(),
+            );
 
             // Explicit targeted retries bypass the broad-sync error cutoff.
             if let Some(ref s) = state {

@@ -247,10 +247,18 @@ mod tests {
             ..Default::default()
         };
 
+        let bare_bond = Asset {
+            instrument_type: Some(InstrumentType::Bond),
+            ..Default::default()
+        };
+
         assert_eq!(equity.contract_multiplier(), dec!(1));
         assert_eq!(bare_option.contract_multiplier(), dec!(100));
         assert_eq!(mini_option.contract_multiplier(), dec!(10));
         assert_eq!(future.contract_multiplier(), dec!(50));
+        // Bonds default to 1 - provider quotes are fraction-of-par;
+        // percent-of-par is opt-in via explicit contractMultiplier metadata.
+        assert_eq!(bare_bond.contract_multiplier(), dec!(1));
     }
 
     // Test InstrumentType

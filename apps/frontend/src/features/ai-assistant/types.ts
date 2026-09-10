@@ -481,6 +481,7 @@ export interface RecordActivitiesDraft {
   unitPrice?: number;
   amount?: number;
   fee?: number;
+  tax?: number;
   currency: string;
   accountId?: string;
   accountName?: string;
@@ -782,6 +783,7 @@ export interface AssetClassificationResolvedAsset {
   symbol?: string | null;
   name?: string | null;
   exchangeMic?: string | null;
+  instrumentType?: string | null;
   currency: string;
   matchedBy: string;
 }

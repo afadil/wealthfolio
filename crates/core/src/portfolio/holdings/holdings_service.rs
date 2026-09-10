@@ -10,6 +10,7 @@ use crate::errors::{CalculatorError, Error as CoreError, Result};
 use crate::fx::currency::{get_normalization_rule, normalize_currency_code};
 use crate::fx::FxServiceTrait;
 use crate::lots::{LotRecord, LotRepositoryTrait};
+use crate::portfolio::economic_events::ActivityEconomicsResolver;
 use crate::portfolio::holdings::holdings_model::{Holding, HoldingType, Instrument, MonetaryValue};
 use crate::portfolio::snapshot::{self, SnapshotServiceTrait};
 use crate::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default, user_today};
@@ -293,6 +294,7 @@ impl HoldingsService {
                             pricing_mode: asset.quote_mode.as_db_str().to_string(),
                             preferred_provider: asset.preferred_provider(),
                             exchange_mic: asset.instrument_exchange_mic.clone(),
+                            instrument_type: asset.instrument_type.clone(),
                             classifications: None,
                         };
 
@@ -417,7 +419,7 @@ impl HoldingsService {
         }
 
         for (currency, &amount) in cash_balances_map {
-            if amount == Decimal::ZERO {
+            if is_cash_dust(amount) {
                 continue;
             }
 
@@ -430,6 +432,7 @@ impl HoldingsService {
                 pricing_mode: "MANUAL".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                instrument_type: None,
                 classifications: None,
             };
 
@@ -883,6 +886,18 @@ impl HoldingsService {
     }
 }
 
+/// Whether a snapshot cash balance is residual noise rather than money.
+///
+/// Snapshot `cash_balances` persist as serde-float JSON, and the incremental recalc
+/// modes re-seed from that f64 round-trip, so long-settled accounts accumulate
+/// balances around 1e-15. Those are non-zero, so an exact zero check emits a full
+/// cash holding that only collapses to $0 at render time. Rounding first drops the
+/// dust; genuine sub-cent balances survive, since DECIMAL_PRECISION is well below a
+/// cent.
+fn is_cash_dust(amount: Decimal) -> bool {
+    amount.round_dp(DECIMAL_PRECISION).is_zero()
+}
+
 fn gain_pct(amount: Decimal, basis: Decimal) -> Option<Decimal> {
     let exposure = basis.abs();
     if exposure > Decimal::ZERO {
@@ -998,12 +1013,9 @@ fn calculate_asset_income(
 }
 
 fn activity_income_amount(activity: &Activity) -> Decimal {
-    let amount = activity.amt();
-    if amount > Decimal::ZERO {
-        amount
-    } else {
-        activity.qty() * activity.price()
-    }
+    ActivityEconomicsResolver::resolve_cash(activity, Decimal::ONE)
+        .gross_amount
+        .unwrap_or(Decimal::ZERO)
 }
 
 fn convert_income_amount(
@@ -1679,6 +1691,7 @@ impl HoldingsServiceTrait for HoldingsService {
                 pricing_mode: asset.quote_mode.as_db_str().to_string(),
                 preferred_provider: asset.preferred_provider(),
                 exchange_mic: asset.instrument_exchange_mic.clone(),
+                instrument_type: asset.instrument_type.clone(),
                 classifications: None,
             };
 
@@ -1729,7 +1742,7 @@ impl HoldingsServiceTrait for HoldingsService {
 
         // Convert cash balances to holdings
         for (currency, &amount) in &snapshot.cash_balances {
-            if amount == Decimal::ZERO {
+            if is_cash_dust(amount) {
                 continue;
             }
 
@@ -4034,6 +4047,7 @@ mod tests {
                 pricing_mode: "MARKET".to_string(),
                 preferred_provider: None,
                 exchange_mic: None,
+                instrument_type: None,
                 classifications: None,
             }),
             asset_kind: None,
@@ -4208,5 +4222,137 @@ mod tests {
         assert_eq!(holding.price, Some(Decimal::ONE));
         assert_eq!(holding.prev_close_value.as_ref().unwrap().local, dec!(10));
         assert_eq!(holding.prev_close_value.as_ref().unwrap().base, dec!(10));
+    }
+
+    // Snapshot cash balances round-trip through f64, so long-settled accounts keep
+    // residual balances around 1e-15. The tests below pin that such balances never
+    // become cash holdings — each one renders as a `$0` row in the Cash drill-down.
+
+    fn cash_snapshot(account_id: &str, balances: Vec<(&str, Decimal)>) -> AccountStateSnapshot {
+        AccountStateSnapshot {
+            account_id: account_id.to_string(),
+            currency: "USD".to_string(),
+            cash_balances: balances
+                .into_iter()
+                .map(|(currency, amount)| (currency.to_string(), amount))
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn cash_dust_is_detected_below_decimal_precision() {
+        assert!(is_cash_dust(Decimal::ZERO));
+        assert!(is_cash_dust(dec!(0.000000000000001)));
+        assert!(is_cash_dust(dec!(-0.000000000000001)));
+        assert!(!is_cash_dust(dec!(0.01)));
+        assert!(!is_cash_dust(dec!(-0.01)));
+        // DECIMAL_PRECISION is 8, well below a cent, so real sub-cent balances survive.
+        assert!(!is_cash_dust(dec!(0.00000001)));
+    }
+
+    #[test]
+    fn cash_dust_boundary_sits_just_above_half_of_decimal_precision() {
+        // `round_dp` uses banker's rounding, so the exact midpoint goes to even (zero)
+        // and the largest discarded balance is 5e-9 — half a nanodollar, either sign.
+        assert!(is_cash_dust(dec!(0.000000005)));
+        assert!(is_cash_dust(dec!(-0.000000005)));
+        assert!(!is_cash_dust(dec!(0.0000000051)));
+        assert!(!is_cash_dust(dec!(-0.0000000051)));
+    }
+
+    #[tokio::test]
+    async fn get_holdings_does_not_round_the_cash_balance_it_emits() {
+        // Only the dust *test* rounds; the balance written into the holding keeps full
+        // precision. Rounding the emitted value would be a behavior change, not a fix.
+        let account_id = "acc-1";
+        let precise = dec!(1234.567890123456789);
+        let snapshot = cash_snapshot(account_id, vec![("USD", precise)]);
+        let service = test_service(snapshot, Vec::new(), HashMap::new());
+
+        let holdings = service.get_holdings(account_id, "USD").await.unwrap();
+
+        let cash = holdings
+            .iter()
+            .find(|holding| holding.holding_type == HoldingType::Cash)
+            .expect("real balance should survive");
+        assert_eq!(cash.quantity, precise);
+        assert_eq!(cash.market_value.local, precise);
+        assert_eq!(cash.cost_basis.as_ref().unwrap().local, precise);
+    }
+
+    #[tokio::test]
+    async fn get_holdings_skips_dust_cash_balances() {
+        let account_id = "acc-1";
+        let snapshot = cash_snapshot(
+            account_id,
+            vec![
+                ("USD", dec!(0.000000000000001)),
+                ("EUR", dec!(-0.0000000000000023679074)),
+            ],
+        );
+        let service = test_service(snapshot, Vec::new(), HashMap::new());
+
+        let holdings = service.get_holdings(account_id, "USD").await.unwrap();
+
+        assert!(holdings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_holdings_keeps_real_cash_balances_alongside_dust() {
+        let account_id = "acc-1";
+        let snapshot = cash_snapshot(
+            account_id,
+            vec![
+                ("USD", dec!(2500)),
+                ("EUR", dec!(0.0000000000000092751693)),
+                // A genuine sub-cent balance is money, not noise.
+                ("GBP", dec!(0.001)),
+            ],
+        );
+        let service = test_service(snapshot, Vec::new(), HashMap::new());
+
+        let holdings = service.get_holdings(account_id, "USD").await.unwrap();
+
+        let mut cash: Vec<(String, Decimal)> = holdings
+            .iter()
+            .filter(|holding| holding.holding_type == HoldingType::Cash)
+            .map(|holding| (holding.local_currency.clone(), holding.quantity))
+            .collect();
+        cash.sort_by(|a, b| a.0.cmp(&b.0));
+
+        assert_eq!(
+            cash,
+            vec![
+                ("GBP".to_string(), dec!(0.001)),
+                ("USD".to_string(), dec!(2500)),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn holdings_from_snapshot_skips_dust_cash_balances() {
+        let snapshot = cash_snapshot(
+            "acc-1",
+            vec![
+                ("USD", dec!(2500)),
+                ("EUR", dec!(0.000000000000001)),
+                ("CAD", dec!(-0.000000000000001)),
+            ],
+        );
+        let service = test_service(snapshot.clone(), Vec::new(), HashMap::new());
+
+        let holdings = service
+            .holdings_from_snapshot(&snapshot, "USD")
+            .await
+            .unwrap();
+
+        let cash: Vec<&Holding> = holdings
+            .iter()
+            .filter(|holding| holding.holding_type == HoldingType::Cash)
+            .collect();
+        assert_eq!(cash.len(), 1);
+        assert_eq!(cash[0].local_currency, "USD");
+        assert_eq!(cash[0].quantity, dec!(2500));
     }
 }

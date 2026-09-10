@@ -112,6 +112,7 @@ export function SingleSelectTaxonomy({
 }: SingleSelectTaxonomyProps) {
   const { t } = useTranslation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [openPillId, setOpenPillId] = useState<string | null>(null);
   const { data: taxonomyData, isLoading: isLoadingTaxonomy } = useTaxonomy(taxonomyId);
   const { data: assignments, isLoading: isLoadingAssignments } =
     useAssetTaxonomyAssignments(assetId);
@@ -146,6 +147,22 @@ export function SingleSelectTaxonomy({
     );
   }, [categoryMap]);
 
+  // Children of each category, so a quick toggle can offer its leaves rather than
+  // assign its own id. Already sorted, because allCategories is.
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, TaxonomyCategory[]>();
+    allCategories.forEach((category) => {
+      if (!category.parentId) return;
+      const siblings = map.get(category.parentId);
+      if (siblings) {
+        siblings.push(category);
+      } else {
+        map.set(category.parentId, [category]);
+      }
+    });
+    return map;
+  }, [allCategories]);
+
   // Find current assignment for this taxonomy
   const currentAssignment = useMemo(() => {
     if (!assignments) return null;
@@ -179,6 +196,7 @@ export function SingleSelectTaxonomy({
       source: "manual",
     });
     setMoreOpen(false);
+    setOpenPillId(null);
   };
 
   // Get abbreviated display name
@@ -212,50 +230,101 @@ export function SingleSelectTaxonomy({
     return (
       <div className="space-y-2">
         {label && <Label className="text-muted-foreground text-sm font-medium">{label}</Label>}
-        <RadioGroup
-          value={selectedCategoryId}
-          onValueChange={handleSelectionChange}
-          disabled={isDisabled}
-          className="flex flex-wrap gap-1.5 pt-2"
-        >
-          {/* Quick toggle buttons for top categories */}
+        <div className="flex flex-wrap gap-1.5 pt-2">
+          {/* Quick toggles for top categories. A category with children opens a
+              leaf picker instead of assigning itself, so a one-click shortcut can
+              never write a container category over the classifier's choice. */}
           {topCategories.map((category) => {
-            const isSelected =
-              selectedCategoryId === category.id || selectedCategory?.parentId === category.id;
-            const displayName = getDisplayName(category.name);
-
-            return (
-              <label
-                key={category.id}
-                className={cn(
-                  "flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm transition-all",
-                  isSelected
-                    ? "border-transparent font-medium shadow-sm"
-                    : "border-border bg-background hover:bg-muted/50",
-                  isDisabled && "cursor-not-allowed opacity-50",
-                )}
-                style={
-                  isSelected
-                    ? {
-                        backgroundColor: `${category.color}20`,
-                        color: category.color,
-                        borderColor: category.color,
-                      }
-                    : undefined
+            const children = childrenByParent.get(category.id) ?? [];
+            const selectedChild =
+              selectedCategory?.parentId === category.id ? selectedCategory : null;
+            const isSelected = selectedCategoryId === category.id || selectedChild !== null;
+            // Label with the assigned leaf when there is one, so a pill sitting on
+            // the container reads differently from one sitting on a child.
+            const shown = selectedChild ?? category;
+            const displayName = getDisplayName(shown.name);
+            const pillClassName = cn(
+              "flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm transition-all",
+              isSelected
+                ? "border-transparent font-medium shadow-sm"
+                : "border-border bg-background hover:bg-muted/50",
+              isDisabled && "cursor-not-allowed opacity-50",
+            );
+            const pillStyle = isSelected
+              ? {
+                  backgroundColor: `${shown.color}20`,
+                  color: shown.color,
+                  borderColor: shown.color,
                 }
-              >
-                <RadioGroupItem
-                  value={category.id}
-                  id={`${taxonomyId}-${category.id}`}
-                  className="sr-only"
-                />
+              : undefined;
+            const pillContent = (
+              <>
                 <span
                   className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: category.color }}
+                  style={{ backgroundColor: shown.color }}
                   aria-hidden="true"
                 />
                 <span className="whitespace-nowrap">{displayName}</span>
-              </label>
+              </>
+            );
+
+            if (children.length === 0) {
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => handleSelectionChange(category.id)}
+                  className={pillClassName}
+                  style={pillStyle}
+                >
+                  {pillContent}
+                </button>
+              );
+            }
+
+            return (
+              <Popover
+                key={category.id}
+                open={openPillId === category.id}
+                onOpenChange={(open) => setOpenPillId(open ? category.id : null)}
+                modal={true}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={isDisabled}
+                    className={pillClassName}
+                    style={pillStyle}
+                  >
+                    {pillContent}
+                    <Icons.ChevronDown className="h-3 w-3 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1" align="start" sideOffset={4}>
+                  {children.map((child) => (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => handleSelectionChange(child.id)}
+                      className={cn(
+                        "hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm",
+                        selectedCategoryId === child.id && "bg-accent",
+                      )}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: child.color }}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 truncate">{child.name}</span>
+                      {selectedCategoryId === child.id && (
+                        <Icons.Check className="text-primary h-4 w-4 shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
             );
           })}
 
@@ -348,7 +417,7 @@ export function SingleSelectTaxonomy({
               </Command>
             </PopoverContent>
           </Popover>
-        </RadioGroup>
+        </div>
       </div>
     );
   }

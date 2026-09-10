@@ -5,9 +5,12 @@ use anyhow::Result;
 use tokio::sync::Mutex;
 use wealthfolio_core::activities::ActivityRepositoryTrait;
 
+use rust_decimal::Decimal;
+
 use super::matcher::{compile_regex_pattern, compile_rules, match_compiled, MAX_REGEX_PATTERN_LEN};
 use super::model::{
-    CategorizationRule, NewCategorizationRule, RuleMatchType, UpdateCategorizationRule,
+    CategorizationRule, NewCategorizationRule, RuleAmountOp, RuleMatchType,
+    UpdateCategorizationRule,
 };
 use super::presets::{self, ImportPresetResult, RemovePresetResult, RulePresetSummary};
 use super::traits::CategorizationRulesRepositoryTrait;
@@ -51,15 +54,28 @@ impl CategorizationRulesService {
     pub async fn get(&self, id: &str) -> Result<Option<CategorizationRule>> {
         self.repo.get(id).await
     }
-    pub async fn create(&self, new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
+    pub async fn create(&self, mut new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
         validate_rule_scope(new_rule.is_global, new_rule.account_id.as_deref())?;
         validate_rule_pattern(&new_rule.match_type, &new_rule.pattern)?;
+        // Normalize before validating: values without an operator are dropped,
+        // and only `between` keeps an upper value.
+        if new_rule.amount_op.is_none() {
+            new_rule.amount_value = None;
+            new_rule.amount_value2 = None;
+        } else if new_rule.amount_op != Some(RuleAmountOp::Between) {
+            new_rule.amount_value2 = None;
+        }
+        validate_rule_amount(
+            new_rule.amount_op,
+            new_rule.amount_value,
+            new_rule.amount_value2,
+        )?;
         self.repo.create(new_rule).await
     }
     pub async fn update(
         &self,
         id: &str,
-        patch: UpdateCategorizationRule,
+        mut patch: UpdateCategorizationRule,
     ) -> Result<CategorizationRule> {
         // Resolve the post-patch (is_global, account_id) and reject contradictions.
         let existing = self
@@ -82,10 +98,53 @@ impl CategorizationRulesService {
             .as_deref()
             .unwrap_or(existing.pattern.as_str());
         validate_rule_pattern(&new_match_type, new_pattern)?;
+
+        // Resolve the post-patch amount condition, normalize it (clearing the
+        // operator clears both values; only `between` keeps an upper value),
+        // then validate the result.
+        let eff_op = patch.amount_op.unwrap_or(existing.amount_op);
+        let mut eff_value = patch.amount_value.unwrap_or(existing.amount_value);
+        let mut eff_value2 = patch.amount_value2.unwrap_or(existing.amount_value2);
+        if eff_op.is_none() {
+            if eff_value.is_some() {
+                patch.amount_value = Some(None);
+                eff_value = None;
+            }
+            if eff_value2.is_some() {
+                patch.amount_value2 = Some(None);
+                eff_value2 = None;
+            }
+        } else if eff_op != Some(RuleAmountOp::Between) && eff_value2.is_some() {
+            patch.amount_value2 = Some(None);
+            eff_value2 = None;
+        }
+        validate_rule_amount(eff_op, eff_value, eff_value2)?;
         self.repo.update(id, patch).await
     }
     pub async fn delete(&self, id: &str) -> Result<()> {
         self.repo.delete(id).await
+    }
+
+    /// Atomically create-or-update the rule identified by `new_rule.id`.
+    /// Unlike `create`/`update`, callers must supply an explicit id — this is
+    /// meant for callers (e.g. the addon bridge) that derive a stable id up
+    /// front and need create-or-update to be race-free against itself,
+    /// including when the same id is submitted twice in quick succession.
+    pub async fn upsert(&self, mut new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
+        validate_rule_scope(new_rule.is_global, new_rule.account_id.as_deref())?;
+        validate_rule_pattern(&new_rule.match_type, &new_rule.pattern)?;
+        if new_rule.amount_op.is_none() {
+            new_rule.amount_value = None;
+            new_rule.amount_value2 = None;
+        } else if new_rule.amount_op != Some(RuleAmountOp::Between) {
+            new_rule.amount_value2 = None;
+        }
+        validate_rule_amount(
+            new_rule.amount_op,
+            new_rule.amount_value,
+            new_rule.amount_value2,
+        )?;
+        self.repo.upsert(new_rule).await
     }
 
     /// Re-run all rules against existing activities. Returns count of activities
@@ -155,6 +214,7 @@ impl CategorizationRulesService {
                 notes_raw,
                 a.effective_type(),
                 &a.account_id,
+                a.amount.map(|d| d.abs()),
             ) else {
                 continue;
             };
@@ -266,6 +326,9 @@ impl CategorizationRulesService {
                 taxonomy_id: Some(tax_id),
                 category_id: Some(cat_id),
                 activity_type: None,
+                amount_op: None,
+                amount_value: None,
+                amount_value2: None,
                 priority: rule.priority,
                 is_global: true,
                 account_id: None,
@@ -313,6 +376,47 @@ fn validate_rule_pattern(match_type: &RuleMatchType, pattern: &str) -> Result<()
     compile_regex_pattern(pattern).map_err(|err| SpendingError::InvalidInput {
         message: format!("Invalid regex pattern: {err}"),
     })?;
+    Ok(())
+}
+
+/// Validate a normalized amount condition. Callers normalize first (no
+/// operator ⇒ no values, non-`between` ⇒ no upper value), so this only has to
+/// check what the user could still get wrong.
+fn validate_rule_amount(
+    op: Option<RuleAmountOp>,
+    value: Option<Decimal>,
+    value2: Option<Decimal>,
+) -> Result<()> {
+    let Some(op) = op else {
+        return Ok(());
+    };
+    let Some(value) = value else {
+        return Err(SpendingError::InvalidInput {
+            message: "Amount condition requires a value".to_string(),
+        }
+        .into());
+    };
+    if value < Decimal::ZERO || value2.is_some_and(|v| v < Decimal::ZERO) {
+        return Err(SpendingError::InvalidInput {
+            message: "Amount values cannot be negative".to_string(),
+        }
+        .into());
+    }
+    if op == RuleAmountOp::Between {
+        let Some(value2) = value2 else {
+            return Err(SpendingError::InvalidInput {
+                message: "Between amount condition requires an upper value".to_string(),
+            }
+            .into());
+        };
+        if value > value2 {
+            return Err(SpendingError::InvalidInput {
+                message: "Amount range lower value must be less than or equal to the upper value"
+                    .to_string(),
+            }
+            .into());
+        }
+    }
     Ok(())
 }
 
@@ -375,6 +479,9 @@ mod tests {
                 taxonomy_id: n.taxonomy_id,
                 category_id: n.category_id,
                 activity_type: n.activity_type,
+                amount_op: n.amount_op,
+                amount_value: n.amount_value,
+                amount_value2: n.amount_value2,
                 priority: n.priority,
                 is_global: n.is_global,
                 account_id: n.account_id,
@@ -390,10 +497,75 @@ mod tests {
         }
         async fn update(
             &self,
-            _id: &str,
-            _p: UpdateCategorizationRule,
+            id: &str,
+            p: UpdateCategorizationRule,
         ) -> Result<CategorizationRule> {
-            unimplemented!()
+            let mut rules = self.rules.lock().unwrap();
+            let rule = rules
+                .iter_mut()
+                .find(|rule| rule.id == id)
+                .expect("rule exists");
+            if let Some(v) = p.name {
+                rule.name = v;
+            }
+            if let Some(v) = p.pattern {
+                rule.pattern = v;
+            }
+            if let Some(v) = p.match_type {
+                rule.match_type = v;
+            }
+            if let Some(v) = p.taxonomy_id {
+                rule.taxonomy_id = v;
+            }
+            if let Some(v) = p.category_id {
+                rule.category_id = v;
+            }
+            if let Some(v) = p.activity_type {
+                rule.activity_type = v;
+            }
+            if let Some(v) = p.amount_op {
+                rule.amount_op = v;
+            }
+            if let Some(v) = p.amount_value {
+                rule.amount_value = v;
+            }
+            if let Some(v) = p.amount_value2 {
+                rule.amount_value2 = v;
+            }
+            if let Some(v) = p.priority {
+                rule.priority = v;
+            }
+            if let Some(v) = p.is_global {
+                rule.is_global = v;
+            }
+            if let Some(v) = p.account_id {
+                rule.account_id = v;
+            }
+            rule.updated_at = Utc::now().naive_utc();
+            Ok(rule.clone())
+        }
+        async fn upsert(&self, n: NewCategorizationRule) -> Result<CategorizationRule> {
+            let id = n.id.clone().expect("upsert requires an explicit id");
+            let exists = self.rules.lock().unwrap().iter().any(|rule| rule.id == id);
+            if exists {
+                let patch = UpdateCategorizationRule {
+                    name: Some(n.name),
+                    pattern: Some(n.pattern),
+                    match_type: Some(n.match_type),
+                    taxonomy_id: Some(n.taxonomy_id),
+                    category_id: Some(n.category_id),
+                    activity_type: Some(n.activity_type),
+                    amount_op: Some(n.amount_op),
+                    amount_value: Some(n.amount_value),
+                    amount_value2: Some(n.amount_value2),
+                    priority: Some(n.priority),
+                    is_global: Some(n.is_global),
+                    account_id: Some(n.account_id),
+                };
+                self.update(&id, patch).await
+            } else {
+                self.create(n).await
+            }
         }
         async fn import_preset_rules(
             &self,
@@ -424,6 +596,9 @@ mod tests {
                     existing.taxonomy_id = n.taxonomy_id;
                     existing.category_id = n.category_id;
                     existing.activity_type = n.activity_type;
+                    existing.amount_op = n.amount_op;
+                    existing.amount_value = n.amount_value;
+                    existing.amount_value2 = n.amount_value2;
                     existing.priority = n.priority;
                     existing.is_global = n.is_global;
                     existing.account_id = n.account_id;
@@ -447,6 +622,9 @@ mod tests {
                     taxonomy_id: n.taxonomy_id,
                     category_id: n.category_id,
                     activity_type: n.activity_type,
+                    amount_op: n.amount_op,
+                    amount_value: n.amount_value,
+                    amount_value2: n.amount_value2,
                     priority: n.priority,
                     is_global: n.is_global,
                     account_id: n.account_id,
@@ -841,6 +1019,9 @@ mod tests {
             taxonomy_id: Some(tax.to_string()),
             category_id: Some(cat.to_string()),
             activity_type: None,
+            amount_op: None,
+            amount_value: None,
+            amount_value2: None,
             priority,
             is_global: true,
             account_id: None,
@@ -1043,6 +1224,9 @@ mod tests {
                 taxonomy_id: Some("spending_categories".to_string()),
                 category_id: Some("cat_food".to_string()),
                 activity_type: None,
+                amount_op: None,
+                amount_value: None,
+                amount_value2: None,
                 priority: 1,
                 is_global: true,
                 account_id: Some("acct1".to_string()),
@@ -1082,6 +1266,9 @@ mod tests {
                 taxonomy_id: Some("spending_categories".to_string()),
                 category_id: Some("cat_food".to_string()),
                 activity_type: None,
+                amount_op: None,
+                amount_value: None,
+                amount_value2: None,
                 priority: 1,
                 is_global: false,
                 account_id: None,
@@ -1121,6 +1308,9 @@ mod tests {
                 taxonomy_id: Some("spending_categories".to_string()),
                 category_id: Some("cat_food".to_string()),
                 activity_type: None,
+                amount_op: None,
+                amount_value: None,
+                amount_value2: None,
                 priority: 1,
                 is_global: true,
                 account_id: None,
@@ -1220,5 +1410,244 @@ mod tests {
             Some(preset.preset_version.as_str())
         );
         assert!(!updated_rule.preset_modified);
+    }
+
+    fn dec(s: &str) -> Decimal {
+        s.parse().unwrap()
+    }
+
+    fn mk_svc(
+        rules: Vec<CategorizationRule>,
+        activities: Vec<Activity>,
+    ) -> (
+        CategorizationRulesService,
+        Arc<MockRulesRepo>,
+        Arc<MockAssignmentRepo>,
+    ) {
+        let rules_repo = Arc::new(MockRulesRepo {
+            rules: Mutex::new(rules),
+        });
+        let assignment_repo = Arc::new(MockAssignmentRepo::default());
+        let assignment_service = Arc::new(ActivityTaxonomyAssignmentService::new(
+            assignment_repo.clone() as Arc<dyn ActivityTaxonomyAssignmentRepositoryTrait>,
+        ));
+        let activity_repo = Arc::new(MockActivityRepo { activities });
+        let svc = CategorizationRulesService::new(
+            rules_repo.clone() as Arc<dyn CategorizationRulesRepositoryTrait>,
+            activity_repo as Arc<dyn ActivityRepositoryTrait>,
+            assignment_service,
+        );
+        (svc, rules_repo, assignment_repo)
+    }
+
+    fn base_new_rule() -> NewCategorizationRule {
+        NewCategorizationRule {
+            id: None,
+            name: "amount rule".to_string(),
+            pattern: "AMAZON".to_string(),
+            match_type: RuleMatchType::Contains,
+            taxonomy_id: Some("spending_categories".to_string()),
+            category_id: Some("cat_food".to_string()),
+            activity_type: None,
+            amount_op: None,
+            amount_value: None,
+            amount_value2: None,
+            priority: 1,
+            is_global: true,
+            account_id: None,
+            preset_id: None,
+            preset_rule_key: None,
+            preset_version: None,
+        }
+    }
+
+    #[test]
+    fn validate_rule_amount_matrix() {
+        // Positive: every operator with a value; between inclusive of equal bounds; zero.
+        for op in [
+            RuleAmountOp::Eq,
+            RuleAmountOp::Gt,
+            RuleAmountOp::Gte,
+            RuleAmountOp::Lt,
+            RuleAmountOp::Lte,
+        ] {
+            assert!(validate_rule_amount(Some(op), Some(dec("10.50")), None).is_ok());
+        }
+        assert!(validate_rule_amount(
+            Some(RuleAmountOp::Between),
+            Some(dec("10")),
+            Some(dec("20"))
+        )
+        .is_ok());
+        assert!(validate_rule_amount(
+            Some(RuleAmountOp::Between),
+            Some(dec("10")),
+            Some(dec("10"))
+        )
+        .is_ok());
+        assert!(validate_rule_amount(Some(RuleAmountOp::Eq), Some(dec("0")), None).is_ok());
+        assert!(validate_rule_amount(None, None, None).is_ok());
+
+        // Negative: missing value, missing upper, swapped bounds, negative values.
+        assert!(validate_rule_amount(Some(RuleAmountOp::Gt), None, None).is_err());
+        assert!(validate_rule_amount(Some(RuleAmountOp::Between), Some(dec("10")), None).is_err());
+        assert!(validate_rule_amount(
+            Some(RuleAmountOp::Between),
+            Some(dec("20")),
+            Some(dec("10"))
+        )
+        .is_err());
+        assert!(validate_rule_amount(Some(RuleAmountOp::Gt), Some(dec("-1")), None).is_err());
+        assert!(
+            validate_rule_amount(Some(RuleAmountOp::Between), Some(dec("1")), Some(dec("-2")))
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn create_normalizes_amount_condition() {
+        let (svc, _, _) = mk_svc(vec![], vec![]);
+
+        // Values without an operator are dropped rather than stored.
+        let mut no_op = base_new_rule();
+        no_op.amount_value = Some(dec("50"));
+        no_op.amount_value2 = Some(dec("60"));
+        let created = svc.create(no_op).await.unwrap();
+        assert_eq!(created.amount_op, None);
+        assert_eq!(created.amount_value, None);
+        assert_eq!(created.amount_value2, None);
+
+        // A non-between operator drops the stale upper value.
+        let mut gt = base_new_rule();
+        gt.amount_op = Some(RuleAmountOp::Gt);
+        gt.amount_value = Some(dec("100"));
+        gt.amount_value2 = Some(dec("200"));
+        let created = svc.create(gt).await.unwrap();
+        assert_eq!(created.amount_op, Some(RuleAmountOp::Gt));
+        assert_eq!(created.amount_value, Some(dec("100")));
+        assert_eq!(created.amount_value2, None);
+    }
+
+    #[tokio::test]
+    async fn create_rejects_invalid_amount_conditions() {
+        let (svc, _, _) = mk_svc(vec![], vec![]);
+
+        let mut missing_value = base_new_rule();
+        missing_value.amount_op = Some(RuleAmountOp::Gte);
+        let err = svc.create(missing_value).await.unwrap_err();
+        assert!(err.to_string().contains("requires a value"));
+
+        let mut swapped = base_new_rule();
+        swapped.amount_op = Some(RuleAmountOp::Between);
+        swapped.amount_value = Some(dec("55"));
+        swapped.amount_value2 = Some(dec("45"));
+        let err = svc.create(swapped).await.unwrap_err();
+        assert!(err.to_string().contains("less than or equal"));
+
+        let mut negative = base_new_rule();
+        negative.amount_op = Some(RuleAmountOp::Lt);
+        negative.amount_value = Some(dec("-5"));
+        let err = svc.create(negative).await.unwrap_err();
+        assert!(err.to_string().contains("cannot be negative"));
+    }
+
+    #[tokio::test]
+    async fn update_clearing_op_clears_values() {
+        let mut rule = mk_rule("r1", "AMAZON", "spending_categories", "cat_food", 1);
+        rule.amount_op = Some(RuleAmountOp::Between);
+        rule.amount_value = Some(dec("10"));
+        rule.amount_value2 = Some(dec("20"));
+        let (svc, _, _) = mk_svc(vec![rule], vec![]);
+
+        let updated = svc
+            .update(
+                "r1",
+                UpdateCategorizationRule {
+                    amount_op: Some(None),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.amount_op, None);
+        assert_eq!(updated.amount_value, None);
+        assert_eq!(updated.amount_value2, None);
+    }
+
+    #[tokio::test]
+    async fn update_changing_op_from_between_drops_upper_value() {
+        let mut rule = mk_rule("r1", "AMAZON", "spending_categories", "cat_food", 1);
+        rule.amount_op = Some(RuleAmountOp::Between);
+        rule.amount_value = Some(dec("10"));
+        rule.amount_value2 = Some(dec("20"));
+        let (svc, _, _) = mk_svc(vec![rule], vec![]);
+
+        let updated = svc
+            .update(
+                "r1",
+                UpdateCategorizationRule {
+                    amount_op: Some(Some(RuleAmountOp::Gt)),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.amount_op, Some(RuleAmountOp::Gt));
+        assert_eq!(updated.amount_value, Some(dec("10")));
+        assert_eq!(updated.amount_value2, None);
+    }
+
+    #[tokio::test]
+    async fn update_rejects_swapped_between_bounds() {
+        let mut rule = mk_rule("r1", "AMAZON", "spending_categories", "cat_food", 1);
+        rule.amount_op = Some(RuleAmountOp::Between);
+        rule.amount_value = Some(dec("10"));
+        rule.amount_value2 = Some(dec("20"));
+        let (svc, _, _) = mk_svc(vec![rule], vec![]);
+
+        // Raising the lower value above the existing upper must be rejected.
+        let err = svc
+            .update(
+                "r1",
+                UpdateCategorizationRule {
+                    amount_value: Some(Some(dec("100"))),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("less than or equal"));
+    }
+
+    fn mk_activity_amt(id: &str, account: &str, notes: &str, amount: &str) -> Activity {
+        let mut a = mk_activity(id, account, notes);
+        a.amount = Some(amount.parse().unwrap());
+        a
+    }
+
+    #[tokio::test]
+    async fn rerun_applies_amount_condition() {
+        let mut rule = mk_rule("r1", "TRANSFER", "spending_categories", "cat_savings", 5);
+        rule.amount_op = Some(RuleAmountOp::Gte);
+        rule.amount_value = Some(dec("1000"));
+        let (svc, _, assignment_repo) = mk_svc(
+            vec![rule],
+            vec![
+                mk_activity_amt("small", "acct1", "TRANSFER TO SAVINGS", "50"),
+                mk_activity_amt("large", "acct1", "TRANSFER TO SAVINGS", "1500"),
+                // Signed amounts are compared unsigned.
+                mk_activity_amt("negative", "acct1", "TRANSFER TO SAVINGS", "-2000"),
+                // No amount at all: never matches an amount-conditioned rule.
+                mk_activity("no_amount", "acct1", "TRANSFER TO SAVINGS"),
+            ],
+        );
+
+        let matched = svc.rerun_all(&["acct1".to_string()], false).await.unwrap();
+        assert_eq!(matched, 2);
+
+        let writes = assignment_repo.writes.lock().unwrap();
+        let mut written: Vec<&str> = writes.iter().map(|w| w.activity_id.as_str()).collect();
+        written.sort();
+        assert_eq!(written, vec!["large", "negative"]);
     }
 }

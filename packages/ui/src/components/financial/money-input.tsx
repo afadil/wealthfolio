@@ -11,8 +11,10 @@ export interface MoneyInputProps {
   /**
    * Called when value changes with the new numeric value.
    * Preferred API - receives number directly.
+   * `isUserEdit` is true for keystrokes/pastes and false for programmatic
+   * value changes (e.g. form.setValue) that echo back through the input.
    */
-  onValueChange?: (value: number | undefined) => void;
+  onValueChange?: (value: number | undefined, isUserEdit?: boolean) => void;
   /**
    * Legacy onChange handler for backward compatibility.
    * Receives a synthetic event with value in e.target.value.
@@ -49,6 +51,8 @@ export interface MoneyInputProps {
   autoFocus?: boolean;
   /** Key down handler */
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Blur handler */
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
 }
 
 const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
@@ -72,6 +76,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       "data-testid": testId,
       autoFocus,
       onKeyDown,
+      onBlur,
     },
     ref,
   ) => {
@@ -102,6 +107,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         data-testid={testId}
         autoFocus={autoFocus}
         onKeyDown={onKeyDown}
+        onBlur={onBlur}
         allowNegative={false}
         decimalScale={maxDecimalPlaces}
         fixedDecimalScale={fixedDecimalScale}
@@ -110,10 +116,12 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         allowedDecimalSeparators={Array.from(new Set([formatting.decimalSeparator, ".", ","]))}
         valueIsNumericString={false}
         value={numericValue}
-        onValueChange={(values) => {
+        onValueChange={(values, sourceInfo) => {
           // Prefer onValueChange if provided
           if (onValueChange) {
-            onValueChange(values.floatValue);
+            // The SourceType enum is not exported from the package's type
+            // entry, so compare its literal value ("event" | "prop") as string.
+            onValueChange(values.floatValue, String(sourceInfo?.source) === "event");
           }
           // Fall back to legacy onChange for backward compatibility
           // Note: e.target.value will be a number, not a string
@@ -140,7 +148,7 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
           event.preventDefault();
           const parsed = formatting.parseNumber(clipboardValue);
           if (parsed === undefined || parsed < 0) return;
-          onValueChange?.(parsed);
+          onValueChange?.(parsed, true);
           if (!onValueChange && onChange) {
             onChange({ target: { name, value: parsed } } as unknown as React.ChangeEvent<HTMLInputElement>);
           }

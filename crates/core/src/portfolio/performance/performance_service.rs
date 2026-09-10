@@ -751,6 +751,18 @@ impl PerformanceService {
         flow_basis: ExternalFlowBasis,
     ) -> DailyExternalFlow {
         let date = curr_point.valuation_date;
+        if curr_point.external_flow_source == ValuationExternalFlowSource::NoFlow
+            && curr_point.external_inflow_base.is_zero()
+            && curr_point.external_outflow_base.is_zero()
+        {
+            return DailyExternalFlow {
+                date,
+                inflow: Decimal::ZERO,
+                outflow: Decimal::ZERO,
+                source: ValuationExternalFlowSource::NoFlow,
+            };
+        }
+
         let cash_flow = match flow_basis {
             ExternalFlowBasis::AccountCurrency => {
                 curr_point.net_contribution - prev_point.net_contribution
@@ -2290,13 +2302,15 @@ impl PerformanceService {
         activity: &Activity,
         activity_type: &ActivityType,
     ) -> (Decimal, Decimal, Decimal) {
+        let resolved = ActivityEconomicsResolver::resolve_cash(activity, Decimal::ONE);
         match activity_type {
             ActivityType::Dividend | ActivityType::Interest => {
-                (activity.amt(), activity.fee_amt(), activity.tax_amt())
+                let gross_income = resolved.gross_amount.unwrap_or(Decimal::ZERO);
+                (gross_income, activity.fee_amt(), activity.tax_amt())
             }
             ActivityType::Fee => (
                 Decimal::ZERO,
-                activity.charge_amt_for(activity_type),
+                resolved.final_amount.unwrap_or(Decimal::ZERO),
                 Decimal::ZERO,
             ),
             ActivityType::Buy | ActivityType::Sell => {
@@ -2305,7 +2319,7 @@ impl PerformanceService {
             ActivityType::Tax => (
                 Decimal::ZERO,
                 Decimal::ZERO,
-                activity.charge_amt_for(activity_type),
+                resolved.final_amount.unwrap_or(Decimal::ZERO),
             ),
             // Note: fees on these cash flows (and cash transfers below) are booked
             // to cash but knowingly not attributed — only trade and income fees are
@@ -6659,6 +6673,7 @@ mod tests {
         activity.asset_id = Some("AAPL".to_string());
         activity.quantity = Some(quantity);
         activity.unit_price = Some(price);
+        activity.amount = Some(quantity * price);
         activity
     }
 
@@ -6673,6 +6688,7 @@ mod tests {
         activity.asset_id = Some("AAPL".to_string());
         activity.quantity = Some(quantity);
         activity.unit_price = Some(price);
+        activity.amount = Some(quantity * price);
         activity
     }
 
@@ -8256,6 +8272,7 @@ mod tests {
             ActivityType::Dividend,
             dec!(20),
         );
+        dividend.amount = Some(dec!(15));
         dividend.tax = Some(dec!(5));
         let activity_repo = Arc::new(TestActivityRepository::new(vec![dividend]));
         let valuation_service = Arc::new(TestValuationService::new(vec![start, end]));
@@ -8325,7 +8342,7 @@ mod tests {
         dividend.tax = Some(dec!(3));
         assert_eq!(
             PerformanceService::activity_attribution_components(&dividend, &ActivityType::Dividend),
-            (dec!(50), dec!(2), dec!(3))
+            (dec!(55), dec!(2), dec!(3))
         );
 
         let explicit_fee = activity_fixture(ActivityType::Fee, dec!(4), Decimal::ZERO);
@@ -8340,10 +8357,21 @@ mod tests {
             (Decimal::ZERO, Decimal::ZERO, dec!(7))
         );
 
-        let mut explicit_tax = activity_fixture(ActivityType::Tax, Decimal::ZERO, Decimal::ZERO);
-        explicit_tax.tax = Some(dec!(9));
+        let mut explicit_zero_tax =
+            activity_fixture(ActivityType::Tax, Decimal::ZERO, Decimal::ZERO);
+        explicit_zero_tax.tax = Some(dec!(9));
         assert_eq!(
-            PerformanceService::activity_attribution_components(&explicit_tax, &ActivityType::Tax),
+            PerformanceService::activity_attribution_components(
+                &explicit_zero_tax,
+                &ActivityType::Tax
+            ),
+            (Decimal::ZERO, Decimal::ZERO, Decimal::ZERO)
+        );
+
+        let mut final_tax = activity_fixture(ActivityType::Tax, dec!(9), Decimal::ZERO);
+        final_tax.tax = Some(dec!(7));
+        assert_eq!(
+            PerformanceService::activity_attribution_components(&final_tax, &ActivityType::Tax),
             (Decimal::ZERO, Decimal::ZERO, dec!(9))
         );
 
@@ -9020,6 +9048,45 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("inferred from net contribution")));
+    }
+
+    #[test]
+    fn daily_external_flows_keep_no_flow_as_neutral() {
+        let prev = valuation("2026-05-01", dec!(100), dec!(100), dec!(100), dec!(100));
+        let curr = valuation("2027-05-01", dec!(110), dec!(100), dec!(110), dec!(100));
+
+        for basis in [
+            ExternalFlowBasis::BaseCurrency,
+            ExternalFlowBasis::AccountCurrency,
+        ] {
+            let flow = PerformanceService::daily_external_flows(&prev, &curr, basis);
+
+            assert_eq!(flow.inflow, Decimal::ZERO);
+            assert_eq!(flow.outflow, Decimal::ZERO);
+            assert_eq!(flow.source, ExternalFlowSource::NoFlow);
+        }
+    }
+
+    #[test]
+    fn no_flow_rows_do_not_warn_about_inferred_cash_flows() {
+        let history = vec![
+            valuation("2026-05-01", dec!(100), dec!(100), dec!(100), dec!(100)),
+            valuation("2027-05-01", dec!(110), dec!(100), dec!(110), dec!(100)),
+        ];
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            true,
+        )
+        .expect("performance should compute");
+
+        assert!(result
+            .data_quality
+            .warnings
+            .iter()
+            .all(|warning| !warning.contains("inferred from net contribution")));
     }
 
     #[test]
@@ -10174,6 +10241,152 @@ mod tests {
                 .all(|reason| !reason
                     .contains("external flow amount or transfer boundary is unknown"))
         );
+    }
+
+    // Issue #1609: a scope-internal in-kind transfer nets to zero flow but keeps
+    // its quote-derived provenance. That day is exact, so it must not raise the
+    // provenance warning or downgrade data quality.
+    #[test]
+    fn netted_in_kind_transfer_day_is_clean() {
+        let mut history = vec![
+            valuation("2026-04-01", dec!(1000), dec!(1000), dec!(1000), dec!(1000)),
+            valuation("2026-04-02", dec!(1010), dec!(1000), dec!(1010), dec!(1000)),
+        ];
+        history[1].external_flow_source = ExternalFlowSource::QuoteDerivedMarketValue;
+
+        let result = PerformanceService::compute_account_performance(
+            &history,
+            Some(TrackingMode::Transactions),
+            None,
+            false,
+        )
+        .expect("netted in-kind transfer day should compute");
+
+        assert_eq!(result.returns.twr.unwrap().round_dp(4), dec!(0.0100));
+        assert_eq!(result.data_quality.status, DataQualityStatus::Ok);
+        assert!(result.data_quality.warnings.is_empty());
+        assert!(result.data_quality.not_applicable_reasons.is_empty());
+    }
+
+    // Issue #1609: the exact mixture is complete provenance. Same fixture as
+    // the degraded mixture above; its returns and data quality must match a
+    // plain cash flow exactly, with no provenance warning.
+    #[test]
+    fn mixed_exact_flow_source_is_clean_and_computable() {
+        let compute = |source: ExternalFlowSource| {
+            let mut history = vec![
+                valuation("2026-04-01", dec!(1000), dec!(1000), dec!(1000), dec!(1000)),
+                valuation("2026-04-02", dec!(1110), dec!(1100), dec!(1110), dec!(1000)),
+            ];
+            history[1].external_inflow_base = dec!(100);
+            history[1].external_flow_source = source;
+            PerformanceService::compute_account_performance(
+                &history,
+                Some(TrackingMode::Transactions),
+                None,
+                false,
+            )
+            .expect("known-source flow should compute")
+        };
+
+        let exact = compute(ExternalFlowSource::MixedExact);
+        let control = compute(ExternalFlowSource::CashAmount);
+        let degraded = compute(ExternalFlowSource::Mixed);
+
+        assert_eq!(exact.returns.twr.unwrap().round_dp(4), dec!(0.0091));
+        assert_eq!(exact.returns.twr, control.returns.twr);
+        assert_eq!(exact.returns.irr, control.returns.irr);
+        assert_eq!(exact.data_quality.status, control.data_quality.status);
+        assert_eq!(exact.data_quality.warnings, control.data_quality.warnings);
+        assert_eq!(
+            exact.data_quality.not_applicable_reasons,
+            control.data_quality.not_applicable_reasons
+        );
+        assert!(exact
+            .data_quality
+            .warnings
+            .iter()
+            .all(|warning| !warning.starts_with("External cash flow")));
+
+        // The degraded mixture differs from the exact one by exactly the
+        // provenance warning.
+        let provenance: Vec<_> = degraded
+            .data_quality
+            .warnings
+            .iter()
+            .filter(|warning| !exact.data_quality.warnings.contains(warning))
+            .collect();
+        assert_eq!(provenance.len(), 1);
+        assert!(provenance[0].contains("External cash flow provenance is incomplete"));
+        assert_eq!(degraded.data_quality.status, DataQualityStatus::Partial);
+    }
+
+    // The exact mixture is explicit gross: the stored amounts are used as-is,
+    // never re-derived from the net-contribution delta.
+    #[test]
+    fn daily_external_flows_read_stored_gross_for_mixed_exact() {
+        let prev = valuation("2026-04-01", dec!(1000), dec!(1000), dec!(1000), dec!(1000));
+        let mut curr = valuation("2026-04-02", dec!(1200), dec!(1200), dec!(1200), dec!(1200));
+        curr.external_inflow_base = dec!(150);
+        curr.external_outflow_base = dec!(30);
+        curr.external_flow_source = ExternalFlowSource::MixedExact;
+
+        let flow =
+            PerformanceService::daily_external_flows(&prev, &curr, ExternalFlowBasis::BaseCurrency);
+
+        assert_eq!(flow.inflow, dec!(150));
+        assert_eq!(flow.outflow, dec!(30));
+        assert_eq!(flow.source, ExternalFlowSource::MixedExact);
+        assert!(!flow.source.is_degraded());
+    }
+
+    #[test]
+    fn external_flow_quality_warnings_ignore_mixed_exact() {
+        let flow = |source: ExternalFlowSource| DailyExternalFlow {
+            date: NaiveDate::from_ymd_opt(2026, 4, 2).unwrap(),
+            inflow: dec!(100),
+            outflow: Decimal::ZERO,
+            source,
+        };
+
+        assert!(PerformanceService::external_flow_quality_warnings(&[flow(
+            ExternalFlowSource::MixedExact
+        )])
+        .is_empty());
+        let degraded =
+            PerformanceService::external_flow_quality_warnings(&[flow(ExternalFlowSource::Mixed)]);
+        assert_eq!(degraded.len(), 1);
+        assert!(degraded[0].contains("External cash flow provenance is incomplete"));
+    }
+
+    // HOLDINGS-mode helpers key off `is_explicit_gross`, so the exact mixture
+    // is netted like any other gross flow and the fallback row is ignored.
+    #[test]
+    fn holdings_flow_helpers_treat_mixed_exact_as_explicit_gross() {
+        let date = NaiveDate::from_ymd_opt(2026, 4, 2).unwrap();
+        let flows = [
+            DailyExternalFlow {
+                date,
+                inflow: dec!(100),
+                outflow: dec!(30),
+                source: ExternalFlowSource::MixedExact,
+            },
+            DailyExternalFlow {
+                date,
+                inflow: dec!(999),
+                outflow: Decimal::ZERO,
+                source: ExternalFlowSource::NetContributionFallback,
+            },
+        ];
+
+        assert_eq!(
+            PerformanceService::net_explicit_gross_flow(&flows),
+            dec!(70)
+        );
+        assert!(PerformanceService::has_estimated_holdings_flows(&flows));
+        assert!(!PerformanceService::has_estimated_holdings_flows(
+            &flows[1..]
+        ));
     }
 
     #[test]

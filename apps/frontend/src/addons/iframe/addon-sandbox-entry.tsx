@@ -17,6 +17,11 @@ import { SandboxAddonAssetRegistry, type SandboxAddonAsset } from "./addon-sandb
 import { applyHostTheme, type AddonThemeSnapshot } from "./addon-sandbox-theme";
 import { rewriteModuleSpecifiers } from "./addon-module-rewriter";
 import type { AddonLocalizationSnapshot } from "./addon-sandbox-localization";
+import {
+  initSandboxI18n,
+  installAddonTranslationRuntime,
+  setSandboxLanguage,
+} from "./addon-sandbox-i18n";
 
 const CHANNEL = "wealthfolio:addon-sandbox:v1";
 const RUNTIME_PROTOCOL_VERSION = 1;
@@ -97,6 +102,11 @@ if (!ADDON_ID || !NONCE || !HOST_BASE_URL || !rootElement) {
 
 const root = rootElement;
 
+// Bootstrap i18next before any addon (and its `@wealthfolio/ui` components)
+// render, seeded from the bootstrap params so there is no flash of raw keys.
+initSandboxI18n(sandboxLocalization.uiLocale);
+installAddonTranslationRuntime(ADDON_ID);
+
 function post(type: string, payload: Record<string, unknown> = {}) {
   parent.postMessage({ channel: CHANNEL, addonId: ADDON_ID, nonce: NONCE, type, ...payload }, "*");
 }
@@ -109,8 +119,17 @@ function callHost(type: string, payload: Record<string, unknown> = {}) {
   });
 }
 
-globalThis.__wealthfolioRequestTickerLogo = (symbol: string) =>
-  callHost("hostAssetRequest", { kind: "tickerLogo", symbol }) as Promise<Blob | null>;
+globalThis.__wealthfolioRequestTickerLogo = (
+  symbol: string,
+  exchangeMic?: string | null,
+  instrumentType?: string | null,
+) =>
+  callHost("hostAssetRequest", {
+    kind: "tickerLogo",
+    symbol,
+    exchangeMic,
+    instrumentType,
+  }) as Promise<Blob | null>;
 
 function createAddonAssetRegistry(assets: SandboxAddonAsset[] = []) {
   return new SandboxAddonAssetRegistry(
@@ -145,6 +164,7 @@ function updateSandboxLocalization(localization?: AddonLocalizationSnapshot) {
     return;
   }
   sandboxLocalization = localization;
+  setSandboxLanguage(localization.uiLocale);
   for (const listener of localizationListeners) listener();
 }
 

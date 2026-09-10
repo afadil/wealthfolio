@@ -147,6 +147,26 @@ vi.mock("../fields", async () => {
         {children}
       </div>
     ),
+    TradeTotalInput: ({
+      calculatedAmount,
+      onCustomChange,
+    }: {
+      calculatedAmount?: number;
+      onCustomChange: (isCustom: boolean) => void;
+    }) => {
+      const { register } = useFormContext();
+      return (
+        <input
+          data-testid="input-amount"
+          data-calculated-amount={calculatedAmount ?? ""}
+          type="number"
+          {...register("amount", {
+            setValueAs: (value) => (value === "" ? undefined : Number(value)),
+          })}
+          onInput={() => onCustomChange(true)}
+        />
+      );
+    },
     createValidatedSubmit: vi.fn((form, handler) => form.handleSubmit(handler)),
   };
 });
@@ -236,6 +256,89 @@ describe("SellForm", () => {
     holdingsHook.useHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+    });
+  });
+
+  describe("Trade Total", () => {
+    it("does not apply the option contract multiplier to a stock", async () => {
+      const user = userEvent.setup();
+      render(<SellForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      await user.type(screen.getByTestId("input-quantity"), "1");
+      await user.type(screen.getByTestId("input-unitPrice"), "12");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute("data-calculated-amount", "12"),
+      );
+    });
+
+    it("applies the contract multiplier to an option", async () => {
+      const user = userEvent.setup();
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ assetType: "option" }}
+        />,
+      );
+
+      await user.type(screen.getByTestId("input-quantity"), "1");
+      await user.type(screen.getByTestId("input-unitPrice"), "12");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute(
+          "data-calculated-amount",
+          "1200",
+        ),
+      );
+    });
+
+    it("uses the existing asset multiplier as read-only when editing an option", async () => {
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          isEditing
+          defaultValues={{
+            assetType: "option",
+            symbolInstrumentType: "OPTION",
+            contractMultiplier: 10,
+            quantity: 1,
+            unitPrice: 12,
+            amount: 120,
+          }}
+        />,
+      );
+
+      expect(screen.getByLabelText(/contract multiplier/i)).toHaveAttribute("readonly");
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute("data-calculated-amount", "120"),
+      );
+    });
+
+    it("submits a user-typed custom total verbatim", async () => {
+      const user = userEvent.setup();
+      render(
+        <SellForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{
+            accountId: "acc-1",
+            assetId: "AAPL",
+            activityDate: new Date("2026-02-01T10:00:00.000Z"),
+            currency: "USD",
+            quantity: 2,
+            unitPrice: 10,
+            fee: 1,
+          }}
+        />,
+      );
+
+      await user.type(screen.getByTestId("input-amount"), "30");
+      await user.click(screen.getByRole("button", { name: /add sell/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ amount: 30 }));
     });
   });
 

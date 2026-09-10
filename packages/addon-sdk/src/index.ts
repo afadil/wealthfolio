@@ -4,7 +4,7 @@
  * TypeScript SDK for building Wealthfolio addons with enhanced functionality,
  * type safety, and comprehensive permission management.
  *
- * @version 3.7.0
+ * @version 3.9.0
  * @author Wealthfolio Team
  * @license MIT
  */
@@ -112,6 +112,15 @@ export { HOST_DEPENDENCIES } from './host-dependencies';
 // Sidebar icon names (see SidebarItemConfig.icon)
 export { ADDON_ICON_NAMES } from './icons';
 export type { AddonIconName } from './icons';
+
+// Addon translations (implemented by the host sandbox)
+export { registerTranslations, useAddonTranslation } from './i18n';
+export type {
+  AddonTranslationApi,
+  AddonTranslationBundle,
+  AddonTranslationResources,
+  AddonTranslationRuntime,
+} from './i18n';
 
 /**
  * Addons receive their context as a parameter to the enable() function.

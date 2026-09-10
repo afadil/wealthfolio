@@ -31,6 +31,10 @@ describe("RecoveryDialog", () => {
       ),
     ).toBeInTheDocument();
 
+    expect(
+      screen.getByRole("button", { name: "Set Up This Device Again" }).parentElement,
+    ).toHaveClass("max-sm:[&>button]:whitespace-normal", "sm:flex-wrap");
+
     fireEvent.click(screen.getByRole("button", { name: "Set Up This Device Again" }));
 
     expect(hookMocks.mutateAsync).toHaveBeenCalledTimes(1);

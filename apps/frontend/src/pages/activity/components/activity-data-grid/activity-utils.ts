@@ -3,12 +3,12 @@ import {
   isAssetIdentityRequired,
   isCashActivity,
   isCashTransfer,
-  isIncomeActivity,
+  isSecuritiesTransfer,
 } from "@/lib/activity-utils";
 import { buildAssetResolutionInput, normalizeOptionalString } from "@/lib/asset-resolution-input";
-import { ActivityType, SUBTYPES_BY_ACTIVITY_TYPE } from "@/lib/constants";
+import { ActivityStatus, ActivityType, SUBTYPES_BY_ACTIVITY_TYPE } from "@/lib/constants";
 import type { Account } from "@/lib/types";
-import { normalizeDecimalString, parseLocalDateTime, toPayloadNumber } from "@/lib/utils";
+import { normalizeDecimalString, parseLocalDateTime } from "@/lib/utils";
 import type {
   ActivityCreatePayload,
   ActivityUpdatePayload,
@@ -18,11 +18,34 @@ import type {
   TransactionUpdateParams,
 } from "./types";
 import { generateTempActivityId } from "./use-activity-grid-state";
+import { calculateIncomeFinalAmount, calculateTradeFinalAmount } from "@/lib/activity-final-amount";
 
 /**
  * Set of numeric field names for value comparison
  */
 const NUMERIC_FIELDS = new Set(["quantity", "unitPrice", "amount", "fee", "tax", "fxRate"]);
+const FINAL_AMOUNT_INPUT_FIELDS = new Set([
+  "activityType",
+  "subtype",
+  "quantity",
+  "unitPrice",
+  "fee",
+  "tax",
+  "instrumentType",
+]);
+const FINAL_CASH_ACTIVITY_TYPES = new Set<string>([
+  ActivityType.BUY,
+  ActivityType.SELL,
+  ActivityType.DEPOSIT,
+  ActivityType.WITHDRAWAL,
+  ActivityType.DIVIDEND,
+  ActivityType.INTEREST,
+  ActivityType.CREDIT,
+  ActivityType.FEE,
+  ActivityType.TAX,
+  ActivityType.TRANSFER_IN,
+  ActivityType.TRANSFER_OUT,
+]);
 
 const isTransferActivity = (activityType: string | undefined): boolean => {
   return activityType === ActivityType.TRANSFER_IN || activityType === ActivityType.TRANSFER_OUT;
@@ -51,6 +74,46 @@ const isAlwaysCashActivity = (
     !isAssetBackedIncomeSubtype(activityType, subtype)
   );
 };
+
+/**
+ * Returns whether a review row has the authoritative cash amount required to
+ * approve it. Security transfers are exempt because only their fee moves cash.
+ */
+export function hasFinalCashAmountForApproval(transaction: LocalTransaction): boolean {
+  if (
+    !FINAL_CASH_ACTIVITY_TYPES.has(transaction.activityType) ||
+    isSecuritiesTransfer(transaction.activityType, transaction.assetSymbol, transaction.assetId)
+  ) {
+    return true;
+  }
+  const amount = normalizeDecimalString(transaction.amount);
+  if (amount === undefined) {
+    return false;
+  }
+  const isTrade =
+    transaction.activityType === ActivityType.BUY || transaction.activityType === ActivityType.SELL;
+  return !isTrade || Number(amount) !== 0 || transaction._amountEdited === true;
+}
+
+export function partitionReviewRowsForApproval(transactions: LocalTransaction[]): {
+  approvable: LocalTransaction[];
+  incomplete: LocalTransaction[];
+} {
+  return transactions.reduce<{
+    approvable: LocalTransaction[];
+    incomplete: LocalTransaction[];
+  }>(
+    (partition, transaction) => {
+      if (hasFinalCashAmountForApproval(transaction)) {
+        partition.approvable.push(transaction);
+      } else {
+        partition.incomplete.push(transaction);
+      }
+      return partition;
+    },
+    { approvable: [], incomplete: [] },
+  );
+}
 
 /**
  * Converts a value to a string for API payloads.
@@ -162,6 +225,7 @@ export function createDraftTransaction(
     assetQuoteMode: undefined,
     subRows: undefined,
     isNew: true,
+    _amountEdited: false,
   };
 }
 
@@ -208,19 +272,40 @@ function applySplitDefaults(transaction: LocalTransaction): LocalTransaction {
   };
 }
 
-function getAssetBackedAmount(
-  quantity: string | null | undefined,
-  unitPrice: string | null | undefined,
-): string | null {
-  const q = quantity != null ? Number.parseFloat(quantity) : NaN;
-  const p = unitPrice != null ? Number.parseFloat(unitPrice) : NaN;
+/**
+ * Fills the amount cell with a preview. The multiplier here is the row's
+ * creation-time seed falling back to the instrument default - an approximation
+ * of the asset's, which the grid does not have. That is why a trade preview is
+ * NOT submitted (see `sendsAmount`): the backend re-derives from the asset.
+ */
+function applyAutomaticFinalAmount(transaction: LocalTransaction): LocalTransaction {
+  if (transaction._amountEdited) return transaction;
 
-  if (!(q > 0) || !(p > 0)) {
-    return null;
+  let finalAmount: number | undefined;
+  if (
+    transaction.activityType === ActivityType.BUY ||
+    transaction.activityType === ActivityType.SELL
+  ) {
+    finalAmount = calculateTradeFinalAmount({
+      activityType: transaction.activityType,
+      instrumentType: transaction.pendingInstrumentType ?? transaction.instrumentType ?? "",
+      quantity: transaction.quantity,
+      unitPrice: transaction.unitPrice,
+      fee: transaction.fee,
+      tax: transaction.tax,
+      contractMultiplier: transaction.metadata?.contract_multiplier,
+    });
+  } else if (isAssetBackedIncomeSubtype(transaction.activityType, transaction.subtype)) {
+    finalAmount = calculateIncomeFinalAmount(
+      transaction.quantity,
+      transaction.unitPrice,
+      transaction.pendingInstrumentType ?? transaction.instrumentType,
+      transaction.metadata?.contract_multiplier,
+    );
   }
 
-  const rounded = toPayloadNumber(q * p);
-  return rounded === undefined ? null : normalizeDecimalString(rounded);
+  if (finalAmount === undefined) return transaction;
+  return { ...transaction, amount: normalizeDecimalString(finalAmount) ?? null };
 }
 
 /**
@@ -252,40 +337,20 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "quantity") {
     const newQty = normalizedDecimalOrNull(value);
     updated = { ...updated, quantity: newQty };
-    if (
-      isAssetBackedIncomeSubtype(updated.activityType, updated.subtype) &&
-      newQty != null &&
-      updated.unitPrice != null
-    ) {
-      const computedAmount = getAssetBackedAmount(newQty, updated.unitPrice);
-      if (computedAmount != null) {
-        updated = { ...updated, amount: computedAmount };
-      }
-    }
     updated = applySplitDefaults(updated);
   } else if (field === "unitPrice") {
     const newUnitPrice = normalizedDecimalOrNull(value);
     updated = { ...updated, unitPrice: newUnitPrice };
-    if (
-      newUnitPrice != null &&
-      (isAlwaysCashActivity(updated.activityType, updated.subtype) ||
-        isIncomeActivity(updated.activityType))
-    ) {
-      if (isAssetBackedIncomeSubtype(updated.activityType, updated.subtype)) {
-        const computedAmount = getAssetBackedAmount(updated.quantity, newUnitPrice);
-        if (computedAmount != null) {
-          updated = { ...updated, amount: computedAmount };
-        }
-      } else {
-        updated = { ...updated, amount: newUnitPrice };
-      }
-    }
     updated = applySplitDefaults(updated);
   } else if (field === "amount") {
     if (value == null || value === "") {
-      updated = { ...updated, amount: null };
+      updated = { ...updated, amount: null, _amountEdited: true };
     } else {
-      updated = { ...updated, amount: normalizeDecimalString(value) ?? null };
+      updated = {
+        ...updated,
+        amount: normalizeDecimalString(value) ?? null,
+        _amountEdited: true,
+      };
     }
   } else if (field === "fee") {
     updated = { ...updated, fee: normalizedDecimalOrNull(value) };
@@ -320,8 +385,18 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     const nextSubtype = isSubtypeAllowedForActivityType(nextActivityType, updated.subtype)
       ? updated.subtype
       : undefined;
+    const nextHasAutomaticAmount =
+      nextActivityType === ActivityType.BUY ||
+      nextActivityType === ActivityType.SELL ||
+      isAssetBackedIncomeSubtype(nextActivityType, nextSubtype);
 
-    updated = { ...updated, activityType: nextActivityType, subtype: nextSubtype };
+    updated = {
+      ...updated,
+      activityType: nextActivityType,
+      subtype: nextSubtype,
+      amount: nextHasAutomaticAmount ? null : updated.amount,
+      _amountEdited: !nextHasAutomaticAmount,
+    };
     if (wasAssetBacked && !isAssetBackedIncomeSubtype(nextActivityType, nextSubtype)) {
       updated = { ...updated, quantity: null, unitPrice: null };
     }
@@ -350,23 +425,19 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "subtype") {
     const wasAssetBacked = isAssetBackedIncomeSubtype(updated.activityType, updated.subtype);
     const newSubtype = typeof value === "string" && value ? value : undefined;
+    const isAssetBacked = isAssetBackedIncomeSubtype(updated.activityType, newSubtype);
     updated = { ...updated, subtype: newSubtype };
-    if (
-      isAssetBackedIncomeSubtype(updated.activityType, newSubtype) &&
-      updated.assetSymbol === "CASH"
-    ) {
+    if (wasAssetBacked !== isAssetBacked) {
+      updated = {
+        ...updated,
+        amount: isAssetBacked ? null : updated.amount,
+        _amountEdited: !isAssetBacked,
+      };
+    }
+    if (isAssetBacked && updated.assetSymbol === "CASH") {
       updated = { ...updated, assetSymbol: "", assetId: "" };
     }
-    if (
-      isAssetBackedIncomeSubtype(updated.activityType, newSubtype) &&
-      updated.quantity != null &&
-      updated.unitPrice != null
-    ) {
-      const computedAmount = getAssetBackedAmount(updated.quantity, updated.unitPrice);
-      if (computedAmount != null) {
-        updated = { ...updated, amount: computedAmount };
-      }
-    } else if (wasAssetBacked) {
+    if (wasAssetBacked && !isAssetBackedIncomeSubtype(updated.activityType, newSubtype)) {
       updated = { ...updated, quantity: null, unitPrice: null };
     }
     updated = applyCashDefaults(updated, resolveTransactionCurrency, fallbackCurrency);
@@ -379,6 +450,9 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     updated = { ...updated, instrumentType, pendingInstrumentType: instrumentType };
   }
 
+  if (FINAL_AMOUNT_INPUT_FIELDS.has(field)) {
+    updated = applyAutomaticFinalAmount(updated);
+  }
   return { ...updated, updatedAt: new Date() };
 }
 
@@ -469,9 +543,13 @@ export function buildSavePayload(
       transaction.activityType === ActivityType.TRANSFER_OUT;
     const supportsBoundary = isTransfer || transaction.activityType === ActivityType.CREDIT;
     const assetSymbol = (transaction.assetSymbol || "").trim();
+    const isSymbolBackedAdjustment =
+      transaction.activityType === ActivityType.ADJUSTMENT && Boolean(assetSymbol);
     const isCash = isTransfer
       ? isCashTransfer(transaction.activityType, assetSymbol) || !assetSymbol
-      : isAlwaysCashActivity(transaction.activityType, transaction.subtype);
+      : transaction.activityType === ActivityType.ADJUSTMENT
+        ? !isSymbolBackedAdjustment
+        : isAlwaysCashActivity(transaction.activityType, transaction.subtype);
     // For assets not in our lookup (new assets), send undefined currency to let the backend
     // derive it from the asset and properly register the FX pair if needed.
     // Only use account currency fallback for cash activities where the currency is deterministic.
@@ -514,6 +592,7 @@ export function buildSavePayload(
       currency: currencyForPayload,
       fee: toDecimalString(transaction.fee),
       tax: toDecimalString(transaction.tax),
+      status: transaction.status,
       fxRate,
       notes: transaction.comment?.trim() || undefined,
       metadata: metadataJson,
@@ -525,8 +604,31 @@ export function buildSavePayload(
       basePayload.unitPrice = undefined;
     }
 
+    // The amount travels only when the user typed it - the backend derives
+    // trade totals from the resolved asset, and a client-computed preview
+    // (possibly priced with an unresolved multiplier) must not be persisted.
+    // Asset-backed income composites are the exception: their amount tracks
+    // quantity x price client-side (as in the dividend/interest forms)
+    // because the backend only derives composite amounts that are missing.
+    const sendsAmount =
+      transaction._amountEdited ||
+      isAssetBackedIncomeSubtype(transaction.activityType, transaction.subtype);
+
+    // A trade total the user typed into the grid is already confirmed;
+    // attest so the backend's confidence check does not queue it for review.
+    // Drafts stay in their queue until explicitly approved and posted.
+    const attestsCustomTotal =
+      transaction._amountEdited === true &&
+      (transaction.activityType === ActivityType.BUY ||
+        transaction.activityType === ActivityType.SELL) &&
+      transaction.status !== ActivityStatus.DRAFT;
+
     if (isNew) {
-      const createPayload: ActivityCreatePayload = { ...basePayload };
+      const createPayload: ActivityCreatePayload = {
+        ...basePayload,
+        amount: sendsAmount ? basePayload.amount : undefined,
+        ...(attestsCustomTotal && { needsReview: false }),
+      };
       const idempotencyKey = normalizeOptionalString(transaction.idempotencyKey);
       if (idempotencyKey) {
         createPayload.idempotencyKey = idempotencyKey;
@@ -554,11 +656,24 @@ export function buildSavePayload(
 
       creates.push(createPayload);
     } else {
-      // Build UPDATE payload
+      // needsReview travels only when it changed - sending false on every save
+      // would read as a standing approval and mute the confidence check. A
+      // total the user typed this session is the exception: that edit is its
+      // own review, so it attests explicitly.
       const updatePayload: ActivityUpdatePayload = {
         ...basePayload,
+        amount: sendsAmount ? basePayload.amount : undefined,
         subtype: transaction.subtype ?? "",
+        needsReview: attestsCustomTotal
+          ? false
+          : transaction.needsReview === transaction._originalNeedsReview
+            ? undefined
+            : transaction.needsReview,
       };
+
+      if (isCash && transaction._originalAssetId) {
+        updatePayload.asset = {};
+      }
 
       if (!isCash) {
         const currentSymbol = (transaction.assetSymbol || "").trim().toUpperCase();
@@ -737,6 +852,18 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
         message: "Either income amount or FMV per unit is required",
       });
     }
+  }
+
+  if (
+    transaction._originalNeedsReview === true &&
+    transaction.needsReview === false &&
+    !hasFinalCashAmountForApproval(transaction)
+  ) {
+    errors.push({
+      transactionId: transaction.id,
+      field: "amount",
+      message: "Final cash amount is required before approval",
+    });
   }
 
   // Validate non-negative values for certain fields

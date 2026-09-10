@@ -153,7 +153,8 @@
     "maturity": "만기",
     "type": "유형",
     "strike": "행사가",
-    "expiry": "만료"
+    "expiry": "만료",
+    "multiplier": "승수"
   },
   "profile": {
     "overview": "개요",
@@ -241,7 +242,7 @@
     "cancel": "취소",
     "currency_required": "통화를 선택해주세요",
     "base_currency": "기준 통화",
-    "quote_currency": "상대통화",
+    "quote_currency": "호가 통화",
     "name": "이름",
     "name_placeholder": "자산 표시 이름",
     "isin": "ISIN",
@@ -256,6 +257,18 @@
     "exchange": "거래소",
     "select_exchange": "거래소 선택",
     "search_exchanges": "거래소 검색...",
+    "contract_multiplier": "계약 승수",
+    "contract_multiplier_hint": "계약 하나가 나타내는 기초자산 단위 수입니다. 비워 두면 표준값 {{default}}을(를) 사용합니다.",
+    "maturity_date": "만기일",
+    "coupon_rate": "쿠폰 금리 (%)",
+    "coupon_frequency": "쿠폰 지급 주기",
+    "select_frequency": "주기 선택",
+    "couponFrequency": {
+      "ANNUAL": "연 1회",
+      "SEMI_ANNUAL": "연 2회",
+      "QUARTERLY": "분기별",
+      "ZERO": "무이표"
+    },
     "saving": "저장하는 중...",
     "saving_short": "저장 중",
     "save_changes": "변경사항 저장",
@@ -699,5 +712,34 @@
     "delete_count_other": "삭제 ({{count}})",
     "modified_other": "{{count}}개 수정됨",
     "to_delete_other": "{{count}}개 삭제 예정"
+  },
+  "logo": {
+    "change": "로고 변경",
+    "title": "자산 로고",
+    "badge_default": "기본",
+    "badge_custom": "사용자 지정",
+    "updated_at": "{{date}} 업데이트됨",
+    "dropzone_cta": "이미지 선택",
+    "dropzone_or_drop": "또는 여기에 끌어다 놓기",
+    "dropzone_hint": "PNG, JPEG, WebP 또는 SVG · 256×256 PNG로 크기 조정됨",
+    "processing": "이미지 준비 중…",
+    "preview_title": "미리보기",
+    "preview_new": "새 로고",
+    "preview_current": "현재 로고",
+    "preview_card": "보유 카드",
+    "preview_table": "보유 종목 표",
+    "preview_list": "활동 목록",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (원본 {{original}})",
+    "choose_different": "다른 이미지 선택",
+    "save": "로고 저장",
+    "reset": "기본값으로 재설정",
+    "saved": "로고가 저장되었습니다.",
+    "reset_done": "로고가 기본값으로 재설정되었습니다.",
+    "error_unsupported_type": "지원되지 않는 파일입니다. PNG, JPEG, WebP 또는 SVG 이미지를 사용하세요.",
+    "error_too_large_input": "파일이 너무 큽니다. 10 MB 미만의 이미지를 선택하세요.",
+    "error_decode_failed": "파일을 이미지로 읽을 수 없습니다.",
+    "error_encode_failed": "이미지를 PNG로 변환할 수 없습니다.",
+    "error_too_large_output": "이미지가 너무 복잡하여 150 KB에 맞출 수 없습니다. 더 단순하거나 작은 이미지를 사용해 보세요.",
+    "error_save_failed": "로고를 저장할 수 없습니다."
   }
 }

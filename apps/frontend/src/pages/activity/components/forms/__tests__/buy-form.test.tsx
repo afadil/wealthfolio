@@ -141,6 +141,26 @@ vi.mock("../fields", async () => {
       );
     },
     StockTradeIntentSelector: () => <div data-testid="stock-trade-intent-selector" />,
+    TradeTotalInput: ({
+      calculatedAmount,
+      onCustomChange,
+    }: {
+      calculatedAmount?: number;
+      onCustomChange: (isCustom: boolean) => void;
+    }) => {
+      const { register } = useFormContext();
+      return (
+        <input
+          data-testid="input-amount"
+          data-calculated-amount={calculatedAmount ?? ""}
+          type="number"
+          {...register("amount", {
+            setValueAs: (value) => (value === "" ? undefined : Number(value)),
+          })}
+          onInput={() => onCustomChange(true)}
+        />
+      );
+    },
     createValidatedSubmit: vi.fn((form, handler) => form.handleSubmit(handler)),
   };
 });
@@ -208,6 +228,176 @@ describe("BuyForm", () => {
     holdingsHook.useHoldings.mockReturnValue({
       holdings: [],
       isLoading: false,
+    });
+  });
+
+  describe("Trade Total", () => {
+    it("does not apply the option contract multiplier to a stock", async () => {
+      const user = userEvent.setup();
+      render(<BuyForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      await user.type(screen.getByTestId("input-quantity"), "1");
+      await user.type(screen.getByTestId("input-unitPrice"), "12");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute("data-calculated-amount", "12"),
+      );
+    });
+
+    it("applies the contract multiplier to an option", async () => {
+      const user = userEvent.setup();
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ assetType: "option" }}
+        />,
+      );
+
+      await user.type(screen.getByTestId("input-quantity"), "1");
+      await user.type(screen.getByTestId("input-unitPrice"), "12");
+
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute(
+          "data-calculated-amount",
+          "1200",
+        ),
+      );
+    });
+
+    it("uses the existing asset multiplier as read-only when editing an option", async () => {
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          isEditing
+          defaultValues={{
+            assetType: "option",
+            symbolInstrumentType: "OPTION",
+            contractMultiplier: 10,
+            quantity: 1,
+            unitPrice: 12,
+            amount: 120,
+          }}
+        />,
+      );
+
+      expect(screen.getByLabelText(/contract multiplier/i)).toHaveAttribute("readonly");
+      await waitFor(() =>
+        expect(screen.getByTestId("input-amount")).toHaveAttribute("data-calculated-amount", "120"),
+      );
+    });
+
+    it("submits a user-typed custom total verbatim", async () => {
+      const user = userEvent.setup();
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{
+            accountId: "acc-1",
+            assetId: "AAPL",
+            activityDate: new Date("2026-02-01T10:00:00.000Z"),
+            currency: "USD",
+            quantity: 2,
+            unitPrice: 10,
+            fee: 1,
+          }}
+        />,
+      );
+
+      await user.type(screen.getByTestId("input-amount"), "30");
+      await user.click(screen.getByRole("button", { name: /add buy/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ amount: 30 }));
+    });
+
+    it("recalculates on edit when the stored total was never custom", async () => {
+      const user = userEvent.setup();
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          isEditing
+          defaultValues={{
+            accountId: "acc-1",
+            assetId: "AAPL",
+            activityDate: new Date("2026-02-01T10:00:00.000Z"),
+            currency: "USD",
+            quantity: 2,
+            unitPrice: 10,
+            fee: 1,
+            // Equals the calculated total (2 x 10 + 1): not a custom value.
+            amount: 21,
+          }}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      const payload = mockOnSubmit.mock.calls[0][0];
+      // null asks the backend to recalculate from the (possibly edited)
+      // economics instead of freezing the old stored total.
+      expect(payload.amount).toBeNull();
+      expect(payload).not.toHaveProperty("needsReview");
+    });
+
+    it("does not attest a stored custom total the user never touched", async () => {
+      const user = userEvent.setup();
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          isEditing
+          defaultValues={{
+            accountId: "acc-1",
+            assetId: "AAPL",
+            activityDate: new Date("2026-02-01T10:00:00.000Z"),
+            currency: "USD",
+            quantity: 2,
+            unitPrice: 10,
+            fee: 1,
+            amount: 30,
+          }}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /update/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      const payload = mockOnSubmit.mock.calls[0][0];
+      // The stored custom total is re-sent, but without an attestation the
+      // backend keeps the right to flag it if the economics changed.
+      expect(payload.amount).toBe(30);
+      expect(payload).not.toHaveProperty("needsReview");
+    });
+
+    it("omits amount and attestation when the total stays calculated", async () => {
+      const user = userEvent.setup();
+      render(
+        <BuyForm
+          accounts={mockAccounts}
+          onSubmit={mockOnSubmit}
+          defaultValues={{
+            accountId: "acc-1",
+            assetId: "AAPL",
+            activityDate: new Date("2026-02-01T10:00:00.000Z"),
+            currency: "USD",
+            quantity: 2,
+            unitPrice: 10,
+            fee: 1,
+          }}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /add buy/i }));
+
+      await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1));
+      const payload = mockOnSubmit.mock.calls[0][0];
+      expect(payload.amount).toBeUndefined();
+      expect(payload).not.toHaveProperty("needsReview");
     });
   });
 

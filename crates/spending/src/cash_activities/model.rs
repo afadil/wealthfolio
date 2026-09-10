@@ -142,6 +142,45 @@ pub struct CashActivity {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transfer_link_status: Option<TransferLinkStatus>,
+    /// Signed cash movement in this row's own currency: positive when money
+    /// entered the account, negative when it left, zero when the row moves no
+    /// cash (an unposted row, for instance).
+    ///
+    /// Produced by the same resolver that builds account cash balances, so a
+    /// client can sum these directly rather than re-deriving a sign, and the
+    /// figures it shows agree with the account page by construction.
+    pub net_amount: f64,
+    /// `net_amount` in the caller's base currency, converted at this row's own
+    /// date. `None` when the caller asked for no conversion, or when this row's
+    /// currency has no rate at all.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_amount_base: Option<f64>,
+}
+
+/// A signed net in one currency.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrencyNet {
+    pub currency: String,
+    pub amount: f64,
+}
+
+/// The net of a filtered set, summed before pagination so it describes the
+/// filter rather than the page.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NetSummary {
+    /// Always populated. Uses no exchange rates, so it cannot be wrong.
+    /// Currencies that net to nothing are omitted.
+    pub by_currency: Vec<CurrencyNet>,
+    /// One figure in the base currency, for readers who want a single number.
+    ///
+    /// `None` when there is nothing to convert (a single currency contributes,
+    /// so `by_currency` already is the total) or when any contributing currency
+    /// has no rate at all — a converted total that silently omitted those rows
+    /// would be worse than no total.
+    pub converted: Option<CurrencyNet>,
 }
 
 /// Paginated response for cash-activity search.
@@ -151,4 +190,21 @@ pub struct CashActivitySearchResponse {
     pub items: Vec<CashActivity>,
     /// Total rows matching the filters (for pagination UI).
     pub total_count: usize,
+    /// Net over the whole filtered set.
+    ///
+    /// Only the first page carries it (`None` afterwards): clients refetch page
+    /// one on every filter change, so later pages would only recompute the same
+    /// answer.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net: Option<NetSummary>,
+    /// Currency that `net_amount_base` on each row — and `net.converted` — are
+    /// denominated in. `None` when no conversion was requested.
+    ///
+    /// Reported rather than left to the client to infer from its own settings:
+    /// a cached response outlives a settings change, and labelling those amounts
+    /// with the new currency would state a figure in a currency it is not in.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_currency: Option<String>,
 }

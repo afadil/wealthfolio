@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +34,43 @@ impl RuleMatchType {
     }
 }
 
+/// Comparison operator for the optional amount condition. Compares against the
+/// activity's unsigned amount (direction is carried by activity type, not sign).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleAmountOp {
+    Eq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Between,
+}
+
+impl RuleAmountOp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Eq => "eq",
+            Self::Gt => "gt",
+            Self::Gte => "gte",
+            Self::Lt => "lt",
+            Self::Lte => "lte",
+            Self::Between => "between",
+        }
+    }
+    pub fn try_parse(s: &str) -> Option<Self> {
+        match s {
+            "eq" => Some(Self::Eq),
+            "gt" => Some(Self::Gt),
+            "gte" => Some(Self::Gte),
+            "lt" => Some(Self::Lt),
+            "lte" => Some(Self::Lte),
+            "between" => Some(Self::Between),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategorizationRule {
@@ -43,6 +81,11 @@ pub struct CategorizationRule {
     pub taxonomy_id: Option<String>,
     pub category_id: Option<String>,
     pub activity_type: Option<String>,
+    /// Optional amount condition on the activity's unsigned amount.
+    /// `amount_value2` is the upper bound, used only when `amount_op` is `Between`.
+    pub amount_op: Option<RuleAmountOp>,
+    pub amount_value: Option<Decimal>,
+    pub amount_value2: Option<Decimal>,
     pub priority: i32,
     pub is_global: bool,
     pub account_id: Option<String>,
@@ -68,6 +111,9 @@ pub struct NewCategorizationRule {
     pub taxonomy_id: Option<String>,
     pub category_id: Option<String>,
     pub activity_type: Option<String>,
+    pub amount_op: Option<RuleAmountOp>,
+    pub amount_value: Option<Decimal>,
+    pub amount_value2: Option<Decimal>,
     #[serde(default)]
     pub priority: i32,
     #[serde(default = "default_true")]
@@ -98,6 +144,12 @@ pub struct UpdateCategorizationRule {
     pub category_id: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_string")]
     pub activity_type: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional")]
+    pub amount_op: Option<Option<RuleAmountOp>>,
+    #[serde(default, deserialize_with = "deserialize_optional")]
+    pub amount_value: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "deserialize_optional")]
+    pub amount_value2: Option<Option<Decimal>>,
     pub priority: Option<i32>,
     pub is_global: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_optional_string")]
@@ -109,6 +161,14 @@ where
     D: serde::Deserializer<'de>,
 {
     Option::<String>::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_optional<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 #[cfg(test)]
@@ -153,5 +213,50 @@ mod tests {
         assert_eq!(patch.category_id, None);
         assert_eq!(patch.activity_type, None);
         assert_eq!(patch.account_id, None);
+        assert_eq!(patch.amount_op, None);
+        assert_eq!(patch.amount_value, None);
+        assert_eq!(patch.amount_value2, None);
+    }
+
+    #[test]
+    fn try_parse_rejects_unknown_amount_op() {
+        assert_eq!(RuleAmountOp::try_parse("gt"), Some(RuleAmountOp::Gt));
+        assert_eq!(
+            RuleAmountOp::try_parse("between"),
+            Some(RuleAmountOp::Between)
+        );
+        assert_eq!(RuleAmountOp::try_parse("approx"), None);
+        assert_eq!(RuleAmountOp::try_parse(""), None);
+    }
+
+    #[test]
+    fn update_rule_amount_fields_are_triple_state() {
+        // Explicit nulls mean "clear".
+        let patch: UpdateCategorizationRule = serde_json::from_value(serde_json::json!({
+            "amountOp": null,
+            "amountValue": null,
+            "amountValue2": null
+        }))
+        .expect("deserialize patch");
+        assert_eq!(patch.amount_op, Some(None));
+        assert_eq!(patch.amount_value, Some(None));
+        assert_eq!(patch.amount_value2, Some(None));
+
+        // Values deserialize from JSON numbers (serde-float Decimal).
+        let patch: UpdateCategorizationRule = serde_json::from_value(serde_json::json!({
+            "amountOp": "between",
+            "amountValue": 45.5,
+            "amountValue2": 55
+        }))
+        .expect("deserialize patch");
+        assert_eq!(patch.amount_op, Some(Some(RuleAmountOp::Between)));
+        assert_eq!(
+            patch.amount_value,
+            Some(Some("45.5".parse::<Decimal>().unwrap()))
+        );
+        assert_eq!(
+            patch.amount_value2,
+            Some(Some("55".parse::<Decimal>().unwrap()))
+        );
     }
 }

@@ -24,30 +24,18 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next";
 import { createColumnHelper } from "@tanstack/react-table";
 import type { Quote } from "@/lib/types";
+import { parseLocalDate } from "@/lib/utils";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { ValueHistoryToolbar } from "./value-history-toolbar";
 import { format } from "date-fns";
 
-const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const UTC_MIDNIGHT_REGEX = /^\d{4}-\d{2}-\d{2}T00:00:00(?:\.\d+)?Z$/;
 const MOBILE_PAGE_SIZE = 20;
-
-// Parse YYYY-MM-DD as local midnight to avoid timezone shifts in date-only values.
-const parseLocalDate = (dateOnly: string): Date => new Date(dateOnly + "T00:00:00");
-
-// Preserve legacy non-midnight timestamps while treating canonical midnight UTC as date-only.
-const parseCalendarDate = (value: string): Date => {
-  const trimmed = value.trim();
-  if (DATE_ONLY_REGEX.test(trimmed)) return parseLocalDate(trimmed);
-  if (UTC_MIDNIGHT_REGEX.test(trimmed)) return parseLocalDate(trimmed.substring(0, 10));
-  return new Date(trimmed);
-};
 
 // Helper to normalize date values (handles both Date objects and strings from DateCell)
 const normalizeDate = (value: Date | string): Date => {
   if (value instanceof Date) return value;
-  return parseCalendarDate(value);
+  return parseLocalDate(value);
 };
 
 // Round number to 2 decimal places (standard for alternative assets)
@@ -88,10 +76,11 @@ interface ValueHistoryDataGridProps {
 // Generate a temporary ID for new entries
 const generateTempId = () => `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+// Quotes use the UTC calendar day; keep that day in local date-picker state.
 // Convert Quote to ValueHistoryEntry with rounding
 const toValueHistoryEntry = (quote: Quote): ValueHistoryEntry => ({
   id: quote.id,
-  date: parseCalendarDate(quote.timestamp),
+  date: parseLocalDate(quote.timestamp),
   value: roundToDecimals(quote.close),
   notes: quote.notes ?? "",
   currency: quote.currency,

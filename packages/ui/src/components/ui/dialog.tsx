@@ -4,7 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "../../lib/utils";
+import { cn, isKeyboardEventComposing } from "../../lib/utils";
 import { Icons } from "./icons";
 import { Sheet, SheetContent } from "./sheet";
 
@@ -128,18 +128,27 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
       mobileClassName = "h-[90vh] overflow-y-auto",
       side = "bottom",
       showCloseButton = true,
+      onEscapeKeyDown,
       ...props
     },
     ref,
   ) => {
     const { t } = useTranslation();
     const { isMobile } = React.useContext(DialogContext);
+    const handleEscapeKeyDown = (event: KeyboardEvent) => {
+      if (isKeyboardEventComposing(event)) {
+        event.preventDefault();
+        return;
+      }
+      onEscapeKeyDown?.(event);
+    };
 
     if (isMobile) {
       return (
         <SheetContent
           side={side}
           showCloseButton={showCloseButton}
+          onEscapeKeyDown={handleEscapeKeyDown}
           className={cn(mobileClassName, "!rounded-t-4xl mx-1", className)}
         >
           {children}
@@ -153,8 +162,9 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
         <DialogPrimitive.Content
           ref={ref}
           data-slot="dialog-content"
+          onEscapeKeyDown={handleEscapeKeyDown}
           className={cn(
-            "bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200",
+            "bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 [&>*]:min-w-0",
             className,
           )}
           {...props}
@@ -194,7 +204,10 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end max-sm:[&_button]:h-auto max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-0 max-sm:[&_button]:max-w-full max-sm:[&_button]:shrink max-sm:[&_button]:whitespace-normal",
+        className,
+      )}
       {...props}
     />
   );

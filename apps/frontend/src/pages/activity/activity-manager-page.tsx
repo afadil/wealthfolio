@@ -248,6 +248,7 @@ const ActivityManagerPage = () => {
               {restrictionLevel !== "blocked" && (
                 <ActivityFormRenderer
                   selectedType={selectedType}
+                  formIdentity={initialActivity?.id}
                   accounts={accountOptions}
                   defaultValues={defaultValues}
                   onSubmit={handleSubmit}

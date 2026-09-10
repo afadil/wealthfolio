@@ -19,6 +19,7 @@ import { useImportContext } from "../context";
 import { setImportResult, nextStep } from "../context/import-actions";
 import { buildNewAssetFromDraft } from "../utils/asset-review-utils";
 import {
+  analyzeDateColumn,
   buildHoldingsRowResolutionMap,
   parseDateToYMD,
   parseHoldingsSnapshots,
@@ -328,10 +329,18 @@ export function HoldingsConfirmStep() {
         const fieldMappings = (enrichedMapping?.fieldMappings || {}) as Record<string, string>;
         const dateHeader = fieldMappings[HoldingsFormat.DATE];
         const dateIndex = dateHeader ? headers.indexOf(dateHeader) : -1;
+        // Same day/month order the snapshots were parsed with, or these dates
+        // will not match the snapshot keys they are being checked against.
+        const { order: dateOrder } = analyzeDateColumn(
+          headers,
+          parsedRows,
+          fieldMappings,
+          parseOptions.dateFormat,
+        );
         const belongsToValidSnapshot = (rowIndex: number) => {
           if (dateIndex < 0 || rowIndex < 0) return false;
           const rawDate = parsedRows[rowIndex]?.[dateIndex] ?? "";
-          const snapshotDate = parseDateToYMD(rawDate, parseOptions.dateFormat);
+          const snapshotDate = parseDateToYMD(rawDate, parseOptions.dateFormat, dateOrder);
           return snapshotDate !== null && validSnapshotDates.has(snapshotDate);
         };
         const validAssetKeys = new Set(

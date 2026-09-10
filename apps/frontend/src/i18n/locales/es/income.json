@@ -65,6 +65,7 @@
   "other": "Otros",
   "other_sources_count_one": "{{count}} fuente más",
   "other_sources_count_other": "{{count}} fuentes más",
+  "other_sources_count_many": "{{count}} fuentes más",
   "percent_of_total": "{{percent}}% del total",
   "view_combined": "Combinado",
   "view_by_account": "Por cuenta",

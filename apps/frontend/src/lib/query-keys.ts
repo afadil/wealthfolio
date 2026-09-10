@@ -59,6 +59,7 @@ export const QueryKeys = {
 
   ASSET_DATA: "asset_data",
   ASSETS: "assets",
+  ASSET_LOGO_INDEX: "asset_logo_index",
   LATEST_QUOTES: "latest_quotes",
   IMPORT_MAPPING: "import_mapping",
   IMPORT_TEMPLATES: "import_templates",

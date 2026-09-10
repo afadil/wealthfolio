@@ -14,6 +14,8 @@
   architecture.
 - [Addon API Reference](./addon-api-reference.md) — Complete API documentation
   for addon development.
+- [Addon Localization](./addon-localization.md) — Formatting and translating
+  addon UI for the user's language and region
 - [Addon Packages](./addon-packages.md) — List of available packages and
   dependencies for addon development.
 - [Addon Migration Guide v2 to v3](./addon-migration-guide-v2-to-v3.md) —
@@ -32,6 +34,7 @@
 
 ## 🛠️ Other Resources
 
+- [Addon Localization](./addon-localization.md)
 - [Addon Packages](./addon-packages.md)
 - [Addon Migration Guide v2 to v3](./addon-migration-guide-v2-to-v3.md)
 - [Addon Migration Guide v3.6 to v3.7](./addon-migration-guide-v3.6-to-v3.7.md)

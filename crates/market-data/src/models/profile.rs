@@ -54,7 +54,13 @@ pub struct AssetProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    /// Country of domicile (ISO 3166-1 alpha-2)
+    /// Country of domicile (ISO 3166-1 alpha-2).
+    ///
+    /// Providers send display names — Yahoo `"United States"`, Alpha Vantage
+    /// `"USA"` — and normalise them through
+    /// [`to_iso_alpha2`](super::to_iso_alpha2) on the way out. A spelling that
+    /// resolves to nothing is carried through unchanged rather than dropped, so
+    /// a consumer should read anything longer than two characters as a name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country: Option<String>,
 

@@ -46,7 +46,7 @@ import {
   sanitizeImportMappingForProfile,
 } from "../utils/activity-import-profile";
 
-import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { ImportFormat, type ActivityType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, CsvRowData, ImportTemplateData } from "@/lib/types";
@@ -222,7 +222,7 @@ export function MappingStepUnified() {
         ? findMappedActivityType(csvType, effectiveActivityMappings || {})
         : null;
 
-      if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(symbol))) {
+      if (appType && !shouldResolveImportAsset(appType, csvSubtype, symbol)) {
         return;
       }
 
@@ -384,7 +384,7 @@ export function MappingStepUnified() {
         ? findMappedActivityType(csvType, effectiveActivityMappings || {})
         : null;
 
-      if (appType && (!needsImportAssetResolution(appType, csvSubtype) || isCashSymbol(symbol))) {
+      if (appType && !shouldResolveImportAsset(appType, csvSubtype, symbol)) {
         return;
       }
       if (validateTickerSymbol(symbol) || localMapping.symbolMappings?.[symbol]) return;

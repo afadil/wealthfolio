@@ -35,7 +35,9 @@ export function TransactionsBulkBar({
           {t("spending:transactions.selectedCount", { count: selectedCount })}
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      {/* Wraps: on a phone these four buttons do not fit beside the count, and
+          without it the last one is cut off at the edge of the screen. */}
+      <div className="flex flex-wrap items-center gap-2">
         {categoryScope ? (
           <QuickCategorizePopover
             align="end"

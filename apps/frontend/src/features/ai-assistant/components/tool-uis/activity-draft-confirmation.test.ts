@@ -4,7 +4,10 @@ import singleDraftUiSource from "./record-activity-tool-ui.tsx?raw";
 describe("activity draft confirmation contract", () => {
   it("persists a single draft only through an explicit confirm or edited-form submit", () => {
     expect(singleDraftUiSource).toContain("const handleConfirm = useCallback(() => {");
-    expect(singleDraftUiSource).toContain("void handleFormSubmit(defaultValues");
+    // Confirm submits the shown draft and attests its total as user-reviewed.
+    expect(singleDraftUiSource).toContain(
+      "void handleFormSubmit({ ...defaultValues, needsReview: false }",
+    );
     expect(singleDraftUiSource).toContain("onClick={onConfirm}");
     expect(singleDraftUiSource).toContain("onSubmit={handleFormSubmit}");
     expect(singleDraftUiSource).toContain("addActivityMutation.mutateAsync(submitData)");

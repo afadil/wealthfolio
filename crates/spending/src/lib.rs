@@ -36,6 +36,7 @@ pub mod categories_seed;
 pub mod categorization_rules;
 pub mod error;
 pub mod events;
+mod fx;
 pub mod insight;
 pub mod settings;
 

@@ -272,6 +272,10 @@ pub struct DriftHoldingRow {
     pub source_account_ids: Vec<String>,
     pub symbol: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_mic: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instrument_type: Option<crate::assets::InstrumentType>,
     pub category_id: String,
     pub category_name: String,
     pub category_color: Option<String>,
@@ -408,6 +412,10 @@ pub struct CalculateRebalancePlanInput {
     pub aggregated_account_id: String,
     #[serde(default)]
     pub scenario_mode: ScenarioMode,
+    /// Optional instrument-level allowlist for buy candidates in CashFlowOnly mode.
+    /// `None` preserves the legacy behavior; an empty list is invalid in that mode.
+    #[serde(default)]
+    pub eligible_asset_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

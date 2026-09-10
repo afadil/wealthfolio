@@ -153,7 +153,8 @@
     "maturity": "Maturity",
     "type": "Type",
     "strike": "Strike",
-    "expiry": "Expiry"
+    "expiry": "Expiry",
+    "multiplier": "Multiplier"
   },
   "profile": {
     "overview": "Overview",
@@ -256,6 +257,18 @@
     "exchange": "Exchange",
     "select_exchange": "Select exchange",
     "search_exchanges": "Search exchanges...",
+    "contract_multiplier": "Contract Multiplier",
+    "contract_multiplier_hint": "Each contract represents this many underlying units. Leave empty to use the standard {{default}}.",
+    "maturity_date": "Maturity Date",
+    "coupon_rate": "Coupon Rate (%)",
+    "coupon_frequency": "Coupon Frequency",
+    "select_frequency": "Select frequency",
+    "couponFrequency": {
+      "ANNUAL": "Annual",
+      "SEMI_ANNUAL": "Semi-annual",
+      "QUARTERLY": "Quarterly",
+      "ZERO": "Zero-coupon"
+    },
     "saving": "Saving...",
     "saving_short": "Saving",
     "save_changes": "Save Changes",
@@ -703,5 +716,34 @@
     "modified_other": "{{count}} modified",
     "to_delete_one": "{{count}} to delete",
     "to_delete_other": "{{count}} to delete"
+  },
+  "logo": {
+    "change": "Change logo",
+    "title": "Asset logo",
+    "badge_default": "Default",
+    "badge_custom": "Custom",
+    "updated_at": "Updated {{date}}",
+    "dropzone_cta": "Choose an image",
+    "dropzone_or_drop": "or drag and drop it here",
+    "dropzone_hint": "PNG, JPEG, WebP or SVG · resized to a 256×256 PNG",
+    "processing": "Preparing image…",
+    "preview_title": "Preview",
+    "preview_new": "New logo",
+    "preview_current": "Current logo",
+    "preview_card": "Holding card",
+    "preview_table": "Holdings table",
+    "preview_list": "Activity list",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (from {{original}})",
+    "choose_different": "Choose a different image",
+    "save": "Save logo",
+    "reset": "Reset to default",
+    "saved": "Logo saved.",
+    "reset_done": "Logo reset to default.",
+    "error_unsupported_type": "Unsupported file. Use a PNG, JPEG, WebP or SVG image.",
+    "error_too_large_input": "That file is too large. Choose an image under 10 MB.",
+    "error_decode_failed": "The file could not be read as an image.",
+    "error_encode_failed": "The image could not be converted to PNG.",
+    "error_too_large_output": "The image is too detailed to fit in 150 KB. Try a simpler or smaller image.",
+    "error_save_failed": "The logo could not be saved."
   }
 }

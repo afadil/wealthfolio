@@ -135,8 +135,8 @@ impl ContributionLimitService {
 
             let amount = activity.amount.ok_or_else(|| {
                 Error::Validation(ValidationError::MissingField(format!(
-                    "Amount missing in {} activity",
-                    activity.activity_type
+                    "Final amount missing in {} activity for account {}",
+                    activity.activity_type, activity.account_id
                 )))
             })?;
 
@@ -1101,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_missing_amount_returns_error() {
+    fn test_missing_final_amount_is_an_error() {
         let activities = vec![ContributionActivity {
             account_id: "acc1".to_string(),
             activity_type: "DEPOSIT".to_string(),
@@ -1114,10 +1114,13 @@ mod tests {
         let service = make_service(activities);
         let (start, end) = dates();
 
-        let result =
-            service.calculate_contributions_by_period(&["acc1".to_string()], start, end, "USD");
+        let error = service
+            .calculate_contributions_by_period(&["acc1".to_string()], start, end, "USD")
+            .unwrap_err();
 
-        assert!(result.is_err());
+        assert!(error
+            .to_string()
+            .contains("Final amount missing in DEPOSIT activity for account acc1"));
     }
 
     #[test]

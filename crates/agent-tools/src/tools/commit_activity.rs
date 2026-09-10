@@ -159,7 +159,9 @@ fn draft_to_new_activity(draft: &ActivityDraft) -> Result<NewActivity, AgentTool
         notes: draft.notes.clone(),
         fx_rate: None,
         metadata: None,
-        needs_review: None,
+        // Committed drafts are previously reviewed (see module docs), so a
+        // custom trade total is attested rather than queued for review again.
+        needs_review: Some(false),
         source_system: None,
         source_record_id: None,
         source_group_id: None,

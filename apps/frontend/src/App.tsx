@@ -1,6 +1,7 @@
 import { isWeb } from "@/adapters";
 import { AddonRuntimeLoader } from "@/addons/addon-runtime-loader";
 import { setAddonQueryClient } from "@/addons/addons-runtime-context";
+import { AssetLogoRegistrySync } from "@/components/asset-logo-registry-sync";
 import { Toaster } from "@/components/sonner";
 import { AuthGate, AuthProvider } from "@/context/auth-context";
 import { EventDialogProvider } from "@/features/spending/components/event-dialog-provider";
@@ -33,10 +34,14 @@ function App() {
 
   const routedContent = isWebEnv ? (
     <AuthGate fallback={<LoginPage />}>
+      <AssetLogoRegistrySync />
       <AppRoutes />
     </AuthGate>
   ) : (
-    <AppRoutes />
+    <>
+      <AssetLogoRegistrySync />
+      <AppRoutes />
+    </>
   );
 
   return (

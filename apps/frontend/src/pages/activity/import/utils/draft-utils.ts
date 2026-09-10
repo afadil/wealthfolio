@@ -7,7 +7,7 @@ import {
 } from "@/lib/constants";
 import { canonicalizeActivitySubtype } from "@/lib/activity-utils";
 import type { ActivityImport } from "@/lib/types";
-import { tryParseDate } from "@/lib/utils";
+import { type DateOrder, detectDateOrder, tryParseDate } from "@/lib/utils";
 import { isValid, parse, parseISO } from "date-fns";
 import { findMappedActivityType } from "./activity-type-mapping";
 import { getDateFnsPattern } from "./date-format-options";
@@ -193,7 +193,11 @@ export function reconcileExpenseReversalBoundary(
  * Parse a date value using the configured format (priority) then auto-detection fallback.
  * Returns a full ISO datetime string preserving any time component from the source.
  */
-export function parseDateValue(value: string | undefined, dateFormat: string): string {
+export function parseDateValue(
+  value: string | undefined,
+  dateFormat: string,
+  order?: DateOrder,
+): string {
   if (!value || value.trim() === "") return "";
 
   const trimmed = value.trim();
@@ -220,7 +224,7 @@ export function parseDateValue(value: string | undefined, dateFormat: string): s
   }
 
   // 3. Auto-detection fallback (handles 80+ formats)
-  const autoDetected = tryParseDate(trimmed);
+  const autoDetected = tryParseDate(trimmed, order);
   if (autoDetected) return autoDetected.toISOString();
 
   // 4. Return as-is if nothing works (will surface as validation error)
@@ -685,6 +689,14 @@ export function createDraftActivities(
     return row[idx];
   };
 
+  // Numeric dates are ambiguous per row but usually not per column: one
+  // "26/06/2026" among them fixes the day/month order for every other row.
+  const dateOrder =
+    dateFormat === "auto"
+      ? (detectDateOrder(parsedRows.map((row) => getColumnValue(row, ImportFormat.DATE) ?? "")) ??
+        undefined)
+      : undefined;
+
   return parsedRows.flatMap((row, rowIndex): DraftActivity[] => {
     // Extract raw values from CSV
     const rawDate = getColumnValue(row, ImportFormat.DATE);
@@ -714,7 +726,7 @@ export function createDraftActivities(
       : getColumnValue(row, ImportFormat.INSTRUMENT_TYPE);
 
     // Parse and normalize values
-    const activityDate = parseDateValue(rawDate, dateFormat);
+    const activityDate = parseDateValue(rawDate, dateFormat, dateOrder);
     const signedAmount = parseSignedNumericValue(rawAmount, decimalSeparator, thousandsSeparator);
     const signedQuantity = parseSignedNumericValue(
       rawQuantity,

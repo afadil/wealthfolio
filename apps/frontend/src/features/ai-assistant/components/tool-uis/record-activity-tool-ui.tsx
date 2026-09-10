@@ -34,6 +34,7 @@ import { memo, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useRuntimeContext } from "../../hooks/use-runtime-context";
+import { estimateDraftAmount } from "./shared";
 
 // ============================================================================
 // Types
@@ -47,6 +48,7 @@ interface RecordActivityArgs {
   unit_price?: number;
   amount?: number;
   fee?: number;
+  tax?: number;
   account?: string;
   subtype?: string;
   notes?: string;
@@ -62,6 +64,7 @@ interface ActivityDraft {
   unitPrice?: number;
   amount?: number;
   fee?: number;
+  tax?: number;
   currency: string;
   accountId?: string;
   accountName?: string;
@@ -264,6 +267,7 @@ function normalizeResult(result: unknown, fallbackCurrency: string): RecordActiv
     unitPrice: finiteNumberValue(draftRaw.unitPrice ?? draftRaw.unit_price),
     amount: finiteNumberValue(draftRaw.amount),
     fee: finiteNumberValue(draftRaw.fee),
+    tax: finiteNumberValue(draftRaw.tax),
     currency: (draftRaw.currency as string) ?? fallbackCurrency,
     accountId: (draftRaw.accountId as string) ?? (draftRaw.account_id as string) ?? undefined,
     accountName: (draftRaw.accountName as string) ?? (draftRaw.account_name as string) ?? undefined,
@@ -533,6 +537,7 @@ function draftToPseudoActivity(
     unitPrice: draft.unitPrice != null ? String(draft.unitPrice) : null,
     amount: draft.amount != null ? String(draft.amount) : null,
     fee: draft.fee != null ? String(draft.fee) : null,
+    tax: draft.tax != null ? String(draft.tax) : null,
     currency: draft.currency,
     comment: draft.notes,
     subtype: draft.subtype,
@@ -663,6 +668,8 @@ function DraftReview({
   );
 
   const assetSummary = getAssetSummary(draft, resolvedAsset, t);
+  // Drafts state only user-provided amounts; trades preview the mirror calc.
+  const estimatedAmount = estimateDraftAmount(draft, resolvedAsset?.instrumentType);
 
   return (
     <CardContent className="space-y-5">
@@ -705,11 +712,17 @@ function DraftReview({
             }
           />
         )}
-        {draft.amount !== undefined && (
-          <ReviewField label={t("ai:recordActivity.amount")} value={formatAmount(draft.amount)} />
+        {estimatedAmount !== undefined && (
+          <ReviewField
+            label={t("ai:recordActivity.amount")}
+            value={formatAmount(estimatedAmount)}
+          />
         )}
         {draft.fee !== undefined && (
           <ReviewField label={t("ai:recordActivity.fee")} value={formatAmount(draft.fee)} />
+        )}
+        {draft.tax !== undefined && (
+          <ReviewField label={t("ai:recordActivity.tax")} value={formatAmount(draft.tax)} />
         )}
         {draft.subtype && (
           <ReviewField
@@ -824,7 +837,10 @@ function DraftForm({
         const submitData = {
           ...basePayload,
           activityType,
-        } as NewActivityFormValues;
+          // A confirm or form save is the user's review of the shown draft;
+          // AI-recorded activities never enter the review queue.
+          needsReview: false,
+        } as unknown as NewActivityFormValues;
 
         const created = await addActivityMutation.mutateAsync(submitData);
 
@@ -856,7 +872,11 @@ function DraftForm({
 
   const handleConfirm = useCallback(() => {
     if (!defaultValues || !canConfirm) return;
-    void handleFormSubmit(defaultValues as ActivityFormValues);
+    // Confirming the card - with its amount visible - is the user's review of
+    // the total, so attest it instead of letting the backend queue it again.
+    void handleFormSubmit({ ...defaultValues, needsReview: false } as ActivityFormValues & {
+      needsReview?: boolean;
+    });
   }, [canConfirm, defaultValues, handleFormSubmit]);
 
   if (!config) {
@@ -876,11 +896,7 @@ function DraftForm({
   const cardTitle = isEditing
     ? t("ai:recordActivity.editActivity", { type: activityTypeDisplay })
     : t("ai:recordActivity.reviewActivity", { type: activityTypeDisplay });
-  const headerAmount =
-    draft.amount ??
-    (draft.quantity != null && draft.unitPrice != null
-      ? draft.quantity * draft.unitPrice
-      : undefined);
+  const headerAmount = estimateDraftAmount(draft, resolvedAsset?.instrumentType);
   const headerAmountLabel =
     headerAmount !== undefined
       ? isBalanceHidden

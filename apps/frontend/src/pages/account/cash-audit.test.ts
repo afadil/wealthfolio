@@ -20,6 +20,7 @@ describe("cash audit helpers", () => {
           date: new Date("2026-03-06T15:30:00.000Z"),
           quantity: "10",
           unitPrice: "82",
+          amount: "820",
         }),
       ],
     );
@@ -90,6 +91,7 @@ describe("cash audit helpers", () => {
           date: new Date("2024-10-15T10:00:00.000Z"),
           quantity: "10",
           unitPrice: "100",
+          amount: "1000",
         }),
         createActivity({
           id: "current-buy",
@@ -97,6 +99,7 @@ describe("cash audit helpers", () => {
           date: new Date("2026-03-08T10:00:00.000Z"),
           quantity: "3",
           unitPrice: "50",
+          amount: "150",
         }),
       ],
     );
@@ -114,6 +117,7 @@ describe("cash audit helpers", () => {
           date: new Date("2026-03-09T10:00:00.000Z"),
           quantity: "1",
           unitPrice: "50",
+          amount: "50",
         }),
       ],
     );

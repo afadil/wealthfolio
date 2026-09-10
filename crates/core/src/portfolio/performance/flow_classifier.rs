@@ -163,17 +163,21 @@ fn opposite_transfer_type(activity_type: &str) -> Option<&'static str> {
     }
 }
 
-fn transfer_amount(activity: &Activity) -> Option<Decimal> {
+fn cash_transfer_amount(activity: &Activity) -> Option<Decimal> {
+    activity.amount.map(|amount| amount.abs())
+}
+
+fn security_transfer_amount(activity: &Activity) -> Option<Decimal> {
     activity
         .amount
         .or_else(|| Some(activity.quantity? * activity.unit_price?))
         .map(|amount| amount.abs())
 }
 
-fn decimal_matches(left: Option<Decimal>, right: Option<Decimal>) -> bool {
+fn decimal_matches(left: Option<Decimal>, right: Option<Decimal>, missing_matches: bool) -> bool {
     match (left, right) {
         (Some(left), Some(right)) => (left - right).abs() <= transfer_match_tolerance(),
-        (None, None) => true,
+        (None, None) => missing_matches,
         _ => false,
     }
 }
@@ -195,11 +199,19 @@ fn transfer_match(activity: &Activity, candidate: &Activity) -> bool {
 
     if has_asset {
         activity_asset_id == candidate_asset_id
-            && decimal_matches(activity.quantity, candidate.quantity)
-            && decimal_matches(transfer_amount(activity), transfer_amount(candidate))
+            && decimal_matches(activity.quantity, candidate.quantity, true)
+            && decimal_matches(
+                security_transfer_amount(activity),
+                security_transfer_amount(candidate),
+                true,
+            )
     } else {
         activity.currency == candidate.currency
-            && decimal_matches(transfer_amount(activity), transfer_amount(candidate))
+            && decimal_matches(
+                cash_transfer_amount(activity),
+                cash_transfer_amount(candidate),
+                false,
+            )
     }
 }
 
@@ -574,6 +586,27 @@ mod tests {
         assert_eq!(
             infer_paired_transfer_account_id(&transfer_out, &candidates, local_date),
             Some("account-2".to_string())
+        );
+    }
+
+    #[test]
+    fn unlinked_cash_transfer_does_not_guess_amount_from_quantity_and_price() {
+        let mut transfer_out = create_test_activity("TRANSFER_OUT");
+        transfer_out.id = "out".to_string();
+        transfer_out.amount = None;
+        transfer_out.quantity = Some(Decimal::from(10));
+        transfer_out.unit_price = Some(Decimal::from(25));
+
+        let mut transfer_in = transfer_out.clone();
+        transfer_in.id = "in".to_string();
+        transfer_in.account_id = "account-2".to_string();
+        transfer_in.activity_type = "TRANSFER_IN".to_string();
+
+        let candidates = vec![transfer_out.clone(), transfer_in];
+
+        assert_eq!(
+            infer_paired_transfer_account_id(&transfer_out, &candidates, local_date),
+            None
         );
     }
 

@@ -1,11 +1,54 @@
 import { parse, parseISO, isValid, format as formatDate } from "date-fns";
 
 import type { HoldingsSnapshotInput, HoldingsPositionInput } from "@/lib/types";
+import {
+  DAY_FIRST_NUMERIC_FORMATS,
+  type DateOrder,
+  MONTH_FIRST_NUMERIC_FORMATS,
+  detectDateOrder,
+  isAmbiguousNumericDate,
+} from "@/lib/utils";
 import type { DraftActivity } from "../context";
 import { HoldingsFormat } from "../steps/holdings-mapping-step";
 import { getDateFnsPattern } from "./date-format-options";
 
 export const CASH_SYMBOL = "$CASH";
+
+/**
+ * Numeric dates like 03/08/2026 or 3-8-26 — the field order is not self-evident.
+ * Deliberately broader than the detection regex in lib/utils: this only guards
+ * the `new Date` fallback, and two-digit-year dates are exactly the input that
+ * fallback would guess at, so they must not reach it either.
+ */
+const NUMERIC_DATE_SHAPE = /^\d{1,2}([/.-])\d{1,2}\1\d{2,4}$/;
+
+/**
+ * Numeric date patterns, ordered by which field leads. The resolved orders
+ * reuse the shared lists so detection and parsing support the same formats.
+ * `auto` keeps its historical sequence — dash dates read month-first here, so
+ * files that parse correctly today keep doing so when a column yields no
+ * evidence — with the single-digit forms appended: those used to be reachable
+ * only through `new Date`, which guessed their field order.
+ */
+const NUMERIC_PATTERNS = {
+  auto: [
+    "MM/dd/yyyy",
+    "dd/MM/yyyy",
+    "MM-dd-yyyy",
+    "dd-MM-yyyy",
+    "dd.MM.yyyy",
+    "MM.dd.yyyy",
+    "M/d/yyyy",
+    "d/M/yyyy",
+    "M-d-yyyy",
+    "d-M-yyyy",
+    "d.M.yyyy",
+    "M.d.yyyy",
+    "yyyy/MM/dd",
+  ],
+  DMY: [...DAY_FIRST_NUMERIC_FORMATS, ...MONTH_FIRST_NUMERIC_FORMATS, "yyyy/MM/dd"],
+  MDY: [...MONTH_FIRST_NUMERIC_FORMATS, ...DAY_FIRST_NUMERIC_FORMATS, "yyyy/MM/dd"],
+} as const;
 
 export interface ParseOptions {
   dateFormat: string;
@@ -131,7 +174,50 @@ export function parseNumericValue(
   return Number.isFinite(numericCheck) ? candidate : undefined;
 }
 
-export function parseDateToYMD(dateStr: string, dateFormat: string): string | null {
+export interface DateColumnAnalysis {
+  /** Day/month order resolved from the column, if it carries the evidence. */
+  order?: DateOrder;
+  /** The column is numeric-ambiguous and nothing settles it — ask the user. */
+  needsExplicitFormat: boolean;
+  /** First unresolvable value, to show the user what is being guessed at. */
+  ambiguousSample?: string;
+}
+
+/**
+ * Inspect a holdings CSV's date column as a whole rather than row by row.
+ *
+ * A lone "03/08/2026" cannot be read, but a "26/06/2026" elsewhere in the same
+ * column resolves every row in it. When the column is all-ambiguous and the
+ * user left the format on auto-detect, say so instead of silently guessing.
+ */
+export function analyzeDateColumn(
+  headers: string[],
+  rows: string[][],
+  mapping: Record<string, string>,
+  dateFormat: string,
+): DateColumnAnalysis {
+  if (dateFormat !== "auto") return { needsExplicitFormat: false };
+
+  const dateHeader = mapping[HoldingsFormat.DATE];
+  const dateIndex = dateHeader ? headers.indexOf(dateHeader) : -1;
+  if (dateIndex < 0) return { needsExplicitFormat: false };
+
+  const values = rows.map((row) => row[dateIndex] ?? "");
+  const order = detectDateOrder(values) ?? undefined;
+  if (order) return { order, needsExplicitFormat: false };
+
+  const ambiguousSample = values.find(isAmbiguousNumericDate);
+  return {
+    needsExplicitFormat: ambiguousSample !== undefined,
+    ...(ambiguousSample ? { ambiguousSample: ambiguousSample.trim() } : {}),
+  };
+}
+
+export function parseDateToYMD(
+  dateStr: string,
+  dateFormat: string,
+  order?: DateOrder,
+): string | null {
   const trimmed = dateStr.trim();
   if (!trimmed) return null;
 
@@ -164,15 +250,10 @@ export function parseDateToYMD(dateStr: string, dateFormat: string): string | nu
     }
   }
 
-  const commonPatterns = [
-    "MM/dd/yyyy",
-    "dd/MM/yyyy",
-    "MM-dd-yyyy",
-    "dd-MM-yyyy",
-    "dd.MM.yyyy",
-    "MM.dd.yyyy",
-    "yyyy/MM/dd",
-  ];
+  // "03/08/2026" is 3 August or 8 March depending only on which pattern runs
+  // first, so a day/month order resolved from the whole column decides it.
+  // Without that evidence the existing per-separator order is left untouched.
+  const commonPatterns = order ? NUMERIC_PATTERNS[order] : NUMERIC_PATTERNS.auto;
   for (const p of commonPatterns) {
     try {
       const parsed = parse(trimmed, p, new Date());
@@ -182,9 +263,14 @@ export function parseDateToYMD(dateStr: string, dateFormat: string): string | nu
     }
   }
 
-  const date = new Date(trimmed);
-  if (!isNaN(date.getTime())) {
-    return formatDate(date, "yyyy-MM-dd");
+  // Never hand a numeric date to the Date constructor: its day/month order is
+  // engine-defined, so it reintroduces exactly the guess the patterns above
+  // just resolved. Anything still unparsed here is not a numeric date.
+  if (!NUMERIC_DATE_SHAPE.test(trimmed)) {
+    const date = new Date(trimmed);
+    if (!isNaN(date.getTime())) {
+      return formatDate(date, "yyyy-MM-dd");
+    }
   }
 
   return null;
@@ -288,6 +374,7 @@ function parseHoldingsSnapshotsInternal(
   const currencyHeader = mapping[HoldingsFormat.CURRENCY];
 
   const dateIndex = dateHeader ? headers.indexOf(dateHeader) : -1;
+  const { order: dateOrder } = analyzeDateColumn(headers, rows, mapping, dateFormat);
   const symbolIndex = symbolHeader ? headers.indexOf(symbolHeader) : -1;
   const quantityIndex = quantityHeader ? headers.indexOf(quantityHeader) : -1;
   const avgCostIndex = avgCostHeader ? headers.indexOf(avgCostHeader) : -1;
@@ -307,7 +394,7 @@ function parseHoldingsSnapshotsInternal(
     const rawAvgCost = avgCostIndex >= 0 ? row[avgCostIndex]?.trim() : undefined;
     const currency = currencyIndex >= 0 ? row[currencyIndex]?.trim() : defaultCurrency;
 
-    const normalizedDate = parseDateToYMD(rawDate, dateFormat);
+    const normalizedDate = parseDateToYMD(rawDate, dateFormat, dateOrder);
     const parsedQuantity = parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator);
     const parsedAvgCost = parseNumericValue(rawAvgCost, decimalSeparator, thousandsSeparator);
 

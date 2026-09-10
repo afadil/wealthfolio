@@ -13,7 +13,7 @@ import {
 } from "@/adapters";
 import { getPlatform as getRuntimePlatform } from "@/hooks/use-platform";
 import { useQueryClient } from "@tanstack/react-query";
-import { Icons, Skeleton } from "@wealthfolio/ui";
+import { Icons, isKeyboardEventComposing, Skeleton } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -1025,7 +1025,7 @@ export function DeviceSyncSection() {
               )}
             </AlertDialogHeader>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center max-sm:[&>button]:h-auto max-sm:[&>button]:min-h-11 max-sm:[&>button]:max-w-full max-sm:[&>button]:whitespace-normal">
               <Button
                 variant="ghost"
                 onClick={() => handleBootstrapOverwriteDialogOpenChange(false)}
@@ -1077,7 +1077,7 @@ export function DeviceSyncSection() {
                 {t("sync:reinit.description")}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center max-sm:[&>button]:h-auto max-sm:[&>button]:min-h-11 max-sm:[&>button]:max-w-full max-sm:[&>button]:whitespace-normal">
               <Button variant="ghost" onClick={() => setShowReinitConfirmDialog(false)}>
                 {t("sync:reinit.notNow")}
               </Button>
@@ -1534,6 +1534,8 @@ function DeviceCard({
                 maxLength={64}
                 autoFocus
                 onKeyDown={(e) => {
+                  if (isKeyboardEventComposing(e.nativeEvent)) return;
+
                   if (e.key === "Enter") handleRename();
                   if (e.key === "Escape") handleCancelRename();
                 }}

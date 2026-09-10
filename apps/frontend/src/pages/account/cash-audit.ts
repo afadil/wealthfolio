@@ -96,6 +96,7 @@ export function buildCashAuditReviewTarget(
   negativeRun: CashAuditNegativeRun | null | undefined,
   activities: ActivityDetails[],
   timezone?: string,
+  isCreditCardAccount = false,
 ): CashAuditReviewTarget | null {
   if (!negativeRun) return null;
 
@@ -116,6 +117,7 @@ export function buildCashAuditReviewTarget(
     firstNegativeValuation.cashBalance,
     previousNonNegativeValuation?.cashBalance,
     timezone,
+    isCreditCardAccount,
   );
 
   const crossingRow = ledgerRows.find((row) => row.crossesNegative);
@@ -142,12 +144,15 @@ function buildCashAuditLedgerRows(
   endingCashBalance: number,
   startingCashBalance: number | undefined,
   timezone?: string,
+  isCreditCardAccount = false,
 ): CashAuditLedgerRow[] {
   const datedActivities = activities
     .map((activity) => ({ activity, dateKey: toDateKey(activity.date, timezone) }))
     .filter((item): item is { activity: ActivityDetails; dateKey: string } => item.dateKey !== null)
     .sort((a, b) => compareActivitiesForCashAudit(a.activity, b.activity));
-  const impacts = datedActivities.map(({ activity }) => calculateActivityCashImpact(activity));
+  const impacts = datedActivities.map(({ activity }) =>
+    calculateActivityCashImpact(activity, isCreditCardAccount),
+  );
   const totalCashImpact = impacts.reduce((sum, impact) => sum + impact, 0);
   let runningBalance = startingCashBalance ?? endingCashBalance - totalCashImpact;
 

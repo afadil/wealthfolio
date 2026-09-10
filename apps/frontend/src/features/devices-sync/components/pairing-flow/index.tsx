@@ -334,7 +334,7 @@ function PairingOverwriteConsent({
   const isBusy = isBackingUp || isApproving;
 
   return (
-    <div className="flex flex-col items-center gap-6 px-4 py-2 text-center">
+    <div className="flex min-w-0 flex-col items-center gap-6 px-4 py-2 text-center">
       <div className="border-warning/30 bg-warning/10 dark:border-warning/20 dark:bg-warning/15 flex h-14 w-14 items-center justify-center rounded-full border">
         <Icons.AlertTriangle className="h-6 w-6 text-amber-500" />
       </div>
@@ -350,7 +350,7 @@ function PairingOverwriteConsent({
         )}
         {error && <p className="text-destructive text-sm">{error}</p>}
       </div>
-      <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center max-sm:[&>button]:h-auto max-sm:[&>button]:min-h-11 max-sm:[&>button]:max-w-full max-sm:[&>button]:whitespace-normal">
         <Button variant="ghost" onClick={onCancel} disabled={isBusy}>
           {t("sync:overwrite.notNow")}
         </Button>

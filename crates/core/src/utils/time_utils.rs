@@ -173,7 +173,14 @@ fn previous_trading_day(date: NaiveDate) -> NaiveDate {
 /// whether the "current" trading day has completed. If the market has not closed
 /// (plus grace), the effective date is the previous trading day. Unknown exchanges
 /// fall back to the UTC date.
-pub fn market_effective_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate {
+///
+/// `is_continuous` should be `true` for 24/7 markets (e.g. crypto): weekend dates
+/// are returned as-is instead of being rolled back to the previous trading day.
+pub fn market_effective_date(
+    now: DateTime<Utc>,
+    mic: Option<&str>,
+    is_continuous: bool,
+) -> NaiveDate {
     let (tz, close_time) = match mic
         .and_then(exchange_metadata::mic_to_timezone)
         .and_then(|tz_name| tz_name.parse::<Tz>().ok())
@@ -185,10 +192,12 @@ pub fn market_effective_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate
     let local_now = now.with_timezone(&tz);
     let local_date = local_now.date_naive();
 
-    // If it's a weekend in the exchange/valuation timezone, use the previous trading day.
-    let weekday = local_date.weekday();
-    if weekday == Weekday::Sat || weekday == Weekday::Sun {
-        return previous_trading_day(local_date);
+    // 24/7 markets (crypto) have no weekend close — return the calendar date as-is.
+    if !is_continuous {
+        let weekday = local_date.weekday();
+        if weekday == Weekday::Sat || weekday == Weekday::Sun {
+            return previous_trading_day(local_date);
+        }
     }
 
     let Some((close_hour, close_minute)) = close_time else {
@@ -222,13 +231,23 @@ pub fn market_effective_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate
 ///
 /// Unlike `market_effective_date`, this does not wait for market close + grace.
 /// It uses the exchange-local calendar day (weekends roll back to prior trading day).
-pub fn market_calendar_date(now: DateTime<Utc>, mic: Option<&str>) -> NaiveDate {
+///
+/// `is_continuous` should be `true` for 24/7 markets (e.g. crypto): weekend dates
+/// are returned as-is instead of being rolled back to the previous trading day.
+pub fn market_calendar_date(
+    now: DateTime<Utc>,
+    mic: Option<&str>,
+    is_continuous: bool,
+) -> NaiveDate {
     let tz = mic
         .and_then(exchange_metadata::mic_to_timezone)
         .and_then(|tz_name| tz_name.parse::<Tz>().ok())
         .unwrap_or(DEFAULT_VALUATION_TZ);
 
     let local_date = now.with_timezone(&tz).date_naive();
+    if is_continuous {
+        return local_date;
+    }
     let weekday = local_date.weekday();
     if weekday == Weekday::Sat || weekday == Weekday::Sun {
         previous_trading_day(local_date)

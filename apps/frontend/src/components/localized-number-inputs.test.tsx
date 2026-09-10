@@ -34,7 +34,12 @@ describe("localized financial input typing", () => {
       await user.type(input, typedValue);
 
       expect(input).toHaveValue(displayedValue);
-      expect(onValueChange).toHaveBeenLastCalledWith(expected);
+      // MoneyInput reports typing as a user edit via the second argument.
+      if (inputKind === "money") {
+        expect(onValueChange).toHaveBeenLastCalledWith(expected, true);
+      } else {
+        expect(onValueChange).toHaveBeenLastCalledWith(expected);
+      }
     },
   );
 
@@ -60,7 +65,11 @@ describe("localized financial input typing", () => {
       await user.type(input, typedValue);
 
       expect(input).toHaveValue(displayedValue);
-      expect(onValueChange).toHaveBeenLastCalledWith(expected);
+      if (inputKind === "money") {
+        expect(onValueChange).toHaveBeenLastCalledWith(expected, true);
+      } else {
+        expect(onValueChange).toHaveBeenLastCalledWith(expected);
+      }
     },
   );
 
@@ -94,7 +103,7 @@ describe("localized financial input typing", () => {
     await user.type(screen.getByRole("textbox", { name: "Amount" }), "-12.5");
     await user.type(screen.getByRole("textbox", { name: "Quantity" }), "-12.5");
 
-    expect(onMoneyChange).toHaveBeenLastCalledWith(12.5);
+    expect(onMoneyChange).toHaveBeenLastCalledWith(12.5, true);
     expect(onQuantityChange).toHaveBeenLastCalledWith(12.5);
     expect(onMoneyChange.mock.calls.every(([value]) => value === undefined || value >= 0)).toBe(
       true,
@@ -171,7 +180,7 @@ describe("localized financial input paste", () => {
 
     paste(clipboardValue);
 
-    expect(onValueChange).toHaveBeenLastCalledWith(expected);
+    expect(onValueChange).toHaveBeenLastCalledWith(expected, true);
   });
 
   it.each([
@@ -190,7 +199,7 @@ describe("localized financial input paste", () => {
 
     paste(clipboardValue);
 
-    expect(onValueChange).toHaveBeenLastCalledWith(expected);
+    expect(onValueChange).toHaveBeenLastCalledWith(expected, true);
   });
 
   it.each([
@@ -258,7 +267,7 @@ describe("localized financial input paste", () => {
 
     paste("￥１，２３４．５６");
 
-    expect(onValueChange).toHaveBeenLastCalledWith(1234.56);
+    expect(onValueChange).toHaveBeenLastCalledWith(1234.56, true);
   });
 
   it.each([
@@ -274,7 +283,7 @@ describe("localized financial input paste", () => {
 
     paste(clipboardValue);
 
-    expect(onValueChange).toHaveBeenLastCalledWith(1234.56);
+    expect(onValueChange).toHaveBeenLastCalledWith(1234.56, true);
   });
 
   it.each([
@@ -294,7 +303,7 @@ describe("localized financial input paste", () => {
 
     paste(formatted);
 
-    expect(onValueChange).toHaveBeenLastCalledWith(1234.56);
+    expect(onValueChange).toHaveBeenLastCalledWith(1234.56, true);
   });
 
   it("leaves partial plain-number pastes to the input", () => {

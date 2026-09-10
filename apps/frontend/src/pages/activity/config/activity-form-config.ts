@@ -6,7 +6,7 @@ import {
   METADATA_CONTRACT_MULTIPLIER,
   QuoteMode,
 } from "@/lib/constants";
-import { isSecuritiesTransfer } from "@/lib/activity-utils";
+import { isCashSymbol, isSecuritiesTransfer } from "@/lib/activity-utils";
 import { parseOccSymbol } from "@/lib/occ-symbol";
 import type { ActivityDetails } from "@/lib/types";
 import { BuyForm, type BuyFormValues } from "../components/forms/buy-form";
@@ -19,6 +19,8 @@ import { SplitForm, type SplitFormValues } from "../components/forms/split-form"
 import { FeeForm, type FeeFormValues } from "../components/forms/fee-form";
 import { InterestForm, type InterestFormValues } from "../components/forms/interest-form";
 import { TaxForm, type TaxFormValues } from "../components/forms/tax-form";
+import { CreditForm, type CreditFormValues } from "../components/forms/credit-form";
+import { AdjustmentForm, type AdjustmentFormValues } from "../components/forms/adjustment-form";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
 
@@ -33,7 +35,9 @@ export type PickerActivityType =
   | typeof ActivityType.SPLIT
   | typeof ActivityType.FEE
   | typeof ActivityType.INTEREST
-  | typeof ActivityType.TAX;
+  | typeof ActivityType.TAX
+  | typeof ActivityType.CREDIT
+  | typeof ActivityType.ADJUSTMENT;
 
 // Form values union type
 export type ActivityFormValues =
@@ -46,7 +50,9 @@ export type ActivityFormValues =
   | SplitFormValues
   | FeeFormValues
   | InterestFormValues
-  | TaxFormValues;
+  | TaxFormValues
+  | CreditFormValues
+  | AdjustmentFormValues;
 
 // Common form props interface
 export interface ActivityFormComponentProps<T> {
@@ -100,6 +106,19 @@ function selectedExistingAsset(
   return id ? { existingAssetId: id } : {};
 }
 
+function hasConcreteAdjustmentAsset(
+  assetSymbol: string | null | undefined,
+  assetId: string | null | undefined,
+): boolean {
+  const symbol = assetSymbol?.trim();
+  if (symbol) {
+    return symbol.toUpperCase() !== "CASH" && !isCashSymbol(symbol);
+  }
+
+  const id = assetId?.trim();
+  return Boolean(id && id.toUpperCase() !== "CASH" && !isCashSymbol(id));
+}
+
 // Configuration for each activity type
 export const ACTIVITY_FORM_CONFIG: Record<
   PickerActivityType,
@@ -139,7 +158,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
           strikePrice: parsed?.strikePrice,
           expirationDate: parsed?.expiration,
           optionType: parsed?.optionType,
-          contractMultiplier: 100,
+          contractMultiplier: absNum(activity?.assetContractMultiplier) ?? 100,
           subtype: activity?.subtype ?? ACTIVITY_SUBTYPES.POSITION_OPEN,
         };
       }
@@ -158,14 +177,17 @@ export const ACTIVITY_FORM_CONFIG: Record<
       return base;
     },
     toPayload: (data) => {
-      const d = data as BuyFormValues;
+      const d = data as BuyFormValues & { needsReview?: boolean };
       return {
+        // Set by the form only when the user confirmed a custom total.
+        ...(d.needsReview !== undefined && { needsReview: d.needsReview }),
         accountId: d.accountId,
         activityDate: d.activityDate,
         assetId: d.assetId,
         ...selectedExistingAsset(d.assetId, d.existingAssetId, d.symbolInstrumentType),
         quantity: d.quantity,
         unitPrice: d.unitPrice,
+        amount: d.amount,
         fee: d.fee,
         tax: d.tax,
         subtype: d.subtype ?? undefined,
@@ -186,6 +208,10 @@ export const ACTIVITY_FORM_CONFIG: Record<
               providerSymbol: d.assetMetadata.providerSymbol ?? undefined,
             }
           : undefined,
+        // Only a NON-STANDARD multiplier is sent: the asset owns the
+        // multiplier, and this metadata exists solely to seed a brand-new
+        // option asset at creation. Sending the default would write an
+        // override the asset never asked for.
         ...(d.symbolInstrumentType === InstrumentType.OPTION &&
           d.contractMultiplier != null &&
           d.contractMultiplier !== 100 && {
@@ -229,7 +255,7 @@ export const ACTIVITY_FORM_CONFIG: Record<
           strikePrice: parsed?.strikePrice,
           expirationDate: parsed?.expiration,
           optionType: parsed?.optionType,
-          contractMultiplier: 100,
+          contractMultiplier: absNum(activity?.assetContractMultiplier) ?? 100,
           subtype: activity?.subtype ?? ACTIVITY_SUBTYPES.POSITION_CLOSE,
         };
       }
@@ -248,14 +274,17 @@ export const ACTIVITY_FORM_CONFIG: Record<
       return base;
     },
     toPayload: (data) => {
-      const d = data as SellFormValues;
+      const d = data as SellFormValues & { needsReview?: boolean };
       return {
+        // Set by the form only when the user confirmed a custom total.
+        ...(d.needsReview !== undefined && { needsReview: d.needsReview }),
         accountId: d.accountId,
         activityDate: d.activityDate,
         assetId: d.assetId,
         ...selectedExistingAsset(d.assetId, d.existingAssetId, d.symbolInstrumentType),
         quantity: d.quantity,
         unitPrice: d.unitPrice,
+        amount: d.amount,
         fee: d.fee,
         tax: d.tax,
         subtype: d.subtype ?? undefined,
@@ -276,6 +305,10 @@ export const ACTIVITY_FORM_CONFIG: Record<
               providerSymbol: d.assetMetadata.providerSymbol ?? undefined,
             }
           : undefined,
+        // Only a NON-STANDARD multiplier is sent: the asset owns the
+        // multiplier, and this metadata exists solely to seed a brand-new
+        // option asset at creation. Sending the default would write an
+        // override the asset never asked for.
         ...(d.symbolInstrumentType === InstrumentType.OPTION &&
           d.contractMultiplier != null &&
           d.contractMultiplier !== 100 && {
@@ -570,6 +603,85 @@ export const ACTIVITY_FORM_CONFIG: Record<
     },
   },
 
+  CREDIT: {
+    component: CreditForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
+    activityType: ActivityType.CREDIT,
+    getDefaults: (activity, accounts) => ({
+      ...getBaseDefaults(activity, accounts),
+      amount: absNum(activity?.amount),
+      currency: activity?.currency,
+      fxRate: activity?.fxRate ?? undefined,
+      subtype: activity?.subtype ?? null,
+    }),
+    toPayload: (data) => {
+      const d = data as CreditFormValues;
+      return {
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount,
+        comment: d.comment,
+        currency: d.currency,
+        fxRate: d.fxRate,
+        subtype: d.subtype,
+      };
+    },
+  },
+
+  ADJUSTMENT: {
+    component: AdjustmentForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
+    activityType: ActivityType.ADJUSTMENT,
+    getDefaults: (activity, accounts) => {
+      const isSecurity = hasConcreteAdjustmentAsset(activity?.assetSymbol, activity?.assetId);
+      return {
+        ...getBaseDefaults(activity, accounts),
+        adjustmentMode: isSecurity ? "securities" : "cash",
+        amount: absNum(activity?.amount),
+        assetId: isSecurity ? (activity?.assetSymbol ?? activity?.assetId ?? null) : null,
+        quantity: isSecurity ? (absNum(activity?.quantity) ?? null) : null,
+        unitPrice: isSecurity ? (absNum(activity?.unitPrice) ?? null) : null,
+        currency: activity?.currency,
+        fxRate: activity?.fxRate ?? undefined,
+        subtype: activity?.subtype ?? null,
+        quoteMode:
+          activity?.assetQuoteMode === QuoteMode.MANUAL ? QuoteMode.MANUAL : QuoteMode.MARKET,
+        exchangeMic: activity?.exchangeMic,
+        symbolInstrumentType: activity?.instrumentType,
+      };
+    },
+    toPayload: (data) => {
+      const d = data as AdjustmentFormValues;
+      const isSecurity = d.adjustmentMode === "securities";
+      return {
+        accountId: d.accountId,
+        activityDate: d.activityDate,
+        amount: d.amount ?? null,
+        assetId: isSecurity ? d.assetId?.trim() || undefined : undefined,
+        ...(isSecurity &&
+          selectedExistingAsset(d.assetId, d.existingAssetId, d.symbolInstrumentType)),
+        quantity: isSecurity ? (d.quantity ?? null) : null,
+        unitPrice: isSecurity ? (d.unitPrice ?? null) : null,
+        comment: d.comment,
+        currency: d.currency,
+        fxRate: d.fxRate,
+        subtype: d.subtype ?? null,
+        quoteMode: isSecurity ? d.quoteMode : undefined,
+        exchangeMic: isSecurity ? (d.exchangeMic ?? undefined) : undefined,
+        symbolQuoteCcy: isSecurity ? (d.symbolQuoteCcy ?? undefined) : undefined,
+        symbolInstrumentType: isSecurity ? (d.symbolInstrumentType ?? undefined) : undefined,
+        assetMetadata:
+          isSecurity && d.assetMetadata
+            ? {
+                name: d.assetMetadata.name ?? undefined,
+                kind: d.assetMetadata.kind ?? undefined,
+                exchangeMic: d.assetMetadata.exchangeMic ?? undefined,
+                providerId: d.assetMetadata.providerId ?? undefined,
+                providerSymbol: d.assetMetadata.providerSymbol ?? undefined,
+              }
+            : undefined,
+      };
+    },
+  },
+
   TAX: {
     component: TaxForm as ComponentType<ActivityFormComponentProps<ActivityFormValues>>,
     activityType: ActivityType.TAX,
@@ -600,3 +712,16 @@ export const ACTIVITY_FORM_CONFIG: Record<
     },
   },
 };
+
+/**
+ * Whether a stored activity type has an editor of its own.
+ *
+ * Not every persisted type does: sync writes needs-review rows as `UNKNOWN`,
+ * which has no fields to edit because it carries no classification, so editing
+ * one has to begin by choosing a type rather than by pinning the stored one.
+ */
+export function hasActivityForm(
+  activityType: string | undefined,
+): activityType is PickerActivityType {
+  return !!activityType && activityType in ACTIVITY_FORM_CONFIG;
+}

@@ -1,4 +1,4 @@
-import { ACTIVITY_SUBTYPES, ActivityType } from "@/lib/constants";
+import { ACTIVITY_SUBTYPES, ActivityStatus, ActivityType } from "@/lib/constants";
 import type { Account } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 import {
@@ -6,6 +6,8 @@ import {
   buildSavePayload,
   createCurrencyResolver,
   createDraftTransaction,
+  hasFinalCashAmountForApproval,
+  partitionReviewRowsForApproval,
   resolveAssetIdForTransaction,
   TRACKED_FIELDS,
   validateTransactionsForSave,
@@ -336,6 +338,192 @@ describe("activity-utils", () => {
       expect(result.updates).toHaveLength(1);
       expect(result.creates[0].id).toBe("temp-new-1");
       expect(result.updates[0].id).toBe("existing-1");
+    });
+
+    it("should persist an explicit review approval on an existing transaction", () => {
+      const result = buildSavePayload(
+        [createMockTransaction({ id: "review-1", isNew: false, needsReview: false })],
+        new Set(["review-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates).toHaveLength(1);
+      expect(result.updates[0].needsReview).toBe(false);
+    });
+
+    it("omits the amount for an untouched existing trade and sends it once edited", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({ id: "untouched", isNew: false, _amountEdited: false }),
+          createMockTransaction({ id: "edited", isNew: false, _amountEdited: true }),
+        ],
+        new Set(["untouched", "edited"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      const byId = new Map(result.updates.map((update) => [update.id, update]));
+      expect(byId.get("untouched")?.amount).toBeUndefined();
+      expect(byId.get("edited")?.amount).toBe("1000");
+    });
+
+    it("applies the same amount-ownership rule to new trades", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({ id: "temp-auto", isNew: true, _amountEdited: false }),
+          createMockTransaction({ id: "temp-typed", isNew: true, _amountEdited: true }),
+        ],
+        new Set(["temp-auto", "temp-typed"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      const byId = new Map(result.creates.map((create) => [create.id, create]));
+      expect(byId.get("temp-auto")?.amount).toBeUndefined();
+      expect(byId.get("temp-typed")?.amount).toBe("1000");
+    });
+
+    it("always sends the amount for asset-backed income composites", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "drip-1",
+            isNew: false,
+            activityType: ActivityType.DIVIDEND,
+            subtype: ACTIVITY_SUBTYPES.DRIP,
+            _amountEdited: false,
+          }),
+        ],
+        new Set(["drip-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].amount).toBe("1000");
+    });
+
+    it("omits needsReview when it matches the server value", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "unchanged-review",
+            isNew: false,
+            needsReview: false,
+            _originalNeedsReview: false,
+          }),
+        ],
+        new Set(["unchanged-review"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].needsReview).toBeUndefined();
+    });
+
+    it("attests a trade total the user typed this session", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "typed-total",
+            isNew: false,
+            status: ActivityStatus.POSTED,
+            needsReview: false,
+            _originalNeedsReview: false,
+            _amountEdited: true,
+          }),
+        ],
+        new Set(["typed-total"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].needsReview).toBe(false);
+    });
+
+    it("attests a typed trade total on a new row", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "temp-typed-review",
+            isNew: true,
+            _amountEdited: true,
+          }),
+        ],
+        new Set(["temp-typed-review"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.creates[0].needsReview).toBe(false);
+    });
+
+    it("does not attest a typed total on a Draft — it stays in its queue", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "draft-typed",
+            isNew: false,
+            status: ActivityStatus.DRAFT,
+            needsReview: true,
+            _originalNeedsReview: true,
+            _amountEdited: true,
+          }),
+        ],
+        new Set(["draft-typed"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].needsReview).toBeUndefined();
+    });
+
+    it("does not attest a non-trade amount edit", () => {
+      const result = buildSavePayload(
+        [
+          createMockTransaction({
+            id: "deposit-typed",
+            isNew: false,
+            activityType: ActivityType.DEPOSIT,
+            status: ActivityStatus.POSTED,
+            needsReview: true,
+            _originalNeedsReview: true,
+            _amountEdited: true,
+          }),
+        ],
+        new Set(["deposit-typed"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].needsReview).toBeUndefined();
     });
 
     it("should include exchangeMic and quoteCcy hints for new market activities", () => {
@@ -771,6 +959,56 @@ describe("activity-utils", () => {
       expect(result.updates[0].asset).toBeUndefined();
     });
 
+    it("preserves a symbol-backed adjustment asset on unrelated edits", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "adjustment-1",
+          activityType: ActivityType.ADJUSTMENT,
+          assetId: "asset-aapl",
+          assetSymbol: "AAPL",
+          _originalAssetId: "asset-aapl",
+          _originalAssetSymbol: "AAPL",
+        }),
+      ];
+
+      const result = buildSavePayload(
+        transactions,
+        new Set(["adjustment-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].asset).toEqual(expect.objectContaining({ id: "asset-aapl" }));
+    });
+
+    it("explicitly clears an adjustment asset when its symbol is removed", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "adjustment-1",
+          activityType: ActivityType.ADJUSTMENT,
+          assetId: "",
+          assetSymbol: "",
+          _originalAssetId: "asset-aapl",
+          _originalAssetSymbol: "AAPL",
+        }),
+      ];
+
+      const result = buildSavePayload(
+        transactions,
+        new Set(["adjustment-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].asset).toEqual({});
+    });
+
     it("should not force account currency for securities transfers", () => {
       const transactions: LocalTransaction[] = [
         createMockTransaction({
@@ -875,6 +1113,92 @@ describe("activity-utils", () => {
       expect(updated.amount).toBe("0.02");
     });
 
+    it("keeps asset-backed income charges separate from the final amount", () => {
+      const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
+        ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+      ]);
+      const tx = createMockTransaction({
+        activityType: ActivityType.DIVIDEND,
+        subtype: ACTIVITY_SUBTYPES.DRIP,
+        quantity: "2",
+        unitPrice: "50",
+        amount: "100",
+        tax: "15",
+      });
+
+      const updated = applyTransactionUpdate({
+        transaction: tx,
+        field: "tax",
+        value: "20",
+        accountLookup,
+        assetCurrencyLookup: new Map<string, string>(),
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      });
+
+      expect(updated.amount).toBe("100");
+      expect(updated.tax).toBe("20");
+    });
+
+    it("stops automatic totals after the user explicitly edits amount", () => {
+      const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
+        ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+      ]);
+      const common = {
+        accountLookup,
+        assetCurrencyLookup: new Map<string, string>(),
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      };
+      const tx = createMockTransaction({
+        activityType: ActivityType.DIVIDEND,
+        subtype: ACTIVITY_SUBTYPES.DRIP,
+        quantity: "2",
+        unitPrice: "50",
+        amount: "100",
+      });
+      const explicitlyEdited = applyTransactionUpdate({
+        transaction: tx,
+        field: "amount",
+        value: "90",
+        ...common,
+      });
+
+      const quantityChanged = applyTransactionUpdate({
+        transaction: explicitlyEdited,
+        field: "quantity",
+        value: "3",
+        ...common,
+      });
+
+      expect(quantityChanged.amount).toBe("90");
+    });
+
+    it("preserves a stored custom trade amount for non-economic edits", () => {
+      const tx = createMockTransaction({
+        activityType: ActivityType.BUY,
+        quantity: "10",
+        unitPrice: "100",
+        fee: "5",
+        amount: "975",
+        _amountEdited: false,
+      });
+
+      const updated = applyTransactionUpdate({
+        transaction: tx,
+        field: "comment",
+        value: "reviewed total",
+        accountLookup: new Map([
+          ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
+        ]),
+        assetCurrencyLookup: new Map<string, string>(),
+        fallbackCurrency: "USD",
+        resolveTransactionCurrency: () => "USD",
+      });
+
+      expect(updated.amount).toBe("975");
+    });
+
     it("should keep staking rewards asset-backed when subtype is selected", () => {
       const accountLookup = new Map<string, { id: string; name: string; currency: string }>([
         ["account-1", { id: "account-1", name: "Test Account", currency: "USD" }],
@@ -934,6 +1258,7 @@ describe("activity-utils", () => {
       expect(updated.quantity).toBeNull();
       expect(updated.unitPrice).toBeNull();
       expect(updated.amount).toBe("200");
+      expect(updated._amountEdited).toBe(true);
     });
 
     it("should clear invalid staking subtype fields when changing to dividend", () => {
@@ -966,6 +1291,7 @@ describe("activity-utils", () => {
       expect(updated.quantity).toBeNull();
       expect(updated.unitPrice).toBeNull();
       expect(updated.amount).toBe("750");
+      expect(updated._amountEdited).toBe(true);
       expect(updated.assetSymbol).toBe("ETH");
       expect(updated.assetId).toBe("ETH");
     });
@@ -999,7 +1325,8 @@ describe("activity-utils", () => {
       expect(updated.subtype).toBeUndefined();
       expect(updated.quantity).toBeNull();
       expect(updated.unitPrice).toBeNull();
-      expect(updated.amount).toBe("200");
+      expect(updated.amount).toBeNull();
+      expect(updated._amountEdited).toBe(false);
       expect(updated.assetSymbol).toBe("AAPL");
       expect(updated.assetId).toBe("AAPL");
     });
@@ -1031,6 +1358,41 @@ describe("activity-utils", () => {
   });
 
   describe("validateTransactionsForSave", () => {
+    it("rejects approval when a final-cash activity still has no amount", () => {
+      const transaction = createMockTransaction({
+        id: "sell-missing-final",
+        activityType: ActivityType.SELL,
+        amount: null,
+        needsReview: false,
+        _originalNeedsReview: true,
+      });
+
+      const result = validateTransactionsForSave([transaction], new Set(["sell-missing-final"]));
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          transactionId: "sell-missing-final",
+          field: "amount",
+          message: "Final cash amount is required before approval",
+        }),
+      );
+    });
+
+    it("allows the unresolved activity to remain in review", () => {
+      const transaction = createMockTransaction({
+        id: "sell-still-reviewing",
+        activityType: ActivityType.SELL,
+        amount: null,
+        needsReview: true,
+        _originalNeedsReview: true,
+      });
+
+      const result = validateTransactionsForSave([transaction], new Set(["sell-still-reviewing"]));
+
+      expect(result.isValid).toBe(true);
+    });
+
     it("should require asset-backed income fields for staking rewards", () => {
       const transactions: LocalTransaction[] = [
         createMockTransaction({
@@ -1095,6 +1457,77 @@ describe("activity-utils", () => {
       expect(result.errors).toEqual(
         expect.arrayContaining([expect.objectContaining({ field: "unitPrice" })]),
       );
+    });
+  });
+
+  describe("hasFinalCashAmountForApproval", () => {
+    it("rejects a cash-bearing activity with no final amount", () => {
+      expect(
+        hasFinalCashAmountForApproval(
+          createMockTransaction({ activityType: ActivityType.SELL, amount: null }),
+        ),
+      ).toBe(false);
+    });
+
+    it("rejects an untouched legacy zero on a trade", () => {
+      expect(
+        hasFinalCashAmountForApproval(
+          createMockTransaction({ activityType: ActivityType.SELL, amount: "0" }),
+        ),
+      ).toBe(false);
+    });
+
+    it("accepts a zero trade total explicitly confirmed this session", () => {
+      expect(
+        hasFinalCashAmountForApproval(
+          createMockTransaction({
+            activityType: ActivityType.SELL,
+            amount: "0",
+            _amountEdited: true,
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it("does not require an amount for a securities transfer", () => {
+      expect(
+        hasFinalCashAmountForApproval(
+          createMockTransaction({
+            activityType: ActivityType.TRANSFER_OUT,
+            assetId: "asset-aapl",
+            assetSymbol: "AAPL",
+            amount: null,
+          }),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("partitionReviewRowsForApproval", () => {
+    it("separates complete and incomplete rows from one bulk selection", () => {
+      const complete = createMockTransaction({
+        id: "complete-sell",
+        activityType: ActivityType.SELL,
+        amount: "125",
+      });
+      const missing = createMockTransaction({
+        id: "missing-sell",
+        activityType: ActivityType.SELL,
+        amount: null,
+      });
+      const untouchedZero = createMockTransaction({
+        id: "zero-buy",
+        activityType: ActivityType.BUY,
+        amount: "0",
+      });
+
+      const result = partitionReviewRowsForApproval([complete, missing, untouchedZero]);
+
+      expect(result.approvable.map((transaction) => transaction.id)).toEqual(["complete-sell"]);
+      expect(result.incomplete.map((transaction) => transaction.id)).toEqual([
+        "missing-sell",
+        "zero-buy",
+      ]);
     });
   });
 

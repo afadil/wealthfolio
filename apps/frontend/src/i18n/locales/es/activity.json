@@ -1,4 +1,11 @@
 {
+  "needs_review_alert": {
+    "title_one": "{{count}} actividad requiere revisión",
+    "title_other": "{{count}} actividades requieren revisión",
+    "title_many": "{{count}} actividades requieren revisión",
+    "description": "Revise el activo, el tipo y el importe final de cada transacción.",
+    "action": "Revisar"
+  },
   "activities": "Actividades",
   "add_activity": "Añadir actividad",
   "add_holdings": "Añadir posiciones",
@@ -129,7 +136,6 @@
   "duplicate": "Duplicar",
   "delete": "Eliminar",
   "loading": "Cargando…",
-  "load_more": "Cargar más...",
   "search_placeholder": "Buscar...",
   "clear_search": "Borrar búsqueda",
   "filter_account": "Cuenta",
@@ -287,7 +293,7 @@
   "import_help_docs_activity_ref": "documentación de referencia de actividades",
   "import_help_how_to_title": "¿Cómo importar un CSV?",
   "import_help_how_to_mobile": "Cómo importar un CSV",
-  "pagination_count": "{{fetched}} / {{total}} actividades",
+  "pagination_count": "{{fetched}}/{{total}} actividades",
   "manager": {
     "add_to_account": "Añadir una nueva transacción a {{account}}",
     "create_transaction": "Crea una nueva transacción o actividad para tu cuenta",
@@ -326,7 +332,8 @@
     "title": "Actividades del {{date}}",
     "count": "{{count}} actividades registradas en esta fecha",
     "count_one": "{{count}} actividad registrada en esta fecha",
-    "count_other": "{{count}} actividades registradas en esta fecha"
+    "count_other": "{{count}} actividades registradas en esta fecha",
+    "count_many": "{{count}} actividades registradas en esta fecha"
   },
   "picker": {
     "transfer": "Transferencia",
@@ -340,7 +347,8 @@
     "status_all": "Todas las actividades",
     "status_pending": "Pendientes de revisión",
     "status_validated": "Validadas",
-    "instrument": "Instrumento"
+    "instrument": "Instrumento",
+    "instrument_all": "Todos los instrumentos"
   },
   "detail": {
     "status_posted": "Contabilizada",
@@ -438,6 +446,7 @@
     "any_eligible": "Cualquier transferencia elegible",
     "eligible_count_one": "{{count}} transferencia elegible",
     "eligible_count_other": "{{count}} transferencias elegibles",
+    "eligible_count_many": "{{count}} transferencias elegibles",
     "no_eligible_filters": "Ninguna transferencia elegible coincide con los filtros actuales.",
     "unlink_button": "Desvincular transferencia",
     "unlink_button_plural": "Desvincular transferencias",
@@ -448,6 +457,7 @@
     "reason_eligible_opposite": "Transferencia opuesta elegible",
     "warning_dates_differ_one": "Las fechas difieren en {{count}} día.",
     "warning_dates_differ_other": "Las fechas difieren en {{count}} días.",
+    "warning_dates_differ_many": "Las fechas difieren en {{count}} días.",
     "warning_currencies_differ": "Las monedas difieren ({{source}} / {{candidate}}).",
     "warning_prices_differ": "Los precios difieren.",
     "warning_amount_mismatch": "El importe o la cantidad no coinciden exactamente.",
@@ -456,7 +466,8 @@
     "error_load_pair": "No se pudo cargar el par de transferencia vinculado.",
     "error_search": "No se pudieron buscar las actividades.",
     "within_days_one": "Dentro de {{count}} día",
-    "within_days_other": "Dentro de {{count}} días"
+    "within_days_other": "Dentro de {{count}} días",
+    "within_days_many": "Dentro de {{count}} días"
   },
   "form": {
     "section_asset_account": "Activo y cuenta",
@@ -555,6 +566,9 @@
     "available_amount": "Disponible: {{amount}}",
     "total_debit": "Débito total",
     "total_credit": "Crédito total",
+    "help_total_debit": "Efectivo final pagado, incluidas las comisiones y los impuestos.",
+    "help_total_credit": "Efectivo final recibido, después de comisiones e impuestos.",
+    "use_calculated_total": "Usar el total calculado ({{amount}})",
     "warn_buy_while_short": "Actualmente tienes una posición corta en esta acción. Usa Comprar para cubrir para reducirla; introduce una Compra normal solo después de que la posición corta esté cerrada.",
     "warn_cover_without_short": "Comprar para cubrir requiere una posición corta existente para esta acción en la cuenta seleccionada.",
     "warn_cover_quantity_excess": "Estás cubriendo {{covering}} acciones, pero la posición corta actual es de {{short}} acciones. Introduce cualquier exceso como una actividad de Compra por separado.",
@@ -602,6 +616,7 @@
     "err_amount_number": "El importe debe ser un número.",
     "err_amount_positive_number": "El importe debe ser un número positivo.",
     "err_amount_gt_zero": "El importe debe ser mayor que 0.",
+    "err_amount_non_negative": "El importe no puede ser negativo.",
     "err_enter_quantity": "Introduce una cantidad.",
     "err_quantity_number": "La cantidad debe ser un número.",
     "err_quantity_gt_zero": "La cantidad debe ser mayor que 0.",
@@ -659,10 +674,13 @@
     "intent_sell": "Venta",
     "shares_count_one": "{{count}} acción",
     "shares_count_other": "{{count}} acciones",
+    "shares_count_many": "{{count}} acciones",
     "short_shares_one": "En corto: {{count}} acción",
     "short_shares_other": "En corto: {{count}} acciones",
+    "short_shares_many": "En corto: {{count}} acciones",
     "holding_contracts_one": "Posición: {{count}} contrato",
     "holding_contracts_other": "Posición: {{count}} contratos",
+    "holding_contracts_many": "Posición: {{count}} contratos",
     "section_income": "Ingresos",
     "err_select_security": "Selecciona un valor.",
     "err_select_reward_asset": "Selecciona un activo de recompensa.",
@@ -685,7 +703,8 @@
       "next_page": "Página siguiente",
       "last_page": "Ir a la última página",
       "jump_hint_one": "Introduce un número de página entre 1 y {{count}}",
-      "jump_hint_other": "Introduce un número de página entre 1 y {{count}}"
+      "jump_hint_other": "Introduce un número de página entre 1 y {{count}}",
+      "jump_hint_many": "Introduce un número de página entre 1 y {{count}}"
     },
     "duplicated_comment": "Duplicada",
     "save_edits_first": "Guarda primero las ediciones",
@@ -725,8 +744,10 @@
     },
     "rows_selected_one": "{{count}} fila seleccionada",
     "rows_selected_other": "{{count}} filas seleccionadas",
+    "rows_selected_many": "{{count}} filas seleccionadas",
     "pending_changes_one": "{{count}} cambio pendiente",
     "pending_changes_other": "{{count}} cambios pendientes",
+    "pending_changes_many": "{{count}} cambios pendientes",
     "add_transaction": "Añadir transacción",
     "add": "Añadir",
     "approve_selected": "Aprobar las actividades sincronizadas seleccionadas",
@@ -741,8 +762,14 @@
     "unit_price_help": "Para compras y ventas, introduce el precio de la operación. Para las recompensas de staking y los dividendos en especie, introduce el valor justo de mercado por unidad en el momento de la recepción; determina el importe del ingreso y la base de coste.",
     "warn_dates_differ_one": "Las fechas difieren en {{count}} día.",
     "warn_dates_differ_other": "Las fechas difieren en {{count}} días.",
+    "warn_dates_differ_many": "Las fechas difieren en {{count}} días.",
     "approve_count_one": "Aprobar {{count}}",
-    "approve_count_other": "Aprobar {{count}}"
+    "approve_count_other": "Aprobar {{count}}",
+    "approve_count_many": "Aprobar {{count}}",
+    "approve_missing_amount_one": "A {{count}} actividad todavía le falta el importe final de efectivo",
+    "approve_missing_amount_other": "A {{count}} actividades todavía les falta el importe final de efectivo",
+    "approve_missing_amount_many": "A {{count}} actividades todavía les falta el importe final de efectivo",
+    "approve_missing_amount_description": "Introduce el importe final de efectivo correcto para cada operación vacía o con valor cero antes de aprobarla."
   },
   "table": {
     "cash": "Efectivo",
@@ -823,6 +850,7 @@
       "csvPreview": "Vista previa del CSV",
       "rows_one": "{{count}} fila",
       "rows_other": "{{count}} filas",
+      "rows_many": "{{count}} filas",
       "parsed": "Analizado",
       "rawFile": "Archivo sin procesar",
       "showingFirstRows": "Mostrando las primeras {{max}} de {{total}} filas",
@@ -871,8 +899,10 @@
       "valuePeriod": "Punto",
       "summarySkipTop_one": "Omitir superiores: {{count}}",
       "summarySkipTop_other": "Omitir superiores: {{count}}",
+      "summarySkipTop_many": "Omitir superiores: {{count}}",
       "summarySkipBottom_one": "Omitir inferiores: {{count}}",
-      "summarySkipBottom_other": "Omitir inferiores: {{count}}"
+      "summarySkipBottom_other": "Omitir inferiores: {{count}}",
+      "summarySkipBottom_many": "Omitir inferiores: {{count}}"
     },
     "template": {
       "label": "Plantilla",
@@ -908,6 +938,7 @@
       "filePreview": "Vista previa del archivo",
       "totalRows_one": "{{count}} fila en total",
       "totalRows_other": "{{count}} filas en total",
+      "totalRows_many": "{{count}} filas en total",
       "noCsvTitle": "No hay datos CSV disponibles",
       "noCsvDescription": "Vuelve atrás y sube un archivo válido.",
       "accountAssignmentRequired": "Se requiere la asignación de cuenta",
@@ -918,6 +949,7 @@
       "selectDefaultOrColumn": "Selecciona una cuenta predeterminada o asigna una columna de cuenta",
       "missingAccountRows_one": "{{count}} fila sin cuenta",
       "missingAccountRows_other": "{{count}} filas sin cuenta",
+      "missingAccountRows_many": "{{count}} filas sin cuenta",
       "blankAccountRowsAssigned": "Filas con cuenta en blanco asignadas",
       "usingSelectedForAll": "Usando la cuenta seleccionada para todas las filas",
       "noUnmappedAccountIds": "No hay ids de cuenta sin asignar",
@@ -933,7 +965,8 @@
       "missingAccount": "Cuenta faltante",
       "emptySymbol": "Símbolo vacío",
       "accountAssignmentBlankRows_one": "Asigna cada fila del CSV a una cuenta. {{count}} fila sigue en blanco, así que elige una cuenta predeterminada en Subir o completa la columna de cuenta.",
-      "accountAssignmentBlankRows_other": "Asigna cada fila del CSV a una cuenta. {{count}} filas siguen en blanco, así que elige una cuenta predeterminada en Subir o completa la columna de cuenta."
+      "accountAssignmentBlankRows_other": "Asigna cada fila del CSV a una cuenta. {{count}} filas siguen en blanco, así que elige una cuenta predeterminada en Subir o completa la columna de cuenta.",
+      "accountAssignmentBlankRows_many": "Asigna cada fila del CSV a una cuenta. {{count}} filas siguen en blanco, así que elige una cuenta predeterminada en Subir o completa la columna de cuenta."
     },
     "csvViewer": {
       "status": "Estado",
@@ -949,7 +982,8 @@
       "noContentFound": "No se encontró contenido",
       "empty": "vacío",
       "lines_one": "{{count}} línea",
-      "lines_other": "{{count}} líneas"
+      "lines_other": "{{count}} líneas",
+      "lines_many": "{{count}} líneas"
     },
     "columns": {
       "dateTime": "Fecha y hora",
@@ -978,6 +1012,7 @@
     "reviewToolbar": {
       "rowsSelected_one": "{{count}} fila seleccionada",
       "rowsSelected_other": "{{count}} filas seleccionadas",
+      "rowsSelected_many": "{{count}} filas seleccionadas",
       "skip": "Omitir",
       "skipTooltip": "Omitir las filas seleccionadas",
       "unskip": "No omitir",
@@ -1015,19 +1050,25 @@
       "revalidate": "Revalidar",
       "rowNeedsFixing_one": "{{count}} fila necesita corrección",
       "rowNeedsFixing_other": "{{count}} filas necesitan corrección",
+      "rowNeedsFixing_many": "{{count}} filas necesitan corrección",
       "warningsToReview_one": "{{count}} advertencia para revisar",
       "warningsToReview_other": "{{count}} advertencias para revisar",
+      "warningsToReview_many": "{{count}} advertencias para revisar",
       "errorsDescription": "{{valid}} de {{all}} filas son válidas y están listas para importar. Corrige los errores a continuación, u omítelas para continuar.",
       "warningsDescription": "Las {{all}} actividades son importables. Revisa las advertencias a continuación o continúa.",
       "errorsBadge_one": "{{count}} error",
       "errorsBadge_other": "{{count}} errores",
+      "errorsBadge_many": "{{count}} errores",
       "warningsBadge_one": "{{count}} advertencia",
       "warningsBadge_other": "{{count}} advertencias",
+      "warningsBadge_many": "{{count}} advertencias",
       "duplicatesBadge_one": "{{count}} duplicada",
       "duplicatesBadge_other": "{{count}} duplicadas",
+      "duplicatesBadge_many": "{{count}} duplicadas",
       "willBeImportedTitle": "Se importarán {{count}} de {{all}} actividades",
       "excludedDescription_one": "{{count}} actividad está excluida. Tus datos están listos para importar.",
       "excludedDescription_other": "{{count}} actividades están excluidas. Tus datos están listos para importar.",
+      "excludedDescription_many": "{{count}} actividades están excluidas. Tus datos están listos para importar.",
       "allValidTitle": "Las {{all}} actividades son válidas",
       "allValidDescription": "Tus datos están listos para importar. Aún puedes revisar y hacer ajustes si es necesario.",
       "activitiesCount": "{{count}} actividades",
@@ -1044,8 +1085,10 @@
       "skipReason": "Omitida",
       "willBeImportedTitle_one": "Se importará {{count}} de {{all}} actividades",
       "willBeImportedTitle_other": "Se importarán {{count}} de {{all}} actividades",
+      "willBeImportedTitle_many": "Se importarán {{count}} de {{all}} actividades",
       "activitiesCount_one": "{{count}} actividad",
-      "activitiesCount_other": "{{count}} actividades"
+      "activitiesCount_other": "{{count}} actividades",
+      "activitiesCount_many": "{{count}} actividades"
     },
     "status": {
       "valid": "Válida",
@@ -1064,6 +1107,7 @@
       "warningsDescription": "{{count}} actividades tienen advertencias pero se importarán de todos modos.",
       "forcedDuplicatesDescription_one": "Incluye {{count}} duplicada marcada como \"importar de todos modos\".",
       "forcedDuplicatesDescription_other": "Incluye {{count}} duplicadas marcadas como \"importar de todos modos\".",
+      "forcedDuplicatesDescription_many": "Incluye {{count}} duplicadas marcadas como \"importar de todos modos\".",
       "reviewSummary": "Revisa el resumen a continuación y luego haz clic en Importar para continuar.",
       "totalRows": "Total de filas",
       "toImport": "Para importar",
@@ -1077,6 +1121,7 @@
       "importing": "Importando...",
       "importActivities_one": "Importar {{count}} actividad",
       "importActivities_other": "Importar {{count}} actividades",
+      "importActivities_many": "Importar {{count}} actividades",
       "errorTitle": "Error de importación",
       "tryAgain": "Intentar de nuevo",
       "noValidActivities": "No hay actividades válidas para importar",
@@ -1097,8 +1142,10 @@
       "validationError": "Error de validación",
       "readyTitle_one": "{{count}} actividad lista para importar",
       "readyTitle_other": "{{count}} actividades listas para importar",
+      "readyTitle_many": "{{count}} actividades listas para importar",
       "warningsDescription_one": "{{count}} actividad tiene advertencias pero se importará de todos modos.",
-      "warningsDescription_other": "{{count}} actividades tienen advertencias pero se importarán de todos modos."
+      "warningsDescription_other": "{{count}} actividades tienen advertencias pero se importarán de todos modos.",
+      "warningsDescription_many": "{{count}} actividades tienen advertencias pero se importarán de todos modos."
     },
     "result": {
       "loading": "Cargando los resultados de la importación...",
@@ -1157,6 +1204,7 @@
       "rowsSummary": "{{total}} en total ({{holdings}} posiciones, {{cash}} efectivo)",
       "snapshotsDates_one": "{{count}} fecha",
       "snapshotsDates_other": "{{count}} fechas",
+      "snapshotsDates_many": "{{count}} fechas",
       "columnMapping": "Asignación de columnas",
       "dataPreview": "Vista previa de datos",
       "skip": "Omitir",
@@ -1172,19 +1220,23 @@
       "cashBalances": "Saldos de efectivo",
       "cashEntries_one": "{{count}} entrada",
       "cashEntries_other": "{{count}} entradas",
+      "cashEntries_many": "{{count}} entradas",
       "validating": "Comprobando tus posiciones…",
       "validatingRows_one": "Comprobando {{count}} fila antes de importar",
       "validatingRows_other": "Comprobando {{count}} filas antes de importar",
+      "validatingRows_many": "Comprobando {{count}} filas antes de importar",
       "validationFailed": "No pudimos comprobar tus posiciones",
       "validationFailedDescription": "No se importó nada. Inténtalo de nuevo.",
       "validationErrors": "Errores de validación",
       "validationErrorsCount_one": "{{count}} error",
       "validationErrorsCount_other": "{{count}} errores",
+      "validationErrorsCount_many": "{{count}} errores",
       "readyToImport": "Listo para importar",
       "readyRows": "{{count}} filas",
       "existingOverwrittenTitle": "Se sobrescribirán las instantáneas existentes",
       "existingOverwritten_one": "{{count}} fecha de instantánea ya existe y se sobrescribirá: {{dates}}",
       "existingOverwritten_other": "{{count}} fechas de instantánea ya existen y se sobrescribirán: {{dates}}",
+      "existingOverwritten_many": "{{count}} fechas de instantánea ya existen y se sobrescribirán: {{dates}}",
       "confirmTitle": "Confirmar la importación de posiciones",
       "importantTitle": "Importante",
       "importantDescription": "La importación creará o actualizará instantáneas para cada fecha de tu CSV. Las instantáneas existentes de las mismas fechas se reemplazarán.",
@@ -1196,26 +1248,33 @@
       "importing": "Importando...",
       "importSnapshots_one": "Importar {{count}} instantánea",
       "importSnapshots_other": "Importar {{count}} instantáneas",
+      "importSnapshots_many": "Importar {{count}} instantáneas",
       "failedToPrepareAssets": "No se pudieron preparar los activos para la importación.",
       "positionsCount_one": "{{count}} posición",
       "positionsCount_other": "{{count}} posiciones",
+      "positionsCount_many": "{{count}} posiciones",
       "readyRows_one": "{{count}} fila",
-      "readyRows_other": "{{count}} filas"
+      "readyRows_other": "{{count}} filas",
+      "readyRows_many": "{{count}} filas"
     },
     "symbolPanel": {
       "unrecognized_one": "{{count}} símbolo no reconocido",
       "unrecognized_other": "{{count}} símbolos no reconocidos",
+      "unrecognized_many": "{{count}} símbolos no reconocidos",
       "affectingRows": " que afecta a {{count}} filas",
       "markAllCustom": "Marcar todos como personalizados",
       "description": "Busca y asigna estos símbolos al ticker correcto o márcalos como personalizados, luego aplica. Si los marcas como personalizados, se creará automáticamente un activo con este símbolo durante la importación. Si el activo con este símbolo ya existe, se reutilizará en lugar de crear un duplicado.",
       "rows_one": "{{count}} fila",
       "rows_other": "{{count}} filas",
+      "rows_many": "{{count}} filas",
       "searchFor": "Buscar {{symbol}}...",
       "markCustom": "Marcar como personalizado",
       "applyMappings_one": "Aplicar {{count}} asignación",
       "applyMappings_other": "Aplicar {{count}} asignaciones",
+      "applyMappings_many": "Aplicar {{count}} asignaciones",
       "affectingRows_one": " que afecta a {{count}} fila",
-      "affectingRows_other": " que afecta a {{count}} filas"
+      "affectingRows_other": " que afecta a {{count}} filas",
+      "affectingRows_many": " que afecta a {{count}} filas"
     },
     "help": {
       "button": "¿Cómo importar un CSV?",
@@ -1315,7 +1374,8 @@
       "cancel": "Cancelar",
       "importing": "Importando...",
       "issuesTitle_one": "Hay problemas con {{count}} entrada de actividad.",
-      "issuesTitle_other": "Hay problemas con {{count}} entradas de actividad."
+      "issuesTitle_other": "Hay problemas con {{count}} entradas de actividad.",
+      "issuesTitle_many": "Hay problemas con {{count}} entradas de actividad."
     }
   }
 }

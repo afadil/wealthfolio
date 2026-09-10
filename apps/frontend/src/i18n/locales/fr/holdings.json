@@ -231,6 +231,7 @@
   "last_update": "Dernière mise à jour : {{date}}",
   "assets_need_valuations_one": "{{count}} actif nécessite des valorisations à jour",
   "assets_need_valuations_other": "{{count}} actifs nécessitent des valorisations à jour",
+  "assets_need_valuations_many": "{{count}} actifs nécessitent des valorisations à jour",
   "category_breakdown": "Répartition par catégorie",
   "personal_assets": "Actifs personnels",
   "health_filter_active": "Affichage des positions signalées par le Centre de santé",

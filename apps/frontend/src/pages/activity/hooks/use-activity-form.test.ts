@@ -1,4 +1,4 @@
-import { ActivityType } from "@/lib/constants";
+import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountSelectOption } from "../components/forms/fields";
@@ -136,6 +136,156 @@ describe("useActivityForm", () => {
         currency: "USD",
       }),
     );
+  });
+
+  it("preserves Draft review lifecycle when editing without explicit approval", async () => {
+    const { result } = renderHook(() =>
+      useActivityForm({
+        accounts,
+        selectedType: "DEPOSIT",
+        activity: {
+          id: "draft-deposit",
+          accountId: "acc-usd",
+          activityType: ActivityType.DEPOSIT,
+          status: ActivityStatus.DRAFT,
+          needsReview: true,
+        },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        accountId: "acc-usd",
+        activityDate: new Date("2026-02-01T10:00:00.000Z"),
+        amount: 1000,
+        comment: "corrected details",
+        currency: "USD",
+      } as ActivityFormValues);
+    });
+
+    const payload = mutationMocks.updateMutateAsync.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("status");
+    expect(payload).not.toHaveProperty("needsReview");
+  });
+
+  it("attests every non-Draft form submission as reviewed", async () => {
+    // A form save is a review: the whole form is on screen when the user
+    // submits, so creates and Posted edits carry needsReview: false.
+    const { result } = renderHook(() =>
+      useActivityForm({
+        accounts,
+        selectedType: "DEPOSIT",
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        accountId: "acc-usd",
+        activityDate: new Date("2026-02-01T10:00:00.000Z"),
+        amount: 1000,
+        comment: null,
+        currency: "USD",
+      } as ActivityFormValues);
+    });
+
+    expect(mutationMocks.addMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ needsReview: false }),
+    );
+
+    const { result: editResult } = renderHook(() =>
+      useActivityForm({
+        accounts,
+        selectedType: "DEPOSIT",
+        activity: {
+          id: "posted-deposit",
+          accountId: "acc-usd",
+          activityType: ActivityType.DEPOSIT,
+          status: ActivityStatus.POSTED,
+          needsReview: true,
+        },
+      }),
+    );
+
+    await act(async () => {
+      await editResult.current.handleSubmit({
+        accountId: "acc-usd",
+        activityDate: new Date("2026-02-01T10:00:00.000Z"),
+        amount: 1000,
+        comment: "reviewed in the form",
+        currency: "USD",
+      } as ActivityFormValues);
+    });
+
+    expect(mutationMocks.updateMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "posted-deposit", needsReview: false }),
+    );
+  });
+
+  it("forwards the custom-total attestation when editing a Posted trade", async () => {
+    const { result } = renderHook(() =>
+      useActivityForm({
+        accounts,
+        selectedType: "BUY",
+        activity: {
+          id: "buy-posted",
+          accountId: "acc-usd",
+          activityType: ActivityType.BUY,
+          status: ActivityStatus.POSTED,
+          needsReview: false,
+        },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        accountId: "acc-usd",
+        activityDate: new Date("2026-02-01T10:00:00.000Z"),
+        assetId: "AAPL",
+        quantity: 2,
+        unitPrice: 10,
+        fee: 1,
+        amount: 30,
+        needsReview: false,
+        currency: "USD",
+      } as unknown as ActivityFormValues);
+    });
+
+    const payload = mutationMocks.updateMutateAsync.mock.calls[0][0];
+    expect(payload.needsReview).toBe(false);
+    expect(payload.amount).toBe(30);
+  });
+
+  it("strips the custom-total attestation when editing a Draft trade", async () => {
+    const { result } = renderHook(() =>
+      useActivityForm({
+        accounts,
+        selectedType: "BUY",
+        activity: {
+          id: "buy-draft",
+          accountId: "acc-usd",
+          activityType: ActivityType.BUY,
+          status: ActivityStatus.DRAFT,
+          needsReview: true,
+        },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSubmit({
+        accountId: "acc-usd",
+        activityDate: new Date("2026-02-01T10:00:00.000Z"),
+        assetId: "AAPL",
+        quantity: 2,
+        unitPrice: 10,
+        fee: 1,
+        amount: 30,
+        needsReview: false,
+        currency: "USD",
+      } as unknown as ActivityFormValues);
+    });
+
+    const payload = mutationMocks.updateMutateAsync.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("needsReview");
   });
 
   it("preserves user-selected currency for external TRANSFER", async () => {

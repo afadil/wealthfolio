@@ -2,6 +2,7 @@ import type {
   AccountScope,
   AllocationTarget,
   DriftReport,
+  Holding,
   RebalancePlan,
   RebalanceWarning,
   ScenarioMode,
@@ -24,11 +25,13 @@ import type { TFunction } from "i18next";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useEligibleHoldingsSelection } from "../hooks/use-eligible-holdings";
 import { useRebalancePlan } from "../hooks/use-rebalance";
 import {
   allocationTargetColorForRow,
   buildAllocationTargetColorMap,
 } from "./allocation-target-colors";
+import { EligibleHoldingsSelector } from "./eligible-holdings-selector";
 import { accountScopeKey } from "./target-scope";
 
 // Drift direction colors — clay for overweight (+), slate-blue for underweight (−).
@@ -172,7 +175,7 @@ function computeSleeveSummary(driftReport: DriftReport, plan: RebalancePlan): Sl
     .filter((s) => s.currentBps > 0 || s.targetBps > 0 || s.afterBps > 0);
 }
 
-/** "Cash sits 42% over a 0% target." — describes the largest current drift driver. */
+/** "Cash is at 42%, above a 0% target." — describes the largest current drift driver. */
 function driftDriverSentence(driftReport: DriftReport, t: TFunction): string | null {
   let top: { name: string; drift: number; cur: number; tgt: number } | null = null;
   for (const r of driftReport.rows) {
@@ -189,8 +192,11 @@ function driftDriverSentence(driftReport: DriftReport, t: TFunction): string | n
       : "allocation:planner.driverSentenceUnder",
     {
       name: top.name,
-      current: (top.cur / 100).toFixed(0),
-      target: (top.tgt / 100).toFixed(0),
+      // 1 decimal, matching the drift figures shown beside this sentence —
+      // at 0 decimals "is at 20%, above a 20% target" reads as a contradiction
+      // whenever current and target round to the same integer.
+      current: pp1(top.cur),
+      target: pp1(top.tgt),
     },
   );
 }
@@ -486,7 +492,7 @@ function ModeSwitch({
 
 // ── Cash deploy controls (left panel) ─────────────────────────────────────────
 
-function PlannerInput({
+export function PlannerInput({
   description,
   cashValue,
   availableCash,
@@ -496,6 +502,8 @@ function PlannerInput({
   hasPlan,
   isCalculating,
   isSourceLoading,
+  hasEligibleHoldings,
+  eligibleHoldingsSelector,
 }: {
   description: string;
   cashValue: string;
@@ -506,6 +514,8 @@ function PlannerInput({
   hasPlan: boolean;
   isCalculating: boolean;
   isSourceLoading: boolean;
+  hasEligibleHoldings: boolean;
+  eligibleHoldingsSelector: ReactNode;
 }) {
   const { t } = useTranslation();
   const amountFormatting = useAmountFormatting();
@@ -524,7 +534,13 @@ function PlannerInput({
   ];
   const activePreset = presets.find((p) => Math.abs(p.value - deploy) <= 0.5 + limit * 0.001)?.id;
 
-  const canCalculate = !isCalculating && !isSourceLoading && limit > 0 && deploy > 0 && !overBudget;
+  const canCalculate =
+    !isCalculating &&
+    !isSourceLoading &&
+    limit > 0 &&
+    deploy > 0 &&
+    !overBudget &&
+    hasEligibleHoldings;
 
   return (
     <div className="flex h-full flex-col">
@@ -597,6 +613,8 @@ function PlannerInput({
           {t("allocation:planner.exceedsAvailableCash")}
         </p>
       )}
+
+      {eligibleHoldingsSelector}
 
       <div className="mt-auto pt-4 sm:pt-5">
         <Button
@@ -1336,6 +1354,7 @@ interface RebalanceTabProps {
   profile: AllocationTarget | null;
   driftReport: DriftReport | null;
   accountScope: AccountScope;
+  holdings: Holding[];
   availableCash: number;
   sourceVersion: string;
   isSourceLoading: boolean;
@@ -1345,6 +1364,7 @@ export function RebalanceTab({
   profile,
   driftReport,
   accountScope,
+  holdings,
   availableCash,
   sourceVersion,
   isSourceLoading,
@@ -1360,6 +1380,14 @@ export function RebalanceTab({
   const tradesRef = useRef<HTMLDivElement>(null);
   const currency = driftReport?.baseCurrency ?? "USD";
   const inputContextKey = `${profile?.id ?? "no-profile"}:${accountScopeKey(accountScope)}:${currency}`;
+  const {
+    excludedAssetIds,
+    eligibleAssetIds: canonicalEligibleAssetIds,
+    hasEligibleHoldings,
+    toggle: toggleEligibleAsset,
+    selectAll: selectAllEligibleAssets,
+    clear: clearEligibleAssets,
+  } = useEligibleHoldingsSelection(holdings, inputContextKey);
   const cashValue =
     cashDraft?.key === inputContextKey
       ? cashDraft.value
@@ -1375,6 +1403,7 @@ export function RebalanceTab({
     filter: accountScope,
     scenarioMode,
     sourceKey,
+    eligibleAssetIds: scenarioMode === "cash_flow_only" ? canonicalEligibleAssetIds : undefined,
   });
   const cachedPlan = planQuery.data ?? null;
   const hasStalePlan = !!cachedPlan && cachedPlan.sourceKey !== sourceKey;
@@ -1395,6 +1424,10 @@ export function RebalanceTab({
     if (!profile) return;
     if (!sourceReady) {
       toast.error(t("allocation:toast.dataLoading"));
+      return;
+    }
+    if (!hasEligibleHoldings && !isSellMode) {
+      toast.error(t("allocation:eligibleHoldings.emptyGuidance"));
       return;
     }
     if (availableCashLimit <= 0 && !isSellMode) {
@@ -1471,6 +1504,18 @@ export function RebalanceTab({
                 hasPlan={!!plan || hasStalePlan}
                 isCalculating={isCalculating}
                 isSourceLoading={!sourceReady}
+                hasEligibleHoldings={isSellMode || hasEligibleHoldings}
+                eligibleHoldingsSelector={
+                  scenarioMode === "cash_flow_only" ? (
+                    <EligibleHoldingsSelector
+                      holdings={holdings}
+                      excludedAssetIds={excludedAssetIds}
+                      onToggle={toggleEligibleAsset}
+                      onSelectAll={selectAllEligibleAssets}
+                      onClear={clearEligibleAssets}
+                    />
+                  ) : null
+                }
               />
             </div>
             <div className="px-4 py-4 sm:px-5 sm:py-5">

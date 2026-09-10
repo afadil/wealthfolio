@@ -138,7 +138,9 @@ export const BulkHoldingsModal = ({
         activityDate: activityDate.toISOString(),
         asset: buildAssetResolutionInput({
           id: holding.assetId,
-          symbol: (holding.ticker || holding.assetId || "").toUpperCase().trim(),
+          symbol: (holding.canonicalSymbol || holding.ticker || holding.assetId || "")
+            .toUpperCase()
+            .trim(),
           exchangeMic: holding.exchangeMic || undefined,
           name: holding.name?.trim() || undefined,
           kind: holding.assetKind?.trim() || undefined,

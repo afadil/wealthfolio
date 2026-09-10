@@ -31,6 +31,7 @@ type BulkHoldingsFormValues = z.infer<typeof bulkHoldingsFormSchema>;
 export interface BulkHoldingRow {
   id: string;
   ticker: string;
+  canonicalSymbol?: string;
   name?: string;
   assetKind?: string;
   sharesOwned: number | string;
@@ -38,6 +39,7 @@ export interface BulkHoldingRow {
   totalValue: number;
   assetId?: string;
   quoteMode?: QuoteMode;
+  exchangeMic?: string;
   symbolQuoteCcy?: string;
   symbolInstrumentType?: string;
 }
@@ -80,10 +82,34 @@ const HoldingRow = memo(
       defaultValue: "",
     });
 
+    const canonicalSymbol = useWatch({
+      control,
+      name: `holdings.${index}.canonicalSymbol`,
+      defaultValue: "",
+    });
+
     const sharesOwned = useWatch({
       control,
       name: `holdings.${index}.sharesOwned`,
       defaultValue: 0,
+    });
+
+    const assetId = useWatch({
+      control,
+      name: `holdings.${index}.assetId`,
+      defaultValue: "",
+    });
+
+    const exchangeMic = useWatch({
+      control,
+      name: `holdings.${index}.exchangeMic`,
+      defaultValue: "",
+    });
+
+    const instrumentType = useWatch({
+      control,
+      name: `holdings.${index}.symbolInstrumentType`,
+      defaultValue: "",
     });
 
     const averageCost = useWatch({
@@ -125,7 +151,7 @@ const HoldingRow = memo(
     );
 
     const handleAssetSelect = useCallback(
-      (_symbol: string, searchResult?: SymbolSearchResult) => {
+      (symbol: string, searchResult?: SymbolSearchResult) => {
         const quoteMode = quoteModeFromSearchResult(searchResult);
         const isManualAsset = quoteMode === QuoteMode.MANUAL;
         setValue(`holdings.${index}.quoteMode`, quoteMode, { shouldDirty: true });
@@ -137,9 +163,18 @@ const HoldingRow = memo(
         setValue(`holdings.${index}.assetId`, searchResult?.existingAssetId ?? "", {
           shouldDirty: true,
         });
-        setValue(`holdings.${index}.exchangeMic`, searchResult?.exchangeMic ?? "", {
-          shouldDirty: true,
-        });
+        setValue(
+          `holdings.${index}.canonicalSymbol`,
+          searchResult?.canonicalSymbol || searchResult?.symbol || symbol,
+          { shouldDirty: true },
+        );
+        setValue(
+          `holdings.${index}.exchangeMic`,
+          searchResult?.canonicalExchangeMic || searchResult?.exchangeMic || "",
+          {
+            shouldDirty: true,
+          },
+        );
         setValue(`holdings.${index}.symbolQuoteCcy`, searchResult?.currency || accountCurrency, {
           shouldDirty: true,
         });
@@ -186,7 +221,13 @@ const HoldingRow = memo(
         {/* Ticker Input */}
         <div className="col-span-3 sm:col-span-6">
           <div className="flex min-w-0 items-center gap-2">
-            <TickerAvatar symbol={ticker} className="shrink-0" />
+            <TickerAvatar
+              symbol={canonicalSymbol || ticker}
+              exchangeMic={exchangeMic || undefined}
+              instrumentType={instrumentType || undefined}
+              assetId={assetId || undefined}
+              className="shrink-0"
+            />
             <div className="min-w-0 flex-1">
               <FormField
                 control={control}

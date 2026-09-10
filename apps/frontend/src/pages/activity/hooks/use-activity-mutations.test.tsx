@@ -86,13 +86,37 @@ describe("useActivityMutations", () => {
       } as any);
     });
 
-    expect(adapterMocks.updateActivity).toHaveBeenCalledWith(
+    const payload = adapterMocks.updateActivity.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("needsReview");
+    expect(payload).not.toHaveProperty("status");
+    expect(payload).toEqual(
       expect.objectContaining({
         asset: expect.objectContaining({
           id: "asset-tsla",
           symbol: "TSLA",
         }),
       }),
+    );
+  });
+
+  it("sends an explicit empty asset patch when an edit clears the asset", async () => {
+    const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.updateActivityMutation.mutateAsync({
+        id: "adjustment-1",
+        accountId: "acc-1",
+        activityType: ActivityType.ADJUSTMENT,
+        activityDate: new Date("2026-04-30T16:00:00Z"),
+        amount: 25,
+        currency: "USD",
+        currentAssetId: "asset-aapl",
+        clearAsset: true,
+      } as any);
+    });
+
+    expect(adapterMocks.updateActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ asset: {} }),
     );
   });
 

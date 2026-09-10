@@ -408,6 +408,78 @@ fn test_detect_addon_permissions_assets_and_market_data_sdk_categories() {
 }
 
 #[test]
+fn test_detect_addon_permissions_historical_exchange_rates() {
+    let addon_files = vec![AddonFile {
+        name: "addon.js".to_string(),
+        content: r#"
+            export default function enable(ctx) {
+                ctx.api.exchangeRates.getRatesForDates([
+                    { fromCurrency: "USD", toCurrency: "EUR", date: "2026-05-18" }
+                ]);
+            }
+        "#
+        .to_string(),
+        is_main: true,
+    }];
+
+    let detected_permissions = detect_addon_permissions(&addon_files);
+    let currency_permission = detected_permissions
+        .iter()
+        .find(|permission| permission.category == "currency")
+        .expect("currency permissions should be detected");
+
+    assert!(
+        currency_permission
+            .functions
+            .iter()
+            .any(|function| function.name == "getRatesForDates"),
+        "getRatesForDates should be detected under currency"
+    );
+}
+
+#[test]
+fn test_detect_addon_permissions_spending() {
+    let addon_files = vec![AddonFile {
+        name: "addon.js".to_string(),
+        content: r#"
+            export default async function enable(ctx) {
+                await ctx.api.spending.isEnabled();
+                await ctx.api.spending.getCategories();
+                await ctx.api.spending.getRules();
+                await ctx.api.spending.saveRule({});
+                await ctx.api.spending.deleteRule("rule-1");
+                await ctx.api.spending.rerunRules();
+            }
+        "#
+        .to_string(),
+        is_main: true,
+    }];
+
+    let detected_permissions = detect_addon_permissions(&addon_files);
+    let spending_permission = detected_permissions
+        .iter()
+        .find(|permission| permission.category == "spending")
+        .expect("spending permissions should be detected");
+    let detected_functions: std::collections::HashSet<&str> = spending_permission
+        .functions
+        .iter()
+        .map(|function| function.name.as_str())
+        .collect();
+
+    assert_eq!(
+        detected_functions,
+        std::collections::HashSet::from([
+            "isEnabled",
+            "getCategories",
+            "getRules",
+            "saveRule",
+            "deleteRule",
+            "rerunRules",
+        ])
+    );
+}
+
+#[test]
 fn test_addon_manifest_to_installed() {
     let manifest = AddonManifest {
         id: "test-addon".to_string(),

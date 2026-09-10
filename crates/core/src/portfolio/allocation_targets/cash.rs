@@ -86,6 +86,8 @@ mod tests {
             source_account_ids: vec![],
             symbol: category_id.to_string(),
             name: category_id.to_string(),
+            exchange_mic: None,
+            instrument_type: None,
             holding_type,
             quantity: Decimal::ONE,
             category_id: category_id.to_string(),

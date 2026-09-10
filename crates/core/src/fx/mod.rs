@@ -12,6 +12,9 @@ pub use currency::{
 };
 pub use currency_converter::CurrencyConverter;
 pub use fx_errors::FxError;
-pub use fx_model::{ExchangeRate, FxContext, NewExchangeRate};
+pub use fx_model::{
+    ExchangeRate, ExchangeRateDateBatchRequest, ExchangeRateDateQuery, ExchangeRateDateResult,
+    FxContext, NewExchangeRate,
+};
 pub use fx_service::FxService;
 pub use fx_traits::{FxRepositoryTrait, FxServiceTrait};

@@ -74,7 +74,7 @@ export default function AboutSettingsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
           <img
-            src="/logo.svg"
+            src="/app-icon-192.png"
             alt={t("settings:about_logo_alt")}
             className="h-12 w-12 rounded-md shadow"
           />

@@ -3,7 +3,7 @@
 use crate::accounts::AccountDB;
 use crate::activities::{ActivityDB, ImportAccountTemplateDB, ImportTemplateDB};
 use crate::ai_chat::{AiMessageDB, AiThreadDB, AiThreadTagDB};
-use crate::assets::AssetDB;
+use crate::assets::{AssetDB, AssetLogoDB};
 use crate::custom_provider::CustomProviderDB;
 use crate::goals::{GoalDB, GoalPlanDB, GoalsAllocationDB};
 use crate::limits::ContributionLimitDB;
@@ -55,6 +55,18 @@ impl SyncOutboxModel for AssetDB {
 
     fn sync_entity_id(&self) -> &str {
         &self.id
+    }
+}
+
+impl SyncOutboxModel for AssetLogoDB {
+    const ENTITY: SyncEntity = SyncEntity::AssetLogo;
+
+    fn sync_entity_id(&self) -> &str {
+        &self.asset_id
+    }
+
+    fn delete_payload(entity_id: &str) -> serde_json::Value {
+        serde_json::json!({ "asset_id": entity_id })
     }
 }
 

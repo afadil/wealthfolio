@@ -17,10 +17,14 @@ use wealthfolio_connect::{
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
 use wealthfolio_core::{
     accounts::{AccountService, AccountServiceTrait},
-    activities::{ActivityService as CoreActivityService, ActivityServiceTrait},
+    activities::{
+        rebuild_pending_final_cash_accounts, run_final_cash_migration,
+        ActivityService as CoreActivityService, ActivityServiceTrait,
+    },
     assets::{
         AlternativeAssetRepositoryTrait, AlternativeAssetService, AlternativeAssetServiceTrait,
-        AssetClassificationService, AssetService, AssetServiceTrait,
+        AssetClassificationService, AssetLogoService, AssetLogoServiceTrait, AssetService,
+        AssetServiceTrait,
     },
     events::DomainEventSink,
     fx::{FxService, FxServiceTrait},
@@ -29,6 +33,7 @@ use wealthfolio_core::{
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
     portfolio::allocation::{AllocationService, AllocationServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
+    portfolio::recalculation_gate::PortfolioRecalculationGate,
     portfolio::{
         holdings::{
             holdings_valuation_service::HoldingsValuationService, HoldingsService,
@@ -51,7 +56,7 @@ use wealthfolio_storage_sqlite::{
     addons::AddonStorageRepository,
     agent::{McpAuditRepository, PatRepository},
     ai_chat::AiChatRepository,
-    assets::{AlternativeAssetRepository, AssetRepository},
+    assets::{AlternativeAssetRepository, AssetLogoRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
@@ -97,6 +102,7 @@ pub struct AppState {
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
+    pub asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync>,
     pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
@@ -406,6 +412,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )?
         .with_event_sink(domain_event_sink.clone()),
     );
+    let recalculation_gate = Arc::new(PortfolioRecalculationGate::default());
     let snapshot_service = Arc::new(
         SnapshotService::new_with_timezone(
             base_currency.clone(),
@@ -417,7 +424,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         )
         .with_event_sink(domain_event_sink.clone())
-        .with_lot_repository(lots_repository.clone()),
+        .with_lot_repository(lots_repository.clone())
+        .with_recalculation_gate(recalculation_gate.clone()),
     );
 
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
@@ -430,7 +438,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             fx_service.clone(),
         )
         .with_activity_repository(activity_repository.clone(), timezone.clone())
-        .with_lot_repository(lots_repository.clone()),
+        .with_lot_repository(lots_repository.clone())
+        .with_recalculation_gate(recalculation_gate.clone()),
     );
 
     let net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync> =
@@ -558,6 +567,39 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         .with_timezone(timezone.clone())
         .with_event_sink(domain_event_sink.clone()),
     );
+    let final_cash_migration = run_final_cash_migration(
+        settings_service.as_ref(),
+        activity_repository.as_ref(),
+        account_service.as_ref(),
+        asset_service.as_ref(),
+    )
+    .await?;
+    recalculation_gate.replace_pending_accounts(final_cash_migration.pending_account_ids.clone());
+    if !final_cash_migration.pending_account_ids.is_empty() {
+        // The recalculation gate already serializes and forces full
+        // recomputation for pending accounts, so the rebuild can always run
+        // in the background instead of blocking (or failing) startup.
+        tracing::info!(
+            "Rebuilding {} account(s) after final-cash migration in the background",
+            final_cash_migration.pending_account_ids.len()
+        );
+        let settings_service = settings_service.clone();
+        let snapshot_service = snapshot_service.clone();
+        let valuation_service = valuation_service.clone();
+        let recalculation_gate = recalculation_gate.clone();
+        tokio::spawn(async move {
+            if let Err(error) = rebuild_pending_final_cash_accounts(
+                settings_service.as_ref(),
+                snapshot_service.as_ref(),
+                valuation_service.as_ref(),
+                recalculation_gate.as_ref(),
+            )
+            .await
+            {
+                tracing::warn!("Background final-cash rebuild failed: {}", error);
+            }
+        });
+    }
 
     // Spending: events + event_types
     let event_types_repo: Arc<dyn wealthfolio_spending::events::EventTypesRepositoryTrait> =
@@ -592,6 +634,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             activity_splits_repo.clone(),
             activity_events_repo.clone(),
             events_service.clone(),
+            fx_service.clone(),
         ),
     );
 
@@ -687,6 +730,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )
         .with_event_sink(domain_event_sink.clone()),
     );
+
+    // Custom asset logo overrides
+    let asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync> =
+        Arc::new(AssetLogoService::new(
+            Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone())),
+            asset_repository.clone(),
+        ));
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
@@ -854,6 +904,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         taxonomy_service,
         net_worth_service,
         alternative_asset_service,
+        asset_logo_service,
         addon_service,
         connect_sync_service,
         ai_provider_service,

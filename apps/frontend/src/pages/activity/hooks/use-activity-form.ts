@@ -1,6 +1,6 @@
 import { getTransferPairForActivity, logger } from "@/adapters";
 import { buildAssetResolutionInput } from "@/lib/asset-resolution-input";
-import { ActivityType } from "@/lib/constants";
+import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails, ActivityUpdate } from "@/lib/types";
 import { useCallback, useMemo } from "react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { AccountSelectOption } from "../components/forms/fields";
 import type { NewActivityFormValues } from "../components/forms/schemas";
 import type { TransferFormValues } from "../components/forms/transfer-form";
+import type { AdjustmentFormValues } from "../components/forms/adjustment-form";
 import {
   ACTIVITY_FORM_CONFIG,
   type ActivityFormValues,
@@ -344,12 +345,37 @@ export function useActivityForm({
           submitData.currency = account.currency;
         }
 
+        // A form save is a review: every field - including the total, typed
+        // or calculated - is on screen when the user submits, so every form
+        // submission attests. Drafts are the exception: they stay in their
+        // review queue until explicitly approved and posted.
+        if (isEditing && activity?.status === ActivityStatus.DRAFT) {
+          delete (submitData as { needsReview?: boolean }).needsReview;
+        } else {
+          (submitData as { needsReview?: boolean }).needsReview = false;
+        }
+
         if (isEditing && activity?.id) {
+          const currentAssetId =
+            selectedType === ActivityType.ADJUSTMENT &&
+            (formData as AdjustmentFormValues).adjustmentMode === "cash"
+              ? undefined
+              : activity.assetId;
+          const clearAsset = Boolean(
+            activity.assetId &&
+            selectedType === ActivityType.ADJUSTMENT &&
+            (formData as AdjustmentFormValues).adjustmentMode === "cash",
+          );
           await updateActivityMutation.mutateAsync({
             id: activity.id,
-            currentAssetId: activity.assetId,
+            currentAssetId,
+            clearAsset,
             ...submitData,
-          } as NewActivityFormValues & { id: string; currentAssetId?: string });
+          } as NewActivityFormValues & {
+            id: string;
+            currentAssetId?: string;
+            clearAsset?: boolean;
+          });
         } else {
           await addActivityMutation.mutateAsync(submitData);
         }

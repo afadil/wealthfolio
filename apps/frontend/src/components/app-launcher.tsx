@@ -5,6 +5,7 @@ import {
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
 import { useHoldings } from "@/hooks/use-holdings";
+import { useNameComparator } from "@/hooks/use-name-comparator";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import {
@@ -79,6 +80,7 @@ const accountTypeIcons: Record<AccountType | typeof PORTFOLIO_ACCOUNT_TYPE, Icon
 
 export function AppLauncher() {
   const { t } = useTranslation();
+  const compareNames = useNameComparator();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -440,8 +442,8 @@ export function AppLauncher() {
         name: account.name,
         accountType: account.accountType,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [accounts]);
+      .sort((a, b) => compareNames(a.name, b.name));
+  }, [accounts, compareNames]);
   const handleSelectHolding = (id: string, symbol: string, name?: string | null) => {
     if (!id) {
       return;
@@ -625,12 +627,14 @@ export function AppLauncher() {
         autoFocus={!isMobileViewport && open}
         value={search}
         onValueChange={setSearch}
-        className={cn(isMobileViewport ? "text-base" : "py-8")}
+        className="text-base"
       />
       <CommandList
         className={cn(
           "flex-1",
-          isMobileViewport ? "max-h-[calc(80vh-160px)] px-2 pb-8" : "max-h-[420px]",
+          isMobileViewport
+            ? "max-h-[calc(80vh-160px)] px-2 pb-8"
+            : "h-[min(420px,calc(100dvh_-_6rem))] max-h-none flex-none",
         )}
       >
         {!hasResults && <CommandEmpty>{t("common:component.no_matches_found")}</CommandEmpty>}
@@ -779,7 +783,11 @@ export function AppLauncher() {
   }
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      contentClassName="w-[calc(100%_-_2rem)] max-w-[720px] rounded-[28px] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
+    >
       <DialogTitle className="sr-only">{t("common:component.command_palette")}</DialogTitle>
       <DialogDescription className="sr-only">
         {t("common:component.command_palette_description")}

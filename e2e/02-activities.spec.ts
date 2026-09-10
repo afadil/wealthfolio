@@ -1,5 +1,6 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, type Locator, Page, test } from "@playwright/test";
 import {
+  BASE_URL,
   completeOnboardingIfNeeded,
   createAccount,
   gotoActivities,
@@ -11,6 +12,7 @@ test.describe.configure({ mode: "serial" });
 
 test.describe("Activity Creation Tests", () => {
   let page: Page;
+  const runId = Date.now().toString(36);
 
   // Test data for activities
   const TEST_DATA = {
@@ -131,6 +133,29 @@ test.describe("Activity Creation Tests", () => {
         amount: 100,
         notes: "Withholding tax",
       },
+      credit: {
+        account: "Test USD Account",
+        currency: "USD",
+        amount: 75.25,
+        updatedAmount: 80.5,
+        notes: `E2E credit ${runId}`,
+        updatedNotes: `E2E credit updated ${runId}`,
+      },
+      cashAdjustment: {
+        amount: 10,
+        securitiesAmount: 360,
+        finalCashAmount: 25,
+        symbol: "AAPL",
+        quantity: 2,
+        unitPrice: 180,
+        notes: `E2E cash adjustment ${runId}`,
+      },
+      optionExpiryAdjustment: {
+        symbol: "AAPL270115C00200000",
+        quantity: 1,
+        updatedQuantity: 2,
+        notes: `E2E option expiry ${runId}`,
+      },
       split: {
         account: "Test USD Account",
         currency: "USD",
@@ -168,6 +193,7 @@ test.describe("Activity Creation Tests", () => {
     Fee: "activity-type-fee",
     Interest: "activity-type-interest",
     Tax: "activity-type-tax",
+    Credit: "activity-type-credit",
   };
 
   async function waitForOverlayClose() {
@@ -186,6 +212,9 @@ test.describe("Activity Creation Tests", () => {
 
   async function selectActivityType(type: string) {
     const typeButton = page.getByTestId(activityTypeTestIds[type]);
+    if (!(await typeButton.isVisible().catch(() => false))) {
+      await page.getByRole("button", { name: "Expand to show all types" }).click();
+    }
     await expect(typeButton).toBeVisible();
     await typeButton.click();
     await page.waitForTimeout(200);
@@ -268,10 +297,10 @@ test.describe("Activity Creation Tests", () => {
     await page.waitForTimeout(100);
   }
 
-  async function searchAndSelectSymbol(symbol: string) {
+  async function searchAndSelectSymbol(symbol: string, dialogName = "Add Activity") {
     const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const exactSymbolPattern = new RegExp(`^${escapedSymbol}$`, "i");
-    const activityDialog = page.getByRole("dialog", { name: "Add Activity" });
+    const activityDialog = page.getByRole("dialog", { name: dialogName });
     const symbolCombobox = activityDialog
       .getByRole("combobox")
       .filter({ hasText: /Select symbol/i });
@@ -420,7 +449,92 @@ test.describe("Activity Creation Tests", () => {
     INTEREST: "Interest",
     TAX: "Tax",
     SPLIT: "Split",
+    CREDIT: "Credit",
+    ADJUSTMENT: "Adjustment",
   };
+
+  interface ActivityApiResponse {
+    id: string;
+    activityType: string;
+    subtype: string | null;
+    assetId: string | null;
+    assetSymbol: string | null;
+    instrumentType: string | null;
+    quantity: string | null;
+    unitPrice: string | null;
+    amount: string | null;
+    comment: string | null;
+  }
+
+  async function getTestAccountId() {
+    const response = await page.request.get(`${BASE_URL}/api/v1/accounts`);
+    expect(response.ok()).toBeTruthy();
+    const accounts = (await response.json()) as Array<{
+      id: string;
+      name: string;
+      currency: string;
+    }>;
+    const account = accounts.find(
+      (item) => item.name === "Test USD Account" && item.currency === "USD",
+    );
+    expect(account, "Expected the activities E2E account to exist").toBeTruthy();
+    return account!.id;
+  }
+
+  async function seedActivity(data: Record<string, unknown>) {
+    const response = await page.request.post(`${BASE_URL}/api/v1/activities`, { data });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return (await response.json()) as ActivityApiResponse;
+  }
+
+  async function getActivity(activityId: string) {
+    const response = await page.request.post(`${BASE_URL}/api/v1/activities/search`, {
+      data: { page: 0, pageSize: 10, activityIdFilter: [activityId] },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = (await response.json()) as { data: ActivityApiResponse[] };
+    expect(body.data).toHaveLength(1);
+    return body.data[0];
+  }
+
+  async function openActivityEditor(...rowText: string[]) {
+    await gotoActivities(page);
+    let row = page.locator("tbody tr");
+    for (const text of rowText) {
+      row = row.filter({ hasText: text });
+    }
+    const targetRow = row.first();
+    await expect(targetRow).toBeVisible({ timeout: 10000 });
+    const dialog = page.getByRole("dialog", { name: "Update Activity" });
+    await expect(async () => {
+      await targetRow.getByRole("button", { name: "Open", exact: true }).press("Enter");
+      await page
+        .getByRole("menuitem", { name: "Edit", exact: true })
+        .evaluate((element: HTMLElement) => element.click());
+      await expect(dialog).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10000 });
+    return dialog;
+  }
+
+  async function updateActivity(dialog: Locator) {
+    const updateButton = dialog.getByRole("button", { name: "Update", exact: true });
+    await expect(updateButton).toBeEnabled({ timeout: 5000 });
+    await updateButton.click();
+    await expect(dialog).not.toBeVisible({ timeout: 20000 });
+  }
+
+  async function expectInputNumber(dialog: Locator, testId: string, expected: number) {
+    const input = dialog.getByTestId(testId);
+    await expect(input).toBeVisible({ timeout: 5000 });
+    expect(Number(await input.inputValue())).toBeCloseTo(expected, 8);
+    return input;
+  }
+
+  async function selectAdvancedSubtype(dialog: Locator, subtype: string) {
+    await dialog.getByTestId("subtype-select").click();
+    await page.getByRole("option", { name: subtype, exact: true }).click();
+    await expect(dialog.getByTestId("subtype-select")).toContainText(subtype);
+  }
 
   async function verifyActivityInTable(
     type: string,
@@ -765,6 +879,154 @@ test.describe("Activity Creation Tests", () => {
     await verifyActivityInTable("FEE", null, { amount: fee.amount });
   });
 
+  test("12. Create and edit CREDIT with subtype and populated account", async () => {
+    const credit = TEST_DATA.activities.credit;
+
+    await gotoActivities(page);
+    await openAddActivitySheet();
+    await selectActivityType("Credit");
+    await selectAccount(credit.account, credit.currency);
+    await selectDate();
+    await fillAmount(credit.amount);
+    await expandAdvancedOptions();
+    const addDialog = page.getByRole("dialog", { name: "Add Activity" });
+    await selectAdvancedSubtype(addDialog, "Trading Rebate");
+    await fillNotes(credit.notes);
+    await submitActivity("Credit");
+
+    await verifyActivityInTable("CREDIT", null, { amount: credit.amount });
+    const editDialog = await openActivityEditor("Credit", credit.notes);
+    await expect(editDialog.getByTestId("account-select")).toContainText(credit.account);
+    const amountInput = await expectInputNumber(editDialog, "amount-input", credit.amount);
+    await editDialog.getByTestId("advanced-options-button").click();
+    await expect(editDialog.getByTestId("subtype-select")).toContainText("Trading Rebate");
+    await expect(editDialog.getByTestId("notes-input")).toHaveValue(credit.notes);
+
+    await amountInput.fill(String(credit.updatedAmount));
+    await selectAdvancedSubtype(editDialog, "Fee Refund");
+    await editDialog.getByTestId("notes-input").fill(credit.updatedNotes);
+    await updateActivity(editDialog);
+
+    const row = page.locator("tbody tr").filter({ hasText: credit.updatedNotes }).first();
+    await expect(row).toContainText("Credit", { timeout: 10000 });
+    await expect(row).toContainText("Fee Refund");
+  });
+
+  test("13. Edit ADJUSTMENT through cash and securities modes", async () => {
+    const adjustment = TEST_DATA.activities.cashAdjustment;
+    const accountId = await getTestAccountId();
+    const seeded = await seedActivity({
+      accountId,
+      activityType: "ADJUSTMENT",
+      subtype: "CASH_SWEEP",
+      activityDate: new Date().toISOString(),
+      currency: "USD",
+      amount: adjustment.amount,
+      comment: adjustment.notes,
+      needsReview: false,
+    });
+
+    const cashDialog = await openActivityEditor("Adjustment", "CASH_SWEEP", "$10.00");
+    await expect(cashDialog.getByTestId("account-select")).toContainText("Test USD Account");
+    await expect(cashDialog.getByRole("button", { name: "Cash", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expectInputNumber(cashDialog, "amount-input", adjustment.amount);
+
+    await cashDialog.getByRole("button", { name: "Securities", exact: true }).click();
+    await searchAndSelectSymbol(adjustment.symbol, "Update Activity");
+    await cashDialog.getByTestId("quantity-input").fill(String(adjustment.quantity));
+    await cashDialog.getByTestId("unit-price-input").fill(String(adjustment.unitPrice));
+    await cashDialog.getByTestId("amount-input").fill(String(adjustment.securitiesAmount));
+    await cashDialog.getByTestId("advanced-options-button").click();
+    await cashDialog.getByTestId("subtype-select").click();
+    await expect(page.getByRole("option", { name: "Option Expiry", exact: true })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await updateActivity(cashDialog);
+
+    let persisted = await getActivity(seeded.id);
+    expect(persisted.assetSymbol).toBe(adjustment.symbol);
+    expect(persisted.instrumentType).toBe("EQUITY");
+    expect(Number(persisted.quantity)).toBe(adjustment.quantity);
+    expect(Number(persisted.unitPrice)).toBe(adjustment.unitPrice);
+    expect(Number(persisted.amount)).toBe(adjustment.securitiesAmount);
+
+    const securitiesDialog = await openActivityEditor("Adjustment", adjustment.symbol);
+    await expect(
+      securitiesDialog.getByRole("button", { name: "Securities", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(securitiesDialog.getByTestId("account-select")).toContainText("Test USD Account");
+    await expectInputNumber(securitiesDialog, "quantity-input", adjustment.quantity);
+    await expectInputNumber(securitiesDialog, "unit-price-input", adjustment.unitPrice);
+    await expectInputNumber(securitiesDialog, "amount-input", adjustment.securitiesAmount);
+
+    await securitiesDialog.getByRole("button", { name: "Cash", exact: true }).click();
+    await securitiesDialog.getByTestId("amount-input").fill(String(adjustment.finalCashAmount));
+    const cashUpdateRequest = page.waitForRequest(
+      (request) =>
+        request.method() === "PUT" && new URL(request.url()).pathname === "/api/v1/activities",
+    );
+    await updateActivity(securitiesDialog);
+    const cashUpdatePayload = (await cashUpdateRequest).postDataJSON() as Record<string, unknown>;
+    expect(cashUpdatePayload.asset).toEqual({});
+
+    persisted = await getActivity(seeded.id);
+    expect(persisted.assetId).toBe("");
+    expect(persisted.assetSymbol).toBe("");
+    expect(persisted.quantity).toBeNull();
+    expect(persisted.unitPrice).toBeNull();
+    expect(Number(persisted.amount)).toBe(adjustment.finalCashAmount);
+  });
+
+  test("14. Edit option-expiry ADJUSTMENT with option-only subtype", async () => {
+    const adjustment = TEST_DATA.activities.optionExpiryAdjustment;
+    const accountId = await getTestAccountId();
+    const seeded = await seedActivity({
+      accountId,
+      activityType: "ADJUSTMENT",
+      subtype: "OPTION_EXPIRY",
+      activityDate: new Date().toISOString(),
+      currency: "USD",
+      quantity: adjustment.quantity,
+      unitPrice: 0,
+      amount: 0,
+      comment: adjustment.notes,
+      needsReview: false,
+      asset: {
+        symbol: adjustment.symbol,
+        name: "AAPL Jan 2027 200 Call",
+        kind: "INVESTMENT",
+        quoteMode: "MANUAL",
+        quoteCcy: "USD",
+        instrumentType: "OPTION",
+      },
+    });
+
+    const dialog = await openActivityEditor("Adjustment", "Option Expiry");
+    await expect(dialog.getByTestId("account-select")).toContainText("Test USD Account");
+    await expect(dialog.getByRole("button", { name: "Securities", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expectInputNumber(dialog, "quantity-input", adjustment.quantity);
+    await expectInputNumber(dialog, "unit-price-input", 0);
+    await expectInputNumber(dialog, "amount-input", 0);
+    await dialog.getByTestId("advanced-options-button").click();
+    await expect(dialog.getByTestId("subtype-select")).toContainText("Option Expiry");
+
+    await dialog.getByTestId("quantity-input").fill(String(adjustment.updatedQuantity));
+    await updateActivity(dialog);
+
+    const persisted = await getActivity(seeded.id);
+    expect(persisted.subtype).toBe("OPTION_EXPIRY");
+    expect(persisted.instrumentType).toBe("OPTION");
+    expect(persisted.assetSymbol).toBe(adjustment.symbol);
+    expect(Number(persisted.quantity)).toBe(adjustment.updatedQuantity);
+    expect(Number(persisted.unitPrice)).toBe(0);
+    expect(Number(persisted.amount)).toBe(0);
+  });
+
   test("15. Create INTEREST activity", async () => {
     await gotoActivities(page);
 
@@ -953,19 +1215,21 @@ test.describe("Activity Creation Tests", () => {
   test("21. Verify activity count in activities page", async () => {
     await gotoActivities(page);
 
-    // Wait for activities to load
-    await page.waitForTimeout(1000);
-
-    // Count activity rows - we created activities:
+    // Count activities - we created activities:
     // deposit, withdrawal, 2 buys, sell, 2 dividends,
     // internal cash transfer (creates 2), external cash transfer out (1), external cash transfer in (1),
     // internal securities transfer (creates 2), external securities transfer in (1),
-    // 1 fee, interest, 1 tax, split, custom buy
-    // Total: 1 + 1 + 2 + 1 + 2 + 2 + 1 + 1 + 2 + 1 + 1 + 1 + 1 + 1 + 1 = 19
-    const activityRows = page.locator("tbody tr");
-    const rowCount = await activityRows.count();
-
-    // We should have at least 19 activities
-    expect(rowCount).toBeGreaterThanOrEqual(19);
+    // 1 fee, credit, cash adjustment, option-expiry adjustment, interest, 1 tax, split, custom buy
+    // Total: 19 existing activities + 3 new-form activities = 22
+    // The table is virtualized, so mounted rows do not represent the total.
+    const activityCount = page.getByRole("main").getByRole("status");
+    await expect
+      .poll(async () => {
+        const match = (await activityCount.textContent())?.match(
+          /^\s*\d+\s*\/\s*(\d+)\s+activities\s*$/,
+        );
+        return match ? Number(match[1]) : 0;
+      })
+      .toBeGreaterThanOrEqual(22);
   });
 });

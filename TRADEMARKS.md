@@ -51,3 +51,16 @@ Inc.”
 
 If you want to use the Trademarks in ways not covered above, contact:
 hello@wealthfolio.app
+
+## Third-party trademarks
+
+Company, fund, and product names and logos under
+`apps/frontend/public/ticker-logos/` are third-party marks. They remain the
+property of their respective owners and are included solely to identify
+securities within Wealthfolio. Their inclusion does not imply sponsorship,
+affiliation, or endorsement.
+
+The Wealthfolio source-code license does not grant permission to extract, reuse,
+or redistribute these marks as a standalone logo collection. Obtain any required
+permission from the relevant rights holder. Nothing in this notice limits uses
+permitted by applicable law or separately authorized by a rights holder.

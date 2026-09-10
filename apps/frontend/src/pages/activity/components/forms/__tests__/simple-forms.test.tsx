@@ -5,6 +5,7 @@ import { WithdrawalForm } from "../withdrawal-form";
 import { FeeForm } from "../fee-form";
 import { InterestForm } from "../interest-form";
 import { TaxForm } from "../tax-form";
+import { AdjustmentForm } from "../adjustment-form";
 import type { AccountSelectOption } from "../fields";
 
 // Mock useSettings hook to avoid AuthProvider dependency
@@ -49,8 +50,19 @@ vi.mock("../fields", () => ({
       <textarea data-testid={`textarea-${name}`} name={name} id={name} />
     </div>
   ),
-  AdvancedOptionsSection: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="advanced-options-section">{children}</div>
+  AdvancedOptionsSection: ({
+    children,
+    subtypeOptions,
+  }: {
+    children?: React.ReactNode;
+    subtypeOptions?: readonly string[];
+  }) => (
+    <div data-testid="advanced-options-section">
+      {subtypeOptions?.map((option) => (
+        <span key={option}>{option}</span>
+      ))}
+      {children}
+    </div>
   ),
   FormSection: ({ action, children }: { action?: React.ReactNode; children?: React.ReactNode }) => (
     <div data-testid="form-section">
@@ -146,6 +158,66 @@ const mockAccounts: AccountSelectOption[] = [
   { value: "acc-1", label: "Savings Account", currency: "USD" },
   { value: "acc-2", label: "Investment Account", currency: "EUR" },
 ];
+
+describe("AdjustmentForm", () => {
+  const mockOnSubmit = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders cash adjustment fields by default", () => {
+    render(<AdjustmentForm accounts={mockAccounts} onSubmit={mockOnSubmit} isEditing />);
+
+    expect(screen.getByTestId("select-accountId")).toBeInTheDocument();
+    expect(screen.getByTestId("date-picker-activityDate")).toBeInTheDocument();
+    expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+    expect(screen.queryByTestId("symbol-search-assetId")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
+  });
+
+  it("renders security fields when selected", async () => {
+    const user = userEvent.setup();
+    render(<AdjustmentForm accounts={mockAccounts} onSubmit={mockOnSubmit} isEditing />);
+
+    await user.click(screen.getByRole("button", { name: /securities/i }));
+
+    expect(screen.getByTestId("symbol-search-assetId")).toBeInTheDocument();
+    expect(screen.getByTestId("input-quantity")).toBeInTheDocument();
+    expect(screen.getByTestId("input-unitPrice")).toBeInTheDocument();
+    expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+  });
+
+  it("offers option expiry only for option securities", () => {
+    const baseDefaults = {
+      adjustmentMode: "securities" as const,
+      accountId: "acc-2",
+      activityDate: new Date(),
+      assetId: "AAPL",
+      currency: "USD",
+    };
+    const equityForm = render(
+      <AdjustmentForm
+        accounts={mockAccounts}
+        defaultValues={{ ...baseDefaults, symbolInstrumentType: "EQUITY" }}
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    expect(screen.queryByText("OPTION_EXPIRY")).not.toBeInTheDocument();
+    equityForm.unmount();
+
+    render(
+      <AdjustmentForm
+        accounts={mockAccounts}
+        defaultValues={{ ...baseDefaults, symbolInstrumentType: "OPTION" }}
+        onSubmit={mockOnSubmit}
+      />,
+    );
+
+    expect(screen.getByText("OPTION_EXPIRY")).toBeInTheDocument();
+  });
+});
 
 describe("WithdrawalForm", () => {
   const mockOnSubmit = vi.fn();

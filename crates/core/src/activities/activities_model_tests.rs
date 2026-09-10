@@ -550,6 +550,7 @@ mod tests {
             tax: None,
             amount: Some(Some(dec!(1505))),
             status: None,
+            needs_review: None,
             notes: None,
             fx_rate: None,
             metadata: None,

@@ -15,7 +15,9 @@ mod tests {
         NewExchangeRate,
     };
     use crate::lots::{LotClosure, LotDisposal, LotRecord};
-    use crate::portfolio::economic_events::BasisStatus;
+    use crate::portfolio::economic_events::{
+        ActivityCashInputs, ActivityEconomicsResolver, BasisStatus,
+    };
     use crate::portfolio::performance::PerformanceService;
     use crate::portfolio::snapshot::holdings_calculator::{HoldingsCalculator, ProjectionRun};
     use crate::portfolio::snapshot::{
@@ -446,6 +448,106 @@ mod tests {
 
     // --- Helper Functions ---
 
+    fn test_contract_multiplier(asset_id: &str) -> Decimal {
+        let bytes = asset_id.as_bytes();
+        if bytes.len() >= 15 {
+            let option_marker = bytes.len() - 9;
+            let has_occ_date = bytes[option_marker.saturating_sub(6)..option_marker]
+                .iter()
+                .all(u8::is_ascii_digit);
+            let has_occ_strike = bytes[option_marker + 1..].iter().all(u8::is_ascii_digit);
+            if has_occ_date && has_occ_strike && matches!(bytes[option_marker], b'C' | b'P') {
+                return dec!(100);
+            }
+        }
+        Decimal::ONE
+    }
+
+    fn canonical_test_trade_amount(
+        activity_type: ActivityType,
+        asset_id: &str,
+        quantity: Decimal,
+        unit_price: Decimal,
+        fee: Decimal,
+    ) -> Option<Decimal> {
+        if matches!(
+            activity_type,
+            ActivityType::TransferIn | ActivityType::TransferOut
+        ) {
+            return None;
+        }
+        let inputs = ActivityCashInputs {
+            activity_type: activity_type.as_str(),
+            currency: "USD",
+            is_security_transfer: false,
+            quantity: Some(quantity),
+            unit_price: Some(unit_price),
+            amount: None,
+            fee: Some(fee),
+            tax: None,
+            unit_multiplier: test_contract_multiplier(asset_id),
+        };
+        ActivityEconomicsResolver::calculate_trade_final_cash(inputs)
+            .or_else(|| ActivityEconomicsResolver::calculate_standalone_charge_amount(inputs))
+    }
+
+    fn canonical_test_cash_amount(
+        activity_type: ActivityType,
+        gross_amount: Decimal,
+        fee: Decimal,
+    ) -> Decimal {
+        let gross_amount = gross_amount.abs();
+        let fee = fee.abs();
+        match activity_type {
+            ActivityType::Buy | ActivityType::Withdrawal | ActivityType::TransferOut => {
+                gross_amount + fee
+            }
+            ActivityType::Sell
+            | ActivityType::Deposit
+            | ActivityType::Dividend
+            | ActivityType::Interest
+            | ActivityType::Credit
+            | ActivityType::TransferIn => (gross_amount - fee).abs(),
+            ActivityType::Fee => fee.max(gross_amount),
+            ActivityType::Tax => gross_amount,
+            _ => gross_amount,
+        }
+    }
+
+    fn set_test_tax(activity: &mut Activity, tax: Decimal) {
+        activity.tax = Some(tax);
+        if ActivityEconomicsResolver::is_security_transfer(activity) {
+            return;
+        }
+        let activity_type = activity.effective_type().to_string();
+        let unit_multiplier = activity
+            .asset_id
+            .as_deref()
+            .map(test_contract_multiplier)
+            .unwrap_or(Decimal::ONE);
+        let inputs = ActivityCashInputs {
+            activity_type: &activity_type,
+            currency: &activity.currency,
+            is_security_transfer: false,
+            quantity: activity.quantity,
+            unit_price: activity.unit_price,
+            amount: None,
+            fee: activity.fee,
+            tax: activity.tax,
+            unit_multiplier,
+        };
+        activity.amount = if matches!(activity_type.as_str(), "BUY" | "SELL") {
+            ActivityEconomicsResolver::calculate_trade_final_cash(inputs)
+        } else if matches!(activity_type.as_str(), "FEE" | "TAX") {
+            ActivityEconomicsResolver::calculate_standalone_charge_amount(inputs)
+        } else {
+            activity.amount.map(|amount| match activity_type.as_str() {
+                "WITHDRAWAL" | "TRANSFER_OUT" => amount + tax.abs(),
+                _ => (amount - tax.abs()).abs(),
+            })
+        };
+    }
+
     /// Creates an external transfer activity with metadata.flow.is_external = true
     /// This is used to simulate transfers from/to outside the tracked portfolio (affects net_contribution)
     #[allow(clippy::too_many_arguments)]
@@ -484,7 +586,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(quantity),
             unit_price: Some(unit_price),
-            amount: None,
+            amount: canonical_test_trade_amount(activity_type, asset_id, quantity, unit_price, fee),
             fee: Some(fee),
             tax: None,
             currency: currency.to_string(),
@@ -533,7 +635,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(quantity),
             unit_price: Some(unit_price),
-            amount: None,
+            amount: canonical_test_trade_amount(activity_type, asset_id, quantity, unit_price, fee),
             fee: Some(fee),
             tax: None,
             currency: currency.to_string(),
@@ -578,7 +680,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(dec!(1)),
             unit_price: Some(amount),
-            amount: Some(amount),
+            amount: Some(canonical_test_cash_amount(activity_type, amount, fee)),
             fee: Some(fee),
             tax: None,
             currency: currency.to_string(),
@@ -908,7 +1010,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        buy_activity.tax = Some(dec!(3));
+        set_test_tax(&mut buy_activity, dec!(3));
 
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &[buy_activity], target_date);
@@ -1013,6 +1115,50 @@ mod tests {
         );
         assert_eq!(next_state.net_contribution, dec!(0));
         assert_eq!(next_state.net_contribution_base, dec!(0));
+    }
+
+    #[test]
+    fn drip_with_unrepresentable_acquisition_price_rebuilds_without_panicking() {
+        let account_currency = "USD";
+        let target_date_str = "2026-05-05";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        for (quantity, expected_basis, expected_status) in [
+            (dec!(0.1), Decimal::ZERO, BasisStatus::Unknown),
+            (dec!(2), Decimal::ZERO, BasisStatus::Unknown),
+            (dec!(3), Decimal::MAX, BasisStatus::Complete),
+        ] {
+            let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+            let mut calculator = create_calculator(Arc::new(MockFxService::new()), base_currency);
+            let previous_snapshot =
+                create_initial_snapshot("acc_1", account_currency, "2026-05-04");
+            let mut drip = create_default_activity(
+                "overflow-drip-1",
+                ActivityType::Dividend,
+                "AAPL",
+                quantity,
+                Decimal::ZERO,
+                Decimal::ZERO,
+                account_currency,
+                target_date_str,
+            );
+            drip.subtype = Some("DRIP".to_string());
+            drip.unit_price = None;
+            drip.amount = Some(Decimal::MAX);
+
+            let activities_today = DefaultActivityCompiler::new().compile(&drip).unwrap();
+            let result = calculator
+                .calculate_next_holdings(&previous_snapshot, &activities_today, target_date)
+                .unwrap();
+
+            let position = result.snapshot.positions.get("AAPL").unwrap();
+            assert_eq!(position.quantity, quantity);
+            assert_eq!(position.total_cost_basis, expected_basis);
+            assert_eq!(position.basis_status(), expected_status);
+            assert_eq!(
+                result.snapshot.cash_balances.get(account_currency),
+                Some(&Decimal::ZERO)
+            );
+        }
     }
 
     #[test]
@@ -1326,7 +1472,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        sell_activity.tax = Some(dec!(3));
+        set_test_tax(&mut sell_activity, dec!(3));
 
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &[sell_activity], target_date);
@@ -1857,7 +2003,7 @@ mod tests {
             activity_currency_div, // CAD
             target_date_str,
         );
-        dividend_activity.tax = Some(dec!(5)); // 5 CAD withholding tax
+        set_test_tax(&mut dividend_activity, dec!(5)); // 5 CAD withholding tax
 
         let interest_activity_usd = create_cash_activity(
             "act_int_usd_1",
@@ -1939,7 +2085,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        credit_activity.tax = Some(dec!(10));
+        set_test_tax(&mut credit_activity, dec!(10));
 
         let result =
             calculator.calculate_next_holdings(&previous_snapshot, &[credit_activity], target_date);
@@ -1986,7 +2132,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        bonus_activity.tax = Some(dec!(10));
+        set_test_tax(&mut bonus_activity, dec!(10));
         bonus_activity.subtype = Some(ACTIVITY_SUBTYPE_BONUS.to_string());
 
         let result =
@@ -2030,7 +2176,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        deposit_activity.tax = Some(dec!(10));
+        set_test_tax(&mut deposit_activity, dec!(10));
 
         let result = calculator.calculate_next_holdings(
             &previous_snapshot,
@@ -2075,7 +2221,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        withdrawal_activity.tax = Some(dec!(10));
+        set_test_tax(&mut withdrawal_activity, dec!(10));
 
         let result = calculator.calculate_next_holdings(
             &previous_snapshot,
@@ -2121,7 +2267,7 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        transfer_in_activity.tax = Some(dec!(10));
+        set_test_tax(&mut transfer_in_activity, dec!(10));
 
         let result = calculator.calculate_next_holdings(
             &previous_snapshot,
@@ -2148,7 +2294,7 @@ mod tests {
             account_currency,
             "2023-01-07",
         );
-        transfer_out_activity.tax = Some(dec!(5));
+        set_test_tax(&mut transfer_out_activity, dec!(5));
 
         let result = calculator.calculate_next_holdings(
             &state_after_in,
@@ -2256,7 +2402,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trade_amount_policy_equity_buy_ignores_inflated_amount() {
+    fn test_trade_amount_policy_equity_buy_uses_authoritative_final_amount() {
         let mock_fx_service = Arc::new(MockFxService::new());
         let account_currency = "USD";
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
@@ -2284,18 +2430,17 @@ mod tests {
 
         let position = next_state.positions.get("AAPL").unwrap();
         assert_eq!(position.quantity, dec!(10));
-        assert_eq!(position.average_cost, dec!(100.25));
-        assert_eq!(position.total_cost_basis, dec!(1002.50));
-        assert_eq!(position.lots[0].acquisition_price, dec!(99.76));
+        assert_eq!(position.average_cost, dec!(997.60));
+        assert_eq!(position.total_cost_basis, dec!(9976));
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&dec!(-1002.50))
+            Some(&dec!(-9976))
         );
-        assert_eq!(next_state.cost_basis, dec!(1002.50));
+        assert_eq!(next_state.cost_basis, dec!(9976));
     }
 
     #[test]
-    fn test_trade_amount_policy_equity_sell_ignores_inflated_amount() {
+    fn test_trade_amount_policy_equity_sell_uses_authoritative_final_amount() {
         let mock_fx_service = Arc::new(MockFxService::new());
         let account_currency = "USD";
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
@@ -2341,7 +2486,7 @@ mod tests {
         assert_eq!(position.total_cost_basis, dec!(250));
         assert_eq!(
             next_state.cash_balances.get(account_currency),
-            Some(&dec!(-201))
+            Some(&dec!(5500))
         );
         assert_eq!(next_state.cost_basis, dec!(250));
     }
@@ -2411,7 +2556,9 @@ mod tests {
             account_currency,
             target_date_str,
         );
-        buy.amount = Some(dec!(997.60));
+        // The stored amount is final cash. The gross trade value is therefore
+        // 997.60 after reversing the 4.90 fee.
+        buy.amount = Some(dec!(1002.50));
 
         let result = calculator.calculate_next_holdings(&previous_snapshot, &[buy], target_date);
         assert!(result.is_ok(), "Calculation failed: {:?}", result.err());
@@ -2470,7 +2617,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trade_amount_policy_transfer_in_uses_amount_as_last_resort_when_unit_price_missing() {
+    fn test_trade_amount_policy_transfer_in_uses_legacy_amount_as_runtime_basis() {
         let mock_fx_service = Arc::new(MockFxService::new());
         let account_currency = "USD";
         let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
@@ -2620,7 +2767,7 @@ mod tests {
             target_date_str,
         );
         tax_activity.amount = None;
-        tax_activity.tax = Some(dec!(42));
+        set_test_tax(&mut tax_activity, dec!(42));
 
         let result = calculator.calculate_next_holdings(
             &previous_snapshot,
@@ -2669,8 +2816,8 @@ mod tests {
             target_date_str,
         );
         tax_activity.amount = None;
-        tax_activity.tax = Some(dec!(42));
         tax_activity.activity_type_override = Some(ActivityType::Tax.as_str().to_string());
+        set_test_tax(&mut tax_activity, dec!(42));
 
         let result = calculator.calculate_next_holdings(
             &previous_snapshot,
@@ -3083,7 +3230,7 @@ mod tests {
 
         // Net Contribution (CAD) - Transfers affect account-level net_contribution
         let expected_net_contribution_after_cash_in = expected_net_contribution_after_asset_out
-            + (transfer_in_cash_activity.amt() * rate_cash_date);
+            + (transfer_in_cash_activity.price() * rate_cash_date);
         assert_eq!(
             state_after_cash_tx_in.net_contribution,
             expected_net_contribution_after_cash_in
@@ -3145,7 +3292,7 @@ mod tests {
 
         // Net Contribution (CAD) - Transfers affect account-level net_contribution
         let expected_net_contribution_after_cash_out = expected_net_contribution_after_cash_in
-            - (transfer_out_cash_activity.amt() * rate_cash_date);
+            - (transfer_out_cash_activity.price() * rate_cash_date);
         assert_eq!(
             state_after_cash_tx_out.net_contribution,
             expected_net_contribution_after_cash_out
@@ -3195,6 +3342,125 @@ mod tests {
         // Account-boundary cashflow: transfers affect net_contribution.
         assert_eq!(state.net_contribution, dec!(1000) * usd_cad);
         assert_eq!(state.net_contribution_base, dec!(1000) * usd_cad);
+    }
+
+    #[test]
+    fn imported_same_account_cash_fx_pair_is_contribution_neutral() {
+        let target_date_str = "2026-04-14";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let valuation_rate = dec!(0.88);
+        let mut mock_fx_service = MockFxService::new();
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", target_date, valuation_rate);
+
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+        let mut calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+        let mut previous_snapshot = create_initial_snapshot("acc_fx", "EUR", "2026-04-13");
+        previous_snapshot
+            .cash_balances
+            .insert("EUR".to_string(), dec!(48.30));
+        previous_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(19839.79));
+        previous_snapshot.net_contribution = dec!(1234.56);
+        previous_snapshot.net_contribution_base = dec!(7890.12);
+
+        let mut transfer_out = create_cash_activity(
+            "fx-out",
+            ActivityType::TransferOut,
+            dec!(106.03),
+            Decimal::ZERO,
+            "EUR",
+            target_date_str,
+        );
+        let mut transfer_in = create_cash_activity(
+            "fx-in",
+            ActivityType::TransferIn,
+            dec!(124.9743801),
+            Decimal::ZERO,
+            "USD",
+            target_date_str,
+        );
+        for activity in [&mut transfer_out, &mut transfer_in] {
+            activity.account_id = "acc_fx".to_string();
+            activity.source_group_id = Some("ibkr-fx-execution".to_string());
+            activity.metadata = Some(json!({
+                "flow": { "is_external": false },
+                "fx": {
+                    "sourceCurrency": "EUR",
+                    "destinationCurrency": "USD",
+                    "sourceAmount": "106.03",
+                    "destinationAmount": "124.9743801",
+                    "impliedRate": "1.1786646232198434405356974441",
+                    "rateSource": "implied_from_import"
+                }
+            }));
+        }
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[transfer_out, transfer_in],
+                target_date,
+            )
+            .expect("same-account FX conversion should calculate");
+        let state = result.snapshot;
+
+        assert_eq!(state.cash_balances.get("EUR"), Some(&dec!(-57.73)));
+        assert_eq!(state.cash_balances.get("USD"), Some(&dec!(19964.7643801)));
+        assert_eq!(state.net_contribution, previous_snapshot.net_contribution);
+        assert_eq!(
+            state.net_contribution_base,
+            previous_snapshot.net_contribution_base
+        );
+
+        let value_before = dec!(48.30) + dec!(19839.79) * valuation_rate;
+        assert_ne!(state.cash_total_account_currency, value_before);
+    }
+
+    #[test]
+    fn grouped_same_account_cash_fx_without_import_metadata_keeps_transfer_semantics() {
+        let target_date_str = "2026-04-14";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let mut mock_fx_service = MockFxService::new();
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", target_date, dec!(0.88));
+
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+        let mut calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+        let previous_snapshot = create_initial_snapshot("acc_fx", "EUR", "2026-04-13");
+
+        let mut transfer_out = create_cash_activity(
+            "ordinary-out",
+            ActivityType::TransferOut,
+            dec!(100),
+            Decimal::ZERO,
+            "EUR",
+            target_date_str,
+        );
+        let mut transfer_in = create_cash_activity(
+            "ordinary-in",
+            ActivityType::TransferIn,
+            dec!(120),
+            Decimal::ZERO,
+            "USD",
+            target_date_str,
+        );
+        for activity in [&mut transfer_out, &mut transfer_in] {
+            activity.account_id = "acc_fx".to_string();
+            activity.source_group_id = Some("ordinary-group".to_string());
+            activity.metadata = Some(json!({ "flow": { "is_external": false } }));
+        }
+
+        let state = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[transfer_out, transfer_in],
+                target_date,
+            )
+            .expect("ordinary grouped transfers should calculate")
+            .snapshot;
+
+        assert_eq!(state.net_contribution, dec!(5.6));
+        assert_eq!(state.net_contribution_base, dec!(5.6));
     }
 
     #[test]
@@ -4072,7 +4338,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(quantity),
             unit_price: Some(unit_price),
-            amount: None,
+            amount: canonical_test_trade_amount(activity_type, asset_id, quantity, unit_price, fee),
             fee: Some(fee),
             tax: None,
             currency: currency.to_string(),
@@ -4119,7 +4385,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(dec!(1)),
             unit_price: Some(amount),
-            amount: Some(amount),
+            amount: Some(canonical_test_cash_amount(activity_type, amount, fee)),
             fee: Some(fee),
             tax: None,
             currency: currency.to_string(),
@@ -5618,7 +5884,7 @@ mod tests {
             target_date_str,
             Some(activity_fx_rate),
         );
-        buy_activity.tax = Some(dec!(3));
+        set_test_tax(&mut buy_activity, dec!(3));
 
         let activities = vec![buy_activity];
         let result =
@@ -7649,7 +7915,7 @@ mod tests {
     }
 
     #[test]
-    fn test_external_transfer_in_uses_legacy_amount_as_last_resort_lot_basis_without_unit_price() {
+    fn test_external_transfer_in_uses_legacy_amount_as_runtime_lot_basis() {
         let mock_fx_service = MockFxService::new();
         let base_currency = Arc::new(RwLock::new("USD".to_string()));
         let mut calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
@@ -8596,7 +8862,7 @@ mod tests {
                 open_date_str,
             );
             a.account_id = "acc_src".to_string();
-            a.tax = Some(dec!(4));
+            set_test_tax(&mut a, dec!(4));
             a
         };
         let result_src_open = calculator

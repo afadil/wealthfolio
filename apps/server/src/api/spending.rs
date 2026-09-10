@@ -163,9 +163,16 @@ async fn search_cash_activities(
         return Ok(Json(CashActivitySearchResponse {
             items: Vec::new(),
             total_count: 0,
+            net: Some(Default::default()),
+            base_currency: None,
         }));
     }
-    let response = state.cash_activity_service.search(request).await?;
+    let base = state.base_currency.read().unwrap().clone();
+    let timezone = state.timezone.read().unwrap().clone();
+    let response = state
+        .cash_activity_service
+        .search(request, Some(base.as_str()), &timezone)
+        .await?;
     Ok(Json(response))
 }
 
@@ -281,9 +288,6 @@ async fn bulk_assign_categories(
 async fn list_categorization_rules(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<CategorizationRule>>> {
-    if !spending_enabled(&state).await? {
-        return Ok(Json(Vec::new()));
-    }
     Ok(Json(state.categorization_rules_service.list().await?))
 }
 
@@ -307,6 +311,15 @@ async fn update_categorization_rule(
         .await?;
     spawn_auto_categorize_for_opted_in_accounts(&state).await;
     Ok(Json(updated))
+}
+
+async fn upsert_categorization_rule(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<NewCategorizationRule>,
+) -> ApiResult<Json<CategorizationRule>> {
+    let saved = state.categorization_rules_service.upsert(payload).await?;
+    spawn_auto_categorize_for_opted_in_accounts(&state).await;
+    Ok(Json(saved))
 }
 
 async fn delete_categorization_rule(
@@ -758,6 +771,7 @@ pub fn router() -> Router<Arc<AppState>> {
             "/spending/rules/{id}",
             put(update_categorization_rule).delete(delete_categorization_rule),
         )
+        .route("/spending/rules/upsert", post(upsert_categorization_rule))
         .route("/spending/rules/rerun", post(rerun_categorization_rules))
         .route("/spending/rule-presets", get(list_rule_presets))
         .route(

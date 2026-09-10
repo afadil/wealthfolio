@@ -209,7 +209,15 @@ export interface RetirementIncomeStream {
   currentValue?: number;
   monthlyContribution?: number;
   accumulationReturn?: number;
+  /** Annual draw rate applied to the projected fund balance once payouts start. */
+  payoutRate?: number;
+  /** What happens to the fund at startAge. Absent means "annuity". */
+  payoutMode?: PayoutMode;
+  /** Annual return the balance still invested earns during a drawdown payout phase. */
+  postPayoutReturn?: number;
 }
+
+export type PayoutMode = "annuity" | "drawdown";
 
 export interface InvestmentAssumptions {
   preRetirementAnnualReturn: number;

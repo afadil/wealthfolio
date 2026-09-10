@@ -2,6 +2,7 @@
   "app_name": "Wealthfolio",
   "welcome": "환영합니다",
   "loading": "로딩 중...",
+  "load_more": "더 보기...",
   "error": "오류",
   "success": "성공",
   "cancel": "취소",
@@ -354,5 +355,6 @@
   "navStyle": {
     "sidebar": "사이드바",
     "floating": "플로팅 바"
-  }
+  },
+  "allocation_other_in_category": "기타 {{category}}"
 }

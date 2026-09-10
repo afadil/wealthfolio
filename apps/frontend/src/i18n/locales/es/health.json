@@ -3,108 +3,130 @@
     "price_manual_valuation_missing": {
       "title_one": "Falta la valoración manual de {{symbol}}",
       "title_other": "Faltan valoraciones manuales de {{count}} posiciones",
+      "title_many": "Faltan valoraciones manuales de {{count}} posiciones",
       "message": "Las posiciones manuales o personalizadas necesitan una valoración manual antes de poder incluirse como posiciones de rendimiento valoradas."
     },
     "price_no_market_data": {
       "title_one": "Sin datos de mercado para {{symbol}}",
       "title_other": "Sin datos de mercado para {{count}} posiciones",
+      "title_many": "Sin datos de mercado para {{count}} posiciones",
       "message": "No se pudieron obtener datos de mercado para algunas posiciones. Esto puede deberse a símbolos no válidos o a problemas del proveedor. El valor de tu cartera puede ser inexacto."
     },
     "price_stale_outdated": {
       "title_one": "Precio desactualizado en {{count}} posición",
       "title_other": "Precios desactualizados en {{count}} posiciones",
+      "title_many": "Precios desactualizados en {{count}} posiciones",
       "message": "Algunas posiciones no han actualizado sus precios en más de 3 días. El valor de tu cartera puede ser inexacto."
     },
     "price_update_needed": {
       "title_one": "Es necesario actualizar el precio de {{count}} posición",
       "title_other": "Es necesario actualizar los precios de {{count}} posiciones",
+      "title_many": "Es necesario actualizar los precios de {{count}} posiciones",
       "message": "Algunas posiciones no han actualizado sus precios recientemente. Considera sincronizar los precios."
     },
     "fx_missing": {
       "title_one": "Falta el tipo de cambio de {{currency}}",
       "title_other": "Faltan los tipos de cambio de {{count}} divisas",
+      "title_many": "Faltan los tipos de cambio de {{count}} divisas",
       "message": "No podemos convertir algunas posiciones a tu divisa base. Esto afecta al valor total de tu cartera."
     },
     "fx_stale_error": {
       "title_one": "Tipo de cambio desactualizado",
       "title_other": "Tipos de cambio desactualizados en {{count}} divisas",
+      "title_many": "Tipos de cambio desactualizados en {{count}} divisas",
       "message": "Algunos tipos de cambio no se han actualizado en más de 3 días. Las conversiones de divisas pueden ser inexactas."
     },
     "fx_stale_warning": {
       "title_one": "Es necesario actualizar el tipo de cambio",
       "title_other": "Es necesario actualizar los tipos de cambio de {{count}} divisas",
+      "title_many": "Es necesario actualizar los tipos de cambio de {{count}} divisas",
       "message": "Algunos tipos de cambio no se han actualizado recientemente. Considera actualizar los tipos."
     },
     "classification_missing_category": {
       "title_one": "{{count}} posición necesita una categoría",
       "title_other": "{{count}} posiciones necesitan categorías",
+      "title_many": "{{count}} posiciones necesitan categorías",
       "message": "Algunas posiciones no tienen asignado un {{taxonomy}}. Esto afecta a tus gráficos de asignación y análisis."
     },
     "classification_legacy_migration": {
       "title_one": "{{count}} activo tiene datos de clasificación heredados",
       "title_other": "{{count}} activos tienen datos de clasificación heredados",
+      "title_many": "{{count}} activos tienen datos de clasificación heredados",
       "message": "Algunos activos tienen datos de sector/país del formato antiguo. Migra al nuevo sistema de taxonomía para un mejor seguimiento de la asignación."
     },
     "data_orphan_activity_account": {
       "title_one": "Una transacción hace referencia a una cuenta inexistente",
       "title_other": "{{count}} transacciones hacen referencia a cuentas inexistentes",
+      "title_many": "{{count}} transacciones hacen referencia a cuentas inexistentes",
       "message": "Algunas transacciones apuntan a cuentas que ya no existen. Esto puede provocar errores de cálculo."
     },
     "data_orphan_activity_asset": {
       "title_one": "Una transacción hace referencia a un activo inexistente",
       "title_other": "{{count}} transacciones hacen referencia a activos inexistentes",
+      "title_many": "{{count}} transacciones hacen referencia a activos inexistentes",
       "message": "Algunas transacciones apuntan a activos que ya no existen. Esto puede provocar errores de cálculo."
     },
     "data_negative_position": {
       "title_one": "Una posición tiene cantidad negativa",
       "title_other": "{{count}} posiciones tienen cantidades negativas",
+      "title_many": "{{count}} posiciones tienen cantidades negativas",
       "message": "Algunas posiciones muestran cantidades negativas, lo que suele indicar transacciones faltantes o incorrectas."
     },
     "data_legacy_classification": {
       "title_one": "{{count}} activo tiene datos de clasificación antiguos",
       "title_other": "{{count}} activos tienen datos de clasificación antiguos",
+      "title_many": "{{count}} activos tienen datos de clasificación antiguos",
       "message": "Algunos activos tienen datos de sector/país heredados que pueden migrarse al nuevo sistema de clasificación."
     },
     "data_negative_account_balance": {
       "title_one": "Una cuenta tiene un saldo de cartera negativo",
       "title_other": "{{count}} cuentas tienen un saldo de cartera negativo",
+      "title_many": "{{count}} cuentas tienen un saldo de cartera negativo",
       "message": "Una o varias cuentas muestran un valor total negativo en su historial. Esto suele deberse a transacciones de compra faltantes. Revisa tus actividades para corregirlo."
     },
     "data_negative_cash_balance": {
       "title_one": "Una cuenta de efectivo tuvo un saldo negativo",
       "title_other": "{{count}} cuentas de efectivo tuvieron un saldo negativo",
+      "title_many": "{{count}} cuentas de efectivo tuvieron un saldo negativo",
       "message": "Una o varias cuentas de efectivo muestran un saldo negativo en su historial. Esto puede ser un descubierto bancario normal o una entrada de depósito faltante."
     },
     "data_missing_lot_disposal_for_sell": {
       "title_one": "Una venta sin coincidencia de coste base",
       "title_other": "{{count}} ventas sin coincidencias de coste base",
+      "title_many": "{{count}} ventas sin coincidencias de coste base",
       "message": "Una venta no se pudo emparejar con un lote, por lo que la ganancia/pérdida realizada y la atribución de rendimiento pueden estar incompletas."
     },
     "data_missing_generated_valuation": {
       "title_one": "El historial de valoración generado está incompleto",
       "title_other": "Faltan {{count}} filas de valoración generadas",
+      "title_many": "Faltan {{count}} filas de valoración generadas",
       "message": "Algunas fechas de instantánea de posiciones no tienen filas de valoración generadas. Reconstruye el historial de la cuenta tras corregir precios faltantes, valoraciones manuales o tipos de cambio."
     },
     "data_incomplete_valuation_value": {
       "title_one": "La cobertura de valoración está incompleta",
       "title_other": "{{count}} filas de valoración tienen un valor de mercado incompleto",
+      "title_many": "{{count}} filas de valoración tienen un valor de mercado incompleto",
       "message": "Algunas filas de valoración generadas tienen una cobertura de valor de mercado incompleta. El rendimiento protege la exactitud marcando las rentabilidades afectadas como no disponibles o degradadas; revisa los precios faltantes o las valoraciones manuales."
     },
     "data_incomplete_valuation_basis": {
       "title_one": "La cobertura del coste base está incompleta",
       "title_other": "{{count}} posiciones tienen un coste base incompleto",
+      "title_many": "{{count}} posiciones tienen un coste base incompleto",
       "message": "Algunas posiciones tienen un coste base de adquisición faltante o parcial. El valor de mercado aún puede mostrarse, pero la ganancia/pérdida y las rentabilidades sobre coste base pueden no estar disponibles hasta que se corrijan las actividades relacionadas."
     },
     "data_unknown_performance_flow_source": {
       "title_one": "El límite del flujo de rendimiento es desconocido",
       "title_other": "{{count}} filas de valoración tienen una clasificación de transferencia desconocida",
+      "title_many": "{{count}} filas de valoración tienen una clasificación de transferencia desconocida",
       "message": "Algunas filas de valoración generadas incluyen una transferencia o flujo cuyo límite de cartera es desconocido. Revisa las actividades de transferencia en las fechas afectadas y marca cada transferencia como externa o vincúlala con su cuenta correspondiente."
     },
     "account_unconfigured": {
       "title_one": "{{count}} cuenta necesita configuración",
       "title_other": "{{count}} cuentas necesitan configuración",
+      "title_many": "{{count}} cuentas necesitan configuración",
       "message_one": "Elige un modo de seguimiento para empezar a sincronizar datos.",
-      "message_other": "Elige los modos de seguimiento para empezar a sincronizar datos."
+      "message_other": "Elige los modos de seguimiento para empezar a sincronizar datos.",
+      "message_many": "Elige los modos de seguimiento para empezar a sincronizar datos."
     },
     "account_timezone_missing": {
       "title": "Zona horaria no configurada",
@@ -121,16 +143,19 @@
     "quote_sync_error": {
       "title_one": "Fallo en la sincronización de cotizaciones de {{symbol}}",
       "title_other": "Fallo en la sincronización de cotizaciones de {{count}} activos",
+      "title_many": "Fallo en la sincronización de cotizaciones de {{count}} activos",
       "message": "Estos activos han fallado repetidamente al sincronizar los precios. Comprueba los símbolos o los ajustes del proveedor de datos."
     },
     "quote_sync_warning": {
       "title_one": "Problemas de sincronización con {{symbol}}",
       "title_other": "Problemas de sincronización con {{count}} activos",
+      "title_many": "Problemas de sincronización con {{count}} activos",
       "message": "Algunos activos tienen problemas para sincronizar los precios. Esto puede resolverse automáticamente."
     },
     "transfer_incomplete": {
       "title_one": "Se detectó una transferencia incompleta",
       "title_other": "Se detectaron {{count}} transferencias incompletas",
+      "title_many": "Se detectaron {{count}} transferencias incompletas",
       "message": "Una transferencia no está emparejada o le falta su contrapartida, por lo que su flujo se trató como externo y puede distorsionar las rentabilidades. Emparéjala con la transferencia correspondiente o márcala como externa si eso es lo previsto."
     }
   },
@@ -185,12 +210,15 @@
     "priceHistoryNeedsReview": "El historial de precios necesita revisión",
     "missingTradingDay_one": "1 día de negociación faltante: {{dates}}",
     "missingTradingDay_other": "{{count}} días de negociación faltantes: {{dates}}",
+    "missingTradingDay_many": "{{count}} días de negociación faltantes: {{dates}}",
     "dateRange": "del {{from}} al {{to}}",
     "priceIssueSummary": "{{diagnosticCount}} {{dateWord}} de precio en {{assetCount}} {{assetWord}}",
     "priceDate_one": "fecha",
     "priceDate_other": "fechas",
+    "priceDate_many": "fechas",
     "investment_one": "inversión",
-    "investment_other": "inversiones"
+    "investment_other": "inversiones",
+    "investment_many": "inversiones"
   },
   "detail": {
     "categories": {
@@ -244,6 +272,7 @@
       "pendingText": "Descartando..."
     },
     "affectedItems_one": "Elemento afectado ({{count}})",
-    "affectedItems_other": "Elementos afectados ({{count}})"
+    "affectedItems_other": "Elementos afectados ({{count}})",
+    "affectedItems_many": "Elementos afectados ({{count}})"
   }
 }

@@ -972,6 +972,7 @@ fn entity_storage_mapping(entity: &SyncEntity) -> Option<(&'static str, &'static
         SyncEntity::BudgetRolloverSetting => Some(("budget_rollover_settings", "id")),
         // Composite primary key; handled by custom branch in apply_remote_event_lww_tx.
         SyncEntity::AddonStorage => None,
+        SyncEntity::AssetLogo => Some(("asset_logos", "asset_id")),
     }
 }
 
@@ -1444,7 +1445,7 @@ fn should_apply_against_metadata(
     // value and permanently swallow any later re-create of a deleted key.
     if matches!(
         entity,
-        SyncEntity::SpendingPresetRuleDeletion | SyncEntity::AddonStorage
+        SyncEntity::SpendingPresetRuleDeletion | SyncEntity::AddonStorage | SyncEntity::AssetLogo
     ) {
         Ok(should_apply_lww(
             &meta.last_client_timestamp,
@@ -3316,6 +3317,20 @@ impl AppSyncRepository {
                         });
                     }
 
+                    // A snapshot from a client predating `asset_logos` lacks the table, so
+                    // it is skipped above — but `DELETE FROM assets` still cascades through
+                    // `asset_logos.asset_id ON DELETE CASCADE`. Stash local logos and put
+                    // back the ones whose asset survived the restore.
+                    let has_plan = |name: &str| restore_plans.iter().any(|plan| plan.table == name);
+                    let keep_asset_logos = has_plan("assets") && !has_plan("asset_logos");
+                    if keep_asset_logos {
+                        diesel::sql_query(
+                            "CREATE TEMP TABLE _keep_asset_logos AS SELECT * FROM asset_logos",
+                        )
+                        .execute(conn)
+                        .map_err(|err| restore_sql_error("clear", "asset_logos", err))?;
+                    }
+
                     for plan in restore_plans.iter().rev() {
                         diesel::sql_query(&plan.clear_sql)
                             .execute(conn)
@@ -3347,6 +3362,17 @@ impl AppSyncRepository {
                             .execute(conn)
                             .map_err(StorageError::from)?;
                     }
+                    if keep_asset_logos {
+                        diesel::sql_query(
+                            "INSERT OR IGNORE INTO asset_logos SELECT * FROM _keep_asset_logos WHERE asset_id IN (SELECT id FROM assets)",
+                        )
+                        .execute(conn)
+                        .map_err(|err| restore_sql_error("copy", "asset_logos", err))?;
+                        diesel::sql_query("DROP TABLE _keep_asset_logos")
+                            .execute(conn)
+                            .map_err(|err| restore_sql_error("copy", "asset_logos", err))?;
+                    }
+
                     ensure_no_foreign_key_violations_tx(
                         conn,
                         restore_plans.iter().map(|plan| plan.table.as_str()),
@@ -3433,7 +3459,7 @@ mod tests {
     use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
     use crate::goals::GoalRepository;
     use crate::schema::{
-        accounts, activities, app_settings, assets, goals, goals_allocation,
+        accounts, activities, app_settings, asset_logos, assets, goals, goals_allocation,
         import_account_templates, import_templates, platforms, spending_preset_rule_deletions,
         sync_applied_events, sync_device_config, sync_entity_metadata, sync_outbox, taxonomies,
         taxonomy_categories,
@@ -4992,6 +5018,79 @@ mod tests {
 
         assert_eq!(repo.get_cursor().expect("cursor"), 88);
         assert_eq!(count_account_rows(&pool, "acc-from-snapshot"), 1);
+    }
+
+    #[tokio::test]
+    async fn snapshot_restore_of_assets_keeps_local_asset_logos_when_snapshot_lacks_table() {
+        #[derive(diesel::QueryableByName)]
+        struct CountRow {
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            c: i64,
+        }
+
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let kept_asset_id = "asset-logo-kept";
+        let dropped_asset_id = "asset-logo-dropped";
+
+        // v1 snapshot: has the kept asset but no asset_logos table at all.
+        let snapshot_path = {
+            let app_data = tempdir()
+                .expect("tempdir")
+                .keep()
+                .to_string_lossy()
+                .to_string();
+            let db_path = init(&app_data).expect("init db");
+            run_migrations(&db_path).expect("migrate db");
+            let pool = create_pool(&db_path).expect("create pool");
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_asset_kind_for_test(&mut conn, kept_asset_id, "INVESTMENT")
+                .expect("insert asset");
+            diesel::sql_query("DROP TABLE asset_logos")
+                .execute(&mut conn)
+                .expect("drop asset_logos");
+            db_path
+        };
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            for asset_id in [kept_asset_id, dropped_asset_id] {
+                insert_asset_kind_for_test(&mut conn, asset_id, "INVESTMENT")
+                    .expect("insert local asset");
+                diesel::sql_query(format!(
+                    "INSERT INTO asset_logos (asset_id, mime_type, data, sha256, width, height, created_at, updated_at)
+                     VALUES ('{}', 'image/png', 'AAAA', 'abc', 1, 1, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                    escape_sqlite_str(asset_id)
+                ))
+                .execute(&mut conn)
+                .expect("insert local logo");
+            }
+        }
+
+        repo.restore_snapshot_tables_from_file(
+            snapshot_path,
+            vec!["assets".to_string()],
+            92,
+            "device-logo-keep".to_string(),
+            Some(1),
+        )
+        .await
+        .expect("restore snapshot");
+
+        assert_eq!(count_asset_rows(&pool, kept_asset_id), 1);
+        assert_eq!(count_asset_rows(&pool, dropped_asset_id), 0);
+        let mut conn = get_connection(&pool).expect("conn");
+        let count_logo = |conn: &mut SqliteConnection, asset_id: &str| -> i64 {
+            let row: CountRow = diesel::sql_query(format!(
+                "SELECT COUNT(*) AS c FROM asset_logos WHERE asset_id = '{}'",
+                escape_sqlite_str(asset_id)
+            ))
+            .get_result(conn)
+            .expect("count logos");
+            row.c
+        };
+        assert_eq!(count_logo(&mut conn, kept_asset_id), 1);
+        assert_eq!(count_logo(&mut conn, dropped_asset_id), 0);
     }
 
     #[tokio::test]
@@ -8126,6 +8225,249 @@ mod tests {
             Some("v3"),
             "re-created key must hold the newer value"
         );
+    }
+
+    fn asset_logo_payload(asset_id: &str, data: &str, updated_at: &str) -> serde_json::Value {
+        serde_json::json!({
+            "asset_id": asset_id,
+            "mime_type": "image/png",
+            "data": data,
+            "sha256": format!("sha-{data}"),
+            "width": 1,
+            "height": 1,
+            "created_at": "2026-09-02T00:00:00+00:00",
+            "updated_at": updated_at,
+        })
+    }
+
+    fn asset_logo_data(
+        pool: &Arc<Pool<r2d2::ConnectionManager<SqliteConnection>>>,
+        asset_id: &str,
+    ) -> Option<String> {
+        let mut conn = get_connection(pool).expect("conn");
+        asset_logos::table
+            .find(asset_id)
+            .select(asset_logos::data)
+            .first::<String>(&mut conn)
+            .optional()
+            .expect("query asset logo")
+    }
+
+    #[tokio::test]
+    async fn replay_asset_logo_upserts_and_deletes() {
+        let (pool, writer) = setup_db();
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_asset_kind_for_test(&mut conn, "asset-logo-a", "INVESTMENT").expect("asset");
+        }
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Create,
+                "evt-logo-create".to_string(),
+                "2026-09-02T00:00:00Z".to_string(),
+                1,
+                asset_logo_payload("asset-logo-a", "AAAA", "2026-09-02T00:00:00+00:00"),
+            )
+            .await
+            .expect("apply logo create");
+        assert!(applied);
+        assert_eq!(
+            asset_logo_data(&pool, "asset-logo-a").as_deref(),
+            Some("AAAA")
+        );
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Update,
+                "evt-logo-update".to_string(),
+                "2026-09-02T00:00:01Z".to_string(),
+                2,
+                asset_logo_payload("asset-logo-a", "BBBB", "2026-09-02T00:00:01+00:00"),
+            )
+            .await
+            .expect("apply logo update");
+        assert!(applied);
+        assert_eq!(
+            asset_logo_data(&pool, "asset-logo-a").as_deref(),
+            Some("BBBB")
+        );
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Delete,
+                "evt-logo-delete".to_string(),
+                "2026-09-02T00:00:02Z".to_string(),
+                3,
+                serde_json::json!({ "asset_id": "asset-logo-a" }),
+            )
+            .await
+            .expect("apply logo delete");
+        assert!(applied);
+        assert_eq!(asset_logo_data(&pool, "asset-logo-a"), None);
+    }
+
+    #[tokio::test]
+    async fn replay_asset_logo_reupload_after_delete_applies() {
+        // asset_id is a reusable key: delete = reset, a later re-upload must win.
+        let (pool, writer) = setup_db();
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_asset_kind_for_test(&mut conn, "asset-logo-a", "INVESTMENT").expect("asset");
+        }
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Create,
+                "evt-logo-create".to_string(),
+                "2026-09-02T00:00:00Z".to_string(),
+                1,
+                asset_logo_payload("asset-logo-a", "AAAA", "2026-09-02T00:00:00+00:00"),
+            )
+            .await
+            .expect("create"));
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Delete,
+                "evt-logo-delete".to_string(),
+                "2026-09-02T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({ "asset_id": "asset-logo-a" }),
+            )
+            .await
+            .expect("delete"));
+        assert_eq!(asset_logo_data(&pool, "asset-logo-a"), None);
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Create,
+                "evt-logo-recreate".to_string(),
+                "2026-09-02T00:00:02Z".to_string(),
+                3,
+                asset_logo_payload("asset-logo-a", "CCCC", "2026-09-02T00:00:02+00:00"),
+            )
+            .await
+            .expect("re-upload after delete");
+        assert!(
+            applied,
+            "re-upload after delete must apply (pure LWW, no tombstone)"
+        );
+        assert_eq!(
+            asset_logo_data(&pool, "asset-logo-a").as_deref(),
+            Some("CCCC")
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_asset_logo_stale_delete_does_not_clobber_newer_upload() {
+        let (pool, writer) = setup_db();
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_asset_kind_for_test(&mut conn, "asset-logo-a", "INVESTMENT").expect("asset");
+        }
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Update,
+                "evt-logo-newer".to_string(),
+                "2026-09-02T00:00:05Z".to_string(),
+                1,
+                asset_logo_payload("asset-logo-a", "NEWER", "2026-09-02T00:00:05+00:00"),
+            )
+            .await
+            .expect("newer upload"));
+
+        let applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Delete,
+                "evt-logo-stale-delete".to_string(),
+                "2026-09-02T00:00:01Z".to_string(),
+                2,
+                serde_json::json!({ "asset_id": "asset-logo-a" }),
+            )
+            .await
+            .expect("stale delete");
+        assert!(!applied, "a stale delete must not be applied");
+        assert_eq!(
+            asset_logo_data(&pool, "asset-logo-a").as_deref(),
+            Some("NEWER")
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_asset_logo_rejects_pk_mismatch() {
+        let (pool, writer) = setup_db();
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_asset_kind_for_test(&mut conn, "asset-logo-a", "INVESTMENT").expect("asset");
+            insert_asset_kind_for_test(&mut conn, "asset-logo-b", "INVESTMENT").expect("asset");
+        }
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let err = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "asset-logo-a".to_string(),
+                SyncOperation::Create,
+                "evt-logo-mismatch".to_string(),
+                "2026-09-02T00:00:00Z".to_string(),
+                1,
+                asset_logo_payload("asset-logo-b", "AAAA", "2026-09-02T00:00:00+00:00"),
+            )
+            .await
+            .expect_err("pk mismatch should fail");
+        assert!(
+            err.to_string().contains("does not match entity_id"),
+            "{err}"
+        );
+        assert_eq!(asset_logo_data(&pool, "asset-logo-a"), None);
+        assert_eq!(asset_logo_data(&pool, "asset-logo-b"), None);
+    }
+
+    #[tokio::test]
+    async fn replay_asset_logo_for_missing_asset_is_foreign_key_violation() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let err = repo
+            .apply_remote_event_lww(
+                SyncEntity::AssetLogo,
+                "ghost-asset".to_string(),
+                SyncOperation::Create,
+                "evt-logo-orphan".to_string(),
+                "2026-09-02T00:00:00Z".to_string(),
+                1,
+                asset_logo_payload("ghost-asset", "AAAA", "2026-09-02T00:00:00+00:00"),
+            )
+            .await
+            .expect_err("missing asset should fail");
+        let message = err.to_string();
+        assert!(message.contains("entity=AssetLogo"), "{message}");
+        assert!(message.contains("table=asset_logos"), "{message}");
+        assert!(
+            message.to_ascii_lowercase().contains("foreign key"),
+            "{message}"
+        );
+        assert_eq!(asset_logo_data(&pool, "ghost-asset"), None);
     }
 
     #[tokio::test]

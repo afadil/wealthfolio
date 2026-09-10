@@ -107,18 +107,18 @@
       "on_track": "정상 진행",
       "fi_reached": "경제적 자유 달성",
       "at_risk": "위험",
-      "never_reaches_fi": "경제적 자유 달성 불가",
+      "never_reaches_fi": "{{age}}세까지 도달이 예측되지 않음",
       "years_late_one": "{{count}}년 지연",
       "years_late_other": "{{count}}년 지연"
     },
     "verdict": {
       "age": "{{age}}세",
-      "spending_gap_prefix": "지출 격차가",
-      "spending_gap_suffix": "부터 발생해 {{age}}세에 도달하기 전 계획이 어려워집니다.",
-      "short_prefix": "{{age}}세 시점에",
-      "short_suffix": "이 부족해 {{age}}세까지 은퇴 생활을 지속할 수 없습니다.",
-      "depleted_prefix": "포트폴리오가",
-      "depleted_suffix": "에 {{age}}세 은퇴 이후 바닥납니다.",
+      "spending_gap_prefix": "지출 부족 시작 예상 나이:",
+      "spending_gap_suffix": "(계획 기간: {{age}}세까지).",
+      "short_prefix": "{{age}}세의 예상 부족액은",
+      "short_suffix": "입니다({{age}}세까지의 은퇴 생활 기준).",
+      "depleted_prefix": "포트폴리오 부족 예상 나이:",
+      "depleted_suffix": "({{age}}세 은퇴 기준).",
       "surplus_prefix": "{{age}}세에 은퇴할 것으로 예상되며, 예상 여유 자금은",
       "surplus_suffix": "입니다.",
       "on_track_prefix": "예상 은퇴 시점은",
@@ -126,33 +126,23 @@
       "fi_reached_prefix": "이미",
       "financial_independence": "경제적 자유",
       "fi_reached_suffix": "를 — 현재 가정 기준으로 — 달성했습니다.",
-      "fi_at_prefix": "경제적 자유 달성 예상 시점은",
-      "years_after_one": "{{count}}년 후",
-      "years_after_other": "{{count}}년 후",
-      "years_before_one": "{{count}}년 전",
-      "years_before_other": "{{count}}년 전",
-      "your_goal_of": "목표인 {{age}}세",
-      "right_on_goal": "목표인 {{age}}세에 정확히 맞습니다.",
-      "not_reachable_prefix": "현재 가정으로는",
-      "not_reachable_suffix": "까지 도달할 수 없습니다."
+      "not_reachable_prefix": "현재 가정에서 경제적 독립은",
+      "not_reachable_suffix": "까지 달성되지 않을 것으로 예상됩니다.",
+      "fi_projected": "<age>{{age}}세</age>에 경제적 독립에 도달할 것으로 예측됩니다."
     },
     "summary": {
-      "at_your_current_prefix": "현재",
-      "contribution": "납입액 기준으로,",
-      "capital_not_available": "현재 가정으로는 필요 자본 목표를 산출할 수 없습니다. 지출, 인플레이션, 수익률, 기대 수명을 다시 확인해 보세요.",
-      "projected_balance_is": "예상 은퇴 자산은",
-      "vs_required_capital_of": "이며, 필요 자본",
       "at_age": "({{age}}세 기준) 대비 비교됩니다.",
-      "the_plan_funds": "이 계획은 연간",
-      "per_yr_expenses_to_age": "의 지출을 {{age}}세까지 충당합니다.",
-      "youre_short": "부족한 금액은"
+      "youre_short": "예상 부족액은",
+      "traditional": "현재 가정과 <contribution>{{contribution}}</contribution> 납입을 기준으로 {{age}}세의 예상 잔액은 <balance>{{balance}}</balance>이며 필요 자금은 <target>{{target}}</target>입니다.",
+      "fire": "현재 가정과 <contribution>{{contribution}}</contribution> 납입을 기준으로 계획에는 {{age}}세까지 연간 <budget>{{budget}}</budget>의 지출이 포함됩니다.",
+      "unavailable": "현재 가정과 <contribution>{{contribution}}</contribution> 납입으로는 목표 자금을 추정할 수 없습니다. 만약에에서 가정을 비교하세요."
     },
     "progress": {
       "portfolio_today": "현재 포트폴리오",
       "required_at_age": "{{age}}세 시점 필요 금액",
       "target_at_age": "{{age}}세 시점 목표 금액",
-      "capital_needed_tip_traditional": "은퇴 연령 시점에 지출, 소득, 세금, 은퇴 후 수익률, 수수료를 반영해 필요한 자본입니다. {{valueLabel}} 기준으로 표시됩니다.",
-      "capital_needed_tip_fire": "희망 은퇴 연령 시점에 지출, 소득, 세금, 은퇴 후 수익률, 수수료를 반영해 필요한 자본입니다. {{valueLabel}} 기준으로 표시됩니다.",
+      "capital_needed_tip_traditional": "계획의 지출, 소득, 세금, 수익률과 수수료 가정에 따른 목표 은퇴 나이의 추정 필요 자금입니다. 표시 기준: {{valueLabel}}.",
+      "capital_needed_tip_fire": "계획의 지출, 소득, 세금, 수익률과 수수료 가정에 따른 목표 은퇴 나이의 추정 필요 자금입니다. 표시 기준: {{valueLabel}}.",
       "not_available": "확인 불가",
       "funded_pct": "{{pct}}% 충당됨"
     },
@@ -169,18 +159,18 @@
     },
     "milestone": {
       "coast_fire": "코스트 파이어(Coast FIRE)",
-      "coast_hint": "추가 납입 없이도 제때 은퇴 가능",
-      "coast_tip_nominal": "코스트 금액을 희망 은퇴 연령 시점의 명목 금액으로 환산한 값입니다.",
-      "coast_tip_real": "추가 납입 없이도 은퇴 연령까지 완전한 경제적 자유로 성장하는 데 필요한 현재 시점의 자본입니다.",
+      "coast_hint": "현재 필요한 추정 자금",
+      "coast_tip_nominal": "현재 필요한 추정 자금을 가정 인플레이션으로 은퇴 나이의 금액으로 환산합니다. 가치 환산이며 투자 성장 예측이 아닙니다.",
+      "coast_tip_real": "은퇴 목표액을 수수료 차감 후 은퇴 전 가정 수익률로 할인한 현재 추정 자금입니다. 연금 가정은 유지됩니다.",
       "lean_fire": "린 파이어(Lean FIRE)",
       "lean_hint": "계획 지출의 70%",
-      "lean_tip": "계획 지출의 약 70% 수준인 검소한 예산으로 은퇴합니다. 더 일찍 실현 가능하지만 여유는 적습니다.",
+      "lean_tip": "다른 가정은 유지하고 계획 지출의 70%에 대해 추정한 자금입니다. 이 플래너의 Lean FIRE 시나리오입니다.",
       "fi": "경제적 자유(FI)",
       "fi_hint": "전체 계획 지출",
       "fi_tip": "전체 은퇴 기간 동안 계획된 은퇴 지출을 충당하는 자본입니다.",
       "fat_fire": "팻 파이어(Fat FIRE)",
       "fat_hint": "계획 지출의 150%",
-      "fat_tip": "계획보다 약 50% 더 많은 지출로 은퇴합니다 — 여행, 선물, 변동성, 생활 수준 향상을 위한 여유가 있습니다.",
+      "fat_tip": "다른 가정은 유지하고 계획 지출의 150%에 대해 추정한 자금입니다. 이 플래너의 Fat FIRE 시나리오입니다.",
       "more_info_about": "{{label}}에 대한 자세한 정보",
       "done": "완료"
     },
@@ -217,11 +207,26 @@
       "unfunded": "미충당",
       "planned_spending_legend": "계획 지출",
       "showing": "{{valueLabel}} 표시 중",
-      "projection_unavailable": "이 계획에서는 자금 충당 예측을 사용할 수 없습니다."
+      "projection_unavailable": "이 계획에서는 자금 충당 예측을 사용할 수 없습니다.",
+      "age_range": "{{start}}세 → {{end}}세",
+      "starts_at": "{{age}}세부터 시작",
+      "ended_at": "{{age}}세에 종료",
+      "not_active": "비활성"
     },
     "disclaimer": {
       "title": "꼭 기억해야 할 사항",
-      "body": "이는 재무 자문이 아닙니다. 이 수치는 예측이 아니라 하나의 스케치로 봐 주세요. 여기에 표시된 모든 내용은 사용자가 입력한 값 — 수익률, 인플레이션, 납입액, 세금, 예상 수명 —을 기반으로 한 시뮬레이션입니다. 실제 시장은 일직선으로 움직이지 않고, 세법은 바뀌며, 정부 제도는 개편됩니다. 이를 활용해 아이디어를 검증하고 빈틈을 찾은 다음, 되돌리기 어려운 결정을 내리기 전에 반드시 전문가와 상담하세요."
+      "body": "예측은 가정에 따라 달라집니다. 실제 결과는 다를 수 있습니다. 금융 조언이 아닙니다."
+    },
+    "guidance": {
+      "unavailable": "현재 가정으로 목표를 추정할 수 없습니다. 만약에에서 가정을 비교하세요.",
+      "depleted": "{{age}}세에 포트폴리오 자금 부족이 예측됩니다. 만약에에서 가정을 비교하세요.",
+      "gap": "{{age}}세부터 지출 부족분이 발생할 것으로 예측됩니다. 만약에에서 가정을 비교하세요.",
+      "fund": "{{label}}은 {{age}}세에 소진될 것으로 예측되며 이후 모델상 지급이 중단됩니다. 지급 및 소득 가정을 비교하세요.",
+      "shortfall": "은퇴 시 부족분이 예측됩니다. 만약에에서 가정을 비교하세요.",
+      "reached": "현재 포트폴리오는 설정한 가정에 따른 추정 경제적 독립 목표에 도달했습니다.",
+      "not_reached": "{{age}}세까지 경제적 독립이 예측되지 않습니다. 만약에에서 가정을 비교하세요.",
+      "late_one": "경제적 독립은 희망 나이보다 {{count}}년 후로 예측됩니다. 만약에에서 가정을 비교하세요.",
+      "late_other": "경제적 독립은 희망 나이보다 {{count}}년 후로 예측됩니다. 만약에에서 가정을 비교하세요."
     }
   },
   "sidebar": {
@@ -231,7 +236,8 @@
       "high_inflation": "높은 인플레이션 가정입니다. 이 비율에서는 장기 지출 필요액이 더 민감하게 반응합니다.",
       "high_fee": "높은 수수료 가정입니다. 수수료 부담이 장기 수익률을 크게 낮춥니다.",
       "high_volatility": "높은 변동성 가정입니다. 결과 범위가 매우 넓어질 수 있습니다.",
-      "high_contribution_growth": "높은 납입 증가율 가정입니다. 이는 지속적으로 큰 폭의 저축 증가를 전제로 합니다."
+      "high_contribution_growth": "높은 납입 증가율 가정입니다. 이는 지속적으로 큰 폭의 저축 증가를 전제로 합니다.",
+      "high_return": "높은 수익률 가정입니다. 예상 잔액은 이 비율에 민감합니다."
     },
     "plan": {
       "kicker": "계획",
@@ -252,14 +258,14 @@
       "desired_retirement_age_hint": "경제적으로 자유로워지고 싶은 나이입니다.",
       "retirement_age_hint": "은퇴하고 싶은 나이입니다.",
       "horizon_age_fire": "계획 종료 연령",
-      "horizon_age_traditional": "기대 수명",
+      "horizon_age_traditional": "계획 종료 연령",
       "horizon_hint": "계획이 대상으로 하는 최대 연령입니다.",
       "monthly_contribution": "월 납입액",
       "monthly_contribution_hint": "은퇴 전까지 매달 추가로 납입할 금액입니다.",
-      "return_before_hint": "저축 기간 동안 예상되는 연간 수익률입니다.",
-      "return_during_hint": "인출 시작 이후 예상되는 연간 수익률입니다.",
+      "return_before_hint": "저축 기간의 연간 가정 수익률이며 투자 수수료 차감 전입니다.",
+      "return_during_hint": "인출 시작 후의 연간 가정 수익률이며 투자 수수료 차감 전입니다.",
       "annual_fee_hint": "예상 연간 포트폴리오 수수료입니다.",
-      "inflation_hint": "예상되는 연간 물가 상승률입니다."
+      "inflation_hint": "연간 가정 물가 상승률입니다."
     },
     "spending": {
       "kicker": "지출",
@@ -318,8 +324,15 @@
       "current_fund_balance": "현재 펀드 잔액",
       "monthly_fund_contribution": "월 펀드 납입액",
       "fund_return_before_payout": "지급 전 펀드 수익률",
+      "fund_payout_rate": "지급률",
+      "fund_payout_mode": "지급 방식",
+      "fund_payout_mode_help": "연금 방식은 계획 기간까지 지속적인 지급을 모델링하며 인출 방식은 펀드가 소진될 때까지 잔액을 사용합니다.",
+      "annuity": "연금",
+      "drawdown": "인출",
+      "fund_return_during_payout": "지급 기간 중 펀드 수익률",
+      "drawdown_note": "인출액은 펀드 잔액의 연 {{pct}}%로 추정합니다. 지급이 이미 시작된 경우 입력한 월 지급액이 우선합니다. 이후 지급액은 설정한 증가율에 따라 조정되며 자금이 소진되면 지급이 중단됩니다.",
       "monthly_payout_after_tax": "세후 월 지급액",
-      "payout_estimate_note": "월 지급액을 직접 입력하지 않으면 예상 지급액은 예측된 펀드 잔액의 연 {{pct}}%로 계산됩니다.",
+      "payout_estimate_note": "예상 지급액은 펀드 잔액의 연 {{pct}}%로 계산합니다. 지급이 이미 시작된 경우 입력한 월 지급액이 우선합니다.",
       "start_age": "시작 연령",
       "income_growth": "소득 증가율",
       "income_growth_help": "이 소득이 계획 인플레이션에 따라 증가할지, 고정된 상태로 유지될지 선택하세요.",
@@ -458,15 +471,15 @@
     "quick_start": {
       "title": "빠른 시작 — 5단계",
       "step1_title": "계획의 기본값 설정하기",
-      "step1_desc": "계획 입력값에서 계획 유형, 출생월, 은퇴 연령, 기대 수명, 월 납입액을 선택하세요.",
+      "step1_desc": "계획 입력에서 유형, 출생 월, 은퇴 나이, 계획 종료 나이, 월 납입액을 설정합니다.",
       "step2_title": "은퇴 후 지출 입력하기",
       "step2_desc": "은퇴 후 지출에서 계획이 충당해야 할 월 지출 항목을 추가하세요. 현재 화폐 가치로 입력하면 되며, 인플레이션은 계획 가정에서 자동으로 처리됩니다.",
       "step3_title": "은퇴 소득 추가하기",
-      "step3_desc": "은퇴 소득에서 공적 연금(예: 캐나다의 CPP/OAS, 미국의 Social Security), 직장 연금, 파트타임 근로, 연금 소득 등 월별 소득원을 추가하세요. 연금 펀드 추가는 월 지급액을 직접 입력하지 않고 플래너가 펀드 잔액 기준 연 3.5% 지급액을 추정하도록 할 때만 사용하세요.",
+      "step3_desc": "연금, 시간제 근로, 종신연금 등의 은퇴 소득을 추가합니다. 연금 펀드의 월 지급 추정액은 월 금액을 직접 입력하지 않는 한 예상 잔액과 설정한 연간 지급률을 사용합니다.",
       "step4_title": "가정, 세금, 계좌 비중 확인하기",
       "step4_desc": "예상 수익률, 수수료, 변동성, 인플레이션, 인출 세율, 세금 그룹, 그리고 어떤 계좌가 목표 자금을 충당하는지 검토하세요.",
       "step5_title": "개요를 읽고 만약에를 열어보기",
-      "step5_desc": "개요는 기본 계획이 성립하는지 알려주며, 자산 추이, 지출 충당 현황, 계획 입력값을 보여줍니다. 만약에는 같은 계획을 시장 경로, 스트레스 테스트, 의사 결정 맵, 고급 검증 기준으로 테스트합니다."
+      "step5_desc": "개요는 기본 예측, 지출 충당과 입력값을 보여줍니다. 시나리오는 시장 경로, 스트레스 조건과 가정 변경을 비교합니다."
     },
     "overview": {
       "title": "개요 이해하기",
@@ -486,13 +499,13 @@
     "what_if": {
       "title": "만약에 이해하기",
       "market_paths_title": "시장 경로",
-      "market_paths_desc": "수익률, 변동성, 인플레이션 가정을 사용해 같은 계획을 다양한 시장 경로에서 테스트합니다. 음영 처리된 범위는 나쁨부터 좋음까지의 결과를 보여주고, 선은 중간 경로를 보여줍니다. '자금이 유지됨'은 계획이 필수 지출을 충당하면서 계획 기간 끝까지 자금이 남아 있음을 의미합니다. 파이어(FIRE) 모드에서는 먼저 경제적 자유를 달성해야 합니다.",
+      "market_paths_desc": "설정한 가정으로 다양한 시장 경로를 모델링합니다. 음영은 각 나이의 10~90 백분위 범위이며 선은 개별 경로가 아닌 경로 전체의 중앙값입니다. 필수 지출을 충당하고 잔액을 남기고 종료한 경로를 집계합니다. FIRE 경로는 경제적 독립에도 도달해야 합니다.",
       "base_case_title": "기본 시나리오",
       "base_case_desc": "개요와 동일한 결정론적 기본 계획을 보여준 다음, 가장 큰 스트레스 테스트 결과를 가리켜 무엇이 가장 중요한지 알 수 있게 합니다.",
       "stress_tests_title": "스트레스 테스트",
       "stress_tests_desc": "고정된 검증 항목으로 수익률이 낮아지거나, 인플레이션이 높아지거나, 지출이 늘어나거나, 은퇴가 앞당겨지거나, 저축이 줄거나, 은퇴 직전 시장 폭락이 발생할 때 계획이 어떻게 바뀌는지 보여줍니다.",
       "what_moves_title": "계획에 가장 큰 영향을 주는 요인은?",
-      "what_moves_desc": "의사 결정 맵은 저축액, 수익률, 은퇴 연령, 지출을 비교합니다. 초록색 셀은 마지막에 더 많은 자금이 남는다는 뜻이고, 빨간색 셀은 여전히 격차가 있거나 자금이 부족하다는 뜻입니다.",
+      "what_moves_desc": "저축, 수익률, 은퇴 나이, 지출을 비교합니다. 녹색은 기본 계획보다 최종 잔액이 많고 황색은 적음을 뜻합니다. 빨간색은 부족분 또는 잔액 없음을 나타냅니다.",
       "crash_paths_title": "초기 시장 폭락 경로",
       "crash_paths_desc": "은퇴 직전의 여러 폭락 시점 경로를 비교합니다. 은퇴 첫해에 발생한 폭락은 포트폴리오가 하락한 상태에서 인출이 이루어지기 때문에 나중에 발생한 동일한 폭락보다 더 큰 타격을 줄 수 있습니다."
     },
@@ -501,25 +514,24 @@
       "yearly_spending_title": "연간 지출 모델링 방식",
       "yearly_spending_desc": "지출이 인출을 결정합니다. 매년 플래너는 입력한 지출 계획을 충당하고, 은퇴 소득을 차감하고, 포트폴리오 인출에 대한 세금 부담을 추정합니다.",
       "target_calc_title": "목표 계산 방식",
-      "target_calc_desc": "플래너는 은퇴 시점부터 계획 기간까지의 전체 지출 계획의 현재 가치를 계산합니다 — 각 지출 항목의 인플레이션율, 서로 다른 연령에 시작되는 소득원, 인출에 대한 세금 부담을 모두 고려합니다. 포트폴리오가 이 금액에 도달하면 기본 계획은 입력한 계획을 충당할 충분한 자본을 갖춘 것입니다. 이는 변동 지출, 이연 연금, 유한한 계획 기간을 모두 반영하기 때문에 단순히 지출의 배수를 사용하는 방식보다 정확합니다.",
+      "target_calc_desc": "플래너는 계획 기간까지 은퇴 지출을 충당하는 데 필요한 초기 포트폴리오를 추정합니다. 지출 인플레이션, 소득 시점, 수익률, 수수료, 인출세를 모델링합니다. 목표는 이러한 가정에 따라 달라집니다.",
       "inflation_title": "인플레이션율",
-      "inflation_desc": "모든 예측은 이 비율로 매년 지출과 물가 연동 소득을 늘려 나갑니다. 기본값 2%는 유럽중앙은행(ECB) 목표치와 일치합니다.",
-      "inflation_it_note": "이탈리아 소비자물가지수(CPI)를 더 보수적으로 가정하려면 2.5~3%를 사용하세요.",
+      "inflation_desc": "인플레이션 가정은 시간이 지남에 따라 지출과 물가 연동 소득을 증가시킵니다. 개별 항목은 별도의 비율을 사용할 수 있습니다.",
       "returns_title": "수익률, 수수료, 변동성",
       "returns_desc": "은퇴 전 수익률은 자산 축적을 좌우합니다. 은퇴 후 수익률은 인출 단계와 필요 자본을 좌우합니다. 연간 투자 수수료는 두 경우 모두에서 차감됩니다. 변동성은 시장 경로 검증에서만 사용되며, 값이 클수록 결과 범위가 넓어집니다.",
       "horizon_title": "계획 기간(연령)",
-      "horizon_desc": "포트폴리오가 얼마나 오래 유지되어야 하는지를 나타냅니다. 은퇴 목표와 만약에 검증은 이 연령까지 실행됩니다. 장수 리스크를 검증하려면 90~95세로 설정하세요. 초기 시장 폭락 경로와 자금 유지 여부는 모두 이 기간 기준으로 측정됩니다."
+      "horizon_desc": "은퇴 지출과 만약에 결과를 모델링하는 마지막 나이입니다. 계획 기간에 대한 가정이며 수명 예측이 아닙니다."
     },
     "italian": {
       "title": "이탈리아 은퇴 설정(fondo pensione, TFR, INPS)",
       "portfolio_title": "투자 포트폴리오(Golden Butterfly, All-Weather 등)",
       "portfolio_desc": "이는 Wealthfolio가 추적하는 값인 주요 포트폴리오입니다. 여기에서 수익률 가정, 수수료 부담, 월 납입액을 설정하세요. 은퇴 계획의 핵심적인 자산 축적 엔진입니다.",
       "fondo_title": "Fondo pensione integrativo(보충 연금 펀드)",
-      "fondo_desc": "연금 펀드 추가를 사용하세요. 현재 펀드 잔액, 월 납입액, 예상 펀드 수익률, 지급 시작 연령을 입력하세요. 월 지급액을 직접 입력하지 않으면 플래너는 미래 잔액을 추정하고, 시작 연령부터 예측 잔액의 연 3.5%를 지급액으로 추정합니다.",
+      "fondo_desc": "연금 펀드 추가에서 잔액, 납입액, 가정 수익률, 지급 시작 나이를 입력합니다. 월 금액을 입력하지 않으면 설정한 지급률로 추정합니다. 인출은 펀드 소진 시 중단되며 종신연금은 계획 기간까지 모델링됩니다.",
       "inps_title": "Pensione INPS(국가 연금 — previdenza obbligatoria)",
       "inps_desc": "은퇴 소득 추가를 사용하세요. 현재 화폐 가치 기준 예상 월 순연금을 입력하고 지급 시작 연령을 설정하세요. 소득이 계획 인플레이션 가정에 따라 오르길 원하면 물가 연동을 사용하세요.",
       "tfr_title": "TFR(Trattamento di Fine Rapporto — 퇴직금 적립)",
-      "tfr_desc": "TFR이 연금 펀드로 들어간다면 월 펀드 납입액에 포함하세요. 별도로 보관한다면 자체 잔액, 납입액, 수익률, 지급 시작 연령을 가진 또 다른 연금 펀드로 모델링하세요. 월 지급액을 직접 입력하지 않으면 동일하게 연 3.5% 지급액 추정치가 적용됩니다."
+      "tfr_desc": "TFR이 연금 펀드에 포함되면 납입액에 반영하세요. 별도 TFR 저축은 별도 펀드로 나타낼 수 있으며 모델상 지급은 설정한 지급률 또는 월 금액을 따릅니다."
     }
   },
   "type": {
@@ -766,7 +778,7 @@
       "retirement_gap": "은퇴 자금 격차",
       "fi_moves_prefix": "경제적 자유 달성 시점이",
       "fi_moves_suffix": "년 늦춰짐",
-      "largest_risk": "{{label}}이(가) 가장 큰 위험 요인입니다",
+      "largest_risk": "이 테스트 중 {{label}}의 영향이 가장 큽니다",
       "and": "그리고",
       "none": "없음",
       "surplus": "여유 자금",
@@ -789,7 +801,10 @@
       "money_lasts_summary_traditional": "{{horizonAge}}세까지 자금이 유지됨",
       "money_lasts_summary_fire": "경제적 자유 달성 + {{horizonAge}}세까지 자금 충당됨",
       "money_lasts_prompt_traditional": "1만 개 경로를 실행해 계획이 {{horizonAge}}세까지 얼마나 자주 유지되는지 확인하세요.",
-      "money_lasts_prompt_fire": "1만 개 경로를 실행해 계획이 경제적 자유를 달성하고 {{horizonAge}}세까지 얼마나 자주 유지되는지 확인하세요."
+      "money_lasts_prompt_fire": "1만 개 경로를 실행해 계획이 경제적 자유를 달성하고 {{horizonAge}}세까지 얼마나 자주 유지되는지 확인하세요.",
+      "of_simulated_paths": "시뮬레이션 경로 중",
+      "simulation_tooltip_traditional": "시뮬레이션 경로의 {{percent}}%가 필수 지출을 충당하고 잔액을 남긴 채 종료되었습니다. 색상 기준 구간은 75% 미만, 75% 이상 90% 미만, 90% 이상입니다. 모델 결과이며 실제 확률이 아닙니다.",
+      "simulation_tooltip_fire": "시뮬레이션 경로의 {{percent}}%가 필수 지출을 충당하고 잔액을 남긴 채 종료되었습니다. 경제적 독립에도 도달해야 합니다. 색상 기준 구간은 75% 미만, 75% 이상 90% 미만, 90% 이상입니다. 모델 결과이며 실제 확률이 아닙니다."
     },
     "stress": {
       "eyebrow_with_count": "이 계획을 무너뜨릴 수 있는 요인은? · 시나리오 {{count}}개",
@@ -805,7 +820,7 @@
     "montecarlo": {
       "eyebrow": "시장 경로",
       "heading": "자금이 얼마나 자주 유지될까요?",
-      "intro": "수익률, 변동성, 인플레이션 가정을 사용해 같은 계획을 다양한 시장 경로에서 테스트합니다. 음영 처리된 범위는 나쁨부터 좋음까지의 결과를 보여주고, 선은 중간 경로를 보여줍니다.",
+      "intro": "설정한 가정으로 다양한 시장 경로를 모델링합니다. 음영은 각 나이의 10~90 백분위 범위이며 선은 개별 경로가 아닌 경로 전체의 중앙값입니다.",
       "run_10k": "1만 개 경로 실행",
       "run_100k": "10만 개 경로 실행",
       "running_short": "실행 중…",
@@ -817,29 +832,30 @@
       "median_fi_age": "중앙값 경제적 자유 달성 연령",
       "withdrawals_start_detail": "인출 시작",
       "vs_goal": "목표 {{age}}세 대비",
-      "bad_path": "나쁜 경로",
-      "middle_path": "중간 경로",
-      "good_path": "좋은 경로"
+      "bad_path": "하위 결과",
+      "middle_path": "중앙값",
+      "good_path": "상위 결과"
     },
     "chart": {
       "age_label": "{{age}}세",
       "age_detail": "{{age}}세",
       "goal_at_age": "{{label}} @{{age}}세",
       "median_fi_at_age": "중앙값 경제적 자유 @{{age}}세",
-      "bad_good_range": "나쁨-좋음 범위",
-      "median_path": "중앙값 경로",
+      "bad_good_range": "10~90 백분위 범위",
+      "median_path": "중앙값",
       "retirement_age": "은퇴 연령",
       "goal_age": "목표 연령",
       "median_fi_age": "중앙값 경제적 자유 달성 연령",
       "market_paths_count": "시장 경로 {{count}}개",
       "retire": "은퇴",
       "goal": "목표",
-      "market_paths_count_other": "시장 경로 {{count}}개"
+      "market_paths_count_other": "시장 경로 {{count}}개",
+      "percentile_at_age": "{{percentile}} 백분위 · {{age}}세"
     },
     "moves": {
       "eyebrow": "계획에 가장 큰 영향을 주는 요인은?",
       "heading": "계획에 가장 큰 영향을 주는 요인은?",
-      "description": "저축액, 수익률, 은퇴 연령, 지출이 결과를 어떻게 바꾸는지 보여줍니다. 초록색 = 잔여 자금 증가, 빨간색 = 부족 또는 자금 소진.",
+      "description": "저축, 수익률, 은퇴 나이, 지출을 비교합니다. 녹색은 기본 계획보다 최종 잔액이 많고 황색은 적음을 뜻합니다. 빨간색은 부족분 또는 잔액 없음을 나타냅니다.",
       "empty_title": "어떤 변화가 가장 도움이 될지 확인하세요.",
       "empty_description": "저축을 늘리거나, 다른 수익률을 기대하거나, 지출을 줄이거나, 다른 연령에 은퇴하는 경우를 비교해 보세요.",
       "building": "생성 중...",
@@ -868,6 +884,39 @@
       "unavailable_title": "폭락 경로를 사용할 수 없습니다.",
       "empty_description": "다섯 가지 경로를 실행해 어떤 순서가 계획에 가장 먼저 압박을 줄지 확인하세요.",
       "unavailable_description": "이 검증에는 은퇴 시작 시점에 양(+)의 예측 포트폴리오 값이 필요합니다."
+    },
+    "labels": {
+      "crash_year_1": "1년 차 급락(−30%)",
+      "crash_year_5": "5년 차 급락(−30%)",
+      "double_crash": "두 번의 급락",
+      "lost_decade": "잃어버린 10년",
+      "after_fee_return": "수수료 차감 후 수익률"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "수익률 하락",
+        "description": "은퇴 전과 은퇴 중 수익률이 2%포인트 낮아집니다."
+      },
+      "inflation-shock": {
+        "label": "인플레이션 상승",
+        "description": "전체 인플레이션이 1.5%포인트 높아집니다."
+      },
+      "spending-shock": {
+        "label": "지출 증가",
+        "description": "모든 은퇴 지출 금액이 10% 높아집니다."
+      },
+      "retire-earlier": {
+        "label": "은퇴 2년 앞당김",
+        "description": "계획의 현재 나이를 기준으로 한도 내에서 목표 은퇴 나이를 2년 앞당깁니다."
+      },
+      "save-less": {
+        "label": "납입액 감소",
+        "description": "월 납입액이 25% 낮아집니다."
+      },
+      "early-crash": {
+        "label": "은퇴 초기 시장 급락",
+        "description": "은퇴 첫해에 시장이 30% 하락하는 것으로 모델링합니다."
+      }
     }
   }
 }

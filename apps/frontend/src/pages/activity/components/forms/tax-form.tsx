@@ -38,8 +38,8 @@ export const createTaxFormSchema = (t?: TFunction) =>
         required_error: msg(t, "activity:form.err_enter_amount", "Please enter an amount."),
         invalid_type_error: msg(t, "activity:form.err_amount_number", "Amount must be a number."),
       })
-      .positive({
-        message: msg(t, "activity:form.err_amount_gt_zero", "Amount must be greater than 0."),
+      .min(0, {
+        message: msg(t, "activity:form.err_amount_non_negative", "Amount must be non-negative."),
       }),
     comment: z.string().optional().nullable(),
     // Advanced options

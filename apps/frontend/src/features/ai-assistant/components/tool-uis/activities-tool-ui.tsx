@@ -115,12 +115,7 @@ function normalizeResult(result: unknown, fallbackCurrency: string): SearchActiv
           : entry.unit_price != null
             ? Number(entry.unit_price)
             : null,
-      amount:
-        entry.amount != null
-          ? Number(entry.amount)
-          : entry.quantity != null && (entry.unitPrice ?? entry.unit_price) != null
-            ? Number(entry.quantity) * Number(entry.unitPrice ?? entry.unit_price)
-            : null,
+      amount: entry.amount != null ? Number(entry.amount) : null,
       fee: entry.fee != null ? Number(entry.fee) : null,
       currency: (entry.currency as string | undefined) ?? fallbackCurrency,
       accountId:

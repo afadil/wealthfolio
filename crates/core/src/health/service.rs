@@ -21,12 +21,9 @@ use crate::activities::{
 use crate::assets::{Asset, AssetKind, AssetServiceTrait, QuoteMode};
 use crate::errors::Result;
 use crate::lots::LotRepositoryTrait;
-use crate::portfolio::economic_events::BasisStatus;
+use crate::portfolio::economic_events::{ActivityEconomicsResolver, BasisStatus};
 use crate::portfolio::holdings::{HoldingType, HoldingsServiceTrait};
 use crate::portfolio::performance::is_external_transfer;
-use crate::portfolio::snapshot::holdings_calculator::economics::{
-    gross_trade_amount, AssetPositionInfo,
-};
 use crate::portfolio::snapshot::{
     max_snapshot_read_date, min_supported_snapshot_date, validate_snapshot_read_date,
     AccountStateSnapshot, HoldingsTimeline, Position, SnapshotServiceTrait,
@@ -1796,16 +1793,13 @@ fn missing_valuation_issue(
 }
 
 fn health_sell_net_proceeds(activity: &Activity, asset: Option<&Asset>) -> Decimal {
-    // Mirrors the holdings calculator's sell cash booking
-    // (`gross_trade_amount(..) - fee - tax`, see handlers/trades.rs); only
-    // `is_bond` and `contract_multiplier` affect the gross amount.
-    let mut asset_info = AssetPositionInfo::fallback(&activity.currency);
-    if let Some(asset) = asset {
-        asset_info.is_bond = asset.is_bond();
-        asset_info.contract_multiplier = asset.contract_multiplier();
-    }
+    let unit_multiplier = asset
+        .map(Asset::contract_multiplier)
+        .unwrap_or(Decimal::ONE);
 
-    gross_trade_amount(activity, &asset_info) - activity.fee_amt() - activity.tax_amt()
+    ActivityEconomicsResolver::resolve_cash(activity, unit_multiplier)
+        .signed_cash_effect
+        .unwrap_or(Decimal::ZERO)
 }
 
 fn transfer_leg_detail(
@@ -2168,7 +2162,7 @@ mod tests {
             settlement_date: None,
             quantity: Some(dec!(1)),
             unit_price: Some(dec!(291.10598755)),
-            amount: None,
+            amount: Some(dec!(291.10598755)),
             fee: None,
             tax: None,
             currency: "USD".to_string(),
@@ -3034,7 +3028,7 @@ mod tests {
 
         assert_eq!(
             health_sell_net_proceeds(&option_sell, Some(&option_asset)),
-            dec!(299.75)
+            dec!(999)
         );
 
         let mut bond_sell = option_sell.clone();
@@ -3046,19 +3040,17 @@ mod tests {
 
         assert_eq!(
             health_sell_net_proceeds(&bond_sell, Some(&bond_asset)),
-            dec!(949.75)
+            dec!(950)
         );
 
-        // Without a booked amount the calculator falls back to qty * price
-        // (has_amount gate in should_use_activity_amount), so the health
-        // check must too — not amt() == 0.
+        // Missing final cash is not reconstructed from quantity and price.
         let mut bond_sell_no_amount = bond_sell.clone();
         bond_sell_no_amount.id = "sell-bond-no-amount".to_string();
         bond_sell_no_amount.amount = None;
 
         assert_eq!(
             health_sell_net_proceeds(&bond_sell_no_amount, Some(&bond_asset)),
-            dec!(2.75)
+            Decimal::ZERO
         );
 
         let mut taxed_sell = sell_activity("sell-taxed", "business", "aapl");
@@ -3066,6 +3058,7 @@ mod tests {
         taxed_sell.unit_price = Some(dec!(100));
         taxed_sell.fee = Some(dec!(5));
         taxed_sell.tax = Some(dec!(15));
+        taxed_sell.amount = Some(dec!(980));
 
         assert_eq!(
             health_sell_net_proceeds(&taxed_sell, Some(&health_asset("aapl"))),

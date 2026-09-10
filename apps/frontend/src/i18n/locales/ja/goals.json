@@ -107,18 +107,18 @@
       "on_track": "順調",
       "fi_reached": "FI達成",
       "at_risk": "要注意",
-      "never_reaches_fi": "FI未達",
+      "never_reaches_fi": "{{age}}歳までの到達は予測されません",
       "years_late_one": "{{count}}年遅れ",
       "years_late_other": "{{count}}年遅れ"
     },
     "verdict": {
       "age": "{{age}}歳",
-      "spending_gap_prefix": "支出ギャップが",
-      "spending_gap_suffix": "から始まり、プランは{{age}}歳に達する前に資金不足になります。",
-      "short_prefix": "{{age}}歳時点で、",
-      "short_suffix": "が不足し、{{age}}歳までの老後資金を賄えません。",
-      "depleted_prefix": "ポートフォリオは",
-      "depleted_suffix": "中に資金不足になります({{age}}歳で退職した場合)。",
+      "spending_gap_prefix": "支出不足が予測される開始年齢：",
+      "spending_gap_suffix": "（計画期間は{{age}}歳まで）。",
+      "short_prefix": "{{age}}歳時点の予測不足額は",
+      "short_suffix": "です（{{age}}歳までの老後資金）。",
+      "depleted_prefix": "資金不足が予測される年齢：",
+      "depleted_suffix": "（{{age}}歳で退職した場合）。",
       "surplus_prefix": "{{age}}歳での退職が見込まれ、",
       "surplus_suffix": "の余剰が出る見通しです。",
       "on_track_prefix": "退職見込みは",
@@ -126,33 +126,23 @@
       "fi_reached_prefix": "あなたは",
       "financial_independence": "経済的自立",
       "fi_reached_suffix": "を達成しています — 現在の前提条件においてです。",
-      "fi_at_prefix": "経済的自立の達成見込みは",
-      "years_after_one": "、目標より{{count}}年遅れて",
-      "years_after_other": "、目標より{{count}}年遅れて",
-      "years_before_one": "、目標より{{count}}年早く",
-      "years_before_other": "、目標より{{count}}年早く",
-      "your_goal_of": "達成します(目標: {{age}}歳)。",
-      "right_on_goal": "目標の{{age}}歳ちょうどです。",
-      "not_reachable_prefix": "現在の前提条件では",
-      "not_reachable_suffix": "までに達成できません。"
+      "not_reachable_prefix": "現在の前提では、経済的自立は",
+      "not_reachable_suffix": "までに達成する見込みがありません。",
+      "fi_projected": "<age>{{age}}歳</age>で経済的自立に到達すると予測されます。"
     },
     "summary": {
-      "at_your_current_prefix": "現在の",
-      "contribution": "の積立では、",
-      "capital_not_available": "現在の前提条件では必要資本の目標を算出できません。支出、インフレ率、リターン、想定寿命を見直してください。",
-      "projected_balance_is": "退職時の予想残高は",
-      "vs_required_capital_of": "、対して必要資本は",
       "at_age": "({{age}}歳時点)。",
-      "the_plan_funds": "このプランで賄えるのは",
-      "per_yr_expenses_to_age": "/年の支出({{age}}歳まで)です。",
-      "youre_short": "不足額は"
+      "youre_short": "予測不足額は",
+      "traditional": "現在の前提条件と<contribution>{{contribution}}</contribution>の積立に基づく{{age}}歳時点の予測残高は<balance>{{balance}}</balance>で、必要資金は<target>{{target}}</target>です。",
+      "fire": "現在の前提条件と<contribution>{{contribution}}</contribution>の積立に基づき、計画には{{age}}歳まで年間<budget>{{budget}}</budget>の支出が含まれます。",
+      "unavailable": "現在の前提条件と<contribution>{{contribution}}</contribution>の積立では、目標資金を推計できません。「シミュレーション」で前提条件を比較してください。"
     },
     "progress": {
       "portfolio_today": "現在のポートフォリオ",
       "required_at_age": "{{age}}歳時点の必要額",
       "target_at_age": "{{age}}歳時点の目標額",
-      "capital_needed_tip_traditional": "支出、収入、税金、退職後リターン、手数料を考慮した、退職年齢時点で必要な資本です。{{valueLabel}}で表示。",
-      "capital_needed_tip_fire": "支出、収入、税金、退職後リターン、手数料を考慮した、希望退職年齢時点で必要な資本です。{{valueLabel}}で表示。",
+      "capital_needed_tip_traditional": "支出、収入、税金、利回り、手数料の前提に基づく、目標退職年齢で必要な推計資金です。表示基準：{{valueLabel}}。",
+      "capital_needed_tip_fire": "支出、収入、税金、利回り、手数料の前提に基づく、目標退職年齢で必要な推計資金です。表示基準：{{valueLabel}}。",
       "not_available": "利用不可",
       "funded_pct": "{{pct}}%充足"
     },
@@ -169,18 +159,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "積立をやめても予定どおり退職できる",
-      "coast_tip_nominal": "Coast金額を希望退職年齢時点の名目額に換算したものです。",
-      "coast_tip_real": "今後一切積み立てなくても、退職年齢までに完全なFIに到達するために今日必要な資本です。",
+      "coast_hint": "現在必要な資金の推計",
+      "coast_tip_nominal": "現在必要な推計額を、想定インフレ率で退職年齢時点の金額に換算しています。価値の換算であり、運用による成長予測ではありません。",
+      "coast_tip_real": "退職時の目標額を、退職前の想定利回りから手数料を差し引いた率で割り引いた現在の推計額です。年金の前提条件は変わりません。",
       "lean_fire": "Lean FIRE",
       "lean_hint": "計画支出の70%",
-      "lean_tip": "質素な予算で退職 — 計画支出の約70%です。より早く実現できますが、余裕はほとんどありません。",
+      "lean_tip": "他の前提条件を変えず、計画支出の70%に対して推計した資金です。このプランナーのLean FIREシナリオです。",
       "fi": "FI",
       "fi_hint": "計画支出の全額",
       "fi_tip": "退職期間全体を通じて計画された老後の支出を賄う資本です。",
       "fat_fire": "Fat FIRE",
       "fat_hint": "計画支出の150%",
-      "fat_tip": "計画より約50%多い支出で退職 — 旅行、贈り物、相場変動、生活水準の向上に余裕を持てます。",
+      "fat_tip": "他の前提条件を変えず、計画支出の150%に対して推計した資金です。このプランナーのFat FIREシナリオです。",
       "more_info_about": "{{label}}の詳細",
       "done": "達成"
     },
@@ -217,11 +207,26 @@
       "unfunded": "未充当",
       "planned_spending_legend": "計画支出",
       "showing": "{{valueLabel}}で表示中",
-      "projection_unavailable": "このプランではカバレッジ予測を利用できません。"
+      "projection_unavailable": "このプランではカバレッジ予測を利用できません。",
+      "age_range": "{{start}}歳 → {{end}}歳",
+      "starts_at": "{{age}}歳から開始",
+      "ended_at": "{{age}}歳で終了",
+      "not_active": "対象期間外"
     },
     "disclaimer": {
       "title": "ご留意ください",
-      "body": "これは投資助言ではありません。これらの数値は予測ではなく、あくまで概算のスケッチとして扱ってください。ここに表示される内容はすべて、入力された前提(リターン、インフレ率、積立額、税金、想定寿命)に基づくシミュレーションです。実際の市場は一直線には動かず、税制は変わり、公的制度も改定されます。アイデアの検証やギャップの発見に活用し、取り返しのつかない意思決定の前には資格を持つ専門家に相談してください。"
+      "body": "予測は前提条件に基づきます。実際の結果は異なる場合があります。金融助言ではありません。"
+    },
+    "guidance": {
+      "unavailable": "現在の前提条件では目標額を推計できません。「シミュレーション」で前提条件を比較してください。",
+      "depleted": "{{age}}歳でポートフォリオの資金不足が予測されます。「シミュレーション」で前提条件を比較してください。",
+      "gap": "{{age}}歳から支出を賄えない見込みです。「シミュレーション」で前提条件を比較してください。",
+      "fund": "{{label}}は{{age}}歳で枯渇し、モデル上の支払いが終了する見込みです。支払額と収入の前提条件を比較してください。",
+      "shortfall": "退職時の資金不足が予測されます。「シミュレーション」で前提条件を比較してください。",
+      "reached": "現在のポートフォリオは、設定した前提条件に基づく経済的自立の推計目標額に達しています。",
+      "not_reached": "{{age}}歳までの経済的自立は予測されません。「シミュレーション」で前提条件を比較してください。",
+      "late_one": "経済的自立は希望年齢の{{count}}年後と予測されます。「シミュレーション」で前提条件を比較してください。",
+      "late_other": "経済的自立は希望年齢の{{count}}年後と予測されます。「シミュレーション」で前提条件を比較してください。"
     }
   },
   "sidebar": {
@@ -231,7 +236,8 @@
       "high_inflation": "インフレ率の前提が高めです。この水準では長期の支出必要額の感応度が高くなります。",
       "high_fee": "手数料の前提が高めです。手数料負担は長期リターンを大きく押し下げます。",
       "high_volatility": "ボラティリティの前提が高めです。結果の範囲が非常に広くなる可能性があります。",
-      "high_contribution_growth": "積立増加率の前提が高めです。大幅な貯蓄増加が継続する想定になっています。"
+      "high_contribution_growth": "積立増加率の前提が高めです。大幅な貯蓄増加が継続する想定になっています。",
+      "high_return": "高い利回りの前提です。予測残高はこの率に大きく左右されます。"
     },
     "plan": {
       "kicker": "プラン",
@@ -252,14 +258,14 @@
       "desired_retirement_age_hint": "経済的自立を達成したい年齢です。",
       "retirement_age_hint": "退職したい年齢です。",
       "horizon_age_fire": "プラン終了年齢",
-      "horizon_age_traditional": "平均寿命",
+      "horizon_age_traditional": "プラン終了年齢",
       "horizon_hint": "プランがカバーする最終年齢です。",
       "monthly_contribution": "毎月の積立額",
       "monthly_contribution_hint": "退職まで毎月積み立てる金額です。",
-      "return_before_hint": "積立期間中の期待年間リターンです。",
-      "return_during_hint": "取り崩し開始後の期待年間リターンです。",
+      "return_before_hint": "積立期間中の想定年間利回り。運用手数料控除前です。",
+      "return_during_hint": "取り崩し開始後の想定年間利回り。運用手数料控除前です。",
       "annual_fee_hint": "推定の年間ポートフォリオ手数料です。",
-      "inflation_hint": "予想される年間の物価上昇率です。"
+      "inflation_hint": "想定される年間の物価上昇率。"
     },
     "spending": {
       "kicker": "支出",
@@ -318,8 +324,15 @@
       "current_fund_balance": "現在のファンド残高",
       "monthly_fund_contribution": "毎月のファンド拠出額",
       "fund_return_before_payout": "受取開始前のファンドリターン",
+      "fund_payout_rate": "受取率",
+      "fund_payout_mode": "受取方法",
+      "fund_payout_mode_help": "年金方式は計画期間の終了まで継続する支払いをモデル化し、取り崩し方式は残高がなくなるまで基金を使います。",
+      "annuity": "年金",
+      "drawdown": "取り崩し",
+      "fund_return_during_payout": "受取期間中のファンドリターン",
+      "drawdown_note": "取り崩し額は基金残高の年{{pct}}%で見積もります。受取開始済みの場合は、入力した月額が優先されます。その後は設定した増加率に従い、残高がなくなるまで支払いが続きます。",
       "monthly_payout_after_tax": "税引後の毎月の受取額",
-      "payout_estimate_note": "毎月の受取額を入力しない場合、予想ファンド残高の{{pct}}%/年を推定受取額として使用します。",
+      "payout_estimate_note": "受取額は基金残高の年{{pct}}%で見積もります。受取開始済みの場合は、入力した月額が優先されます。",
       "start_age": "開始年齢",
       "income_growth": "収入の増加",
       "income_growth_help": "この収入をプランのインフレ率に連動させるか、固定にするかを選択します。",
@@ -454,19 +467,19 @@
   },
   "guide": {
     "title": "リタイアメントガイド",
-    "subtitle": "概要とWhat Ifの仕組み。",
+    "subtitle": "概要とシミュレーションの仕組み。",
     "quick_start": {
       "title": "クイックスタート — 5ステップ",
       "step1_title": "プランの基本を設定",
-      "step1_desc": "「プラン入力」で、プランタイプ、生まれ月、退職年齢、想定寿命、毎月の積立額を選択します。",
+      "step1_desc": "プラン入力で種類、誕生月、退職年齢、計画期間の終了年齢、毎月の積立額を設定します。",
       "step2_title": "老後の支出を入力",
       "step2_desc": "「老後の支出」で、プランで賄いたい毎月の支出項目を追加します。現在の貨幣価値で入力してください。インフレはプランの前提条件で処理されます。",
       "step3_title": "老後の収入を追加",
-      "step3_desc": "「老後の収入」で、公的年金(例: カナダのCPP/OAS、米国のSocial Security)、企業年金、パートタイム収入、年金保険などの毎月の収入を追加します。「年金基金を追加」は、毎月の受取額を自分で入力しない限りファンド残高から3.5%/年で受取額を推定させたい場合にのみ使用してください。",
+      "step3_desc": "年金、パート収入、終身年金などの退職後収入を追加します。年金基金の月額推計は、月額を直接入力しない限り、予測残高と設定した年間支払率に基づきます。",
       "step4_title": "前提条件・税金・口座配分を確認",
       "step4_desc": "予想リターン、手数料、ボラティリティ、インフレ率、取り崩し税率、税区分、目標の資金に充てる口座を確認します。",
-      "step5_title": "概要を読み、What Ifを開く",
-      "step5_desc": "概要は基本プランが機能するかに答え、推移、支出カバレッジ、プラン入力を表示します。What Ifは同じプランを市場パス、ストレステスト、意思決定マップ、高度なチェックでテストします。"
+      "step5_title": "概要を読み、シミュレーションを開く",
+      "step5_desc": "概要では基本予測、支出の充足状況、入力値を確認できます。シナリオでは市場経路、ストレス条件、前提条件の変更を比較します。"
     },
     "overview": {
       "title": "概要の見方",
@@ -484,15 +497,15 @@
       "snapshot_desc": "表には、年齢ごとの期末ポートフォリオ、年間積立額、老後の収入、計画支出、ポートフォリオ取り崩し額が表示されます。"
     },
     "what_if": {
-      "title": "What Ifの見方",
+      "title": "シミュレーションの見方",
       "market_paths_title": "市場パス",
-      "market_paths_desc": "リターン、ボラティリティ、インフレの前提を使い、同じプランを多数の市場パスでテストします。帯は悪い〜良い結果の範囲を、線は中央のパスを示します。「資金持続」とは、計画期間の終わりまで必須支出を賄い、なお資金が残ることを意味します。FIREモードでは、まず経済的自立に到達する必要もあります。",
+      "market_paths_desc": "設定した前提条件で異なる市場経路をモデル化します。塗りつぶしは各年齢の第10～第90パーセンタイル、線は経路全体の中央値を表し、個別の経路ではありません。 必須支出を賄い資金を残して終了する経路を数えます。FIREの経路は経済的自立への到達も必要です。",
       "base_case_title": "基本ケース",
       "base_case_desc": "概要と同じ決定論的な基本プランを表示し、最も影響の大きいストレス結果を示して、何が最も重要かを確認できます。",
       "stress_tests_title": "ストレステスト",
       "stress_tests_desc": "リターン低下、インフレ上昇、支出増加、早期退職、貯蓄減少、退職直前の市場暴落が起きた場合にプランがどう変わるかを、固定のチェックで示します。",
       "what_moves_title": "プランを動かすものは?",
-      "what_moves_desc": "意思決定マップは貯蓄、リターン、退職年齢、支出を比較します。緑のセルは最終的に残る資金が多く、赤のセルはギャップが残るか資金不足になります。",
+      "what_moves_desc": "積立、利回り、退職年齢、支出を比較します。緑は基本計画より期末資金が多く、黄は少ないことを示します。赤は不足または残高なしを示します。",
       "crash_paths_title": "早期市場暴落パス",
       "crash_paths_desc": "退職前後の暴落タイミングのパスをいくつか比較します。退職1年目の暴落は、ポートフォリオが下落している間に取り崩しが発生するため、同じ暴落が後で起きる場合より打撃が大きくなることがあります。"
     },
@@ -501,25 +514,24 @@
       "yearly_spending_title": "年間支出のモデル化",
       "yearly_spending_desc": "支出が取り崩しを決めます。プランナーは毎年、入力された支出プランを賄い、老後の収入を差し引き、ポートフォリオ取り崩しにかかる税負担を推定します。",
       "target_calc_title": "目標額の計算方法",
-      "target_calc_desc": "プランナーは、退職から計画期間の終わりまでの支出スケジュール全体の現在価値を計算します。各支出項目のインフレ率、開始年齢の異なる収入、取り崩しの税負担が考慮されます。ポートフォリオがこの金額に達すれば、基本プランは入力されたスケジュールを賄う資本を確保できたことになります。支出の変動、開始の遅い年金、有限の期間を扱えるため、単純な支出倍率よりも正確です。",
+      "target_calc_desc": "退職後の支出を計画期間の終了まで賄うための初期ポートフォリオを推計します。支出のインフレ、収入の時期、利回り、手数料、引出税をモデル化します。目標額はこれらの前提条件によって変わります。",
       "inflation_title": "インフレ率",
-      "inflation_desc": "すべての予測で、支出とインフレ連動の収入がこの率で毎年増加します。デフォルトの2%はECBの目標に一致します。",
-      "inflation_it_note": "イタリアのCPIをより保守的に見積もる場合は2.5〜3%を使用してください。",
+      "inflation_desc": "インフレの前提により、支出と物価連動収入が経年で増加します。個々の項目には独自の率を設定できます。",
       "returns_title": "リターン・手数料・ボラティリティ",
       "returns_desc": "退職前リターンは資産形成を左右します。退職後リターンは取り崩し期と必要資本を左右します。年間投資手数料は両方から差し引かれます。ボラティリティは市場パスのチェックでのみ使用され、値が大きいほど結果の幅が広がります。",
       "horizon_title": "計画終了年齢",
-      "horizon_desc": "ポートフォリオが持続すべき期間です。退職目標とWhat Ifのチェックはこの年齢まで実行されます。長寿リスクをストレステストするには90〜95歳に設定してください。早期市場暴落パスと「資金持続」もこの年齢で測定されます。"
+      "horizon_desc": "退職後の支出とシミュレーションの結果をモデル化する上限年齢です。計画期間の前提であり、寿命の予測ではありません。"
     },
     "italian": {
       "title": "イタリアの退職設定(fondo pensione、TFR、INPS)",
       "portfolio_title": "投資ポートフォリオ(Golden Butterfly、All-Weatherなど)",
       "portfolio_desc": "これはWealthfolioが追跡するメインのポートフォリオです。リターンの前提、手数料負担、毎月の積立額をここで設定します。老後プランにおける主要な資産形成エンジンです。",
       "fondo_title": "Fondo pensione integrativo(補完的年金基金)",
-      "fondo_desc": "「年金基金を追加」を使用します。現在のファンド残高、毎月の拠出額、期待ファンドリターン、受取開始年齢を入力します。プランナーは将来残高を推定し、毎月の受取額を入力しない場合は、受取開始年齢から予想残高の3.5%/年を受取額として推定します。",
+      "fondo_desc": "「年金基金を追加」で残高、積立額、想定利回り、支払開始年齢を入力します。月額を指定しない場合、設定した支払率で推計します。取り崩しは基金の枯渇時に終了し、終身年金は計画期間の終了までモデル化されます。",
       "inps_title": "Pensione INPS(公的年金 — previdenza obbligatoria)",
       "inps_desc": "「老後の収入を追加」を使用します。現在の貨幣価値での推定月額手取り年金を入力し、受取開始年齢を設定します。プランのインフレ率の前提に合わせて増やしたい場合は「連動」を選択してください。",
       "tfr_title": "TFR(Trattamento di Fine Rapporto — 退職金積立)",
-      "tfr_desc": "TFRが年金基金に拠出される場合は、毎月のファンド拠出額に含めてください。別で保有する場合は、残高・拠出額・リターン・受取開始年齢を持つ別の年金基金としてモデル化します。毎月の受取額を入力しない限り、同じ3.5%/年の受取額推定が適用されます。"
+      "tfr_desc": "TFRが年金基金に入る場合は積立額に含めます。別管理のTFRは別の基金で表せます。モデル上の支払いは設定した支払率または月額に従います。"
     }
   },
   "type": {
@@ -766,7 +778,7 @@
       "retirement_gap": "退職時ギャップ",
       "fi_moves_prefix": "FIが",
       "fi_moves_suffix": "年後ろ倒しになります",
-      "largest_risk": "{{label}}が最大のリスクです",
+      "largest_risk": "これらのテストで最も影響が大きいのは{{label}}です",
       "and": "と",
       "none": "なし",
       "surplus": "余剰",
@@ -789,7 +801,10 @@
       "money_lasts_summary_traditional": "{{horizonAge}}歳まで資金が持続",
       "money_lasts_summary_fire": "FI達成+{{horizonAge}}歳まで資金が持続",
       "money_lasts_prompt_traditional": "1万パスを実行して、{{horizonAge}}歳まで資金が持続する頻度を確認します。",
-      "money_lasts_prompt_fire": "1万パスを実行して、FIに到達し{{horizonAge}}歳まで資金が持続する頻度を確認します。"
+      "money_lasts_prompt_fire": "1万パスを実行して、FIに到達し{{horizonAge}}歳まで資金が持続する頻度を確認します。",
+      "of_simulated_paths": "シミュレーション経路の割合",
+      "simulation_tooltip_traditional": "シミュレーション経路の{{percent}}%が必須支出を賄い、資金を残して終了しました。色の参考区分は75%未満、75%以上90%未満、90%以上です。モデル上の結果であり、現実の確率ではありません。",
+      "simulation_tooltip_fire": "シミュレーション経路の{{percent}}%が必須支出を賄い、資金を残して終了しました。経済的自立への到達も条件です。色の参考区分は75%未満、75%以上90%未満、90%以上です。モデル上の結果であり、現実の確率ではありません。"
     },
     "stress": {
       "eyebrow_with_count": "このプランを崩すものは? · {{count}}シナリオ",
@@ -804,8 +819,8 @@
     },
     "montecarlo": {
       "eyebrow": "市場パス",
-      "heading": "資金はどのくらいの確率で持続する?",
-      "intro": "同じプランを多数の市場パスでテストします。帯は悪い〜良い結果の範囲を、線は中央のパスを示します。",
+      "heading": "資金が持続するシミュレーションの割合は？",
+      "intro": "設定した前提条件で異なる市場経路をモデル化します。塗りつぶしは各年齢の第10～第90パーセンタイル、線は経路全体の中央値を表し、個別の経路ではありません。",
       "run_10k": "1万パスを実行",
       "run_100k": "10万パスを実行",
       "running_short": "実行中…",
@@ -817,29 +832,30 @@
       "median_fi_age": "FI年齢の中央値",
       "withdrawals_start_detail": "取り崩し開始",
       "vs_goal": "目標{{age}}歳比",
-      "bad_path": "悪いパス",
-      "middle_path": "中央パス",
-      "good_path": "良いパス"
+      "bad_path": "下位の結果",
+      "middle_path": "中央値",
+      "good_path": "上位の結果"
     },
     "chart": {
       "age_label": "{{age}}歳",
       "age_detail": "{{age}}歳",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "FI中央値 @{{age}}",
-      "bad_good_range": "悪い〜良いの範囲",
-      "median_path": "中央値パス",
+      "bad_good_range": "第10～第90パーセンタイル",
+      "median_path": "中央値",
       "retirement_age": "退職年齢",
       "goal_age": "目標年齢",
       "median_fi_age": "FI年齢の中央値",
       "market_paths_count": "{{count}}本の市場パス",
       "retire": "退職",
       "goal": "目標",
-      "market_paths_count_other": "{{count}}本の市場パス"
+      "market_paths_count_other": "{{count}}本の市場パス",
+      "percentile_at_age": "第{{percentile}}パーセンタイル · {{age}}歳"
     },
     "moves": {
       "eyebrow": "プランを最も変えるものは?",
       "heading": "プランを動かすものは?",
-      "description": "貯蓄、リターン、退職年齢、支出が結果をどう変えるかを示します。緑=最終的に残る資金が多い、赤=不足または資金切れ。",
+      "description": "積立、利回り、退職年齢、支出を比較します。緑は基本計画より期末資金が多く、黄は少ないことを示します。赤は不足または残高なしを示します。",
       "empty_title": "どの変更が最も効果的かを確認しましょう。",
       "empty_description": "積立を増やす、異なるリターン、支出を減らす、退職年齢を変える、を比較します。",
       "building": "作成中...",
@@ -868,6 +884,39 @@
       "unavailable_title": "暴落パスを利用できません。",
       "empty_description": "5つのパスを実行して、どの順序がプランに最初に負荷をかけるかを確認します。",
       "unavailable_description": "このチェックには、退職開始時点でプラスの予想ポートフォリオが必要です。"
+    },
+    "labels": {
+      "crash_year_1": "1年目の急落（−30%）",
+      "crash_year_5": "5年目の急落（−30%）",
+      "double_crash": "2回の急落",
+      "lost_decade": "失われた10年",
+      "after_fee_return": "手数料控除後の利回り"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "利回り低下",
+        "description": "退職前と退職後の利回りが2パーセントポイント低下します。"
+      },
+      "inflation-shock": {
+        "label": "インフレ上昇",
+        "description": "全体のインフレ率が1.5パーセントポイント上昇します。"
+      },
+      "spending-shock": {
+        "label": "支出増加",
+        "description": "退職後のすべての支出額が10%増加します。"
+      },
+      "retire-earlier": {
+        "label": "退職を2年前倒し",
+        "description": "計画の現在年齢を下限として、目標退職年齢を2年前倒しします。"
+      },
+      "save-less": {
+        "label": "積立額減少",
+        "description": "毎月の積立額が25%減少します。"
+      },
+      "early-crash": {
+        "label": "退職初期の市場急落",
+        "description": "退職1年目に市場が30%下落するモデルです。"
+      }
     }
   }
 }

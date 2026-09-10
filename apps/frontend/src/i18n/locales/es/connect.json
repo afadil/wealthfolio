@@ -85,8 +85,10 @@
     "allAccountsExcluded": "Todas las cuentas excluidas",
     "accountsSyncing_one": "{{count}} cuenta sincronizándose",
     "accountsSyncing_other": "{{count}} cuentas sincronizándose",
+    "accountsSyncing_many": "{{count}} cuentas sincronizándose",
     "partialSyncing_one": "{{syncing}} de {{total}} cuentas sincronizándose · {{excluded}} cuenta excluida",
-    "partialSyncing_other": "{{syncing}} de {{total}} cuentas sincronizándose · {{excluded}} cuentas excluidas"
+    "partialSyncing_other": "{{syncing}} de {{total}} cuentas sincronizándose · {{excluded}} cuentas excluidas",
+    "partialSyncing_many": "{{syncing}} de {{total}} cuentas sincronizándose · {{excluded}} cuentas excluidas"
   },
   "sync": {
     "syncNow": "Sincronizar ahora",
@@ -97,7 +99,8 @@
     "syncingBrokerData": "Sincronizando datos del corredor...",
     "startFailed": "Error al iniciar la sincronización: {{error}}",
     "needAttention_one": "{{count}} cuenta requiere atención",
-    "needAttention_other": "{{count}} cuentas requieren atención"
+    "needAttention_other": "{{count}} cuentas requieren atención",
+    "needAttention_many": "{{count}} cuentas requieren atención"
   },
   "status": {
     "upToDate": "Actualizado",
@@ -121,6 +124,7 @@
     "empty": "Aún no hay ejecuciones de sincronización.",
     "warningsCount_one": "{{count}} advertencia",
     "warningsCount_other": "{{count}} advertencias",
+    "warningsCount_many": "{{count}} advertencias",
     "fetched": "Obtenidos",
     "inserted": "Insertados",
     "updated": "Actualizados",
@@ -131,7 +135,8 @@
     "duration": "Duración:",
     "inProgress": "En curso...",
     "andMore_one": "... y {{count}} más",
-    "andMore_other": "... y {{count}} más"
+    "andMore_other": "... y {{count}} más",
+    "andMore_many": "... y {{count}} más"
   },
   "syncHistory": {
     "title": "Historial de sincronización",
@@ -141,6 +146,7 @@
     "emptyDescription": "Tu historial de sincronización aparecerá aquí tras tu primera sincronización",
     "runCount_one": "{{count}} ejecución",
     "runCount_other": "{{count}} ejecuciones",
+    "runCount_many": "{{count}} ejecuciones",
     "loadMore": "Cargar más",
     "lessThanOneSecond": "<1s",
     "new": "nuevos",
@@ -148,9 +154,11 @@
     "skipped": "omitidos",
     "warningsCount_one": "{{count}} advertencia",
     "warningsCount_other": "{{count}} advertencias",
+    "warningsCount_many": "{{count}} advertencias",
     "andMore": "+{{count}} más",
     "andMore_one": "+{{count}} más",
-    "andMore_other": "+{{count}} más"
+    "andMore_other": "+{{count}} más",
+    "andMore_many": "+{{count}} más"
   },
   "activity": {
     "syncingData": "Sincronizando tus datos...",
@@ -158,34 +166,43 @@
     "upToDate": "Todo está actualizado",
     "itemsNeedReview_one": "{{count}} elemento requiere tu revisión",
     "itemsNeedReview_other": "{{count}} elementos requieren tu revisión",
+    "itemsNeedReview_many": "{{count}} elementos requieren tu revisión",
     "newItems": {
       "transaction_one": "{{count}} transacción nueva",
       "transaction_other": "{{count}} transacciones nuevas",
+      "transaction_many": "{{count}} transacciones nuevas",
       "position_one": "{{count}} posición nueva",
-      "position_other": "{{count}} posiciones nuevas"
+      "position_other": "{{count}} posiciones nuevas",
+      "position_many": "{{count}} posiciones nuevas"
     },
     "updatedItems": {
       "transaction_one": "{{count}} transacción actualizada",
       "transaction_other": "{{count}} transacciones actualizadas",
+      "transaction_many": "{{count}} transacciones actualizadas",
       "position_one": "{{count}} posición actualizada",
-      "position_other": "{{count}} posiciones actualizadas"
+      "position_other": "{{count}} posiciones actualizadas",
+      "position_many": "{{count}} posiciones actualizadas"
     },
     "removedItems": {
       "transaction_one": "{{count}} transacción eliminada",
       "transaction_other": "{{count}} transacciones eliminadas",
+      "transaction_many": "{{count}} transacciones eliminadas",
       "position_one": "{{count}} posición eliminada",
-      "position_other": "{{count}} posiciones eliminadas"
+      "position_other": "{{count}} posiciones eliminadas",
+      "position_many": "{{count}} posiciones eliminadas"
     }
   },
   "attention": {
     "title": "La sincronización del corredor requiere atención",
     "description_one": "{{count}} cuenta necesita un reintento o revisión del corredor.",
-    "description_other": "{{count}} cuentas necesitan un reintento o revisión del corredor."
+    "description_other": "{{count}} cuentas necesitan un reintento o revisión del corredor.",
+    "description_many": "{{count}} cuentas necesitan un reintento o revisión del corredor."
   },
   "setup": {
     "newAccountsTitle": "Las nuevas cuentas requieren configuración",
     "newAccountsDescription_one": "{{count}} cuenta necesita una configuración rápida antes de que podamos empezar a sincronizar.",
     "newAccountsDescription_other": "{{count}} cuentas necesitan una configuración rápida antes de que podamos empezar a sincronizar.",
+    "newAccountsDescription_many": "{{count}} cuentas necesitan una configuración rápida antes de que podamos empezar a sincronizar.",
     "reviewAccounts": "Revisar cuentas"
   },
   "devices": {

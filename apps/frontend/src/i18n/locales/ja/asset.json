@@ -153,7 +153,8 @@
     "maturity": "償還日",
     "type": "タイプ",
     "strike": "権利行使価格",
-    "expiry": "満期日"
+    "expiry": "満期日",
+    "multiplier": "乗数"
   },
   "profile": {
     "overview": "概要",
@@ -241,7 +242,7 @@
     "cancel": "キャンセル",
     "currency_required": "通貨は必須です",
     "base_currency": "基準通貨",
-    "quote_currency": "決済通貨",
+    "quote_currency": "建値通貨",
     "name": "名称",
     "name_placeholder": "資産の表示名",
     "isin": "ISIN",
@@ -256,6 +257,18 @@
     "exchange": "取引所",
     "select_exchange": "取引所を選択",
     "search_exchanges": "取引所を検索...",
+    "contract_multiplier": "契約乗数",
+    "contract_multiplier_hint": "1契約が表す原資産の単位数です。空欄にすると標準値の {{default}} を使用します。",
+    "maturity_date": "償還日",
+    "coupon_rate": "クーポン利率 (%)",
+    "coupon_frequency": "クーポン頻度",
+    "select_frequency": "頻度を選択",
+    "couponFrequency": {
+      "ANNUAL": "年1回",
+      "SEMI_ANNUAL": "年2回",
+      "QUARTERLY": "四半期ごと",
+      "ZERO": "ゼロクーポン"
+    },
     "saving": "保存中...",
     "saving_short": "保存中",
     "save_changes": "変更を保存",
@@ -699,5 +712,34 @@
     "delete_count_other": "削除({{count}})",
     "modified_other": "{{count}}件変更",
     "to_delete_other": "{{count}}件削除予定"
+  },
+  "logo": {
+    "change": "ロゴを変更",
+    "title": "資産のロゴ",
+    "badge_default": "デフォルト",
+    "badge_custom": "カスタム",
+    "updated_at": "更新日: {{date}}",
+    "dropzone_cta": "画像を選択",
+    "dropzone_or_drop": "またはここにドラッグ＆ドロップ",
+    "dropzone_hint": "PNG、JPEG、WebP、SVG · 256×256 の PNG にリサイズされます",
+    "processing": "画像を処理中…",
+    "preview_title": "プレビュー",
+    "preview_new": "新しいロゴ",
+    "preview_current": "現在のロゴ",
+    "preview_card": "保有カード",
+    "preview_table": "保有一覧",
+    "preview_list": "取引履歴",
+    "preview_meta": "{{width}}×{{height}} · {{size}}（元: {{original}}）",
+    "choose_different": "別の画像を選択",
+    "save": "ロゴを保存",
+    "reset": "デフォルトに戻す",
+    "saved": "ロゴを保存しました。",
+    "reset_done": "ロゴをデフォルトに戻しました。",
+    "error_unsupported_type": "対応していないファイルです。PNG、JPEG、WebP、SVG 画像を使用してください。",
+    "error_too_large_input": "ファイルが大きすぎます。10 MB 未満の画像を選択してください。",
+    "error_decode_failed": "ファイルを画像として読み込めませんでした。",
+    "error_encode_failed": "画像を PNG に変換できませんでした。",
+    "error_too_large_output": "画像が複雑すぎて 150 KB に収まりません。よりシンプルな画像か小さい画像をお試しください。",
+    "error_save_failed": "ロゴを保存できませんでした。"
   }
 }

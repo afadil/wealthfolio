@@ -105,12 +105,157 @@ describe("ActivityMobileFilterSheet", () => {
         portfolios={portfolios}
         selectedActivityTypes={[]}
         dateRange={undefined}
+        statusFilter="all"
+        selectedInstrumentTypes={[]}
         setFilters={setFilters}
+        hasActiveFilters={false}
+        onResetFilters={vi.fn()}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Done" }));
 
-    expect(setFilters).toHaveBeenCalledWith([], undefined, accountScope);
+    expect(setFilters).toHaveBeenCalledWith({
+      activityTypes: [],
+      dateRange: undefined,
+      accountScope,
+      statusFilter: "all",
+      instrumentTypes: [],
+    });
+  });
+
+  it("offers a reset that clears filters the sheet has no control for", async () => {
+    const user = userEvent.setup();
+    const onResetFilters = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <ActivityMobileFilterSheet
+        open
+        onOpenChange={onOpenChange}
+        accountScope={{ type: "all" }}
+        accounts={accounts}
+        portfolios={portfolios}
+        selectedActivityTypes={[]}
+        dateRange={undefined}
+        statusFilter="all"
+        selectedInstrumentTypes={[]}
+        setFilters={vi.fn()}
+        hasActiveFilters
+        onResetFilters={onResetFilters}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+
+    expect(onResetFilters).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("hides the reset when nothing is filtered", () => {
+    render(
+      <ActivityMobileFilterSheet
+        open
+        onOpenChange={vi.fn()}
+        accountScope={{ type: "all" }}
+        accounts={accounts}
+        portfolios={portfolios}
+        selectedActivityTypes={[]}
+        dateRange={undefined}
+        statusFilter="all"
+        selectedInstrumentTypes={[]}
+        setFilters={vi.fn()}
+        hasActiveFilters={false}
+        onResetFilters={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
+  });
+
+  it("applies a status chosen in the sheet, so the review filter can be left", async () => {
+    const user = userEvent.setup();
+    const setFilters = vi.fn();
+
+    render(
+      <ActivityMobileFilterSheet
+        open
+        onOpenChange={vi.fn()}
+        accountScope={{ type: "all" }}
+        accounts={accounts}
+        portfolios={portfolios}
+        selectedActivityTypes={[]}
+        dateRange={undefined}
+        statusFilter="pending"
+        selectedInstrumentTypes={[]}
+        setFilters={setFilters}
+        hasActiveFilters
+        onResetFilters={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText("All Activities"));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(setFilters).toHaveBeenCalledWith(expect.objectContaining({ statusFilter: "all" }));
+  });
+
+  /**
+   * The rows used to be clickable `li` elements, so keyboard and switch users
+   * could not change any filter in this sheet.
+   */
+  it("exposes filter options as keyboard-operable buttons", async () => {
+    const user = userEvent.setup();
+    const setFilters = vi.fn();
+
+    render(
+      <ActivityMobileFilterSheet
+        open
+        onOpenChange={vi.fn()}
+        accountScope={{ type: "all" }}
+        accounts={accounts}
+        portfolios={portfolios}
+        selectedActivityTypes={[]}
+        dateRange={undefined}
+        statusFilter="all"
+        selectedInstrumentTypes={[]}
+        setFilters={setFilters}
+        hasActiveFilters={false}
+        onResetFilters={vi.fn()}
+      />,
+    );
+
+    const pending = screen.getByRole("button", { name: "Pending Review" });
+    expect(pending).toHaveAttribute("aria-pressed", "false");
+
+    pending.focus();
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(setFilters).toHaveBeenCalledWith(expect.objectContaining({ statusFilter: "pending" }));
+  });
+
+  it("marks the selected option as pressed", () => {
+    render(
+      <ActivityMobileFilterSheet
+        open
+        onOpenChange={vi.fn()}
+        accountScope={{ type: "all" }}
+        accounts={accounts}
+        portfolios={portfolios}
+        selectedActivityTypes={[]}
+        dateRange={undefined}
+        statusFilter="pending"
+        selectedInstrumentTypes={[]}
+        setFilters={vi.fn()}
+        hasActiveFilters
+        onResetFilters={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Pending Review" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
 
 interface ActivityFormRendererProps {
   selectedType: PickerActivityType | undefined;
+  formIdentity?: string;
   accounts: AccountSelectOption[];
   defaultValues: Partial<ActivityFormValues> | undefined;
   onSubmit: (data: ActivityFormValues) => void | Promise<void>;
@@ -22,6 +23,7 @@ interface ActivityFormRendererProps {
  */
 export function ActivityFormRenderer({
   selectedType,
+  formIdentity = "new",
   accounts,
   defaultValues,
   onSubmit,
@@ -53,7 +55,7 @@ export function ActivityFormRenderer({
   const accountSignature = accounts
     .map((account) => `${account.value}:${account.currency}`)
     .join("|");
-  const formKey = `${selectedType}:${defaultAccountId}:${defaultCurrency}:${accountSignature}`;
+  const formKey = `${formIdentity}:${selectedType}:${defaultAccountId}:${defaultCurrency}:${accountSignature}`;
 
   // Key forces re-mount when form identity changes (type/account defaults/accounts list).
   return (

@@ -13,6 +13,7 @@ import {
 } from "@wealthfolio/ui/components/ui/sheet";
 import {
   ACTIVITY_SUBTYPES,
+  ActivityStatus,
   ActivityType,
   METADATA_CONTRACT_MULTIPLIER,
   QuoteMode,
@@ -26,7 +27,7 @@ import { buildOccSymbol, parseOccSymbol } from "@/lib/occ-symbol";
 import { generateId } from "@/lib/id";
 import type { ActivityCreate, ActivityDetails, ActivityUpdate } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -35,7 +36,7 @@ import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { showValidationToast, type AccountSelectOption } from "../forms/fields";
 import { newActivitySchema, type NewActivityFormValues } from "../forms/schemas";
 import { MobileActivitySteps } from "./mobile-activity-steps";
-import { getMobileActivityAssetId } from "./mobile-activity-utils";
+import { getMobileActivityAssetId, hasStoredCustomTradeAmount } from "./mobile-activity-utils";
 
 interface MobileActivityFormProps {
   accounts: AccountSelectOption[];
@@ -294,9 +295,18 @@ export function MobileActivityForm({
   startOnDetails,
 }: MobileActivityFormProps) {
   const { t } = useTranslation();
-  const shouldStartOnDetails = Boolean(activity?.id || startOnDetails);
+  // Sync stores a needs-review row as UNKNOWN, which has no editor here. Jumping
+  // such a row straight to the details step renders a form with no type and no
+  // way back, so the edit has to begin by choosing a type.
+  const needsTypeSelection =
+    Boolean(activity?.id) && !isValidMobileActivityType(activity?.activityType);
+  const shouldStartOnDetails = Boolean(activity?.id || startOnDetails) && !needsTypeSelection;
   const initialStep = shouldStartOnDetails ? 2 : 1;
   const [currentStep, setCurrentStep] = useState(initialStep);
+  // True when an existing stored total is custom or after the user types in
+  // the amount field. Owned here so step navigation cannot reset it before
+  // submit reads it.
+  const amountWasEdited = useRef(false);
   const {
     addActivityMutation,
     updateActivityMutation,
@@ -349,7 +359,7 @@ export function MobileActivityForm({
       activityType: isValidMobileActivityType(activity?.activityType)
         ? activity.activityType
         : undefined,
-      amount: activity?.amount ? Number(activity.amount) : undefined,
+      amount: activity?.amount != null ? Number(activity.amount) : undefined,
       sourceAmount,
       destinationAmount,
       sourceCurrency: editingTransferIn
@@ -404,7 +414,7 @@ export function MobileActivityForm({
         strikePrice: parsedOcc?.strikePrice,
         expirationDate: parsedOcc?.expiration,
         optionType: parsedOcc?.optionType,
-        contractMultiplier: 100,
+        contractMultiplier: Number(activity?.assetContractMultiplier) || 100,
       }),
       // Bond defaults when editing a bond activity
       ...(isBondActivity && {
@@ -420,6 +430,7 @@ export function MobileActivityForm({
     defaultValues: defaultValues as any,
   });
   const { reset } = form;
+  const storedAmountIsCustom = useMemo(() => hasStoredCustomTradeAmount(activity), [activity]);
 
   useEffect(() => {
     if (!open) return;
@@ -428,13 +439,24 @@ export function MobileActivityForm({
       ? defaultValues
       : { ...defaultValues, activityDate: new Date() };
 
+    amountWasEdited.current = storedAmountIsCustom;
     reset(nextDefaultValues);
     setCurrentStep(shouldStartOnDetails ? 2 : 1);
-  }, [activity?.date, defaultValues, open, reset, shouldStartOnDetails]);
+  }, [activity?.date, defaultValues, open, reset, shouldStartOnDetails, storedAmountIsCustom]);
 
   // Transfers may target any account (incl. spending/saving accounts the Spending
   // split hides from `accounts`), so widen the list once the type is a transfer.
   const watchedActivityType = form.watch("activityType");
+  // A type switch re-purposes the amount field (cash total vs trade total):
+  // whatever was typed belonged to the previous type, so amount ownership
+  // resets and the calculated trade total takes over again. Without this, a
+  // deposit amount typed before switching to BUY/SELL would be submitted as
+  // an attested custom trade total.
+  useEffect(() => {
+    if (form.getFieldState("activityType").isDirty) {
+      amountWasEdited.current = false;
+    }
+  }, [form, watchedActivityType]);
   const effectiveAccounts =
     transferAccounts && TRANSFER_ACTIVITY_TYPES.includes(watchedActivityType ?? "")
       ? transferAccounts
@@ -716,12 +738,17 @@ export function MobileActivityForm({
         return;
       }
 
-      // For non-symbol activities (cash deposits, withdrawals, etc.) and cash transfers:
-      // Clear assetId so backend generates CASH:{currency}
+      const isCashAdjustment =
+        submitData.activityType === ActivityType.ADJUSTMENT &&
+        !submitData.assetId?.trim() &&
+        submitData.amount != null;
+
+      // Clear asset fields for cash activities so no asset resolution is attempted.
       if (
-        !isSymbolRequired(submitData.activityType) &&
-        !isSecuritiesTransfer &&
-        !isAssetBackedIncome
+        (!isSymbolRequired(submitData.activityType) &&
+          !isSecuritiesTransfer &&
+          !isAssetBackedIncome) ||
+        isCashAdjustment
       ) {
         delete (submitData as Record<string, unknown>).assetId;
         delete (submitData as Record<string, unknown>).quantity;
@@ -741,6 +768,36 @@ export function MobileActivityForm({
         submitData.currency = account.currency;
       }
 
+      // The preview is intentionally not the persistence authority. Let the
+      // backend use the resolved asset multiplier unless the user explicitly
+      // entered a trade total. Mirrors the desktop buy/sell forms.
+      if (TRADE_ACTIVITY_TYPES.includes(submitData.activityType)) {
+        if (!amountWasEdited.current) {
+          const economicsChanged = [
+            "quantity",
+            "unitPrice",
+            "fee",
+            "tax",
+            "contractMultiplier",
+          ].some((field) => form.getFieldState(field as any).isDirty);
+          if (!id || economicsChanged) {
+            submitData.amount = undefined;
+          }
+        } else if (submitData.amount == null) {
+          // The user cleared the total: null asks the backend to recalculate,
+          // where omission would silently keep the old stored amount.
+          submitData.amount = null;
+        }
+      }
+
+      // A form save is a review: every field - including the total, typed or
+      // calculated - is on screen when the user submits, so every form
+      // submission attests. Drafts are the exception: they stay in their
+      // review queue until explicitly approved and posted.
+      if (activity?.status !== ActivityStatus.DRAFT) {
+        (submitData as { needsReview?: boolean }).needsReview = false;
+      }
+
       if (id) {
         const wasAssetBackedIncome = isAssetBackedIncomeSubtype(
           activity?.activityType ?? "",
@@ -748,12 +805,20 @@ export function MobileActivityForm({
         );
         const currentAssetId =
           wasAssetBackedIncome && !isAssetBackedIncome ? undefined : activity?.assetId;
+        const clearAsset = Boolean(
+          activity?.assetId && wasAssetBackedIncome && !isAssetBackedIncome,
+        );
 
         await updateActivityMutation.mutateAsync({
           id,
           ...submitData,
           currentAssetId,
-        } as NewActivityFormValues & { id: string; currentAssetId?: string });
+          clearAsset,
+        } as NewActivityFormValues & {
+          id: string;
+          currentAssetId?: string;
+          clearAsset?: boolean;
+        });
       } else {
         await addActivityMutation.mutateAsync(submitData);
       }
@@ -800,9 +865,17 @@ export function MobileActivityForm({
         if (TRADE_ACTIVITY_TYPES.includes(activityType ?? "")) {
           // Options: validate underlying instead of assetId (OCC built at submit)
           if (assetType === "option") {
-            return [...baseFields, "underlyingSymbol", "quantity", "unitPrice", "fee", "tax"];
+            return [
+              ...baseFields,
+              "underlyingSymbol",
+              "quantity",
+              "unitPrice",
+              "fee",
+              "tax",
+              "amount",
+            ];
           }
-          return [...baseFields, "assetId", "quantity", "unitPrice", "fee", "tax"];
+          return [...baseFields, "assetId", "quantity", "unitPrice", "fee", "tax", "amount"];
         }
         if (CASH_AMOUNT_ACTIVITY_TYPES.includes(activityType ?? "")) {
           if (
@@ -828,7 +901,10 @@ export function MobileActivityForm({
             : [...baseFields, "amount", "tax"];
         }
         if (activityType === ActivityType.ADJUSTMENT) {
-          return [...baseFields, "assetId"];
+          const assetId = form.getValues("assetId");
+          const amount = form.getValues("amount");
+          const isCashAdjustment = !!activity?.id && !assetId?.trim() && amount != null;
+          return [...baseFields, isCashAdjustment ? "amount" : "assetId"];
         }
         return ["amount", ...baseFields];
       }
@@ -847,7 +923,7 @@ export function MobileActivityForm({
                 ? t("activity:mobile_update_activity")
                 : t("activity:mobile_add_activity")}
             </SheetTitle>
-            {!activity?.id && !startOnDetails && (
+            {!shouldStartOnDetails && (
               <div className="flex gap-1.5">
                 {[1, 2].map((step) => (
                   <div
@@ -883,6 +959,8 @@ export function MobileActivityForm({
                   currentStep={currentStep}
                   accounts={effectiveAccounts}
                   isEditing={!!activity?.id}
+                  needsTypeSelection={needsTypeSelection}
+                  amountWasEdited={amountWasEdited}
                 />
               </form>
             </Form>
@@ -891,7 +969,7 @@ export function MobileActivityForm({
 
         <SheetFooter className="mt-auto border-t px-6 py-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex w-full gap-3">
-            {currentStep > 1 && !activity?.id && !startOnDetails && (
+            {currentStep > 1 && !shouldStartOnDetails && (
               <Button
                 type="button"
                 variant="outline"

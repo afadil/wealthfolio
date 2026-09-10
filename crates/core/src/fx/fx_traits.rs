@@ -1,4 +1,6 @@
-use super::fx_model::{ExchangeRate, NewExchangeRate};
+use super::fx_model::{
+    ExchangeRate, ExchangeRateDateQuery, ExchangeRateDateResult, NewExchangeRate,
+};
 use crate::errors::Result;
 use crate::quotes::Quote;
 use async_trait::async_trait;
@@ -54,6 +56,39 @@ pub trait FxServiceTrait: Send + Sync {
         to_currency: &str,
         date: NaiveDate,
     ) -> Result<Decimal>;
+    /// Resolves a historical rate for each requested (currency pair, date).
+    /// Never fails the whole batch for one bad pair — each result carries
+    /// either a rate or an error.
+    fn get_exchange_rates_for_dates(
+        &self,
+        pairs: Vec<ExchangeRateDateQuery>,
+    ) -> Vec<ExchangeRateDateResult> {
+        pairs
+            .into_iter()
+            .map(|pair| {
+                match self.get_exchange_rate_for_date(
+                    &pair.from_currency,
+                    &pair.to_currency,
+                    pair.date,
+                ) {
+                    Ok(rate) => ExchangeRateDateResult {
+                        from_currency: pair.from_currency,
+                        to_currency: pair.to_currency,
+                        date: pair.date,
+                        rate: Some(rate),
+                        error: None,
+                    },
+                    Err(e) => ExchangeRateDateResult {
+                        from_currency: pair.from_currency,
+                        to_currency: pair.to_currency,
+                        date: pair.date,
+                        rate: None,
+                        error: Some(e.to_string()),
+                    },
+                }
+            })
+            .collect()
+    }
     fn convert_currency(
         &self,
         amount: Decimal,

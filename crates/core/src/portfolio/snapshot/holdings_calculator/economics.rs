@@ -1,15 +1,13 @@
 //! Trade-economics, position-intent, and asset-fact cache helpers
 //! shared across the holdings-calculator handlers.
 use crate::activities::{
-    Activity, ActivityType, NewActivity, ACTIVITY_SUBTYPE_POSITION_CLOSE,
-    ACTIVITY_SUBTYPE_POSITION_OPEN,
+    Activity, NewActivity, ACTIVITY_SUBTYPE_POSITION_CLOSE, ACTIVITY_SUBTYPE_POSITION_OPEN,
 };
 use crate::constants::DECIMAL_PRECISION;
 use crate::portfolio::economic_events::ActivityEconomicsResolver;
 use crate::portfolio::snapshot::{AccountStateSnapshot, Position};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
-use std::str::FromStr;
 
 /// Helper function for cash mutations.
 /// Books cash in the specified currency (should be activity.currency per design spec).
@@ -26,7 +24,6 @@ pub(crate) struct AssetPositionInfo {
     pub(crate) currency: String,
     pub(crate) is_alternative: bool,
     pub(crate) contract_multiplier: Decimal,
-    pub(crate) is_bond: bool,
     pub(crate) allows_negative_lots: bool,
     pub(crate) requires_explicit_short_intent: bool,
 }
@@ -39,44 +36,27 @@ impl AssetPositionInfo {
             currency: activity_currency.to_string(),
             is_alternative: false,
             contract_multiplier: Decimal::ONE,
-            is_bond: false,
             allows_negative_lots: false,
             requires_explicit_short_intent: false,
         }
     }
 }
 
-fn should_use_activity_amount(activity: &Activity, asset_info: &AssetPositionInfo) -> bool {
-    let has_amount = activity.amount.is_some_and(|amount| !amount.is_zero());
-    if !has_amount {
-        return false;
-    }
-
-    if ActivityEconomicsResolver::is_security_transfer(activity) {
-        return false;
-    }
-
-    let activity_type = ActivityType::from_str(activity.effective_type());
-    let has_qty = activity.quantity.is_some_and(|qty| !qty.is_zero());
-    let has_unit_price = activity.unit_price.is_some_and(|price| !price.is_zero());
-    let is_buy_or_sell = matches!(activity_type, Ok(ActivityType::Buy | ActivityType::Sell));
-    if !is_buy_or_sell {
-        return true;
-    }
-
-    asset_info.is_bond || !has_qty || !has_unit_price
-}
-
-/// Gross trade value (pre-fee) for a BUY/SELL/TRANSFER lot.
-/// Plain trades use qty * price; bonds and incomplete price/quantity rows use
-/// broker amount when present.
+/// Gross trade value (pre-charge) reverse-derived from authoritative final cash.
+/// Security transfers remain lot-only and therefore use quantity * unit price.
 #[inline]
 pub(crate) fn gross_trade_amount(activity: &Activity, asset_info: &AssetPositionInfo) -> Decimal {
-    if should_use_activity_amount(activity, asset_info) {
-        activity.amt()
-    } else {
-        activity.qty() * activity.price() * asset_info.contract_multiplier
+    if ActivityEconomicsResolver::is_security_transfer(activity) {
+        return activity
+            .qty()
+            .checked_mul(activity.price())
+            .and_then(|value| value.checked_mul(asset_info.contract_multiplier))
+            .unwrap_or(Decimal::ZERO);
     }
+
+    ActivityEconomicsResolver::resolve_cash(activity, asset_info.contract_multiplier)
+        .gross_amount
+        .unwrap_or(Decimal::ZERO)
 }
 
 /// Canonical position intent for an activity, resolved through the single
@@ -108,16 +88,51 @@ pub(crate) fn storage_money(value: Decimal) -> Decimal {
 
 /// Per-share/per-contract acquisition price for a lot (multiplier-inclusive).
 ///
-/// Mirrors `gross_trade_amount`: when `amount` is authoritative, derive the
-/// per-unit price from it so the lot's cost basis matches the booked cash.
+/// Derives book price from authoritative gross economics while retaining the
+/// reported unit price as an independent input/diagnostic.
 #[inline]
 pub(crate) fn effective_unit_price(activity: &Activity, asset_info: &AssetPositionInfo) -> Decimal {
     let qty = activity.qty();
-    if should_use_activity_amount(activity, asset_info) && !qty.is_zero() {
-        activity.amt() / qty
+    let gross = gross_trade_amount(activity, asset_info);
+    // Keep a representable reported price as the fallback when gross cannot
+    // be divided into a per-unit value; otherwise leave the lot basis unknown.
+    let reported_price = activity
+        .price()
+        .checked_mul(asset_info.contract_multiplier)
+        .unwrap_or(Decimal::ZERO);
+    if !qty.is_zero() && !gross.is_zero() {
+        gross.checked_div(qty).unwrap_or(reported_price)
     } else {
-        activity.price() * asset_info.contract_multiplier
+        reported_price
     }
+}
+
+#[inline]
+pub(crate) fn signed_cash_effect(activity: &Activity, asset_info: &AssetPositionInfo) -> Decimal {
+    ActivityEconomicsResolver::resolve_cash(activity, asset_info.contract_multiplier)
+        .signed_cash_effect
+        .unwrap_or(Decimal::ZERO)
+}
+
+/// Non-trade cash always settles in the activity's declared cash currency.
+pub(crate) fn cash_booking(activity: &Activity, signed_effect: Decimal) -> (String, Decimal) {
+    (activity.currency.clone(), signed_effect)
+}
+
+/// A trade carrying a broker FX rate settles in account currency; otherwise it
+/// settles in the activity currency.
+pub(crate) fn trade_cash_booking(
+    activity: &Activity,
+    account_currency: &str,
+    signed_effect: Decimal,
+) -> (String, Decimal) {
+    if activity.currency != account_currency {
+        if let Some(fx_rate) = activity.fx_rate.filter(|rate| *rate > Decimal::ZERO) {
+            return (account_currency.to_string(), signed_effect * fx_rate);
+        }
+    }
+
+    cash_booking(activity, signed_effect)
 }
 
 pub(crate) fn proportional_amount(
@@ -127,8 +142,18 @@ pub(crate) fn proportional_amount(
 ) -> Decimal {
     if amount.is_zero() || part_quantity.is_zero() || total_quantity.is_zero() {
         Decimal::ZERO
+    } else if part_quantity == total_quantity {
+        amount
     } else {
-        amount * part_quantity / total_quantity
+        amount
+            .checked_mul(part_quantity)
+            .and_then(|value| value.checked_div(total_quantity))
+            .or_else(|| {
+                amount
+                    .checked_div(total_quantity)
+                    .and_then(|value| value.checked_mul(part_quantity))
+            })
+            .unwrap_or(Decimal::ZERO)
     }
 }
 

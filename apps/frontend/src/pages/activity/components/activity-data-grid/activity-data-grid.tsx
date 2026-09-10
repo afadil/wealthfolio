@@ -9,12 +9,12 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { resolveSymbolQuote } from "@/adapters";
 import { CreateCustomAssetDialog } from "@/components/create-custom-asset-dialog";
-import { ActivityType } from "@/lib/constants";
+import { ActivityStatus, ActivityType } from "@/lib/constants";
 import { isManualSearchResult, quoteModeFromSearchResult } from "@/lib/asset-utils";
 import { generateId } from "@/lib/id";
 import { LinkTransferModal } from "../link-transfer-modal";
 import { TransferMatchDialog } from "../transfer-match-dialog";
-import { isSameAccountCashFxConversion } from "../transfer-link-utils";
+import { isSameAccountCashFxConversion, nonCashTransferAssetKey } from "../transfer-link-utils";
 import { ActivityDeleteModal } from "../activity-delete-modal";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
@@ -23,6 +23,7 @@ import {
   applyTransactionUpdate,
   createCurrencyResolver,
   createDraftTransaction,
+  partitionReviewRowsForApproval,
   PINNED_COLUMNS,
   TRACKED_FIELDS,
   valuesAreEqual,
@@ -408,6 +409,7 @@ export function ActivityDataGrid({
     onDelete: handleDelete,
     onLinkTransfer: handleRowLinkTransfer,
     onUnlinkTransfer: handleRowUnlinkTransfer,
+    showSubtypeInType: columnVisibility.subtype === false,
     onSymbolSelect: handleSymbolSelect,
     onCreateCustomAsset: handleCreateCustomAsset,
   });
@@ -662,8 +664,12 @@ export function ActivityDataGrid({
         }),
       );
     }
-    const inAmount = Number(transferIn.amount ?? transferIn.unitPrice ?? 0);
-    const outAmount = Number(transferOut.amount ?? transferOut.unitPrice ?? 0);
+    const inAmount = Number(
+      transferIn.amount ?? (nonCashTransferAssetKey(transferIn) ? transferIn.unitPrice : 0),
+    );
+    const outAmount = Number(
+      transferOut.amount ?? (nonCashTransferAssetKey(transferOut) ? transferOut.unitPrice : 0),
+    );
     if (Number.isFinite(inAmount) && Number.isFinite(outAmount) && inAmount && outAmount) {
       const diff = Math.abs(inAmount - outAmount) / Math.max(inAmount, outAmount);
       if (diff > 0.01) {
@@ -722,21 +728,41 @@ export function ActivityDataGrid({
 
     if (pendingToApprove.length === 0) return;
 
-    // Mark all pending activities as approved (needsReview=false) and mark them as dirty
-    setLocalTransactions((prev) =>
-      prev.map((transaction) => {
-        const shouldApprove = pendingToApprove.some((p) => p.id === transaction.id);
-        if (shouldApprove) {
-          return { ...transaction, needsReview: false };
-        }
-        return transaction;
-      }),
-    );
+    const { approvable, incomplete } = partitionReviewRowsForApproval(pendingToApprove);
+    const approvableIds = new Set(approvable.map((transaction) => transaction.id));
 
-    // Mark them as dirty so they will be saved
-    markDirtyBatch(pendingToApprove.map((transaction) => transaction.id));
+    // Draft review rows require an explicit lifecycle transition. Posted and
+    // Pending rows keep their existing lifecycle.
+    if (approvable.length > 0) {
+      setLocalTransactions((prev) =>
+        prev.map((transaction) => {
+          if (approvableIds.has(transaction.id)) {
+            return {
+              ...transaction,
+              needsReview: false,
+              status:
+                transaction.status === ActivityStatus.DRAFT
+                  ? ActivityStatus.POSTED
+                  : transaction.status,
+            };
+          }
+          return transaction;
+        }),
+      );
+
+      // Mark only complete approvals as dirty so unresolved rows remain in review.
+      markDirtyBatch(approvable.map((transaction) => transaction.id));
+    }
     dataGrid.table.resetRowSelection();
-  }, [dataGrid.table, markDirtyBatch, setLocalTransactions]);
+
+    if (incomplete.length > 0) {
+      toast({
+        title: t("activity:datagrid.approve_missing_amount", { count: incomplete.length }),
+        description: t("activity:datagrid.approve_missing_amount_description"),
+        variant: "destructive",
+      });
+    }
+  }, [dataGrid.table, markDirtyBatch, setLocalTransactions, t]);
 
   // Save activities hook with validation and error handling
   const { saveActivities, isSaving } = useSaveActivities({

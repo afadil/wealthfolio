@@ -28,7 +28,9 @@ test.describe("Asset Creation", () => {
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
 
     await page.getByRole("button", { name: "Add Security" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog", { name: "Add Security", exact: true })).toBeVisible({
+      timeout: 5000,
+    });
     await expect(page.getByRole("heading", { name: "Add Security" })).toBeVisible({
       timeout: 3000,
     });
@@ -45,7 +47,9 @@ test.describe("Asset Creation", () => {
     }
 
     await page.getByRole("button", { name: "Add Security" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog", { name: "Add Security", exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Fill Symbol
     const symbolInput = page.getByPlaceholder("e.g., AAPL");
@@ -62,7 +66,9 @@ test.describe("Asset Creation", () => {
     await page.getByRole("button", { name: "Create Security" }).click();
 
     // Dialog should close
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("dialog", { name: "Add Security", exact: true })).not.toBeVisible({
+      timeout: 10000,
+    });
 
     await page.waitForTimeout(1000);
 
@@ -87,16 +93,15 @@ test.describe("Asset Creation", () => {
     await page.waitForTimeout(1000);
 
     // Skip if AAPL already exists (likely from earlier specs like CSV import)
-    const existingRow = page.getByRole("row").filter({ hasText: "AAPL" });
-    if (await existingRow.isVisible().catch(() => false)) {
-      return;
-    }
+    const existingStock = page.getByTestId("security-EQUITY-AAPL");
+    test.skip((await existingStock.count()) > 0, "AAPL already exists");
 
+    const dialog = page.getByRole("dialog", { name: "Add Security", exact: true });
     await page.getByRole("button", { name: "Add Security" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
     // Click the search combobox trigger to open the search popover
-    const searchTrigger = page.getByRole("combobox", { name: /search/i });
+    const searchTrigger = dialog.getByRole("combobox", { name: "Search", exact: true });
     await searchTrigger.click();
 
     // Fill the actual CommandInput inside the popover
@@ -120,16 +125,15 @@ test.describe("Asset Creation", () => {
     await aaplOption.click();
 
     // Verify symbol field got auto-filled
-    const symbolInput = page.getByPlaceholder("e.g., AAPL");
+    const symbolInput = dialog.getByPlaceholder("e.g., AAPL");
     await expect(symbolInput).toHaveValue(/AAPL/i);
 
     // Click Create Security
-    await page.getByRole("button", { name: "Create Security" }).click();
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
+    await dialog.getByRole("button", { name: "Create Security", exact: true }).click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
 
     await page.waitForTimeout(1000);
-    const aaplRow = page.getByRole("row").filter({ hasText: "AAPL" });
-    await expect(aaplRow.first()).toBeVisible({ timeout: 10000 });
+    await expect(existingStock.first()).toBeVisible({ timeout: 10000 });
   });
 
   test("5. Edit asset — add notes", async () => {
@@ -201,7 +205,9 @@ test.describe("Asset Creation", () => {
     await expect(page.getByRole("heading", { name: "Securities" })).toBeVisible({ timeout: 10000 });
 
     await page.getByRole("button", { name: "Add Security" }).click();
-    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog", { name: "Add Security", exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Click Create without filling anything
     await page.getByRole("button", { name: "Create Security" }).click();
@@ -213,6 +219,8 @@ test.describe("Asset Creation", () => {
 
     // Close dialog
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("dialog", { name: "Add Security", exact: true })).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 });

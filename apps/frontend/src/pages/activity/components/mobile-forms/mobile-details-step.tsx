@@ -1,7 +1,6 @@
 import { restrictionAllowsType } from "@/lib/activity-restrictions";
 import { ACTIVITY_SUBTYPES, ActivityType, QuoteMode } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { roundDecimal } from "@/lib/utils";
 import {
   Button,
   DatePickerInput,
@@ -29,9 +28,10 @@ import { Label } from "@wealthfolio/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { ScrollArea } from "@wealthfolio/ui/components/ui/scroll-area";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
+import { useAmountFormatting } from "@wealthfolio/ui";
 import {
   AdvancedOptionsSection,
   AssetTypeSelector,
@@ -44,11 +44,14 @@ import {
   type AssetType,
 } from "../forms/fields";
 import type { NewActivityFormValues } from "../forms/schemas";
+import { calculateIncomeFinalAmount, calculateTradeFinalCash } from "@/lib/activity-final-amount";
 
 interface MobileDetailsStepProps {
   accounts: AccountSelectOption[];
   activityType: string;
   isEditing?: boolean;
+  /** Owned by the form root; true for a stored or session-entered custom amount. */
+  amountWasEdited: RefObject<boolean>;
 }
 
 const INCOME_MODE_CASH = "CASH";
@@ -109,7 +112,12 @@ function FmvPerUnitLabel() {
   );
 }
 
-export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileDetailsStepProps) {
+export function MobileDetailsStep({
+  accounts,
+  activityType,
+  isEditing,
+  amountWasEdited,
+}: MobileDetailsStepProps) {
   const { t } = useTranslation();
   const formatting = useNumberFormatting();
   const { control, getFieldState, getValues, watch, setValue, register } =
@@ -137,6 +145,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   // BUY/SELL asset type (stock/option/bond)
   const isBuyOrSell = TRADE_ACTIVITY_TYPES.includes(activityType);
   const assetType = isBuyOrSell ? ((watch("assetType" as any) as string) ?? "stock") : "stock";
+  const symbolInstrumentType = watch("symbolInstrumentType" as any) as string | undefined;
   const isOption = assetType === "option";
   const isBond = assetType === "bond";
   const isManualForType = isManualAsset && !isBond;
@@ -147,16 +156,6 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   const optFee = isBuyOrSell ? watch("fee") : undefined;
   const optTax = isBuyOrSell ? watch("tax") : undefined;
   const optMultiplier = isOption ? ((watch("contractMultiplier" as any) as number) ?? 100) : 1;
-
-  const optionTotal = useMemo(() => {
-    if (!isOption || !optQuantity || !optUnitPrice) return 0;
-    const q = Number(optQuantity) || 0;
-    const p = Number(optUnitPrice) || 0;
-    const f = Number(optFee) || 0;
-    const t = Number(optTax) || 0;
-    const m = Number(optMultiplier) || 100;
-    return activityType === ActivityType.BUY ? q * p * m + f + t : q * p * m - f - t;
-  }, [isOption, optQuantity, optUnitPrice, optFee, optTax, optMultiplier, activityType]);
 
   // Transfer state
   const isTransfer = TRANSFER_ACTIVITY_TYPES.includes(activityType);
@@ -179,16 +178,22 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
 
   const isCreditActivity = activityType === ActivityType.CREDIT;
   const isAdjustmentActivity = activityType === ActivityType.ADJUSTMENT;
+  const adjustmentAssetId = isAdjustmentActivity ? watch("assetId") : undefined;
+  const adjustmentAmount = isAdjustmentActivity ? watch("amount") : undefined;
+  const isCashAdjustment =
+    isAdjustmentActivity && !!isEditing && !adjustmentAssetId?.trim() && adjustmentAmount != null;
   const isFeeActivity = activityType === ActivityType.FEE;
   const isTaxActivity = activityType === ActivityType.TAX;
   const isIncomeActivity = isDividendActivity || isInterestActivity;
   const needsTax = isBuyOrSell || isIncomeActivity;
   const needsAssetSymbol =
-    SYMBOL_FIELD_ACTIVITY_TYPES.includes(activityType) || isStakingReward || isSecuritiesTransfer;
+    (SYMBOL_FIELD_ACTIVITY_TYPES.includes(activityType) && !isCashAdjustment) ||
+    isStakingReward ||
+    isSecuritiesTransfer;
   const needsQuantity =
     TRADE_ACTIVITY_TYPES.includes(activityType) ||
     isSecuritiesTransfer ||
-    isAdjustmentActivity ||
+    (isAdjustmentActivity && !isCashAdjustment) ||
     isAssetBackedIncome;
   const needsUnitPrice =
     TRADE_ACTIVITY_TYPES.includes(activityType) ||
@@ -196,8 +201,51 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
     (isSecuritiesTransfer && isExternal && direction === "in");
   const needsInternalCashTransferAmounts = isCashTransfer && !isExternal;
   const needsAmount =
+    isBuyOrSell ||
     AMOUNT_FIELD_ACTIVITY_TYPES.includes(activityType) ||
+    isCashAdjustment ||
     (isCashTransfer && !needsInternalCashTransferAmounts);
+  const { formatAmount } = useAmountFormatting();
+  // One calculation feeds both the auto-fill effect below and the "use
+  // calculated total" affordance that mirrors the desktop TradeTotalInput.
+  const calculatedTradeCash = useMemo(
+    () =>
+      isBuyOrSell
+        ? calculateTradeFinalCash({
+            activityType: activityType === ActivityType.BUY ? ActivityType.BUY : ActivityType.SELL,
+            instrumentType: symbolInstrumentType ?? assetType,
+            quantity,
+            unitPrice,
+            fee: optFee,
+            tax: optTax,
+            contractMultiplier: isOption ? optMultiplier : undefined,
+          })
+        : undefined,
+    [
+      isBuyOrSell,
+      activityType,
+      symbolInstrumentType,
+      assetType,
+      quantity,
+      unitPrice,
+      optFee,
+      optTax,
+      isOption,
+      optMultiplier,
+    ],
+  );
+  const calculatedTradeAmount =
+    calculatedTradeCash === undefined ? undefined : Math.abs(calculatedTradeCash);
+  const isTradeDebit =
+    calculatedTradeCash === undefined ? activityType === ActivityType.BUY : calculatedTradeCash < 0;
+  const applyCalculatedTradeTotal = () => {
+    if (calculatedTradeAmount === undefined) return;
+    amountWasEdited.current = false;
+    setValue("amount", calculatedTradeAmount, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+  };
   const needsFee =
     FEE_FIELD_ACTIVITY_TYPES.includes(activityType) && !needsInternalCashTransferAmounts;
 
@@ -412,24 +460,33 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
   };
 
   useEffect(() => {
-    if (!isAssetBackedIncome) return;
-    const q = Number(quantity);
-    const p = Number(unitPrice);
-    const currentAmount = Number(getValues("amount"));
-    const quantityIsDirty = getFieldState("quantity").isDirty;
-    const unitPriceIsDirty = getFieldState("unitPrice").isDirty;
-    const shouldAutoSetAmount =
-      quantityIsDirty || unitPriceIsDirty || !(Number.isFinite(currentAmount) && currentAmount > 0);
-    if (q > 0 && p > 0 && shouldAutoSetAmount) {
-      const computedAmount = roundDecimal(q * p);
-      if (currentAmount !== computedAmount) {
-        setValue("amount" as any, computedAmount, {
-          shouldDirty: quantityIsDirty || unitPriceIsDirty,
-          shouldValidate: false,
-        });
-      }
-    }
-  }, [getFieldState, getValues, isAssetBackedIncome, quantity, setValue, unitPrice]);
+    if (amountWasEdited.current || (!isBuyOrSell && !isAssetBackedIncome)) return;
+    const shouldDirty = ["quantity", "unitPrice", "fee", "tax", "contractMultiplier"].some(
+      (field) => getFieldState(field as any).isDirty,
+    );
+    // An existing final amount remains authoritative until the user changes an
+    // input that participates in the session-local calculation.
+    if (isEditing && !shouldDirty) return;
+    const computedAmount = isBuyOrSell
+      ? calculatedTradeAmount
+      : calculateIncomeFinalAmount(quantity, unitPrice, symbolInstrumentType);
+    if (computedAmount === undefined || Number(getValues("amount")) === computedAmount) return;
+    setValue("amount" as any, computedAmount, {
+      shouldDirty,
+      shouldValidate: false,
+    });
+  }, [
+    calculatedTradeAmount,
+    symbolInstrumentType,
+    getFieldState,
+    getValues,
+    isAssetBackedIncome,
+    isBuyOrSell,
+    isEditing,
+    quantity,
+    setValue,
+    unitPrice,
+  ]);
 
   // Quantity label adapts to asset type
   const quantityLabel = isAssetBackedIncome
@@ -826,6 +883,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                       <input
                         type="number"
                         {...register("contractMultiplier" as any, { valueAsNumber: true })}
+                        readOnly={isEditing}
                         className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
                         aria-label={t("activity:form.contract_multiplier")}
                       />
@@ -841,7 +899,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                        {activityType === ActivityType.BUY
+                        {isTradeDebit
                           ? t("activity:form.total_debit")
                           : t("activity:form.total_credit")}
                       </span>
@@ -863,7 +921,7 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                       </p>
                     </div>
                     <span className="text-lg font-semibold tabular-nums">
-                      {formatting.formatDecimal(optionTotal, {
+                      {formatting.formatDecimal(calculatedTradeAmount ?? 0, {
                         style: currency ? "currency" : "decimal",
                         currency: currency || undefined,
                         minimumFractionDigits: 2,
@@ -893,8 +951,31 @@ export function MobileDetailsStep({ accounts, activityType, isEditing }: MobileD
                                 : t("activity:form.label_amount")}
                       </FormLabel>
                       <FormControl>
-                        <MoneyInput {...field} />
+                        <MoneyInput
+                          {...field}
+                          onValueChange={(value, isUserEdit) => {
+                            field.onChange(value);
+                            if (isUserEdit) amountWasEdited.current = true;
+                          }}
+                        />
                       </FormControl>
+                      {isBuyOrSell &&
+                        amountWasEdited.current &&
+                        calculatedTradeAmount !== undefined && (
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+                            onClick={applyCalculatedTradeTotal}
+                          >
+                            {t("activity:form.use_calculated_total", {
+                              amount: formatAmount(
+                                calculatedTradeAmount,
+                                currency ?? "",
+                                Boolean(currency),
+                              ),
+                            })}
+                          </button>
+                        )}
                       <FormMessage />
                     </FormItem>
                   )}

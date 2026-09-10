@@ -16,7 +16,8 @@ vi.mock("@/addons/addons-runtime-context", () => ({
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
-import { AddonIframeManager } from "./addon-iframe-manager";
+import { ALLOWED_API_METHODS, AddonIframeManager } from "./addon-iframe-manager";
+import { createSDKHostAPIBridge, type InternalHostAPI } from "../type-bridge";
 import { resetAddonSandboxRuntimeAssetsForTest } from "./addon-sandbox-assets";
 import { setAddonLocalizationSnapshot } from "./addon-sandbox-localization";
 import { loadAddonAsset } from "@/adapters";
@@ -530,5 +531,35 @@ describe("AddonIframeManager", () => {
       "Sandbox failed during loading runtime stylesheet: Sandbox runtime stylesheet failed to load",
     );
     await vi.waitFor(() => expect(document.querySelector("iframe")).toBeNull());
+  });
+});
+
+describe("ALLOWED_API_METHODS", () => {
+  // `events.*` is brokered through the separate three-level ALLOWED_EVENT_METHODS
+  // set and exercised elsewhere — not a gap in this one.
+  const EXCLUDED_NAMESPACES = new Set(["events"]);
+  // `query.getClient` intentionally never crosses the iframe bridge: it would
+  // hand a live QueryClient instance across the sandbox boundary. The bridge
+  // implementation throws for it instead of forwarding a call.
+  const EXCLUDED_METHODS = new Set(["query.getClient"]);
+
+  it("covers every method the SDK host API bridge actually exposes", () => {
+    // No guard is passed, so guardNamespace short-circuits and returns each
+    // namespace's methods unwrapped — this only needs to walk the shape of
+    // the bridge, never call into `internalAPI`.
+    const sdkAPI = createSDKHostAPIBridge({} as InternalHostAPI, "test-addon");
+
+    const missing: string[] = [];
+    for (const [namespace, api] of Object.entries(sdkAPI)) {
+      if (EXCLUDED_NAMESPACES.has(namespace)) continue;
+      if (typeof api !== "object" || api === null) continue;
+      for (const fn of Object.keys(api)) {
+        const method = `${namespace}.${fn}`;
+        if (EXCLUDED_METHODS.has(method)) continue;
+        if (!ALLOWED_API_METHODS.has(method)) missing.push(method);
+      }
+    }
+
+    expect(missing).toEqual([]);
   });
 });

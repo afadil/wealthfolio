@@ -47,13 +47,23 @@ export function useCashActivitySearch(
     [query.data],
   );
   const totalCount = query.data?.pages[0]?.totalCount ?? 0;
+  // Only page one carries the net: it covers the whole filtered set, and the
+  // client refetches it whenever the filter changes.
+  const net = query.data?.pages[0]?.net ?? null;
+  // Reported by the server rather than read from settings: it is the currency
+  // `netAmountBase` is actually denominated in, so a cached page stays labelled
+  // correctly even if the setting has since changed.
+  const baseCurrency = query.data?.pages[0]?.baseCurrency ?? undefined;
 
   return {
     items,
     totalCount,
+    net,
+    baseCurrency,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isFetchingNextPage: query.isFetchingNextPage,
+    isFetchNextPageError: query.isFetchNextPageError,
     isError: query.isError,
     hasNextPage: query.hasNextPage ?? false,
     fetchNextPage: query.fetchNextPage,

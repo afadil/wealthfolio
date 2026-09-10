@@ -1,4 +1,10 @@
 {
+  "needs_review_alert": {
+    "title_one": "{{count}} Aktivität muss geprüft werden",
+    "title_other": "{{count}} Aktivitäten müssen geprüft werden",
+    "description": "Prüfen Sie bei jeder Transaktion Vermögenswert, Typ und Endbetrag.",
+    "action": "Prüfen"
+  },
   "activities": "Aktivitäten",
   "add_activity": "Aktivität hinzufügen",
   "add_holdings": "Bestände hinzufügen",
@@ -74,7 +80,6 @@
   "duplicate": "Duplizieren",
   "delete": "Löschen",
   "loading": "Wird geladen...",
-  "load_more": "Mehr laden",
   "search_placeholder": "Suchen...",
   "clear_search": "Suche löschen",
   "filter_account": "Konto",
@@ -182,7 +187,7 @@
   "import_help_docs_activity_ref": "Dokumentation zu Aktivitätstypen",
   "import_help_how_to_title": "CSV-Import Hilfe?",
   "import_help_how_to_mobile": "CSV-Import Hilfe?",
-  "pagination_count": "{{fetched}} / {{total}} Aktivitäten",
+  "pagination_count": "{{fetched}}/{{total}} Aktivitäten",
   "manager": {
     "add_to_account": "Eine neue Transaktion zu {{account}} hinzufügen",
     "create_transaction": "Eine neue Transaktion oder Aktivität für Ihr Konto erstellen",
@@ -235,7 +240,8 @@
     "status_all": "Alle Aktivitäten",
     "status_pending": "Prüfung ausstehend",
     "status_validated": "Validiert",
-    "instrument": "Instrument"
+    "instrument": "Instrument",
+    "instrument_all": "Alle Instrumente"
   },
   "detail": {
     "status_posted": "Gebucht",
@@ -450,6 +456,9 @@
     "available_amount": "Verfügbar: {{amount}}",
     "total_debit": "Gesamtbelastung",
     "total_credit": "Gesamtgutschrift",
+    "help_total_debit": "Endgültig gezahlter Betrag einschließlich Gebühren und Steuern.",
+    "help_total_credit": "Endgültig erhaltener Betrag nach Gebühren und Steuern.",
+    "use_calculated_total": "Berechneten Gesamtbetrag verwenden ({{amount}})",
     "warn_buy_while_short": "Sie halten aktuell eine Short-Position in dieser Aktie. Nutzen Sie den Deckungskauf, um sie zu reduzieren; einen normalen Kauf erst nach Schließung der Short-Position erfassen.",
     "warn_cover_without_short": "Ein Deckungskauf erfordert eine bestehende Short-Position für diese Aktie im ausgewählten Konto.",
     "warn_cover_quantity_excess": "Sie decken {{covering}} Anteile, aber die aktuelle Short-Position beträgt {{short}} Anteile. Erfassen Sie einen Überschuss als separaten Kauf.",
@@ -497,6 +506,7 @@
     "err_amount_number": "Der Betrag muss eine Zahl sein.",
     "err_amount_positive_number": "Der Betrag muss eine positive Zahl sein.",
     "err_amount_gt_zero": "Der Betrag muss größer als 0 sein.",
+    "err_amount_non_negative": "Der Betrag darf nicht negativ sein.",
     "err_enter_quantity": "Bitte geben Sie eine Menge ein.",
     "err_quantity_number": "Die Menge muss eine Zahl sein.",
     "err_quantity_gt_zero": "Die Menge muss größer als 0 sein.",
@@ -637,7 +647,10 @@
     "warn_dates_differ_one": "Die Daten unterscheiden sich um {{count}} Tag.",
     "warn_dates_differ_other": "Die Daten unterscheiden sich um {{count}} Tage.",
     "approve_count_one": "{{count}} genehmigen",
-    "approve_count_other": "{{count}} genehmigen"
+    "approve_count_other": "{{count}} genehmigen",
+    "approve_missing_amount_one": "Für {{count}} Aktivität fehlt noch der endgültige Barbetrag",
+    "approve_missing_amount_other": "Für {{count}} Aktivitäten fehlen noch die endgültigen Barbeträge",
+    "approve_missing_amount_description": "Geben Sie für jeden leeren oder nullwertigen Trade den korrekten endgültigen Barbetrag ein, bevor Sie ihn genehmigen."
   },
   "table": {
     "cash": "Bargeld",

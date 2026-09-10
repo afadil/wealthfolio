@@ -1,6 +1,5 @@
 import { getIncomeSummary } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
-import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import {
   ChartContainer,
@@ -12,7 +11,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { AccountScopeSelector } from "@/components/account-filter-selector";
-import type { AccountScope } from "@/lib/types";
+import { useAccountScopeStore } from "@/lib/account-scope-store";
 
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
@@ -22,7 +21,6 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
-import { IncomeMobileFilterSheet } from "./income-mobile-filter-sheet";
 
 type IncomePeriod = "ALL" | "YTD" | "LAST_YEAR";
 
@@ -72,9 +70,9 @@ export default function IncomePage() {
   const { t } = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState<IncomePeriod>("ALL");
   const { isBalanceHidden } = useBalancePrivacy();
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
-  const [accountFilter, setAccountScope] = useState<AccountScope>({ type: "all" });
+  const accountFilter = useAccountScopeStore((state) => state.scope);
+  const setAccountScope = useAccountScopeStore((state) => state.setScope);
 
   const {
     data: incomeData,
@@ -85,15 +83,38 @@ export default function IncomePage() {
     queryFn: () => getIncomeSummary(accountFilter),
   });
 
+  // Keep the selector mounted as queries change so multi-selection can continue
+  // through loading, empty, populated and error states.
+  const filters = (
+    <>
+      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
+        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+      </div>
+      <div className="mb-6 flex items-center justify-end gap-2 md:hidden">
+        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
+        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
+      </div>
+    </>
+  );
+
   if (isLoading) {
-    return <IncomeDashboardSkeleton />;
+    return (
+      <>
+        {filters}
+        <IncomeDashboardSkeleton />
+      </>
+    );
   }
 
   if (error || !incomeData) {
     return (
-      <div>
-        {t("income:failed_to_load", { error: error?.message || t("income:unknown_error") })}
-      </div>
+      <>
+        {filters}
+        <div>
+          {t("income:failed_to_load", { error: error?.message || t("income:unknown_error") })}
+        </div>
+      </>
     );
   }
 
@@ -103,41 +124,12 @@ export default function IncomePage() {
   if (!periodSummary || !totalSummary) {
     return (
       <>
-        <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
-          <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-        </div>
-        <div className="flex items-center justify-end gap-2 md:hidden">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            className="bg-secondary/30 relative h-9 w-9 rounded-full border-none"
-            onClick={() => setIsFilterSheetOpen(true)}
-          >
-            <Icons.ListFilter className="h-4 w-4" />
-            {accountFilter.type !== "all" && (
-              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
-            )}
-          </Button>
-        </div>
+        {filters}
         <EmptyPlaceholder
           className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
           icon={<Icons.DollarSign className="h-10 w-10" />}
           title={t("income:no_income_data")}
           description={t("income:no_income_data_desc")}
-        />
-        <IncomeMobileFilterSheet
-          open={isFilterSheetOpen}
-          onOpenChange={setIsFilterSheetOpen}
-          accountFilter={accountFilter}
-          onAccountScopeChange={setAccountScope}
         />
       </>
     );
@@ -206,31 +198,8 @@ export default function IncomePage() {
 
   return (
     <>
-      {/* Desktop: fixed header with account selector + period toggle */}
-      <div className="pointer-events-auto fixed right-2 top-4 z-20 hidden items-center gap-2 md:flex lg:right-4">
-        <AccountScopeSelector value={accountFilter} onChange={setAccountScope} />
-        <IncomePeriodSelector selectedPeriod={selectedPeriod} onPeriodSelect={setSelectedPeriod} />
-      </div>
-
+      {filters}
       <div className="space-y-6">
-        {/* Mobile: filter icon button + period toggle */}
-        <div className="flex items-center justify-end gap-2 md:hidden">
-          <IncomePeriodSelector
-            selectedPeriod={selectedPeriod}
-            onPeriodSelect={setSelectedPeriod}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            className="bg-secondary/30 relative h-9 w-9 rounded-full border-none"
-            onClick={() => setIsFilterSheetOpen(true)}
-          >
-            <Icons.ListFilter className="h-4 w-4" />
-            {accountFilter.type !== "all" && (
-              <span className="bg-destructive absolute -right-1 -top-1 h-2 w-2 rounded-full" />
-            )}
-          </Button>
-        </div>
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -502,13 +471,6 @@ export default function IncomePage() {
           </Card>
         </div>
       </div>
-
-      <IncomeMobileFilterSheet
-        open={isFilterSheetOpen}
-        onOpenChange={setIsFilterSheetOpen}
-        accountFilter={accountFilter}
-        onAccountScopeChange={setAccountScope}
-      />
     </>
   );
 }
