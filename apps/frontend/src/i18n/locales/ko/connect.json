@@ -38,6 +38,7 @@
     }
   },
   "flow": {
+    "aggregatorExample": "(예: SnapTrade)",
     "yourDevice": "내 기기",
     "localDatabase": "로컬 데이터베이스",
     "dataStaysHere": "데이터는 여기 저장됩니다",

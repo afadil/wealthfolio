@@ -38,6 +38,7 @@
     }
   },
   "flow": {
+    "aggregatorExample": "(z. B. SnapTrade)",
     "yourDevice": "Ihr Gerät",
     "localDatabase": "Lokale Datenbank",
     "dataStaysHere": "Daten bleiben hier",

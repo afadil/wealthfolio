@@ -38,6 +38,7 @@
     }
   },
   "flow": {
+    "aggregatorExample": "（例如 SnapTrade）",
     "yourDevice": "你的裝置",
     "localDatabase": "本機資料庫",
     "dataStaysHere": "資料保留在此",
