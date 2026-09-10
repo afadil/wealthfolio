@@ -25,6 +25,7 @@ import {
   syncBrokerData,
 } from "../services/broker-service";
 import type { BrokerAccount, BrokerConnection } from "../types";
+import { PortalLink } from "./portal-link";
 import { SubscriptionPlans } from "./subscription-plans";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -240,14 +241,10 @@ function BrokerConnectionsCard({
   isRefreshing,
 }: BrokerConnectionsCardProps) {
   const { t } = useTranslation();
-  const openConnectionsPortal = () => {
-    openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`);
-  };
-
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
               <Icons.Link className="text-muted-foreground h-4 w-4" />
@@ -258,31 +255,17 @@ function BrokerConnectionsCard({
             <Button
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-foreground h-8 w-8"
+              className="text-muted-foreground hover:text-foreground size-11 sm:size-8"
+              aria-label={t("common:refresh")}
               onClick={onRefresh}
               disabled={isRefreshing}
             >
               <Icons.RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
-            {/* Mobile: icon only */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground sm:hidden"
-              onClick={openConnectionsPortal}
-            >
-              <Icons.ExternalLink className="h-4 w-4" />
-            </Button>
-            {/* Desktop: full text */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-              onClick={openConnectionsPortal}
-            >
-              {t("connect:connections.manage")}
-              <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+            <PortalLink
+              href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`}
+              label={t("connect:connections.manage")}
+            />
           </div>
         </div>
 
@@ -295,9 +278,14 @@ function BrokerConnectionsCard({
           ) : connections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-6 text-center">
               <p className="text-muted-foreground text-sm">{t("connect:connections.empty")}</p>
-              <Button className="mt-3" onClick={openConnectionsPortal}>
+              <Button
+                className="mt-3"
+                onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/connections`)}
+                title={t("connect:opensInBrowser")}
+              >
                 <Icons.Plus className="h-4 w-4" />
                 {t("connect:connections.connectBroker")}
+                <Icons.ExternalLink className="size-4" aria-hidden="true" />
               </Button>
             </div>
           ) : (
@@ -545,7 +533,7 @@ export function ConnectedView() {
       {showBrokerSync && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
                   <Icons.Wallet className="text-muted-foreground h-4 w-4" />
@@ -562,25 +550,10 @@ export function ConnectedView() {
                   <Icons.CloudSync2 className={`h-4 w-4 ${isSyncing ? "animate-pulse" : ""}`} />
                   {t("connect:sync.syncNow")}
                 </Button>
-                {/* Mobile: icon only */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground sm:hidden"
-                  onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
-                >
-                  <Icons.ExternalLink className="h-4 w-4" />
-                </Button>
-                {/* Desktop: full text */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-                  onClick={() => openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`)}
-                >
-                  {t("connect:accounts.manage")}
-                  <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Button>
+                <PortalLink
+                  href={`${WEALTHFOLIO_CONNECT_PORTAL_URL}/accounts`}
+                  label={t("connect:accounts.manage")}
+                />
               </div>
             </div>
 
@@ -631,12 +604,13 @@ export function ConnectedView() {
               </div>
               <Button
                 size="sm"
+                title={t("connect:opensInBrowser")}
                 onClick={() =>
                   openUrlInBrowser(`${WEALTHFOLIO_CONNECT_PORTAL_URL}/settings/billing`)
                 }
               >
                 {t("connect:upgrade.button")}
-                <Icons.ArrowRight className="ml-1 h-3.5 w-3.5" />
+                <Icons.ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </div>
           </CardContent>

@@ -1,4 +1,5 @@
 {
+  "opensInBrowser": "Se abre en el navegador",
   "page": {
     "title": "Sincronización y conexiones",
     "subtitle": "Tus dispositivos, todos en un solo lugar.",
@@ -239,6 +240,7 @@
     "lastUsed": "Usado por última vez"
   },
   "subscription": {
+    "copySupportEmail": "Copiar el correo de soporte",
     "syncPausedTooltip": "Sincronización pausada — se requiere una suscripción activa",
     "syncPausedTitle": "La sincronización está pausada",
     "syncPausedDescription": "Se requiere una suscripción activa para sincronizar. Tus datos locales y los cambios pendientes se conservan.",

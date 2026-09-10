@@ -1,4 +1,5 @@
 {
+  "opensInBrowser": "在浏览器中打开",
   "page": {
     "title": "同步与连接",
     "subtitle": "您的所有设备,尽在一处。",
@@ -220,6 +221,7 @@
     "lastUsed": "上次使用"
   },
   "subscription": {
+    "copySupportEmail": "复制支持邮箱地址",
     "syncPausedTooltip": "同步已暂停 — 需要有效订阅",
     "syncPausedTitle": "同步已暂停",
     "syncPausedDescription": "同步需要有效订阅。您的本地数据和待同步的更改会保留。",

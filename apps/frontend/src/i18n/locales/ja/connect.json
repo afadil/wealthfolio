@@ -1,4 +1,5 @@
 {
+  "opensInBrowser": "ブラウザで開きます",
   "page": {
     "title": "同期と連携",
     "subtitle": "すべてのデバイスを一元管理。",
@@ -220,6 +221,7 @@
     "lastUsed": "前回使用"
   },
   "subscription": {
+    "copySupportEmail": "サポートのメールアドレスをコピー",
     "syncPausedTooltip": "同期は一時停止中です — 有効なサブスクリプションが必要です",
     "syncPausedTitle": "同期は一時停止中です",
     "syncPausedDescription": "同期には有効なサブスクリプションが必要です。ローカルデータと未同期の変更は保持されます。",
