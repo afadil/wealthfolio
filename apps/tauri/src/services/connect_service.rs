@@ -134,6 +134,23 @@ impl ConnectService {
         ConnectApiClient::new(&cloud_api_base_url, &access_token).map_err(|e| e.to_string())
     }
 
+    pub async fn has_device_sync(&self) -> Result<bool, String> {
+        let token = self.get_valid_access_token().await?;
+        let url = cloud_api_base_url().ok_or("Cloud sync is disabled")?;
+        ConnectApiClient::new(&url, &token)
+            .map_err(|err| err.to_string())?
+            .has_device_sync()
+            .await
+            .map_err(|err| err.to_string())
+    }
+
+    pub async fn ensure_device_sync_subscription(&self) -> Result<(), String> {
+        if !self.has_device_sync().await? {
+            return Err("Device sync is paused: an active subscription is required.".to_string());
+        }
+        Ok(())
+    }
+
     /// Check if the current user's plan includes broker sync.
     ///
     /// Returns `Ok(true)` only when the user has an active subscription

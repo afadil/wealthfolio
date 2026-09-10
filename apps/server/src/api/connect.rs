@@ -457,6 +457,9 @@ async fn run_post_login_device_bootstrap(state: Arc<AppState>) -> PostLoginBoots
     match decision {
         PostLoginDeviceBootstrapDecision::StartBackground => {}
         PostLoginDeviceBootstrapDecision::Skip(reason) => {
+            if matches!(reason, PostLoginBootstrapReason::AlreadyRunning) {
+                state.device_sync_runtime.notify_sync_work_available();
+            }
             return PostLoginBootstrapSyncResult::skipped(reason);
         }
     }
@@ -569,6 +572,11 @@ async fn sync_broker_connections(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<SyncConnectionsResponse>> {
     ensure_connect_sync_enabled()?;
+    if !has_broker_sync(&state).await.map_err(ApiError::Internal)? {
+        return Err(ApiError::Forbidden(
+            "An active broker-sync subscription is required.".to_string(),
+        ));
+    }
     info!("[Connect] Syncing broker connections...");
 
     let client = create_connect_client(&state).await?;
@@ -603,6 +611,11 @@ async fn sync_broker_accounts(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<SyncAccountsResponse>> {
     ensure_connect_sync_enabled()?;
+    if !has_broker_sync(&state).await.map_err(ApiError::Internal)? {
+        return Err(ApiError::Forbidden(
+            "An active broker-sync subscription is required.".to_string(),
+        ));
+    }
     info!("[Connect] Syncing broker accounts...");
 
     let client = create_connect_client(&state).await?;
@@ -634,6 +647,11 @@ async fn sync_broker_activities(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<SyncActivitiesResponse>> {
     ensure_connect_sync_enabled()?;
+    if !has_broker_sync(&state).await.map_err(ApiError::Internal)? {
+        return Err(ApiError::Forbidden(
+            "An active broker-sync subscription is required.".to_string(),
+        ));
+    }
     info!("[Connect] Running activities-only broker sync");
     let result = perform_broker_activities_only_sync(&state)
         .await
@@ -702,6 +720,22 @@ pub async fn has_broker_sync(state: &AppState) -> Result<bool, String> {
         .await
         .map_err(|e| e.to_string())?;
     client.has_broker_sync().await.map_err(|e| e.to_string())
+}
+
+pub async fn has_device_sync(state: &AppState) -> Result<bool, String> {
+    create_connect_client(state)
+        .await
+        .map_err(|err| err.to_string())?
+        .has_device_sync()
+        .await
+        .map_err(|err| err.to_string())
+}
+
+pub async fn ensure_device_sync_subscription(state: &AppState) -> Result<(), String> {
+    if !has_device_sync(state).await? {
+        return Err("Device sync is paused: an active subscription is required.".to_string());
+    }
+    Ok(())
 }
 
 /// Core broker sync logic - syncs connections, accounts, and activities from cloud to local DB.

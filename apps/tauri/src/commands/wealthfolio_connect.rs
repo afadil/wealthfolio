@@ -203,6 +203,9 @@ async fn run_post_login_device_bootstrap(
     match decision {
         PostLoginDeviceBootstrapDecision::StartBackground => {}
         PostLoginDeviceBootstrapDecision::Skip(reason) => {
+            if matches!(reason, PostLoginBootstrapReason::AlreadyRunning) {
+                context.device_sync_runtime().notify_sync_work_available();
+            }
             return PostLoginBootstrapSyncResult::skipped(reason);
         }
     }
