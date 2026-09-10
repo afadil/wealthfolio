@@ -53,14 +53,15 @@ export const EventsCalendarCard: FC<Props> = ({
     ? events.find((event) => event.eventId === selectedId)?.startDate
     : undefined;
   const eventMonth = selectedStart ? startOfMonth(parseLocalDate(selectedStart)) : null;
-  const initialMonth = eventMonth && firstMonth
-    ? new Date(
-        Math.max(
-          firstMonth.getTime(),
-          Math.min(eventMonth.getTime(), lastMonth?.getTime() ?? Infinity),
-        ),
-      )
-    : (firstMonth ?? startOfMonth(today));
+  const initialMonth =
+    eventMonth && firstMonth
+      ? new Date(
+          Math.max(
+            firstMonth.getTime(),
+            Math.min(eventMonth.getTime(), lastMonth?.getTime() ?? Infinity),
+          ),
+        )
+      : (firstMonth ?? startOfMonth(today));
   const rangeKey = `${rangeStart?.getTime() ?? ""}:${rangeEnd?.getTime() ?? ""}:${timezone ?? ""}:${selectedStart ?? ""}`;
   const [cursorBinding, setCursorBinding] = useState(() => ({
     rangeKey,
