@@ -582,10 +582,21 @@ mod tests {
     #[derive(Clone, Debug)]
     struct MockActivityRepositoryWithData {
         activities: Vec<Activity>,
+        /// Mirrors the SQLite repository, whose account-scoped queries join on
+        /// `accounts.is_archived = false` and so never return an archived
+        /// account's activities, even when its id is requested explicitly.
+        archived_account_ids: HashSet<String>,
     }
     impl MockActivityRepositoryWithData {
         fn new(activities: Vec<Activity>) -> Self {
-            Self { activities }
+            Self {
+                activities,
+                archived_account_ids: HashSet::new(),
+            }
+        }
+        fn with_archived_accounts(mut self, account_ids: &[&str]) -> Self {
+            self.archived_account_ids = account_ids.iter().map(|id| id.to_string()).collect();
+            self
         }
     }
     #[async_trait]
@@ -616,6 +627,7 @@ mod tests {
                 .activities
                 .iter()
                 .filter(|&a| a.account_id == account_id)
+                .filter(|&a| !self.archived_account_ids.contains(&a.account_id))
                 .cloned()
                 .collect())
         }
@@ -627,6 +639,7 @@ mod tests {
                 .activities
                 .iter()
                 .filter(|&a| account_ids.contains(&a.account_id))
+                .filter(|&a| !self.archived_account_ids.contains(&a.account_id))
                 .cloned()
                 .collect())
         }
@@ -6024,6 +6037,13 @@ mod tests {
         accounts: Vec<Account>,
         activities: Vec<Activity>,
     ) -> (SnapshotService, Arc<MockSnapshotRepository>) {
+        scope_test_service_with_repo(accounts, MockActivityRepositoryWithData::new(activities))
+    }
+
+    fn scope_test_service_with_repo(
+        accounts: Vec<Account>,
+        activity_repo: MockActivityRepositoryWithData,
+    ) -> (SnapshotService, Arc<MockSnapshotRepository>) {
         let mut account_repo = MockAccountRepository::new();
         for account in accounts {
             account_repo.add_account(account);
@@ -6032,7 +6052,7 @@ mod tests {
         let svc = SnapshotService::new(
             Arc::new(RwLock::new("USD".to_string())),
             Arc::new(account_repo),
-            Arc::new(MockActivityRepositoryWithData::new(activities)),
+            Arc::new(activity_repo),
             snapshot_repo.clone(),
             Arc::new(MockAssetRepository::new()),
             Arc::new(MockFxService::new()),
@@ -6197,17 +6217,63 @@ mod tests {
         assert_eq!(latest_position(&snapshot_repo, "acc_z", "AAPL").0, dec!(0));
     }
 
-    /// A full (`None`) rebuild only lists non-archived accounts. An archived
-    /// source is the same gap as a scoped rebuild, so it is pulled in too.
+    /// The activity repository never returns an archived account's activities,
+    /// so an archived source cannot be replayed. It must be left out of the
+    /// run (pulling it in would overwrite its snapshots with empty state) and
+    /// the leg keeps the unit-price fallback. Checked for both a full rebuild
+    /// and a rebuild scoped to the destination.
     #[tokio::test]
-    async fn test_full_rebuild_pulls_in_archived_transfer_source() {
-        let mut archived_source = create_test_account("acc_a", "USD", "Archived A");
-        archived_source.is_archived = true;
-        let (out, incoming) =
+    async fn test_scope_expansion_skips_archived_transfer_source() {
+        for requested in [None, Some(vec!["acc_b".to_string()])] {
+            let mut archived_source = create_test_account("acc_a", "USD", "Archived A");
+            archived_source.is_archived = true;
+            let (out, incoming) =
+                in_kind_transfer_10_aapl_at_150("xfer", "acc_a", "acc_b", "grp", d(2025, 1, 15));
+            let activity_repo = MockActivityRepositoryWithData::new(vec![
+                buy_10_aapl_at_100("buy1", "acc_a", d(2025, 1, 10)),
+                out,
+                incoming,
+            ])
+            .with_archived_accounts(&["acc_a"]);
+            let (svc, snapshot_repo) = scope_test_service_with_repo(
+                vec![
+                    archived_source,
+                    create_test_account("acc_b", "USD", "Account B"),
+                ],
+                activity_repo,
+            );
+
+            svc.recalculate_holdings_snapshots(requested.as_deref(), SnapshotRecalcMode::Full)
+                .await
+                .unwrap();
+
+            assert_eq!(
+                sorted(snapshot_repo.overwrite_all_calls()),
+                vec!["acc_b".to_string()],
+                "archived source must not be rebuilt (requested = {requested:?})"
+            );
+            assert_eq!(
+                latest_position(&snapshot_repo, "acc_b", "AAPL"),
+                (dec!(10), dec!(1500)),
+                "leg falls back to the transfer's unit price (requested = {requested:?})"
+            );
+        }
+    }
+
+    /// Synced activities can be re-typed through `activity_type_override`.
+    /// Scope discovery and the same-day ordering must match transfer legs on
+    /// the effective type, not the raw synced type.
+    #[tokio::test]
+    async fn test_scope_expansion_respects_activity_type_overrides() {
+        let (mut out, mut incoming) =
             in_kind_transfer_10_aapl_at_150("xfer", "acc_a", "acc_b", "grp", d(2025, 1, 15));
+        out.activity_type = "SELL".to_string();
+        out.activity_type_override = Some("TRANSFER_OUT".to_string());
+        incoming.activity_type = "BUY".to_string();
+        incoming.activity_type_override = Some("TRANSFER_IN".to_string());
         let (svc, snapshot_repo) = scope_test_service(
             vec![
-                archived_source,
+                create_test_account("acc_a", "USD", "Account A"),
                 create_test_account("acc_b", "USD", "Account B"),
             ],
             vec![
@@ -6217,19 +6283,21 @@ mod tests {
             ],
         );
 
-        svc.recalculate_holdings_snapshots(None, SnapshotRecalcMode::Full)
+        svc.recalculate_holdings_snapshots(Some(&["acc_b".to_string()]), SnapshotRecalcMode::Full)
             .await
             .unwrap();
 
         assert_eq!(
             sorted(snapshot_repo.overwrite_all_calls()),
             vec!["acc_a".to_string(), "acc_b".to_string()],
-            "archived source must be rebuilt alongside the destination"
+            "overridden TRANSFER_IN must still pull its source in"
         );
         assert_eq!(
             latest_position(&snapshot_repo, "acc_b", "AAPL"),
-            (dec!(10), dec!(1000))
+            (dec!(10), dec!(1000)),
+            "basis must carry over through the overridden legs"
         );
+        assert_eq!(latest_position(&snapshot_repo, "acc_a", "AAPL").0, dec!(0));
     }
 
     /// HOLDINGS-mode accounts never replay activities, so a HOLDINGS source is

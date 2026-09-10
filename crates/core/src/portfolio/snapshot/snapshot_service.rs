@@ -780,9 +780,14 @@ impl SnapshotService {
     /// Follows chains (Z→A→B when only B was requested) to a fixed point. The
     /// expansion is one-directional: a `TRANSFER_OUT` whose destination is out
     /// of scope does not pull the destination in, because the source's own
-    /// state does not depend on it. HOLDINGS-mode counterparts are skipped
-    /// (they never replay activities) and unpaired or dangling group ids are
-    /// ignored; both keep the current unit-price fallback for that leg.
+    /// state does not depend on it. Transfer legs are matched on
+    /// `effective_type()` so user overrides of synced activities count.
+    ///
+    /// Counterparts that cannot be replayed are skipped and keep the current
+    /// unit-price fallback for that leg: archived accounts (the activity
+    /// repository never loads their activities, so adding them would only
+    /// wipe their snapshots), HOLDINGS-mode accounts (they never replay
+    /// activities), and unpaired or dangling group ids.
     ///
     /// Returns the requested ids (deduplicated, order preserved) followed by the
     /// added ids in discovery order.
@@ -810,9 +815,10 @@ impl SnapshotService {
                 let Some(group_id) = activity.source_group_id.as_deref() else {
                     continue;
                 };
-                if activity.activity_type == ACTIVITY_TYPE_TRANSFER_IN {
+                let effective_type = activity.effective_type();
+                if effective_type == ACTIVITY_TYPE_TRANSFER_IN {
                     transfer_in_by_group.entry(group_id).or_insert(activity);
-                } else if activity.activity_type == ACTIVITY_TYPE_TRANSFER_OUT {
+                } else if effective_type == ACTIVITY_TYPE_TRANSFER_OUT {
                     groups_with_out_in_batch.insert(group_id);
                 }
             }
@@ -835,6 +841,13 @@ impl SnapshotService {
                     continue;
                 }
                 match self.account_repository.get_by_id(&source_account_id) {
+                    Ok(account) if account.is_archived => {
+                        debug!(
+                            "Not expanding recalculation scope with account {} (source of transfer \
+                             group {}): archived accounts' activities are not loaded",
+                            source_account_id, group_id
+                        );
+                    }
                     Ok(account) if account.tracking_mode == TrackingMode::Holdings => {
                         debug!(
                             "Not expanding recalculation scope with account {} (source of transfer \
@@ -1929,9 +1942,10 @@ fn order_accounts_by_transfer_deps<'a>(
             let acct_idx = idx_of[account_id.as_str()];
             for a in activities {
                 if let Some(ref gid) = a.source_group_id {
-                    if a.activity_type == "TRANSFER_OUT" {
+                    let effective_type = a.effective_type();
+                    if effective_type == ACTIVITY_TYPE_TRANSFER_OUT {
                         out_idx_for_group.insert(gid.clone(), acct_idx);
-                    } else if a.activity_type == "TRANSFER_IN" {
+                    } else if effective_type == ACTIVITY_TYPE_TRANSFER_IN {
                         in_idx_for_group.insert(gid.clone(), acct_idx);
                     }
                 }
