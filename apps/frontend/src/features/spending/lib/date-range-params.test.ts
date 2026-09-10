@@ -4,6 +4,7 @@ import {
   SPENDING_RANGE_FROM_PARAM,
   SPENDING_RANGE_TO_PARAM,
   spendingRangeFromParams,
+  spendingRangeToReportsRange,
 } from "./date-range-params";
 
 describe("spendingRangeFromParams", () => {
@@ -40,4 +41,14 @@ describe("spendingRangeFromParams", () => {
       ),
     ).toBeUndefined();
   });
+});
+
+it("keeps calendar endpoints across DST in the app timezone", () => {
+  const range = spendingRangeFromParams(
+    new URLSearchParams({ spendingFrom: "2025-03-08", spendingTo: "2025-03-10" }),
+  )!;
+  const reportRange = spendingRangeToReportsRange(range, "America/Toronto");
+  expect(reportRange.start.toISOString()).toBe("2025-03-08T05:00:00.000Z");
+  expect(reportRange.end.toISOString()).toBe("2025-03-11T03:59:59.999Z");
+  expect(reportRange.days).toBe(3);
 });

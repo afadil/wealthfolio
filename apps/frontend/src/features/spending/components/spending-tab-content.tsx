@@ -251,19 +251,16 @@ function selectionData(
 
   if (selection.kind === "range") {
     const { from, to } = selection.range;
-    const days = calendarDaysBetweenInclusive(localDateParts(from), localDateParts(to));
     const format = (date: Date) =>
       formatting.formatCalendarDate(localDateParts(date), {
         month: "short",
         day: "numeric",
         year: "numeric",
       });
-    const insightPeriod: ReportsPeriod =
-      days <= 31 ? "MTD" : days <= 100 ? "3M" : days <= 200 ? "6M" : "1Y";
     return {
       range: selection.range,
       description: `${format(from)} – ${format(to)}`,
-      insightPeriod,
+      insightPeriod: selection.restoreCode,
     };
   }
 
@@ -530,11 +527,13 @@ export default function SpendingTabContent() {
   // accounts. Single-currency users see the same number either way.
   const currency = baseCurrency;
   const dashboardInsightHref = useMemo(() => {
-    const preferDashboardPeriod = shouldPreferDashboardPeriod({
-      persistedInsightPeriod,
-      dashboardUpdatedAt: dashboardPeriodUpdatedAt,
-      insightUpdatedAt: insightPeriodUpdatedAt,
-    });
+    const preferDashboardPeriod =
+      selection.kind === "range" ||
+      shouldPreferDashboardPeriod({
+        persistedInsightPeriod,
+        dashboardUpdatedAt: dashboardPeriodUpdatedAt,
+        insightUpdatedAt: insightPeriodUpdatedAt,
+      });
     const linkPeriod = preferDashboardPeriod
       ? insightPeriod
       : (normalizeReportsPeriod(persistedInsightPeriod) ?? insightPeriod);
@@ -542,8 +541,12 @@ export default function SpendingTabContent() {
       preferDashboardPeriod && selection.kind === "month"
         ? `&${SPENDING_MONTH_PARAM}=${selection.monthKey}`
         : "";
+    const rangeParams =
+      selection.kind === "range"
+        ? `&${SPENDING_RANGE_FROM_PARAM}=${formatDateISO(selection.range.from)}&${SPENDING_RANGE_TO_PARAM}=${formatDateISO(selection.range.to)}`
+        : "";
     const href = (stage: (typeof INSIGHT_STAGES)[number]["stage"], hash = "") =>
-      `/spending/insights?stage=${stage}&period=${linkPeriod}${monthParams}${hash}`;
+      `/spending/insights?stage=${stage}&period=${linkPeriod}${monthParams}${rangeParams}${hash}`;
     const cashflow = href("where", "#cashflow");
     return {
       where: href("where"),
@@ -1058,7 +1061,13 @@ export default function SpendingTabContent() {
                     const entry = ((data as { payload?: (typeof barData)[number] })?.payload ??
                       data) as (typeof barData)[number];
                     if (!entry || entry.future || entry.value <= 0) return;
-                    const { from, to } = barKeyToRange(entry.key, granularity);
+                    const bucket = barKeyToRange(entry.key, granularity);
+                    const rangeStart = dateRange?.from
+                      ? formatDateISO(dateRange.from)
+                      : bucket.from;
+                    const rangeEnd = dateRange?.to ? formatDateISO(dateRange.to) : bucket.to;
+                    const from = bucket.from < rangeStart ? rangeStart : bucket.from;
+                    const to = bucket.to > rangeEnd ? rangeEnd : bucket.to;
                     navigate(`/activities?tab=spending&from=${from}&to=${to}`);
                   }}
                 >

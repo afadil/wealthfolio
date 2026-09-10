@@ -77,16 +77,15 @@ interface DateRangeSelectorProps {
   value: DateRange | undefined;
   onChange: (range: DateRange | undefined) => void;
   hiddenRanges?: readonly DateRangePresetLabel[];
-  customOnly?: boolean;
 }
 
-export function DateRangeSelector({ value, onChange, hiddenRanges = [], customOnly = false }: DateRangeSelectorProps) {
+export function DateRangeSelector({ value, onChange, hiddenRanges = [] }: DateRangeSelectorProps) {
   const { t } = useTranslation();
   const formatting = useDateFormatting();
   const isMobile = useIsMobile();
   const [isCustomPickerOpen, setIsCustomPickerOpen] = React.useState(false);
   const [draftRange, setDraftRange] = React.useState<DateRange | undefined>(value);
-  const visibleRanges = customOnly ? [] : ranges.filter((range) => !hiddenRanges.includes(range.label));
+  const visibleRanges = ranges.filter((range) => !hiddenRanges.includes(range.label));
 
   // Helper function to compare dates ignoring time
   const compareDates = (date1: Date | undefined, date2: Date | undefined) => {
@@ -108,7 +107,7 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], customOn
   };
 
   const selectedLabel = getSelectedRange();
-  const isCustomRange = customOnly ? !!value?.from || !!value?.to : !selectedLabel;
+  const isCustomRange = !selectedLabel;
   const isDraftRangeComplete = !draftRange || (!!draftRange.from && !!draftRange.to);
   const allTimeRange = visibleRanges.find((range) => range.label === "ALL")?.getValue();
   const appliedDraftRange = draftRange ?? allTimeRange;
@@ -140,46 +139,36 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], customOn
       variant={isCustomRange ? "default" : "ghost"}
       size="sm"
       className={cn(
-        "h-8 rounded-full p-0",
-        customOnly ? "w-auto gap-1.5 px-2.5 text-xs" : "w-9",
+        "h-8 w-9 rounded-full p-0",
         isCustomRange && "bg-primary text-primary-foreground hover:bg-primary/90",
       )}
       aria-label={t("ui:dateRange.chooseCustom", "Choose custom date range")}
     >
       <Icons.Calendar className="h-4 w-4" />
-      {customOnly && (
-        <span>
-          {value?.from && value.to
-            ? `${formatRangeDate(value.from)} – ${formatRangeDate(value.to)}`
-            : t("ui:dateRange.customRange", "Custom range")}
-        </span>
-      )}
     </Button>
   );
 
   return (
     <div className="flex items-center space-x-1">
-      {!customOnly && (
-        <AnimatedToggleGroup
-          items={visibleRanges.map((range) => ({
-            value: range.label,
-            label: range.label,
-            title: t("ui:dateRange.presets." + range.label, range.name),
-          }))}
-          value={selectedLabel}
-          onValueChange={(newValue) => {
-            if (!newValue) {
-              return;
-            }
-            const selectedRange = visibleRanges.find((r) => r.label === newValue);
-            if (selectedRange) {
-              onChange(selectedRange.getValue());
-            }
-          }}
-          size="sm"
-          variant="secondary"
-        />
-      )}
+      <AnimatedToggleGroup
+        items={visibleRanges.map((range) => ({
+          value: range.label,
+          label: range.label,
+          title: t("ui:dateRange.presets." + range.label, range.name),
+        }))}
+        value={selectedLabel}
+        onValueChange={(newValue) => {
+          if (!newValue) {
+            return;
+          }
+          const selectedRange = visibleRanges.find((r) => r.label === newValue);
+          if (selectedRange) {
+            onChange(selectedRange.getValue());
+          }
+        }}
+        size="sm"
+        variant="secondary"
+      />
 
       {isMobile ? (
         <Sheet open={isCustomPickerOpen} onOpenChange={handleCustomPickerOpenChange}>
@@ -241,7 +230,7 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], customOn
           </SheetContent>
         </Sheet>
       ) : (
-        <Popover open={isCustomPickerOpen} onOpenChange={handleCustomPickerOpenChange}>
+        <Popover>
           <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
           <PopoverContent
             className="max-h-[min(var(--radix-popover-content-available-height,80vh),80vh)] w-auto overflow-y-auto overscroll-contain p-0 [-webkit-overflow-scrolling:touch]"
@@ -249,27 +238,13 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], customOn
           >
             <Calendar
               mode="range"
-              defaultMonth={draftRange?.from}
-              selected={draftRange as DayPickerDateRange | undefined}
+              defaultMonth={value?.from}
+              selected={value as DayPickerDateRange | undefined}
               onSelect={(selectedRange: DayPickerDateRange | undefined) => {
-                setDraftRange(selectedRange as DateRange | undefined);
+                onChange(selectedRange as DateRange | undefined);
               }}
               numberOfMonths={3}
             />
-            <div className="border-border flex items-center gap-2 border-t p-3">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setDraftRange(allTimeRange)}>
-                {t("ui:dateRange.clear", "Clear")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="ml-auto"
-                onClick={handleApplyDraftRange}
-                disabled={!isDraftRangeComplete}
-              >
-                {t("ui:dateRange.done", "Done")}
-              </Button>
-            </div>
           </PopoverContent>
         </Popover>
       )}
