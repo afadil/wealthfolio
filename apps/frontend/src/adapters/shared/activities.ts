@@ -185,9 +185,9 @@ export const restoreSuppressedActivities = async (deletionIds: string[]): Promis
 
 export const getTransferPairForActivity = async (
   activityId: string,
-): Promise<InternalTransferPairResponse> => {
+): Promise<InternalTransferPairResponse | null> => {
   try {
-    return await invoke<InternalTransferPairResponse>("get_transfer_pair_for_activity", {
+    return await invoke<InternalTransferPairResponse | null>("get_transfer_pair_for_activity", {
       activityId,
     });
   } catch (err) {

@@ -437,10 +437,12 @@ pub trait ActivityServiceTrait: Send + Sync {
         &self,
         deletion_ids: Vec<String>,
     ) -> Result<Vec<Activity>>;
+    /// Returns the internal transfer pair for the activity, or `None` when the
+    /// activity exists but is not part of a valid internal transfer pair.
     fn get_transfer_pair_for_activity(
         &self,
         activity_id: String,
-    ) -> Result<InternalTransferPairResponse>;
+    ) -> Result<Option<InternalTransferPairResponse>>;
     fn find_transfer_match_candidates(
         &self,
         request: TransferMatchCandidateRequest,

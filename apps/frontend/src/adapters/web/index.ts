@@ -301,6 +301,7 @@ export {
   claimPairing,
   clearDeviceSyncData,
   clearSyncSession,
+  getSyncSessionStatus,
   completePairing,
   completePairingWithTransfer,
   confirmPairing,
