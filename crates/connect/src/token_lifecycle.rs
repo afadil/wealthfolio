@@ -544,7 +544,7 @@ mod tests {
         let server = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             let mut request = [0; 4096];
-            stream.read(&mut request).unwrap();
+            assert!(stream.read(&mut request).unwrap() > 0);
             received_tx.send(()).unwrap();
             release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
             let body = r#"{"access_token":"test-access","refresh_token":"rotated-refresh","expires_in":3600}"#;
