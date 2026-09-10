@@ -64,6 +64,7 @@
     "create_first_goal": "Créez votre premier objectif",
     "more_goals_one": "+{{count}} objectif de plus",
     "more_goals_other": "+{{count}} objectifs de plus",
+    "more_goals_many": "+{{count}} objectifs de plus",
     "time_no_deadline": "SANS ÉCHÉANCE",
     "time_due": "ÉCHU"
   },
@@ -88,12 +89,15 @@
     "display_name": "Nom",
     "shares_one": "{{formatted}} action",
     "shares_other": "{{formatted}} actions",
+    "shares_many": "{{formatted}} actions",
     "more_holdings": "+{{count}} autres positions",
     "more": "+{{count}} de plus",
     "more_holdings_one": "+{{count}} autre position",
     "more_holdings_other": "+{{count}} autres positions",
+    "more_holdings_many": "+{{count}} autres positions",
     "more_one": "+{{count}} de plus",
-    "more_other": "+{{count}} de plus"
+    "more_other": "+{{count}} de plus",
+    "more_many": "+{{count}} de plus"
   },
   "summary": {
     "return_unavailable_holdings": "% de rendement indisponible - base de coût ou valeur initiale des positions manquante.",
@@ -105,5 +109,6 @@
     "try_restarting": "Essayez de redémarrer l'application. Si le problème persiste, votre base de données devra peut-être être réinitialisée."
   },
   "accounts_count_one": "{{count}} compte",
-  "accounts_count_other": "{{count}} comptes"
+  "accounts_count_other": "{{count}} comptes",
+  "accounts_count_many": "{{count}} comptes"
 }

@@ -85,8 +85,10 @@
     "allAccountsExcluded": "Tous les comptes exclus",
     "accountsSyncing_one": "{{count}} compte en cours de synchronisation",
     "accountsSyncing_other": "{{count}} comptes en cours de synchronisation",
+    "accountsSyncing_many": "{{count}} comptes en cours de synchronisation",
     "partialSyncing_one": "{{syncing}} compte sur {{total}} en cours de synchronisation · {{excluded}} compte exclu",
-    "partialSyncing_other": "{{syncing}} comptes sur {{total}} en cours de synchronisation · {{excluded}} comptes exclus"
+    "partialSyncing_other": "{{syncing}} comptes sur {{total}} en cours de synchronisation · {{excluded}} comptes exclus",
+    "partialSyncing_many": "{{syncing}} comptes sur {{total}} en cours de synchronisation · {{excluded}} comptes exclus"
   },
   "sync": {
     "syncNow": "Synchroniser maintenant",
@@ -97,7 +99,8 @@
     "syncingBrokerData": "Synchronisation des données du courtier...",
     "startFailed": "Échec du démarrage de la synchronisation : {{error}}",
     "needAttention_one": "{{count}} compte nécessite votre attention",
-    "needAttention_other": "{{count}} comptes nécessitent votre attention"
+    "needAttention_other": "{{count}} comptes nécessitent votre attention",
+    "needAttention_many": "{{count}} comptes nécessitent votre attention"
   },
   "status": {
     "upToDate": "À jour",
@@ -121,6 +124,7 @@
     "empty": "Aucune synchronisation pour le moment.",
     "warningsCount_one": "{{count}} avertissement",
     "warningsCount_other": "{{count}} avertissements",
+    "warningsCount_many": "{{count}} avertissements",
     "fetched": "Récupéré",
     "inserted": "Inséré",
     "updated": "Mis à jour",
@@ -131,7 +135,8 @@
     "duration": "Durée :",
     "inProgress": "En cours...",
     "andMore_one": "... et {{count}} de plus",
-    "andMore_other": "... et {{count}} de plus"
+    "andMore_other": "... et {{count}} de plus",
+    "andMore_many": "... et {{count}} de plus"
   },
   "syncHistory": {
     "title": "Historique de synchronisation",
@@ -141,6 +146,7 @@
     "emptyDescription": "Votre historique de synchronisation apparaîtra ici après votre première synchronisation",
     "runCount_one": "{{count}} synchronisation",
     "runCount_other": "{{count}} synchronisations",
+    "runCount_many": "{{count}} synchronisations",
     "loadMore": "Charger plus",
     "lessThanOneSecond": "<1 s",
     "new": "nouveaux",
@@ -148,9 +154,11 @@
     "skipped": "ignorés",
     "warningsCount_one": "{{count}} avertissement",
     "warningsCount_other": "{{count}} avertissements",
+    "warningsCount_many": "{{count}} avertissements",
     "andMore": "+{{count}} de plus",
     "andMore_one": "+{{count}} de plus",
-    "andMore_other": "+{{count}} de plus"
+    "andMore_other": "+{{count}} de plus",
+    "andMore_many": "+{{count}} de plus"
   },
   "activity": {
     "syncingData": "Synchronisation de vos données...",
@@ -158,34 +166,43 @@
     "upToDate": "Tout est à jour",
     "itemsNeedReview_one": "{{count}} élément nécessite votre vérification",
     "itemsNeedReview_other": "{{count}} éléments nécessitent votre vérification",
+    "itemsNeedReview_many": "{{count}} éléments nécessitent votre vérification",
     "newItems": {
       "transaction_one": "{{count}} nouvelle transaction",
       "transaction_other": "{{count}} nouvelles transactions",
+      "transaction_many": "{{count}} nouvelles transactions",
       "position_one": "{{count}} nouvelle position",
-      "position_other": "{{count}} nouvelles positions"
+      "position_other": "{{count}} nouvelles positions",
+      "position_many": "{{count}} nouvelles positions"
     },
     "updatedItems": {
       "transaction_one": "{{count}} transaction mise à jour",
       "transaction_other": "{{count}} transactions mises à jour",
+      "transaction_many": "{{count}} transactions mises à jour",
       "position_one": "{{count}} position mise à jour",
-      "position_other": "{{count}} positions mises à jour"
+      "position_other": "{{count}} positions mises à jour",
+      "position_many": "{{count}} positions mises à jour"
     },
     "removedItems": {
       "transaction_one": "{{count}} transaction supprimée",
       "transaction_other": "{{count}} transactions supprimées",
+      "transaction_many": "{{count}} transactions supprimées",
       "position_one": "{{count}} position supprimée",
-      "position_other": "{{count}} positions supprimées"
+      "position_other": "{{count}} positions supprimées",
+      "position_many": "{{count}} positions supprimées"
     }
   },
   "attention": {
     "title": "La synchronisation du courtier nécessite votre attention",
     "description_one": "{{count}} compte nécessite une nouvelle tentative ou une vérification du courtier.",
-    "description_other": "{{count}} comptes nécessitent une nouvelle tentative ou une vérification du courtier."
+    "description_other": "{{count}} comptes nécessitent une nouvelle tentative ou une vérification du courtier.",
+    "description_many": "{{count}} comptes nécessitent une nouvelle tentative ou une vérification du courtier."
   },
   "setup": {
     "newAccountsTitle": "De nouveaux comptes doivent être configurés",
     "newAccountsDescription_one": "{{count}} compte nécessite une configuration rapide avant de pouvoir commencer la synchronisation.",
     "newAccountsDescription_other": "{{count}} comptes nécessitent une configuration rapide avant de pouvoir commencer la synchronisation.",
+    "newAccountsDescription_many": "{{count}} comptes nécessitent une configuration rapide avant de pouvoir commencer la synchronisation.",
     "reviewAccounts": "Vérifier les comptes"
   },
   "devices": {

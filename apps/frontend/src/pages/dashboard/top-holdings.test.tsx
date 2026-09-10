@@ -1,7 +1,7 @@
 import { render, screen } from "@/test/render";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HoldingType } from "@/lib/constants";
 import type { Holding } from "@/lib/types";
 import { TopHoldings } from "./top-holdings";
@@ -20,8 +20,10 @@ vi.mock("@/components/ticker-avatar", () => ({
   TickerAvatar: ({ symbol }: { symbol: string }) => <span>{symbol}</span>,
 }));
 
+const privacy = vi.hoisted(() => ({ isBalanceHidden: false }));
+
 vi.mock("@/hooks/use-balance-privacy", () => ({
-  useBalancePrivacy: () => ({ isBalanceHidden: false }),
+  useBalancePrivacy: () => ({ isBalanceHidden: privacy.isBalanceHidden }),
 }));
 
 vi.mock("@wealthfolio/ui", async (importOriginal) => ({
@@ -57,6 +59,10 @@ const longQuantityHolding = {
 } satisfies Holding;
 
 describe("TopHoldings", () => {
+  beforeEach(() => {
+    privacy.isBalanceHidden = false;
+  });
+
   it("truncates a long quantity within the shrinkable holding details column", () => {
     render(
       <MemoryRouter>
@@ -65,5 +71,18 @@ describe("TopHoldings", () => {
     );
 
     expect(screen.getByText("123,456,789 shares")).toHaveClass("truncate");
+  });
+
+  it("hides the share count when balances are hidden", () => {
+    privacy.isBalanceHidden = true;
+
+    render(
+      <MemoryRouter>
+        <TopHoldings holdings={[longQuantityHolding]} isLoading={false} baseCurrency="CNY" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText("123,456,789 shares")).not.toBeInTheDocument();
+    expect(screen.getByText("•••• shares")).toBeInTheDocument();
   });
 });

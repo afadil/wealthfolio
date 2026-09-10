@@ -10,6 +10,7 @@ import { ImportAlert } from "../components/import-alert";
 import { HoldingsFormat } from "./holdings-mapping-step";
 import {
   CASH_SYMBOL,
+  analyzeDateColumn,
   buildHoldingsRowResolutionMap,
   type HoldingsRowResolution,
   parseDateToYMD,
@@ -34,6 +35,8 @@ function buildHoldingsRows(
   rowResolutions?: Record<number, HoldingsRowResolution>,
 ): HoldingsRow[] {
   const { dateFormat, decimalSeparator, thousandsSeparator, defaultCurrency } = parseOptions;
+
+  const { order: dateOrder } = analyzeDateColumn(headers, parsedRows, fieldMappings, dateFormat);
 
   const dateIndex = fieldMappings[HoldingsFormat.DATE]
     ? headers.indexOf(fieldMappings[HoldingsFormat.DATE])
@@ -65,7 +68,7 @@ function buildHoldingsRows(
     // Skip rows with missing required fields
     if (!rawDate || !rawSymbol || !rawQuantity) continue;
 
-    const normalizedDate = parseDateToYMD(rawDate, dateFormat) ?? rawDate;
+    const normalizedDate = parseDateToYMD(rawDate, dateFormat, dateOrder) ?? rawDate;
     const quantity =
       parseNumericValue(rawQuantity, decimalSeparator, thousandsSeparator) ?? rawQuantity;
     const avgCost =
@@ -114,6 +117,10 @@ export function HoldingsReviewStep() {
       defaultCurrency: parseConfig.defaultCurrency,
     }),
     [parseConfig],
+  );
+  const dateColumn = useMemo(
+    () => analyzeDateColumn(headers, parsedRows, fieldMappings, parseConfig.dateFormat),
+    [headers, parsedRows, fieldMappings, parseConfig.dateFormat],
   );
   const rowResolutions = useMemo(
     () => buildHoldingsRowResolutionMap(draftActivities),
@@ -255,6 +262,17 @@ export function HoldingsReviewStep() {
 
   return (
     <div className="flex flex-col gap-6">
+      {dateColumn.needsExplicitFormat && (
+        <ImportAlert
+          variant="warning"
+          size="sm"
+          title={t("activity:import.holdings.ambiguousDateTitle")}
+          description={t("activity:import.holdings.ambiguousDateHint", {
+            example: dateColumn.ambiguousSample,
+          })}
+          className="mb-0"
+        />
+      )}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <ImportAlert

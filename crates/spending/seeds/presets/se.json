@@ -1,0 +1,393 @@
+{
+  "presetId": "se",
+  "presetVersion": "2026-08.1",
+  "name": "Sweden",
+  "description": "~45 expense rules covering common Swedish household transactions. Includes supermarkets, Systembolaget, kiosks, fuel, regional transit and SJ, e-scooters, telecom, electricity, housing, pharmacies, healthcare regions, gyms, student nations, retail chains, education and government fees.",
+  "language": "sv-SE",
+  "rules": [
+    {
+      "key": "se.groceries.major_chains",
+      "name": "Groceries — major chains",
+      "pattern": "(?i)\\bica\\b|hemk(ö|o)p|\\bcoop\\b|\\bwillys\\b|\\bwilly'?s\\b|lidl|\\bspar\\b|\\bhemma\\b|city ?gross|\\bmath(e|ä)m\\b|\\btempo\\b|\\bnetto\\b|\\bmatr(i|í)k|handlarn|matöppet|\\bstora coop\\b|konsum\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 80
+    },
+    {
+      "key": "se.groceries.asian_market",
+      "name": "Specialty food markets",
+      "pattern": "(?i)asian market|thai market|orientmarknad|\\bmarket i sto|panda asian",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 82
+    },
+    {
+      "key": "se.alcohol",
+      "name": "Systembolaget & bars",
+      "pattern": "(?i)systembolaget|\\bpub\\b|\\bbryggeri\\b|brewing|\\bbar\\b(?:$| )|\\bnattklubb\\b|\\bkrogen\\b",
+      "matchType": "regex",
+      "categoryKey": "food_alcohol",
+      "priority": 73
+    },
+    {
+      "key": "se.coffee",
+      "name": "Coffee shops & bakeries",
+      "pattern": "(?i)espresso house|wayne'?s coffee|\\bgateau\\b|\\bfazer\\b|barista fair|\\bcaf(é|e)\\b|konditori\\b|bageri\\b|\\bfik\\b|\\bcoffee\\b|starbucks|lillebrors|sundbergs",
+      "matchType": "regex",
+      "categoryKey": "food_coffee",
+      "priority": 80
+    },
+    {
+      "key": "se.kiosk_convenience",
+      "name": "Kiosks & convenience",
+      "pattern": "(?i)pressbyr(å|a)n|\\b7-?eleven\\b|\\bselecta\\b|servicehandel|\\bnormal\\b se|\\bqopla\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 78
+    },
+    {
+      "key": "se.fastfood",
+      "name": "Fast food & restaurants",
+      "pattern": "(?i)max burger|\\bmcdonald\\b|mcd[a-z]*|burger king|\\bkfc\\b|\\bsubway\\b|\\btaco bar\\b|sibylla|frasses|\\bpizzeria\\b|\\bpizza\\b|\\bsushi\\b|\\brestaurang\\b|\\bgrill\\b|holy greens|\\bnooshi\\b|\\bwok\\b|streetfood|street food|\\bkebab\\b|\\bthai\\b|\\bindian\\b|\\bramen\\b",
+      "matchType": "regex",
+      "categoryKey": "food_restaurants",
+      "priority": 74
+    },
+    {
+      "key": "se.food_delivery",
+      "name": "Food delivery",
+      "pattern": "(?i)foodora|\\bwolt\\b|uber ?eats|\\bhungrig\\b|\\bmatkassen\\b|linas matkasse|\\bhelloFresh\\b",
+      "matchType": "regex",
+      "categoryKey": "food_delivery",
+      "priority": 88
+    },
+    {
+      "key": "se.student_nations",
+      "name": "Student nations & unions (Uppsala/Lund)",
+      "pattern": "(?i)v[äae?]+stmanlands?-?da|s[öo?]+dermanlands?-?ne|g[äa?]+strike-?h[äa?]+lsinge|\\bgh nation\\b|\\bv-?dala\\b|(stockholms|uplands|[öo?]+stg[öo?]+ta|v[äae?]+stg[öo?]+ta|sm[åa?]+lands|g[öo?]+teborgs|kalmar|v[äa?]+rmlands|norrlands|gotlands|blekingska|helsingkrona|lunds) ?nati|kuratorskonventet|k[åa?]+rhus|studentk[åa?]+r|uppsala teknol",
+      "matchType": "regex",
+      "categoryKey": "food_restaurants",
+      "priority": 84
+    },
+    {
+      "key": "se.fuel",
+      "name": "Fuel stations",
+      "pattern": "(?i)circle ?k|\\bpreem\\b|\\bokq8\\b|\\bok q8\\b|\\bingo\\b|\\bst1\\b|\\btanka\\b|\\bqstar\\b|\\bshell\\b|bilisten|drivmedel",
+      "matchType": "regex",
+      "categoryKey": "transport_gas",
+      "priority": 85
+    },
+    {
+      "key": "se.transit",
+      "name": "Public transit",
+      "pattern": "(?i)\\bsl\\b|storstockholms lokaltrafik|\\bul\\b, region|\\bul\\b resekort|v(ä|a)sttrafik|sk(å|a)netrafiken|(ö|o)stg(ö|o)tatrafiken|m(ä|a)lardalstrafik|\\bm(ä|a)lab\\b|v(ä|a)rmlandstrafik|\\blänstrafik|kollektivtrafik|\\bres(e|)kort\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_public",
+      "priority": 86
+    },
+    {
+      "key": "se.rail",
+      "name": "Trains & long-distance coach",
+      "pattern": "(?i)\\bsj ab\\b|\\bsj\\.se\\b|\\bsj app\\b|\\bsnälltåget\\b|\\bmtrx\\b|\\bvy t(å|a)g\\b|flixbus|\\bswebus\\b|\\bfl(y|)gbussarna\\b|arlanda express",
+      "matchType": "regex",
+      "categoryKey": "transport_public",
+      "priority": 86
+    },
+    {
+      "key": "se.micromobility",
+      "name": "E-scooters & rideshare",
+      "pattern": "(?i)\\bvoi\\b|\\bryde\\b|\\btier\\b|\\bbolt\\b|\\bdott\\b|\\buber\\b|\\btaxi\\b|\\bgomore\\b|sunfleet|\\bm sverige\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_rideshare",
+      "priority": 80
+    },
+    {
+      "key": "se.parking",
+      "name": "Parking & congestion",
+      "pattern": "(?i)aimo ?park|\\beasypark\\b|\\bparkster\\b|\\bapcoa\\b|\\bq-?park\\b|\\bp-?hus\\b|parkering|tr(ä|a)ngselskatt|\\bautopay\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_parking",
+      "priority": 88
+    },
+    {
+      "key": "se.car_maintenance",
+      "name": "Car maintenance & inspection",
+      "pattern": "(?i)\\bbesiktning\\b|\\bopus bilprovning\\b|bilprovning|\\bmekonomen\\b|\\bbilia\\b|\\bdäckia\\b|\\bvianor\\b|\\bbiltema\\b|\\bjula\\b|\\bautoexperten\\b|biltv(ä|a)tt|\\bverkstad\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_maintenance",
+      "priority": 84
+    },
+    {
+      "key": "se.vehicle_tax",
+      "name": "Vehicle & road authority",
+      "pattern": "(?i)trafikverket|transportstyrelsen|fordonsskatt|\\bf(ä|a)rjerederiet\\b",
+      "matchType": "regex",
+      "categoryKey": "transport",
+      "priority": 90
+    },
+    {
+      "key": "se.airlines",
+      "name": "Airlines",
+      "pattern": "(?i)\\bsas\\b|scandinavian airlines|\\bnorwegian\\b|ryanair|\\bwizz air\\b|\\bfinnair\\b|\\blufthansa\\b|\\bklm\\b|\\bair france\\b|\\bbra sverigeflyg\\b|thai airways|\\bturkish airlines\\b",
+      "matchType": "regex",
+      "categoryKey": "travel",
+      "priority": 90
+    },
+    {
+      "key": "se.travel_booking",
+      "name": "Hotels & travel booking",
+      "pattern": "(?i)airbnb|booking\\.com|\\bhotell\\b|\\bhotel\\b|\\bscandic\\b|\\bnordic choice\\b|\\bstrawberry\\b hotel|\\bfirst hotel\\b|\\belite hotel\\b|\\bvandrarhem\\b|\\bsts?f\\b|expedia|\\bhotels\\.com\\b|\\bticket\\.se\\b|\\bvingresor\\b|\\bapollo\\b resor|\\bskistar\\b|\\bromme alpin\\b",
+      "matchType": "regex",
+      "categoryKey": "travel",
+      "priority": 86
+    },
+    {
+      "key": "se.streaming",
+      "name": "Streaming services",
+      "pattern": "(?i)netflix|spotify|\\bviaplay\\b|\\btv4 play\\b|\\bhbo\\b|\\bmax\\.com\\b|disney ?\\+|apple\\.com/bill|apple music|prime video|\\bcmore\\b|\\bsvt play\\b|youtube ?premium|\\bstoryte[a-z]*|\\bbookbeat\\b|\\bnextory\\b|\\baudible\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_streaming",
+      "priority": 86
+    },
+    {
+      "key": "se.news",
+      "name": "News & magazines",
+      "pattern": "(?i)\\bdagens nyheter\\b|\\bdn\\.se\\b|svenska dagbladet|\\bsvd\\b|\\bdagens industri\\b|\\bdi\\.se\\b|\\bexpressen\\b|\\baftonbladet\\b|nya tidning|\\bnews abo\\b|\\bprenumeration\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_subscriptions",
+      "priority": 82
+    },
+    {
+      "key": "se.software_subs",
+      "name": "Software & cloud",
+      "pattern": "(?i)\\bgithub\\b|\\bopenai\\b|\\bchatgpt\\b|anthropic|claude|\\bopenrouter\\b|google ?\\*?cloud|\\baws\\b|\\bcloudflare\\b|\\bbackblaze\\b|\\badobe\\b|microsoft ?\\*|office ?365|dropbox|\\bicloud\\b|google one|\\bnotion\\b|jetbrains|\\b1password\\b|\\bporkbun\\b|\\bpaddle\\.net\\b|\\blemonsqueezy\\b|\\blemsqzy\\b|\\bgumroad\\b|home assistant",
+      "matchType": "regex",
+      "categoryKey": "bills_software",
+      "priority": 84
+    },
+    {
+      "key": "se.telecom",
+      "name": "Mobile operators",
+      "pattern": "(?i)\\btelia\\b|\\btele2\\b|\\btelenor\\b|\\bcomviq\\b|\\bhalebop\\b|\\bvimla\\b|\\bhallon\\b|\\btre\\b mobil|\\bfello\\b|\\blycamobile\\b|\\bsaily\\b|\\bairalo\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_phone",
+      "priority": 84
+    },
+    {
+      "key": "se.internet",
+      "name": "Broadband & TV",
+      "pattern": "(?i)\\bbahnhof\\b|\\bbredband2\\b|\\bcom ?hem\\b|\\bboxer\\b|\\bofelia\\b|\\bopen ?universe\\b|\\bbredband\\b|\\bstadsn(ä|a)t\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_internet",
+      "priority": 86
+    },
+    {
+      "key": "se.utilities",
+      "name": "Electricity, heating & water",
+      "pattern": "(?i)\\bvattenfall\\b|\\bellevio\\b|\\be\\.?on\\b|\\bfortum\\b|\\bg(ö|o)teborg energi\\b|\\bskellefte(å|a) kraft\\b|\\bjämtkraft\\b|\\bm(ä|a)larenergi\\b|\\bvattenfall eldistribution\\b|\\belhandel\\b|\\bfj(ä|a)rrv(ä|a)rme\\b|\\benergi ab\\b|\\bvatten och avlopp\\b|\\brenh(å|a)llning\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 84
+    },
+    {
+      "key": "se.housing_rent",
+      "name": "Rent & housing",
+      "pattern": "(?i)\\bhyra\\b|\\brent\\b|\\bhyresavi\\b|\\bavgift bostad\\b|bostadsr(ä|a)tt|\\bbrf\\b|bostadsf(ö|o)rmedling|\\bhemn(e|)t\\b|\\bl(å|a)n ränta\\b|\\bam(o|)rtering\\b|\\bbol(å|a)n\\b|\\bfastighets ab\\b|\\briksbyggen\\b|\\bhsb\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_rent",
+      "priority": 88
+    },
+    {
+      "key": "se.home_improvement",
+      "name": "Home improvement & furnishing",
+      "pattern": "(?i)\\bikea\\b|\\bbauhaus\\b|\\bbyggmax\\b|\\bhornbach\\b|\\bbeijer\\b|\\bk-?rauta\\b|\\bhornbach\\b|\\bmio\\b|\\bem home\\b|\\bjysk\\b|\\bchilli\\b|\\bfurniturebox\\b|\\bmobello\\b|\\bcervera\\b|\\bs(ø|o)strene grene\\b|\\brusta\\b|\\bclas ohlson\\b|\\bhemtex\\b|\\bindiska\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_home",
+      "priority": 82
+    },
+    {
+      "key": "se.electronics",
+      "name": "Electronics",
+      "pattern": "(?i)\\belgiganten\\b|\\bnetonnet\\b|\\bmediamarkt\\b|\\bmedia markt\\b|\\bwebhallen\\b|\\bkjell\\b|kjell ?& ?company|\\binet\\b|\\bkomplett\\b|\\bdustin\\b|apple store|\\bteknikmagasinet\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_electronics",
+      "priority": 86
+    },
+    {
+      "key": "se.online_marketplaces",
+      "name": "Online marketplaces",
+      "pattern": "(?i)amazon|\\bamzn\\b|\\bebay\\b|\\betsy\\b|\\btemu\\b|\\bshein\\b|aliexpress|\\bwish\\b|\\bcdon\\b|\\bfyndiq\\b|\\btradera\\b|\\bblocket\\b|\\bzalando\\b|\\bboozt\\b|\\bnelly\\b|\\bwww\\.b\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_online",
+      "priority": 70
+    },
+    {
+      "key": "se.clothing",
+      "name": "Clothing & shoes",
+      "pattern": "(?i)\\bh&m\\b|\\bhennes\\b|\\buniqlo\\b|\\bzara\\b|\\blindex\\b|\\bkappahl\\b|\\b(å|a)hl(é|e)ns\\b|\\bmq\\b|\\bdressmann\\b|\\bjd sports\\b|\\bstadium\\b|\\bintersport\\b|\\bxxl\\b|\\bnike\\b|\\badidas\\b|\\bscorett\\b|\\bnilson shoes\\b|\\bl(ö|o)plabbet\\b|beyond retro|\\bmyrorna\\b|\\berikshj(ä|a)lpen\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_clothing",
+      "priority": 82
+    },
+    {
+      "key": "se.variety_stores",
+      "name": "Variety & discount stores",
+      "pattern": "(?i)\\bnormal\\b|\\bdollarstore\\b|\\b(ö|o)ob\\b|\\bthe body shop\\b|\\blekia\\b|\\bbr leksaker\\b|\\bpartaj\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping",
+      "priority": 74
+    },
+    {
+      "key": "se.books",
+      "name": "Books & stationery",
+      "pattern": "(?i)akademibokhandeln|\\badlibris\\b|\\bbokus\\b|\\bbokl(å|a)da\\b|\\bbokhandel\\b|\\bpanduro\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_hobbies",
+      "priority": 84
+    },
+    {
+      "key": "se.pharmacy",
+      "name": "Pharmacies",
+      "pattern": "(?i)apotek|\\bapotea\\b|apoteket ab|apotek hj(ä|a)rtat|kronans apote|\\bdoz\\b|\\bl(ä|a)kemedel\\b",
+      "matchType": "regex",
+      "categoryKey": "health_pharmacy",
+      "priority": 88
+    },
+    {
+      "key": "se.medical",
+      "name": "Healthcare & clinics",
+      "pattern": "(?i)\\bv(å|a)rdcentral\\b|\\bh(ä|a)lsocenter\\b|\\bh(ä|a)lsocentral\\b|\\bsjukhus\\b|\\bl(ä|a)karhus\\b|\\bkry\\b|\\bdoktor\\.se\\b|\\bmin doktor\\b|\\bpatientinb[a-zåäö]*|\\b1177\\b|\\bnärakut\\b|\\bfysioterapi\\b|\\bnaprapat\\b|\\bkiropraktor\\b",
+      "matchType": "regex",
+      "categoryKey": "health_medical",
+      "priority": 84
+    },
+    {
+      "key": "se.medical.patient_fees",
+      "name": "Patient fees",
+      "pattern": "(?i)patientinb[a-zåäö]*|patientavgift|\\bv(å|a)rdavgift\\b|\\bpatientfaktura\\b|\\begenavgift v(å|a)rd\\b",
+      "matchType": "regex",
+      "categoryKey": "health_medical",
+      "priority": 95
+    },
+    {
+      "key": "se.dental",
+      "name": "Dental",
+      "pattern": "(?i)\\btandv(å|a)rd\\b|\\bfolktandv(å|a)rden\\b|\\btandl(ä|a)kare\\b|distriktstandv|\\bpraktikertj(ä|a)nst\\b",
+      "matchType": "regex",
+      "categoryKey": "health_dental",
+      "priority": 88
+    },
+    {
+      "key": "se.vision",
+      "name": "Vision & optics",
+      "pattern": "(?i)\\bsynsam\\b|\\bsmarteyes\\b|\\bspecsavers\\b|\\bklarsynt\\b|\\boptiker\\b|\\blenson\\b|\\blinsshopen\\b",
+      "matchType": "regex",
+      "categoryKey": "health_vision",
+      "priority": 88
+    },
+    {
+      "key": "se.fitness",
+      "name": "Gyms & sports facilities",
+      "pattern": "(?i)friskis ?& ?svetti|friskis|\\bsats\\b|\\bactic\\b|nordic wellness|\\bfitness24seven\\b|\\bpuls ?& ?tr(ä|a)ning\\b|\\bgym\\b|\\bstudentmotion\\b|\\bcampus 1477\\b|\\bfyrishov\\b|\\bsimhall\\b|\\bbadhus\\b|\\bishall\\b|\\bbowling\\b",
+      "matchType": "regex",
+      "categoryKey": "health_fitness",
+      "priority": 84
+    },
+    {
+      "key": "se.movies_events",
+      "name": "Cinemas & live events",
+      "pattern": "(?i)filmstaden|\\bsf bio\\b|\\bbiograf\\b|ticketmaster|live nation|\\bbiljett\\b|\\btickster\\b|\\bnortic\\b|\\bfienta\\b|\\bmuse(um|et)\\b|\\bteater\\b|\\bkonserthus\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_movies",
+      "priority": 86
+    },
+    {
+      "key": "se.gaming",
+      "name": "Gaming platforms",
+      "pattern": "(?i)\\bsteam\\b|valve corp|\\bxbox\\b|playstation|\\bpsn\\b|nintendo|epic games|\\bgamivo\\b|\\beneba\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_games",
+      "priority": 86
+    },
+    {
+      "key": "se.personal_care",
+      "name": "Personal care",
+      "pattern": "(?i)\\bfris(ö|o)r\\b|\\bbarber\\b|\\bsalong\\b|\\bnaglar\\b|\\bnagelsalong\\b|\\bskonhet\\b|\\bsk(ö|o)nhet\\b|\\bkicks\\b|\\blyko\\b|\\bsephora\\b|\\bspa\\b|\\bmassage\\b",
+      "matchType": "regex",
+      "categoryKey": "personal",
+      "priority": 82
+    },
+    {
+      "key": "se.pets",
+      "name": "Pets & veterinary",
+      "pattern": "(?i)\\barken zoo\\b|\\bzooplus\\b|\\bdjurmagazinet\\b|\\bveterin(ä|a)r\\b|\\bdjursjukhus\\b|\\banicura\\b|\\bevidensia\\b|\\bagria\\b",
+      "matchType": "regex",
+      "categoryKey": "personal",
+      "priority": 84
+    },
+    {
+      "key": "se.education",
+      "name": "Education & student fees",
+      "pattern": "(?i)\\bcsn\\b|\\buniversitet\\b|\\bh(ö|o)gskola\\b|\\bstudentk(å|a)ravgift\\b|\\bk(å|a)ravgift\\b|\\bfolkuniversitetet\\b|\\bkomvux\\b|\\bcoursera\\b|\\budemy\\b|\\bkurslitteratur\\b|\\bf(ö|o)rskola\\b|\\bbarnomsorg\\b",
+      "matchType": "regex",
+      "categoryKey": "education",
+      "priority": 90
+    },
+    {
+      "key": "se.donations",
+      "name": "Donations & charities",
+      "pattern": "(?i)\\br(ö|o)da korset\\b|\\br(ä|a)dda barnen\\b|\\bunicef\\b|\\bl(ä|a)kare utan gr(ä|a)nser\\b|\\bcancerfonden\\b|\\bstadsmissionen\\b|\\bnaturskyddsf(ö|o)reningen\\b|\\bswedish church\\b|\\bsvenska kyrkan\\b|\\bkyrkoavgift\\b|\\bg(å|a)va\\b|\\bdonation\\b|gofundme",
+      "matchType": "regex",
+      "categoryKey": "gifts",
+      "priority": 84
+    },
+    {
+      "key": "se.insurance_home",
+      "name": "Home & general insurance",
+      "pattern": "(?i)\\bfolksam\\b|\\bl(ä|a)nsf(ö|o)rs(ä|a)kringar\\b|\\btrygg-?hansa\\b|\\bif skadef(ö|o)rs(ä|a)kring\\b|\\bhedvig\\b|\\bmoderna f(ö|o)rs(ä|a)kringar\\b|\\bdina f(ö|o)rs(ä|a)kringar\\b|hemf(ö|o)rs(ä|a)kring|akademikerf(ö|o)rs(ä|a)kring",
+      "matchType": "regex",
+      "categoryKey": "housing_insurance",
+      "priority": 84
+    },
+    {
+      "key": "se.union_dues",
+      "name": "Union & professional dues",
+      "pattern": "(?i)\\bunionen\\b|\\bsveriges ingenj(ö|o)rer\\b|\\bsaco\\b|\\blo\\b avgift|\\bvision\\b fackf|\\bakademikerf(ö|o)rbundet\\b|\\bfackavgift\\b|\\ba-?kassa\\b|\\bakademikernas a-kassa\\b",
+      "matchType": "regex",
+      "categoryKey": "fees",
+      "priority": 86
+    },
+    {
+      "key": "se.gov_fees",
+      "name": "Government & municipal fees",
+      "pattern": "(?i)\\bskatteverket\\b|\\bkronofogden\\b|\\bkommun\\b|\\bmigrationsverket\\b|\\bpolismyndigheten\\b|\\bpass[a-zåäö]* avgift\\b|\\bl(ä|a)nsstyrelsen\\b",
+      "matchType": "regex",
+      "categoryKey": "fees",
+      "priority": 70
+    },
+    {
+      "key": "se.bank_fees",
+      "name": "Bank & card fees",
+      "pattern": "(?i)\\b(å|a)rsavgift\\b|\\bm(å|a)nadsavgift\\b|\\bvaluta(p(å|a)slag|avgift)\\b|\\b(ö|o)verf(ö|o)ringsavgift\\b|\\bp(å|a)minnelseavgift\\b|\\bfakturaavgift\\b|\\bdr(ö|o)jsm(å|a)lsr(ä|a)nta\\b|\\bnotifikationsavgift\\b|\\blunar (plus|standard|premium)\\b",
+      "matchType": "regex",
+      "categoryKey": "fees_bank",
+      "priority": 70
+    },
+    {
+      "key": "se.atm_fees",
+      "name": "ATM withdrawals & fees",
+      "pattern": "(?i)\\buttag\\b|\\bbankomat\\b|\\bkontantuttag\\b|\\buttagsavgift\\b",
+      "matchType": "regex",
+      "categoryKey": "fees_atm",
+      "priority": 88
+    },
+    {
+      "key": "se.shipping",
+      "name": "Shipping & postage",
+      "pattern": "(?i)\\bpostnord\\b|\\bdhl\\b|\\bups\\b|\\bbudbee\\b|\\binstabox\\b|\\bearly bird\\b|\\bschenker\\b|\\bfrakt\\b|\\bporto\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_online",
+      "priority": 80
+    }
+  ]
+}

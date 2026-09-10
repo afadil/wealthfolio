@@ -41,7 +41,8 @@ use std::sync::{Arc, RwLock};
 use crate::accounts::{account_types, Account, AccountServiceTrait};
 use crate::activities::activities_constants::{
     classify_import_activity, is_cash_symbol, is_garbage_symbol, is_securities_transfer,
-    requires_final_cash_amount, requires_symbol, ImportSymbolDisposition, ACTIVITY_TYPE_BUY,
+    requires_final_cash_amount, requires_symbol, ImportSymbolDisposition,
+    ACTIVITY_SUBTYPE_OPTION_EXPIRY, ACTIVITY_TYPE_ADJUSTMENT, ACTIVITY_TYPE_BUY,
     ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL,
     ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TAX, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
     ACTIVITY_TYPE_WITHDRAWAL, PRICE_BEARING_ACTIVITY_TYPES,
@@ -49,7 +50,7 @@ use crate::activities::activities_constants::{
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
-use crate::activities::idempotency::compute_idempotency_key;
+use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
 use crate::activities::{
     ActivityRepositoryTrait, ActivityServiceTrait, TransferPair, TransferPairResolution,
 };
@@ -475,6 +476,19 @@ impl ActivityService {
         activity: &mut ActivityUpdate,
         existing: &Activity,
     ) -> Result<()> {
+        // PATCH semantics: omission preserves the current asset. Hydrate the
+        // existing id before validation/resolution; an explicit empty object
+        // remains empty and is handled as a clear by the repository.
+        if activity.asset.is_none() {
+            activity.asset = existing
+                .asset_id
+                .as_ref()
+                .map(|asset_id| AssetResolutionInput {
+                    id: Some(asset_id.clone()),
+                    ..Default::default()
+                });
+        }
+
         // A metadata patch carries only the keys its writer owns (e.g. the
         // option form's contract multiplier); merge it over the stored blob
         // so unrelated keys - the migration's legacy_amount breadcrumb,
@@ -504,10 +518,13 @@ impl ActivityService {
             Some(subtype) => Some(subtype),
             None => existing.subtype.as_deref(),
         };
-        let effective_asset_id = activity
-            .get_symbol_id()
-            .map(str::to_string)
-            .or_else(|| existing.asset_id.clone());
+        let effective_asset_id = match activity.asset.as_ref() {
+            Some(asset) if asset.is_empty() => None,
+            _ => activity
+                .get_symbol_id()
+                .map(str::to_string)
+                .or_else(|| existing.asset_id.clone()),
+        };
         let is_security_transfer =
             is_securities_transfer(&activity.activity_type, effective_asset_id.as_deref());
         let quantity = activity
@@ -695,7 +712,10 @@ impl ActivityService {
         if activity.amount.is_some() {
             return false;
         }
-        let asset_id = activity.get_symbol_id().or(existing.asset_id.as_deref());
+        let asset_id = match activity.asset.as_ref() {
+            Some(asset) if asset.is_empty() => None,
+            _ => activity.get_symbol_id().or(existing.asset_id.as_deref()),
+        };
         if !is_securities_transfer(&activity.activity_type, asset_id)
             || self.is_bond_asset(asset_id)
         {
@@ -754,7 +774,7 @@ impl ActivityService {
         activity
     }
 
-    fn downgrade_unresolvable_sync_asset_income(activity: &mut NewActivity) {
+    fn prepare_incomplete_sync_asset_income_for_review(activity: &mut NewActivity) {
         if activity.amount.is_none() {
             activity.amount = ActivityEconomicsResolver::calculate_composite_final_cash(
                 &activity.activity_type,
@@ -764,11 +784,9 @@ impl ActivityService {
                 Decimal::ONE,
             );
         }
-
-        activity.subtype = None;
     }
 
-    fn sync_asset_income_needs_downgrade(
+    fn sync_asset_income_needs_review(
         activity: &NewActivity,
         resolved_asset_id: Option<&str>,
     ) -> bool {
@@ -805,6 +823,11 @@ impl ActivityService {
     }
 
     fn requires_asset_identity(activity_type: &str, subtype: Option<&str>) -> bool {
+        if activity_type.eq_ignore_ascii_case(ACTIVITY_TYPE_ADJUSTMENT) {
+            return subtype.is_some_and(|subtype| {
+                subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_OPTION_EXPIRY)
+            });
+        }
         requires_symbol(activity_type)
             || NewActivity::is_asset_backed_income_subtype(activity_type, subtype)
     }
@@ -1881,6 +1904,72 @@ impl ActivityService {
         ))
     }
 
+    fn add_legacy_import_duplicates<'a>(
+        &self,
+        activities: impl Iterator<Item = &'a ActivityImport>,
+        existing: &mut HashMap<String, String>,
+    ) -> Result<()> {
+        let mut keys_by_legacy_key: HashMap<String, HashSet<String>> = HashMap::new();
+        for activity in activities {
+            if !matches!(
+                activity.activity_type.as_str(),
+                ACTIVITY_TYPE_BUY | ACTIVITY_TYPE_SELL
+            ) || activity.amount.is_none()
+                || activity.quantity.is_none()
+                || activity.unit_price.is_none()
+            {
+                continue;
+            }
+            let Some(account_id) = activity.account_id.as_deref() else {
+                continue;
+            };
+            let Some(key) = Self::build_import_idempotency_key(activity, account_id) else {
+                continue;
+            };
+            if existing.contains_key(&key) {
+                continue;
+            }
+
+            // Legacy trades could be keyed before their amount was derived. The
+            // final-cash migration intentionally preserves those stored keys.
+            let mut legacy = activity.clone();
+            legacy.amount = None;
+            if let Some(legacy_key) = Self::build_import_idempotency_key(&legacy, account_id) {
+                keys_by_legacy_key
+                    .entry(legacy_key)
+                    .or_default()
+                    .insert(key);
+            }
+        }
+        if keys_by_legacy_key.is_empty() {
+            return Ok(());
+        }
+
+        let candidates =
+            self.check_existing_duplicates(keys_by_legacy_key.keys().cloned().collect())?;
+        let candidate_ids: Vec<String> = candidates.into_values().collect();
+        for stored in self
+            .activity_repository
+            .get_activities_by_ids(&candidate_ids)?
+        {
+            let Some(requested_keys) = stored
+                .idempotency_key
+                .as_ref()
+                .and_then(|key| keys_by_legacy_key.get(key))
+            else {
+                continue;
+            };
+            // The amount-less key is only a lookup hint, not proof of a duplicate.
+            // Require the current stored fields, including final cash, to match.
+            // This also avoids matching an edited row using its stale legacy key.
+            let current_key = compute_activity_idempotency_key(&stored);
+            if requested_keys.contains(&current_key) {
+                existing.insert(current_key, stored.id);
+            }
+        }
+        Ok(())
+    }
+
     fn add_activity_warning(activity: &mut ActivityImport, key: &str, message: &str) {
         let warnings = activity.warnings.get_or_insert_with(HashMap::new);
         let entry = warnings.entry(key.to_string()).or_default();
@@ -2938,6 +3027,21 @@ impl ActivityService {
         let base_ccy = self.account_service.get_base_currency().unwrap_or_default();
         let account_currency = resolve_currency(&[&account.currency, &base_ccy]);
         let currency = resolve_currency(&[&activity.currency, &account_currency]);
+
+        if activity.asset.as_ref().is_some_and(|asset| {
+            !asset.is_empty()
+                && asset.id.as_deref().is_none_or(|id| id.trim().is_empty())
+                && asset
+                    .symbol
+                    .as_deref()
+                    .is_none_or(|symbol| symbol.trim().is_empty())
+        }) {
+            return Err(ActivityError::InvalidData(
+                "Asset updates need either asset_id or symbol; use an empty asset object to clear"
+                    .to_string(),
+            )
+            .into());
+        }
 
         if activity.activity_type == ACTIVITY_TYPE_SPLIT {
             activity.amount = activity.amount.map(|v| v.map(|d| d.abs()));
@@ -4172,12 +4276,19 @@ impl ActivityService {
         }
 
         let unique_keys: Vec<String> = first_index_by_key.into_keys().collect();
-        let existing = if unique_keys.is_empty() {
+        let mut existing = if unique_keys.is_empty() {
             HashMap::new()
         } else {
             self.check_existing_duplicates(unique_keys)
                 .unwrap_or_default()
         };
+        self.add_legacy_import_duplicates(
+            activities_with_status
+                .iter()
+                .zip(&keys)
+                .filter_map(|(activity, key)| key.as_ref().map(|_| activity)),
+            &mut existing,
+        )?;
 
         for (idx, maybe_key) in keys.iter().enumerate() {
             let Some(key) = maybe_key else {
@@ -5606,11 +5717,19 @@ impl ActivityServiceTrait for ActivityService {
             }
         }
 
-        let existing_duplicates = if first_index_by_key.is_empty() {
+        let mut existing_duplicates = if first_index_by_key.is_empty() {
             HashMap::new()
         } else {
             self.check_existing_duplicates(first_index_by_key.keys().cloned().collect())?
         };
+        self.add_legacy_import_duplicates(
+            source_slice
+                .iter()
+                .enumerate()
+                .filter(|(position, _)| !policy_failed_positions.contains(position))
+                .map(|(_, activity)| activity),
+            &mut existing_duplicates,
+        )?;
 
         let mut duplicate_count = 0u32;
         let mut insertable_positions: Vec<usize> = Vec::with_capacity(new_activities.len());
@@ -6576,9 +6695,9 @@ impl ActivityService {
             }
 
             if mode.is_sync()
-                && Self::sync_asset_income_needs_downgrade(&activity, resolved_asset_id.as_deref())
+                && Self::sync_asset_income_needs_review(&activity, resolved_asset_id.as_deref())
             {
-                Self::downgrade_unresolvable_sync_asset_income(&mut activity);
+                Self::prepare_incomplete_sync_asset_income_for_review(&mut activity);
                 sync_review_indices.insert(idx);
             }
 

@@ -56,6 +56,8 @@ import {
   isSpendingAccountType,
 } from "../lib/constants";
 import { useEventTypes, useSpendingEvents } from "../hooks/use-spending-events";
+import { useSettings } from "@/hooks/use-settings";
+import { AdvancedOptionsSection } from "@/pages/activity/components/forms/fields/advanced-options-section";
 import { useSpendingSettings } from "../hooks/use-spending-settings";
 import { QuickCategorizePopover } from "./quick-categorize-popover";
 import { QuickEventPopover } from "./quick-event-popover";
@@ -86,6 +88,13 @@ function buildFormSchema(t: TFunction) {
     activityDate: z.date({ required_error: t("spending:cashForm.pickDate") }),
     amount: z.coerce.number().min(0, { message: t("spending:cashForm.amountNonNegative") }),
     notes: z.string().optional(),
+    // Advanced options. Currency defaults to the account's, so the common case
+    // never sees these; a foreign charge on a domestic card needs both.
+    currency: z.string().optional(),
+    fxRate: z.coerce
+      .number({ invalid_type_error: t("activity:form.err_fxrate_number") })
+      .positive({ message: t("activity:form.err_fxrate_positive") })
+      .optional(),
     /** "<taxonomyId>:<categoryId>" or "" */
     category: z.string().optional(),
   });
@@ -105,6 +114,8 @@ interface FormValues {
     | "CREDIT";
   activityDate: Date;
   amount: number;
+  currency?: string;
+  fxRate?: number;
   notes?: string;
   category?: string;
 }
@@ -176,6 +187,8 @@ export function CashActivityForm({
   const qc = useQueryClient();
   const { accounts } = useAccounts({ filterActive: false });
   const { settings } = useSpendingSettings();
+  const { data: appSettings } = useSettings();
+  const baseCurrency = appSettings?.baseCurrency;
   const trackedAccountIds = settings?.accountIds;
   const spendingAccounts = useMemo(() => {
     const tracked = new Set(trackedAccountIds ?? []);
@@ -227,6 +240,8 @@ export function CashActivityForm({
       activityType: (activity?.activityType as FormValues["activityType"]) ?? "WITHDRAWAL",
       activityDate: activity?.activityDate ? new Date(activity.activityDate) : new Date(),
       amount: activity?.amount != null ? Math.abs(parseFloat(activity.amount)) : 0,
+      currency: activity?.currency ?? "",
+      fxRate: activity?.fxRate != null ? Number(activity.fxRate) : undefined,
       notes: activity?.notes ?? "",
       category:
         activity?.categoryTaxonomyId && activity?.categoryId
@@ -242,6 +257,10 @@ export function CashActivityForm({
         activityType: (activity?.activityType as FormValues["activityType"]) ?? "WITHDRAWAL",
         activityDate: activity?.activityDate ? new Date(activity.activityDate) : new Date(),
         amount: activity?.amount != null ? Math.abs(parseFloat(activity.amount)) : 0,
+        // Seeded from the activity, not the account: recomputing it on save is
+        // what would silently turn a 9.59 USD charge into 9.59 CAD.
+        currency: activity?.currency ?? "",
+        fxRate: activity?.fxRate != null ? Number(activity.fxRate) : undefined,
         notes: activity?.notes ?? "",
         category:
           activity?.categoryTaxonomyId && activity?.categoryId
@@ -311,7 +330,26 @@ export function CashActivityForm({
     mutationFn: async (values: FormValues) => {
       const dateStr = values.activityDate.toISOString();
       const account = spendingAccounts.find((a) => a.id === values.accountId);
-      const currency = account?.currency ?? "USD";
+      // The account's currency is only the default. Taking it unconditionally
+      // rewrote an existing activity's currency on every save, turning a 9.59
+      // USD charge on a CAD card into 9.59 CAD without changing the number.
+      const currency = values.currency?.trim() || account?.currency || "USD";
+      // A rate converts `currency` into the ACCOUNT's currency, so it holds only
+      // while both ends are the pair it was entered against. Moving the activity
+      // to a differently-denominated account leaves a seeded rate describing a
+      // pair that no longer exists, and the field is collapsed by default — so a
+      // USD->CAD rate would be reread as USD->EUR rather than questioned. A rate
+      // the user typed themselves is theirs to keep.
+      const seededRate = activity?.fxRate != null ? Number(activity.fxRate) : undefined;
+      const seededAgainst = activity
+        ? spendingAccounts.find((a) => a.id === activity.accountId)?.currency
+        : undefined;
+      const rateHolds =
+        values.fxRate !== seededRate ||
+        (activity?.currency === currency && seededAgainst === account?.currency);
+      // Only meaningful when the money moved in something other than the
+      // account's own currency; otherwise the rate is 1 and worth nothing.
+      const fxRate = currency !== account?.currency && rateHolds ? (values.fxRate ?? null) : null;
       const subtype = resolveCashActivitySubtype({
         activityType: values.activityType,
         accountType: account?.accountType,
@@ -329,6 +367,7 @@ export function CashActivityForm({
           activityDate: dateStr,
           amount: values.amount,
           currency,
+          fxRate,
           comment: values.notes ?? null,
           metadata: cashActivityFlowMetadata(values.activityType, subtype, activity?.metadata),
         };
@@ -341,6 +380,7 @@ export function CashActivityForm({
           activityDate: dateStr,
           amount: values.amount,
           currency,
+          fxRate,
           comment: values.notes ?? null,
           metadata: cashActivityFlowMetadata(values.activityType, subtype),
         };
@@ -793,6 +833,22 @@ export function CashActivityForm({
                           <FormMessage />
                         </FormItem>
                       )}
+                    />
+
+                    {/* Collapsed by default, so the everyday case — a charge in
+                        the account's own currency — never sees it. Open, it
+                        covers a foreign charge on a domestic card, which the
+                        backend has always stored but the form could not enter.
+                        Notes stays outside: the payee is what identifies a
+                        spending row, not an advanced detail. */}
+                    <AdvancedOptionsSection
+                      currencyName="currency"
+                      fxRateName="fxRate"
+                      accountCurrency={selectedAccount?.currency}
+                      baseCurrency={baseCurrency}
+                      showSubtype={false}
+                      variant={isMobile ? "mobile" : "desktop"}
+                      dashed
                     />
                   </>
                 )}

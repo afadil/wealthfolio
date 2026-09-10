@@ -9,7 +9,7 @@
 //! a short-lived **encrypted** cookie rather than server memory, so the flow is
 //! stateless and survives restarts.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use axum::{
@@ -27,8 +27,8 @@ use chacha20poly1305::{
 };
 use openidconnect::{
     core::{CoreAuthenticationFlow, CoreClient, CoreIdTokenClaims, CoreProviderMetadata},
-    AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce as OidcNonce,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
+    AuthorizationCode, ClaimsVerificationError, ClientId, ClientSecret, CsrfToken, IssuerUrl,
+    Nonce as OidcNonce, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse,
 };
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -149,7 +149,12 @@ impl OidcConfig {
 /// `CoreClient` per request (rebuilding is cheap and avoids storing the client's
 /// verbose typestate generics in a struct field).
 pub struct OidcManager {
-    provider_metadata: CoreProviderMetadata,
+    /// Discovered provider metadata, JWKS included. Behind a lock so it can be
+    /// re-fetched when the IdP rotates its signing keys (see
+    /// [`Self::refresh_provider_metadata`]).
+    provider_metadata: RwLock<CoreProviderMetadata>,
+    /// Kept for re-discovery.
+    issuer_url: IssuerUrl,
     client_id: ClientId,
     /// Raw client id string, used for the `client_id` logout parameter.
     client_id_str: String,
@@ -181,7 +186,7 @@ impl OidcManager {
 
         let issuer = IssuerUrl::new(config.issuer_url.clone())
             .map_err(|e| anyhow::anyhow!("Invalid WF_OIDC_ISSUER_URL: {e}"))?;
-        let provider_metadata = CoreProviderMetadata::discover_async(issuer, &http_client)
+        let provider_metadata = CoreProviderMetadata::discover_async(issuer.clone(), &http_client)
             .await
             .map_err(|e| anyhow::anyhow!("OIDC discovery failed: {e}"))?;
         let redirect_url = RedirectUrl::new(config.redirect_url.clone())
@@ -208,7 +213,8 @@ impl OidcManager {
         };
 
         Ok(Self {
-            provider_metadata,
+            provider_metadata: RwLock::new(provider_metadata),
+            issuer_url: issuer,
             client_id: ClientId::new(config.client_id.clone()),
             client_id_str: config.client_id.clone(),
             client_secret: config.client_secret.clone().map(ClientSecret::new),
@@ -238,12 +244,33 @@ impl OidcManager {
         openidconnect::EndpointMaybeSet,
         openidconnect::EndpointMaybeSet,
     > {
+        let provider_metadata = self
+            .provider_metadata
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         CoreClient::from_provider_metadata(
-            self.provider_metadata.clone(),
+            provider_metadata,
             self.client_id.clone(),
             self.client_secret.clone(),
         )
         .set_redirect_uri(self.redirect_url.clone())
+    }
+
+    /// Re-runs discovery so the next [`Self::client`] verifies against the
+    /// IdP's current JWKS. Called when ID-token signature verification fails:
+    /// the metadata cached at startup goes stale when the IdP rotates its
+    /// signing keys, which would otherwise fail every login until a restart.
+    async fn refresh_provider_metadata(&self) -> anyhow::Result<()> {
+        let fresh =
+            CoreProviderMetadata::discover_async(self.issuer_url.clone(), &self.http_client)
+                .await
+                .map_err(|e| anyhow::anyhow!("OIDC re-discovery failed: {e}"))?;
+        *self
+            .provider_metadata
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = fresh;
+        Ok(())
     }
 
     /// Whether the authenticated subject/email is permitted. Extracts the claim
@@ -416,6 +443,29 @@ pub async fn oidc_callback(
     let nonce = OidcNonce::new(tx.nonce);
     let claims = match id_token.claims(&verifier, &nonce) {
         Ok(claims) => claims,
+        Err(ClaimsVerificationError::SignatureVerification(e)) => {
+            // The JWKS cached at startup goes stale when the IdP rotates its
+            // signing keys; re-discover and retry once. Only reachable after a
+            // successful PKCE-verified code exchange, so unauthenticated
+            // traffic cannot drive re-discovery load against the IdP.
+            tracing::warn!(
+                "OIDC ID token signature verification failed ({e}); refreshing \
+                 provider metadata and retrying"
+            );
+            if let Err(e) = oidc.refresh_provider_metadata().await {
+                tracing::warn!("{e}");
+                return error_redirect("oidc_invalid_token");
+            }
+            let refreshed_client = oidc.client();
+            let refreshed_verifier = refreshed_client.id_token_verifier();
+            match id_token.claims(&refreshed_verifier, &nonce) {
+                Ok(claims) => claims,
+                Err(e) => {
+                    tracing::warn!("OIDC ID token verification failed after JWKS refresh: {e}");
+                    return error_redirect("oidc_invalid_token");
+                }
+            }
+        }
         Err(e) => {
             tracing::warn!("OIDC ID token verification failed: {e}");
             return error_redirect("oidc_invalid_token");

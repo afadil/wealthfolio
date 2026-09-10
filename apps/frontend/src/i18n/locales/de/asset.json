@@ -153,7 +153,8 @@
     "maturity": "Fälligkeit",
     "type": "Typ",
     "strike": "Ausübungspreis",
-    "expiry": "Verfall"
+    "expiry": "Verfall",
+    "multiplier": "Multiplikator"
   },
   "profile": {
     "overview": "Übersicht",
@@ -256,6 +257,18 @@
     "exchange": "Börse",
     "select_exchange": "Börse auswählen",
     "search_exchanges": "Börsen suchen...",
+    "contract_multiplier": "Kontraktmultiplikator",
+    "contract_multiplier_hint": "Jeder Kontrakt entspricht so vielen Basiswerteinheiten. Leer lassen für den Standardwert {{default}}.",
+    "maturity_date": "Fälligkeitsdatum",
+    "coupon_rate": "Kuponsatz (%)",
+    "coupon_frequency": "Kuponfrequenz",
+    "select_frequency": "Frequenz auswählen",
+    "couponFrequency": {
+      "ANNUAL": "Jährlich",
+      "SEMI_ANNUAL": "Halbjährlich",
+      "QUARTERLY": "Vierteljährlich",
+      "ZERO": "Nullkupon"
+    },
     "saving": "Wird gespeichert...",
     "saving_short": "Wird gespeichert",
     "save_changes": "Änderungen speichern",
@@ -703,5 +716,34 @@
     "modified_other": "{{count}} geändert",
     "to_delete_one": "{{count}} zu löschen",
     "to_delete_other": "{{count}} zu löschen"
+  },
+  "logo": {
+    "change": "Logo ändern",
+    "title": "Logo der Anlage",
+    "badge_default": "Standard",
+    "badge_custom": "Benutzerdefiniert",
+    "updated_at": "Aktualisiert am {{date}}",
+    "dropzone_cta": "Bild auswählen",
+    "dropzone_or_drop": "oder hierher ziehen und ablegen",
+    "dropzone_hint": "PNG, JPEG, WebP oder SVG · wird auf 256×256 PNG skaliert",
+    "processing": "Bild wird vorbereitet…",
+    "preview_title": "Vorschau",
+    "preview_new": "Neues Logo",
+    "preview_current": "Aktuelles Logo",
+    "preview_card": "Positionskarte",
+    "preview_table": "Positionstabelle",
+    "preview_list": "Aktivitätenliste",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (statt {{original}})",
+    "choose_different": "Anderes Bild auswählen",
+    "save": "Logo speichern",
+    "reset": "Auf Standard zurücksetzen",
+    "saved": "Logo gespeichert.",
+    "reset_done": "Logo auf Standard zurückgesetzt.",
+    "error_unsupported_type": "Nicht unterstützte Datei. Verwenden Sie ein PNG-, JPEG-, WebP- oder SVG-Bild.",
+    "error_too_large_input": "Die Datei ist zu groß. Wählen Sie ein Bild unter 10 MB.",
+    "error_decode_failed": "Die Datei konnte nicht als Bild gelesen werden.",
+    "error_encode_failed": "Das Bild konnte nicht in PNG konvertiert werden.",
+    "error_too_large_output": "Das Bild ist zu detailliert für 150 KB. Versuchen Sie ein einfacheres oder kleineres Bild.",
+    "error_save_failed": "Das Logo konnte nicht gespeichert werden."
   }
 }

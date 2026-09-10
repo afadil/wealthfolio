@@ -40,6 +40,10 @@ import type {
   SnapshotImportResult,
   SnapshotInfo,
   SnapshotInput,
+  CategorizationRule,
+  CategorizationRuleInput,
+  SpendCategory,
+  SpendCategoryKind,
   SymbolSearchResult,
   TransferMatchCandidate,
   TransferMatchCandidateRequest,
@@ -442,6 +446,61 @@ export interface ExchangeRatesAPI {
    * @returns Promise resolving to one result per requested pair, in the same order
    */
   getRatesForDates(pairs: ExchangeRateDateQuery[]): Promise<ExchangeRateDateResult[]>;
+}
+
+/**
+ * Spend categorization APIs
+ * Lets addons classify activities (e.g. WITHDRAWALs) into the user's
+ * existing spend-category taxonomy via Wealthfolio's categorization-rules
+ * engine, rather than a one-off per-activity tag.
+ */
+export interface SpendingAPI {
+  /**
+   * Whether the user has Spending enabled. Rules and categories still work
+   * when it's off, but re-running rules is a no-op until the user opts an
+   * account in — check this to explain a `rerunRules()` result of 0.
+   * @returns Promise resolving to whether Spending is enabled
+   */
+  isEnabled(): Promise<boolean>;
+
+  /**
+   * List selectable spend categories, flattened with a display path.
+   * @param kind Restrict to one taxonomy. Omit to get all three (expense, income, saving).
+   * @returns Promise resolving to array of spend categories
+   */
+  getCategories(kind?: SpendCategoryKind): Promise<SpendCategory[]>;
+
+  /**
+   * List this addon's own categorization rules (those created via `saveRule`).
+   * @returns Promise resolving to array of categorization rules
+   */
+  getRules(): Promise<CategorizationRule[]>;
+
+  /**
+   * Create or update a categorization rule identified by `rule.ruleKey`.
+   * Calling this again with the same ruleKey updates the existing rule
+   * in place instead of creating a duplicate.
+   * @param rule Rule definition
+   * @returns Promise resolving to the created or updated rule
+   */
+  saveRule(rule: CategorizationRuleInput): Promise<CategorizationRule>;
+
+  /**
+   * Delete the rule previously created with this ruleKey. No-op if absent.
+   * @param ruleKey The stable key passed to a prior saveRule call
+   * @returns Promise that resolves once the rule is deleted (or confirmed absent)
+   */
+  deleteRule(ruleKey: string): Promise<void>;
+
+  /**
+   * Re-run all categorization rules. Pass false to overwrite existing
+   * rule/AI/history/import-assigned categories too — the default only fills in
+   * currently uncategorized activities. Manual assignments are always
+   * preserved.
+   * @param onlyUncategorized Defaults to true
+   * @returns Promise resolving to the number of activities matched by a rule
+   */
+  rerunRules(onlyUncategorized?: boolean): Promise<number>;
 }
 
 /**
@@ -907,6 +966,9 @@ export interface HostAPI {
 
   /** Exchange rates operations */
   exchangeRates: ExchangeRatesAPI;
+
+  /** Spend categorization operations */
+  spending: SpendingAPI;
 
   /** Contribution limits operations */
   contributionLimits: ContributionLimitsAPI;

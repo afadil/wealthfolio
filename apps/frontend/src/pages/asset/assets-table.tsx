@@ -111,10 +111,17 @@ export function AssetsTable({
           return (
             <button
               type="button"
+              data-testid={`security-${asset.instrumentType}-${asset.displayCode}`}
               onClick={() => navigate(`/holdings/${encodeURIComponent(asset.id)}`)}
               className="hover:bg-muted/60 focus-visible:ring-ring group flex w-full items-center gap-2.5 rounded-md py-1 text-left transition"
             >
-              <TickerAvatar symbol={avatarSymbol} className="h-8 w-8 shrink-0" />
+              <TickerAvatar
+                symbol={avatarSymbol}
+                exchangeMic={asset.instrumentExchangeMic}
+                instrumentType={asset.instrumentType}
+                assetId={asset.id}
+                className="h-8 w-8 shrink-0"
+              />
               <div className="min-w-0 flex-1">
                 <div className="group-hover:text-primary flex items-center gap-1.5 font-semibold leading-tight transition-colors">
                   {displaySymbol}

@@ -9,11 +9,220 @@ import { splitFormSchema } from "../split-form";
 import { feeFormSchema } from "../fee-form";
 import { interestFormSchema, type InterestFormValues } from "../interest-form";
 import { taxFormSchema } from "../tax-form";
+import { CreditForm, creditFormSchema, type CreditFormValues } from "../credit-form";
+import {
+  AdjustmentForm,
+  adjustmentFormSchema,
+  type AdjustmentFormValues,
+} from "../adjustment-form";
 import { newActivitySchema } from "../schemas";
 import { ACTIVITY_FORM_CONFIG } from "../../../config/activity-form-config";
 import { ACTIVITY_SUBTYPES, ActivityType, METADATA_CONTRACT_MULTIPLIER } from "@/lib/constants";
 
 describe("Form Schemas Validation", () => {
+  describe("adjustment form", () => {
+    it("is registered as an editable desktop activity", () => {
+      expect(ACTIVITY_FORM_CONFIG.ADJUSTMENT.component).toBe(AdjustmentForm);
+    });
+
+    it("accepts calculation-neutral cash adjustments without an asset", () => {
+      const result = adjustmentFormSchema.safeParse({
+        adjustmentMode: "cash",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        amount: 0,
+        currency: "USD",
+        subtype: "CASH_SWEEP",
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("requires a symbol for security adjustments", () => {
+      const result = adjustmentFormSchema.safeParse({
+        adjustmentMode: "securities",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        quantity: 1,
+        unitPrice: 0,
+        currency: "USD",
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([expect.objectContaining({ path: ["assetId"] })]),
+        );
+      }
+    });
+
+    it("requires positive quantity for option expiry", () => {
+      const result = adjustmentFormSchema.safeParse({
+        adjustmentMode: "securities",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        assetId: "AAPL260116C00200000",
+        quantity: 0,
+        unitPrice: 0,
+        currency: "USD",
+        subtype: ACTIVITY_SUBTYPES.OPTION_EXPIRY,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([expect.objectContaining({ path: ["quantity"] })]),
+        );
+      }
+    });
+
+    it("rejects option expiry for a known non-option security", () => {
+      const result = adjustmentFormSchema.safeParse({
+        adjustmentMode: "securities",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        assetId: "AAPL",
+        symbolInstrumentType: "EQUITY",
+        quantity: 1,
+        unitPrice: 0,
+        currency: "USD",
+        subtype: ACTIVITY_SUBTYPES.OPTION_EXPIRY,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([expect.objectContaining({ path: ["assetId"] })]),
+        );
+      }
+    });
+
+    it("derives cash and security edit modes without losing imported values", () => {
+      const cashDefaults = ACTIVITY_FORM_CONFIG.ADJUSTMENT.getDefaults(
+        {
+          activityType: ActivityType.ADJUSTMENT,
+          accountId: "acc-123",
+          date: new Date(),
+          amount: "0",
+          currency: "USD",
+          subtype: "CASH_SWEEP",
+        },
+        [],
+      ) as AdjustmentFormValues;
+      const securityDefaults = ACTIVITY_FORM_CONFIG.ADJUSTMENT.getDefaults(
+        {
+          activityType: ActivityType.ADJUSTMENT,
+          accountId: "acc-123",
+          date: new Date(),
+          assetId: "asset-option",
+          assetSymbol: "AAPL260116C00200000",
+          instrumentType: "OPTION",
+          quantity: "1",
+          unitPrice: "0",
+          amount: "0",
+          currency: "USD",
+          subtype: ACTIVITY_SUBTYPES.OPTION_EXPIRY,
+        },
+        [],
+      ) as AdjustmentFormValues;
+
+      expect(cashDefaults).toMatchObject({
+        adjustmentMode: "cash",
+        amount: 0,
+        subtype: "CASH_SWEEP",
+      });
+      expect(securityDefaults).toMatchObject({
+        adjustmentMode: "securities",
+        assetId: "AAPL260116C00200000",
+        quantity: 1,
+        unitPrice: 0,
+        subtype: ACTIVITY_SUBTYPES.OPTION_EXPIRY,
+        symbolInstrumentType: "OPTION",
+      });
+    });
+
+    it("treats a cash placeholder symbol as cash even when it has an opaque asset id", () => {
+      const defaults = ACTIVITY_FORM_CONFIG.ADJUSTMENT.getDefaults(
+        {
+          activityType: ActivityType.ADJUSTMENT,
+          accountId: "acc-123",
+          date: new Date(),
+          assetId: "opaque-cash-asset-id",
+          assetSymbol: "$CASH-USD",
+          amount: "10",
+          currency: "USD",
+        },
+        [],
+      ) as AdjustmentFormValues;
+
+      expect(defaults).toMatchObject({
+        adjustmentMode: "cash",
+        amount: 10,
+        assetId: null,
+      });
+    });
+
+    it("clears asset fields when a security adjustment is changed to cash", () => {
+      const payload = ACTIVITY_FORM_CONFIG.ADJUSTMENT.toPayload({
+        adjustmentMode: "cash",
+        accountId: "acc-123",
+        activityDate: new Date(),
+        amount: 0,
+        assetId: "AAPL",
+        existingAssetId: "asset-aapl",
+        quantity: 2,
+        unitPrice: 100,
+        currency: "USD",
+        quoteMode: "MARKET",
+      } as AdjustmentFormValues) as Record<string, unknown>;
+
+      expect(payload).toMatchObject({ amount: 0, quantity: null, unitPrice: null });
+      expect(payload.assetId).toBeUndefined();
+      expect(payload).not.toHaveProperty("existingAssetId");
+    });
+  });
+
+  describe("credit form", () => {
+    it("is registered as an editable desktop activity", () => {
+      expect(ACTIVITY_FORM_CONFIG.CREDIT.component).toBe(CreditForm);
+    });
+
+    it("accepts a credit with a provider-supplied subtype", () => {
+      const result = creditFormSchema.safeParse({
+        accountId: "acc-123",
+        activityDate: new Date(),
+        amount: 25,
+        currency: "USD",
+        subtype: ACTIVITY_SUBTYPES.REBATE,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("preserves the subtype in defaults and payload", () => {
+      const defaults = ACTIVITY_FORM_CONFIG.CREDIT.getDefaults(
+        {
+          activityType: ActivityType.CREDIT,
+          accountId: "acc-123",
+          date: new Date(),
+          amount: "25",
+          currency: "USD",
+          subtype: ACTIVITY_SUBTYPES.REBATE,
+        },
+        [],
+      ) as CreditFormValues;
+
+      expect(defaults).toMatchObject({
+        amount: 25,
+        subtype: ACTIVITY_SUBTYPES.REBATE,
+      });
+      expect(ACTIVITY_FORM_CONFIG.CREDIT.toPayload(defaults)).toMatchObject({
+        amount: 25,
+        subtype: ACTIVITY_SUBTYPES.REBATE,
+      });
+    });
+  });
+
   it("uses the asset-owned option multiplier in trade edit defaults", () => {
     for (const activityType of [ActivityType.BUY, ActivityType.SELL] as const) {
       const defaults = ACTIVITY_FORM_CONFIG[activityType].getDefaults(
@@ -1472,6 +1681,19 @@ describe("Form Schemas Validation", () => {
           kind: null,
           exchangeMic: null,
         },
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts a cash adjustment without an asset", () => {
+      const result = newActivitySchema.safeParse({
+        accountId: "acc-123",
+        activityType: "ADJUSTMENT",
+        activityDate: new Date(),
+        assetId: "",
+        amount: 25,
+        currency: "USD",
       });
 
       expect(result.success).toBe(true);

@@ -194,7 +194,12 @@ describe("PairingFlow", () => {
     render(<PairingFlow />);
 
     expect(screen.getByText("Replace data on this device?")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Replace & Sync" }));
+    const replaceButton = screen.getByRole("button", { name: "Replace & Sync" });
+    expect(replaceButton.parentElement).toHaveClass(
+      "max-sm:[&>button]:whitespace-normal",
+      "sm:flex-wrap",
+    );
+    fireEvent.click(replaceButton);
     expect(approveOverwrite).toHaveBeenCalledTimes(1);
   });
 });

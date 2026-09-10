@@ -68,6 +68,13 @@ const shouldDisplaySubtype = (
   );
 };
 
+export const shouldDisplaySubtypeInTypeColumn = (
+  showSubtypeInType: boolean,
+  transaction: LocalTransaction | undefined,
+  activityType: string | undefined,
+  subtype: string | null | undefined,
+): boolean => showSubtypeInType && shouldDisplaySubtype(transaction, activityType, subtype);
+
 const getSubtypeDisplayLabel = (t: TFunction, subtype: string, optionLabel?: string): string => {
   return optionLabel ?? localizeActivitySubtypeName(t, subtype);
 };
@@ -79,6 +86,7 @@ interface UseActivityColumnsOptions {
   onDelete: (activity: ActivityDetails) => void;
   onLinkTransfer?: (activity: ActivityDetails) => void;
   onUnlinkTransfer?: (activity: ActivityDetails) => void;
+  showSubtypeInType: boolean;
   /** Called when a symbol is selected from search, with the full result including exchangeMic */
   onSymbolSelect?: (rowIndex: number, result: SymbolSearchResult) => void;
   /** Called when user wants to create a custom asset. Opens a dialog to collect asset metadata. */
@@ -95,6 +103,7 @@ export function useActivityColumns({
   onDelete,
   onLinkTransfer,
   onUnlinkTransfer,
+  showSubtypeInType,
   onSymbolSelect,
   onCreateCustomAsset,
 }: UseActivityColumnsOptions) {
@@ -200,6 +209,16 @@ export function useActivityColumns({
         size: 150,
         enablePinning: false,
         meta: {
+          renderKey: showSubtypeInType,
+          getRenderKey: (rowData) => {
+            if (!showSubtypeInType) return null;
+            const transaction = rowData as LocalTransaction;
+            return JSON.stringify([
+              transaction.subtype ?? null,
+              transaction.needsReview,
+              transaction.isNew === true,
+            ]);
+          },
           cell: {
             variant: "select",
             options: activityTypeOptions,
@@ -210,7 +229,11 @@ export function useActivityColumns({
               return (
                 <ActivityTypeBadge
                   type={value as ActivityType}
-                  subtype={shouldDisplaySubtype(transaction, value, subtype) ? subtype : undefined}
+                  subtype={
+                    shouldDisplaySubtypeInTypeColumn(showSubtypeInType, transaction, value, subtype)
+                      ? subtype
+                      : undefined
+                  }
                   className="text-xs font-normal"
                 />
               );
@@ -473,6 +496,7 @@ export function useActivityColumns({
       onLinkTransfer,
       onUnlinkTransfer,
       onSymbolSelect,
+      showSubtypeInType,
       t,
     ],
   );

@@ -163,5 +163,9 @@ pub fn default_adapter_descriptors() -> Vec<EntityAdapterDescriptor> {
             entity: SyncEntity::AddonStorage,
             table_name: "addon_storage",
         },
+        EntityAdapterDescriptor {
+            entity: SyncEntity::AssetLogo,
+            table_name: "asset_logos",
+        },
     ]
 }

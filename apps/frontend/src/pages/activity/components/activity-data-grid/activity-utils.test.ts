@@ -959,6 +959,56 @@ describe("activity-utils", () => {
       expect(result.updates[0].asset).toBeUndefined();
     });
 
+    it("preserves a symbol-backed adjustment asset on unrelated edits", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "adjustment-1",
+          activityType: ActivityType.ADJUSTMENT,
+          assetId: "asset-aapl",
+          assetSymbol: "AAPL",
+          _originalAssetId: "asset-aapl",
+          _originalAssetSymbol: "AAPL",
+        }),
+      ];
+
+      const result = buildSavePayload(
+        transactions,
+        new Set(["adjustment-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].asset).toEqual(expect.objectContaining({ id: "asset-aapl" }));
+    });
+
+    it("explicitly clears an adjustment asset when its symbol is removed", () => {
+      const transactions: LocalTransaction[] = [
+        createMockTransaction({
+          id: "adjustment-1",
+          activityType: ActivityType.ADJUSTMENT,
+          assetId: "",
+          assetSymbol: "",
+          _originalAssetId: "asset-aapl",
+          _originalAssetSymbol: "AAPL",
+        }),
+      ];
+
+      const result = buildSavePayload(
+        transactions,
+        new Set(["adjustment-1"]),
+        new Set(),
+        mockResolveTransactionCurrency,
+        dirtyCurrencyLookup,
+        assetCurrencyLookup,
+        "USD",
+      );
+
+      expect(result.updates[0].asset).toEqual({});
+    });
+
     it("should not force account currency for securities transfers", () => {
       const transactions: LocalTransaction[] = [
         createMockTransaction({

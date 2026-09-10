@@ -2,7 +2,8 @@
   "needs_review_alert": {
     "title_one": "{{count}} activity needs review",
     "title_other": "{{count}} activities need review",
-    "description": "Confirm each transaction's asset, type, and final amount."
+    "description": "Confirm each transaction's asset, type, and final amount.",
+    "action": "Review"
   },
   "activities": "Activities",
   "add_activity": "Add Activity",
@@ -134,7 +135,6 @@
   "duplicate": "Duplicate",
   "delete": "Delete",
   "loading": "Loading…",
-  "load_more": "Load more...",
   "search_placeholder": "Search...",
   "clear_search": "Clear search",
   "filter_account": "Account",
@@ -292,7 +292,7 @@
   "import_help_docs_activity_ref": "Activity Reference documentation",
   "import_help_how_to_title": "How to Import CSV?",
   "import_help_how_to_mobile": "How to Import CSV",
-  "pagination_count": "{{fetched}} / {{total}} activities",
+  "pagination_count": "{{fetched}}/{{total}} activities",
   "manager": {
     "add_to_account": "Add a new transaction to {{account}}",
     "create_transaction": "Create a new transaction or activity for your account",
@@ -345,7 +345,8 @@
     "status_all": "All Activities",
     "status_pending": "Pending Review",
     "status_validated": "Validated",
-    "instrument": "Instrument"
+    "instrument": "Instrument",
+    "instrument_all": "All Instruments"
   },
   "detail": {
     "status_posted": "Posted",
@@ -1212,7 +1213,9 @@
       "positionsCount_one": "{{count}} holding",
       "positionsCount_other": "{{count}} holdings",
       "readyRows_one": "{{count}} row",
-      "readyRows_other": "{{count}} rows"
+      "readyRows_other": "{{count}} rows",
+      "ambiguousDateTitle": "Date order is ambiguous",
+      "ambiguousDateHint": "Dates like {{example}} can be read as day/month or month/day, and nothing in this file settles it. Go back and choose a date format instead of Auto-detect."
     },
     "symbolPanel": {
       "unrecognized_one": "{{count}} unrecognized symbol",

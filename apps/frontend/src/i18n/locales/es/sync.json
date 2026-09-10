@@ -18,7 +18,8 @@
     "connectThisDevice": "Conectar este dispositivo",
     "enableDeviceSync": "Activar la sincronización de dispositivos",
     "morePreview_one": "+{{count}} más",
-    "morePreview_other": "+{{count}} más"
+    "morePreview_other": "+{{count}} más",
+    "morePreview_many": "+{{count}} más"
   },
   "status": {
     "syncError": "Error de sincronización",
@@ -38,10 +39,13 @@
     "thisDeviceSuffix": "· Este dispositivo",
     "minutesAgo_one": "hace {{count}} min",
     "minutesAgo_other": "hace {{count}} min",
+    "minutesAgo_many": "hace {{count}} min",
     "hoursAgo_one": "hace {{count}} h",
     "hoursAgo_other": "hace {{count}} h",
+    "hoursAgo_many": "hace {{count}} h",
     "daysAgo_one": "hace {{count}} d",
-    "daysAgo_other": "hace {{count}} d"
+    "daysAgo_other": "hace {{count}} d",
+    "daysAgo_many": "hace {{count}} d"
   },
   "engine": {
     "pauseSync": "Pausar sincronización",
@@ -72,6 +76,7 @@
     "notConnectedYet": "Este dispositivo aún no está conectado",
     "enterCodeFromDevices_one": "Introduce el código de uno de tus {{count}} otros dispositivos conectados.",
     "enterCodeFromDevices_other": "Introduce el código de uno de tus {{count}} otros dispositivos conectados.",
+    "enterCodeFromDevices_many": "Introduce el código de uno de tus {{count}} otros dispositivos conectados.",
     "enterCodeGeneric": "Introduce el código de tu otro dispositivo conectado para sincronizar tus datos.",
     "connectThisDevice": "Conectar este dispositivo",
     "connectToStartSyncing": "Conecta este dispositivo para empezar a sincronizar."
@@ -127,6 +132,7 @@
     "replaceDataDescription": "Tus datos locales se reemplazarán con los datos de tu otro dispositivo conectado.",
     "localRowsReplaced_one": "Se reemplazará {{count}} fila local.",
     "localRowsReplaced_other": "Se reemplazarán {{count}} filas locales.",
+    "localRowsReplaced_many": "Se reemplazarán {{count}} filas locales.",
     "notNow": "Ahora no",
     "syncing": "Sincronizando...",
     "replaceAndSync": "Reemplazar y sincronizar"

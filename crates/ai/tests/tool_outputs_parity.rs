@@ -591,6 +591,11 @@ fn fixture_cash_activity(
         splits: Vec::new(),
         event_id: None,
         transfer_link_status: None,
+        // Matches the -12.50 posted withdrawal above. Unused by the parity
+        // assertions, but the fixture should not claim a movement the activity
+        // does not describe.
+        net_amount: -12.5,
+        net_amount_base: None,
     }
 }
 

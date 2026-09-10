@@ -254,6 +254,11 @@ const ActivityPage = () => {
     [materializeInvestmentFilters],
   );
 
+  const handleReviewActivities = useCallback(() => {
+    setViewMode("datagrid");
+    setStatusFilter("pending");
+  }, [setStatusFilter, setViewMode]);
+
   const setInvestmentDateRange = useCallback(
     (range: DateRange | undefined) => {
       materializeInvestmentFilters({ dateRange: fromDateRange(range) });
@@ -277,11 +282,19 @@ const ActivityPage = () => {
 
   // handle filter changes in mobile form
   const setMobileFilters = useCallback(
-    (types: ActivityType[], range: DateRange | undefined, scope: AccountScope) => {
+    (next: {
+      activityTypes: ActivityType[];
+      dateRange: DateRange | undefined;
+      accountScope: AccountScope;
+      statusFilter: ActivityStatusFilter;
+      instrumentTypes: string[];
+    }) => {
       materializeInvestmentFilters({
-        accountScope: scope,
-        activityTypes: types,
-        dateRange: fromDateRange(range),
+        accountScope: next.accountScope,
+        activityTypes: next.activityTypes,
+        dateRange: fromDateRange(next.dateRange),
+        statusFilter: next.statusFilter,
+        instrumentTypes: next.instrumentTypes,
       });
     },
     [materializeInvestmentFilters],
@@ -391,7 +404,7 @@ const ActivityPage = () => {
         : source;
 
     return list
-      .filter((acc: Account) => !acc.isArchived)
+      .filter((acc: Account) => !acc.isArchived || acc.id === selectedActivity?.accountId)
       .map((account: Account) => ({
         value: account.id,
         label: account.name,
@@ -690,7 +703,7 @@ const ActivityPage = () => {
       {statusFilter !== "pending" && (
         <NeedsReviewBanner
           accountIds={effectiveInvestmentAccountIds}
-          onReview={() => setStatusFilter("pending")}
+          onReview={handleReviewActivities}
         />
       )}
       {isHealthActivityDeepLink && (
@@ -717,7 +730,10 @@ const ActivityPage = () => {
           onSearchQueryChange={handleSearchChange}
           accountScope={accountScope}
           selectedActivityTypes={effectiveActivityTypes}
+          statusFilter={statusFilter}
+          selectedInstrumentTypes={effectiveInstrumentTypes}
           dateRange={effectiveDateRange}
+          onResetFilters={clearInvestmentsFilters}
           isCompactView={isCompactView}
           onCompactViewChange={setIsCompactView}
           onFilterChange={setMobileFilters}
@@ -761,6 +777,11 @@ const ActivityPage = () => {
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
           onClearFilters={clearInvestmentsFilters}
+          onLoadMore={infiniteSearch.fetchNextPage}
+          hasNextPage={infiniteSearch.hasNextPage}
+          isFetching={infiniteSearch.isFetching}
+          isFetchingNextPage={infiniteSearch.isFetchingNextPage}
+          hasLoadMoreError={infiniteSearch.isFetchNextPageError}
         />
       ) : shouldUseDatagridView ? (
         <ActivityDataGrid
@@ -792,13 +813,16 @@ const ActivityPage = () => {
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
           onClearFilters={clearInvestmentsFilters}
+          onLoadMore={infiniteSearch.fetchNextPage}
+          hasNextPage={infiniteSearch.hasNextPage}
+          isFetching={infiniteSearch.isFetching}
+          isFetchingNextPage={infiniteSearch.isFetchingNextPage}
+          hasLoadMoreError={infiniteSearch.isFetchNextPageError}
         />
       )}
 
       {!shouldUseDatagridView && (
         <ActivityPagination
-          hasMore={infiniteSearch.hasNextPage ?? false}
-          onLoadMore={infiniteSearch.fetchNextPage}
           isFetching={infiniteSearch.isFetchingNextPage}
           totalFetched={totalFetched}
           totalCount={infiniteSearch.totalRowCount}
@@ -892,7 +916,12 @@ const ActivityPage = () => {
 
   return (
     <>
-      <SwipablePage views={views} defaultView="investments" persistKey="activity-page-tab" />
+      <SwipablePage
+        views={views}
+        defaultView="investments"
+        persistKey="activity-page-tab"
+        desktopContentClassName="overflow-y-visible"
+      />
       {sharedModals}
     </>
   );

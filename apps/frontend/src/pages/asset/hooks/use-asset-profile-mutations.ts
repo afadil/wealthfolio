@@ -28,6 +28,7 @@ export const useAssetProfileMutations = () => {
   const updateAssetProfileMutation = useMutation({
     mutationFn: updateAssetProfile,
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_LOGO_INDEX] });
       handleSuccess("Asset profile updated successfully.", result.id);
     },
     onError: (error) => {

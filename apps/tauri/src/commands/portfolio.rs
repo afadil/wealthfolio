@@ -10,7 +10,7 @@ use crate::{
 };
 
 use chrono::NaiveDate;
-use log::{debug, info, warn};
+use log::{debug, info};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -1618,176 +1618,13 @@ pub async fn get_snapshot_by_date(
         .find(|s| s.snapshot_date == target_date)
         .ok_or_else(|| format!("No snapshot found for date {}", date))?;
 
-    // Convert snapshot to holdings format directly
+    // Keep desktop snapshot conversion aligned with the server path.
     let base_currency = state.get_base_currency();
-    let mut holdings: Vec<Holding> = Vec::new();
-
-    // Get all asset IDs from positions
-    let asset_ids: Vec<String> = snapshot
-        .positions
-        .values()
-        .map(|p| p.asset_id.clone())
-        .collect();
-
-    // Fetch asset details if we have positions
-    let assets_map: HashMap<String, wealthfolio_core::assets::Asset> = if !asset_ids.is_empty() {
-        state
-            .asset_service()
-            .get_assets_by_asset_ids(&asset_ids)
-            .await
-            .map_err(|e| format!("Failed to get asset details: {}", e))?
-            .into_iter()
-            .map(|a| (a.id.clone(), a))
-            .collect()
-    } else {
-        HashMap::new()
-    };
-
-    // Convert positions to holdings
-    for position in snapshot.positions.values() {
-        if position.quantity == Decimal::ZERO {
-            continue;
-        }
-
-        let asset = assets_map.get(&position.asset_id);
-        if asset.is_none() {
-            warn!(
-                "Asset {} not found for position in snapshot",
-                position.asset_id
-            );
-            continue;
-        }
-        let asset = asset.unwrap();
-
-        let (holding_type, id_prefix) = if asset.kind.is_alternative() {
-            (
-                wealthfolio_core::holdings::HoldingType::AlternativeAsset,
-                "ALT",
-            )
-        } else {
-            (wealthfolio_core::holdings::HoldingType::Security, "SEC")
-        };
-
-        // Extract purchase_price from metadata for alternative assets
-        let purchase_price: Option<Decimal> = asset.metadata.as_ref().and_then(|m| {
-            m.get("purchase_price").and_then(|v| {
-                if let Some(s) = v.as_str() {
-                    s.parse::<Decimal>().ok()
-                } else if let Some(n) = v.as_f64() {
-                    Decimal::try_from(n).ok()
-                } else {
-                    None
-                }
-            })
-        });
-
-        let instrument = wealthfolio_core::holdings::Instrument {
-            id: asset.id.clone(),
-            symbol: asset.display_code.clone().unwrap_or_default(),
-            name: asset.name.clone(),
-            currency: asset.quote_ccy.clone(),
-            notes: asset.notes.clone(),
-            pricing_mode: asset.quote_mode.as_db_str().to_string(),
-            preferred_provider: asset.preferred_provider(),
-            exchange_mic: asset.instrument_exchange_mic.clone(),
-            instrument_type: asset.instrument_type.clone(),
-            classifications: None,
-        };
-
-        let holding = Holding {
-            id: format!("{}-{}-{}", id_prefix, account_id, position.asset_id),
-            account_id: account_id.clone(),
-            holding_type,
-            is_closed: false,
-            instrument: Some(instrument),
-            asset_kind: Some(asset.kind.clone()),
-            quantity: position.quantity,
-            open_date: Some(position.inception_date),
-            lots: None,
-            contract_multiplier: position.contract_multiplier,
-            local_currency: position.currency.clone(),
-            base_currency: base_currency.clone(),
-            fx_rate: None,
-            market_value: wealthfolio_core::holdings::MonetaryValue::zero(),
-            cost_basis: Some(wealthfolio_core::holdings::MonetaryValue {
-                local: position.total_cost_basis,
-                base: Decimal::ZERO,
-            }),
-            price: None,
-            purchase_price,
-            unrealized_gain: None,
-            unrealized_gain_pct: None,
-            realized_gain: None,
-            realized_gain_pct: None,
-            total_gain: None,
-            total_gain_pct: None,
-            income: None,
-            total_return: None,
-            total_return_pct: None,
-            return_basis: None,
-            day_change: None,
-            day_change_pct: None,
-            prev_close_value: None,
-            weight: Decimal::ZERO,
-            as_of_date: target_date,
-            metadata: asset.metadata.clone(),
-            source_account_ids: Vec::new(),
-        };
-        holdings.push(holding);
-    }
-
-    // Convert cash balances to holdings
-    for (currency, &amount) in &snapshot.cash_balances {
-        if amount == Decimal::ZERO {
-            continue;
-        }
-
-        let holding = Holding {
-            id: format!("CASH-{}-{}", account_id, currency),
-            account_id: account_id.clone(),
-            holding_type: wealthfolio_core::holdings::HoldingType::Cash,
-            is_closed: false,
-            instrument: None,
-            asset_kind: None, // Cash holdings have no asset
-            quantity: amount,
-            open_date: None,
-            lots: None,
-            contract_multiplier: Decimal::ONE,
-            local_currency: currency.clone(),
-            base_currency: base_currency.clone(),
-            fx_rate: None,
-            market_value: wealthfolio_core::holdings::MonetaryValue {
-                local: amount,
-                base: Decimal::ZERO,
-            },
-            cost_basis: Some(wealthfolio_core::holdings::MonetaryValue {
-                local: amount,
-                base: Decimal::ZERO,
-            }),
-            price: Some(Decimal::ONE),
-            purchase_price: None,
-            unrealized_gain: None,
-            unrealized_gain_pct: None,
-            realized_gain: None,
-            realized_gain_pct: None,
-            total_gain: None,
-            total_gain_pct: None,
-            income: None,
-            total_return: None,
-            total_return_pct: None,
-            return_basis: None,
-            day_change: None,
-            day_change_pct: None,
-            prev_close_value: None,
-            weight: Decimal::ZERO,
-            as_of_date: target_date,
-            metadata: None,
-            source_account_ids: Vec::new(),
-        };
-        holdings.push(holding);
-    }
-
-    Ok(holdings)
+    state
+        .holdings_service()
+        .holdings_from_snapshot(&snapshot, &base_currency)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Deletes a snapshot by date or ID.

@@ -1118,6 +1118,50 @@ mod tests {
     }
 
     #[test]
+    fn drip_with_unrepresentable_acquisition_price_rebuilds_without_panicking() {
+        let account_currency = "USD";
+        let target_date_str = "2026-05-05";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        for (quantity, expected_basis, expected_status) in [
+            (dec!(0.1), Decimal::ZERO, BasisStatus::Unknown),
+            (dec!(2), Decimal::ZERO, BasisStatus::Unknown),
+            (dec!(3), Decimal::MAX, BasisStatus::Complete),
+        ] {
+            let base_currency = Arc::new(RwLock::new(account_currency.to_string()));
+            let mut calculator = create_calculator(Arc::new(MockFxService::new()), base_currency);
+            let previous_snapshot =
+                create_initial_snapshot("acc_1", account_currency, "2026-05-04");
+            let mut drip = create_default_activity(
+                "overflow-drip-1",
+                ActivityType::Dividend,
+                "AAPL",
+                quantity,
+                Decimal::ZERO,
+                Decimal::ZERO,
+                account_currency,
+                target_date_str,
+            );
+            drip.subtype = Some("DRIP".to_string());
+            drip.unit_price = None;
+            drip.amount = Some(Decimal::MAX);
+
+            let activities_today = DefaultActivityCompiler::new().compile(&drip).unwrap();
+            let result = calculator
+                .calculate_next_holdings(&previous_snapshot, &activities_today, target_date)
+                .unwrap();
+
+            let position = result.snapshot.positions.get("AAPL").unwrap();
+            assert_eq!(position.quantity, quantity);
+            assert_eq!(position.total_cost_basis, expected_basis);
+            assert_eq!(position.basis_status(), expected_status);
+            assert_eq!(
+                result.snapshot.cash_balances.get(account_currency),
+                Some(&Decimal::ZERO)
+            );
+        }
+    }
+
+    #[test]
     fn test_activity_buckets_to_user_local_day_boundary() {
         let mut calculator = create_calculator_with_timezone(
             Arc::new(MockFxService::new()),
@@ -3298,6 +3342,125 @@ mod tests {
         // Account-boundary cashflow: transfers affect net_contribution.
         assert_eq!(state.net_contribution, dec!(1000) * usd_cad);
         assert_eq!(state.net_contribution_base, dec!(1000) * usd_cad);
+    }
+
+    #[test]
+    fn imported_same_account_cash_fx_pair_is_contribution_neutral() {
+        let target_date_str = "2026-04-14";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let valuation_rate = dec!(0.88);
+        let mut mock_fx_service = MockFxService::new();
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", target_date, valuation_rate);
+
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+        let mut calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+        let mut previous_snapshot = create_initial_snapshot("acc_fx", "EUR", "2026-04-13");
+        previous_snapshot
+            .cash_balances
+            .insert("EUR".to_string(), dec!(48.30));
+        previous_snapshot
+            .cash_balances
+            .insert("USD".to_string(), dec!(19839.79));
+        previous_snapshot.net_contribution = dec!(1234.56);
+        previous_snapshot.net_contribution_base = dec!(7890.12);
+
+        let mut transfer_out = create_cash_activity(
+            "fx-out",
+            ActivityType::TransferOut,
+            dec!(106.03),
+            Decimal::ZERO,
+            "EUR",
+            target_date_str,
+        );
+        let mut transfer_in = create_cash_activity(
+            "fx-in",
+            ActivityType::TransferIn,
+            dec!(124.9743801),
+            Decimal::ZERO,
+            "USD",
+            target_date_str,
+        );
+        for activity in [&mut transfer_out, &mut transfer_in] {
+            activity.account_id = "acc_fx".to_string();
+            activity.source_group_id = Some("ibkr-fx-execution".to_string());
+            activity.metadata = Some(json!({
+                "flow": { "is_external": false },
+                "fx": {
+                    "sourceCurrency": "EUR",
+                    "destinationCurrency": "USD",
+                    "sourceAmount": "106.03",
+                    "destinationAmount": "124.9743801",
+                    "impliedRate": "1.1786646232198434405356974441",
+                    "rateSource": "implied_from_import"
+                }
+            }));
+        }
+
+        let result = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[transfer_out, transfer_in],
+                target_date,
+            )
+            .expect("same-account FX conversion should calculate");
+        let state = result.snapshot;
+
+        assert_eq!(state.cash_balances.get("EUR"), Some(&dec!(-57.73)));
+        assert_eq!(state.cash_balances.get("USD"), Some(&dec!(19964.7643801)));
+        assert_eq!(state.net_contribution, previous_snapshot.net_contribution);
+        assert_eq!(
+            state.net_contribution_base,
+            previous_snapshot.net_contribution_base
+        );
+
+        let value_before = dec!(48.30) + dec!(19839.79) * valuation_rate;
+        assert_ne!(state.cash_total_account_currency, value_before);
+    }
+
+    #[test]
+    fn grouped_same_account_cash_fx_without_import_metadata_keeps_transfer_semantics() {
+        let target_date_str = "2026-04-14";
+        let target_date = NaiveDate::from_str(target_date_str).unwrap();
+        let mut mock_fx_service = MockFxService::new();
+        mock_fx_service.add_bidirectional_rate("USD", "EUR", target_date, dec!(0.88));
+
+        let base_currency = Arc::new(RwLock::new("EUR".to_string()));
+        let mut calculator = create_calculator(Arc::new(mock_fx_service), base_currency);
+        let previous_snapshot = create_initial_snapshot("acc_fx", "EUR", "2026-04-13");
+
+        let mut transfer_out = create_cash_activity(
+            "ordinary-out",
+            ActivityType::TransferOut,
+            dec!(100),
+            Decimal::ZERO,
+            "EUR",
+            target_date_str,
+        );
+        let mut transfer_in = create_cash_activity(
+            "ordinary-in",
+            ActivityType::TransferIn,
+            dec!(120),
+            Decimal::ZERO,
+            "USD",
+            target_date_str,
+        );
+        for activity in [&mut transfer_out, &mut transfer_in] {
+            activity.account_id = "acc_fx".to_string();
+            activity.source_group_id = Some("ordinary-group".to_string());
+            activity.metadata = Some(json!({ "flow": { "is_external": false } }));
+        }
+
+        let state = calculator
+            .calculate_next_holdings(
+                &previous_snapshot,
+                &[transfer_out, transfer_in],
+                target_date,
+            )
+            .expect("ordinary grouped transfers should calculate")
+            .snapshot;
+
+        assert_eq!(state.net_contribution, dec!(5.6));
+        assert_eq!(state.net_contribution_base, dec!(5.6));
     }
 
     #[test]

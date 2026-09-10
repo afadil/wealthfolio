@@ -63,6 +63,7 @@ export * from "./components/formatting-provider";
 // Export utilities
 export * from "./lib/utils";
 export * from "./lib/formatting";
+export * from "./lib/ticker-logo";
 
 // Export currencies data
 export * from "./lib/currencies";

@@ -2,8 +2,8 @@
 
 Complete reference for Wealthfolio addon APIs. Data APIs require an appropriate
 permission entry in `manifest.json`. The baseline capabilities — `query`,
-`storage`, `toast`, `logger`, UI integration, and packaged assets — are
-available to every addon and need no declaration.
+`storage`, `toast`, `logger`, navigation, UI integration, and packaged assets —
+are available to every addon and need no declaration.
 
 ## Context Overview
 
@@ -12,11 +12,11 @@ The `AddonContext` is provided to your addon's `enable` function:
 ```typescript
 export interface AddonContext {
   api: HostAPI;
-  sidebar: SidebarAPI;
-  router: RouterAPI;
+  sidebar: SidebarManager;
+  router: RouterManager;
   ui: { root: HTMLElement };
   assets: AddonAssets;
-  onDisable: (callback: () => void) => void;
+  onDisable(callback: () => void): void;
 }
 ```
 
@@ -155,14 +155,18 @@ host.
 
 ### Methods
 
-#### `getClient(): QueryClient`
+#### `getClient(): unknown`
 
-Gets the sandbox's addon-local QueryClient. It is reused across this addon's
-routes, but its cache is not shared with the host or other addons. Calls to the
-client's `invalidateQueries()` and `refetchQueries()` are mirrored to the host.
+Gets the sandbox's addon-local QueryClient as an opaque bridge value. Cast it to
+the exported `QueryClient` type before using TanStack Query methods or passing
+it to `QueryClientProvider`. It is reused across this addon's routes, but its
+cache is not shared with the host or other addons. Calls to the client's
+`invalidateQueries()` and `refetchQueries()` are mirrored to the host.
 
 ```typescript
-const queryClient = ctx.api.query.getClient();
+import type { QueryClient } from "@wealthfolio/addon-sdk";
+
+const queryClient = ctx.api.query.getClient() as QueryClient;
 
 // Use standard React Query methods
 const accounts = await queryClient.fetchQuery({
@@ -263,7 +267,7 @@ which is what enables lazy activation. Two primitives:
 Runtime sidebar registration still exists for **genuinely dynamic** items;
 static nav should be declared in the manifest instead.
 
-#### `addItem(item: SidebarItem): SidebarItemHandle`
+#### `addItem(config: SidebarItemConfig): SidebarItemHandle`
 
 ```typescript
 const sidebarItem = ctx.sidebar.addItem({
@@ -328,118 +332,149 @@ const enable: AddonEnableFunction = (ctx) => {
 
 ---
 
-## Error Handling
+## Activities API
 
-### API Error Types
+Create, update, search, and import activities. These methods require the
+corresponding functions in the `activities` permission.
 
-```typescript
-interface APIError {
-  code: string;
-  message: string;
-  details?: any;
-}
-```
+### Methods
 
-Common error codes:
+#### `getAll(accountId?: string): Promise<ActivityDetails[]>`
 
-- `PERMISSION_DENIED` - Insufficient permissions
-- `NOT_FOUND` - Resource not found
-- `VALIDATION_ERROR` - Invalid data provided
-- `NETWORK_ERROR` - Connection issues
-- `RATE_LIMITED` - Too many requests
-
-### Best Practices
+Gets all activities, optionally filtered to one account.
 
 ```typescript
-try {
-  const accounts = await ctx.api.accounts.getAll();
+const activities = await ctx.api.activities.getAll("account-123");
 ```
 
-#### `search(
+#### `search(page: number, pageSize: number, filters: ActivitySearchFilters, searchKeyword: string, sort?: ActivitySort): Promise<ActivitySearchResponse>`
 
-page: number, pageSize: number, filters: ActivitySearchFilters, searchKeyword:
-string, sort?: ActivitySort, ): Promise<ActivitySearchResponse>`
+Searches activities with pagination, filters, and one optional sort.
 
-Search activities with pagination, filters, and a single optional sort.
-
-- `page`: Zero-based page index. Use `0` for the first page (e.g., for exports
-  you can pass `0` with a large `pageSize` such as `1000`).
-- `pageSize`: Number of rows per page.
-- `filters`: Accepts single strings or arrays for `accountIds` and
-  `activityTypes`. Empty strings/arrays are ignored.
+- `page`: Zero-based page index. Use `0` for the first page.
+- `filters`: Accepts a string or array for `accountIds` and `activityTypes`.
+  Empty values are ignored.
 - `searchKeyword`: Free-form keyword search; pass an empty string when unused.
-- `sort`: Optional sort object (defaults to `{ id: "date", desc: true }`). Only
-  one sort is supported.
+- `sort`: Defaults to `{ id: "date", desc: true }` when omitted.
 
 ```typescript
 const { data, meta } = await ctx.api.activities.search(
   0,
   50,
   {
-    accountIds: "account-1", // single string or string[] both work
+    accountIds: "account-1",
     activityTypes: ["BUY", "DIVIDEND"],
-    symbol: "AAPL", // optional exact symbol filter
+    symbol: "AAPL",
   },
-  "", // optional search keyword
+  "",
   { id: "date", desc: true },
 );
 
 console.log(meta.totalRowCount);
 ```
 
-#### `update(activity: ActivityUpdate): Promise<Activity>`
+#### `create(activity: ActivityCreate): Promise<Activity>`
 
-Updates an existing activity with conflict detection.
+Creates an activity. Wealthfolio 3.8 adds the optional `status` and
+`needsReview` fields to `ActivityCreate`.
 
 ```typescript
-const updated = await ctx.api.activities.update({
-  ...existingActivity,
-  quantity: 150,
-  unitPrice: 145.75,
+const activity = await ctx.api.activities.create({
+  accountId: "account-123",
+  activityType: "BUY",
+  activityDate: "2026-09-04",
+  asset: { symbol: "AAPL" },
+  quantity: 100,
+  unitPrice: 150.5,
+  currency: "USD",
+  status: "POSTED",
+  needsReview: false,
 });
 ```
 
-#### `saveMany(activities: ActivityUpdate[]): Promise<Activity[]>`
+#### `update(activity: ActivityUpdate): Promise<Activity>`
 
-Efficiently creates multiple activities in a single transaction.
-
-```typescript
-const activities = await ctx.api.activities.saveMany([
-  { accountId: "account-123", activityType: "BUY" /* ... */ },
-  { accountId: "account-123", activityType: "DIVIDEND" /* ... */ },
-]);
-```
-
-#### `delete(activityId: string): Promise<void>`
-
-Deletes an activity and updates portfolio calculations.
+Updates an activity. Wealthfolio 3.8 adds the optional `status` and
+`needsReview` fields. Omit `asset` to preserve the current asset association;
+pass `asset: {}` to clear it.
 
 ```typescript
-await ctx.api.activities.delete("activity-456");
+const updated = await ctx.api.activities.update({
+  ...editableActivity, // ActivityUpdate
+  quantity: 150,
+  unitPrice: 145.75,
+  needsReview: false,
+});
 ```
 
-#### `import(activities: ActivityImport[]): Promise<ActivityImport[]>`
+Addons using the review fields or asset patch semantics must set
+`minWealthfolioVersion` to `3.8.0` or newer.
 
-Imports validated activities with duplicate detection.
+#### `saveMany(request: ActivityBulkMutationRequest): Promise<ActivityBulkMutationResult>`
+
+Creates, updates, and deletes activities in one request.
 
 ```typescript
-const imported = await ctx.api.activities.import(checkedActivities);
+const result = await ctx.api.activities.saveMany({
+  creates: [
+    {
+      accountId: "account-123",
+      activityType: "DIVIDEND",
+      activityDate: "2026-09-04",
+      amount: 25,
+      currency: "USD",
+    },
+  ],
+  updates: [],
+  deleteIds: [],
+});
 ```
 
-#### `checkImport(accountId: string, activities: ActivityImport[]): Promise<ActivityImport[]>`
+#### `import(activities: ActivityImport[]): Promise<ImportActivitiesResult>`
 
-Validates activities before import with error reporting.
+Imports validated activities with duplicate detection and returns the import
+run, imported activities, and summary.
 
 ```typescript
-const validated = await ctx.api.activities.checkImport(
-  "account-123",
-  activities,
-);
+const result = await ctx.api.activities.import(checkedActivities);
 ```
 
-#### `getImportMapping(accountId: string): Promise<ImportMappingData>`
+Use `isExternal` to identify whether a transfer or credit crosses the tracked
+Wealthfolio portfolio boundary. For example, an internal transfer can be
+imported explicitly as:
 
-Get import mapping configuration for an account.
+```typescript
+const internalTransfer: ActivityImport = {
+  accountId: "account-123",
+  activityType: "TRANSFER_IN",
+  date: "2026-09-04",
+  currency: "USD",
+  amount: 100,
+  symbol: "",
+  isExternal: false,
+  isValid: true,
+  isDraft: false,
+};
+```
+
+`false` means the activity stays within the tracked portfolio boundary; `true`
+means it crosses that boundary. Do not set `false` for every transfer: when
+omitted, `TRANSFER_IN` and `TRANSFER_OUT` default to internal at the portfolio
+boundary. For `CREDIT`, omission keeps the subtype default (`BONUS` is external;
+other credit subtypes are internal).
+
+#### `checkImport(activities: ActivityImport[]): Promise<ActivityImport[]>`
+
+Validates and normalizes activities without importing them.
+
+```typescript
+const validated = await ctx.api.activities.checkImport(activities);
+```
+
+#### `getImportMapping(accountId: string, contextKind?: string): Promise<ImportMappingData>`
+
+Gets import mapping configuration for an account. `contextKind` defaults to
+`"ACTIVITY"`.
 
 ```typescript
 const mapping = await ctx.api.activities.getImportMapping("account-123");
@@ -447,7 +482,7 @@ const mapping = await ctx.api.activities.getImportMapping("account-123");
 
 #### `saveImportMapping(mapping: ImportMappingData): Promise<ImportMappingData>`
 
-Save import mapping configuration.
+Saves import mapping configuration.
 
 ```typescript
 const savedMapping = await ctx.api.activities.saveImportMapping(mapping);
@@ -536,20 +571,20 @@ const [a, b] = await ctx.api.activities.unlinkTransfer(
 );
 ```
 
+---
+
+## Error Handling
+
+Host API failures reject their promise with an error. Handle failures at the
+user action boundary and show a useful message without exposing financial data.
+
 ```typescript
 try {
   const accounts = await ctx.api.accounts.getAll();
 } catch (error) {
-  if (error.code === "PERMISSION_DENIED") {
-    ctx.api.logger.error("Missing account permissions");
-    // Show user-friendly message
-  } else if (error.code === "NETWORK_ERROR") {
-    ctx.api.logger.warn("Network issue, retrying...");
-    // Implement retry logic
-  } else {
-    ctx.api.logger.error("Unexpected error:", error);
-    // General error handling
-  }
+  const message = error instanceof Error ? error.message : String(error);
+  ctx.api.logger.error(`Unable to load accounts: ${message}`);
+  ctx.api.toast.error("Unable to load accounts");
 }
 ```
 
@@ -587,23 +622,23 @@ const { data, meta } = await ctx.api.activities.search(
 console.log(meta.totalRowCount);
 
 // Batch create
-const newActivities = await ctx.api.activities.saveMany([
-  {
-    /* activity 1 */
-  },
-  {
-    /* activity 2 */
-  },
-  {
-    /* activity 3 */
-  },
-]);
+const result = await ctx.api.activities.saveMany({
+  creates: [
+    {
+      accountId: "account-1",
+      activityType: "DEPOSIT",
+      activityDate: "2026-09-04",
+      amount: 1000,
+      currency: "USD",
+    },
+  ],
+});
 ```
 
 ### Real-time Updates
 
 ```typescript
-export default function enable(ctx: AddonContext) {
+export default async function enable(ctx: AddonContext) {
   // Listen for multiple events
   const unsubscribers = [
     await ctx.api.events.portfolio.onUpdateComplete(() => refreshData()),
@@ -653,7 +688,7 @@ import type {
   Account,
   Activity,
   Holding,
-  PerformanceHistory,
+  PerformanceResult,
   PerformanceSummary,
   // ... and many more
 } from "@wealthfolio/addon-sdk";
@@ -678,30 +713,29 @@ const holdings: Holding[] = await ctx.api.portfolio.getHoldings(accounts[0].id);
 [official addon examples](https://github.com/wealthfolio/wealthfolio-addons/tree/main/official)
 to see these APIs in action.
 
-````
-
 ---
 
 ## Performance API
 
 Calculate portfolio and account performance metrics with historical analysis.
-`returns.irr` is the selected-period money-weighted return. `returns.annualizedIrr`
-is the annualized XIRR on the same dated cash flows.
+`returns.irr` is the selected-period money-weighted return.
+`returns.annualizedIrr` is the annualized XIRR on the same dated cash flows.
 
 ### Methods
 
-#### `calculateHistory(itemType: 'account' | 'symbol', itemId: string, startDate: string, endDate: string): Promise<PerformanceResult>`
+#### `calculateHistory(itemType: 'account' | 'symbol', itemId: string, startDate?: string, endDate?: string): Promise<PerformanceResult>`
+
 Calculates detailed performance history for charts and analysis.
 
 ```typescript
 const history = await ctx.api.performance.calculateHistory(
-  'account',
-  'account-123',
-  '2024-01-01',
-  '2024-12-31'
+  "account",
+  "account-123",
+  "2024-01-01",
+  "2024-12-31",
 );
 console.log(history.returns.twr, history.returns.irr, history.series);
-````
+```
 
 #### `calculateSummary(args: { itemType: 'account' | 'symbol'; itemId: string; startDate?: string | null; endDate?: string | null; }): Promise<PerformanceResult>`
 
@@ -758,7 +792,8 @@ const updatedRate = await ctx.api.exchangeRates.update({
   fromCurrency: "USD",
   toCurrency: "EUR",
   rate: 0.85,
-  // ... other rate data
+  source: "MANUAL",
+  timestamp: "2024-12-01T00:00:00Z",
 });
 ```
 
@@ -771,7 +806,8 @@ const newRate = await ctx.api.exchangeRates.add({
   fromCurrency: "USD",
   toCurrency: "GBP",
   rate: 0.75,
-  // ... other rate data
+  source: "MANUAL",
+  timestamp: "2024-12-01T00:00:00Z",
 });
 ```
 
@@ -786,6 +822,9 @@ to come from an exact quote on the requested date.
 Results preserve the input order. A pair that cannot be resolved returns
 `rate: null` and an `error` without failing the rest of the batch.
 
+This method requires Wealthfolio 3.8 or newer. Addons using it must set
+`minWealthfolioVersion` to `3.8.0` or newer.
+
 ```typescript
 const results = await ctx.api.exchangeRates.getRatesForDates([
   { fromCurrency: "USD", toCurrency: "EUR", date: "2024-01-15" },
@@ -799,6 +838,100 @@ for (const result of results) {
     console.error(result.error);
   }
 }
+```
+
+---
+
+## Spend Categorization API
+
+Classify activities (e.g. `WITHDRAWAL`s) into the user's existing spend-category
+taxonomy via Wealthfolio's categorization-rules engine, instead of a one-off
+per-activity tag. A rule is reusable — it keeps applying to future matching
+imports, not just the activities that exist when it's created.
+
+This API requires Wealthfolio 3.8 or newer and the medium-risk `spending`
+permission. Declare only the methods your addon calls from `isEnabled`,
+`getCategories`, `getRules`, `saveRule`, `deleteRule`, and `rerunRules`.
+
+`kind` selects which of Wealthfolio's three fixed activity-scope taxonomies a
+category or rule belongs to: `"expense"`, `"income"`, or `"saving"`. Asset
+classification taxonomies aren't reachable through this API.
+
+### Methods
+
+#### `isEnabled(): Promise<boolean>`
+
+Whether the user has Spending enabled. Categories and rules still work when it's
+off, but `rerunRules()` is a no-op until the user opts an account in — check
+this to explain a result of `0`.
+
+```typescript
+if (!(await ctx.api.spending.isEnabled())) {
+  // Nudge the user to enable Spending before offering categorization.
+}
+```
+
+#### `getCategories(kind?: SpendCategoryKind): Promise<SpendCategory[]>`
+
+Lists selectable spend categories, flattened with a display path. Omit `kind` to
+load all three taxonomies at once.
+
+```typescript
+const categories = await ctx.api.spending.getCategories("expense");
+// [{ kind: "expense", taxonomyId: "spending_categories", categoryId: "cat_groceries",
+//    key: "groceries", name: "Groceries", path: "Food & Dining / Groceries" }, ...]
+```
+
+#### `getRules(): Promise<CategorizationRule[]>`
+
+Lists this addon's own categorization rules — the ones created via `saveRule`.
+Use this to reconcile after a user deletes one of your rules from Wealthfolio's
+own Settings → Spending → Rules UI.
+
+```typescript
+const rules = await ctx.api.spending.getRules();
+```
+
+#### `saveRule(rule: CategorizationRuleInput): Promise<CategorizationRule>`
+
+Creates or updates a categorization rule identified by `rule.ruleKey`. Calling
+this again with the same `ruleKey` (typically a stable id you already persist in
+your own addon settings) updates the existing rule in place instead of creating
+a duplicate — safe to call on every settings save.
+
+```typescript
+const saved = await ctx.api.spending.saveRule({
+  ruleKey: "my-addon-rule-1", // a stable key you choose and reuse
+  name: "Groceries via MyBank",
+  pattern: "MYBANK GROCERY",
+  matchType: "contains", // "contains" | "starts_with" | "exact" | "regex"
+  kind: "expense",
+  categoryId: "cat_groceries",
+  activityType: "WITHDRAWAL", // omit to match any activity type
+  accountId: "account-123", // omit for a rule that applies to all accounts
+});
+```
+
+#### `deleteRule(ruleKey: string): Promise<void>`
+
+Deletes the rule previously created with this `ruleKey`. No-op if no matching
+rule exists.
+
+```typescript
+await ctx.api.spending.deleteRule("my-addon-rule-1");
+```
+
+#### `rerunRules(onlyUncategorized?: boolean): Promise<number>`
+
+Re-runs all categorization rules and returns the number of activities matched by
+a rule. Defaults to `true`, which only fills in currently uncategorized
+activities. Pass `false` to also overwrite existing rule/AI/history/import-
+assigned categories. Manual assignments are always preserved. Call this after an
+import so newly created activities pick up matching rules, since a rule only
+recategorizes existing activities at the moment it's created or updated.
+
+```typescript
+const matched = await ctx.api.spending.rerunRules();
 ```
 
 ---
@@ -823,11 +956,9 @@ Creates a new contribution limit.
 
 ```typescript
 const limit = await ctx.api.contributionLimits.create({
-  name: "RRSP 2024",
-  limitType: "RRSP",
-  maxAmount: 30000,
-  year: 2024,
-  // ... other limit data
+  groupName: "RRSP",
+  contributionYear: 2024,
+  limitAmount: 30000,
 });
 ```
 
@@ -837,9 +968,9 @@ Updates an existing contribution limit.
 
 ```typescript
 const updatedLimit = await ctx.api.contributionLimits.update("limit-123", {
-  name: "Updated RRSP 2024",
-  maxAmount: 31000,
-  // ... other updated data
+  groupName: "RRSP",
+  contributionYear: 2024,
+  limitAmount: 31000,
 });
 ```
 
@@ -868,16 +999,16 @@ Gets all goals.
 const goals = await ctx.api.goals.getAll();
 ```
 
-#### `create(goal: any): Promise<Goal>`
+#### `create(goal: unknown): Promise<Goal>`
 
 Creates a new goal.
 
 ```typescript
 const goal = await ctx.api.goals.create({
-  name: "Retirement Fund",
+  goalType: "retirement",
+  title: "Retirement Fund",
   targetAmount: 500000,
   targetDate: "2040-01-01",
-  // ... other goal data
 });
 ```
 
@@ -900,13 +1031,18 @@ Gets funding rules for a goal.
 const allocations = await ctx.api.goals.getFunding("goal-123");
 ```
 
-#### `saveFunding(goalId: string, allocations: GoalAllocation[]): Promise<GoalAllocation[]>`
+#### `saveFunding(goalId: string, rules: GoalAllocation[]): Promise<GoalAllocation[]>`
 
 Saves funding rules for a goal.
 
 ```typescript
 await ctx.api.goals.saveFunding("goal-123", [
-  { goalId: "goal-123", accountId: "account-456", sharePercent: 50 },
+  {
+    id: "allocation-123",
+    goalId: "goal-123",
+    accountId: "account-456",
+    sharePercent: 50,
+  },
 ]);
 ```
 
@@ -918,7 +1054,12 @@ Deprecated: use `saveFunding(goalId, allocations)` instead.
 
 ```typescript
 await ctx.api.goals.updateAllocations([
-  { goalId: "goal-123", accountId: "account-456", sharePercent: 50 },
+  {
+    id: "allocation-123",
+    goalId: "goal-123",
+    accountId: "account-456",
+    sharePercent: 50,
+  },
   // ... other allocations
 ]);
 ```
@@ -949,19 +1090,17 @@ Gets application settings.
 const settings = await ctx.api.settings.get();
 ```
 
-#### `update(settingsUpdate: Settings): Promise<Settings>`
+#### `update(settingsUpdate: Partial<Settings>): Promise<Settings>`
 
 Updates application settings.
 
 ```typescript
 const updatedSettings = await ctx.api.settings.update({
-  ...currentSettings,
   baseCurrency: "EUR",
-  // ... other settings
 });
 ```
 
-#### `backupDatabase(): Promise<{ filename: string; data: Uint8Array }>`
+#### `backupDatabase(): Promise<{ filename: string }>`
 
 Creates a database backup.
 
@@ -988,7 +1127,7 @@ if (files) {
 }
 ```
 
-#### `openSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<any>`
+#### `openSaveDialog(fileContent: Uint8Array | Blob | string, fileName: string): Promise<unknown>`
 
 Opens a file save dialog.
 

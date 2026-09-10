@@ -8,14 +8,31 @@ and this project adheres to
 
 ### Added
 
+- Optional `ActivityImport.isExternal` boundary override for transfer and credit
+  imports.
 - `ExchangeRatesAPI.getRatesForDates(pairs)` for batched date-specific FX-rate
   lookups, with per-pair errors and Wealthfolio's standard FX resolution rules.
+- `ctx.api.spending` (`SpendingAPI`) — `isEnabled()`, `getCategories()`,
+  `getRules()`, `saveRule()`, `deleteRule()`, `rerunRules()`, letting addons
+  classify activities into the user's existing spend-category taxonomy via
+  Wealthfolio's categorization-rules engine. Requires a Wealthfolio release that
+  ships this bridge (unreleased at the time of writing). See the
+  [Spend Categorization API reference](../../docs/addons/addon-api-reference.md#spend-categorization-api).
 - `registerTranslations()` and `useAddonTranslation()` for translating addon UI
   strings. Resources live on a dedicated i18next instance inside the addon
   sandbox, isolated from the host catalog; the language follows the host
   setting. Requires a Wealthfolio release that ships this sandbox runtime
   (unreleased at the time of writing). See the
   [Addon Localization guide](../../docs/addons/addon-localization.md).
+- Optional `status` and `needsReview` fields on `ActivityCreate` and
+  `ActivityUpdate`.
+
+### Changed
+
+- `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
+  the current asset, or pass an empty object to clear the asset association.
+- Host-provided `@wealthfolio/addon-sdk` and `@wealthfolio/ui` dependency ranges
+  are now `^3.8.0`.
 
 ## [3.7.0] - 2026-08-10
 

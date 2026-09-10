@@ -864,6 +864,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
     async fn update_activity(&self, activity_update: ActivityUpdate) -> Result<Activity> {
         activity_update.validate()?;
+        let asset_patch_supplied = activity_update.asset.is_some();
         let activity_update_owned = activity_update.clone();
         let activity_db_owned: ActivityDB = activity_update.into();
         let activity_id_owned = activity_db_owned.id.clone();
@@ -884,6 +885,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
                 // Preserve fields from existing record that shouldn't be overwritten
                 let ActivityDB {
+                    asset_id,
                     created_at,
                     fx_rate,
                     source_system,
@@ -907,6 +909,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 } = existing;
 
                 activity_to_update.created_at = created_at;
+                if !asset_patch_supplied {
+                    activity_to_update.asset_id = asset_id;
+                }
                 activity_to_update.quantity =
                     apply_decimal_patch(quantity, activity_update_owned.quantity);
                 activity_to_update.unit_price =
@@ -1292,6 +1297,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
                 for update in updates {
                     update.validate()?;
+                    let asset_patch_supplied = update.asset.is_some();
                     let update_owned = update.clone();
                     let subtype_patch = update_owned.subtype.clone();
                     let mut activity_db: ActivityDB = update.into();
@@ -1307,6 +1313,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
 
                     // Preserve fields from existing record
                     let ActivityDB {
+                        asset_id,
                         created_at,
                         source_system,
                         source_record_id,
@@ -1330,6 +1337,9 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     } = existing;
 
                     activity_db.created_at = created_at;
+                    if !asset_patch_supplied {
+                        activity_db.asset_id = asset_id;
+                    }
                     activity_db.quantity = apply_decimal_patch(quantity, update_owned.quantity);
                     activity_db.unit_price =
                         apply_decimal_patch(unit_price, update_owned.unit_price);
@@ -4397,6 +4407,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn update_activity_preserves_omitted_asset_and_clears_explicit_patch() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        let mut conn = get_connection(&pool).expect("conn");
+
+        insert_account(&mut conn, "acc-adjustment");
+        diesel::insert_into(assets::table)
+            .values((
+                assets::id.eq("asset-aapl"),
+                assets::kind.eq("INVESTMENT"),
+                assets::is_active.eq(1),
+                assets::quote_mode.eq("MARKET"),
+                assets::quote_ccy.eq("USD"),
+                assets::created_at.eq("2024-01-15T00:00:00+00:00"),
+                assets::updated_at.eq("2024-01-15T00:00:00+00:00"),
+            ))
+            .execute(&mut conn)
+            .expect("insert asset");
+        insert_activity_with_subtype(
+            &mut conn,
+            "security-adjustment",
+            "acc-adjustment",
+            "ADJUSTMENT",
+            Some("asset-aapl"),
+            Some("CASH_SWEEP"),
+        );
+        drop(conn);
+
+        let omitted_update = || ActivityUpdate {
+            id: "security-adjustment".to_string(),
+            account_id: "acc-adjustment".to_string(),
+            asset: None,
+            activity_type: "ADJUSTMENT".to_string(),
+            subtype: Some("CASH_SWEEP".to_string()),
+            activity_date: "2024-01-15".to_string(),
+            quantity: Some(None),
+            unit_price: Some(None),
+            currency: "USD".to_string(),
+            fee: None,
+            tax: None,
+            amount: Some(Some(Decimal::new(25, 0))),
+            status: None,
+            needs_review: Some(false),
+            notes: None,
+            fx_rate: None,
+            metadata: None,
+        };
+
+        let preserved = repo
+            .update_activity(omitted_update())
+            .await
+            .expect("preserve omitted adjustment asset");
+
+        assert_eq!(preserved.asset_id.as_deref(), Some("asset-aapl"));
+
+        let bulk_preserved = repo
+            .bulk_mutate_activities(Vec::new(), vec![omitted_update()], Vec::new())
+            .await
+            .expect("bulk preserve omitted adjustment asset")
+            .updated
+            .into_iter()
+            .next()
+            .expect("bulk update result");
+        assert_eq!(bulk_preserved.asset_id.as_deref(), Some("asset-aapl"));
+
+        let updated = repo
+            .update_activity(ActivityUpdate {
+                id: "security-adjustment".to_string(),
+                account_id: "acc-adjustment".to_string(),
+                asset: Some(wealthfolio_core::activities::AssetResolutionInput::default()),
+                activity_type: "ADJUSTMENT".to_string(),
+                subtype: Some("CASH_SWEEP".to_string()),
+                activity_date: "2024-01-15".to_string(),
+                quantity: Some(None),
+                unit_price: Some(None),
+                currency: "USD".to_string(),
+                fee: None,
+                tax: None,
+                amount: Some(Some(Decimal::new(25, 0))),
+                status: None,
+                needs_review: Some(false),
+                notes: None,
+                fx_rate: None,
+                metadata: None,
+            })
+            .await
+            .expect("clear explicit adjustment asset patch");
+
+        assert_eq!(updated.asset_id, None);
+        assert_eq!(updated.quantity, None);
+        assert_eq!(updated.unit_price, None);
+        assert_eq!(updated.amount, Some(Decimal::new(25, 0)));
+    }
+
+    #[tokio::test]
     async fn final_cash_migration_updates_are_local_only() {
         let (pool, writer) = setup_db();
         let repo = ActivityRepository::new(pool.clone(), writer);
@@ -5459,6 +5564,124 @@ mod tests {
             activity_metadata(&mut conn, "linked-in")["flow"]["is_external"],
             false
         );
+    }
+
+    #[tokio::test]
+    async fn bulk_upsert_broker_activities_keeps_grouped_records_distinct() {
+        use wealthfolio_connect::broker::{mapping::map_broker_activity, AccountUniversalActivity};
+
+        // Exercise provider fallback, incoming ID fallback, and generated composite IDs.
+        for identity in ["provider", "id", "composite"] {
+            let (pool, writer) = setup_db();
+            let repo = ActivityRepository::new(pool.clone(), writer);
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "acc-sync");
+
+            let rows: Vec<ActivityUpsert> = ["BUY", "FEE", "TAX"]
+                .into_iter()
+                .map(|kind| {
+                    let incoming: AccountUniversalActivity =
+                        serde_json::from_value(serde_json::json!({
+                            "id": format!("activity-{kind}"),
+                            "type": kind,
+                            "amount": 10.0,
+                            "trade_date": "2024-01-15",
+                            "provider_activity_id": if identity == "id" {
+                                None
+                            } else {
+                                Some(format!("provider-{kind}"))
+                            },
+                            "source_record_id": if identity == "composite" {
+                                Some(format!("kraken:composite:{kind}"))
+                            } else {
+                                None
+                            },
+                            "source_group_id": "shared-reference",
+                            "external_reference_id": "shared-reference",
+                        }))
+                        .unwrap();
+                    let mapped =
+                        map_broker_activity(&incoming, "acc-sync", Some("USD"), Some("USD"))
+                            .expect("mapped broker activity");
+                    ActivityUpsert {
+                        id: mapped.id.unwrap(),
+                        account_id: mapped.account_id,
+                        asset_id: None,
+                        activity_type: mapped.activity_type,
+                        subtype: mapped.subtype,
+                        activity_date: mapped.activity_date,
+                        quantity: mapped.quantity,
+                        unit_price: mapped.unit_price,
+                        currency: mapped.currency,
+                        fee: mapped.fee,
+                        tax: mapped.tax,
+                        amount: mapped.amount,
+                        status: mapped.status,
+                        notes: mapped.notes,
+                        fx_rate: mapped.fx_rate,
+                        metadata: mapped.metadata,
+                        needs_review: mapped.needs_review,
+                        source_system: mapped.source_system,
+                        source_record_id: mapped.source_record_id,
+                        source_group_id: mapped.source_group_id,
+                        idempotency_key: mapped.idempotency_key,
+                        import_run_id: mapped.import_run_id,
+                    }
+                })
+                .collect();
+
+            let first = repo.bulk_upsert(rows.clone()).await.unwrap();
+            assert_eq!((first.created, first.updated, first.skipped), (3, 0, 0));
+
+            let reimport = repo.bulk_upsert(rows.clone()).await.unwrap();
+            assert_eq!(
+                (reimport.created, reimport.updated, reimport.skipped),
+                (0, 3, 0)
+            );
+
+            diesel::update(activities::table.filter(activities::id.eq("activity-BUY")))
+                .set((
+                    activities::is_user_modified.eq(1),
+                    activities::notes.eq("user correction"),
+                ))
+                .execute(&mut conn)
+                .unwrap();
+
+            // Churn local IDs to exercise matching and protection by source identity.
+            let mut changed = rows.clone();
+            for row in &mut changed {
+                row.id = format!("reimport-{}", row.id);
+                row.notes = Some("provider update".to_string());
+            }
+            let protected = repo.bulk_upsert(changed).await.unwrap();
+            assert_eq!(
+                (protected.created, protected.updated, protected.skipped),
+                (0, 2, 1)
+            );
+
+            let stored = activities::table
+                .filter(activities::account_id.eq("acc-sync"))
+                .select(ActivityDB::as_select())
+                .load(&mut conn)
+                .unwrap();
+            assert_eq!(stored.len(), 3);
+            for expected in &rows {
+                let row = stored.iter().find(|row| row.id == expected.id).unwrap();
+                assert_eq!(row.activity_type, expected.activity_type);
+                assert_eq!(row.source_record_id, expected.source_record_id);
+                assert_eq!(row.source_group_id.as_deref(), Some("shared-reference"));
+                let metadata: serde_json::Value =
+                    serde_json::from_str(row.metadata.as_deref().unwrap()).unwrap();
+                assert_eq!(metadata["external_reference_id"], "shared-reference");
+                assert_eq!(metadata["source_group_id"], "shared-reference");
+                if row.id == "activity-BUY" {
+                    assert_eq!(row.notes.as_deref(), Some("user correction"));
+                    assert_eq!(row.is_user_modified, 1);
+                } else {
+                    assert_eq!(row.notes.as_deref(), Some("provider update"));
+                }
+            }
+        }
     }
 
     #[tokio::test]

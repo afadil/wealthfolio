@@ -36,7 +36,7 @@ import type {
 } from "@wealthfolio/addon-sdk";
 ```
 
-**Version:** 3.7.0 **Peer Dependencies:** React ^19.2.4
+**Version:** 3.8.0 **Peer Dependencies:** React ^19.2.4
 
 ### @wealthfolio/ui
 
@@ -172,7 +172,10 @@ import { Input, Label, Checkbox, Select } from "@wealthfolio/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@wealthfolio/ui";
 
 // Feedback
-import { Alert, AlertDescription, Toast } from "@wealthfolio/ui";
+import { Alert, AlertDescription } from "@wealthfolio/ui";
+
+// User notifications are exposed by the addon context
+ctx.api.toast.success("Saved");
 ```
 
 ### Icons
@@ -215,7 +218,7 @@ export default function PerformanceChart({ data }) {
 
 ### React Query
 
-Available through `@wealthfolio/ui`:
+Available as a host-provided dependency:
 
 ```typescript
 import { useQuery } from '@tanstack/react-query';
@@ -277,7 +280,7 @@ export default function Card({ className, children }) {
 
 ### date-fns
 
-Available through `@wealthfolio/ui`:
+Available as a host-provided dependency:
 
 ```typescript
 import { format, parseISO, isAfter } from 'date-fns';
@@ -287,8 +290,8 @@ export default function ActivityList({ activities }) {
     <div>
       {activities.map(activity => (
         <div key={activity.id}>
-          <span>{format(parseISO(activity.date), 'MMM dd, yyyy')}</span>
-          <span>{activity.type}</span>
+          <span>{format(parseISO(activity.activityDate), 'MMM dd, yyyy')}</span>
+          <span>{activity.activityType}</span>
         </div>
       ))}
     </div>
@@ -305,8 +308,8 @@ You can add other npm packages to your addon:
 ```json
 {
   "dependencies": {
-    "@wealthfolio/addon-sdk": "^3.7.0",
-    "@wealthfolio/ui": "^3.7.0",
+    "@wealthfolio/addon-sdk": "^3.8.0",
+    "@wealthfolio/ui": "^3.8.0",
     "react": "^19.2.4"
   }
 }
@@ -340,13 +343,13 @@ Template for addon package.json:
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@wealthfolio/addon-sdk": "^3.7.0",
-    "@wealthfolio/ui": "^3.7.0",
+    "@wealthfolio/addon-sdk": "^3.8.0",
+    "@wealthfolio/ui": "^3.8.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "@wealthfolio/addon-dev-tools": "^3.7.0",
+    "@wealthfolio/addon-dev-tools": "^3.8.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
@@ -408,6 +411,7 @@ Always use compatible versions:
 
 | SDK Version | Wealthfolio Version | React Version |
 | ----------- | ------------------- | ------------- |
+| 3.8.x       | 3.8.0+              | ^19.2.4       |
 | 3.7.x       | 3.7.0+              | ^19.2.4       |
 | 3.6.x       | 3.6.0+              | ^19.2.4       |
 

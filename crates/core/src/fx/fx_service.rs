@@ -210,7 +210,15 @@ impl FxServiceTrait for FxService {
         // (e.g. "1") stamped on a non-trading day that the sync can never
         // overwrite, since providers only return quotes for trading days (#1143).
         if rate.source == DATA_SOURCE_MANUAL {
-            self.repository.save_exchange_rate(rate).await
+            let saved = self.repository.save_exchange_rate(rate).await?;
+
+            // Reinitialize the converter with updated rates: every dated lookup
+            // consults it before falling back to the repository, so without this
+            // a rate the user just entered stays invisible until a market sync
+            // or a restart. `delete_exchange_rate` has always done the same.
+            self.initialize_converter()?;
+
+            Ok(saved)
         } else {
             Ok(rate)
         }
@@ -502,6 +510,9 @@ mod tests {
 
         async fn save_exchange_rate(&self, rate: ExchangeRate) -> Result<ExchangeRate> {
             self.saved_rates.lock().unwrap().push(rate.clone());
+            // A saved quote becomes part of history, as it would in the real
+            // repository — without this the converter rebuild has nothing to see.
+            self.historical_rates.lock().unwrap().push(rate.clone());
             Ok(rate)
         }
 
@@ -588,6 +599,32 @@ mod tests {
         let saved = repo.saved_rates.lock().unwrap();
         assert_eq!(saved.len(), 1, "manual rate should be persisted as a quote");
         assert_eq!(saved[0].rate, Decimal::new(11, 1));
+    }
+
+    /// The converter is consulted before the repository on every dated lookup,
+    /// so a rate the user just entered stayed invisible to spending, budget and
+    /// insight totals until a market sync or a restart.
+    #[tokio::test]
+    async fn add_exchange_rate_makes_the_new_rate_immediately_usable() {
+        let repo = Arc::new(MockFxRepository::default());
+        let service = FxService::new(repo.clone());
+
+        service
+            .add_exchange_rate(NewExchangeRate {
+                from_currency: "EUR".to_string(),
+                to_currency: "USD".to_string(),
+                rate: Decimal::new(11, 1), // 1.1
+                source: DATA_SOURCE_MANUAL.to_string(),
+            })
+            .await
+            .unwrap();
+
+        // No explicit initialize(): adding the rate must refresh the converter.
+        let rate = service
+            .get_exchange_rate_for_date("EUR", "USD", Utc::now().naive_utc().date())
+            .unwrap();
+
+        assert_eq!(rate, Decimal::new(11, 1));
     }
 
     #[tokio::test]

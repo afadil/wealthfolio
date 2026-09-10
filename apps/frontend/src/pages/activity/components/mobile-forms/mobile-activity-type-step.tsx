@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
-export function MobileActivityTypeStep() {
+interface MobileActivityTypeStepProps {
+  includeReclassificationTypes?: boolean;
+}
+
+export function MobileActivityTypeStep({
+  includeReclassificationTypes = false,
+}: MobileActivityTypeStepProps) {
   const { control } = useFormContext();
   const { t } = useTranslation();
 
@@ -90,12 +96,22 @@ export function MobileActivityTypeStep() {
           icon: "Split" as const,
           description: t("activity:mobile_type_split_desc"),
         },
-        {
-          value: ActivityType.ADJUSTMENT,
-          label: t("activity:mobile_type_adjustment_label"),
-          icon: "RefreshCw" as const,
-          description: t("activity:mobile_type_adjustment_desc"),
-        },
+        ...(includeReclassificationTypes
+          ? [
+              {
+                value: ActivityType.ADJUSTMENT,
+                label: t("activity:mobile_type_adjustment_label"),
+                icon: "RefreshCw" as const,
+                description: t("activity:mobile_type_adjustment_desc"),
+              },
+              {
+                value: ActivityType.CREDIT,
+                label: t("activity:type_credit"),
+                icon: "Coins" as const,
+                description: t("activity:type_credit"),
+              },
+            ]
+          : []),
       ],
     },
   ];

@@ -69,6 +69,17 @@ export const isCashSymbol = (symbol?: string): boolean => {
 };
 
 /**
+ * Matches the backend's import-only placeholder detection. These values are
+ * not real tickers and must never enter asset mapping/resolution.
+ */
+export const isGarbageSymbol = (symbol?: string): boolean => {
+  const normalized = symbol?.trim() ?? "";
+  if (!normalized) return false;
+  if (/^-+$/.test(normalized)) return true;
+  return normalized.startsWith("$") && !isCashSymbol(normalized);
+};
+
+/**
  * Whether a symbol is required for this activity type.
  */
 export const isSymbolRequired = (activityType: string): boolean => {
@@ -97,18 +108,45 @@ export const isAssetBackedIncomeSubtype = (
  * Activity/subtype pairs that must carry a market asset identity.
  */
 export const isAssetIdentityRequired = (activityType: string, subtype?: string | null): boolean => {
+  if (activityType === ActivityType.ADJUSTMENT) {
+    return subtype?.trim().toUpperCase() === ACTIVITY_SUBTYPES.OPTION_EXPIRY;
+  }
   return isSymbolRequired(activityType) || isAssetBackedIncomeSubtype(activityType, subtype);
 };
 
 /**
- * Import-time asset resolution can also be required by subtype even when the
- * base activity type is normally cash-oriented (e.g. staking rewards).
+ * Import-time asset resolution also applies to optional, provider-supplied
+ * adjustment symbols and asset-backed income subtypes such as staking rewards.
  */
 export const needsImportAssetResolution = (
   activityType: string,
   subtype?: string | null,
 ): boolean => {
-  return isAssetIdentityRequired(activityType, subtype);
+  return (
+    activityType === ActivityType.ADJUSTMENT ||
+    isSymbolRequired(activityType) ||
+    isAssetBackedIncomeSubtype(activityType, subtype)
+  );
+};
+
+/** Whether an imported symbol represents an asset the user must resolve. */
+export const shouldResolveImportAsset = (
+  activityType: string,
+  subtype: string | null | undefined,
+  symbol: string,
+): boolean => {
+  if (!needsImportAssetResolution(activityType, subtype)) return false;
+  // Required-asset rows still enter validation so malformed symbols surface
+  // as errors. Optional-asset rows mirror backend classification and treat
+  // placeholders as cash movements.
+  if (
+    isSymbolRequired(activityType) &&
+    activityType !== ActivityType.DIVIDEND &&
+    activityType !== ActivityType.ADJUSTMENT
+  ) {
+    return true;
+  }
+  return !isCashSymbol(symbol) && !isGarbageSymbol(symbol);
 };
 
 export const canonicalizeActivitySubtype = (

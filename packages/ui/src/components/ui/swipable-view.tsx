@@ -179,8 +179,12 @@ export function SwipableView({
                  1. We use a nested div for scrolling.
                  2. This ensures the Header stays fixed while content scrolls.
                  3. touch-pan-y allows vertical scrolling while horizontal swipes trigger the carousel.
+                 4. This nesting makes the pane — not the page container — the scroll port a
+                    virtualized list inside a slide has to measure against, so it is marked
+                    for `useVirtualScrollContainer` to find.
                */}
               <div
+                data-virtual-scroll-parent
                 className={cn(
                   "h-full w-full overflow-y-auto overflow-x-hidden",
                   withMobileNavOffset && "scroll-pb-nav pb-[var(--mobile-nav-total-offset)]",

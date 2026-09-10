@@ -20,6 +20,7 @@ interface SwipablePageProps {
   onViewChange?: (view: string) => void;
   className?: string;
   contentClassName?: string;
+  desktopContentClassName?: string;
   withPadding?: boolean;
   withMobileNavOffset?: boolean;
   title?: string;
@@ -156,6 +157,7 @@ export function SwipablePage({
   onViewChange,
   className,
   contentClassName,
+  desktopContentClassName,
   withPadding = true,
   withMobileNavOffset = true,
   title,
@@ -293,7 +295,7 @@ export function SwipablePage({
           <div className="hidden h-full flex-col md:flex">
             {/* Header with Navigation and Actions */}
             <div className="flex shrink-0 items-center justify-between gap-4 px-2 pb-3 pt-4 lg:px-4">
-              <div className="flex items-center gap-3">
+              <div className="titlebar-nudge flex items-center gap-3">
                 {title && <h1 className="text-muted-foreground text-sm font-medium">{title}</h1>}
                 <NavigationPills
                   views={views}
@@ -310,6 +312,7 @@ export function SwipablePage({
               className={cn(
                 "relative grow overflow-y-auto pt-8 md:pt-2",
                 withPadding && "px-2 pb-2 lg:px-4 lg:pb-4",
+                desktopContentClassName,
               )}
             >
               {views.find((v) => v.value === currentView)?.content}

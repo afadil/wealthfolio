@@ -1,12 +1,14 @@
 import { ACTIVITY_SUBTYPES, ActivityStatus, ActivityType } from "./constants";
 import {
   isCashActivity,
+  isGarbageSymbol,
   isCashTransfer,
   isIncomeActivity,
   isAssetBackedIncomeActivity,
   isAssetBackedIncomeSubtype,
   isAssetIdentityRequired,
   needsImportAssetResolution,
+  shouldResolveImportAsset,
   calculateActivityValue,
   calculateActivityCashImpact,
   canonicalizeActivitySubtype,
@@ -111,6 +113,14 @@ describe("Activity Utilities", () => {
       );
       expect(isAssetIdentityRequired(ActivityType.INTEREST, null)).toBe(false);
     });
+
+    it("requires an asset only for asset-affecting adjustments", () => {
+      expect(isAssetIdentityRequired(ActivityType.ADJUSTMENT, null)).toBe(false);
+      expect(isAssetIdentityRequired(ActivityType.ADJUSTMENT, "CASH_SWEEP")).toBe(false);
+      expect(
+        isAssetIdentityRequired(ActivityType.ADJUSTMENT, ACTIVITY_SUBTYPES.OPTION_EXPIRY),
+      ).toBe(true);
+    });
   });
 
   describe("needsImportAssetResolution", () => {
@@ -125,6 +135,28 @@ describe("Activity Utilities", () => {
 
     it("does not force cash-only interest imports through asset resolution", () => {
       expect(needsImportAssetResolution(ActivityType.INTEREST)).toBe(false);
+    });
+
+    it("resolves provider-supplied symbols for otherwise optional adjustments", () => {
+      expect(needsImportAssetResolution(ActivityType.ADJUSTMENT, "CORPORATE_ACTION")).toBe(true);
+      expect(isAssetIdentityRequired(ActivityType.ADJUSTMENT, "CORPORATE_ACTION")).toBe(false);
+    });
+
+    it("matches backend placeholder classification for optional-asset imports", () => {
+      expect(isGarbageSymbol("----")).toBe(true);
+      expect(isGarbageSymbol("$FOO")).toBe(true);
+      expect(isGarbageSymbol("$CASH-USD")).toBe(false);
+      expect(shouldResolveImportAsset(ActivityType.ADJUSTMENT, "CASH_SWEEP", "----")).toBe(false);
+      expect(shouldResolveImportAsset(ActivityType.ADJUSTMENT, "CORPORATE_ACTION", "$FOO")).toBe(
+        false,
+      );
+      expect(shouldResolveImportAsset(ActivityType.ADJUSTMENT, "CORPORATE_ACTION", "AAPL")).toBe(
+        true,
+      );
+    });
+
+    it("keeps malformed required-asset symbols in validation", () => {
+      expect(shouldResolveImportAsset(ActivityType.BUY, undefined, "----")).toBe(true);
     });
   });
 

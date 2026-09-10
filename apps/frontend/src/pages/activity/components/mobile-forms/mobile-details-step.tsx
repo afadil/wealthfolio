@@ -178,16 +178,22 @@ export function MobileDetailsStep({
 
   const isCreditActivity = activityType === ActivityType.CREDIT;
   const isAdjustmentActivity = activityType === ActivityType.ADJUSTMENT;
+  const adjustmentAssetId = isAdjustmentActivity ? watch("assetId") : undefined;
+  const adjustmentAmount = isAdjustmentActivity ? watch("amount") : undefined;
+  const isCashAdjustment =
+    isAdjustmentActivity && !!isEditing && !adjustmentAssetId?.trim() && adjustmentAmount != null;
   const isFeeActivity = activityType === ActivityType.FEE;
   const isTaxActivity = activityType === ActivityType.TAX;
   const isIncomeActivity = isDividendActivity || isInterestActivity;
   const needsTax = isBuyOrSell || isIncomeActivity;
   const needsAssetSymbol =
-    SYMBOL_FIELD_ACTIVITY_TYPES.includes(activityType) || isStakingReward || isSecuritiesTransfer;
+    (SYMBOL_FIELD_ACTIVITY_TYPES.includes(activityType) && !isCashAdjustment) ||
+    isStakingReward ||
+    isSecuritiesTransfer;
   const needsQuantity =
     TRADE_ACTIVITY_TYPES.includes(activityType) ||
     isSecuritiesTransfer ||
-    isAdjustmentActivity ||
+    (isAdjustmentActivity && !isCashAdjustment) ||
     isAssetBackedIncome;
   const needsUnitPrice =
     TRADE_ACTIVITY_TYPES.includes(activityType) ||
@@ -197,6 +203,7 @@ export function MobileDetailsStep({
   const needsAmount =
     isBuyOrSell ||
     AMOUNT_FIELD_ACTIVITY_TYPES.includes(activityType) ||
+    isCashAdjustment ||
     (isCashTransfer && !needsInternalCashTransferAmounts);
   const { formatAmount } = useAmountFormatting();
   // One calculation feeds both the auto-fill effect below and the "use

@@ -263,7 +263,7 @@ impl AnalyticsService {
             if income_native == Decimal::ZERO && spending_native == Decimal::ZERO {
                 continue;
             }
-            let income_amount = fx_to_target(
+            let income_amount = crate::fx::convert(
                 fx,
                 income_native,
                 &a.currency,
@@ -271,7 +271,7 @@ impl AnalyticsService {
                 fx_as_of_current,
             )
             .unwrap_or(Decimal::ZERO);
-            let spending_amount = fx_to_target(
+            let spending_amount = crate::fx::convert(
                 fx,
                 spending_native,
                 &a.currency,
@@ -489,11 +489,11 @@ fn summarize(
         }
         // FX-convert each activity to the report currency at `fx_as_of`,
         // matching insight::aggregate_spend so the two services agree.
-        income += fx_to_target(fx, income_native, &a.currency, target_currency, fx_as_of)
+        income += crate::fx::convert(fx, income_native, &a.currency, target_currency, fx_as_of)
             .unwrap_or(Decimal::ZERO);
-        outflow += fx_to_target(fx, spending_native, &a.currency, target_currency, fx_as_of)
+        outflow += crate::fx::convert(fx, spending_native, &a.currency, target_currency, fx_as_of)
             .unwrap_or(Decimal::ZERO);
-        saved += fx_to_target(fx, saving_native, &a.currency, target_currency, fx_as_of)
+        saved += crate::fx::convert(fx, saving_native, &a.currency, target_currency, fx_as_of)
             .unwrap_or(Decimal::ZERO);
         // `count` is "activities that contributed income OR outflow" — it
         // counts each activity once, regardless of how many spending/income
@@ -544,8 +544,9 @@ fn add_report_breakdown_allocations(
         splits_by_activity,
     );
     if allocations.is_empty() {
-        let amount = fx_to_target(fx, native_amount, from_currency, target_currency, fx_as_of)
-            .unwrap_or(Decimal::ZERO);
+        let amount =
+            crate::fx::convert(fx, native_amount, from_currency, target_currency, fx_as_of)
+                .unwrap_or(Decimal::ZERO);
         if amount == Decimal::ZERO {
             return;
         }
@@ -572,7 +573,7 @@ fn add_report_breakdown_allocations(
     }
 
     for allocation in allocations {
-        let amount = fx_to_target(
+        let amount = crate::fx::convert(
             fx,
             allocation.amount,
             from_currency,
@@ -609,36 +610,6 @@ fn classification_for(
     account_types
         .get(&activity.account_id)
         .map(|account_type| classify_activity(activity, account_type))
-}
-
-/// Convert a native amount to the report's target currency at `as_of`.
-/// Mirrors `insight::service::fx_to_target` — same convention (one rate per
-/// report, snapshot-date style) so analytics and insight surfaces agree.
-/// Same-currency short-circuit; on FxService error, returns None so callers
-/// exclude the native amount instead of mixing currencies into the target total.
-fn fx_to_target(
-    fx: &dyn wealthfolio_core::fx::FxServiceTrait,
-    amount: Decimal,
-    from: &str,
-    to: &str,
-    as_of: NaiveDate,
-) -> Option<Decimal> {
-    if amount == Decimal::ZERO || from == to || from.is_empty() {
-        return Some(amount);
-    }
-    match fx.convert_currency_for_date(amount, from, to, as_of) {
-        Ok(converted) => Some(converted),
-        Err(e) => {
-            log::warn!(
-                "spending analytics FX conversion {}→{} on {} failed ({}); excluding native amount",
-                from,
-                to,
-                as_of,
-                e,
-            );
-            None
-        }
-    }
 }
 
 // ====================== SpendingSummary (PR-style multi-period rollup) ======================
@@ -955,7 +926,7 @@ fn build_summary(
         }
         // FX-convert each activity to the report currency at `fx_as_of`
         // (snapshot-date convention, matches insight + monthly_report).
-        let Some(amt) = fx_to_target(fx, amt_native, &a.currency, currency, fx_as_of) else {
+        let Some(amt) = crate::fx::convert(fx, amt_native, &a.currency, currency, fx_as_of) else {
             continue;
         };
         if amt == Decimal::ZERO {
@@ -999,7 +970,7 @@ fn build_summary(
 
         for allocation in allocations {
             let Some(allocation_amount) =
-                fx_to_target(fx, allocation.amount, &a.currency, currency, fx_as_of)
+                crate::fx::convert(fx, allocation.amount, &a.currency, currency, fx_as_of)
             else {
                 continue;
             };
@@ -1401,7 +1372,8 @@ impl AnalyticsService {
                 // FX-convert to the report currency at fx_as_of, matching
                 // insight + monthly_report so event totals reconcile with
                 // the broader period numbers.
-                let Some(amt) = fx_to_target(fx, amt_native, &a.currency, &currency, fx_as_of)
+                let Some(amt) =
+                    crate::fx::convert(fx, amt_native, &a.currency, &currency, fx_as_of)
                 else {
                     continue;
                 };
@@ -1432,9 +1404,13 @@ impl AnalyticsService {
                     add_event_category_allocation(None, amt, &cat_meta, &mut by_category);
                 } else {
                     for allocation in allocations {
-                        let Some(allocation_amount) =
-                            fx_to_target(fx, allocation.amount, &a.currency, &currency, fx_as_of)
-                        else {
+                        let Some(allocation_amount) = crate::fx::convert(
+                            fx,
+                            allocation.amount,
+                            &a.currency,
+                            &currency,
+                            fx_as_of,
+                        ) else {
                             continue;
                         };
                         if allocation_amount == Decimal::ZERO {

@@ -52,7 +52,8 @@
       "compare_weights": "Compara los pesos actuales con tu cartera prevista.",
       "set_target_allocation": "Establecer asignación objetivo",
       "outside_range_one": "{{count}} fuera de rango · mayor diferencia {{gap}}",
-      "outside_range_other": "{{count}} fuera de rango · mayor diferencia {{gap}}"
+      "outside_range_other": "{{count}} fuera de rango · mayor diferencia {{gap}}",
+      "outside_range_many": "{{count}} fuera de rango · mayor diferencia {{gap}}"
     },
     "value_strip": {
       "portfolio_value": "Valor de la cartera",
@@ -64,8 +65,10 @@
       "available_cash": "Efectivo disponible",
       "holdings_count_one": "{{count}} posición",
       "holdings_count_other": "{{count}} posiciones",
+      "holdings_count_many": "{{count}} posiciones",
       "accounts_count_one": "{{count}} cuenta",
-      "accounts_count_other": "{{count}} cuentas"
+      "accounts_count_other": "{{count}} cuentas",
+      "accounts_count_many": "{{count}} cuentas"
     }
   },
   "networth": {
@@ -79,6 +82,7 @@
     "update_valuations": "Actualiza tus valoraciones",
     "assets_count_one": "{{count}} activo",
     "assets_count_other": "{{count}} activos",
+    "assets_count_many": "{{count}} activos",
     "not_updated_over_90_days": "No se ha actualizado en más de 90 días.",
     "chart": {
       "net_worth": "Patrimonio neto",
@@ -116,6 +120,7 @@
       "monthly_pace": "Ritmo mensual",
       "over_months_one": "en {{count}} mes",
       "over_months_other": "en {{count}} meses",
+      "over_months_many": "en {{count}} meses",
       "trailing_pace": " · {{multiple}}× del ritmo de los últimos 12 meses",
       "drivers_of_change": "Factores del cambio",
       "market_returns": "Rentabilidades del mercado",
@@ -124,6 +129,7 @@
       "per_month": "/mes"
     },
     "days_ago_one": "hace {{count}} d",
-    "days_ago_other": "hace {{count}} d"
+    "days_ago_other": "hace {{count}} d",
+    "days_ago_many": "hace {{count}} d"
   }
 }

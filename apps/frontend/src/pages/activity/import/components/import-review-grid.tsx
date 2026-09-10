@@ -15,9 +15,9 @@ import {
 
 import { ActivityType, INSTRUMENT_TYPE_OPTIONS, SUBTYPES_BY_ACTIVITY_TYPE } from "@/lib/constants";
 import {
+  isAssetIdentityRequired,
   localizeActivitySubtypeName,
   localizeActivityTypeName,
-  needsImportAssetResolution,
   supportsPerformanceBoundary,
 } from "@/lib/activity-utils";
 import { quoteModeFromSearchResult } from "@/lib/asset-utils";
@@ -354,7 +354,7 @@ function useImportReviewColumns({
             onCreateCustomAsset,
             isClearable: (rowData: unknown) => {
               const row = rowData as DraftActivity;
-              return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
+              return !isAssetIdentityRequired(row.activityType ?? "", row.subtype);
             },
           },
         },

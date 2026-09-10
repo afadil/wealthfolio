@@ -125,6 +125,28 @@ impl CategorizationRulesService {
         self.repo.delete(id).await
     }
 
+    /// Atomically create-or-update the rule identified by `new_rule.id`.
+    /// Unlike `create`/`update`, callers must supply an explicit id — this is
+    /// meant for callers (e.g. the addon bridge) that derive a stable id up
+    /// front and need create-or-update to be race-free against itself,
+    /// including when the same id is submitted twice in quick succession.
+    pub async fn upsert(&self, mut new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
+        validate_rule_scope(new_rule.is_global, new_rule.account_id.as_deref())?;
+        validate_rule_pattern(&new_rule.match_type, &new_rule.pattern)?;
+        if new_rule.amount_op.is_none() {
+            new_rule.amount_value = None;
+            new_rule.amount_value2 = None;
+        } else if new_rule.amount_op != Some(RuleAmountOp::Between) {
+            new_rule.amount_value2 = None;
+        }
+        validate_rule_amount(
+            new_rule.amount_op,
+            new_rule.amount_value,
+            new_rule.amount_value2,
+        )?;
+        self.repo.upsert(new_rule).await
+    }
+
     /// Re-run all rules against existing activities. Returns count of activities
     /// matched by a rule (a rule that fires counts toward the total even when it
     /// has no category target to write — matches the prior count semantics).
@@ -521,6 +543,29 @@ mod tests {
             }
             rule.updated_at = Utc::now().naive_utc();
             Ok(rule.clone())
+        }
+        async fn upsert(&self, n: NewCategorizationRule) -> Result<CategorizationRule> {
+            let id = n.id.clone().expect("upsert requires an explicit id");
+            let exists = self.rules.lock().unwrap().iter().any(|rule| rule.id == id);
+            if exists {
+                let patch = UpdateCategorizationRule {
+                    name: Some(n.name),
+                    pattern: Some(n.pattern),
+                    match_type: Some(n.match_type),
+                    taxonomy_id: Some(n.taxonomy_id),
+                    category_id: Some(n.category_id),
+                    activity_type: Some(n.activity_type),
+                    amount_op: Some(n.amount_op),
+                    amount_value: Some(n.amount_value),
+                    amount_value2: Some(n.amount_value2),
+                    priority: Some(n.priority),
+                    is_global: Some(n.is_global),
+                    account_id: Some(n.account_id),
+                };
+                self.update(&id, patch).await
+            } else {
+                self.create(n).await
+            }
         }
         async fn import_preset_rules(
             &self,

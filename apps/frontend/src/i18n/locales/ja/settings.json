@@ -1442,9 +1442,13 @@
       "germany": "ドイツ",
       "spain": "スペイン",
       "mexico": "メキシコ",
+      "brazil": "ブラジル",
+      "portugal": "ポルトガル",
       "china": "中国",
+      "taiwan": "台湾",
       "japan": "日本",
-      "southKorea": "韓国"
+      "southKorea": "韓国",
+      "italy": "イタリア"
     }
   },
   "appearance_navigation_title": "ナビゲーション",

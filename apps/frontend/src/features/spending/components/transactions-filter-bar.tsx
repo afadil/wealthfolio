@@ -3,6 +3,7 @@ import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
 
 import {
+  AmountDisplay,
   Button,
   FacetedFilter,
   FacetedSearchInput,
@@ -14,15 +15,86 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  useBalancePrivacy,
 } from "@wealthfolio/ui";
+
+import { cn } from "@/lib/utils";
 
 import { AmountRangeFilter, type AmountRange } from "./amount-range-filter";
 import { DateRangeFilter } from "./date-range-filter";
+import type { CurrencyNet, NetSummary } from "../types/cash-activity";
 import type { CashActivityStatusFilter } from "../types/cash-activity";
 
 export interface FilterOption {
   value: string;
   label: string;
+}
+
+/**
+ * One currency's net, shaped like the currency pills on the insights value
+ * strip: a coloured tick, the code, then the figure. The code carries the
+ * currency so the amount itself is rendered without a symbol.
+ */
+function CurrencyNetPill({ total }: { total: CurrencyNet }) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  const isNegative = total.amount < 0;
+  return (
+    <span className="bg-muted/45 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5">
+      <span
+        className={cn("h-2 w-1 rounded-sm", isNegative ? "bg-destructive/70" : "bg-success/70")}
+        aria-hidden="true"
+      />
+      <span className="text-muted-foreground">{total.currency}</span>
+      <span className="text-foreground font-semibold tabular-nums">
+        {isNegative ? "-" : "+"}
+        <AmountDisplay
+          value={Math.abs(total.amount)}
+          currency={total.currency}
+          displayCurrency={false}
+          isHidden={isBalanceHidden}
+        />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A labelled net: the converted figure when there is one, with the per-currency
+ * breakdown beside it. When conversion was withheld — a single currency, or a
+ * currency with no rate — the breakdown stands alone and is still exact.
+ */
+function NetReadout({ label, net }: { label: string; net: NetSummary }) {
+  const { isBalanceHidden } = useBalancePrivacy();
+  if (net.byCurrency.length === 0) return null;
+  return (
+    // Wraps rather than staying on one line: each currency adds a pill, and
+    // from three of them the readout is wider than a phone. It sits under a
+    // `.flex` ancestor, which `globals.css` gives `overflow-x: hidden` below
+    // 1024px, so anything past the edge is clipped with no way to scroll to it.
+    // The pills keep `whitespace-nowrap` so a break lands between them rather
+    // than inside an amount.
+    <span className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+      {label}
+      {net.converted && (
+        <span
+          className={cn(
+            "text-foreground font-semibold tabular-nums",
+            net.converted.amount < 0 ? "text-destructive" : "text-success",
+          )}
+        >
+          {net.converted.amount < 0 ? "-" : "+"}
+          <AmountDisplay
+            value={Math.abs(net.converted.amount)}
+            currency={net.converted.currency}
+            isHidden={isBalanceHidden}
+          />
+        </span>
+      )}
+      {net.byCurrency.map((total) => (
+        <CurrencyNetPill key={total.currency} total={total} />
+      ))}
+    </span>
+  );
 }
 
 interface TransactionsFilterBarProps {
@@ -63,6 +135,10 @@ interface TransactionsFilterBarProps {
   // Count display
   visibleCount: number;
   totalCount: number;
+  /** Net of the checked rows, one entry per currency. Empty hides the readout. */
+  selectedNet: NetSummary;
+  /** Net of the filtered set, one entry per currency. Empty hides the readout. */
+  filteredNet: NetSummary | null;
   isRefreshing: boolean;
   isMobile?: boolean;
 }
@@ -96,6 +172,8 @@ export function TransactionsFilterBar({
   onClearAll,
   visibleCount,
   totalCount,
+  selectedNet,
+  filteredNet,
   isRefreshing,
   isMobile = false,
 }: TransactionsFilterBarProps) {
@@ -223,6 +301,19 @@ export function TransactionsFilterBar({
             </SheetFooter>
           </SheetContent>
         </Sheet>
+        {/* The nets belong on a phone too — arguably more, since the row list
+            is harder to scan there. They wrap under the search row rather than
+            sitting inline with it. */}
+        {(selectedNet.byCurrency.length > 0 || filteredNet) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+            {selectedNet.byCurrency.length > 0 && (
+              <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />
+            )}
+            {filteredNet && (
+              <NetReadout label={t("spending:filters.filteredNet")} net={filteredNet} />
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -245,15 +336,21 @@ export function TransactionsFilterBar({
           {t("spending:filters.clearAll")}
         </Button>
       )}
-      <span className="text-muted-foreground ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs tabular-nums">
-        {countLabel}
-        {isRefreshing && (
-          <Icons.Spinner
-            className="h-3 w-3 animate-spin"
-            aria-label={t("spending:filters.refreshing")}
-          />
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+        {selectedNet.byCurrency.length > 0 && (
+          <NetReadout label={t("spending:filters.selectedNet")} net={selectedNet} />
         )}
-      </span>
+        {filteredNet && <NetReadout label={t("spending:filters.filteredNet")} net={filteredNet} />}
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs tabular-nums">
+          {countLabel}
+          {isRefreshing && (
+            <Icons.Spinner
+              className="h-3 w-3 animate-spin"
+              aria-label={t("spending:filters.refreshing")}
+            />
+          )}
+        </span>
+      </div>
     </div>
   );
 }

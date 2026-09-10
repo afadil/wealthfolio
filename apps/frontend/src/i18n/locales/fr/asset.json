@@ -153,7 +153,8 @@
     "maturity": "Échéance",
     "type": "Type",
     "strike": "Prix d'exercice",
-    "expiry": "Expiration"
+    "expiry": "Expiration",
+    "multiplier": "Multiplicateur"
   },
   "profile": {
     "overview": "Aperçu",
@@ -256,6 +257,18 @@
     "exchange": "Bourse",
     "select_exchange": "Sélectionner une bourse",
     "search_exchanges": "Rechercher des bourses...",
+    "contract_multiplier": "Multiplicateur du contrat",
+    "contract_multiplier_hint": "Chaque contrat représente ce nombre d'unités sous-jacentes. Laissez vide pour utiliser la valeur standard de {{default}}.",
+    "maturity_date": "Date d’échéance",
+    "coupon_rate": "Taux du coupon (%)",
+    "coupon_frequency": "Fréquence du coupon",
+    "select_frequency": "Sélectionner la fréquence",
+    "couponFrequency": {
+      "ANNUAL": "Annuelle",
+      "SEMI_ANNUAL": "Semestrielle",
+      "QUARTERLY": "Trimestrielle",
+      "ZERO": "Coupon zéro"
+    },
     "saving": "Enregistrement...",
     "saving_short": "Enregistrement",
     "save_changes": "Enregistrer les modifications",
@@ -320,12 +333,15 @@
     "lots_by_account": "Lots par compte",
     "account_one": "{{count}} compte",
     "account_other": "{{count}} comptes",
+    "account_many": "{{count}} comptes",
     "lot_one": "{{count}} lot",
     "lot_other": "{{count}} lots",
+    "lot_many": "{{count}} lots",
     "collapse_all": "Tout réduire",
     "expand_all": "Tout développer",
     "share_one": "part",
     "share_other": "parts",
+    "share_many": "parts",
     "market_value": "Valeur de marché",
     "shares_suffix": "parts",
     "cost_basis": "Prix de revient",
@@ -402,7 +418,8 @@
     "to_manual_warning": "Les mises à jour automatiques des prix seront désactivées.",
     "confirm_change": "Confirmer le changement",
     "delete_count_one": "Supprimer ({{count}})",
-    "delete_count_other": "Supprimer ({{count}})"
+    "delete_count_other": "Supprimer ({{count}})",
+    "delete_count_many": "Supprimer ({{count}})"
   },
   "quoteTable": {
     "date": "Date",
@@ -699,9 +716,41 @@
     "save_changes": "Enregistrer les modifications",
     "delete_count_one": "Supprimer ({{count}})",
     "delete_count_other": "Supprimer ({{count}})",
+    "delete_count_many": "Supprimer ({{count}})",
     "modified_one": "{{count}} modifié",
     "modified_other": "{{count}} modifié(s)",
+    "modified_many": "{{count}} modifié(s)",
     "to_delete_one": "{{count}} à supprimer",
-    "to_delete_other": "{{count}} à supprimer"
+    "to_delete_other": "{{count}} à supprimer",
+    "to_delete_many": "{{count}} à supprimer"
+  },
+  "logo": {
+    "change": "Changer le logo",
+    "title": "Logo de l'actif",
+    "badge_default": "Par défaut",
+    "badge_custom": "Personnalisé",
+    "updated_at": "Mis à jour le {{date}}",
+    "dropzone_cta": "Choisir une image",
+    "dropzone_or_drop": "ou glissez-déposez-la ici",
+    "dropzone_hint": "PNG, JPEG, WebP ou SVG · redimensionnée en PNG 256×256",
+    "processing": "Préparation de l'image…",
+    "preview_title": "Aperçu",
+    "preview_new": "Nouveau logo",
+    "preview_current": "Logo actuel",
+    "preview_card": "Carte de position",
+    "preview_table": "Tableau des positions",
+    "preview_list": "Liste des activités",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (au lieu de {{original}})",
+    "choose_different": "Choisir une autre image",
+    "save": "Enregistrer le logo",
+    "reset": "Rétablir le logo par défaut",
+    "saved": "Logo enregistré.",
+    "reset_done": "Logo par défaut rétabli.",
+    "error_unsupported_type": "Fichier non pris en charge. Utilisez une image PNG, JPEG, WebP ou SVG.",
+    "error_too_large_input": "Ce fichier est trop volumineux. Choisissez une image de moins de 10 Mo.",
+    "error_decode_failed": "Le fichier n'a pas pu être lu comme une image.",
+    "error_encode_failed": "L'image n'a pas pu être convertie en PNG.",
+    "error_too_large_output": "L'image est trop détaillée pour tenir dans 150 Ko. Essayez une image plus simple ou plus petite.",
+    "error_save_failed": "Le logo n'a pas pu être enregistré."
   }
 }

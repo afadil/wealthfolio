@@ -31,6 +31,18 @@ const RESIDUAL_TOLERANCE_BPS: i32 = 75;
 /// `source` written by auto-classification (`crates/core/src/assets/auto_classification.rs`).
 const AUTO_SOURCE: &str = "AUTO";
 
+/// Suffix on the id of the drill-down child that holds the part of a rolled-up category carrying
+/// no sub-category assignment (e.g. holdings classified as "Fixed Income" but no bond type).
+/// Without that child a category's children silently understate their parent, and a UI dividing by
+/// the children it received reports the largest one as 100%. The id is `<parent id><suffix>` so the
+/// holdings query can address exactly those holdings; to recognize such a child, read
+/// `CategoryAllocation::is_residual` rather than matching this suffix.
+pub const RESIDUAL_CATEGORY_SUFFIX: &str = ":__residual__";
+
+/// Residual shares below one basis point of the parent are rounding noise, not an unassigned
+/// remainder — weights are stored in basis points, so a real remainder is at least this large.
+const RESIDUAL_CHILD_MIN_SHARE: Decimal = dec!(0.0001);
+
 #[derive(Debug, Clone)]
 struct HoldingTaxonomyShare {
     category_id: String,
@@ -609,16 +621,10 @@ impl AllocationService {
                             value: *value,
                             percentage,
                             children: Vec::new(),
+                            is_residual: false,
                         },
                     );
                 }
-            }
-            for children in children_map.values_mut() {
-                children.sort_by(|a, b| {
-                    b.value
-                        .cmp(&a.value)
-                        .then_with(|| a.category_id.cmp(&b.category_id))
-                });
             }
         }
 
@@ -642,7 +648,20 @@ impl AllocationService {
                     Decimal::ZERO
                 };
 
-                let children = children_map.remove(&cat_id).unwrap_or_default();
+                let mut children = children_map.remove(&cat_id).unwrap_or_default();
+                Self::push_residual_child(
+                    &mut children,
+                    &cat_id,
+                    &name,
+                    &color,
+                    value,
+                    total_value,
+                );
+                children.sort_by(|a, b| {
+                    b.value
+                        .cmp(&a.value)
+                        .then_with(|| a.category_id.cmp(&b.category_id))
+                });
 
                 CategoryAllocation {
                     category_id: cat_id,
@@ -651,6 +670,7 @@ impl AllocationService {
                     value,
                     percentage,
                     children,
+                    is_residual: false,
                 }
             })
             .collect();
@@ -667,6 +687,43 @@ impl AllocationService {
             color: taxonomy_color.to_string(),
             categories: allocations,
         }
+    }
+
+    /// Appends the residual child for a rolled-up category: the part of its value that carries no
+    /// sub-category assignment. No-op for leaf categories (nothing to understate) and for
+    /// categories whose children already account for the whole value.
+    fn push_residual_child(
+        children: &mut Vec<CategoryAllocation>,
+        category_id: &str,
+        category_name: &str,
+        color: &str,
+        value: Decimal,
+        total_value: Decimal,
+    ) {
+        if children.is_empty() {
+            return;
+        }
+        let assigned: Decimal = children.iter().map(|child| child.value).sum();
+        let residual = value - assigned;
+        if residual < value * RESIDUAL_CHILD_MIN_SHARE {
+            return;
+        }
+
+        let percentage = if total_value > Decimal::ZERO {
+            (residual / total_value * dec!(100)).round_dp(2)
+        } else {
+            Decimal::ZERO
+        };
+
+        children.push(CategoryAllocation {
+            category_id: format!("{category_id}{RESIDUAL_CATEGORY_SUFFIX}"),
+            category_name: format!("Other {category_name}"),
+            color: color.to_string(),
+            value: residual,
+            percentage,
+            children: Vec::new(),
+            is_residual: true,
+        });
     }
 
     /// Builds a map from each category to its top-level ancestor.
@@ -928,6 +985,14 @@ impl AllocationService {
                     source_account_ids: holding.source_account_ids.clone(),
                     symbol: symbol.clone(),
                     name: name.clone(),
+                    exchange_mic: holding
+                        .instrument
+                        .as_ref()
+                        .and_then(|instrument| instrument.exchange_mic.clone()),
+                    instrument_type: holding
+                        .instrument
+                        .as_ref()
+                        .and_then(|instrument| instrument.instrument_type.clone()),
                     holding_type: holding.holding_type.clone(),
                     quantity: holding.quantity,
                     category_id,
@@ -983,14 +1048,24 @@ impl AllocationService {
             ),
         };
 
-        let (category_name, category_color) = if category_id == "__UNKNOWN__" {
+        // A residual id addresses the part of its parent that carries no sub-category assignment;
+        // everything below resolves against the parent, then filters down to those holdings.
+        let residual_parent_id = category_id.strip_suffix(RESIDUAL_CATEGORY_SUFFIX);
+        let lookup_id = residual_parent_id.unwrap_or(category_id);
+
+        let (category_name, category_color) = if lookup_id == "__UNKNOWN__" {
             ("Unknown".to_string(), "#878580".to_string())
         } else {
             categories
                 .iter()
-                .find(|c| c.id == category_id)
+                .find(|c| c.id == lookup_id)
                 .map(|c| (c.name.clone(), c.color.clone()))
-                .unwrap_or_else(|| (category_id.to_string(), taxonomy_color.clone()))
+                .unwrap_or_else(|| (lookup_id.to_string(), taxonomy_color.clone()))
+        };
+        let category_name = if residual_parent_id.is_some() {
+            format!("Other {category_name}")
+        } else {
+            category_name
         };
 
         if holdings.is_empty() {
@@ -1031,8 +1106,15 @@ impl AllocationService {
 
             let matched_share: Decimal = shares
                 .into_iter()
-                .filter(|share| {
-                    share.category_id == category_id || share.assigned_category_id == category_id
+                .filter(|share| match residual_parent_id {
+                    // Residual: assigned to the parent itself, with no sub-category to roll up.
+                    Some(parent) => {
+                        share.category_id == parent && share.assigned_category_id == parent
+                    }
+                    None => {
+                        share.category_id == category_id
+                            || share.assigned_category_id == category_id
+                    }
                 })
                 .map(|share| share.share)
                 .sum();
@@ -1048,6 +1130,14 @@ impl AllocationService {
                     id: asset_id,
                     symbol,
                     name: Some(name),
+                    exchange_mic: holding
+                        .instrument
+                        .as_ref()
+                        .and_then(|instrument| instrument.exchange_mic.clone()),
+                    instrument_type: holding
+                        .instrument
+                        .as_ref()
+                        .and_then(|instrument| instrument.instrument_type.clone()),
                     account_name: Self::cash_account_name(holding, &account_names),
                     holding_type: holding.holding_type.clone(),
                     quantity: holding.quantity,
@@ -1960,6 +2050,279 @@ mod tests {
             "Expected Americas = 400 (leaf US only), got {}",
             americas.value
         );
+    }
+
+    #[test]
+    fn top_level_only_assignments_become_a_residual_child() {
+        let svc = svc();
+        // MUNI carries a sub-class; TBILL is classified as Fixed Income and nothing finer.
+        let holdings = vec![
+            make_holding("MUNI", dec!(1200)),
+            make_holding("TBILL", dec!(800)),
+        ];
+        let categories = vec![
+            make_category_for_taxonomy("asset_classes", "FIXED_INCOME", None),
+            make_category_for_taxonomy("asset_classes", "FI_MUNICIPAL", Some("FIXED_INCOME")),
+        ];
+        let assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::from([
+            (
+                "MUNI".to_string(),
+                vec![make_assignment(
+                    "MUNI",
+                    "asset_classes",
+                    "FI_MUNICIPAL",
+                    10000,
+                )],
+            ),
+            (
+                "TBILL".to_string(),
+                vec![make_assignment(
+                    "TBILL",
+                    "asset_classes",
+                    "FIXED_INCOME",
+                    10000,
+                )],
+            ),
+        ]);
+
+        let result = svc.aggregate_by_taxonomy(
+            &holdings,
+            "asset_classes",
+            "Asset Classes",
+            "#ccc",
+            &categories,
+            &assignments,
+            dec!(2000),
+            true,
+            &HashMap::new(),
+        );
+
+        let fixed_income = result
+            .categories
+            .iter()
+            .find(|c| c.category_id == "FIXED_INCOME")
+            .expect("Fixed Income category missing");
+        let residual = fixed_income
+            .children
+            .iter()
+            .find(|c| c.category_id == format!("FIXED_INCOME{RESIDUAL_CATEGORY_SUFFIX}"))
+            .expect("residual child missing");
+
+        assert_eq!(residual.value, dec!(800));
+        assert_eq!(residual.percentage, dec!(40));
+        assert_eq!(residual.category_name, "Other FIXED_INCOME");
+        assert!(residual.is_residual);
+        assert!(!fixed_income.is_residual);
+        // The whole point: children now account for the parent.
+        let children_total: Decimal = fixed_income.children.iter().map(|c| c.value).sum();
+        assert_eq!(children_total, fixed_income.value);
+    }
+
+    #[test]
+    fn residual_child_is_sorted_with_its_siblings() {
+        let svc = svc();
+        // The remainder (1800) outweighs the sub-classified holding (200).
+        let holdings = vec![
+            make_holding("MUNI", dec!(200)),
+            make_holding("TBILL", dec!(1800)),
+        ];
+        let categories = vec![
+            make_category_for_taxonomy("asset_classes", "FIXED_INCOME", None),
+            make_category_for_taxonomy("asset_classes", "FI_MUNICIPAL", Some("FIXED_INCOME")),
+        ];
+        let assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::from([
+            (
+                "MUNI".to_string(),
+                vec![make_assignment(
+                    "MUNI",
+                    "asset_classes",
+                    "FI_MUNICIPAL",
+                    10000,
+                )],
+            ),
+            (
+                "TBILL".to_string(),
+                vec![make_assignment(
+                    "TBILL",
+                    "asset_classes",
+                    "FIXED_INCOME",
+                    10000,
+                )],
+            ),
+        ]);
+
+        let result = svc.aggregate_by_taxonomy(
+            &holdings,
+            "asset_classes",
+            "Asset Classes",
+            "#ccc",
+            &categories,
+            &assignments,
+            dec!(2000),
+            true,
+            &HashMap::new(),
+        );
+
+        let fixed_income = result
+            .categories
+            .iter()
+            .find(|c| c.category_id == "FIXED_INCOME")
+            .expect("Fixed Income category missing");
+
+        // Children stay ordered by value; consumers that don't re-sort render them as given.
+        let order: Vec<&str> = fixed_income
+            .children
+            .iter()
+            .map(|c| c.category_id.as_str())
+            .collect();
+        assert_eq!(
+            order,
+            vec![
+                format!("FIXED_INCOME{RESIDUAL_CATEGORY_SUFFIX}").as_str(),
+                "FI_MUNICIPAL"
+            ]
+        );
+    }
+
+    #[test]
+    fn no_residual_child_when_children_cover_the_parent() {
+        let svc = svc();
+        let holdings = vec![make_holding("MUNI", dec!(1200))];
+        let categories = vec![
+            make_category_for_taxonomy("asset_classes", "FIXED_INCOME", None),
+            make_category_for_taxonomy("asset_classes", "FI_MUNICIPAL", Some("FIXED_INCOME")),
+        ];
+        let assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::from([(
+            "MUNI".to_string(),
+            vec![make_assignment(
+                "MUNI",
+                "asset_classes",
+                "FI_MUNICIPAL",
+                10000,
+            )],
+        )]);
+
+        let result = svc.aggregate_by_taxonomy(
+            &holdings,
+            "asset_classes",
+            "Asset Classes",
+            "#ccc",
+            &categories,
+            &assignments,
+            dec!(1200),
+            true,
+            &HashMap::new(),
+        );
+
+        let fixed_income = result
+            .categories
+            .iter()
+            .find(|c| c.category_id == "FIXED_INCOME")
+            .expect("Fixed Income category missing");
+
+        assert_eq!(fixed_income.children.len(), 1);
+        assert_eq!(fixed_income.children[0].category_id, "FI_MUNICIPAL");
+    }
+
+    #[test]
+    fn leaf_categories_get_no_residual_child() {
+        let svc = svc();
+        let holdings = vec![make_holding("VOO", dec!(1000))];
+        let categories = vec![make_category_for_taxonomy("asset_classes", "EQUITY", None)];
+        let assignments: HashMap<String, Vec<AssetTaxonomyAssignment>> = HashMap::from([(
+            "VOO".to_string(),
+            vec![make_assignment("VOO", "asset_classes", "EQUITY", 10000)],
+        )]);
+
+        let result = svc.aggregate_by_taxonomy(
+            &holdings,
+            "asset_classes",
+            "Asset Classes",
+            "#ccc",
+            &categories,
+            &assignments,
+            dec!(1000),
+            true,
+            &HashMap::new(),
+        );
+
+        let equity = result
+            .categories
+            .iter()
+            .find(|c| c.category_id == "EQUITY")
+            .expect("Equity category missing");
+        assert!(equity.children.is_empty());
+    }
+
+    #[tokio::test]
+    async fn holdings_by_allocation_returns_only_the_residual_holdings() {
+        let holdings = vec![
+            make_holding("MUNI", dec!(1200)),
+            make_holding("TBILL", dec!(800)),
+        ];
+        let taxonomies = StaticTaxonomies {
+            taxonomies: vec![TaxonomyWithCategories {
+                taxonomy: make_taxonomy("asset_classes", "Asset Classes", true),
+                categories: vec![
+                    make_category_for_taxonomy("asset_classes", "FIXED_INCOME", None),
+                    make_category_for_taxonomy(
+                        "asset_classes",
+                        "FI_MUNICIPAL",
+                        Some("FIXED_INCOME"),
+                    ),
+                ],
+            }],
+            assignments_by_asset: HashMap::from([
+                (
+                    "MUNI".to_string(),
+                    vec![make_assignment(
+                        "MUNI",
+                        "asset_classes",
+                        "FI_MUNICIPAL",
+                        10000,
+                    )],
+                ),
+                (
+                    "TBILL".to_string(),
+                    vec![make_assignment(
+                        "TBILL",
+                        "asset_classes",
+                        "FIXED_INCOME",
+                        10000,
+                    )],
+                ),
+            ]),
+        };
+        let svc = AllocationService::new(Arc::new(NoopHoldings), Arc::new(taxonomies));
+
+        let residual = svc
+            .compute_holdings_by_allocation_from_holdings(
+                &holdings,
+                "USD",
+                "asset_classes",
+                &format!("FIXED_INCOME{RESIDUAL_CATEGORY_SUFFIX}"),
+                &HashMap::new(),
+            )
+            .await
+            .unwrap();
+        let parent = svc
+            .compute_holdings_by_allocation_from_holdings(
+                &holdings,
+                "USD",
+                "asset_classes",
+                "FIXED_INCOME",
+                &HashMap::new(),
+            )
+            .await
+            .unwrap();
+
+        // The residual holds the top-level-only holding, not the whole class.
+        assert_eq!(residual.total_value, dec!(800));
+        assert_eq!(residual.holdings.len(), 1);
+        assert_eq!(residual.holdings[0].symbol, "TBILL");
+        assert_eq!(residual.category_name, "Other FIXED_INCOME");
+        assert_eq!(parent.total_value, dec!(2000));
+        assert_eq!(parent.holdings.len(), 2);
     }
 
     #[tokio::test]

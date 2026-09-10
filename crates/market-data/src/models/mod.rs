@@ -7,9 +7,11 @@
 //! - `quote` - Quote data structures (Quote, QuoteContext)
 //! - `profile` - Asset profile data (AssetProfile)
 //! - `coverage` - Provider market coverage restrictions (Coverage)
+//! - `country` - ISO 3166-1 alpha-2 normalisation for provider country strings
 //! - `search` - Search result data (SearchResult)
 //! - `dividend` - Dividend event data (DividendEvent)
 
+mod country;
 mod coverage;
 mod dividend;
 mod instrument;
@@ -19,6 +21,7 @@ mod quote;
 mod search;
 mod types;
 
+pub use country::to_iso_alpha2;
 pub use coverage::Coverage;
 pub use dividend::DividendEvent;
 pub use instrument::{AssetKind, InstrumentId, InstrumentKind};

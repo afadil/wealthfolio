@@ -7,6 +7,7 @@ const PURE_CASH_ACTIVITY_TYPES: readonly string[] = [
   ActivityType.FEE,
   ActivityType.INTEREST,
   ActivityType.TAX,
+  ActivityType.CREDIT,
 ];
 
 /**

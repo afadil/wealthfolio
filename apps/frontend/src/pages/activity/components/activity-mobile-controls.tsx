@@ -1,6 +1,7 @@
 import { Button, Icons, Input } from "@wealthfolio/ui";
 import { ActivityType } from "@/lib/constants";
 import { Account, AccountScope, PortfolioWithAccounts } from "@/lib/types";
+import type { ActivityStatusFilter } from "../hooks/use-activity-search";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DateRange } from "react-day-picker";
@@ -13,14 +14,25 @@ interface ActivityMobileControlsProps {
   onSearchQueryChange: (value: string) => void;
   accountScope: AccountScope;
   selectedActivityTypes: ActivityType[];
+  /**
+   * Status and instrument type have no control in the mobile sheet, but they
+   * are set from the desktop toolbar and from the needs-review banner and they
+   * persist — so they still have to count towards the active-filter dot, and
+   * the reset below has to be able to clear them.
+   */
+  statusFilter: ActivityStatusFilter;
+  selectedInstrumentTypes: string[];
   dateRange: DateRange | undefined;
+  onResetFilters: () => void;
   isCompactView: boolean;
   onCompactViewChange: (isCompact: boolean) => void;
-  onFilterChange: (
-    types: ActivityType[],
-    range: DateRange | undefined,
-    scope: AccountScope,
-  ) => void;
+  onFilterChange: (next: {
+    activityTypes: ActivityType[];
+    dateRange: DateRange | undefined;
+    accountScope: AccountScope;
+    statusFilter: ActivityStatusFilter;
+    instrumentTypes: string[];
+  }) => void;
 }
 
 export function ActivityMobileControls({
@@ -30,7 +42,10 @@ export function ActivityMobileControls({
   onSearchQueryChange,
   accountScope,
   selectedActivityTypes,
+  statusFilter,
+  selectedInstrumentTypes,
   dateRange,
+  onResetFilters,
   isCompactView,
   onCompactViewChange,
   onFilterChange,
@@ -42,6 +57,8 @@ export function ActivityMobileControls({
     searchQuery.trim().length > 0 ||
     accountScope.type !== "all" ||
     selectedActivityTypes.length > 0 ||
+    statusFilter !== "all" ||
+    selectedInstrumentTypes.length > 0 ||
     !!dateRange?.from ||
     !!dateRange?.to;
 
@@ -90,7 +107,11 @@ export function ActivityMobileControls({
         portfolios={portfolios}
         selectedActivityTypes={selectedActivityTypes}
         dateRange={dateRange}
+        statusFilter={statusFilter}
+        selectedInstrumentTypes={selectedInstrumentTypes}
         setFilters={onFilterChange}
+        hasActiveFilters={hasActiveFilters}
+        onResetFilters={onResetFilters}
       />
     </>
   );

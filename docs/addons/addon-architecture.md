@@ -139,28 +139,30 @@ The Rust backend scans for patterns like:
 
 Based on the actual code, these are the permission categories:
 
-| Category              | Functions                                   | Risk Level |
-| --------------------- | ------------------------------------------- | ---------- |
-| `accounts`            | getAll, create                              | High       |
-| `portfolio`           | getHoldings, update, recalculate            | High       |
-| `activities`          | getAll, search, create, update, import      | High       |
-| `market-data`         | searchTicker, sync, getProviders            | Low        |
-| `assets`              | getProfile, updateProfile, updateDataSource | Medium     |
-| `quotes`              | update, getHistory                          | Low        |
-| `performance`         | calculateHistory, calculateSummary          | Medium     |
-| `currency`            | getAll, update, add, getRatesForDates       | Low        |
-| `goals`               | getAll, create, update, updateAllocations   | Medium     |
-| `contribution-limits` | getAll, create, update, calculateDeposits   | Medium     |
-| `settings`            | get, update, backupDatabase                 | Medium     |
-| `files`               | openCsvDialog, openSaveDialog               | Medium     |
-| `events`              | onDrop, onUpdateComplete, onSyncStart       | Low        |
-| `network`             | request (brokered fetch to declared hosts)  | High       |
-| `secrets`             | set, get, delete                            | High       |
+| Category              | Risk Level | Common Functions                                                     |
+| --------------------- | ---------- | -------------------------------------------------------------------- |
+| `accounts`            | High       | getAll, create                                                       |
+| `portfolio`           | High       | getHoldings, getHolding, update, recalculate                         |
+| `activities`          | High       | getAll, search, create, update, saveMany, import                     |
+| `market-data`         | Low        | searchTicker, syncHistory, sync, getProviders, fetchDividends        |
+| `assets`              | Medium     | getProfile, updateProfile, updateQuoteMode                           |
+| `quotes`              | Low        | update, getHistory                                                   |
+| `performance`         | Medium     | calculateHistory, calculateSummary, calculateAccountsSimple          |
+| `currency`            | Low        | getAll, update, add, getRatesForDates                                |
+| `spending`            | Medium     | isEnabled, getCategories, getRules, saveRule, deleteRule, rerunRules |
+| `financial-planning`  | Medium     | getAll, create, update, getFunding, saveFunding                      |
+| `contribution-limits` | Medium     | getAll, create, update, calculateDeposits                            |
+| `settings`            | Medium     | get, update, backupDatabase                                          |
+| `files`               | Medium     | openCsvDialog, openSaveDialog                                        |
+| `snapshots`           | High       | getAll, getByDate, save, checkImport, importSnapshots                |
+| `events`              | Low        | onDrop, onUpdateComplete, onSyncComplete                             |
+| `network`             | High       | request                                                              |
+| `secrets`             | High       | set, get, use, delete                                                |
 
-> **Baseline capabilities are not permissions.** `ui`, packaged `assets`,
-> `query`, `toast`, `logger`, and `storage` are granted to every addon and are
-> **not** declared in `manifest.json`. Only data categories plus `files`,
-> `network`, `secrets`, `events`, `snapshots`, and `settings` require
+> **Baseline capabilities are not permissions.** `ui`, `navigation`, packaged
+> `assets`, `query`, `toast`, `logger`, and `storage` are granted to every addon
+> and are **not** declared in `manifest.json`. Only data categories plus
+> `files`, `network`, `secrets`, `events`, `snapshots`, and `settings` require
 > declaration and consent.
 
 ### Permission Enforcement
@@ -245,21 +247,25 @@ interface HostAPI {
   storage: StorageAPI;
   toast: ToastAPI;
   logger: LoggerAPI;
+  navigation: NavigationAPI;
   // Domain data APIs — gated by manifest permissions
   accounts: AccountsAPI;
   portfolio: PortfolioAPI;
   activities: ActivitiesAPI;
-  market: MarketAPI;
+  market: MarketDataAPI;
   assets: AssetsAPI;
   quotes: QuotesAPI;
   performance: PerformanceAPI;
   exchangeRates: ExchangeRatesAPI;
+  spending: SpendingAPI;
   goals: GoalsAPI;
   contributionLimits: ContributionLimitsAPI;
   settings: SettingsAPI;
   files: FilesAPI;
+  snapshots: SnapshotsAPI;
   events: EventsAPI;
   secrets: SecretsAPI;
+  network: NetworkAPI;
 }
 ```
 
@@ -572,8 +578,8 @@ Each addon includes a manifest.json file:
   "version": "1.0.0",
   "description": "Does something useful",
   "main": "dist/addon.js",
-  "sdkVersion": "3.7.0",
-  "minWealthfolioVersion": "3.7.0",
+  "sdkVersion": "3.8.0",
+  "minWealthfolioVersion": "3.8.0",
   "contributes": {
     "routes": [{ "id": "my-addon" }],
     "links": {
@@ -618,7 +624,7 @@ Optional fields:
   render before booting the addon
 - `permissions`: Declared data access (array of
   `{ category, functions, purpose }`)
-- `sdkVersion`: SDK version the addon targets (`"3.7.0"`)
+- `sdkVersion`: SDK version the addon targets (`"3.8.0"`)
 - `minWealthfolioVersion`: Minimum host version required to load the addon
 
 The host mounts every contributed route below `/addons/<manifest.id>`. Omit

@@ -43,7 +43,7 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
             {t("sync:recovery.description")}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center max-sm:[&>button]:h-auto max-sm:[&>button]:min-h-11 max-sm:[&>button]:max-w-full max-sm:[&>button]:whitespace-normal">
           <Button variant="ghost" onClick={() => onOpenChange?.(false)}>
             {t("sync:recovery.notNow")}
           </Button>

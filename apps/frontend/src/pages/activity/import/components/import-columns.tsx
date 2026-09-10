@@ -4,9 +4,9 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Checkbox, type SymbolSearchResult } from "@wealthfolio/ui";
 import { ActivityType, INSTRUMENT_TYPE_OPTIONS, SUBTYPES_BY_ACTIVITY_TYPE } from "@/lib/constants";
 import {
+  isAssetIdentityRequired,
   localizeActivitySubtypeName,
   localizeActivityTypeName,
-  needsImportAssetResolution,
   supportsPerformanceBoundary,
 } from "@/lib/activity-utils";
 import { ActivityTypeBadge } from "../../components/activity-type-badge";
@@ -272,7 +272,7 @@ export function useImportColumns<T extends ImportRowData>({
           onCreateCustomAsset,
           isClearable: (rowData: unknown) => {
             const row = rowData as ImportRowData;
-            return !needsImportAssetResolution(row.activityType ?? "", row.subtype);
+            return !isAssetIdentityRequired(row.activityType ?? "", row.subtype);
           },
         },
       },

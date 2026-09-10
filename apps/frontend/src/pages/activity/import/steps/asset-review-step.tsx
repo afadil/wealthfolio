@@ -86,6 +86,7 @@ function NeedsFixingRow({
   onCreateAsset,
 }: NeedsFixingRowProps) {
   const { t } = useTranslation();
+  const logoSymbol = item.draft?.instrumentSymbol || item.draft?.displayCode || symbol;
   const meaningfulErrors = Object.values(item.errors ?? {})
     .flat()
     .filter((msg) => !REDUNDANT_ERROR_PATTERNS.some((re) => re.test(msg)));
@@ -97,7 +98,12 @@ function NeedsFixingRow({
     >
       {/* Col 1: avatar + symbol + count */}
       <div className="flex items-center gap-2.5">
-        <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
+        <TickerAvatar
+          symbol={logoSymbol}
+          exchangeMic={item.draft?.instrumentExchangeMic}
+          instrumentType={item.draft?.instrumentType}
+          className="size-7 shrink-0"
+        />
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
@@ -185,6 +191,7 @@ function AutoResolvedRow({
 }: AutoResolvedRowProps) {
   const { t } = useTranslation();
   const asset = item.draft;
+  const logoSymbol = asset?.instrumentSymbol || asset?.displayCode || symbol;
   const assetName =
     asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
   const exchangeDisplay = asset?.instrumentExchangeMic
@@ -199,7 +206,12 @@ function AutoResolvedRow({
     >
       {/* Col 1: avatar + symbol + name */}
       <div className="flex items-center gap-2.5">
-        <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
+        <TickerAvatar
+          symbol={logoSymbol}
+          exchangeMic={asset?.instrumentExchangeMic}
+          instrumentType={asset?.instrumentType}
+          className="size-7 shrink-0"
+        />
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
@@ -304,6 +316,7 @@ function ReadyAssetRow({
 }: ReadyAssetRowProps) {
   const { t } = useTranslation();
   const asset = item.draft;
+  const logoSymbol = asset?.instrumentSymbol || asset?.displayCode || symbol;
   const assetName =
     asset?.name && asset.name.toUpperCase() !== symbol.toUpperCase() ? asset.name : undefined;
   const exchangeDisplay = asset?.instrumentExchangeMic
@@ -318,7 +331,12 @@ function ReadyAssetRow({
     >
       {/* Col 1: avatar + symbol + name */}
       <div className="flex items-center gap-2.5">
-        <TickerAvatar symbol={symbol} className="size-7 shrink-0" />
+        <TickerAvatar
+          symbol={logoSymbol}
+          exchangeMic={asset?.instrumentExchangeMic}
+          instrumentType={asset?.instrumentType}
+          className="size-7 shrink-0"
+        />
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>

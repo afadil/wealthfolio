@@ -409,6 +409,7 @@ export function ActivityDataGrid({
     onDelete: handleDelete,
     onLinkTransfer: handleRowLinkTransfer,
     onUnlinkTransfer: handleRowUnlinkTransfer,
+    showSubtypeInType: columnVisibility.subtype === false,
     onSymbolSelect: handleSymbolSelect,
     onCreateCustomAsset: handleCreateCustomAsset,
   });

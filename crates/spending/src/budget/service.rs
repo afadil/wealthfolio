@@ -990,7 +990,7 @@ fn add_allocated_actuals(
         assignments_by_activity,
         splits_by_activity,
     ) {
-        let amount = fx_to_target(
+        let amount = crate::fx::convert(
             fx,
             allocation.amount,
             from_currency,
@@ -1364,37 +1364,6 @@ fn validate_month_key(period_key: &str) -> Result<()> {
 fn period_key_for_date_in_tz(date: DateTime<Utc>, timezone: &str) -> String {
     let d = wealthfolio_core::utils::time_utils::activity_date_in_user_timezone(date, timezone);
     format!("{:04}-{:02}", d.year(), d.month())
-}
-
-/// Convert a native amount to the budget's target currency at `as_of`.
-/// Mirrors `insight::service::fx_to_target` and `analytics::service::fx_to_target`
-/// — same convention (one rate per report, snapshot-date style) so all three
-/// services agree. Same-currency short-circuit; on FxService error, returns
-/// None so callers exclude the native amount instead of mixing currencies into
-/// the target total.
-fn fx_to_target(
-    fx: &dyn wealthfolio_core::fx::FxServiceTrait,
-    amount: Decimal,
-    from: &str,
-    to: &str,
-    as_of: NaiveDate,
-) -> Option<Decimal> {
-    if amount == Decimal::ZERO || from == to || from.is_empty() {
-        return Some(amount);
-    }
-    match fx.convert_currency_for_date(amount, from, to, as_of) {
-        Ok(converted) => Some(converted),
-        Err(e) => {
-            log::warn!(
-                "spending budget FX conversion {}→{} on {} failed ({}); excluding native amount",
-                from,
-                to,
-                as_of,
-                e,
-            );
-            None
-        }
-    }
 }
 
 fn month_end(period_key: &str) -> Result<DateTime<Utc>> {

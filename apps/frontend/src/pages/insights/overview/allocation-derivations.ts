@@ -5,6 +5,7 @@ import type {
   CurrentValuationSummary,
   Holding,
 } from "@/lib/types";
+import { namedChildren } from "@/lib/allocation-children";
 import type { FormattingApi } from "@wealthfolio/ui";
 
 /** Cycling palette built from the theme chart tokens (retargeted to the allocation palette). */
@@ -218,10 +219,12 @@ export interface BreakdownNode {
 /**
  * Build a colored breakdown tree from a taxonomy's categories. Top-level nodes get distinct
  * theme chart colors; descendants inherit their parent's color so each branch reads as one family.
+ * `residualName` labels the unassigned remainder of a category (see `withResidualChild`).
  */
 export function buildBreakdownTree(
   categories: CategoryAllocation[] | undefined,
   total: number,
+  residualName: (categoryName: string) => string,
   depth = 0,
   inheritedColor?: string,
 ): BreakdownNode[] {
@@ -231,6 +234,7 @@ export function buildBreakdownTree(
     .sort((a, b) => b.value - a.value)
     .map((c, index) => {
       const color = depth === 0 ? paletteColor(index) : (inheritedColor ?? paletteColor(index));
+      const children = namedChildren(c, residualName);
       return {
         id: c.categoryId,
         name: c.categoryName,
@@ -238,8 +242,8 @@ export function buildBreakdownTree(
         percentage: total > 0 ? (c.value / total) * 100 : 0,
         color,
         depth,
-        children: c.children?.length
-          ? buildBreakdownTree(c.children, total, depth + 1, color)
+        children: children.length
+          ? buildBreakdownTree(children, total, residualName, depth + 1, color)
           : undefined,
       };
     });
@@ -293,6 +297,7 @@ export function currencyLensItems(holdings: Holding[]): LensItem[] {
 
 /**
  * Nested account breakdown: account groups at the top level, individual accounts as children.
+ * A group stays a group at any member count, so its accounts are always reachable underneath.
  * Ungrouped accounts (no `account.group`) appear as flat top-level rows. Values come from real
  * per-account valuations (holdings are aggregated under a single id in "all" scope).
  */
@@ -303,7 +308,12 @@ export function accountTreeWeights(
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
   const groups = new Map<
     string,
-    { name: string; value: number; accounts: { id: string; name: string; value: number }[] }
+    {
+      name: string;
+      groupName: string | null;
+      value: number;
+      accounts: { id: string; name: string; value: number }[];
+    }
   >();
   let total = 0;
   for (const v of valuations) {
@@ -315,8 +325,15 @@ export function accountTreeWeights(
         : num(v.totalValue) * (num(v.fxRateToBase) || 1);
     if (value <= 0) continue;
     total += value;
-    const key = account.group || account.name;
-    const group = groups.get(key) ?? { name: key, value: 0, accounts: [] };
+    const groupName = account.group?.trim() || null;
+    // Ungrouped accounts key by id so two accounts sharing a name stay separate rows.
+    const key = groupName ? `grp:${groupName}` : `acct:${account.id}`;
+    const group = groups.get(key) ?? {
+      name: groupName ?? account.name,
+      groupName,
+      value: 0,
+      accounts: [],
+    };
     group.value += value;
     group.accounts.push({ id: account.id, name: account.name, value });
     groups.set(key, group);
@@ -325,15 +342,15 @@ export function accountTreeWeights(
     .sort((a, b) => b.value - a.value)
     .map((group, index) => {
       const color = paletteColor(index);
-      const nested = group.accounts.length > 1;
+      const isGroup = group.groupName != null;
       return {
-        id: `grp:${group.name}`,
+        id: isGroup ? `grp:${group.groupName}` : group.accounts[0].id,
         name: group.name,
         value: group.value,
         percentage: total > 0 ? (group.value / total) * 100 : 0,
         color,
         depth: 0,
-        children: nested
+        children: isGroup
           ? group.accounts
               .sort((a, b) => b.value - a.value)
               .map((acc) => ({

@@ -7,7 +7,9 @@ across that addon's route renders, then cleared when the sandbox stops. It is
 not the main application's client and does not share the host's in-memory cache.
 
 ```tsx
-const addonQueryClient = ctx.api.query.getClient();
+import type { QueryClient } from "@wealthfolio/addon-sdk";
+
+const addonQueryClient = ctx.api.query.getClient() as QueryClient;
 
 function AddonRoot() {
   return (

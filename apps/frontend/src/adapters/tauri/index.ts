@@ -111,11 +111,17 @@ export * from "../shared/taxonomies";
 // Alternative Assets Commands
 export * from "../shared/alternative-assets";
 
+// Asset Logo Commands
+export * from "../shared/asset-logos";
+
 // Contribution Limits Commands
 export * from "../shared/contribution-limits";
 
 // Exchange Rates Commands
 export * from "../shared/exchange-rates";
+
+// Spending Categorization Commands
+export * from "../shared/spending";
 
 // Secrets Commands
 export * from "../shared/secrets";

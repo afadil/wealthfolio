@@ -7,7 +7,10 @@ use axum::{
     routing::{delete, get, put},
     Json, Router,
 };
-use wealthfolio_core::assets::{Asset as CoreAsset, AssetProfile, NewAsset, UpdateAssetProfile};
+use wealthfolio_core::assets::{
+    Asset as CoreAsset, AssetLogo, AssetLogoSummary, AssetProfile, NewAsset, UpdateAssetProfile,
+    UpsertAssetLogo,
+};
 
 #[derive(serde::Deserialize)]
 struct AssetQuery {
@@ -74,6 +77,39 @@ async fn delete_asset(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn list_asset_logos(
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Vec<AssetLogoSummary>>> {
+    Ok(Json(state.asset_logo_service.list_asset_logos()?))
+}
+
+async fn get_asset_logo(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<Json<Option<AssetLogo>>> {
+    Ok(Json(state.asset_logo_service.get_asset_logo(&id)?))
+}
+
+async fn upsert_asset_logo(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<UpsertAssetLogo>,
+) -> ApiResult<Json<AssetLogo>> {
+    let logo = state
+        .asset_logo_service
+        .upsert_asset_logo(&id, payload)
+        .await?;
+    Ok(Json(logo))
+}
+
+async fn delete_asset_logo(
+    Path(id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> ApiResult<StatusCode> {
+    state.asset_logo_service.delete_asset_logo(&id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/assets", get(list_assets).post(create_asset))
@@ -81,4 +117,11 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/assets/profile", get(get_asset_profile))
         .route("/assets/profile/{id}", put(update_asset_profile))
         .route("/assets/pricing-mode/{id}", put(update_quote_mode))
+        .route("/assets/logos", get(list_asset_logos))
+        .route(
+            "/assets/logo/{id}",
+            get(get_asset_logo)
+                .put(upsert_asset_logo)
+                .delete(delete_asset_logo),
+        )
 }

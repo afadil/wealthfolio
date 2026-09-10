@@ -255,8 +255,12 @@ struct AccountCashFacts {
 struct LegacyCashDecision {
     final_amount: Option<Decimal>,
     needs_review: bool,
-    previous_cash_effect: Decimal,
-    final_cash_effect: Decimal,
+    /// `None` when the legacy effect could not be recomputed; treated as a
+    /// change, so the account rebuilds rather than being skipped on a
+    /// comparison nobody could make.
+    previous_cash_effect: Option<Decimal>,
+    /// Unknown totals must also trigger review and a rebuild.
+    final_cash_effect: Option<Decimal>,
 }
 
 pub(crate) async fn migrate_activities_to_final_cash(
@@ -305,7 +309,9 @@ pub(crate) async fn migrate_activities_to_final_cash(
         };
 
         if activity.status == ActivityStatus::Posted
-            && decision.previous_cash_effect != decision.final_cash_effect
+            && (decision.previous_cash_effect.is_none()
+                || decision.final_cash_effect.is_none()
+                || decision.previous_cash_effect != decision.final_cash_effect)
         {
             affected_account_ids.insert(activity.account_id.clone());
         }
@@ -437,7 +443,10 @@ fn classify_legacy_activity_cash(
         .then(|| ActivityEconomicsResolver::derived_positive_gross(inputs))
         .flatten();
     let supplied = activity.amount.map(|amount| amount.abs());
-    let charges = activity.fee_amt() + activity.tax_amt();
+    // Only ever asked whether the row carries a charge at all. Both accessors
+    // return absolute values, so the sum is zero exactly when both are, and
+    // asking each in turn cannot overflow the way totalling them can.
+    let has_charges = !activity.fee_amt().is_zero() || !activity.tax_amt().is_zero();
     let tolerance = currency_minor_unit(&activity.currency) / Decimal::TWO;
 
     let (final_amount, needs_review) = if is_trade {
@@ -483,12 +492,12 @@ fn classify_legacy_activity_cash(
         match supplied {
             // A charged composite (e.g. DRIP with withholding) changes its
             // compiled cash effect under the final contract; surface it.
-            Some(amount) => (Some(amount), !charges.is_zero()),
+            Some(amount) => (Some(amount), has_charges),
             None => (derived_final, derived_final.is_none()),
         }
     } else {
         match supplied {
-            Some(amount) => (Some(amount), !charges.is_zero()),
+            Some(amount) => (Some(amount), has_charges),
             None => (None, true),
         }
     };
@@ -503,8 +512,7 @@ fn classify_legacy_activity_cash(
         account_facts.is_credit_card,
     )
     .ok()
-    .and_then(|resolved| resolved.signed_cash_effect)
-    .unwrap_or(Decimal::ZERO);
+    .and_then(|resolved| resolved.signed_cash_effect);
 
     // Before the cutover the review queue was `status = DRAFT`; after it,
     // `needs_review` is the only queue. Flag legacy drafts so they stay
@@ -513,7 +521,10 @@ fn classify_legacy_activity_cash(
 
     Some(LegacyCashDecision {
         final_amount,
-        needs_review: needs_review || activity.needs_review || is_legacy_draft,
+        needs_review: needs_review
+            || activity.needs_review
+            || is_legacy_draft
+            || final_cash_effect.is_none(),
         previous_cash_effect,
         final_cash_effect,
     })
@@ -541,11 +552,16 @@ fn legacy_compiled_cash_effect(
     activity: &Activity,
     asset_facts: &AssetCashFacts,
     is_credit_card: bool,
-) -> Decimal {
+) -> Option<Decimal> {
     legacy_cash_postings(activity)
         .iter()
-        .map(|posting| legacy_runtime_cash_effect(posting, asset_facts, is_credit_card))
-        .sum()
+        .try_fold(Decimal::ZERO, |total, posting| {
+            total.checked_add(legacy_runtime_cash_effect(
+                posting,
+                asset_facts,
+                is_credit_card,
+            )?)
+        })
 }
 
 /// Reproduces only the pre-cutover asset-income expansion needed to compare
@@ -564,7 +580,11 @@ fn legacy_cash_postings(activity: &Activity) -> Vec<Activity> {
     }
 
     let quantity = activity.quantity.unwrap_or(Decimal::ZERO);
-    let derived_amount = activity.unit_price.map(|unit_price| quantity * unit_price);
+    // A figure that cannot be computed is simply not a candidate, which the
+    // `.or` chains below already handle.
+    let derived_amount = activity
+        .unit_price
+        .and_then(|unit_price| quantity.checked_mul(unit_price));
     let income_amount = activity
         .amount
         .filter(|amount| !amount.is_zero())
@@ -575,11 +595,13 @@ fn legacy_cash_postings(activity: &Activity) -> Vec<Activity> {
         .filter(|price| price.is_sign_positive() && !price.is_zero())
         .or_else(|| {
             income_amount.and_then(|amount| {
-                let reinvested_amount = amount - activity.fee_amt() - activity.tax_amt();
+                let reinvested_amount = amount
+                    .checked_sub(activity.fee_amt())?
+                    .checked_sub(activity.tax_amt())?;
                 if quantity.is_zero() || reinvested_amount <= Decimal::ZERO {
                     None
                 } else {
-                    Some(reinvested_amount / quantity)
+                    reinvested_amount.checked_div(quantity)
                 }
             })
         })
@@ -605,19 +627,23 @@ fn legacy_cash_postings(activity: &Activity) -> Vec<Activity> {
     vec![income_leg, buy_leg]
 }
 
+/// `None` when the legacy figures cannot be recombined inside `Decimal`. The
+/// caller reads that as "the effect may have changed", which is the safe
+/// answer for a value whose only job is to decide whether to rebuild.
 fn legacy_runtime_cash_effect(
     activity: &Activity,
     asset_facts: &AssetCashFacts,
     is_credit_card: bool,
-) -> Decimal {
+) -> Option<Decimal> {
     let activity_type = activity.effective_type();
     let fee = activity.fee_amt();
     let tax = activity.tax_amt();
     let amount = activity.amt();
+    let charges = fee.checked_add(tax);
 
     if is_credit_card && activity_type == ACTIVITY_TYPE_INTEREST {
         let charge = if !fee.is_zero() { fee } else { amount };
-        return -charge;
+        return Some(-charge);
     }
 
     match activity_type {
@@ -633,23 +659,26 @@ fn legacy_runtime_cash_effect(
             let gross = if use_amount {
                 amount
             } else {
-                activity.qty() * activity.price() * asset_facts.unit_multiplier
+                activity
+                    .qty()
+                    .checked_mul(activity.price())?
+                    .checked_mul(asset_facts.unit_multiplier)?
             };
             if activity_type == ACTIVITY_TYPE_BUY {
-                -(gross + fee + tax)
+                gross.checked_add(charges?).map(|total| -total)
             } else {
-                gross - fee - tax
+                gross.checked_sub(charges?)
             }
         }
         ACTIVITY_TYPE_DEPOSIT
         | ACTIVITY_TYPE_DIVIDEND
         | ACTIVITY_TYPE_INTEREST
         | ACTIVITY_TYPE_CREDIT
-        | ACTIVITY_TYPE_TRANSFER_IN => amount - fee - tax,
-        ACTIVITY_TYPE_WITHDRAWAL | ACTIVITY_TYPE_TRANSFER_OUT => -amount - fee - tax,
+        | ACTIVITY_TYPE_TRANSFER_IN => amount.checked_sub(charges?),
+        ACTIVITY_TYPE_WITHDRAWAL | ACTIVITY_TYPE_TRANSFER_OUT => (-amount).checked_sub(charges?),
         ACTIVITY_TYPE_FEE => {
             let charge = if !fee.is_zero() { fee } else { amount };
-            -charge
+            Some(-charge)
         }
         ACTIVITY_TYPE_TAX => {
             let charge = if !tax.is_zero() {
@@ -659,9 +688,9 @@ fn legacy_runtime_cash_effect(
             } else {
                 amount
             };
-            -charge
+            Some(-charge)
         }
-        _ => Decimal::ZERO,
+        _ => Some(Decimal::ZERO),
     }
 }
 
@@ -860,8 +889,8 @@ mod tests {
 
         assert_eq!(decision.final_amount, Some(dec!(100)));
         assert!(decision.needs_review);
-        assert_eq!(decision.previous_cash_effect, dec!(85));
-        assert_eq!(decision.final_cash_effect, dec!(100));
+        assert_eq!(decision.previous_cash_effect, Some(dec!(85)));
+        assert_eq!(decision.final_cash_effect, Some(dec!(100)));
     }
 
     #[test]
@@ -876,7 +905,7 @@ mod tests {
 
         assert_eq!(decision.final_amount, Some(dec!(100)));
         assert!(decision.needs_review);
-        assert_eq!(decision.final_cash_effect, dec!(100));
+        assert_eq!(decision.final_cash_effect, Some(dec!(100)));
     }
 
     #[test]
@@ -892,8 +921,8 @@ mod tests {
 
         assert_eq!(decision.final_amount, Some(dec!(23)));
         assert!(!decision.needs_review);
-        assert_eq!(decision.previous_cash_effect, dec!(-23));
-        assert_eq!(decision.final_cash_effect, dec!(-23));
+        assert_eq!(decision.previous_cash_effect, Some(dec!(-23)));
+        assert_eq!(decision.final_cash_effect, Some(dec!(-23)));
     }
 
     #[test]
@@ -950,7 +979,7 @@ mod tests {
         let decision = classify_legacy_activity_cash(&sell, facts(), &account_facts()).unwrap();
 
         assert_eq!(decision.final_amount, Some(dec!(2)));
-        assert_eq!(decision.final_cash_effect, dec!(-2));
+        assert_eq!(decision.final_cash_effect, Some(dec!(-2)));
         assert!(!decision.needs_review);
     }
 
@@ -1086,8 +1115,57 @@ mod tests {
 
         assert_eq!(decision.final_amount, Some(dec!(100)));
         assert!(decision.needs_review);
-        assert_eq!(decision.previous_cash_effect, dec!(95));
-        assert_eq!(decision.final_cash_effect, dec!(100));
+        assert_eq!(decision.previous_cash_effect, Some(dec!(95)));
+        assert_eq!(decision.final_cash_effect, Some(dec!(100)));
+    }
+
+    #[test]
+    fn charges_too_large_to_total_still_classify() {
+        // The migration only asks whether the row carries a charge at all, so
+        // a pair that cannot be summed must not stop it classifying - this
+        // runs at startup over stored rows, where one such row would take the
+        // whole pass down rather than fail a single import.
+        let mut deposit = activity(ACTIVITY_TYPE_DEPOSIT);
+        deposit.amount = Some(dec!(100));
+        deposit.fee = Some(Decimal::MAX);
+        deposit.tax = Some(Decimal::MAX);
+
+        let decision = classify_legacy_activity_cash(&deposit, facts(), &account_facts()).unwrap();
+
+        assert_eq!(decision.final_amount, Some(dec!(100)));
+        assert!(decision.needs_review);
+    }
+
+    #[test]
+    fn composite_price_division_overflow_still_classifies() {
+        let mut drip = activity(ACTIVITY_TYPE_DIVIDEND);
+        drip.subtype = Some("DRIP".to_string());
+        drip.quantity = Some(dec!(0.1));
+        drip.amount = Some(Decimal::MAX);
+        let decision = classify_legacy_activity_cash(&drip, facts(), &account_facts()).unwrap();
+        assert_eq!(decision.final_amount, Some(Decimal::MAX));
+        assert_eq!(decision.final_cash_effect, Some(Decimal::ZERO));
+    }
+
+    #[test]
+    fn credit_card_staking_overflow_stays_unknown_and_reviewable() {
+        let mut staking = activity(ACTIVITY_TYPE_INTEREST);
+        staking.subtype = Some("STAKING_REWARD".to_string());
+        staking.quantity = Some(dec!(1));
+        staking.unit_price = Some(Decimal::MAX);
+        staking.amount = Some(Decimal::MAX);
+        let decision = classify_legacy_activity_cash(
+            &staking,
+            facts(),
+            &AccountCashFacts {
+                is_credit_card: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(decision.final_amount, Some(Decimal::MAX));
+        assert_eq!(decision.previous_cash_effect, None);
+        assert_eq!(decision.final_cash_effect, None);
+        assert!(decision.needs_review);
     }
 
     #[test]
@@ -1126,8 +1204,8 @@ mod tests {
 
         assert_eq!(decision.final_amount, Some(dec!(9850)));
         assert!(!decision.needs_review);
-        assert_eq!(decision.previous_cash_effect, dec!(-9850));
-        assert_eq!(decision.final_cash_effect, dec!(-9850));
+        assert_eq!(decision.previous_cash_effect, Some(dec!(-9850)));
+        assert_eq!(decision.final_cash_effect, Some(dec!(-9850)));
     }
 
     #[test]
@@ -1178,8 +1256,8 @@ mod tests {
         let decision = classify_legacy_activity_cash(&drip, facts(), &account_facts()).unwrap();
 
         assert_eq!(decision.final_amount, Some(dec!(100)));
-        assert_eq!(decision.previous_cash_effect, Decimal::ZERO);
-        assert_eq!(decision.final_cash_effect, Decimal::ZERO);
+        assert_eq!(decision.previous_cash_effect, Some(Decimal::ZERO));
+        assert_eq!(decision.final_cash_effect, Some(Decimal::ZERO));
         assert!(!decision.needs_review);
     }
 

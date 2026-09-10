@@ -49,6 +49,7 @@ export interface UseActivitySearchInfiniteResult {
   hasNextPage: boolean | undefined;
   isFetching: boolean;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   isLoading: boolean;
   refetch: () => Promise<unknown>;
 }
@@ -203,6 +204,7 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     hasNextPage: infiniteQuery.hasNextPage,
     isFetching: infiniteQuery.isFetching,
     isFetchingNextPage: infiniteQuery.isFetchingNextPage,
+    isFetchNextPageError: infiniteQuery.isFetchNextPageError,
     isLoading: infiniteQuery.isLoading,
     refetch: infiniteQuery.refetch,
   };

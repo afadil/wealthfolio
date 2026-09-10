@@ -7,13 +7,15 @@
 //! - country (United States, Canada) → regions taxonomy
 
 use crate::assets::assets_model::{AssetKind, InstrumentType};
-use crate::taxonomies::{NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
+use crate::taxonomies::{Category, NewAssetTaxonomyAssignment, TaxonomyServiceTrait};
 use log::{debug, warn};
 use std::{collections::BTreeMap, sync::Arc};
+use wealthfolio_market_data::to_iso_alpha2;
 
 const AUTO_SOURCE: &str = "AUTO";
 const ASSET_CLASSES_TAXONOMY: &str = "asset_classes";
 const INSTRUMENT_TYPE_TAXONOMY: &str = "instrument_type";
+const REGIONS_TAXONOMY: &str = "regions";
 
 /// Maps Yahoo quote_type to instrument_type taxonomy category ID
 /// Yahoo quoteType values: EQUITY, ETF, MUTUALFUND, INDEX, CRYPTOCURRENCY, OPTION, BOND, FUTURES, CURRENCY
@@ -320,10 +322,59 @@ fn map_sector_to_gics(sector: &str) -> Option<&'static str> {
     }
 }
 
+/// Resolves a provider country string against the regions taxonomy.
+///
+/// The seeded taxonomy is three levels — continent, sub-region, country — and
+/// carries 227 `country_*` nodes keyed on ISO 3166-1 alpha-2. Resolving to the
+/// country node is what lets a German holding be told apart from a Portuguese
+/// one, and what gives Europe a drill-down at all: a category rolled up to
+/// itself contributes no child row to the allocation breakdown.
+///
+/// Matching the taxonomy's own categories rather than a hard-coded table also
+/// means a country the user adds by hand resolves without a code change.
+///
+/// The providers normalise to alpha-2 on the way out, so a freshly enriched
+/// asset takes the first branch. The rest answers for what normalisation cannot
+/// reach: profiles already on disk, hand-entered spellings, and categories the
+/// user added.
+fn resolve_country_category(country: &str, categories: &[Category]) -> Option<String> {
+    let country = country.trim();
+    if country.is_empty() {
+        return None;
+    }
+
+    let country_id = |code: &str| {
+        let id = format!("country_{}", code.to_ascii_uppercase());
+        categories
+            .iter()
+            .any(|category| category.id == id)
+            .then_some(id)
+    };
+
+    // A bare ISO code, which is what the providers now send, and the same table
+    // they normalise against for a name they still spell their own way.
+    if let Some(id) = to_iso_alpha2(country).and_then(country_id) {
+        return Some(id);
+    }
+
+    if let Some(category) = categories
+        .iter()
+        .find(|category| category.name.eq_ignore_ascii_case(country))
+    {
+        return Some(category.id.clone());
+    }
+
+    map_country_to_region(country).map(String::from)
+}
+
 /// Maps country name to regions taxonomy category ID
 /// Uses specific country codes where available, falls back to regional groupings
 /// Regions hierarchy: R10=Europe, R20=Americas, R2010=North America, R2040=South America,
 ///                    R30=Asia, R3030=East Asia, R40=Africa, R50=Oceania
+///
+/// Only reached when `resolve_country_category` finds nothing in the taxonomy
+/// itself, so it answers for spellings the seed does not carry rather than for
+/// the countries it does.
 fn map_country_to_region(country: &str) -> Option<&'static str> {
     // Normalize country name
     let country_lower = country.to_lowercase();
@@ -614,15 +665,27 @@ impl AutoClassificationService {
 
         // 4. Classify region
         if let Some(country) = &input.country {
-            let region_assignments = map_country_to_region(country)
-                .map(|category_id| vec![(category_id.to_string(), 10000)])
+            let region_categories = self
+                .taxonomy_service
+                .get_taxonomy(REGIONS_TAXONOMY)
+                .unwrap_or_else(|e| {
+                    warn!(
+                        "Failed to load the regions taxonomy for {}: {}",
+                        asset_id, e
+                    );
+                    None
+                })
+                .map(|taxonomy| taxonomy.categories)
+                .unwrap_or_default();
+            let region_assignments = resolve_country_category(country, &region_categories)
+                .map(|category_id| vec![(category_id, 10000)])
                 .unwrap_or_default();
             let first_region = region_assignments
                 .first()
                 .map(|(category_id, _)| category_id.clone());
 
             match self
-                .replace_auto_taxonomy_assignments(asset_id, "regions", region_assignments)
+                .replace_auto_taxonomy_assignments(asset_id, REGIONS_TAXONOMY, region_assignments)
                 .await
             {
                 Ok(assigned_count) if assigned_count > 0 => {
@@ -1041,7 +1104,9 @@ mod tests {
         assert_eq!(map_country_to_region("Hong Kong"), Some("country_HK"));
         assert_eq!(map_country_to_region("Australia"), Some("country_AU"));
 
-        // European countries -> Europe region (R10)
+        // European countries -> Europe region (R10). This is the fallback only:
+        // resolve_country_category reaches country_GB/country_DE first whenever
+        // the regions taxonomy carries them, which the seed does.
         assert_eq!(map_country_to_region("United Kingdom"), Some("R10"));
         assert_eq!(map_country_to_region("Germany"), Some("R10"));
         assert_eq!(map_country_to_region("France"), Some("R10"));
@@ -1241,6 +1306,116 @@ mod tests {
         assert!(service.assignments_for("asset-1", "regions").is_empty());
     }
 
+    /// The shape of the seeded regions taxonomy: continent, sub-region, country.
+    fn seeded_regions() -> Vec<Category> {
+        vec![
+            region_category("R10", None, "Europe"),
+            region_category("R1020", Some("R10"), "Western Europe"),
+            region_category("country_DE", Some("R1020"), "Germany"),
+            region_category("country_FR", Some("R1020"), "France"),
+            region_category("R1040", Some("R10"), "Southern Europe"),
+            region_category("country_PT", Some("R1040"), "Portugal"),
+            region_category("R1030", Some("R10"), "Eastern Europe"),
+            region_category("country_RU", Some("R1030"), "Russian Federation"),
+            region_category("R20", None, "Americas"),
+            region_category("R2010", Some("R20"), "North America"),
+            region_category("country_US", Some("R2010"), "United States"),
+        ]
+    }
+
+    fn region_category(id: &str, parent_id: Option<&str>, name: &str) -> Category {
+        let now = Utc::now().naive_utc();
+        Category {
+            id: id.to_string(),
+            taxonomy_id: REGIONS_TAXONOMY.to_string(),
+            parent_id: parent_id.map(String::from),
+            name: name.to_string(),
+            key: id.to_string(),
+            color: "#4385be".to_string(),
+            description: None,
+            sort_order: 0,
+            created_at: now,
+            updated_at: now,
+            icon: None,
+        }
+    }
+
+    #[test]
+    fn country_resolves_to_the_country_node_not_its_continent() {
+        let regions = seeded_regions();
+
+        // Two Western European holdings that the continent-level mapping made
+        // indistinguishable, and one that already worked.
+        assert_eq!(
+            resolve_country_category("Germany", &regions).as_deref(),
+            Some("country_DE")
+        );
+        assert_eq!(
+            resolve_country_category("Portugal", &regions).as_deref(),
+            Some("country_PT")
+        );
+        assert_eq!(
+            resolve_country_category("United States", &regions).as_deref(),
+            Some("country_US")
+        );
+    }
+
+    #[test]
+    fn provider_country_spellings_resolve_to_the_taxonomy_name() {
+        let regions = seeded_regions();
+
+        // Provider spelling against the taxonomy's UN name.
+        assert_eq!(
+            resolve_country_category("Russia", &regions).as_deref(),
+            Some("country_RU")
+        );
+        // A bare ISO 3166-1 alpha-2 code, which is what the ids are keyed on.
+        assert_eq!(
+            resolve_country_category("DE", &regions).as_deref(),
+            Some("country_DE")
+        );
+        // Case and surrounding whitespace are not signal.
+        assert_eq!(
+            resolve_country_category("  france  ", &regions).as_deref(),
+            Some("country_FR")
+        );
+    }
+
+    #[test]
+    fn an_unknown_country_falls_back_rather_than_inventing_a_category() {
+        let regions = seeded_regions();
+
+        // Carried by the fallback table but absent from this taxonomy: answer
+        // with the coarse region rather than a country id nothing can render.
+        assert_eq!(
+            resolve_country_category("Italy", &regions).as_deref(),
+            Some("R10")
+        );
+        assert_eq!(resolve_country_category("Atlantis", &regions), None);
+        assert_eq!(resolve_country_category("   ", &regions), None);
+        // An ISO code with no node must not be minted as country_ZZ.
+        assert_eq!(resolve_country_category("ZZ", &regions), None);
+    }
+
+    #[tokio::test]
+    async fn classification_assigns_the_country_node_for_a_european_holding() {
+        let service = Arc::new(MockTaxonomyService::with_regions(seeded_regions()));
+        let classifier = AutoClassificationService::new(service.clone());
+        let input = ClassificationInput {
+            quote_type: Some("EQUITY".to_string()),
+            country: Some("Germany".to_string()),
+            ..Default::default()
+        };
+
+        classifier.classify_asset("asset-1", &input).await.unwrap();
+
+        let assignments = service.assignments_for("asset-1", REGIONS_TAXONOMY);
+        assert_eq!(assignments.len(), 1);
+        assert_eq!(assignments[0].category_id, "country_DE");
+        assert_eq!(assignments[0].weight, 10000);
+        assert_eq!(assignments[0].source, AUTO_SOURCE);
+    }
+
     fn assignment(
         id: &str,
         asset_id: &str,
@@ -1265,12 +1440,21 @@ mod tests {
     #[derive(Default)]
     struct MockTaxonomyService {
         assignments: Mutex<Vec<AssetTaxonomyAssignment>>,
+        regions: Vec<Category>,
     }
 
     impl MockTaxonomyService {
         fn with_assignments(assignments: Vec<AssetTaxonomyAssignment>) -> Self {
             Self {
                 assignments: Mutex::new(assignments),
+                regions: Vec::new(),
+            }
+        }
+
+        fn with_regions(regions: Vec<Category>) -> Self {
+            Self {
+                assignments: Mutex::new(Vec::new()),
+                regions,
             }
         }
 
@@ -1297,8 +1481,26 @@ mod tests {
             unimplemented!("unused in auto-classification tests")
         }
 
-        fn get_taxonomy(&self, _id: &str) -> Result<Option<TaxonomyWithCategories>> {
-            unimplemented!("unused in auto-classification tests")
+        fn get_taxonomy(&self, id: &str) -> Result<Option<TaxonomyWithCategories>> {
+            if id != REGIONS_TAXONOMY {
+                unimplemented!("only the regions taxonomy is read during classification")
+            }
+            let now = Utc::now().naive_utc();
+            Ok(Some(TaxonomyWithCategories {
+                taxonomy: Taxonomy {
+                    id: REGIONS_TAXONOMY.to_string(),
+                    name: "Regions".to_string(),
+                    color: "#8b7ec8".to_string(),
+                    description: None,
+                    is_system: true,
+                    is_single_select: false,
+                    sort_order: 0,
+                    created_at: now,
+                    updated_at: now,
+                    scope: "asset".to_string(),
+                },
+                categories: self.regions.clone(),
+            }))
         }
 
         fn get_taxonomies_with_categories(&self) -> Result<Vec<TaxonomyWithCategories>> {

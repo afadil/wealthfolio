@@ -54,6 +54,7 @@ import {
   FileArchive,
   FileAudio,
   FileImage,
+  ImageUp,
   FileSpreadsheet,
   FileText,
   FileVideo,
@@ -341,6 +342,7 @@ const IconsInternal = {
   FileArchive: FileArchive,
   FileAudio: FileAudio,
   FileImage: FileImage,
+  ImageUp: ImageUp,
   FileSpreadsheet: FileSpreadsheet,
   FileVideo: FileVideo,
   Folder: Folder,
@@ -972,6 +974,7 @@ export type IconName =
   | "FileArchive"
   | "FileAudio"
   | "FileImage"
+  | "ImageUp"
   | "FileSpreadsheet"
   | "FileVideo"
   | "Folder"

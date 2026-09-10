@@ -8,6 +8,10 @@ localization: **formatting** (numbers, currencies, dates — region-driven) and
 Both follow the user's settings automatically and update live when the user
 changes them — no reload, no listeners to wire up.
 
+The sandbox localization runtime described here ships with Wealthfolio 3.8.
+Addons that use these APIs must set both `sdkVersion` and
+`minWealthfolioVersion` to `3.8.0` or newer.
+
 ## Region formatting (numbers, currencies, dates)
 
 The host separates the UI **language** from the **formatting region**: a user
@@ -90,7 +94,21 @@ Behavior and rules:
   cannot see yours.
 - **Language follows the host.** There is no API to change the language from an
   addon — the UI language is a user setting. `language` from the hook tells you
-  the current base code (`en`, `fr`, `de`, `es`, `zh`, `ja`, `ko`).
+  the current host locale code: `en`, `fr`, `de`, `es`, `pt`, `zh`, `zh-Hant`,
+  `ja`, `ko`, `it`.
+
+  Note that these are **not** all bare language codes. `zh-Hant` (Traditional
+  Chinese) carries a script subtag, so `language.split("-")[0]` is not a safe
+  way to key a lookup table — it collapses Traditional and Simplified onto the
+  same `zh`. Compare against the full code, and register a `zh-Hant` bundle
+  separately from `zh`. A missing `zh-Hant` string falls back to your `en`
+  bundle, never to `zh`: Simplified glyphs in a Traditional UI read as broken
+  rather than untranslated.
+
+  Regional aliases normalize to the host's supported language. For example,
+  `fr-CA` becomes `fr`, while `zh-TW`, `zh-HK`, and `zh-MO` become `zh-Hant`.
+  Invalid language keys are ignored with a warning.
+
 - **Fallback is your `en` bundle.** If the current language is missing a key (or
   the whole bundle), lookup falls back to your `en` resources; if that is
   missing too, the key itself is rendered. Always ship a complete `en` bundle.

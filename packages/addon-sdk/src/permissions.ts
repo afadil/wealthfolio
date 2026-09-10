@@ -133,6 +133,21 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     riskLevel: 'low',
   },
   {
+    id: 'spending',
+    name: 'Spend Categorization',
+    description:
+      'View spend categories and manage categorization rules that auto-tag transactions',
+    functions: [
+      'isEnabled',
+      'getCategories',
+      'getRules',
+      'saveRule',
+      'deleteRule',
+      'rerunRules',
+    ],
+    riskLevel: 'medium',
+  },
+  {
     id: 'financial-planning',
     name: 'Financial Planning',
     description: 'Access to financial goals and allocations',

@@ -78,6 +78,7 @@ fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
 pub struct ActivityDB {
     pub id: String,
     pub account_id: String,
+    #[diesel(treat_none_as_null = true)]
     pub asset_id: Option<String>, // NOW NULLABLE
 
     // Classification

@@ -52,7 +52,8 @@
       "compare_weights": "Comparez les pondérations actuelles avec votre portefeuille souhaité.",
       "set_target_allocation": "Définir une répartition cible",
       "outside_range_one": "{{count}} hors de la plage · plus grand écart {{gap}}",
-      "outside_range_other": "{{count}} hors de la plage · plus grand écart {{gap}}"
+      "outside_range_other": "{{count}} hors de la plage · plus grand écart {{gap}}",
+      "outside_range_many": "{{count}} hors de la plage · plus grand écart {{gap}}"
     },
     "value_strip": {
       "portfolio_value": "Valeur du portefeuille",
@@ -64,8 +65,10 @@
       "available_cash": "Trésorerie disponible",
       "holdings_count_one": "{{count}} position",
       "holdings_count_other": "{{count}} positions",
+      "holdings_count_many": "{{count}} positions",
       "accounts_count_one": "{{count}} compte",
-      "accounts_count_other": "{{count}} comptes"
+      "accounts_count_other": "{{count}} comptes",
+      "accounts_count_many": "{{count}} comptes"
     }
   },
   "networth": {
@@ -79,6 +82,7 @@
     "update_valuations": "Mettez à jour vos valorisations",
     "assets_count_one": "{{count}} actif",
     "assets_count_other": "{{count}} actifs",
+    "assets_count_many": "{{count}} actifs",
     "not_updated_over_90_days": "Non mis à jour depuis plus de 90 jours.",
     "chart": {
       "net_worth": "Valeur nette",
@@ -116,6 +120,7 @@
       "monthly_pace": "Rythme mensuel",
       "over_months_one": "sur {{count}} mois",
       "over_months_other": "sur {{count}} mois",
+      "over_months_many": "sur {{count}} mois",
       "trailing_pace": " · {{multiple}}× rythme sur 12 mois glissants",
       "drivers_of_change": "Facteurs d'évolution",
       "market_returns": "Rendements du marché",
@@ -124,6 +129,7 @@
       "per_month": "/mois"
     },
     "days_ago_one": "il y a {{count}}j",
-    "days_ago_other": "il y a {{count}}j"
+    "days_ago_other": "il y a {{count}}j",
+    "days_ago_many": "il y a {{count}}j"
   }
 }

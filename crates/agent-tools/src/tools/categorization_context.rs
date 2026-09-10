@@ -889,6 +889,8 @@ mod tests {
             splits: Vec::new(),
             event_id: None,
             transfer_link_status: None,
+            net_amount: -10.0,
+            net_amount_base: None,
         }
     }
 

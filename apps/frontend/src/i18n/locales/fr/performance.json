@@ -65,7 +65,8 @@
     "different_methods": "Des méthodes de rendement différentes ne peuvent pas partager le même graphique. Sélectionnez une pastille grisée pour changer le mode du graphique.",
     "not_enough_overlap": "Ces éléments sélectionnés n'ont pas suffisamment de dates de graphique communes avec le graphique actif.",
     "not_plotted_count_one": "{{count}} élément sélectionné n'est pas tracé",
-    "not_plotted_count_other": "{{count}} éléments sélectionnés ne sont pas tracés"
+    "not_plotted_count_other": "{{count}} éléments sélectionnés ne sont pas tracés",
+    "not_plotted_count_many": "{{count}} éléments sélectionnés ne sont pas tracés"
   },
   "metric": {
     "return": "Rendement",

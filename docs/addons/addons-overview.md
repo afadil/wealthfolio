@@ -109,28 +109,31 @@ const accounts = await ctx.api.accounts.getAll();
 
 #### 2. Permission Categories
 
-| Category      | Risk Level | Functions                                   |
-| ------------- | ---------- | ------------------------------------------- |
-| `accounts`    | High       | getAll, create                              |
-| `portfolio`   | High       | getHoldings, update, recalculate            |
-| `activities`  | High       | getAll, search, create, update, import      |
-| `market-data` | Low        | searchTicker, sync, getProviders            |
-| `assets`      | Medium     | getProfile, updateProfile, updateDataSource |
-| `quotes`      | Low        | update, getHistory                          |
-| `performance` | Medium     | calculateHistory, calculateSummary          |
-| `currency`    | Low        | getAll, update, add, getRatesForDates       |
-| `goals`       | Medium     | getAll, create, update, updateAllocations   |
-| `settings`    | Medium     | get, update, backupDatabase                 |
-| `files`       | Medium     | openCsvDialog, openSaveDialog               |
-| `events`      | Low        | onDrop, onUpdateComplete, onSyncStart       |
-| `secrets`     | High       | set, get, delete                            |
-| `network`     | High       | request (brokered fetch to declared hosts)  |
+| Category              | Risk Level | Common Functions                                                     |
+| --------------------- | ---------- | -------------------------------------------------------------------- |
+| `accounts`            | High       | getAll, create                                                       |
+| `portfolio`           | High       | getHoldings, getHolding, update, recalculate                         |
+| `activities`          | High       | getAll, search, create, update, saveMany, import                     |
+| `market-data`         | Low        | searchTicker, syncHistory, sync, getProviders, fetchDividends        |
+| `assets`              | Medium     | getProfile, updateProfile, updateQuoteMode                           |
+| `quotes`              | Low        | update, getHistory                                                   |
+| `performance`         | Medium     | calculateHistory, calculateSummary, calculateAccountsSimple          |
+| `currency`            | Low        | getAll, update, add, getRatesForDates                                |
+| `spending`            | Medium     | isEnabled, getCategories, getRules, saveRule, deleteRule, rerunRules |
+| `financial-planning`  | Medium     | getAll, create, update, getFunding, saveFunding                      |
+| `contribution-limits` | Medium     | getAll, create, update, calculateDeposits                            |
+| `settings`            | Medium     | get, update, backupDatabase                                          |
+| `files`               | Medium     | openCsvDialog, openSaveDialog                                        |
+| `snapshots`           | High       | getAll, getByDate, save, checkImport, importSnapshots                |
+| `events`              | Low        | onDrop, onUpdateComplete, onSyncComplete                             |
+| `network`             | High       | request                                                              |
+| `secrets`             | High       | set, get, use, delete                                                |
 
-> **Baseline capabilities are not permissions.** `ui`, packaged `assets`,
-> `query`, `toast`, `logger`, and `storage` are granted to every addon and must
-> **not** appear in `manifest.json` `permissions`. Only data categories plus
-> `files`, `network`, `secrets`, `events`, `snapshots`, and `settings` require
-> declaration and consent.
+> **Baseline capabilities are not permissions.** `ui`, `navigation`, packaged
+> `assets`, `query`, `toast`, `logger`, and `storage` are granted to every addon
+> and must **not** appear in `manifest.json` `permissions`. Only data categories
+> plus `files`, `network`, `secrets`, `events`, `snapshots`, and `settings`
+> require declaration and consent.
 
 #### 3. User Approval
 
@@ -140,37 +143,42 @@ approve or reject the addon installation.
 ## Available APIs
 
 The addon context provides access to domain-specific data APIs plus a set of
-**baseline capabilities** (`ui`, packaged `assets`, `query`, `storage`, `toast`,
-`logger`) that every addon gets without declaring a permission:
+**baseline capabilities** (`ui`, `navigation`, packaged `assets`, `query`,
+`storage`, `toast`, `logger`) that every addon gets without declaring a
+permission:
 
 ```typescript
 interface AddonContext {
   ui: { root: HTMLElement };
-  sidebar: SidebarAPI;
-  router: RouterAPI;
+  sidebar: SidebarManager;
+  router: RouterManager;
   assets: AddonAssets;
-  onDisable: (callback: () => void) => void;
+  onDisable(callback: () => void): void;
   api: {
     // Baseline capabilities — no permission declaration required
     query: QueryAPI; // addon-local QueryClient with host invalidation bridge
     storage: StorageAPI; // durable, per-addon key/value store
     toast: ToastAPI; // user-facing notifications
     logger: LoggerAPI; // scoped logging
+    navigation: NavigationAPI; // application route navigation
     // Domain data APIs — declared in manifest `permissions`
     accounts: AccountsAPI;
     portfolio: PortfolioAPI;
     activities: ActivitiesAPI;
-    market: MarketAPI;
+    market: MarketDataAPI;
     assets: AssetsAPI;
     quotes: QuotesAPI;
     performance: PerformanceAPI;
     exchangeRates: ExchangeRatesAPI;
+    spending: SpendingAPI;
     goals: GoalsAPI;
     contributionLimits: ContributionLimitsAPI;
     settings: SettingsAPI;
     files: FilesAPI;
+    snapshots: SnapshotsAPI;
     events: EventsAPI;
     secrets: SecretsAPI;
+    network: NetworkAPI;
   };
 }
 ```
@@ -252,8 +260,8 @@ automatically. Addons using this API must set `minWealthfolioVersion` to
   "main": "dist/addon.js",
   "description": "Addon description",
   "author": "Your Name",
-  "sdkVersion": "3.7.0",
-  "minWealthfolioVersion": "3.7.0",
+  "sdkVersion": "3.8.0",
+  "minWealthfolioVersion": "3.8.0",
   "enabled": true,
   "contributes": {
     "routes": [{ "id": "my-addon" }],

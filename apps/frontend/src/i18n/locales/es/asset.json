@@ -153,7 +153,8 @@
     "maturity": "Vencimiento",
     "type": "Tipo",
     "strike": "Precio de ejercicio",
-    "expiry": "Vencimiento"
+    "expiry": "Vencimiento",
+    "multiplier": "Multiplicador"
   },
   "profile": {
     "overview": "Resumen",
@@ -256,6 +257,18 @@
     "exchange": "Mercado",
     "select_exchange": "Seleccionar mercado",
     "search_exchanges": "Buscar mercados...",
+    "contract_multiplier": "Multiplicador del contrato",
+    "contract_multiplier_hint": "Cada contrato representa esta cantidad de unidades subyacentes. Déjalo vacío para usar el valor estándar {{default}}.",
+    "maturity_date": "Fecha de vencimiento",
+    "coupon_rate": "Tasa del cupón (%)",
+    "coupon_frequency": "Frecuencia del cupón",
+    "select_frequency": "Seleccionar frecuencia",
+    "couponFrequency": {
+      "ANNUAL": "Anual",
+      "SEMI_ANNUAL": "Semestral",
+      "QUARTERLY": "Trimestral",
+      "ZERO": "Cupón cero"
+    },
     "saving": "Guardando...",
     "saving_short": "Guardando",
     "save_changes": "Guardar cambios",
@@ -320,12 +333,15 @@
     "lots_by_account": "Lotes por cuenta",
     "account_one": "{{count}} cuenta",
     "account_other": "{{count}} cuentas",
+    "account_many": "{{count}} cuentas",
     "lot_one": "{{count}} lote",
     "lot_other": "{{count}} lotes",
+    "lot_many": "{{count}} lotes",
     "collapse_all": "Contraer todo",
     "expand_all": "Expandir todo",
     "share_one": "acción",
     "share_other": "acciones",
+    "share_many": "acciones",
     "market_value": "Valor de mercado",
     "shares_suffix": "acciones",
     "cost_basis": "Base de coste",
@@ -402,7 +418,8 @@
     "to_manual_warning": "Las actualizaciones automáticas de precios se desactivarán.",
     "confirm_change": "Confirmar cambio",
     "delete_count_one": "Eliminar ({{count}})",
-    "delete_count_other": "Eliminar ({{count}})"
+    "delete_count_other": "Eliminar ({{count}})",
+    "delete_count_many": "Eliminar ({{count}})"
   },
   "quoteTable": {
     "date": "Fecha",
@@ -699,9 +716,41 @@
     "save_changes": "Guardar cambios",
     "delete_count_one": "Eliminar ({{count}})",
     "delete_count_other": "Eliminar ({{count}})",
+    "delete_count_many": "Eliminar ({{count}})",
     "modified_one": "{{count}} modificado",
     "modified_other": "{{count}} modificados",
+    "modified_many": "{{count}} modificados",
     "to_delete_one": "{{count}} para eliminar",
-    "to_delete_other": "{{count}} para eliminar"
+    "to_delete_other": "{{count}} para eliminar",
+    "to_delete_many": "{{count}} para eliminar"
+  },
+  "logo": {
+    "change": "Cambiar logo",
+    "title": "Logo del activo",
+    "badge_default": "Predeterminado",
+    "badge_custom": "Personalizado",
+    "updated_at": "Actualizado el {{date}}",
+    "dropzone_cta": "Elegir una imagen",
+    "dropzone_or_drop": "o arrástrala y suéltala aquí",
+    "dropzone_hint": "PNG, JPEG, WebP o SVG · se redimensiona a PNG de 256×256",
+    "processing": "Preparando la imagen…",
+    "preview_title": "Vista previa",
+    "preview_new": "Logo nuevo",
+    "preview_current": "Logo actual",
+    "preview_card": "Tarjeta de posición",
+    "preview_table": "Tabla de posiciones",
+    "preview_list": "Lista de actividades",
+    "preview_meta": "{{width}}×{{height}} · {{size}} (antes {{original}})",
+    "choose_different": "Elegir otra imagen",
+    "save": "Guardar logo",
+    "reset": "Restablecer predeterminado",
+    "saved": "Logo guardado.",
+    "reset_done": "Logo restablecido al predeterminado.",
+    "error_unsupported_type": "Archivo no compatible. Usa una imagen PNG, JPEG, WebP o SVG.",
+    "error_too_large_input": "El archivo es demasiado grande. Elige una imagen de menos de 10 MB.",
+    "error_decode_failed": "No se pudo leer el archivo como imagen.",
+    "error_encode_failed": "No se pudo convertir la imagen a PNG.",
+    "error_too_large_output": "La imagen tiene demasiado detalle para caber en 150 KB. Prueba con una imagen más simple o más pequeña.",
+    "error_save_failed": "No se pudo guardar el logo."
   }
 }

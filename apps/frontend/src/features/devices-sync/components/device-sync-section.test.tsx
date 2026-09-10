@@ -145,6 +145,56 @@ describe("DeviceSyncSection", () => {
     });
   });
 
+  it("keeps ready-state overwrite actions responsive", async () => {
+    vi.useFakeTimers();
+    try {
+      const bootstrapSync = {
+        mutateAsync: vi.fn().mockResolvedValue({
+          status: "overwrite_required",
+          localRows: 12,
+          nonEmptyTables: [{ table: "accounts", rows: 1 }],
+        }),
+        isPending: false,
+        error: null,
+      };
+
+      hookMocks.useSyncStatus.mockReturnValue({
+        isLoading: false,
+        error: null,
+        syncState: "READY",
+        trustedDevices: [{ id: "trusted-1", name: "Laptop", platform: "mac", lastSeenAt: null }],
+        device: { trustState: "trusted" },
+        engineStatus: {
+          lastCycleStatus: "stale_cursor",
+          bootstrapRequired: true,
+          backgroundRunning: false,
+        },
+        engineIsFetching: false,
+        refetch: vi.fn(),
+      });
+      hookMocks.useDevices.mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+      });
+      hookMocks.useSyncActions.mockReturnValue(createActions({ bootstrapSync }));
+
+      renderWithQueryClient(<DeviceSyncSection />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      await flushAsyncWork();
+
+      expect(screen.getByRole("button", { name: "Back up first" }).parentElement).toHaveClass(
+        "max-sm:[&>button]:whitespace-normal",
+        "sm:flex-wrap",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("requires confirmation when any other non-revoked device exists", async () => {
     const reinitializeSync = {
       mutateAsync: vi.fn().mockResolvedValue(undefined),

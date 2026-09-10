@@ -23,7 +23,8 @@ use wealthfolio_core::{
     },
     assets::{
         AlternativeAssetRepositoryTrait, AlternativeAssetService, AlternativeAssetServiceTrait,
-        AssetClassificationService, AssetService, AssetServiceTrait,
+        AssetClassificationService, AssetLogoService, AssetLogoServiceTrait, AssetService,
+        AssetServiceTrait,
     },
     events::DomainEventSink,
     fx::{FxService, FxServiceTrait},
@@ -55,7 +56,7 @@ use wealthfolio_storage_sqlite::{
     addons::AddonStorageRepository,
     agent::{McpAuditRepository, PatRepository},
     ai_chat::AiChatRepository,
-    assets::{AlternativeAssetRepository, AssetRepository},
+    assets::{AlternativeAssetRepository, AssetLogoRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
@@ -101,6 +102,7 @@ pub struct AppState {
     pub taxonomy_service: Arc<dyn TaxonomyServiceTrait + Send + Sync>,
     pub net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync>,
     pub alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync>,
+    pub asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync>,
     pub addon_service: Arc<dyn AddonServiceTrait + Send + Sync>,
     pub connect_sync_service: Arc<dyn BrokerSyncServiceTrait + Send + Sync>,
     pub ai_provider_service: Arc<dyn AiProviderServiceTrait + Send + Sync>,
@@ -632,6 +634,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             activity_splits_repo.clone(),
             activity_events_repo.clone(),
             events_service.clone(),
+            fx_service.clone(),
         ),
     );
 
@@ -727,6 +730,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )
         .with_event_sink(domain_event_sink.clone()),
     );
+
+    // Custom asset logo overrides
+    let asset_logo_service: Arc<dyn AssetLogoServiceTrait + Send + Sync> =
+        Arc::new(AssetLogoService::new(
+            Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone())),
+            asset_repository.clone(),
+        ));
 
     // Connect sync service for broker data synchronization
     let platform_repository = Arc::new(PlatformRepository::new(pool.clone(), writer.clone()));
@@ -894,6 +904,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         taxonomy_service,
         net_worth_service,
         alternative_asset_service,
+        asset_logo_service,
         addon_service,
         connect_sync_service,
         ai_provider_service,

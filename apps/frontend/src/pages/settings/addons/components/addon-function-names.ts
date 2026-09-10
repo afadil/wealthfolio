@@ -69,6 +69,14 @@ export const FUNCTION_DISPLAY_NAMES: Record<string, string> = {
   "exchangeRates.add": "Add new exchange rates",
   "exchangeRates.getRatesForDates": "View historical exchange rates",
 
+  // SpendingAPI functions
+  "spending.isEnabled": "Check whether Spending is enabled",
+  "spending.getCategories": "View your spend categories",
+  "spending.getRules": "View its own auto-categorization rules",
+  "spending.saveRule": "Create or update auto-categorization rules",
+  "spending.deleteRule": "Delete auto-categorization rules",
+  "spending.rerunRules": "Re-apply categorization rules to your transactions",
+
   // ContributionLimitsAPI functions
   "contributionLimits.getAll": "View contribution limits",
   "contributionLimits.create": "Set contribution limits",

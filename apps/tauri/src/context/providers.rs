@@ -14,7 +14,7 @@ use wealthfolio_core::{
     accounts::AccountService,
     activities::{rebuild_pending_final_cash_accounts, run_final_cash_migration, ActivityService},
     addons::AddonService,
-    assets::{AlternativeAssetService, AssetClassificationService, AssetService},
+    assets::{AlternativeAssetService, AssetClassificationService, AssetLogoService, AssetService},
     events::DomainEvent,
     fx::{FxService, FxServiceTrait},
     goals::GoalService,
@@ -43,7 +43,7 @@ use wealthfolio_storage_sqlite::{
     addons::AddonStorageRepository,
     agent::{McpAuditRepository, PatRepository},
     ai_chat::AiChatRepository,
-    assets::{AlternativeAssetRepository, AssetRepository},
+    assets::{AlternativeAssetRepository, AssetLogoRepository, AssetRepository},
     db::{self, write_actor},
     fx::FxRepository,
     goals::GoalRepository,
@@ -281,6 +281,7 @@ pub async fn initialize_context(
             activity_splits_repo.clone(),
             activity_events_repo.clone(),
             events_service.clone(),
+            fx_service.clone(),
         ),
     );
 
@@ -541,6 +542,12 @@ pub async fn initialize_context(
         .with_event_sink(domain_event_sink.clone()),
     );
 
+    let asset_logo_repository = Arc::new(AssetLogoRepository::new(pool.clone(), writer.clone()));
+    let asset_logo_service = Arc::new(AssetLogoService::new(
+        asset_logo_repository,
+        asset_repository.clone(),
+    ));
+
     let sync_service = Arc::new(
         BrokerSyncService::new(
             account_service.clone(),
@@ -672,6 +679,7 @@ pub async fn initialize_context(
             net_worth_service,
             sync_service,
             alternative_asset_service,
+            asset_logo_service,
             taxonomy_service,
             connect_service,
             ai_provider_service,

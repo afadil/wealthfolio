@@ -152,6 +152,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    asset_logos (asset_id) {
+        asset_id -> Text,
+        mime_type -> Text,
+        data -> Text,
+        sha256 -> Text,
+        width -> Integer,
+        height -> Integer,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     brokers_sync_state (account_id, provider) {
         account_id -> Text,
         provider -> Text,
@@ -841,6 +854,7 @@ diesel::joinable!(activities -> import_runs (import_run_id));
 diesel::joinable!(ai_messages -> ai_threads (thread_id));
 diesel::joinable!(ai_thread_tags -> ai_threads (thread_id));
 diesel::joinable!(asset_taxonomy_assignments -> assets (asset_id));
+diesel::joinable!(asset_logos -> assets (asset_id));
 diesel::joinable!(brokers_sync_state -> accounts (account_id));
 diesel::joinable!(brokers_sync_state -> import_runs (last_run_id));
 diesel::joinable!(goals_allocation -> accounts (account_id));
@@ -886,6 +900,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ai_threads,
     app_settings,
     asset_taxonomy_assignments,
+    asset_logos,
     assets,
     brokers_sync_state,
     contribution_limits,

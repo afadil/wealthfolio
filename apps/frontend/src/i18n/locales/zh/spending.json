@@ -195,9 +195,9 @@
     "statusNeedsReview": "需要审核",
     "statusUncategorized": "未归类",
     "statusCategorized": "已归类",
-    "countLabel": "{{visible}} / {{total}} 笔交易",
-    "countLabel_one": "{{visible}} / {{total}} 笔交易",
-    "countLabel_other": "{{visible}} / {{total}} 笔交易",
+    "countLabel": "{{visible}}/{{total}} 笔交易",
+    "countLabel_one": "{{visible}}/{{total}} 笔交易",
+    "countLabel_other": "{{visible}}/{{total}} 笔交易",
     "countZero": "0 笔交易",
     "category": "类别",
     "subcategory": "子类别",
@@ -205,7 +205,9 @@
     "filterTransactions": "筛选交易",
     "clearAll": "全部清除",
     "done": "完成",
-    "refreshing": "正在刷新"
+    "refreshing": "正在刷新",
+    "selectedNet": "所选净额",
+    "filteredNet": "筛选净额"
   },
   "period": {
     "thisMonth": "本月",
@@ -359,9 +361,8 @@
     "spent": "已花费",
     "allSubcategories": "所有子类别",
     "tx": "交易",
-    "outflowsCount": "{{count}} 笔支出",
     "avgPerTx": "每笔平均",
-    "outflowsOnly": "仅支出",
+    "acrossAllTx": "按全部交易计算",
     "dailyPace": "每日进度",
     "inThisPeriod": "在此周期内",
     "subcategoryMix": "子类别构成",
@@ -373,7 +374,6 @@
     "noTransactions": "此周期内没有交易。",
     "loadMore": "再加载 {{count}} 笔",
     "openInTransactions": "在交易中打开",
-    "outflowsCount_other": "{{count}} 笔支出",
     "totalCount_other": "共 {{count}} 笔",
     "loadMore_other": "再加载 {{count}} 笔"
   },
@@ -815,9 +815,12 @@
     "deselectAllVisible": "取消选择所有可见交易",
     "selectAllVisible": "选择所有可见交易",
     "nameNotes": "名称 / 备注",
-    "loading": "正在加载……",
-    "loadMore": "加载更多（剩余 {{count}} 项）",
-    "loadMore_other": "加载更多（剩余 {{count}} 项）"
+    "time": "时间",
+    "net": "净额",
+    "dayCount_one": "{{count}} 笔交易",
+    "dayCount_other": "{{count}} 笔交易",
+    "selectDay": "选择 {{date}} 的所有交易",
+    "deselectDay": "取消选择 {{date}} 的所有交易"
   },
   "tabContent": {
     "stageWhereLabel": "我的现状",

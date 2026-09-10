@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -17,7 +18,9 @@ import { createActivity, deleteActivity, updateActivity } from "@/adapters";
 import { generateId } from "@/lib/id";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useIsMobileViewport } from "@/hooks/use-platform";
+import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { QueryKeys } from "@/lib/query-keys";
 import { formatDateISO } from "@/lib/utils";
@@ -32,6 +35,7 @@ import {
   Skeleton,
   Table,
   TableBody,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
@@ -46,6 +50,8 @@ import { ActivityType } from "@/lib/constants";
 import type { AmountRange } from "./amount-range-filter";
 import { DeleteTransactionsDialog, type DeletePreview } from "./delete-transactions-dialog";
 import { TransactionCard } from "./transaction-card";
+import { SelectionToolbar } from "./selection-toolbar";
+import { TransactionDayHeader, TransactionDayHeading } from "./transaction-day-header";
 import { TransactionRow } from "./transaction-row";
 import { SplitTransactionSheet } from "./split-transaction-sheet";
 import { TransactionsBulkBar } from "./transactions-bulk-bar";
@@ -63,6 +69,10 @@ import {
   isTransferCashActivity,
   stableArr,
   toRowVM,
+  groupRowsByDay,
+  flattenDayGroups,
+  netSummary,
+  type TransactionDayGroup,
   type TransactionRowVM,
 } from "../lib/transactions-helpers";
 import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
@@ -86,6 +96,20 @@ import type {
 const SPENDING_TAXONOMY = "spending_categories";
 const INCOME_TAXONOMY = "income_sources";
 const SAVINGS_TAXONOMY = "savings_categories";
+
+/**
+ * Starting heights for virtualized rows, taken from the rendered layouts. They
+ * only have to be close: every row reports its real height once measured, and
+ * the estimate just keeps the scrollbar honest for rows still below the fold.
+ */
+const ROW_HEIGHT = 45;
+const ROW_HEIGHT_HEADER = 34;
+const MOBILE_CARD_HEIGHT = 61;
+const MOBILE_HEADING_HEIGHT = 32;
+/** `space-y-2`, which positioned rows no longer inherit. */
+const MOBILE_CARD_GAP = 8;
+/** Rows kept mounted past the viewport edge, so a fast flick stays painted. */
+const OVERSCAN = 8;
 
 /**
  * Parse a `YYYY-MM-DD` URL param as LOCAL midnight. `new Date("YYYY-MM-DD")`
@@ -352,6 +376,12 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     ]);
 
     const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+    /**
+     * Mobile only. The card list hides its checkboxes until the user asks to
+     * select, the way a phone list normally does — a checkbox on every row is a
+     * permanent cost for an occasional task. The table always shows them.
+     */
+    const [selectionMode, setSelectionMode] = useState(false);
 
     const { accounts = [] } = useAccounts({ filterActive: false });
     const { accountIds: spendingAccountIds } = useSpendingSettings();
@@ -475,9 +505,12 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const {
       items,
       totalCount,
+      net,
+      baseCurrency,
       isLoading,
       isFetching,
       isFetchingNextPage,
+      isFetchNextPageError,
       isError,
       error,
       hasNextPage,
@@ -497,6 +530,28 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const rows: TransactionRowVM[] = useMemo(
       () => items.map((it) => toRowVM(it, allCategories)),
       [items, allCategories],
+    );
+
+    /** Account is only worth a slot in the row when the results span several. */
+    const showAccount = useMemo(
+      () => new Set(rows.map((r) => r.activity.accountId)).size > 1,
+      [rows],
+    );
+
+    const dayGroups = useMemo(() => groupRowsByDay(rows, appTimezone), [rows, appTimezone]);
+
+    /**
+     * Selection only ever covers loaded rows, so summing them client-side is
+     * exact — and it sums the same signed figure the server nets, so the two
+     * readouts cannot disagree.
+     */
+    const selectedNet = useMemo(
+      () =>
+        netSummary(
+          rows.filter((r) => selectedRowIds.has(r.activity.id)),
+          baseCurrency,
+        ),
+      [rows, selectedRowIds, baseCurrency],
     );
     const bulkCategoryScope = useMemo<QuickCategorizeScope | null>(() => {
       if (selectedRowIds.size === 0) return null;
@@ -525,6 +580,12 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       amountRange.max != null ||
       !!dateRange?.from ||
       !!dateRange?.to;
+
+    /**
+     * Summed server-side over the whole filtered set before pagination, so it
+     * describes the filter rather than the rows that happen to be loaded.
+     */
+    const filteredNet = filtersActive ? net : null;
 
     const clearAllFilters = useCallback(() => {
       setSearchInput("");
@@ -564,6 +625,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           activityType,
           subtype: a.subtype,
           currency: a.currency,
+          fxRate: a.fxRate ?? undefined,
           amount: a.amount,
           activityDate:
             typeof a.activityDate === "string" ? a.activityDate : new Date().toISOString(),
@@ -685,6 +747,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const clearSelection = useCallback(() => setSelectedRowIds(new Set()), []);
 
+    const exitSelectionMode = useCallback(() => {
+      setSelectionMode(false);
+      setSelectedRowIds(new Set());
+    }, []);
+
     const handleAssignCategory = useCallback(
       (activityId: string, taxonomyId: string, categoryId: string) => {
         assignMutation.mutate({ activityId, taxonomyId, categoryId });
@@ -764,6 +831,26 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const someVisibleSelected =
       rows.some((r) => selectedRowIds.has(r.activity.id)) && !allVisibleSelected;
 
+    const daySelectionState = useCallback(
+      (group: TransactionDayGroup): boolean | "indeterminate" => {
+        const selected = group.rows.filter((r) => selectedRowIds.has(r.activity.id)).length;
+        if (selected === 0) return false;
+        return selected === group.rows.length ? true : "indeterminate";
+      },
+      [selectedRowIds],
+    );
+
+    const handleToggleDay = useCallback((group: TransactionDayGroup) => {
+      setSelectedRowIds((prev) => {
+        const next = new Set(prev);
+        const allSelected = group.rows.every((r) => next.has(r.activity.id));
+        group.rows.forEach((r) =>
+          allSelected ? next.delete(r.activity.id) : next.add(r.activity.id),
+        );
+        return next;
+      });
+    }, []);
+
     const toggleSelectAllVisible = () => {
       setSelectedRowIds((prev) => {
         const next = new Set(prev);
@@ -838,53 +925,173 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     const isRefreshing = isFetching && !isFetchingNextPage;
     const isMobile = useIsMobileViewport();
 
-    const loadMoreButton = hasNextPage ? (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => fetchNextPage()}
-        disabled={isFetchingNextPage}
-      >
-        {isFetchingNextPage ? (
-          <>
-            <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-            {t("spending:txTab.loading")}
-          </>
-        ) : (
-          t("spending:txTab.loadMore", { count: totalCount - rows.length })
-        )}
-      </Button>
-    ) : null;
+    /**
+     * Both layouts render the same day-grouped sequence, so they share one flat
+     * item list and one virtualizer; only one of them is ever mounted.
+     */
+    const listItems = useMemo(() => flattenDayGroups(dayGroups), [dayGroups]);
 
-    const renderRows = () =>
-      rows.map((r) => {
-        const eventId = r.activity.eventId ?? null;
-        const ev = eventId ? eventsById.get(eventId) : null;
-        const eventTypeColor = ev ? (eventTypeById.get(ev.eventTypeId)?.color ?? null) : null;
-        const RowComponent = isMobile ? TransactionCard : TransactionRow;
+    // Neither layout owns its scroll box — the table scrolls with the page, the
+    // card list scrolls inside its swipeable pane — so both sit below a filter
+    // bar whose height the virtualizer has to offset by.
+    const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
+
+    /**
+     * Keyed by activity rather than index, so a row keeps its measured height
+     * when a page loads above it or a filter reorders the list. The layout is
+     * part of the identity because a card and a table row are not the same
+     * height; changing the key also remounts the row, which is what makes it
+     * re-measure — `measureElement` is a stable callback ref, so React never
+     * re-runs it for a row that merely re-rendered.
+     */
+    const getItemKey = useCallback(
+      (index: number) => `${isMobile ? "card" : "row"}:${listItems[index]?.key ?? index}`,
+      [listItems, isMobile],
+    );
+
+    const virtualizer = useVirtualizer({
+      count: listItems.length,
+      getScrollElement: () => scrollElement,
+      estimateSize: (index) => {
+        const isHeader = listItems[index]?.kind === "header";
+        if (isMobile) return isHeader ? MOBILE_HEADING_HEIGHT : MOBILE_CARD_HEIGHT;
+        return isHeader ? ROW_HEIGHT_HEADER : ROW_HEIGHT;
+      },
+      getItemKey,
+      overscan: OVERSCAN,
+      scrollMargin,
+      // The card list spaced its children with `space-y-2`; positioned rows
+      // need that gap in the layout maths instead.
+      gap: isMobile ? MOBILE_CARD_GAP : 0,
+    });
+
+    const virtualItems = virtualizer.getVirtualItems();
+    const totalSize = virtualizer.getTotalSize();
+    // `start`/`end` are offsets within the scroll port, which begins above the
+    // list; the list positions its own rows from zero.
+    const firstItemStart = virtualItems.length ? virtualItems[0].start - scrollMargin : 0;
+    const lastItemEnd = virtualItems.length
+      ? virtualItems[virtualItems.length - 1].end - scrollMargin
+      : 0;
+
+    const loadMoreTrigger =
+      hasNextPage || isFetchingNextPage ? (
+        <InfiniteScrollTrigger
+          onLoadMore={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetching={isFetching}
+          isFetchingNextPage={isFetchingNextPage}
+          hasLoadMoreError={isFetchNextPageError}
+        />
+      ) : null;
+
+    const sharedRowProps = (r: TransactionRowVM) => {
+      const eventId = r.activity.eventId ?? null;
+      const ev = eventId ? eventsById.get(eventId) : null;
+      return {
+        row: r,
+        account: accountById.get(r.activity.accountId),
+        event: ev ?? null,
+        eventTypeColor: ev ? (eventTypeById.get(ev.eventTypeId)?.color ?? null) : null,
+        appTimezone,
+        isSelected: selectedRowIds.has(r.activity.id),
+        onToggleSelect: handleToggleRow,
+        onAssignCategory: handleAssignCategory,
+        onClearCategory: handleClearCategory,
+        onSetEvent: handleSetEvent,
+        onMarkReimbursement: (row: TransactionRowVM) => markReimbursementMutation.mutate(row),
+        onEditSplits: setSplittingActivity,
+        onEdit: handleEditRow,
+        onDuplicate: handleDuplicate,
+        onDelete: handleDeleteRow,
+        onLinkTransfer: handleLinkTransfer,
+        onUnlinkTransfer: handleUnlinkTransfer,
+      };
+    };
+
+    /**
+     * The card list carries the same day grouping as the table. Each row is
+     * positioned by the virtualizer, so the wrapper — not the card — is what
+     * gets measured and what carries the offset.
+     */
+    const renderGroupedCards = () =>
+      virtualItems.map((virtualItem) => {
+        const item = listItems[virtualItem.index];
+        if (!item) return null;
         return (
-          <RowComponent
-            key={r.activity.id}
-            row={r}
-            account={accountById.get(r.activity.accountId)}
-            event={ev ?? null}
-            eventTypeColor={eventTypeColor}
-            appTimezone={appTimezone}
-            isSelected={selectedRowIds.has(r.activity.id)}
-            onToggleSelect={handleToggleRow}
-            onAssignCategory={handleAssignCategory}
-            onClearCategory={handleClearCategory}
-            onSetEvent={handleSetEvent}
-            onMarkReimbursement={(row) => markReimbursementMutation.mutate(row)}
-            onEditSplits={setSplittingActivity}
-            onEdit={handleEditRow}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDeleteRow}
-            onLinkTransfer={handleLinkTransfer}
-            onUnlinkTransfer={handleUnlinkTransfer}
-          />
+          <div
+            key={virtualItem.key}
+            data-index={virtualItem.index}
+            ref={virtualizer.measureElement}
+            className="absolute left-0 top-0 w-full"
+            style={{ transform: `translateY(${virtualItem.start - scrollMargin}px)` }}
+          >
+            {item.kind === "header" ? (
+              <TransactionDayHeading
+                group={item.group}
+                appTimezone={appTimezone}
+                selectionState={daySelectionState(item.group)}
+                onToggleDay={handleToggleDay}
+                isPartial={hasNextPage === true && item.isLastGroup}
+              />
+            ) : (
+              <TransactionCard
+                {...sharedRowProps(item.row)}
+                showAccount={showAccount}
+                selectionMode={selectionMode}
+              />
+            )}
+          </div>
         );
       });
+
+    /**
+     * Day headers are interleaved into the table body. The trailing group is
+     * marked partial while more pages are pending — its count and net would
+     * otherwise describe only the rows fetched so far.
+     *
+     * A table row cannot be wrapped in a positioned element without breaking
+     * column alignment, so the off-screen rows are stood in for by a spacer row
+     * at each end and the real rows stay in normal table flow.
+     */
+    const renderGroupedRows = () => (
+      <>
+        {firstItemStart > 0 && (
+          <TableRow aria-hidden className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0" style={{ height: firstItemStart }} />
+          </TableRow>
+        )}
+        {virtualItems.map((virtualItem) => {
+          const item = listItems[virtualItem.index];
+          if (!item) return null;
+          return item.kind === "header" ? (
+            <TransactionDayHeader
+              key={virtualItem.key}
+              ref={virtualizer.measureElement}
+              data-index={virtualItem.index}
+              group={item.group}
+              appTimezone={appTimezone}
+              selectionState={daySelectionState(item.group)}
+              onToggleDay={handleToggleDay}
+              isPartial={hasNextPage === true && item.isLastGroup}
+            />
+          ) : (
+            <TransactionRow
+              key={virtualItem.key}
+              ref={virtualizer.measureElement}
+              data-index={virtualItem.index}
+              {...sharedRowProps(item.row)}
+              showAccount={showAccount}
+            />
+          );
+        })}
+        {totalSize - lastItemEnd > 0 && (
+          <TableRow aria-hidden className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0" style={{ height: totalSize - lastItemEnd }} />
+          </TableRow>
+        )}
+      </>
+    );
 
     const editingActivityForForm = useMemo(() => {
       if (!editingActivity) return undefined;
@@ -931,6 +1138,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           onClearAll={clearAllFilters}
           visibleCount={rows.length}
           totalCount={totalCount}
+          selectedNet={selectedNet}
+          filteredNet={filteredNet}
           isRefreshing={isRefreshing}
           isMobile={isMobile}
         />
@@ -952,7 +1161,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             <Skeleton className="h-12" />
             <Skeleton className="h-12" />
           </div>
-        ) : isError ? (
+        ) : isError && !isFetchNextPageError ? (
           <EmptyPlaceholder>
             <EmptyPlaceholder.Icon name="AlertTriangle" />
             <EmptyPlaceholder.Title>{t("spending:txTab.loadErrorTitle")}</EmptyPlaceholder.Title>
@@ -982,32 +1191,35 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             )}
           </EmptyPlaceholder>
         ) : isMobile ? (
-          <div className="space-y-2">
-            {rows.length > 1 && (
-              <div className="flex items-center gap-2 px-1">
-                <Checkbox
-                  checked={
-                    allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false
-                  }
-                  onCheckedChange={toggleSelectAllVisible}
-                  aria-label={
-                    allVisibleSelected
-                      ? t("spending:txTab.deselectAllVisible")
-                      : t("spending:txTab.selectAllVisible")
-                  }
-                />
-                <span className="text-muted-foreground text-xs">{t("common:select_all")}</span>
-              </div>
-            )}
-            {renderRows()}
-            {loadMoreButton && <div className="flex justify-center pt-1">{loadMoreButton}</div>}
+          <div className="spending-activity-list space-y-2">
+            <SelectionToolbar
+              rowCount={rows.length}
+              selectionMode={selectionMode}
+              onEnterSelectionMode={() => setSelectionMode(true)}
+              onExitSelectionMode={exitSelectionMode}
+              allVisibleSelected={allVisibleSelected}
+              someVisibleSelected={someVisibleSelected}
+              onToggleSelectAllVisible={toggleSelectAllVisible}
+            />
+            {/* `overflow-anchor: none` keeps the browser from picking a row
+                inside here as its scroll anchor: rows are recycled as you
+                scroll, and re-anchoring to one that just changed height fights
+                the virtualizer. */}
+            <div
+              ref={listRef}
+              className="relative w-full"
+              style={{ height: totalSize, overflowAnchor: "none" }}
+            >
+              {renderGroupedCards()}
+            </div>
+            {loadMoreTrigger && <div className="flex justify-center pt-1">{loadMoreTrigger}</div>}
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border" style={{ overflowAnchor: "none" }}>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10">
+                  <TableHead className="w-10 px-3">
                     <Checkbox
                       checked={
                         allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false
@@ -1020,26 +1232,25 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                       }
                     />
                   </TableHead>
-                  <TableHead className="hidden sm:table-cell">{t("common:date")}</TableHead>
-                  <TableHead className="hidden md:table-cell">{t("common:type")}</TableHead>
-                  <TableHead className="hidden lg:table-cell">{t("common:account")}</TableHead>
-                  <TableHead>{t("spending:txTab.nameNotes")}</TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  <TableHead className="hidden w-20 px-3 md:table-cell">
+                    {t("spending:txTab.time")}
+                  </TableHead>
+                  <TableHead className="px-3">{t("spending:txTab.nameNotes")}</TableHead>
+                  <TableHead className="hidden w-44 px-3 sm:table-cell">
                     {t("spending:filters.category")}
                   </TableHead>
-                  <TableHead className="hidden lg:table-cell">
-                    {t("spending:filters.event")}
-                  </TableHead>
-                  <TableHead className="text-right">{t("common:amount")}</TableHead>
-                  <TableHead className="w-12" />
+                  <TableHead className="w-28 px-3 text-right">{t("common:amount")}</TableHead>
+                  <TableHead className="w-10 px-3" />
                 </TableRow>
               </TableHeader>
-              <TableBody>{renderRows()}</TableBody>
+              {/* The ref goes on the body, not the table: the virtualizer's
+                  origin has to be where the rows start, below the header. */}
+              <TableBody ref={listRef}>{renderGroupedRows()}</TableBody>
             </Table>
 
-            {loadMoreButton && (
+            {loadMoreTrigger && (
               <div className="border-border flex items-center justify-center border-t p-3">
-                {loadMoreButton}
+                {loadMoreTrigger}
               </div>
             )}
           </div>

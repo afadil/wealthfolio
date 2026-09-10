@@ -38,6 +38,10 @@ pub const DEVICE_SYNC_OUTBOX_PRUNE_INTERVAL_SECS: u64 = 24 * 60 * 60;
 pub const DEVICE_SYNC_SENT_OUTBOX_RETENTION_DAYS: i64 = 7;
 pub const DEVICE_SYNC_DEAD_OUTBOX_RETENTION_DAYS: i64 = 30;
 const MAX_REMOTE_ENTITY_ID_LEN: usize = 256;
+/// Upper bound on the summed encrypted payload chars in one push request.
+/// The relay rejects batches over 8,000,000 chars with a 400 that dead-letters
+/// the whole batch; large rows (asset logos) can reach that within 500 events.
+const MAX_PUSH_BATCH_CHARS: usize = 7_000_000;
 
 /// Exponential backoff in seconds with cap.
 pub fn backoff_seconds(consecutive_failures: i32) -> i64 {
@@ -96,6 +100,7 @@ fn sync_entity_name(entity: &SyncEntity) -> &'static str {
         SyncEntity::BudgetTarget => "budget_target",
         SyncEntity::BudgetRolloverSetting => "budget_rollover_setting",
         SyncEntity::AddonStorage => "addon_storage",
+        SyncEntity::AssetLogo => "asset_logo",
     }
 }
 
@@ -450,6 +455,7 @@ where
     let current_key_version = identity.key_version.unwrap_or(1).max(1);
     let mut stale_key_version_event_ids = Vec::new();
     let mut future_key_version_event_ids = Vec::new();
+    let mut push_batch_chars = 0usize;
 
     for event in pending {
         if !remote_entity_id_is_valid(&event.entity, &event.entity_id) {
@@ -462,19 +468,7 @@ where
             invalid_entity_id_event_ids.push(event.event_id.clone());
             continue;
         }
-        max_retry_count = max_retry_count.max(event.retry_count);
-        let event_type = format!(
-            "{}.{}.v1",
-            sync_entity_name(&event.entity),
-            sync_operation_name(&event.op)
-        );
-        push_event_ids.push(event.event_id.clone());
         let payload_key_version = event.payload_key_version.max(1);
-        if payload_key_version < current_key_version {
-            stale_key_version_event_ids.push(event.event_id.clone());
-        } else if payload_key_version > current_key_version {
-            future_key_version_event_ids.push(event.event_id.clone());
-        }
         let encrypted_payload =
             match ports.encrypt_sync_payload(&event.payload, &identity, payload_key_version) {
                 Ok(payload) => payload,
@@ -488,6 +482,32 @@ where
                         .await;
                 }
             };
+        // Byte-aware batching: stop before the relay batch cap; the remaining
+        // events stay pending for the next cycle. A single oversized event
+        // still goes alone so it can be rejected individually, not as a batch.
+        if push_batch_chars + encrypted_payload.len() > MAX_PUSH_BATCH_CHARS
+            && !push_events.is_empty()
+        {
+            debug!(
+                "[DeviceSync] Push batch reached {} chars after {} events; deferring the rest",
+                push_batch_chars,
+                push_events.len()
+            );
+            break;
+        }
+        push_batch_chars += encrypted_payload.len();
+        max_retry_count = max_retry_count.max(event.retry_count);
+        let event_type = format!(
+            "{}.{}.v1",
+            sync_entity_name(&event.entity),
+            sync_operation_name(&event.op)
+        );
+        push_event_ids.push(event.event_id.clone());
+        if payload_key_version < current_key_version {
+            stale_key_version_event_ids.push(event.event_id.clone());
+        } else if payload_key_version > current_key_version {
+            future_key_version_event_ids.push(event.event_id.clone());
+        }
         push_events.push(SyncPushEventRequest {
             event_id: event.event_id,
             device_id: device_id.clone(),
@@ -1306,6 +1326,7 @@ mod tests {
         set_cursor_calls: Arc<Mutex<Vec<i64>>>,
         applied_events: Arc<Mutex<Vec<ReplayEvent>>>,
         push_error: Option<TransportError>,
+        push_batches: Arc<Mutex<Vec<Vec<String>>>>,
         reconcile_response: crate::ReconcileReadyStateResponse,
         persisted_trust_states: Arc<Mutex<Vec<String>>>,
         cycle_outcomes: Arc<Mutex<Vec<String>>>,
@@ -1329,6 +1350,7 @@ mod tests {
                 set_cursor_calls: Arc::new(Mutex::new(Vec::new())),
                 applied_events: Arc::new(Mutex::new(Vec::new())),
                 push_error: None,
+                push_batches: Arc::new(Mutex::new(Vec::new())),
                 reconcile_response: crate::ReconcileReadyStateResponse {
                     action: "NOOP".to_string(),
                     cursor: Some(0),
@@ -1496,8 +1518,15 @@ mod tests {
             &self,
             _token: &str,
             _device_id: &str,
-            _request: SyncPushRequest,
+            request: SyncPushRequest,
         ) -> Result<crate::SyncPushResponse, TransportError> {
+            self.push_batches.lock().await.push(
+                request
+                    .events
+                    .iter()
+                    .map(|event| event.event_id.clone())
+                    .collect(),
+            );
             if let Some(err) = &self.push_error {
                 return Err(err.clone());
             }
@@ -2018,6 +2047,150 @@ mod tests {
             root_key: Some("root-key".to_string()),
             key_version: Some(1),
         }
+    }
+
+    /// Outbox event whose (identity-encrypted) payload is `payload_len` chars.
+    fn sized_outbox_event(
+        event_id: &str,
+        payload_len: usize,
+    ) -> wealthfolio_core::sync::SyncOutboxEvent {
+        let mut event = outbox_event(event_id, "019cb093-06a8-7534-8677-546317b17957", 1);
+        event.entity = SyncEntity::AssetLogo;
+        event.payload = "x".repeat(payload_len);
+        event
+    }
+
+    /// Removes already-pushed events from the fake outbox (the real store does
+    /// this through `mark_outbox_sent`).
+    async fn drop_pushed_from_pending(ports: &TestPorts, pushed: &[String]) {
+        let mut pending = ports.pending_outbox.lock().await;
+        pending.retain(|event| !pushed.contains(&event.event_id));
+    }
+
+    /// A max-size logo row (~205 KB base64) encrypts to exactly this many
+    /// base64 chars; pinned by `max_size_logo_event_fits_relay_per_event_cap`.
+    const MAX_LOGO_EVENT_CHARS: usize = 273_504;
+
+    /// Worst-case `asset_logos` outbox row, serialized as the outbox does
+    /// (`AssetLogoDB`: snake_case column names, no renames), encrypted with
+    /// the real DEK path, must fit the relay per-event payload cap of 350,000
+    /// base64 chars (wealthfolio-cloud apps/api/src/schemas/sync.ts,
+    /// `payload: z.string().max(350000)`).
+    #[test]
+    fn max_size_logo_event_fits_relay_per_event_cap() {
+        const RELAY_MAX_EVENT_PAYLOAD_CHARS: usize = 350_000;
+        // MAX_ASSET_LOGO_BYTES (150 KiB) canonical-base64 encodes to exactly 204,800 chars.
+        let data = "A".repeat(wealthfolio_core::assets::MAX_ASSET_LOGO_BYTES / 3 * 4);
+        assert_eq!(data.len(), 204_800);
+        let row = serde_json::json!({
+            "asset_id": "019cb093-06a8-7534-8677-546317b17957",
+            "mime_type": "image/png",
+            "data": data,
+            "sha256": "0".repeat(64),
+            "width": 256,
+            "height": 256,
+            "created_at": "2026-09-02T21:56:26.440073123+00:00",
+            "updated_at": "2026-09-02T21:56:26.440073123+00:00",
+        });
+        let plaintext = serde_json::to_string(&row).expect("serialize row");
+        let dek = crate::crypto::derive_dek(&crate::crypto::generate_root_key(), 1).expect("dek");
+        let encrypted = crate::crypto::encrypt(&dek, &plaintext).expect("encrypt");
+
+        assert_eq!(encrypted.len(), MAX_LOGO_EVENT_CHARS);
+        assert!(encrypted.len() <= RELAY_MAX_EVENT_PAYLOAD_CHARS);
+    }
+
+    #[tokio::test]
+    async fn push_splits_max_size_logo_events_across_cycles() {
+        let ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        {
+            let mut pending = ports.pending_outbox.lock().await;
+            for i in 0..30 {
+                pending.push(sized_outbox_event(
+                    &format!("evt-logo-{i:02}"),
+                    MAX_LOGO_EVENT_CHARS,
+                ));
+            }
+        }
+
+        let first = run_sync_cycle(&ports, false).await.expect("first cycle");
+        assert_eq!(first.status, "ok");
+        let batches = ports.push_batches.lock().await.clone();
+        assert_eq!(batches.len(), 1);
+        let expected_first = MAX_PUSH_BATCH_CHARS / MAX_LOGO_EVENT_CHARS;
+        assert_eq!(batches[0].len(), expected_first);
+        assert!(batches[0].len() * MAX_LOGO_EVENT_CHARS <= MAX_PUSH_BATCH_CHARS);
+        assert_eq!(batches[0][0], "evt-logo-00");
+        assert!(ports.dead_outbox_batches.lock().await.is_empty());
+
+        drop_pushed_from_pending(&ports, &batches[0]).await;
+        let second = run_sync_cycle(&ports, false).await.expect("second cycle");
+        assert_eq!(second.status, "ok");
+        let batches = ports.push_batches.lock().await.clone();
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[1].len(), 30 - expected_first);
+        assert_eq!(batches[1][0], format!("evt-logo-{expected_first:02}"));
+        assert!(ports.dead_outbox_batches.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn push_mixed_batch_defers_events_after_budget_in_outbox_order() {
+        let ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        let big_count = MAX_PUSH_BATCH_CHARS / MAX_LOGO_EVENT_CHARS + 1;
+        {
+            let mut pending = ports.pending_outbox.lock().await;
+            for i in 0..big_count {
+                pending.push(sized_outbox_event(
+                    &format!("evt-logo-{i:02}"),
+                    MAX_LOGO_EVENT_CHARS,
+                ));
+            }
+            for i in 0..50 {
+                pending.push(outbox_event(
+                    &format!("evt-small-{i:02}"),
+                    "019cb093-06a8-7534-8677-546317b17957",
+                    1,
+                ));
+            }
+        }
+
+        let first = run_sync_cycle(&ports, false).await.expect("first cycle");
+        assert_eq!(first.status, "ok");
+        let batches = ports.push_batches.lock().await.clone();
+        assert_eq!(batches.len(), 1);
+        // Everything up to the budget goes; the last logo and every small
+        // event behind it wait (outbox order is preserved, never reordered).
+        assert_eq!(batches[0].len(), big_count - 1);
+        assert!(batches[0].iter().all(|id| id.starts_with("evt-logo-")));
+
+        drop_pushed_from_pending(&ports, &batches[0]).await;
+        let second = run_sync_cycle(&ports, false).await.expect("second cycle");
+        assert_eq!(second.status, "ok");
+        let batches = ports.push_batches.lock().await.clone();
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[1].len(), 1 + 50);
+        assert_eq!(batches[1][0], format!("evt-logo-{:02}", big_count - 1));
+        assert!(batches[1][1..]
+            .iter()
+            .all(|id| id.starts_with("evt-small-")));
+        assert!(ports.dead_outbox_batches.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn push_single_event_over_batch_budget_still_pushes_alone() {
+        let ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        {
+            let mut pending = ports.pending_outbox.lock().await;
+            pending.push(sized_outbox_event("evt-huge", MAX_PUSH_BATCH_CHARS + 1));
+            pending.push(sized_outbox_event("evt-next", 10));
+        }
+
+        let result = run_sync_cycle(&ports, false).await.expect("cycle");
+        assert_eq!(result.status, "ok");
+        let batches = ports.push_batches.lock().await.clone();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0], vec!["evt-huge".to_string()]);
+        assert!(ports.dead_outbox_batches.lock().await.is_empty());
     }
 
     fn pull_event(

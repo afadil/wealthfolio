@@ -20,6 +20,18 @@ pub fn is_quantity_significant(quantity: &Decimal) -> bool {
     quantity.abs() >= threshold
 }
 
+fn checked_lot_cost_basis(
+    quantity: Decimal,
+    unit_price: Decimal,
+    fee: Decimal,
+    tax: Decimal,
+) -> Option<Decimal> {
+    quantity
+        .checked_mul(unit_price)?
+        .checked_add(fee)?
+        .checked_add(tax)
+}
+
 /// Sum a position's cost basis in `target_currency` from its materialized
 /// lots, anchoring each lot to its acquisition-date FX (stored lot rate
 /// preferred). `fx_fallback` supplies an acquisition-date market rate for a lot
@@ -568,7 +580,19 @@ impl Position {
         let acquisition_taxes = activity.tax_amt();
 
         // Cost basis includes acquisition trade charges for BUY activities.
-        let cost_basis = quantity * acquisition_price + acquisition_fees + acquisition_taxes;
+        let cost_basis = checked_lot_cost_basis(
+            quantity,
+            acquisition_price,
+            acquisition_fees,
+            acquisition_taxes,
+        )
+        .unwrap_or_else(|| {
+            warn!(
+                "Lot {} cost basis could not be represented; storing unknown zero basis",
+                activity.id
+            );
+            Decimal::ZERO
+        });
 
         let new_lot = Lot {
             id: activity.id.clone(), // Use activity ID as Lot ID
@@ -652,7 +676,14 @@ impl Position {
             );
         }
 
-        let cost_basis = quantity * unit_price + fee + tax;
+        let cost_basis =
+            checked_lot_cost_basis(quantity, unit_price, fee, tax).unwrap_or_else(|| {
+                warn!(
+                    "Lot {} cost basis could not be represented; storing unknown zero basis",
+                    lot_id
+                );
+                Decimal::ZERO
+            });
 
         let new_lot = Lot {
             id: lot_id,
@@ -725,7 +756,14 @@ impl Position {
             );
         }
 
-        let cost_basis = signed_quantity * unit_price + fee + tax;
+        let cost_basis = checked_lot_cost_basis(signed_quantity, unit_price, fee, tax)
+            .unwrap_or_else(|| {
+                warn!(
+                    "Lot {} cost basis could not be represented; storing unknown zero basis",
+                    lot_id
+                );
+                Decimal::ZERO
+            });
 
         let new_lot = Lot {
             id: lot_id,

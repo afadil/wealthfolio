@@ -19,7 +19,7 @@ import {
 } from "./data-grid-cell-variants";
 import type { DataGridCellProps } from "./data-grid-types";
 
-export const DataGridCell = React.memo(DataGridCellImpl, (prev, next) => {
+function areDataGridCellPropsEqual<TData>(prev: DataGridCellProps<TData>, next: DataGridCellProps<TData>): boolean {
   // Fast path: check stable primitive props first
   if (prev.isFocused !== next.isFocused) return false;
   if (prev.isEditing !== next.isEditing) return false;
@@ -43,8 +43,20 @@ export const DataGridCell = React.memo(DataGridCellImpl, (prev, next) => {
   // Check cell/row identity
   if (prev.cell.row.id !== next.cell.row.id) return false;
 
+  // Re-render when an explicitly tracked display dependency changes. The cell
+  // value can stay the same while a visibility-dependent renderer changes.
+  if (prev.cell.column.columnDef.meta?.renderKey !== next.cell.column.columnDef.meta?.renderKey) return false;
+
+  // Some renderers depend on other fields from row.original. Compare only the
+  // primitive dependency they opt into so unrelated row updates stay memoized.
+  const prevRowRenderKey = prev.cell.column.columnDef.meta?.getRenderKey?.(prev.cell.row.original);
+  const nextRowRenderKey = next.cell.column.columnDef.meta?.getRenderKey?.(next.cell.row.original);
+  if (prevRowRenderKey !== nextRowRenderKey) return false;
+
   return true;
-}) as typeof DataGridCellImpl;
+}
+
+export const DataGridCell = React.memo(DataGridCellImpl, areDataGridCellPropsEqual) as typeof DataGridCellImpl;
 
 function DataGridCellImpl<TData>({
   cell,

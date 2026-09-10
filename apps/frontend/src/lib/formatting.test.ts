@@ -13,6 +13,8 @@ import {
   parseLocalizedNumber,
   resolveFormattingLocale,
 } from "@wealthfolio/ui";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
 import { describe, expect, it, vi } from "vitest";
 import { formatOptionSubtitle } from "./occ-symbol";
 
@@ -27,6 +29,7 @@ describe("locale formatting", () => {
     expect(resolveFormattingLocale("de-DE", "en")).toBe("de-DE");
     expect(resolveFormattingLocale("DE", "en")).toBe("de-DE");
     expect(resolveFormattingLocale("DE", "ja")).toBe("de-DE");
+    expect(resolveFormattingLocale("TW", "en")).toBe("zh-TW");
     expect(resolveFormattingLocale("en-US", "fr")).toBe("en-US");
   });
 
@@ -68,6 +71,19 @@ describe("locale formatting", () => {
     expect(dateFnsLocaleFor("es-MX").options?.weekStartsOn).toBe(0);
     expect(() => dateFnsLocaleFor(undefined)).toThrow("A resolved formatting locale is required");
   });
+
+  it.each(["zh-TW", "zh-Hant", "zh-Hant-TW", "zh-HK", "zh-MO"])(
+    "gives %s Traditional calendar text with a Sunday week start",
+    (tag) => {
+      const locale = dateFnsLocaleFor(tag);
+      // Text comes from date-fns zhTW ...
+      expect(locale.formatDistance).toBe(zhTW.formatDistance);
+      expect(format(new Date(2026, 7, 30), "PPPP", { locale })).toContain("星期日");
+      // ... but the week start comes from CLDR, which says Sunday for all of these.
+      // date-fns ships zhTW with Monday, so returning it verbatim would be wrong.
+      expect(locale.options?.weekStartsOn).toBe(0);
+    },
+  );
 
   it.each(["it-IT", "pt-BR", "nl-NL", "ar-EG", "fa-IR"])(
     "supports the arbitrary system locale %s in date-fns calendars",
@@ -355,5 +371,41 @@ describe("locale formatting", () => {
         formatting,
       ),
     ).toContain("$1.234,5");
+  });
+});
+
+describe("pt-BR calendar text", () => {
+  it("uses Brazilian month names, ordinals and a 24-hour clock", () => {
+    const locale = dateFnsLocaleFor(resolveFormattingLocale("BR"));
+    const date = new Date(2026, 2, 9, 15, 30);
+
+    // Without a real ptBR entry the generic fallback keeps en-US ordinals,
+    // quarters and a 12-hour clock behind Portuguese month names.
+    expect(format(date, "p", { locale })).toBe("15:30");
+    expect(format(date, "PPPP", { locale })).toBe("segunda-feira, 9 de março de 2026");
+    expect(format(date, "QQQQ", { locale })).toBe("1º trimestre");
+  });
+});
+
+describe("pt-PT formatting", () => {
+  it("keeps Portugal on European conventions, not Brazilian ones", () => {
+    const brazil = resolveFormattingLocale("BR");
+    const portugal = resolveFormattingLocale("PT");
+    expect(brazil).toBe("pt-BR");
+    expect(portugal).toBe("pt-PT");
+
+    // The two variants put the currency symbol on opposite sides (the space
+    // between symbol and digits is a non-breaking one, so match on position).
+    expect(createFormatter(brazil).formatAmount(1234.56, "EUR")).toMatch(/^\u20ac\s?1\.234,56$/);
+    expect(createFormatter(portugal).formatAmount(1234.56, "EUR")).toMatch(/^1\s?234,56\s?\u20ac$/);
+  });
+
+  it("uses European Portuguese calendar data", () => {
+    const locale = dateFnsLocaleFor(resolveFormattingLocale("PT"));
+    const date = new Date(2026, 2, 9, 15, 30);
+
+    expect(locale.code).toBe("pt");
+    expect(format(date, "p", { locale })).toBe("15:30");
+    expect(format(date, "PPPP", { locale })).toBe("segunda-feira, 9 de março de 2026");
   });
 });

@@ -282,7 +282,7 @@ const ActivityType = {
   SPLIT: "SPLIT",
 };
 
-// v3 - 15 types (added CREDIT, ADJUSTMENT, UNKNOWN)
+// v3 - 14 types (removed ADD_HOLDING/REMOVE_HOLDING; added CREDIT/ADJUSTMENT/UNKNOWN)
 const ActivityType = {
   BUY: "BUY",
   SELL: "SELL",
@@ -327,7 +327,7 @@ interface Activity {
   accountId: string;
   assetId?: string; // NOW OPTIONAL for pure cash events
 
-  activityType: string; // Canonical type (closed set of 15)
+  activityType: string; // Canonical type (closed set of 14)
   activityTypeOverride?: string; // User override
   sourceType?: string; // Raw provider label
   subtype?: string; // Semantic variation (DRIP, STAKING_REWARD, etc.)

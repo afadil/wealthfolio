@@ -1,33 +1,21 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Account } from "@/lib/types";
-import { cn, formatDateTime } from "@/lib/utils";
-import {
-  Badge,
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Icons,
-  PrivacyAmount,
-  useDateFormatting,
-} from "@wealthfolio/ui";
+import { cn } from "@/lib/utils";
+import { Card, Icons, PrivacyAmount, useDateFormatting } from "@wealthfolio/ui";
 
-import {
-  getCashActivityLabel,
-  getEffectiveCashActivityType,
-  isCreditCardAccountType,
-} from "../lib/constants";
+import { getEffectiveCashActivityType, isCreditCardAccountType } from "../lib/constants";
 import {
   getTransactionDisplay,
   getTransferLinkStatus,
   isTransferCashActivity,
   type TransactionRowVM,
 } from "../lib/transactions-helpers";
+import { ActionPalette } from "@/components/action-palette";
+
 import { QuickCategorizePopover } from "./quick-categorize-popover";
+import { SelectionCheckbox } from "./selection-checkbox";
 import { QuickEventPopover } from "./quick-event-popover";
 
 interface TransactionCardProps {
@@ -36,6 +24,10 @@ interface TransactionCardProps {
   event: { id: string; name: string; eventTypeId: string } | null;
   eventTypeColor: string | null;
   appTimezone?: string;
+  /** True when the loaded result set spans more than one account. */
+  showAccount: boolean;
+  /** Checkboxes only appear once the list is in selection mode. */
+  selectionMode: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onAssignCategory: (activityId: string, taxonomyId: string, categoryId: string) => void;
@@ -50,8 +42,13 @@ interface TransactionCardProps {
   onUnlinkTransfer?: (row: TransactionRowVM) => void;
 }
 
-const CHIP =
-  "border-border/60 bg-background/50 hover:bg-muted/60 inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors";
+/**
+ * The meta line's tappable elements. No chip border or padding: on a card this
+ * narrow those cost a line of their own, and the table row already shows
+ * category and event as plain inline text.
+ */
+const INLINE =
+  "hover:bg-muted/60 inline-flex min-w-0 items-center gap-1 overflow-hidden rounded transition-colors";
 
 function TransactionCardImpl({
   row,
@@ -59,6 +56,8 @@ function TransactionCardImpl({
   event,
   eventTypeColor,
   appTimezone,
+  showAccount,
+  selectionMode,
   isSelected,
   onToggleSelect,
   onAssignCategory,
@@ -72,7 +71,8 @@ function TransactionCardImpl({
   onLinkTransfer,
   onUnlinkTransfer,
 }: TransactionCardProps) {
-  const dateFormatting = useDateFormatting();
+  const { formatTime } = useDateFormatting();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const { t } = useTranslation();
   const a = row.activity;
@@ -86,198 +86,248 @@ function TransactionCardImpl({
   const transferLinkStatus = getTransferLinkStatus(a);
   const canMarkReimbursement =
     isIncome && !isCreditCardAccountType(account?.accountType) && activityType !== "CREDIT";
-  const formattedDate = formatDateTime(a.activityDate, dateFormatting, appTimezone);
+  // Minutes only, matching the desktop row — the seconds-bearing formatDateTime
+  // is too verbose for a line that now carries just the time and the account.
+  const time = formatTime(a.activityDate, {
+    hour: "numeric",
+    minute: "numeric",
+    ...(appTimezone ? { timeZone: appTimezone } : {}),
+  });
 
   return (
-    <div
+    <Card
       data-state={isSelected ? "selected" : undefined}
       className={cn(
-        "border-border/40 bg-card/40 rounded-2xl border p-3",
+        "relative overflow-hidden p-2.5",
         row.needsReview && "border-amber-500/40 bg-amber-500/5",
       )}
     >
-      <div className="flex items-start gap-3">
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={() => onToggleSelect(a.id)}
-          aria-label={
-            isSelected ? t("spending:transactions.deselect") : t("spending:transactions.select")
-          }
-          className="mt-0.5 shrink-0"
-        />
+      {/* Same leading marker the table row uses, so review state costs no width
+          in the name and no height in the card. */}
+      {row.needsReview && (
+        <span className="absolute inset-y-0 left-0 w-[3px] bg-amber-500" aria-hidden="true" />
+      )}
+      {/* Centred rather than top-aligned: on a two-line card the selection
+          control and the row menu read as belonging to the whole row, which is
+          also how the investment activity card places them. */}
+      <div className="flex items-center gap-2.5">
+        {selectionMode && (
+          <SelectionCheckbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect(a.id)}
+            aria-label={
+              isSelected ? t("spending:transactions.deselect") : t("spending:transactions.select")
+            }
+            className="shrink-0"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
+            {/* See the table row: the amber stripe is decorative, so the state
+                needs a form that survives both a screen reader and a reader who
+                cannot separate the colours. */}
+            {row.needsReview && (
+              <span className="shrink-0 text-amber-600 dark:text-amber-500">
+                <Icons.AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="sr-only">{t("spending:transactions.review")}</span>
+              </span>
+            )}
             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
               {a.notes ?? <span className="text-muted-foreground italic">—</span>}
             </span>
-            {row.needsReview && (
-              <Badge
-                variant="outline"
-                className="shrink-0 border-amber-500/50 text-[10px] text-amber-600"
-              >
-                {t("spending:transactions.review")}
-              </Badge>
-            )}
-          </div>
-          <div className="text-muted-foreground mt-0.5 truncate text-[11px]">
-            {formattedDate.date} {formattedDate.time} · {accountName} ·{" "}
-            {getCashActivityLabel(activityType, account?.accountType, a.subtype)}
-          </div>
-        </div>
-        <div
-          className={cn(
-            "shrink-0 text-sm font-medium tabular-nums",
-            isSaving
-              ? "text-[#6B8E54]"
-              : isOutflow
-                ? "text-destructive"
-                : isNeutral
-                  ? "text-muted-foreground"
-                  : "text-success",
-          )}
-        >
-          {sign}
-          <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex items-center gap-2 pl-7">
-        {isNeutral ? (
-          <span className="text-muted-foreground text-xs">
-            {t("spending:transactions.neutral")}
-          </span>
-        ) : row.splitCount > 0 ? (
-          <button type="button" className={cn(CHIP, "min-w-0")} onClick={() => onEditSplits(row)}>
-            <Icons.SplitHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {t("spending:transactions.splitLines", { count: row.splitCount })}
+            <span
+              className={cn(
+                "shrink-0 text-sm font-medium tabular-nums",
+                isSaving
+                  ? "text-[#6B8E54]"
+                  : isOutflow
+                    ? "text-destructive"
+                    : isNeutral
+                      ? "text-muted-foreground"
+                      : "text-success",
+              )}
+            >
+              {sign}
+              <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
             </span>
-          </button>
-        ) : (
-          <QuickCategorizePopover
-            scope={isIncome ? "income" : isSaving ? "saving" : "expense"}
-            selectedCategoryId={row.category?.id ?? null}
-            onSelect={(taxonomyId, categoryId) => onAssignCategory(a.id, taxonomyId, categoryId)}
-            onClear={() => row.category && onClearCategory(a.id, row.category.taxonomyId)}
-            trigger={
-              <button
-                type="button"
-                aria-label={
-                  row.category
-                    ? t("spending:transactions.changeCategory", { name: row.category.name })
-                    : t("spending:transactions.assignCategory")
-                }
-                className={cn(CHIP, "min-w-0")}
-              >
-                {row.category ? (
-                  <>
-                    {row.category.color && (
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: row.category.color }}
-                        aria-hidden="true"
-                      />
-                    )}
-                    <span className="truncate">{row.category.name}</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground inline-flex items-center gap-1 italic">
-                    <Icons.Plus className="h-3 w-3" aria-hidden="true" />
-                    {t("spending:transactions.categorize")}
-                  </span>
-                )}
-              </button>
-            }
-          />
-        )}
+          </div>
 
-        <QuickEventPopover
-          selectedEventId={event?.id ?? null}
-          onSelect={(eventId) => onSetEvent(a.id, eventId)}
-          onClear={() => onSetEvent(a.id, null)}
-          activityId={a.id}
-          defaultDate={a.activityDate ? new Date(a.activityDate) : undefined}
-          trigger={
-            event ? (
-              <button
-                type="button"
-                aria-label={t("spending:transactions.changeEvent", { name: event.name })}
-                className={cn(CHIP, "min-w-0")}
-              >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: eventTypeColor ?? "var(--muted-foreground)" }}
-                  aria-hidden="true"
-                />
-                <span className="truncate">{event.name}</span>
+          {/* Everything secondary shares one line: the day heading above owns
+              the date, and the category sits inline the way the table row shows
+              it rather than in a chip row of its own. */}
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[11px]">
+            <span className="shrink-0">{time}</span>
+            <span aria-hidden="true">·</span>
+            {isNeutral ? (
+              <span className="shrink-0">{t("spending:transactions.neutral")}</span>
+            ) : row.splitCount > 0 ? (
+              <button type="button" className={INLINE} onClick={() => onEditSplits(row)}>
+                <Icons.SplitHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {t("spending:transactions.splitLines", { count: row.splitCount })}
+                </span>
               </button>
             ) : (
-              <button
-                type="button"
-                aria-label={t("spending:transactions.tagEvent")}
-                className="border-border/60 bg-background/50 text-muted-foreground hover:bg-muted/60 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors"
-              >
-                <Icons.Tag className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            )
-          }
-        />
+              <QuickCategorizePopover
+                scope={isIncome ? "income" : isSaving ? "saving" : "expense"}
+                selectedCategoryId={row.category?.id ?? null}
+                onSelect={(taxonomyId, categoryId) =>
+                  onAssignCategory(a.id, taxonomyId, categoryId)
+                }
+                onClear={() => row.category && onClearCategory(a.id, row.category.taxonomyId)}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label={
+                      row.category
+                        ? t("spending:transactions.changeCategory", { name: row.category.name })
+                        : t("spending:transactions.assignCategory")
+                    }
+                    className={cn(INLINE, "max-w-[55%]")}
+                  >
+                    {row.category ? (
+                      <>
+                        {row.category.color && (
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: row.category.color }}
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span className="truncate">{row.category.name}</span>
+                      </>
+                    ) : (
+                      <span className="inline-flex min-w-0 items-center gap-0.5 italic">
+                        <Icons.Plus className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{t("spending:transactions.categorize")}</span>
+                      </span>
+                    )}
+                  </button>
+                }
+              />
+            )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="ml-auto h-8 w-8 shrink-0"
+            {showAccount && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 flex-1 truncate">{accountName}</span>
+              </>
+            )}
+            {/* Keeps the event slot pinned right when the account is absent. */}
+            {!showAccount && <span className="flex-1" />}
+
+            <QuickEventPopover
+              selectedEventId={event?.id ?? null}
+              onSelect={(eventId) => onSetEvent(a.id, eventId)}
+              onClear={() => onSetEvent(a.id, null)}
+              activityId={a.id}
+              defaultDate={a.activityDate ? new Date(a.activityDate) : undefined}
+              trigger={
+                <button
+                  type="button"
+                  aria-label={
+                    event
+                      ? t("spending:transactions.changeEvent", { name: event.name })
+                      : t("spending:transactions.tagEvent")
+                  }
+                  className={cn(INLINE, event && "bg-muted/60 max-w-[45%] rounded-full px-1.5")}
+                >
+                  {event ? (
+                    <>
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: eventTypeColor ?? "var(--muted-foreground)" }}
+                        aria-hidden="true"
+                      />
+                      <span className="truncate">{event.name}</span>
+                    </>
+                  ) : (
+                    // Untagged: an icon rather than a chip, so a rarely-used
+                    // slot costs a few pixels of width and no height.
+                    <Icons.Tag className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  )}
+                </button>
+              }
+            />
+          </div>
+        </div>
+
+        {/* This card only renders on mobile, so the menu is always the touch
+            presentation — the dropdown's 32px rows are mouse-sized for a list
+            whose last entry is Delete. */}
+        <ActionPalette
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          groups={[
+            {
+              items: [
+                { icon: Icons.Pencil, label: t("common:edit"), onClick: () => onEdit(row) },
+                ...(canMarkReimbursement
+                  ? [
+                      {
+                        icon: Icons.RefreshCw,
+                        label: t("spending:transactions.markReimbursement"),
+                        onClick: () => onMarkReimbursement(row),
+                      },
+                    ]
+                  : []),
+                ...(!isNeutral
+                  ? [
+                      {
+                        icon: Icons.SplitHorizontal,
+                        label: t("spending:transactions.splitTransaction"),
+                        onClick: () => onEditSplits(row),
+                      },
+                    ]
+                  : []),
+                {
+                  icon: Icons.Copy,
+                  label: t("spending:transactions.duplicate"),
+                  onClick: () => onDuplicate(row),
+                },
+                ...(isTransfer && transferLinkStatus === "linked" && onUnlinkTransfer
+                  ? [
+                      {
+                        icon: Icons.Unlink,
+                        label: t("spending:transactions.unlinkTransfer"),
+                        onClick: () => onUnlinkTransfer(row),
+                      },
+                    ]
+                  : []),
+                ...(isTransfer && transferLinkStatus !== "linked" && onLinkTransfer
+                  ? [
+                      {
+                        icon: Icons.Link,
+                        label: t("spending:transactions.linkTransfer"),
+                        onClick: () => onLinkTransfer(row),
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              items: [
+                {
+                  icon: Icons.Trash,
+                  label: t("common:delete"),
+                  onClick: () => onDelete(row),
+                  variant: "destructive" as const,
+                },
+              ],
+            },
+          ]}
+          trigger={
+            <button
+              type="button"
+              className="hover:bg-muted -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
               aria-label={t("spending:transactions.rowActions")}
             >
               <Icons.MoreVertical className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(row)}>
-              <Icons.Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("common:edit")}
-            </DropdownMenuItem>
-            {canMarkReimbursement && (
-              <DropdownMenuItem onClick={() => onMarkReimbursement(row)}>
-                <Icons.RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("spending:transactions.markReimbursement")}
-              </DropdownMenuItem>
-            )}
-            {!isNeutral && (
-              <DropdownMenuItem onClick={() => onEditSplits(row)}>
-                <Icons.SplitHorizontal className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("spending:transactions.splitTransaction")}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => onDuplicate(row)}>
-              <Icons.Copy className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("spending:transactions.duplicate")}
-            </DropdownMenuItem>
-            {isTransfer && (onLinkTransfer || onUnlinkTransfer) ? (
-              transferLinkStatus === "linked" ? (
-                onUnlinkTransfer ? (
-                  <DropdownMenuItem onClick={() => onUnlinkTransfer(row)}>
-                    <Icons.Unlink className="mr-2 h-4 w-4" aria-hidden="true" />
-                    {t("spending:transactions.unlinkTransfer")}
-                  </DropdownMenuItem>
-                ) : null
-              ) : onLinkTransfer ? (
-                <DropdownMenuItem onClick={() => onLinkTransfer(row)}>
-                  <Icons.Link className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {t("spending:transactions.linkTransfer")}
-                </DropdownMenuItem>
-              ) : null
-            ) : null}
-            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(row)}>
-              <Icons.Trash className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("common:delete")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </button>
+          }
+        />
       </div>
-    </div>
+    </Card>
   );
 }
 

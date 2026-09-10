@@ -116,16 +116,20 @@ mod desktop {
     use super::*;
 
     /// Sets up the application menu and its event handler.
-    pub fn setup_menu(handle: &AppHandle) {
-        match menu::create_menu(handle) {
-            Ok(menu) => {
-                if let Err(e) = handle.set_menu(menu) {
-                    error!("Failed to set menu: {}", e);
+    pub fn setup_menu(handle: &AppHandle, menu_bar_visible: bool) {
+        if menu_bar_visible {
+            match menu::create_menu(handle) {
+                Ok(menu) => {
+                    if let Err(e) = handle.set_menu(menu) {
+                        error!("Failed to set menu: {}", e);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to create menu: {}", e);
                 }
             }
-            Err(e) => {
-                error!("Failed to create menu: {}", e);
-            }
+        } else if let Err(e) = handle.remove_menu() {
+            error!("Failed to remove menu: {}", e);
         }
 
         handle.on_menu_event(move |app, event| {
@@ -178,7 +182,12 @@ mod desktop {
         });
 
         // Menu setup is synchronous (no I/O)
-        setup_menu(&handle);
+        let menu_bar_visible = context
+            .settings_service()
+            .get_settings()
+            .map(|s| s.menu_bar_visible)
+            .unwrap_or(true);
+        setup_menu(&handle, menu_bar_visible);
 
         // Notify frontend that app is ready
         // The frontend will trigger the initial portfolio update and update check after it's mounted
@@ -468,6 +477,7 @@ pub fn run() {
             commands::spending::list_categorization_rules,
             commands::spending::create_categorization_rule,
             commands::spending::update_categorization_rule,
+            commands::spending::upsert_categorization_rule,
             commands::spending::delete_categorization_rule,
             commands::spending::rerun_categorization_rules,
             commands::spending::list_rule_presets,
@@ -568,6 +578,11 @@ pub fn run() {
             commands::asset::update_quote_mode,
             commands::asset::delete_asset,
             commands::asset::create_asset,
+            // Asset logo commands
+            commands::asset_logo::get_asset_logo,
+            commands::asset_logo::list_asset_logos,
+            commands::asset_logo::upsert_asset_logo,
+            commands::asset_logo::delete_asset_logo,
             // Alternative asset commands
             commands::alternative_assets::create_alternative_asset,
             commands::alternative_assets::update_alternative_asset_valuation,

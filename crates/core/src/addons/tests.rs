@@ -482,6 +482,48 @@ fn test_detect_addon_permissions_activities_transfer_functions() {
 }
 
 #[test]
+fn test_detect_addon_permissions_spending() {
+    let addon_files = vec![AddonFile {
+        name: "addon.js".to_string(),
+        content: r#"
+            export default async function enable(ctx) {
+                await ctx.api.spending.isEnabled();
+                await ctx.api.spending.getCategories();
+                await ctx.api.spending.getRules();
+                await ctx.api.spending.saveRule({});
+                await ctx.api.spending.deleteRule("rule-1");
+                await ctx.api.spending.rerunRules();
+            }
+        "#
+        .to_string(),
+        is_main: true,
+    }];
+
+    let detected_permissions = detect_addon_permissions(&addon_files);
+    let spending_permission = detected_permissions
+        .iter()
+        .find(|permission| permission.category == "spending")
+        .expect("spending permissions should be detected");
+    let detected_functions: std::collections::HashSet<&str> = spending_permission
+        .functions
+        .iter()
+        .map(|function| function.name.as_str())
+        .collect();
+
+    assert_eq!(
+        detected_functions,
+        std::collections::HashSet::from([
+            "isEnabled",
+            "getCategories",
+            "getRules",
+            "saveRule",
+            "deleteRule",
+            "rerunRules",
+        ])
+    );
+}
+
+#[test]
 fn test_addon_manifest_to_installed() {
     let manifest = AddonManifest {
         id: "test-addon".to_string(),

@@ -77,7 +77,10 @@ fn split_lots_by_cover_quantity(lots: &[Lot], cover_qty_abs: Decimal) -> (Vec<Lo
 impl HoldingsCalculator {
     /// Handle TRANSFER_IN activity.
     /// Books cash/asset inflow in ACTIVITY currency.
-    /// Transfers always affect account-level net_contribution; portfolio boundary is handled by aggregation.
+    /// Ordinary transfers increase account-level net_contribution and
+    /// net_contribution_base; a cash leg in a qualified same-account internal FX
+    /// pair still books cash but is contribution-neutral. Portfolio boundary is
+    /// handled by aggregation.
     pub(crate) fn handle_transfer_in(
         &self,
         activity: &Activity,
@@ -98,32 +101,34 @@ impl HoldingsCalculator {
             let (cash_currency, cash_effect) = cash_booking(activity, cash_effect);
             add_cash(state, &cash_currency, cash_effect);
 
-            let amount_acct = self.convert_to_account_currency(
-                gross_effect,
-                activity,
-                account_currency,
-                "TransferIn Cash",
-            );
+            if !run.is_contribution_neutral_transfer(&activity.id) {
+                let amount_acct = self.convert_to_account_currency(
+                    gross_effect,
+                    activity,
+                    account_currency,
+                    "TransferIn Cash",
+                );
 
-            let base_ccy = self.base_currency.read().unwrap();
-            let amount_base = match self.fx_service.convert_currency_for_date(
-                gross_effect,
-                activity_currency,
-                &base_ccy,
-                activity_date,
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(
-                        "Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {}: {}.",
-                        activity.id, activity_currency, e
-                    );
-                    Decimal::ZERO
-                }
-            };
+                let base_ccy = self.base_currency.read().unwrap();
+                let amount_base = match self.fx_service.convert_currency_for_date(
+                    gross_effect,
+                    activity_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContrib TransferIn Cash {}): Failed conversion {}: {}.",
+                            activity.id, activity_currency, e
+                        );
+                        Decimal::ZERO
+                    }
+                };
 
-            state.net_contribution += amount_acct;
-            state.net_contribution_base += amount_base;
+                state.net_contribution += amount_acct;
+                state.net_contribution_base += amount_base;
+            }
         } else {
             // Asset transfer
             let activity_date = self.activity_local_date(activity);
@@ -397,7 +402,10 @@ impl HoldingsCalculator {
 
     /// Handle TRANSFER_OUT activity.
     /// Books cash/asset outflow in ACTIVITY currency.
-    /// Transfers always affect account-level net_contribution; portfolio boundary is handled by aggregation.
+    /// Ordinary transfers decrease account-level net_contribution and
+    /// net_contribution_base; a cash leg in a qualified same-account internal FX
+    /// pair still books cash but is contribution-neutral. Portfolio boundary is
+    /// handled by aggregation.
     pub(crate) fn handle_transfer_out(
         &self,
         activity: &Activity,
@@ -418,32 +426,34 @@ impl HoldingsCalculator {
             let (cash_currency, cash_effect) = cash_booking(activity, cash_effect);
             add_cash(state, &cash_currency, cash_effect);
 
-            let amount_acct = self.convert_to_account_currency(
-                gross_effect,
-                activity,
-                account_currency,
-                "TransferOut Cash",
-            );
+            if !run.is_contribution_neutral_transfer(&activity.id) {
+                let amount_acct = self.convert_to_account_currency(
+                    gross_effect,
+                    activity,
+                    account_currency,
+                    "TransferOut Cash",
+                );
 
-            let base_ccy = self.base_currency.read().unwrap();
-            let amount_base = match self.fx_service.convert_currency_for_date(
-                gross_effect,
-                activity_currency,
-                &base_ccy,
-                activity_date,
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(
-                        "Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {}: {}.",
-                        activity.id, activity_currency, e
-                    );
-                    Decimal::ZERO
-                }
-            };
+                let base_ccy = self.base_currency.read().unwrap();
+                let amount_base = match self.fx_service.convert_currency_for_date(
+                    gross_effect,
+                    activity_currency,
+                    &base_ccy,
+                    activity_date,
+                ) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(
+                            "Holdings Calc (NetContrib TransferOut Cash {}): Failed conversion {}: {}.",
+                            activity.id, activity_currency, e
+                        );
+                        Decimal::ZERO
+                    }
+                };
 
-            state.net_contribution += amount_acct;
-            state.net_contribution_base += amount_base;
+                state.net_contribution += amount_acct;
+                state.net_contribution_base += amount_base;
+            }
         } else {
             // Asset transfer
             if !cash_effect.is_zero() {

@@ -49,6 +49,7 @@
     "noActionRequired": "{{status}}. No se requiere ninguna acción.",
     "moreOutsideTarget_one": "{{count}} más fuera del objetivo",
     "moreOutsideTarget_other": "{{count}} más fuera del objetivo",
+    "moreOutsideTarget_many": "{{count}} más fuera del objetivo",
     "reviewRebalance": "Revisar reequilibrio →"
   },
   "overview": {
@@ -71,10 +72,13 @@
     "colAccount": "Cuenta",
     "accountCount_one": "{{count}} cuenta",
     "accountCount_other": "{{count}} cuentas",
+    "accountCount_many": "{{count}} cuentas",
     "summary_one": "{{count}} posición · {{currency}}",
     "summary_other": "{{count}} posiciones · {{currency}}",
+    "summary_many": "{{count}} posiciones · {{currency}}",
     "summaryUpdated_one": "{{count}} posición · {{currency}} · Actualizada {{updatedAt}}",
-    "summaryUpdated_other": "{{count}} posiciones · {{currency}} · Actualizado {{updatedAt}}"
+    "summaryUpdated_other": "{{count}} posiciones · {{currency}} · Actualizado {{updatedAt}}",
+    "summaryUpdated_many": "{{count}} posiciones · {{currency}} · Actualizado {{updatedAt}}"
   },
   "presets": {
     "currentAllocation": "Asignación actual",
@@ -104,8 +108,8 @@
     "loading": "Cargando…",
     "recalculate": "Recalcular",
     "calculatePlan": "Calcular plan",
-    "driverSentenceOver": "{{name}} está {{current}}% por encima de un objetivo del {{target}}%.",
-    "driverSentenceUnder": "{{name}} está {{current}}% por debajo de un objetivo del {{target}}%.",
+    "driverSentenceOver": "{{name}} está en el {{current}}%, por encima del objetivo del {{target}}%.",
+    "driverSentenceUnder": "{{name}} está en el {{current}}%, por debajo del objetivo del {{target}}%.",
     "modeVerbSells": "Ventas y compras",
     "modeVerbHybrid": "Efectivo y ventas",
     "modeVerbCashFlow": "Compras con flujo de efectivo"
@@ -157,10 +161,13 @@
     "projectedMaxDrift": "Desviación máxima proyectada",
     "buysCount_one": "{{count}} compra",
     "buysCount_other": "{{count}} compras",
+    "buysCount_many": "{{count}} compras",
     "sellsCount_one": "{{count}} venta",
     "sellsCount_other": "{{count}} ventas",
+    "sellsCount_many": "{{count}} ventas",
     "tradesCount_one": "{{count}} operación",
     "tradesCount_other": "{{count}} operaciones",
+    "tradesCount_many": "{{count}} operaciones",
     "buysAndSells": "{{buys}} y {{sells}}",
     "deployedShort": "Desplegado",
     "cashDeployed": "Efectivo desplegado",
@@ -192,7 +199,8 @@
     "sellConstraint": "Restricción de venta",
     "turnoverCap": "Límite de rotación",
     "thingsToKnow_one": "{{count}} cosa que debes saber sobre este plan",
-    "thingsToKnow_other": "{{count}} cosas que debes saber sobre este plan"
+    "thingsToKnow_other": "{{count}} cosas que debes saber sobre este plan",
+    "thingsToKnow_many": "{{count}} cosas que debes saber sobre este plan"
   },
   "trades": {
     "buy": "Comprar",
@@ -257,7 +265,8 @@
     "account": "cuenta {{account}}",
     "shares": "{{qty}} acc",
     "warnings_one": "{{count}} advertencia:",
-    "warnings_other": "{{count}} advertencias:"
+    "warnings_other": "{{count}} advertencias:",
+    "warnings_many": "{{count}} advertencias:"
   },
   "toast": {
     "dataLoading": "Los datos de la cartera aún se están cargando",
@@ -306,6 +315,7 @@
     "cannotTargetScope": "Las selecciones personalizadas de varias cuentas aún no pueden tener objetivos. Selecciona todas las cuentas, una cartera o una cuenta.",
     "currentCategories_one": "{{count}} categoría actual",
     "currentCategories_other": "{{count}} categorías actuales",
+    "currentCategories_many": "{{count}} categorías actuales",
     "rebalanceSettings": "Ajustes de reequilibrio",
     "mode": "Modo",
     "buyOnly": "Solo compra",

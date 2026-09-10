@@ -76,6 +76,23 @@ export function isPendingReview(transaction: LocalTransaction): boolean {
 }
 
 /**
+ * Returns the review reasons supplied by the broker mapping service.
+ */
+export function getProviderMappingReasons(activity: Pick<ActivityDetails, "metadata">): string[] {
+  const reasons = activity.metadata?.mapping_reasons;
+  if (!Array.isArray(reasons)) {
+    return [];
+  }
+
+  const normalizedReasons = reasons
+    .filter((reason): reason is string => typeof reason === "string")
+    .map((reason) => reason.trim())
+    .filter(Boolean);
+
+  return [...new Set(normalizedReasons)];
+}
+
+/**
  * Tracks the state of changes to transactions
  */
 export interface TransactionChangeState {
@@ -180,7 +197,7 @@ export interface ActivityCreatePayload extends ActivityBasePayload {
  * - Or send asset.symbol + asset.exchangeMic to re-resolve the asset
  */
 export interface ActivityUpdatePayload extends ActivityBasePayload {
-  /** Asset resolution input - id plus natural identity and creation hints */
+  /** Omit to preserve, provide identity to replace, or pass {} to clear. */
   asset?: AssetResolutionInput;
   /** Explicit review patch; false approves a flagged activity. */
   needsReview?: boolean;

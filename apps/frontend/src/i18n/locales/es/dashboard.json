@@ -64,6 +64,7 @@
     "create_first_goal": "Crea tu primer objetivo",
     "more_goals_one": "+{{count}} objetivo más",
     "more_goals_other": "+{{count}} objetivos más",
+    "more_goals_many": "+{{count}} objetivos más",
     "time_no_deadline": "SIN FECHA LÍMITE",
     "time_due": "VENCE"
   },
@@ -88,12 +89,15 @@
     "display_name": "Nombre",
     "shares_one": "{{formatted}} acción",
     "shares_other": "{{formatted}} acciones",
+    "shares_many": "{{formatted}} acciones",
     "more_holdings": "+{{count}} posiciones más",
     "more": "+{{count}} más",
     "more_holdings_one": "+{{count}} posición más",
     "more_holdings_other": "+{{count}} posiciones más",
+    "more_holdings_many": "+{{count}} posiciones más",
     "more_one": "+{{count}} más",
-    "more_other": "+{{count}} más"
+    "more_other": "+{{count}} más",
+    "more_many": "+{{count}} más"
   },
   "summary": {
     "return_unavailable_holdings": "Rentabilidad % no disponible: falta el coste base o el valor inicial de las posiciones.",
@@ -105,5 +109,6 @@
     "try_restarting": "Prueba a reiniciar la aplicación. Si el problema persiste, puede que sea necesario restablecer tu base de datos."
   },
   "accounts_count_one": "{{count}} cuenta",
-  "accounts_count_other": "{{count}} cuentas"
+  "accounts_count_other": "{{count}} cuentas",
+  "accounts_count_many": "{{count}} cuentas"
 }

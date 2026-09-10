@@ -837,6 +837,14 @@ mod tests {
                 .as_ref()
                 .and_then(|i| i.name.clone())
                 .unwrap_or_default(),
+            exchange_mic: holding
+                .instrument
+                .as_ref()
+                .and_then(|instrument| instrument.exchange_mic.clone()),
+            instrument_type: holding
+                .instrument
+                .as_ref()
+                .and_then(|instrument| instrument.instrument_type.clone()),
             holding_type: holding.holding_type.clone(),
             quantity: holding.quantity,
             category_id: category_id.to_string(),

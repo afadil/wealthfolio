@@ -205,7 +205,9 @@
     "filterTransactions": "거래 필터링",
     "clearAll": "모두 지우기",
     "done": "완료",
-    "refreshing": "새로고침 중"
+    "refreshing": "새로고침 중",
+    "selectedNet": "선택 순액",
+    "filteredNet": "필터 순액"
   },
   "period": {
     "thisMonth": "이번 달",
@@ -359,9 +361,8 @@
     "spent": "지출액",
     "allSubcategories": "모든 하위 카테고리",
     "tx": "Tx",
-    "outflowsCount": "지출 {{count}}건",
     "avgPerTx": "건당 평균",
-    "outflowsOnly": "지출만",
+    "acrossAllTx": "전체 거래 기준",
     "dailyPace": "일일 페이스",
     "inThisPeriod": "이 기간 동안",
     "subcategoryMix": "하위 카테고리 구성",
@@ -373,7 +374,6 @@
     "noTransactions": "이 기간에 거래가 없습니다.",
     "loadMore": "{{count}}건 더 불러오기",
     "openInTransactions": "거래 내역에서 열기",
-    "outflowsCount_other": "지출 {{count}}건",
     "totalCount_other": "총 {{count}}건",
     "loadMore_other": "{{count}}건 더 불러오기"
   },
@@ -815,9 +815,12 @@
     "deselectAllVisible": "표시된 거래 모두 선택 해제",
     "selectAllVisible": "표시된 거래 모두 선택",
     "nameNotes": "이름 / 메모",
-    "loading": "불러오는 중…",
-    "loadMore": "더 불러오기 (남은 항목 {{count}}건)",
-    "loadMore_other": "더 불러오기 (남은 항목 {{count}}건)"
+    "time": "시간",
+    "net": "순액",
+    "dayCount_one": "거래 {{count}}건",
+    "dayCount_other": "거래 {{count}}건",
+    "selectDay": "{{date}} 거래 모두 선택",
+    "deselectDay": "{{date}} 거래 모두 선택 해제"
   },
   "tabContent": {
     "stageWhereLabel": "현재 위치",

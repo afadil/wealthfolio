@@ -47,7 +47,11 @@ impl AssetPositionInfo {
 #[inline]
 pub(crate) fn gross_trade_amount(activity: &Activity, asset_info: &AssetPositionInfo) -> Decimal {
     if ActivityEconomicsResolver::is_security_transfer(activity) {
-        return activity.qty() * activity.price() * asset_info.contract_multiplier;
+        return activity
+            .qty()
+            .checked_mul(activity.price())
+            .and_then(|value| value.checked_mul(asset_info.contract_multiplier))
+            .unwrap_or(Decimal::ZERO);
     }
 
     ActivityEconomicsResolver::resolve_cash(activity, asset_info.contract_multiplier)
@@ -90,10 +94,16 @@ pub(crate) fn storage_money(value: Decimal) -> Decimal {
 pub(crate) fn effective_unit_price(activity: &Activity, asset_info: &AssetPositionInfo) -> Decimal {
     let qty = activity.qty();
     let gross = gross_trade_amount(activity, asset_info);
+    // Keep a representable reported price as the fallback when gross cannot
+    // be divided into a per-unit value; otherwise leave the lot basis unknown.
+    let reported_price = activity
+        .price()
+        .checked_mul(asset_info.contract_multiplier)
+        .unwrap_or(Decimal::ZERO);
     if !qty.is_zero() && !gross.is_zero() {
-        gross / qty
+        gross.checked_div(qty).unwrap_or(reported_price)
     } else {
-        activity.price() * asset_info.contract_multiplier
+        reported_price
     }
 }
 
@@ -132,8 +142,18 @@ pub(crate) fn proportional_amount(
 ) -> Decimal {
     if amount.is_zero() || part_quantity.is_zero() || total_quantity.is_zero() {
         Decimal::ZERO
+    } else if part_quantity == total_quantity {
+        amount
     } else {
-        amount * part_quantity / total_quantity
+        amount
+            .checked_mul(part_quantity)
+            .and_then(|value| value.checked_div(total_quantity))
+            .or_else(|| {
+                amount
+                    .checked_div(total_quantity)
+                    .and_then(|value| value.checked_mul(part_quantity))
+            })
+            .unwrap_or(Decimal::ZERO)
     }
 }
 

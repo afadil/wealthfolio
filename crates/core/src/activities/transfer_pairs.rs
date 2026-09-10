@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 use rust_decimal::Decimal;
 
@@ -176,6 +177,96 @@ pub fn is_same_account_cash_fx_conversion(transfer_in: &Activity, transfer_out: 
             .eq_ignore_ascii_case(transfer_out.currency.trim())
 }
 
+fn has_imported_fx_pair_metadata(
+    activity: &Activity,
+    source_currency: &str,
+    destination_currency: &str,
+    source_amount: Decimal,
+    destination_amount: Decimal,
+) -> bool {
+    let Some(metadata) = activity.metadata.as_ref() else {
+        return false;
+    };
+    if metadata
+        .pointer("/flow/is_external")
+        .and_then(serde_json::Value::as_bool)
+        != Some(false)
+    {
+        return false;
+    }
+
+    let Some(fx) = metadata.get("fx") else {
+        return false;
+    };
+    let metadata_amount_matches = |key: &str, expected: Decimal| {
+        fx.get(key)
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| Decimal::from_str(value).ok())
+            .is_some_and(|value| value == expected)
+    };
+
+    fx.get("rateSource").and_then(serde_json::Value::as_str) == Some("implied_from_import")
+        && fx
+            .get("sourceCurrency")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|currency| currency.eq_ignore_ascii_case(source_currency))
+        && fx
+            .get("destinationCurrency")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|currency| currency.eq_ignore_ascii_case(destination_currency))
+        && metadata_amount_matches("sourceAmount", source_amount)
+        && metadata_amount_matches("destinationAmount", destination_amount)
+}
+
+/// Returns true only for a complete same-account cash FX pair carrying the
+/// internal-flow metadata written by the import linker. Structural pairing
+/// alone is deliberately insufficient for contribution-neutral accounting.
+pub fn is_contribution_neutral_same_account_cash_fx_conversion(
+    transfer_in: &Activity,
+    transfer_out: &Activity,
+) -> bool {
+    if !is_same_account_cash_fx_conversion(transfer_in, transfer_out) {
+        return false;
+    }
+
+    let Some(in_group_id) = transfer_in
+        .source_group_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|group_id| !group_id.is_empty())
+    else {
+        return false;
+    };
+    let Some(out_group_id) = transfer_out
+        .source_group_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|group_id| !group_id.is_empty())
+    else {
+        return false;
+    };
+    if in_group_id != out_group_id {
+        return false;
+    }
+
+    let Some(source_amount) = transfer_out.amount.map(|amount| amount.abs()) else {
+        return false;
+    };
+    let Some(destination_amount) = transfer_in.amount.map(|amount| amount.abs()) else {
+        return false;
+    };
+
+    [transfer_in, transfer_out].iter().all(|activity| {
+        has_imported_fx_pair_metadata(
+            activity,
+            &transfer_out.currency,
+            &transfer_in.currency,
+            source_amount,
+            destination_amount,
+        )
+    })
+}
+
 fn build_transfer_pair(group_id: &str, activities: &[Activity]) -> Result<TransferPair, String> {
     if activities.len() != 2 {
         return Err(format!(
@@ -319,6 +410,47 @@ mod tests {
                 .and_then(|pair| pair.counterparty_account_id("out")),
             Some("a1")
         );
+    }
+
+    #[test]
+    fn imported_same_account_cash_fx_pair_is_contribution_neutral() {
+        let mut transfer_out = activity("out", ACTIVITY_TYPE_TRANSFER_OUT, "a1", Some("g1"), "USD");
+        transfer_out.amount = Some(Decimal::new(2433, 2));
+        let mut transfer_in = activity("in", ACTIVITY_TYPE_TRANSFER_IN, "a1", Some("g1"), "CAD");
+        transfer_in.amount = Some(Decimal::new(3293, 2));
+        let metadata = serde_json::json!({
+            "flow": { "is_external": false },
+            "fx": {
+                "sourceCurrency": "USD",
+                "destinationCurrency": "CAD",
+                "sourceAmount": "24.33",
+                "destinationAmount": "32.93",
+                "impliedRate": "1.3534730785039046444718454583",
+                "rateSource": "implied_from_import"
+            }
+        });
+        transfer_out.metadata = Some(metadata.clone());
+        transfer_in.metadata = Some(metadata);
+
+        assert!(is_contribution_neutral_same_account_cash_fx_conversion(
+            &transfer_in,
+            &transfer_out
+        ));
+    }
+
+    #[test]
+    fn structural_same_account_cash_fx_pair_without_import_metadata_is_not_neutral() {
+        let transfer_out = activity("out", ACTIVITY_TYPE_TRANSFER_OUT, "a1", Some("g1"), "USD");
+        let transfer_in = activity("in", ACTIVITY_TYPE_TRANSFER_IN, "a1", Some("g1"), "CAD");
+
+        assert!(is_same_account_cash_fx_conversion(
+            &transfer_in,
+            &transfer_out
+        ));
+        assert!(!is_contribution_neutral_same_account_cash_fx_conversion(
+            &transfer_in,
+            &transfer_out
+        ));
     }
 
     #[test]

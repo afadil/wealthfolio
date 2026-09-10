@@ -53,6 +53,9 @@ jobs:
       - name: Install addon sandbox browsers
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
+      - name: Run net worth layout regression tests
+        run: pnpm test:e2e:net-worth
+
       - name: Run addon sandbox browser tests
         run: pnpm test:e2e:addon-sandbox
         env:

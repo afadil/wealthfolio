@@ -99,6 +99,27 @@ describe("useActivityMutations", () => {
     );
   });
 
+  it("sends an explicit empty asset patch when an edit clears the asset", async () => {
+    const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.updateActivityMutation.mutateAsync({
+        id: "adjustment-1",
+        accountId: "acc-1",
+        activityType: ActivityType.ADJUSTMENT,
+        activityDate: new Date("2026-04-30T16:00:00Z"),
+        amount: 25,
+        currency: "USD",
+        currentAssetId: "asset-aapl",
+        clearAsset: true,
+      } as any);
+    });
+
+    expect(adapterMocks.updateActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ asset: {} }),
+    );
+  });
+
   it("ignores stale selected asset id for option identities", async () => {
     const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
 

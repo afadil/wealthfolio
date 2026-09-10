@@ -119,8 +119,17 @@ function callHost(type: string, payload: Record<string, unknown> = {}) {
   });
 }
 
-globalThis.__wealthfolioRequestTickerLogo = (symbol: string) =>
-  callHost("hostAssetRequest", { kind: "tickerLogo", symbol }) as Promise<Blob | null>;
+globalThis.__wealthfolioRequestTickerLogo = (
+  symbol: string,
+  exchangeMic?: string | null,
+  instrumentType?: string | null,
+) =>
+  callHost("hostAssetRequest", {
+    kind: "tickerLogo",
+    symbol,
+    exchangeMic,
+    instrumentType,
+  }) as Promise<Blob | null>;
 
 function createAddonAssetRegistry(assets: SandboxAddonAsset[] = []) {
   return new SandboxAddonAssetRegistry(

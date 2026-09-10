@@ -65,7 +65,8 @@
     "different_methods": "Los distintos métodos de rentabilidad no pueden compartir el mismo gráfico. Selecciona una etiqueta atenuada para cambiar el modo del gráfico.",
     "not_enough_overlap": "Estos elementos seleccionados no tienen suficientes fechas del gráfico que coincidan con el gráfico activo.",
     "not_plotted_count_one": "{{count}} elemento seleccionado no está representado",
-    "not_plotted_count_other": "{{count}} elementos seleccionados no están representados"
+    "not_plotted_count_other": "{{count}} elementos seleccionados no están representados",
+    "not_plotted_count_many": "{{count}} elementos seleccionados no están representados"
   },
   "metric": {
     "return": "Rentabilidad",

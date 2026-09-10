@@ -29,7 +29,7 @@ const AppLayoutContent = () => {
   } = useSettings();
   const location = useLocation();
   const navigation = useNavigation();
-  const { isMobile, isTauri } = usePlatform();
+  const { isMobile, isMacOS, isTauri } = usePlatform();
   const isMobileViewport = useIsMobileViewport();
   const isIPad =
     typeof window !== "undefined" &&
@@ -39,6 +39,15 @@ const AppLayoutContent = () => {
   const shouldUseMobileNavigation = isIPad ? false : isMobile || isMobileViewport;
   const shouldUseBottomNavigation = shouldUseMobileNavigation || (isLaunchBar && !isFocusMode);
   const isDesktopFocusMode = !shouldUseMobileNavigation && isFocusMode;
+  const hasSidebar = !shouldUseBottomNavigation && !isDesktopFocusMode;
+  // macOS only: `titleBarStyle: "Overlay"` floats the traffic lights over the
+  // WebView, and without the sidebar nothing covers the top-left corner they
+  // occupy. Observed at y 8-20 against pills starting at y 16, so 8px clears
+  // them with a small margin. Consumed by .titlebar-nudge.
+  const titleBarNudge =
+    isTauri && isMacOS && !shouldUseMobileNavigation && !hasSidebar
+      ? "translateY(0.5rem)"
+      : undefined;
   const launchBarHeight =
     !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
   const isAppShellReady = isSettingsReady && !!settings?.onboardingCompleted;
@@ -80,17 +89,16 @@ const AppLayoutContent = () => {
     <ErrorBoundary>
       <ApplicationShell
         className="app-shell h-screen overflow-x-hidden"
-        style={
-          launchBarHeight ? { ["--mobile-nav-ui-height" as string]: launchBarHeight } : undefined
-        }
+        style={{
+          ...(launchBarHeight ? { ["--mobile-nav-ui-height" as string]: launchBarHeight } : {}),
+          ...(titleBarNudge ? { ["--titlebar-nudge" as string]: titleBarNudge } : {}),
+        }}
       >
         {/* Mobile sync loading indicator */}
         {shouldUseMobileNavigation && <MobileLoadingIndicator />}
 
         <div className="scan-hide-target">
-          {!shouldUseBottomNavigation && !isDesktopFocusMode && (
-            <AppSidebar navigation={navigation} />
-          )}
+          {hasSidebar && <AppSidebar navigation={navigation} />}
         </div>
 
         <div

@@ -42,10 +42,16 @@ function cashSymbol(currency: string): string {
 function HoldingAvatar({
   isCash,
   symbol,
+  assetId,
+  exchangeMic,
+  instrumentType,
   className = "size-6",
 }: {
   isCash: boolean;
   symbol: string;
+  assetId?: string;
+  exchangeMic?: string | null;
+  instrumentType?: string | null;
   className?: string;
 }) {
   if (isCash) {
@@ -64,8 +70,10 @@ function HoldingAvatar({
   return (
     <TickerAvatar
       symbol={symbol === "-" ? "?" : symbol}
+      assetId={assetId}
+      exchangeMic={exchangeMic}
+      instrumentType={instrumentType}
       className={cn("shrink-0", className)}
-      imageClassName="object-contain p-1"
     />
   );
 }
@@ -162,7 +170,14 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
               >
                 <div className="grid grid-cols-[1.75rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1">
                   <div className="row-span-2 flex items-center">
-                    <HoldingAvatar isCash={row.isCash} symbol={row.symbol} className="size-7" />
+                    <HoldingAvatar
+                      isCash={row.isCash}
+                      symbol={row.symbol}
+                      assetId={row.assetId}
+                      exchangeMic={row.exchangeMic}
+                      instrumentType={row.instrumentType}
+                      className="size-7"
+                    />
                   </div>
 
                   <div className="flex min-w-0 items-baseline gap-1.5">
@@ -251,7 +266,13 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                   >
                     <td className="pl-6 pr-3">
                       <div className="flex min-w-[280px] items-center gap-2">
-                        <HoldingAvatar isCash={row.isCash} symbol={row.symbol} />
+                        <HoldingAvatar
+                          isCash={row.isCash}
+                          symbol={row.symbol}
+                          assetId={row.assetId}
+                          exchangeMic={row.exchangeMic}
+                          instrumentType={row.instrumentType}
+                        />
                         <div className="flex min-w-0 items-baseline gap-2">
                           <span className="text-foreground shrink-0 text-[12px] font-semibold">
                             {row.symbol}

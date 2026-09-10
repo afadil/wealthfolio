@@ -309,6 +309,7 @@ export interface ActivityUpdate {
   activityDate: string | Date;
   /** Optional grouping key (links paired transfer legs). */
   sourceGroupId?: string;
+  /** Omit to preserve the current asset; pass an empty object to clear it. */
   asset?: AssetResolutionInput;
   /** @deprecated Use asset. */
   symbol?: AssetResolutionInput;
@@ -753,6 +754,8 @@ export interface HoldingSummary {
   id: string;
   symbol: string;
   name?: string | null;
+  exchangeMic?: string | null;
+  instrumentType?: string | null;
   accountName?: string | null;
   holdingType: HoldingType;
   quantity: number;
@@ -817,6 +820,30 @@ export interface Asset {
   // Audit
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
+}
+
+/** One row of the custom-logo index (no image bytes). */
+export interface AssetLogoSummary {
+  assetId: string;
+  displayCode: string | null;
+  sha256: string;
+  updatedAt: string;
+}
+
+/** A custom logo override for an asset, including the PNG bytes as base64. */
+export interface AssetLogo {
+  assetId: string;
+  mimeType: string;
+  dataBase64: string;
+  sha256: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertAssetLogoInput {
+  dataBase64: string;
 }
 
 export interface Quote {
@@ -1030,7 +1057,8 @@ export interface AccountValuation {
     | "ACTIVITY_DERIVED"
     | "STORED_GROSS"
     | "NET_CONTRIBUTION_FALLBACK"
-    | "MIXED";
+    | "MIXED"
+    | "MIXED_EXACT";
   performanceEligibleValueBase: number;
   valueStatus: ValuationStatus;
   basisStatus: BasisStatus;
@@ -1906,6 +1934,7 @@ export interface CategoryAllocation {
   value: number; // Base currency value
   percentage: number; // 0-100
   children?: CategoryAllocation[]; // Child allocations for drill-down
+  isResidual?: boolean; // True for the synthetic "rest of the parent" drill-down child
 }
 
 export interface TaxonomyAllocation {
@@ -2451,6 +2480,8 @@ export interface RetirementOverview {
   portfolioAtGoalAge: number;
   requiredCapitalReachable: boolean;
   requiredCapitalAtGoalAge: number;
+  leanRequiredCapitalAtGoalAge?: number | null;
+  fatRequiredCapitalAtGoalAge?: number | null;
   shortfallAtGoalAge: number;
   surplusAtGoalAge: number;
   fundedThroughAge: number | null;
@@ -2691,6 +2722,8 @@ export interface DriftHoldingRow {
   sourceAccountIds?: string[];
   symbol: string;
   name: string;
+  exchangeMic?: string | null;
+  instrumentType?: string | null;
   categoryId: string;
   categoryName: string;
   categoryColor?: string | null;

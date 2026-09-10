@@ -543,9 +543,13 @@ export function buildSavePayload(
       transaction.activityType === ActivityType.TRANSFER_OUT;
     const supportsBoundary = isTransfer || transaction.activityType === ActivityType.CREDIT;
     const assetSymbol = (transaction.assetSymbol || "").trim();
+    const isSymbolBackedAdjustment =
+      transaction.activityType === ActivityType.ADJUSTMENT && Boolean(assetSymbol);
     const isCash = isTransfer
       ? isCashTransfer(transaction.activityType, assetSymbol) || !assetSymbol
-      : isAlwaysCashActivity(transaction.activityType, transaction.subtype);
+      : transaction.activityType === ActivityType.ADJUSTMENT
+        ? !isSymbolBackedAdjustment
+        : isAlwaysCashActivity(transaction.activityType, transaction.subtype);
     // For assets not in our lookup (new assets), send undefined currency to let the backend
     // derive it from the asset and properly register the FX pair if needed.
     // Only use account currency fallback for cash activities where the currency is deterministic.
@@ -666,6 +670,10 @@ export function buildSavePayload(
             ? undefined
             : transaction.needsReview,
       };
+
+      if (isCash && transaction._originalAssetId) {
+        updatePayload.asset = {};
+      }
 
       if (!isCash) {
         const currentSymbol = (transaction.assetSymbol || "").trim().toUpperCase();

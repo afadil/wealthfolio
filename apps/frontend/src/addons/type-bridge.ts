@@ -47,14 +47,52 @@ import type {
 } from "@/lib/types";
 import type { HoldingInput } from "@/adapters";
 import type {
+  CategorizationRule as InternalCategorizationRule,
+  NewCategorizationRule,
+} from "@/features/spending/types/rule";
+import {
+  SPEND_CATEGORY_KIND_TO_TAXONOMY_ID,
+  TAXONOMY_ID_TO_SPEND_CATEGORY_KIND,
+} from "../adapters/shared/spending";
+import type {
+  ActivityType,
+  CategorizationRule as SDKCategorizationRule,
+  CategorizationRuleInput,
   Goal as SDKGoal,
   GoalAllocation as SDKGoalAllocation,
   HostAPI as SDKHostAPI,
   NetworkRequest as SDKNetworkRequest,
   NetworkResponse as SDKNetworkResponse,
   Permission,
+  SpendCategory,
+  SpendCategoryKind,
 } from "@wealthfolio/addon-sdk";
 import { isBaselineCategory } from "@wealthfolio/addon-sdk";
+import { deriveRuleId } from "./spending-rule-key";
+
+/**
+ * Converts an internal rule to the addon-facing shape. Returns null when the
+ * rule's taxonomy/category isn't a resolvable spend-category kind — this
+ * should never happen for a rule created via `saveRule`, which always sets
+ * both, but guards against a caller reading back a rule it didn't create.
+ */
+function toSDKCategorizationRule(rule: InternalCategorizationRule): SDKCategorizationRule | null {
+  const kind = rule.taxonomyId ? TAXONOMY_ID_TO_SPEND_CATEGORY_KIND[rule.taxonomyId] : undefined;
+  if (!kind || !rule.categoryId) return null;
+  return {
+    id: rule.id,
+    name: rule.name,
+    pattern: rule.pattern,
+    matchType: rule.matchType,
+    kind,
+    categoryId: rule.categoryId,
+    activityType: (rule.activityType ?? undefined) as ActivityType | undefined,
+    accountId: rule.accountId ?? undefined,
+    priority: rule.priority,
+    createdAt: rule.createdAt,
+    updatedAt: rule.updatedAt,
+  };
+}
 
 /**
  * Internal HostAPI interface that matches the actual command function signatures
@@ -71,6 +109,14 @@ export interface InternalHostAPI {
   updateExchangeRate(updatedRate: ExchangeRate): Promise<ExchangeRate>;
   addExchangeRate(newRate: Omit<ExchangeRate, "id">): Promise<ExchangeRate>;
   getExchangeRatesForDates(pairs: ExchangeRateDateQuery[]): Promise<ExchangeRateDateResult[]>;
+
+  // Spend categorization
+  isSpendingEnabled(): Promise<boolean>;
+  getSpendCategories(kind?: SpendCategoryKind): Promise<SpendCategory[]>;
+  listCategorizationRules(): Promise<InternalCategorizationRule[]>;
+  upsertCategorizationRule(rule: NewCategorizationRule): Promise<InternalCategorizationRule>;
+  deleteCategorizationRuleById(id: string): Promise<void>;
+  rerunCategorizationRulesForAddon(onlyUncategorized?: boolean): Promise<number>;
 
   // Contribution limits
   getContributionLimit(): Promise<ContributionLimit[]>;
@@ -509,6 +555,55 @@ export function createSDKHostAPIBridge(
     "currency",
     guard,
   );
+  const spending = guardNamespace(
+    {
+      isEnabled: internalAPI.isSpendingEnabled,
+      getCategories: internalAPI.getSpendCategories,
+      getRules: async (): Promise<SDKCategorizationRule[]> => {
+        const prefix = `addon:${addonId || "unknown-addon"}:`;
+        const rules = await internalAPI.listCategorizationRules();
+        const own: SDKCategorizationRule[] = [];
+        for (const rule of rules) {
+          if (!rule.id.startsWith(prefix)) continue;
+          const sdkRule = toSDKCategorizationRule(rule);
+          if (sdkRule) own.push(sdkRule);
+        }
+        return own;
+      },
+      saveRule: async (input: CategorizationRuleInput): Promise<SDKCategorizationRule> => {
+        const id = await deriveRuleId(addonId || "unknown-addon", input.ruleKey);
+        const taxonomyId = SPEND_CATEGORY_KIND_TO_TAXONOMY_ID[input.kind];
+        if (typeof taxonomyId !== "string") {
+          throw new Error(`Unsupported spend category kind '${String(input.kind)}'`);
+        }
+        const saved = await internalAPI.upsertCategorizationRule({
+          id,
+          name: input.name,
+          pattern: input.pattern,
+          matchType: input.matchType ?? "contains",
+          taxonomyId,
+          categoryId: input.categoryId,
+          activityType: input.activityType ?? null,
+          isGlobal: !input.accountId,
+          accountId: input.accountId ?? null,
+          priority: input.priority ?? 0,
+        });
+        const sdkRule = toSDKCategorizationRule(saved);
+        if (!sdkRule) {
+          throw new Error(`Saved rule '${saved.id}' is missing a resolvable category`);
+        }
+        return sdkRule;
+      },
+      deleteRule: async (ruleKey: string): Promise<void> => {
+        const id = await deriveRuleId(addonId || "unknown-addon", ruleKey);
+        await internalAPI.deleteCategorizationRuleById(id);
+      },
+      rerunRules: (onlyUncategorized?: boolean): Promise<number> =>
+        internalAPI.rerunCategorizationRulesForAddon(onlyUncategorized ?? true),
+    },
+    "spending",
+    guard,
+  );
   const contributionLimits = guardNamespace(
     {
       getAll: internalAPI.getContributionLimit,
@@ -598,6 +693,7 @@ export function createSDKHostAPIBridge(
     quotes: quotes as unknown as SDKApiWithoutSecrets["quotes"],
     performance: performance as unknown as SDKApiWithoutSecrets["performance"],
     exchangeRates: exchangeRates as unknown as SDKApiWithoutSecrets["exchangeRates"],
+    spending: spending as unknown as SDKApiWithoutSecrets["spending"],
     contributionLimits: contributionLimits as unknown as SDKApiWithoutSecrets["contributionLimits"],
     goals: goals as unknown as SDKApiWithoutSecrets["goals"],
     settings: settings as unknown as SDKApiWithoutSecrets["settings"],

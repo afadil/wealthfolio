@@ -1,4 +1,4 @@
-import { isCashSymbol, needsImportAssetResolution } from "@/lib/activity-utils";
+import { shouldResolveImportAsset } from "@/lib/activity-utils";
 import { quoteModeFromSearchResult } from "@/lib/asset-utils";
 import { ActivityType } from "@/lib/constants";
 import { getQuoteUnitCurrency } from "@wealthfolio/ui/lib/currencies";
@@ -158,10 +158,7 @@ export function buildImportAssetCandidateFromDraft(
   if (!draft.symbol || !draft.activityType) {
     return null;
   }
-  if (
-    !needsImportAssetResolution(draft.activityType, draft.subtype) ||
-    isCashSymbol(draft.symbol)
-  ) {
+  if (!shouldResolveImportAsset(draft.activityType, draft.subtype, draft.symbol)) {
     return null;
   }
   if (!draft.accountId) {

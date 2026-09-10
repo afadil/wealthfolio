@@ -52,5 +52,6 @@ pub use import_run_model::{
     ImportRunType, ReviewMode,
 };
 pub use transfer_pairs::{
-    is_same_account_cash_fx_conversion, InvalidTransferGroup, TransferPair, TransferPairResolution,
+    is_contribution_neutral_same_account_cash_fx_conversion, is_same_account_cash_fx_conversion,
+    InvalidTransferGroup, TransferPair, TransferPairResolution,
 };

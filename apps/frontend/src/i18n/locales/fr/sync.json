@@ -18,7 +18,8 @@
     "connectThisDevice": "Connecter cet appareil",
     "enableDeviceSync": "Activer la synchronisation",
     "morePreview_one": "+{{count}} de plus",
-    "morePreview_other": "+{{count}} de plus"
+    "morePreview_other": "+{{count}} de plus",
+    "morePreview_many": "+{{count}} de plus"
   },
   "status": {
     "syncError": "Erreur de synchronisation",
@@ -38,10 +39,13 @@
     "thisDeviceSuffix": "· Cet appareil",
     "minutesAgo_one": "il y a {{count}} min",
     "minutesAgo_other": "il y a {{count}} min",
+    "minutesAgo_many": "il y a {{count}} min",
     "hoursAgo_one": "il y a {{count}} h",
     "hoursAgo_other": "il y a {{count}} h",
+    "hoursAgo_many": "il y a {{count}} h",
     "daysAgo_one": "il y a {{count}} j",
-    "daysAgo_other": "il y a {{count}} j"
+    "daysAgo_other": "il y a {{count}} j",
+    "daysAgo_many": "il y a {{count}} j"
   },
   "engine": {
     "pauseSync": "Suspendre la synchronisation",
@@ -72,6 +76,7 @@
     "notConnectedYet": "Cet appareil n'est pas encore connecté",
     "enterCodeFromDevices_one": "Saisissez le code de votre {{count}} autre appareil connecté.",
     "enterCodeFromDevices_other": "Saisissez le code de l'un de vos {{count}} autres appareils connectés.",
+    "enterCodeFromDevices_many": "Saisissez le code de l'un de vos {{count}} autres appareils connectés.",
     "enterCodeGeneric": "Saisissez le code de votre autre appareil connecté pour synchroniser vos données.",
     "connectThisDevice": "Connecter cet appareil",
     "connectToStartSyncing": "Connectez cet appareil pour commencer la synchronisation."
@@ -127,6 +132,7 @@
     "replaceDataDescription": "Vos données locales seront remplacées par celles de votre autre appareil connecté.",
     "localRowsReplaced_one": "{{count}} ligne locale sera remplacée.",
     "localRowsReplaced_other": "{{count}} lignes locales seront remplacées.",
+    "localRowsReplaced_many": "{{count}} lignes locales seront remplacées.",
     "notNow": "Pas maintenant",
     "syncing": "Synchronisation...",
     "replaceAndSync": "Remplacer et synchroniser"

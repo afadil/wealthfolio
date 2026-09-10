@@ -50,6 +50,58 @@ describe("addon translation runtime", () => {
     expect(screen.getByTestId("language")).toHaveTextContent(/^fr$/);
   });
 
+  it("uses a zh-Hant add-on bundle when the host selects Traditional Chinese", async () => {
+    const { initSandboxI18n, installAddonTranslationRuntime, setSandboxLanguage } =
+      await loadSandbox();
+    initSandboxI18n("en");
+    installAddonTranslationRuntime("sample-addon");
+    registerTranslations({
+      en: { greeting: "Hello {{name}}" },
+      "zh-Hant": { greeting: "你好，{{name}}" },
+    });
+
+    render(<AddonGreeting name="Aziz" />);
+    setSandboxLanguage("zh-Hant");
+
+    expect(await screen.findByText("你好，Aziz")).toBeInTheDocument();
+  });
+
+  it("falls back to English instead of zh for missing zh-Hant add-on strings", async () => {
+    const { initSandboxI18n, installAddonTranslationRuntime, setSandboxLanguage } =
+      await loadSandbox();
+    initSandboxI18n("en");
+    installAddonTranslationRuntime("sample-addon");
+
+    registerTranslations({
+      en: { greeting: "Hello {{name}}" },
+      zh: { greeting: "你好，{{name}}" },
+      "zh-Hant": { other: "繁體中文" },
+    });
+
+    render(<AddonGreeting name="Aziz" />);
+    setSandboxLanguage("zh-Hant");
+
+    expect(await screen.findByText("Hello Aziz")).toBeInTheDocument();
+  });
+
+  it("accepts an add-on bundle keyed by a Traditional Chinese alias", async () => {
+    const { initSandboxI18n, installAddonTranslationRuntime, setSandboxLanguage } =
+      await loadSandbox();
+    initSandboxI18n("en");
+    installAddonTranslationRuntime("sample-addon");
+    // `zh-TW` is what most add-on authors will write; it has to reach zh-Hant
+    // rather than landing on the Simplified bundle.
+    registerTranslations({
+      en: { greeting: "Hello {{name}}" },
+      "zh-TW": { greeting: "你好，{{name}}" },
+    });
+
+    render(<AddonGreeting name="Aziz" />);
+    setSandboxLanguage("zh-Hant");
+
+    expect(await screen.findByText("你好，Aziz")).toBeInTheDocument();
+  });
+
   it("cannot read or overwrite the host ui namespace", async () => {
     const { initSandboxI18n, installAddonTranslationRuntime } = await loadSandbox();
     const i18n = initSandboxI18n("en");

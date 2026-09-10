@@ -1,5 +1,6 @@
 import { AllocationBreadcrumb } from "@/components/allocation-breadcrumb";
 import { useDrillDownState } from "@/hooks/use-drill-down-state";
+import { namedChildren } from "@/lib/allocation-children";
 import type { TaxonomyAllocation, CategoryAllocation } from "@/lib/types";
 import {
   Card,
@@ -68,7 +69,9 @@ export function DrillableDonutChart({
 
     if (!category?.children?.length) return [];
 
-    return category.children
+    return namedChildren(category, (name) =>
+      t("common:allocation_other_in_category", { category: name }),
+    )
       .filter((child) => child.value > 0)
       .map((child) => ({
         id: child.categoryId,
@@ -78,9 +81,18 @@ export function DrillableDonutChart({
         color: child.color,
       }))
       .sort((a, b) => b.value - a.value);
-  }, [path, allocation, baseCurrency]);
+  }, [path, allocation, baseCurrency, t]);
 
   const data = isAtRoot ? rootData : drilledData;
+
+  // The selection points at a category, not at a position — reset it when the categories
+  // change (re-classification, account-scope change) instead of pointing at a new one.
+  const categoryKey = data.map((item) => item.id).join("|");
+  const [renderedCategoryKey, setRenderedCategoryKey] = useState(categoryKey);
+  if (categoryKey !== renderedCategoryKey) {
+    setRenderedCategoryKey(categoryKey);
+    setActiveIndex(0);
+  }
 
   const handleSectionClick = (
     sectionData: { name: string; value: number; currency: string },

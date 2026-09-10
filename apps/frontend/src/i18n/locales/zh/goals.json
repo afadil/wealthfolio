@@ -94,7 +94,7 @@
       "nominal": "名义值",
       "explained_aria": "现值与名义值说明",
       "todays_value_tip": "将未来的金额换算回今天的购买力，使金额与您当前的预算具有可比性。",
-      "nominal_tip": "显示经通胀调整后的未来金额。这是您在未来那一年将看到的金额。"
+      "nominal_tip": "显示计入通胀后的未来名义金额。这是您在未来那一年将看到的金额。"
     },
     "age_label": "{{age}} 岁",
     "failed_to_load_portfolio": "加载投资组合数据失败：{{message}}",
@@ -107,17 +107,17 @@
       "on_track": "进展顺利",
       "fi_reached": "已实现财务独立",
       "at_risk": "有风险",
-      "never_reaches_fi": "永远无法实现财务独立",
+      "never_reaches_fi": "预计{{age}}岁前无法达到",
       "years_late_one": "晚 {{count}} 年",
       "years_late_other": "晚 {{count}} 年"
     },
     "verdict": {
       "age": "{{age}} 岁",
-      "spending_gap_prefix": "支出缺口开始于",
+      "spending_gap_prefix": "预计支出缺口开始于",
       "spending_gap_suffix": "而计划尚未到达 {{age}} 岁。",
-      "short_prefix": "在 {{age}} 岁时，您还差",
+      "short_prefix": "{{age}}岁时预计缺口为",
       "short_suffix": "才能支撑退休生活至 {{age}} 岁。",
-      "depleted_prefix": "投资组合资金将在此期间耗尽：",
+      "depleted_prefix": "预计投资组合资金不足的年龄为",
       "depleted_suffix": "即在 {{age}} 岁退休之后。",
       "surplus_prefix": "预计您将在 {{age}} 岁退休，并有",
       "surplus_suffix": "盈余。",
@@ -126,33 +126,23 @@
       "fi_reached_prefix": "您已实现",
       "financial_independence": "财务独立",
       "fi_reached_suffix": "——按当前假设计算。",
-      "fi_at_prefix": "您将实现财务独立于",
-      "years_after_one": "晚 {{count}} 年",
-      "years_after_other": "晚 {{count}} 年",
-      "years_before_one": "早 {{count}} 年",
-      "years_before_other": "早 {{count}} 年",
-      "your_goal_of": "您 {{age}} 岁的目标。",
-      "right_on_goal": "恰好符合您 {{age}} 岁的目标。",
-      "not_reachable_prefix": "无法达成于",
-      "not_reachable_suffix": "按当前假设计算。"
+      "not_reachable_prefix": "预计无法达到的年龄上限为",
+      "not_reachable_suffix": "按当前假设计算。",
+      "fi_projected": "预计您将在<age>{{age}}岁</age>达到财务独立。"
     },
     "summary": {
-      "at_your_current_prefix": "按您当前的",
-      "contribution": "供款，",
-      "capital_not_available": "按当前假设无法达到所需的资本目标。请检查支出、通胀、收益率和预期寿命。",
-      "projected_balance_is": "预计退休余额为",
-      "vs_required_capital_of": "对比所需资本",
       "at_age": "在 {{age}} 岁时。",
-      "the_plan_funds": "该计划可支撑",
-      "per_yr_expenses_to_age": "/年的支出至 {{age}} 岁。",
-      "youre_short": "您还差"
+      "youre_short": "预计缺口为",
+      "traditional": "根据当前假设及<contribution>{{contribution}}</contribution>的缴款，{{age}}岁时的预计余额为<balance>{{balance}}</balance>，所需资金为<target>{{target}}</target>。",
+      "fire": "根据当前假设及<contribution>{{contribution}}</contribution>的缴款，计划包括直至{{age}}岁的每年<budget>{{budget}}</budget>支出。",
+      "unavailable": "根据当前假设及<contribution>{{contribution}}</contribution>的缴款，无法估算资金目标。请在假设分析中比较假设。"
     },
     "progress": {
       "portfolio_today": "当前投资组合",
       "required_at_age": "{{age}} 岁时所需",
       "target_at_age": "{{age}} 岁时目标",
-      "capital_needed_tip_traditional": "在扣除支出、收入、税费、退休期收益率和费用后，退休年龄时所需的资本。以{{valueLabel}}显示。",
-      "capital_needed_tip_fire": "在扣除支出、收入、税费、退休期收益率和费用后，您期望退休年龄时所需的资本。以{{valueLabel}}显示。",
+      "capital_needed_tip_traditional": "根据计划的支出、收入、税收、收益率和费用假设，估算目标退休年龄所需的资金。以{{valueLabel}}显示。",
+      "capital_needed_tip_fire": "根据计划的支出、收入、税收、收益率和费用假设，估算目标退休年龄所需的资金。以{{valueLabel}}显示。",
       "not_available": "不可用",
       "funded_pct": "已达标 {{pct}}%"
     },
@@ -169,18 +159,18 @@
     },
     "milestone": {
       "coast_fire": "Coast FIRE",
-      "coast_hint": "停止供款，仍可按时退休",
-      "coast_tip_nominal": "换算为您期望退休年龄名义金额的 Coast 金额。",
-      "coast_tip_real": "您今天所需的资本——在不再供款的情况下，可在退休年龄时增长为完全财务独立。",
+      "coast_hint": "目前所需资金估算",
+      "coast_tip_nominal": "按假设通胀率，将目前所需资金估算换算为退休年龄时的金额。这是价值换算，并非投资增长预测。",
+      "coast_tip_real": "将退休目标按扣除费用后的退休前假设收益率折现，估算目前所需资金。养老金假设保持不变。",
       "lean_fire": "Lean FIRE",
       "lean_hint": "计划支出的 70%",
-      "lean_tip": "以节俭预算退休——约为您计划支出的 70%。可较早实现，但余地较小。",
+      "lean_tip": "在其他假设不变的情况下，为计划支出的70%估算所需资金。这是本规划器的Lean FIRE情景。",
       "fi": "FI",
       "fi_hint": "完整的计划支出",
       "fi_tip": "在整个退休期内支撑您计划退休支出的资本。",
       "fat_fire": "Fat FIRE",
       "fat_hint": "计划支出的 150%",
-      "fat_tip": "以比计划多约 50% 的支出退休——为旅行、馈赠、市场波动和生活品质提升留有余地。",
+      "fat_tip": "在其他假设不变的情况下，为计划支出的150%估算所需资金。这是本规划器的Fat FIRE情景。",
       "more_info_about": "关于 {{label}} 的更多信息",
       "done": "已完成"
     },
@@ -217,21 +207,37 @@
       "unfunded": "无资金支持",
       "planned_spending_legend": "计划支出",
       "showing": "显示{{valueLabel}}",
-      "projection_unavailable": "该计划的覆盖情况预测不可用。"
+      "projection_unavailable": "该计划的覆盖情况预测不可用。",
+      "age_range": "{{start}}岁 → {{end}}岁",
+      "starts_at": "{{age}}岁开始",
+      "ended_at": "{{age}}岁结束",
+      "not_active": "未生效"
     },
     "disclaimer": {
       "title": "有一点需要记住",
-      "body": "这并非财务建议。请将这些数字视为草图，而非预测。此处的一切都是基于您输入的数据构建的模拟：收益率、通胀、供款、税费，以及您预期的寿命。真实市场不会沿直线运行，税收规则会变化，政府项目也会被改写。请借此对各种想法进行压力测试并发现漏洞，然后在做出难以撤销的决定之前咨询合格的专业人士。"
+      "body": "预测取决于您的假设。实际结果可能不同。不构成财务建议。"
+    },
+    "guidance": {
+      "unavailable": "当前假设下无法估算目标。请在假设分析中比较假设。",
+      "depleted": "预计投资组合在{{age}}岁时出现资金不足。请在假设分析中比较假设。",
+      "gap": "预计从{{age}}岁起出现支出缺口。请在假设分析中比较假设。",
+      "fund": "预计{{label}}在{{age}}岁时耗尽，模型中的付款随后停止。请比较付款和收入假设。",
+      "shortfall": "预计退休时出现缺口。请在假设分析中比较假设。",
+      "reached": "当前投资组合已达到您的假设下估算的财务独立目标。",
+      "not_reached": "预计{{age}}岁前无法实现财务独立。请在假设分析中比较假设。",
+      "late_one": "预计在期望年龄的{{count}}年后实现财务独立。请在假设分析中比较假设。",
+      "late_other": "预计在期望年龄的{{count}}年后实现财务独立。请在假设分析中比较假设。"
     }
   },
   "sidebar": {
     "more_info_about": "关于 {{label}} 的更多信息",
     "edit_section": "编辑 {{title}}",
     "warnings": {
-      "high_inflation": "通胀假设偏高。在此利率下，长期支出需求会变得更加敏感。",
+      "high_inflation": "通胀假设偏高。在该通胀率下，长期支出需求会变得更加敏感。",
       "high_fee": "费用假设偏高。费用拖累会显著降低长期收益。",
       "high_volatility": "波动率假设偏高。结果区间可能变得非常宽。",
-      "high_contribution_growth": "供款增长假设偏高。这意味着持续大幅增加储蓄。"
+      "high_contribution_growth": "供款增长假设偏高。这意味着持续大幅增加储蓄。",
+      "high_return": "收益率假设较高。预计余额对这一比率较为敏感。"
     },
     "plan": {
       "kicker": "计划",
@@ -252,14 +258,14 @@
       "desired_retirement_age_hint": "您希望实现财务独立的年龄。",
       "retirement_age_hint": "您希望退休的年龄。",
       "horizon_age_fire": "计划终止年龄",
-      "horizon_age_traditional": "预期寿命",
+      "horizon_age_traditional": "计划终止年龄",
       "horizon_hint": "计划应覆盖至的年龄。",
       "monthly_contribution": "每月供款",
       "monthly_contribution_hint": "退休前您每月增加的金额。",
-      "return_before_hint": "储蓄期间的预期年收益率。",
-      "return_during_hint": "开始提取后的预期年收益率。",
+      "return_before_hint": "储蓄期间的假设年收益率，未扣除投资费用。",
+      "return_during_hint": "开始提款后的假设年收益率，未扣除投资费用。",
       "annual_fee_hint": "估算的年度投资组合费用。",
-      "inflation_hint": "预期的物价年度涨幅。"
+      "inflation_hint": "假设的年度物价涨幅。"
     },
     "spending": {
       "kicker": "支出",
@@ -320,13 +326,13 @@
       "fund_return_before_payout": "支付前基金收益率",
       "fund_payout_rate": "支付比率",
       "fund_payout_mode": "支付方式",
-      "fund_payout_mode_help": "年金终身支付；提取则动用基金，直到耗尽。",
+      "fund_payout_mode_help": "年金模式假设付款持续至规划期末；提款模式使用基金余额直至耗尽。",
       "annuity": "年金",
       "drawdown": "提取",
       "fund_return_during_payout": "支付期间的基金收益率",
-      "drawdown_note": "提取按起始年龄时余额的 {{pct}}%/年支取，此后按下方的增长设置继续，直到基金耗尽。",
+      "drawdown_note": "提取金额按基金余额的每年 {{pct}}% 估算。若已开始领取，则优先使用输入的每月领取金额。此后按设定的增长率调整，直至资金耗尽。",
       "monthly_payout_after_tax": "税后每月支付额",
-      "payout_estimate_note": "除非您输入每月支付额，否则估算支付额按预计基金余额的 {{pct}}%/年计算。",
+      "payout_estimate_note": "预计领取金额按基金余额的每年 {{pct}}% 估算。若已开始领取，则优先使用输入的每月领取金额。",
       "start_age": "起始年龄",
       "income_growth": "收入增长",
       "income_growth_help": "选择此收入是随计划通胀上涨还是保持固定。",
@@ -465,15 +471,15 @@
     "quick_start": {
       "title": "快速入门——5 个步骤",
       "step1_title": "设置计划基础",
-      "step1_desc": "在“计划输入”中，选择计划类型、出生月份、退休年龄、预期寿命和每月供款。",
+      "step1_desc": "在计划输入中设置类型、出生月份、退休年龄、规划结束年龄和每月缴款。",
       "step2_title": "输入退休支出",
       "step2_desc": "在“退休支出”中，添加您希望计划支撑的每月支出项。使用今天的金额；通胀由计划假设处理。",
       "step3_title": "添加退休收入",
-      "step3_desc": "在“退休收入”中，添加每月收入流，例如公共养老金（如加拿大的 CPP/OAS、美国的 Social Security）、职场养老金、兼职工作或年金收入。仅当您希望规划器按基金余额的 3.5%/年估算支付额（除非您自行输入每月支付额）时，才使用“添加养老基金”。",
+      "step3_desc": "添加养老金、兼职或年金等退休收入。对于养老基金，除非输入每月付款额，否则会使用预计余额及设定的年度支付率估算月付款额。",
       "step4_title": "检查假设、税费和账户占比",
       "step4_desc": "查看预计收益率、费用、波动率、通胀、提取税率、税收类别，以及哪些账户为目标提供资金。",
       "step5_title": "先阅读“概览”，再打开“假设分析”",
-      "step5_desc": "“概览”回答基础计划是否可行，并显示轨迹、支出覆盖情况和计划输入。“假设分析”在市场路径、压力测试、决策图和高级检查中测试同一计划。"
+      "step5_desc": "概览显示基础预测、支出覆盖和输入。情景分析比较市场路径、压力情景和假设变化。"
     },
     "overview": {
       "title": "理解“概览”",
@@ -493,13 +499,13 @@
     "what_if": {
       "title": "理解“假设分析”",
       "market_paths_title": "市场路径",
-      "market_paths_desc": "使用您的收益率、波动率和通胀假设，在多种可能的市场路径中测试同一计划。阴影区间显示从差到好的结果；线条显示中间路径。“资金充足”表示计划覆盖必需支出，并在整个规划期限内仍有余钱。在 FIRE 模式下，计划还需要先实现财务独立。",
+      "market_paths_desc": "我们根据您的假设模拟不同市场路径。阴影显示各年龄的第10至第90百分位区间；线条显示各路径的中位数，并非单一路径。 统计覆盖必要支出且期末仍有结余的路径；FIRE路径还必须达到财务独立。",
       "base_case_title": "基准情形",
       "base_case_desc": "显示与“概览”相同的确定性基础计划，然后指出最大的压力测试结果，让您看到最重要的因素。",
       "stress_tests_title": "压力测试",
       "stress_tests_desc": "固定检查项显示当收益率降低、通胀升高、支出增加、退休提前、储蓄减少或退休前后发生市场崩盘时，计划将如何变化。",
       "what_moves_title": "哪些因素影响计划？",
-      "what_moves_desc": "决策图比较储蓄、收益率、退休年龄和支出。绿色单元格在最后留有更多余钱。红色单元格仍留有缺口或资金不足。",
+      "what_moves_desc": "比较储蓄、收益率、退休年龄和支出。绿色表示期末资金比基础计划多，黄色表示更少。红色表示存在缺口或没有剩余资金。",
       "crash_paths_title": "早期市场崩盘路径",
       "crash_paths_desc": "比较退休前后几种崩盘时点路径。退休第一年发生的崩盘可能比之后同样的崩盘造成更大伤害，因为提取发生在投资组合下跌之时。"
     },
@@ -508,25 +514,24 @@
       "yearly_spending_title": "年度支出如何建模",
       "yearly_spending_desc": "您的支出驱动提取。规划器每年为您输入的支出计划提供资金，减去退休收入，并估算投资组合提取的任何税收拖累。",
       "target_calc_title": "目标如何计算",
-      "target_calc_desc": "规划器计算从退休到您规划期限的完整支出计划表的现值——考虑每个支出类别的通胀率、在不同年龄开始的收入流，以及提取的税收拖累。当您的投资组合达到此金额时，基础计划就有足够的资本支撑您所输入的计划表。这比简单的支出倍数更准确，因为它处理了变化的支出、递延的养老金和有限的期限。",
+      "target_calc_desc": "规划器估算覆盖退休支出安排直至规划期末所需的初始投资组合。模型考虑支出通胀、收入时间、收益率、费用及提款税。目标取决于这些假设。",
       "inflation_title": "通胀率",
-      "inflation_desc": "所有预测均按此利率逐年增长支出和与通胀挂钩的收入。默认的 2% 与欧洲央行的目标一致。",
-      "inflation_it_note": "如需更保守的意大利 CPI 假设，请使用 2.5–3%。",
+      "inflation_desc": "通胀假设使支出及与通胀挂钩的收入随时间增长。各个项目可以使用各自的增长率。",
       "returns_title": "收益率、费用和波动率",
       "returns_desc": "退休前收益率驱动积累。退休期收益率驱动提取阶段和所需资本。年度投资费用从两者中扣除。波动率仅用于市场路径检查——数值越高，产生的结果分布越宽。",
       "horizon_title": "规划期限年龄",
-      "horizon_desc": "投资组合必须持续的时长。退休目标和“假设分析”检查运行至此年龄。将其设为 90–95 以对长寿风险进行压力测试。早期市场崩盘路径和“资金充足”均在此期限衡量。"
+      "horizon_desc": "退休支出及假设分析结果建模到的年龄。这是规划期间的假设，不是寿命预测。"
     },
     "italian": {
       "title": "意大利退休设置（fondo pensione、TFR、INPS）",
       "portfolio_title": "投资组合（Golden Butterfly、All-Weather……）",
       "portfolio_desc": "这是您的主投资组合——Wealthfolio 跟踪的价值。在此处设置您的收益率假设、费用拖累和每月供款。它是您退休计划的主要积累引擎。",
       "fondo_title": "Fondo pensione integrativo（补充养老基金）",
-      "fondo_desc": "使用“添加养老基金”。输入当前基金余额、每月供款、预期基金收益率和支付开始年龄。规划器会估算未来余额，如果您不输入每月支付额，则从起始年龄起按该预计余额的 3.5%/年估算支付额。",
+      "fondo_desc": "使用添加养老基金，输入余额、缴款、假设收益率及付款起始年龄。未输入月付款额时，使用设定支付率估算。提款在基金耗尽时停止；年金付款建模至规划期末。",
       "inps_title": "Pensione INPS（国家养老金——强制性社保）",
       "inps_desc": "使用“添加退休收入”。以今天的金额输入您估算的每月净养老金，并设置支付开始年龄。如果您希望收入随计划通胀假设上涨，请使用“挂钩”。",
       "tfr_title": "TFR（Trattamento di Fine Rapporto——离职补偿累积）",
-      "tfr_desc": "如果您的 TFR 存入养老基金，请将其计入每月基金供款中。如果您将其单独保留，请将其建模为另一个养老基金，拥有自己的余额、供款、收益率和支付开始年龄。除非您自行输入每月支付额，否则同样适用 3.5%/年的支付估算。"
+      "tfr_desc": "若TFR转入养老基金，请将其计入缴款。单独储蓄的TFR可用另一基金表示；模型付款按设定支付率或月付款额计算。"
     }
   },
   "type": {
@@ -773,7 +778,7 @@
       "retirement_gap": "退休缺口",
       "fi_moves_prefix": "财务独立推迟",
       "fi_moves_suffix": "年",
-      "largest_risk": "{{label}} 是最大风险",
+      "largest_risk": "在这些测试中，{{label}}的影响最大",
       "and": "和",
       "none": "无",
       "surplus": "盈余",
@@ -796,7 +801,10 @@
       "money_lasts_summary_traditional": "在 {{horizonAge}} 岁前保持资金充足",
       "money_lasts_summary_fire": "实现财务独立 + 在 {{horizonAge}} 岁前资金充足",
       "money_lasts_prompt_traditional": "运行 1 万条路径，查看计划在 {{horizonAge}} 岁前保持资金充足的频率。",
-      "money_lasts_prompt_fire": "运行 1 万条路径，查看计划实现财务独立并在 {{horizonAge}} 岁前保持资金充足的频率。"
+      "money_lasts_prompt_fire": "运行 1 万条路径，查看计划实现财务独立并在 {{horizonAge}} 岁前保持资金充足的频率。",
+      "of_simulated_paths": "模拟路径占比",
+      "simulation_tooltip_traditional": "{{percent}}%的模拟路径覆盖了必要支出，并在结束时仍有资金结余。颜色采用参考区间：低于75%、75%至低于90%、90%及以上。这些是模型结果，不是现实概率。",
+      "simulation_tooltip_fire": "{{percent}}%的模拟路径覆盖了必要支出，并在结束时仍有资金结余。路径还必须达到财务独立。颜色采用参考区间：低于75%、75%至低于90%、90%及以上。这些是模型结果，不是现实概率。"
     },
     "stress": {
       "eyebrow_with_count": "什么可能破坏此计划？ · {{count}} 个情景",
@@ -811,8 +819,8 @@
     },
     "montecarlo": {
       "eyebrow": "市场路径",
-      "heading": "资金能维持多久的概率？",
-      "intro": "我们在多种可能的市场路径中测试同一计划。阴影区间显示从差到好的结果；线条显示中间路径。",
+      "heading": "资金够用的模拟路径占比是多少？",
+      "intro": "我们根据您的假设模拟不同市场路径。阴影显示各年龄的第10至第90百分位区间；线条显示各路径的中位数，并非单一路径。",
       "run_10k": "运行 1 万条路径",
       "run_100k": "运行 10 万条路径",
       "running_short": "正在运行……",
@@ -824,29 +832,30 @@
       "median_fi_age": "中位数财务独立年龄",
       "withdrawals_start_detail": "提取开始",
       "vs_goal": "对比目标 {{age}}",
-      "bad_path": "较差路径",
-      "middle_path": "中间路径",
-      "good_path": "较好路径"
+      "bad_path": "较低结果",
+      "middle_path": "中位数",
+      "good_path": "较高结果"
     },
     "chart": {
       "age_label": "{{age}} 岁",
       "age_detail": "{{age}} 岁",
       "goal_at_age": "{{label}} @{{age}}",
       "median_fi_at_age": "中位数财务独立 @{{age}}",
-      "bad_good_range": "差—好区间",
-      "median_path": "中位数路径",
+      "bad_good_range": "第10至第90百分位区间",
+      "median_path": "中位数",
       "retirement_age": "退休年龄",
       "goal_age": "目标年龄",
       "median_fi_age": "中位数财务独立年龄",
       "market_paths_count": "{{count}} 条市场路径",
       "retire": "退休",
       "goal": "目标",
-      "market_paths_count_other": "{{count}} 条市场路径"
+      "market_paths_count_other": "{{count}} 条市场路径",
+      "percentile_at_age": "第{{percentile}}百分位 · {{age}}岁"
     },
     "moves": {
       "eyebrow": "什么对计划影响最大？",
       "heading": "哪些因素影响计划？",
-      "description": "显示储蓄、收益率、退休年龄和支出如何改变结果。绿色 = 剩余资金更多；红色 = 缺口或资金不足。",
+      "description": "比较储蓄、收益率、退休年龄和支出。绿色表示期末资金比基础计划多，黄色表示更少。红色表示存在缺口或没有剩余资金。",
       "empty_title": "看看哪些改变最有帮助。",
       "empty_description": "比较多储蓄、获得不同收益率、减少支出，或在不同年龄退休。",
       "building": "正在构建……",
@@ -875,6 +884,39 @@
       "unavailable_title": "崩盘路径不可用。",
       "empty_description": "运行这五条路径，查看哪种序列会最先给计划带来压力。",
       "unavailable_description": "此检查需要退休开始时投资组合为正值。"
+    },
+    "labels": {
+      "crash_year_1": "第1年下跌（−30%）",
+      "crash_year_5": "第5年下跌（−30%）",
+      "double_crash": "两次下跌",
+      "lost_decade": "失落的十年",
+      "after_fee_return": "扣费后收益率"
+    },
+    "scenarios": {
+      "return-drag": {
+        "label": "收益率降低",
+        "description": "退休前和退休期间的收益率降低2个百分点。"
+      },
+      "inflation-shock": {
+        "label": "通胀升高",
+        "description": "总体通胀率提高1.5个百分点。"
+      },
+      "spending-shock": {
+        "label": "支出增加",
+        "description": "所有退休支出金额增加10%。"
+      },
+      "retire-earlier": {
+        "label": "提前2年退休",
+        "description": "目标退休年龄提前两年，受计划当前年龄限制。"
+      },
+      "save-less": {
+        "label": "缴款减少",
+        "description": "每月缴款减少25%。"
+      },
+      "early-crash": {
+        "label": "退休初期市场下跌",
+        "description": "模型假设退休第一年市场下跌30%。"
+      }
     }
   }
 }

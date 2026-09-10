@@ -17,12 +17,101 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Field order of a purely numeric date such as "03/08/2026". */
+export type DateOrder = "DMY" | "MDY";
+
+/**
+ * Numeric dates the formats below can actually parse: two small fields, a
+ * repeated separator, four-digit year. Detection deliberately matches no more
+ * than parsing supports — claiming an order for "03/08/26" would be useless,
+ * since no pattern here reads a two-digit year.
+ */
+const NUMERIC_DATE_RE = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{4})(?:\D|$)/;
+
+/**
+ * The two field orders NUMERIC_DATE_RE can report, each covering every
+ * separator that regex accepts, so anything detection resolves is also
+ * parseable. Keep the two lists mirror images of each other.
+ */
+export const MONTH_FIRST_NUMERIC_FORMATS = [
+  "MM/dd/yyyy", // "05/01/2024" - US Standard
+  "M/d/yyyy", // "5/1/2024" - US Relaxed
+  "MM.dd.yyyy", // "05.01.2024"
+  "M.d.yyyy", // "5.1.2024"
+  "MM-dd-yyyy", // "05-01-2024"
+  "M-d-yyyy", // "5-1-2024"
+];
+
+export const DAY_FIRST_NUMERIC_FORMATS = [
+  "dd/MM/yyyy", // "01/05/2024" - UK/EU Standard
+  "d/M/yyyy", // "1/5/2024" - UK/EU Relaxed
+  "dd.MM.yyyy", // "01.05.2024" - German/Swiss/Russian
+  "d.M.yyyy", // "1.5.2024" - German/Swiss Relaxed
+  "dd-MM-yyyy", // "01-05-2024" - Dutch/Danish
+  "d-M-yyyy", // "1-5-2024"
+];
+
+/**
+ * Numeric patterns by resolved field order. `auto` is the historical sequence
+ * and stays exactly as it was — dot dates read day-first there, so a file that
+ * imports correctly today keeps doing so when a column yields no evidence.
+ */
+const NUMERIC_FORMATS_BY_ORDER = {
+  auto: [
+    "MM/dd/yyyy",
+    "M/d/yyyy",
+    "dd/MM/yyyy",
+    "d/M/yyyy",
+    "dd.MM.yyyy",
+    "d.M.yyyy",
+    "dd-MM-yyyy",
+  ],
+  DMY: [...DAY_FIRST_NUMERIC_FORMATS, ...MONTH_FIRST_NUMERIC_FORMATS],
+  MDY: [...MONTH_FIRST_NUMERIC_FORMATS, ...DAY_FIRST_NUMERIC_FORMATS],
+} as const;
+
+/**
+ * True when a numeric date could be read either way — both leading fields are
+ * <= 12, so "03/08/2026" is 3 August or 8 March with equal justification.
+ */
+export function isAmbiguousNumericDate(dateStr: string): boolean {
+  const match = NUMERIC_DATE_RE.exec((dateStr ?? "").trim());
+  if (!match) return false;
+  return Number(match[1]) <= 12 && Number(match[3]) <= 12;
+}
+
+/**
+ * Decide whether a whole column of numeric dates is day-first or month-first.
+ *
+ * A single value carries no answer, but one "13/08/2026" anywhere in the column
+ * settles every other row in it. Returns null when the column offers no
+ * evidence, or contradicts itself — callers must not guess in that case.
+ */
+export function detectDateOrder(values: Iterable<string>): DateOrder | null {
+  let dayFirst = false;
+  let monthFirst = false;
+
+  for (const value of values) {
+    const match = NUMERIC_DATE_RE.exec((value ?? "").trim());
+    if (!match) continue;
+    const first = Number(match[1]);
+    const second = Number(match[3]);
+    if (first > 12 && second <= 12) dayFirst = true;
+    else if (second > 12 && first <= 12) monthFirst = true;
+  }
+
+  if (dayFirst === monthFirst) return null;
+  return dayFirst ? "DMY" : "MDY";
+}
+
 /**
  * Attempts to parse a date string in multiple formats using date-fns
  * @param dateStr The date string to parse
+ * @param order Field order for ambiguous numeric dates, from detectDateOrder.
+ *   Omit it to keep the historical month-first preference.
  * @returns A valid Date object if parsing succeeds, null if all parsing attempts fail
  */
-export function tryParseDate(dateStr: string): Date | null {
+export function tryParseDate(dateStr: string, order?: DateOrder): Date | null {
   if (!dateStr) return null;
 
   // Standardize the input - replace multiple spaces with single space and trim
@@ -44,8 +133,8 @@ export function tryParseDate(dateStr: string): Date | null {
     "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXX", // Added Standard ISO timestamp with microsecond precision and timezone offset
 
     // 12-hour / AM-PM Formats (e.g. Questrade exports). Only the unambiguous
-    // ISO date order is auto-detected; slash orders (MM/dd vs dd/MM) are
-    // ambiguous and must be chosen explicitly via an import format preset.
+    // ISO date order is listed here; slash orders (MM/dd vs dd/MM) are settled
+    // by the `order` argument or an explicit import format preset.
     "yyyy-MM-dd hh:mm:ss a", // "2024-05-01 12:00:00 AM"
     "yyyy-MM-dd hh:mm a", // "2024-05-01 12:00 AM"
 
@@ -60,15 +149,12 @@ export function tryParseDate(dateStr: string): Date | null {
     "MMMM dd yyyy", // "MAY 01 2024" (full month)
     "MMM-dd-yyyy", // "MAY-01-2024" - Month name with separators
     "MMMM-dd-yyyy", // "MAY-01-2024" (full month)
-    "MM/dd/yyyy", // "05/01/2024" - US Standard
-    "M/d/yyyy", // "5/1/2024" - US Relaxed
 
-    // European Banking Formats
-    "dd/MM/yyyy", // "01/05/2024" - UK/EU Standard
-    "d/M/yyyy", // "1/5/2024" - UK/EU Relaxed
-    "dd.MM.yyyy", // "01.05.2024" - German/Swiss/Russian
-    "d.M.yyyy", // "1.5.2024" - German/Swiss Relaxed
-    "dd-MM-yyyy", // "01-05-2024" - Dutch/Danish
+    // Numeric day/month orders. "05/01/2024" is 5 January or May 1st with equal
+    // justification, so whichever group is tried first silently decides. When
+    // the caller resolved the order from the whole column, honour it; otherwise
+    // leave the historical sequence untouched.
+    ...NUMERIC_FORMATS_BY_ORDER[order ?? "auto"],
 
     // Asian Banking Formats
     "yyyy年MM月dd日", // "2024年05月01日" - Japanese

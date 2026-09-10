@@ -409,6 +409,99 @@ impl CategorizationRulesRepositoryTrait for CategorizationRulesRepository {
             .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn upsert(&self, new_rule: NewCategorizationRule) -> Result<CategorizationRule> {
+        let id = new_rule
+            .id
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("upsert requires an explicit rule id"))?;
+        let now = chrono::Utc::now().to_rfc3339();
+        self.writer
+            .exec_tx(move |tx| {
+                let existing: Option<CategorizationRuleDB> = spending_categorization_rules::table
+                    .find(&id)
+                    .first::<CategorizationRuleDB>(tx.conn())
+                    .optional()
+                    .map_err(StorageError::from)?;
+
+                match existing {
+                    None => {
+                        let row = new_rule_db(new_rule, &now);
+                        let inserted = diesel::insert_into(spending_categorization_rules::table)
+                            .values(&row)
+                            .returning(CategorizationRuleDB::as_returning())
+                            .get_result(tx.conn())
+                            .map_err(StorageError::from)?;
+                        tx.insert(&inserted)?;
+                        Ok(inserted)
+                    }
+                    Some(mut existing) => {
+                        let previous_amount_fields = (
+                            existing.amount_op.clone(),
+                            existing.amount_value.clone(),
+                            existing.amount_value2.clone(),
+                        );
+
+                        existing.name = new_rule.name;
+                        existing.pattern = new_rule.pattern;
+                        existing.match_type = new_rule.match_type.as_str().to_string();
+                        existing.taxonomy_id = new_rule.taxonomy_id;
+                        existing.category_id = new_rule.category_id;
+                        existing.activity_type = new_rule.activity_type;
+                        existing.amount_op = new_rule.amount_op.map(|op| op.as_str().to_string());
+                        existing.amount_value = new_rule.amount_value.map(|d| d.to_string());
+                        existing.amount_value2 = new_rule.amount_value2.map(|d| d.to_string());
+                        existing.priority = new_rule.priority;
+                        existing.is_global = if new_rule.is_global { 1 } else { 0 };
+                        existing.account_id = new_rule.account_id;
+                        existing.updated_at = now.clone();
+
+                        diesel::update(spending_categorization_rules::table.find(&existing.id))
+                            .set((
+                                spending_categorization_rules::name.eq(&existing.name),
+                                spending_categorization_rules::pattern.eq(&existing.pattern),
+                                spending_categorization_rules::match_type.eq(&existing.match_type),
+                                spending_categorization_rules::taxonomy_id
+                                    .eq(&existing.taxonomy_id),
+                                spending_categorization_rules::category_id
+                                    .eq(&existing.category_id),
+                                spending_categorization_rules::activity_type
+                                    .eq(&existing.activity_type),
+                                spending_categorization_rules::amount_op.eq(&existing.amount_op),
+                                spending_categorization_rules::amount_value
+                                    .eq(&existing.amount_value),
+                                spending_categorization_rules::amount_value2
+                                    .eq(&existing.amount_value2),
+                                spending_categorization_rules::priority.eq(existing.priority),
+                                spending_categorization_rules::is_global.eq(existing.is_global),
+                                spending_categorization_rules::account_id.eq(&existing.account_id),
+                                spending_categorization_rules::updated_at.eq(&existing.updated_at),
+                            ))
+                            .execute(tx.conn())
+                            .map_err(StorageError::from)?;
+
+                        let amount_fields_changed = previous_amount_fields
+                            != (
+                                existing.amount_op.clone(),
+                                existing.amount_value.clone(),
+                                existing.amount_value2.clone(),
+                            );
+                        if amount_fields_changed {
+                            tx.queue_outbox(outbox_request_with_explicit_amount_fields(
+                                &existing,
+                                SyncOperation::Update,
+                            )?);
+                        } else {
+                            tx.update(&existing)?;
+                        }
+                        Ok(existing)
+                    }
+                }
+            })
+            .await
+            .map(CategorizationRule::from)
+            .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn import_preset_rules(
         &self,
         preset_id: &str,
@@ -922,6 +1015,50 @@ mod tests {
             assert!(payload.get("amount_value").is_none());
             assert!(payload.get("amount_value2").is_none());
         }
+    }
+
+    #[tokio::test]
+    async fn upsert_creates_then_updates_the_same_row_without_duplicating() {
+        let repo = setup_repo();
+        let rule_id = "addon:test-addon:abc123".to_string();
+        let new_rule = |name: &str| NewCategorizationRule {
+            id: Some(rule_id.clone()),
+            name: name.to_string(),
+            pattern: "SUPERMARKET".to_string(),
+            match_type: RuleMatchType::Contains,
+            taxonomy_id: None,
+            category_id: None,
+            activity_type: Some("WITHDRAWAL".to_string()),
+            amount_op: None,
+            amount_value: None,
+            amount_value2: None,
+            priority: 0,
+            is_global: true,
+            account_id: None,
+            preset_id: None,
+            preset_rule_key: None,
+            preset_version: None,
+        };
+
+        let created = repo
+            .upsert(new_rule("Groceries"))
+            .await
+            .expect("first upsert creates");
+        assert_eq!(created.id, rule_id);
+        assert_eq!(created.name, "Groceries");
+
+        // A second upsert with the same id must update the existing row in
+        // place, not collide on the primary key (the bug this replaces) or
+        // create a duplicate row.
+        let updated = repo
+            .upsert(new_rule("Groceries (renamed)"))
+            .await
+            .expect("second upsert updates in place");
+        assert_eq!(updated.id, rule_id);
+        assert_eq!(updated.name, "Groceries (renamed)");
+
+        let all = repo.list().await.expect("list rules");
+        assert_eq!(all.iter().filter(|r| r.id == rule_id).count(), 1);
     }
 
     #[test]

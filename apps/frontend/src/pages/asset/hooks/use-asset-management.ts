@@ -47,6 +47,7 @@ export const useAssetManagement = () => {
     },
     onSuccess: (asset) => {
       invalidateCaches(asset.id);
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_LOGO_INDEX] });
       toast({
         title: "Security updated",
         description: "Changes saved successfully.",
@@ -67,6 +68,7 @@ export const useAssetManagement = () => {
     mutationFn: (assetId: string) => deleteAsset(assetId),
     onSuccess: (_, assetId) => {
       invalidateCaches(assetId);
+      queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_LOGO_INDEX] });
       toast({
         title: "Security deleted",
         description: "The security has been removed.",

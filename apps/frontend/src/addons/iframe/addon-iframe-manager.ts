@@ -117,6 +117,8 @@ interface SandboxMessage {
   runtimeProtocolVersion?: number;
   kind?: string;
   symbol?: string;
+  exchangeMic?: string;
+  instrumentType?: string;
   assetId?: string;
 }
 
@@ -310,7 +312,9 @@ function getParkingRoot() {
   return root;
 }
 
-const ALLOWED_API_METHODS = new Set([
+// Exported so tests can assert every host-API bridge method is reachable —
+// see the drift check in addons/type-bridge.test.ts.
+export const ALLOWED_API_METHODS = new Set([
   "accounts.getAll",
   "accounts.create",
   "portfolio.getHoldings",
@@ -351,6 +355,12 @@ const ALLOWED_API_METHODS = new Set([
   "exchangeRates.update",
   "exchangeRates.add",
   "exchangeRates.getRatesForDates",
+  "spending.isEnabled",
+  "spending.getCategories",
+  "spending.getRules",
+  "spending.saveRule",
+  "spending.deleteRule",
+  "spending.rerunRules",
   "contributionLimits.getAll",
   "contributionLimits.create",
   "contributionLimits.update",
@@ -1015,7 +1025,11 @@ export class AddonIframeManager {
       return;
     }
 
-    const logo = await tickerLogoAssetBridge.load(message.symbol);
+    const logo = await tickerLogoAssetBridge.load(
+      message.symbol,
+      message.exchangeMic,
+      message.instrumentType,
+    );
     this.respond(runtime, message.requestId, true, logo);
   }
 

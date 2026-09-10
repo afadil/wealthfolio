@@ -4,6 +4,9 @@ mod alternative_assets_model;
 mod alternative_assets_service;
 mod alternative_assets_traits;
 mod asset_id;
+mod asset_logo_model;
+mod asset_logo_service;
+mod asset_logo_traits;
 mod asset_resolution;
 mod assets_constants;
 mod assets_model;
@@ -29,6 +32,13 @@ pub use asset_id::{
     parse_crypto_pair_symbol, parse_symbol_with_exchange_suffix, parse_symbol_with_known_exchange,
     symbol_resolution_candidates, unknown_dotted_suffix_fallback,
 };
+pub use asset_logo_model::{
+    decode_and_validate as decode_and_validate_asset_logo, AssetLogo, AssetLogoSummary,
+    UpsertAssetLogo, ValidatedPng, ASSET_LOGO_MIME_PNG, MAX_ASSET_LOGO_BYTES,
+    MAX_ASSET_LOGO_DIMENSION,
+};
+pub use asset_logo_service::AssetLogoService;
+pub use asset_logo_traits::{AssetLogoRepositoryTrait, AssetLogoServiceTrait};
 pub(crate) use asset_resolution::asset_provider_alias_symbols;
 pub use asset_resolution::{AssetResolutionInput, AssetResolutionOutput};
 pub use assets_model::{

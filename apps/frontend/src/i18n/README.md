@@ -60,9 +60,35 @@ community-contributed translations are preserved.
 
 ## Adding a language
 
-1. Add a `locales/<code>/` folder with the namespace JSON files.
-2. Add an entry to `SUPPORTED_LOCALES` in `locales.ts` and `locales` in
-   `i18next.config.ts`.
+A locale code is public API — addons read it, and it is persisted per device —
+so pick it deliberately before shipping. Five places have to agree:
+
+1. `locales/<code>/` — one JSON file per namespace, complete parity with `en`.
+2. `SUPPORTED_LOCALES` in `locales.ts`.
+3. `locales` in `i18next.config.ts`.
+4. `SUPPORTED_UI_LANGUAGES` in `crates/core/src/settings/settings_service.rs`,
+   plus any alias normalization (`fr-CA` -> `fr`).
+5. `addon-sandbox-i18n.ts`, if the locale should reach addon iframes.
+
+### Naming
+
+Bare language codes (`fr`, `ja`) unless the language is written in more than one
+script. Chinese is the case that matters: `zh` means Simplified (CLDR expands it
+to `zh-Hans-CN`) and `zh-Hant` means Traditional. Name Chinese variants by
+**script**, not region — one `zh-Hant` catalog serves Taiwan, Hong Kong and
+Macau, and regional differences belong in `formattingRegion`, which is a
+separate setting. A `zh-Hant-HK` catalog can be added later and will fall back
+to `zh-Hant`; that path does not exist from a region-named `zh-TW`.
+
+Fallback never crosses a script boundary: a missing `zh-Hant` string resolves to
+`en`, not `zh`. Mixed glyphs read as broken, untranslated text reads as missing.
+
+### Terminology
+
+Each locale should carry a glossary test (see `traditional-chinese.test.ts`)
+asserting the term the catalog standardises on and rejecting its alternates. Key
+parity and a green suite do not catch a catalog that says "Return" three
+different ways — only a glossary does.
 
 ## Provenance of current translations
 
@@ -74,3 +100,21 @@ community-contributed translations are preserved.
 - **Korean**: AI-drafted, full-coverage translation of all namespaces against
   the English source keys, using standard Korean financial/investment
   terminology; intended for community review.
+- **Italian**: community contribution (PR #1588), full coverage of all
+  namespaces, reviewed against the terminology already used by the French and
+  Spanish sets (`Posizioni`, `Classe di attività`, `Costo di carico`) and
+  Italian sentence case; `_many` plural forms are required because Italian has a
+  CLDR `many` category. Intended for continued community review.
+- **Portuguese (pt-BR)**: community contribution (PR #1533), full coverage of
+  all namespaces in Brazilian Portuguese. Terminology follows Brazilian market
+  usage — `Posições`, `Carteira`, `Custo de aquisição`, `Rentabilidade`, `L/P`,
+  `Valores mobiliários`, `Aportes`, `Desdobramento de ações` — and Brazilian
+  punctuation (`"..."`, never `«...»`). `_many` plural forms are required
+  because Portuguese has a CLDR `many` category. Intended for continued
+  community review.
+- **Traditional Chinese (`zh-Hant`)**: contributed in PR #1566, machine-seeded
+  from the English source and reviewed for Taiwan financial terminology by a
+  native speaker; intended for continued community review.
+
+Non-English catalogs are machine-drafted and community-corrected. Terminology
+reports are expected and welcome — file them as issues against the locale.

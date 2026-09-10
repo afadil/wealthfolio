@@ -136,6 +136,8 @@ export const HoldingsEditMode = ({
           quantity: String(h.quantity),
           averageCost,
           currency: h.localCurrency,
+          exchangeMic: h.instrument?.exchangeMic ?? undefined,
+          instrumentType: h.instrument?.instrumentType ?? undefined,
           isNew: false,
         };
       });
@@ -470,7 +472,13 @@ export const HoldingsEditMode = ({
                         {/* Symbol */}
                         <div className="col-span-5">
                           <div className="flex items-center gap-2">
-                            <TickerAvatar symbol={holding.symbol} className="h-7 w-7 shrink-0" />
+                            <TickerAvatar
+                              symbol={holding.symbol}
+                              exchangeMic={holding.exchangeMic}
+                              instrumentType={holding.instrumentType}
+                              assetId={holding.assetId}
+                              className="h-7 w-7 shrink-0"
+                            />
                             <div className="min-w-0">
                               <div className="truncate text-sm font-medium">{holding.symbol}</div>
                               {holding.name && (

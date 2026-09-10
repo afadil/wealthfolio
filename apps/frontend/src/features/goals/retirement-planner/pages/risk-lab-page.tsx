@@ -51,6 +51,8 @@ import type {
   StressTestResult,
 } from "../types";
 
+import { SimulationPercentage } from "../components/simulation-percentage";
+
 type PlannerMode = "fire" | "traditional";
 
 interface Props {
@@ -78,8 +80,19 @@ function fmt(value: number, currency: string, formatting: Pick<FormattingApi, "f
   return formatting.formatAmount(value, currency);
 }
 
-function pct(value: number, formatting: Pick<FormattingApi, "formatPercent">) {
-  return formatting.formatPercent(value, { digits: 0 });
+function localizedBackendLabel(t: TFunction, label: string) {
+  const keys: Record<string, string> = {
+    "Base case": "risk_lab.advanced.base_case",
+    "Crash Year 1 (-30%)": "risk_lab.labels.crash_year_1",
+    "Crash Year 5 (-30%)": "risk_lab.labels.crash_year_5",
+    "Double Crash": "risk_lab.labels.double_crash",
+    "Lost Decade": "risk_lab.labels.lost_decade",
+    "After-fee return": "risk_lab.labels.after_fee_return",
+    "Monthly contribution": "sidebar.plan.monthly_contribution",
+    "Monthly spending": "sidebar.spending.monthly_spending",
+    "Retirement age": "sidebar.plan.retirement_age",
+  };
+  return keys[label] ? t(`goals:${keys[label]}`) : label;
 }
 
 function moneyLastsDefinition(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
@@ -88,14 +101,6 @@ function moneyLastsDefinition(t: TFunction, plannerMode: PlannerMode, horizonAge
   }
 
   return t("goals:risk_lab.results.money_lasts_definition_fire", { horizonAge });
-}
-
-function moneyLastsSummary(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
-  if (plannerMode === "traditional") {
-    return t("goals:risk_lab.results.money_lasts_summary_traditional", { horizonAge });
-  }
-
-  return t("goals:risk_lab.results.money_lasts_summary_fire", { horizonAge });
 }
 
 function moneyLastsPrompt(t: TFunction, plannerMode: PlannerMode, horizonAge: number) {
@@ -243,7 +248,9 @@ function deterministicRiskContent(
 
   return (
     <>
-      {t("goals:risk_lab.results.largest_risk", { label: stress.label })}
+      {t("goals:risk_lab.results.largest_risk", {
+        label: t(`goals:risk_lab.scenarios.${stress.id}.label`),
+      })}
       {fragments.length ? ": " : "."}
       {fragments.map((fragment, index) => (
         <Fragment key={index}>
@@ -346,7 +353,6 @@ function PlanResilienceHero({
   plannerMode?: PlannerMode;
 }) {
   const amountFormatting = useAmountFormatting();
-  const numberFormatting = useNumberFormatting();
 
   const { t } = useTranslation();
   const currency = plan.currency;
@@ -390,12 +396,6 @@ function PlanResilienceHero({
     <Card className="overflow-hidden shadow-sm">
       <CardContent className="space-y-4 p-5 md:p-6">
         <div className="flex gap-4">
-          <div
-            className={cn(
-              "mt-2 h-14 w-1.5 shrink-0 rounded-full",
-              isBaselineHealthy ? "bg-[hsl(111,25%,48%)]" : "bg-destructive",
-            )}
-          />
           <div className="min-w-0 space-y-3">
             <div>
               <p className="text-muted-foreground text-[9px] font-semibold uppercase tracking-[0.22em]">
@@ -413,7 +413,7 @@ function PlanResilienceHero({
                 </span>
                 .
               </h2>
-              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed">
+              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
                 {risk}
               </p>
             </div>
@@ -461,15 +461,19 @@ function PlanResilienceHero({
           />
           <HeroMetric
             label={t("goals:risk_lab.hero.money_lasts")}
-            value={mc ? pct(mc.successRate, numberFormatting) : "—"}
-            detail={
-              mc
-                ? t("goals:risk_lab.hero.paths_count", {
-                    count: numberFormatting.formatDecimal(mc.nSimulations),
-                  })
-                : t("goals:risk_lab.hero.not_run")
+            value={
+              mc ? <SimulationPercentage rate={mc.successRate} plannerMode={plannerMode} /> : "—"
             }
-            tone={mc ? (mc.successRate >= 0.9 ? "good" : "bad") : "default"}
+            detail={
+              mc ? (
+                <>
+                  {t("goals:risk_lab.results.of_simulated_paths")} ·{" "}
+                  {t("goals:risk_lab.hero.paths_count", { count: mc.nSimulations })}
+                </>
+              ) : (
+                t("goals:risk_lab.hero.not_run")
+              )
+            }
           />
         </div>
       </CardContent>
@@ -513,12 +517,6 @@ function severityBadgeClass(severity: StressSeverity) {
   return "bg-muted text-muted-foreground";
 }
 
-function severityRailClass(severity: StressSeverity) {
-  if (severity === "high") return "bg-destructive";
-  if (severity === "medium") return "bg-amber-500";
-  return "bg-border";
-}
-
 function impactTextClass(value: number, badWhenPositive = true) {
   if (Math.abs(value) < 1) return "text-foreground";
   const isBad = badWhenPositive ? value > 0 : value < 0;
@@ -526,7 +524,7 @@ function impactTextClass(value: number, badWhenPositive = true) {
 }
 
 function StressIcon({ id }: { id: StressTestResult["id"] }) {
-  const className = "mt-0.5 size-3.5 shrink-0 text-muted-foreground";
+  const className = "size-3.5 shrink-0 text-muted-foreground";
   switch (id) {
     case "return-drag":
       return <Icons.TrendingDown className={className} />;
@@ -670,21 +668,22 @@ function StressTestsSection({
               key={stress.id}
               className="bg-card relative overflow-hidden rounded-xl border shadow-sm"
             >
-              <div
-                className={cn(
-                  "absolute inset-y-5 left-0 w-0.5 rounded-r-full",
-                  severityRailClass(stress.severity),
-                )}
-              />
               <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <StressIcon id={stress.id} />
-                      <h3 className="text-base font-semibold leading-none">{stress.label}</h3>
+                      <span
+                        aria-hidden="true"
+                        className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full"
+                      >
+                        <StressIcon id={stress.id} />
+                      </span>
+                      <h3 className="text-base font-semibold leading-none">
+                        {t(`goals:risk_lab.scenarios.${stress.id}.label`)}
+                      </h3>
                     </div>
                     <p className="text-muted-foreground mt-3 line-clamp-2 text-sm">
-                      {stress.description}
+                      {t(`goals:risk_lab.scenarios.${stress.id}.description`)}
                     </p>
                   </div>
                   <Badge
@@ -966,7 +965,7 @@ function MonteCarloDistributionSection({
   const desiredAge = plan.personal.targetRetirementAge;
   const isTraditional = plannerMode === "traditional";
   const moneyLastsCopy = moneyLastsDefinition(t, plannerMode, plan.personal.planningHorizonAge);
-  const moneyLastsDetail = moneyLastsSummary(t, plannerMode, plan.personal.planningHorizonAge);
+
   const moneyLastsCta = moneyLastsPrompt(t, plannerMode, plan.personal.planningHorizonAge);
 
   return (
@@ -1064,9 +1063,8 @@ function MonteCarloDistributionSection({
             <div className="bg-muted/10 grid border-b md:grid-cols-5">
               <SimulationMetric
                 label={t("goals:risk_lab.montecarlo.money_lasts")}
-                value={pct(result.successRate, numberFormatting)}
-                detail={moneyLastsDetail}
-                tone={result.successRate >= 0.9 ? "good" : "bad"}
+                value={<SimulationPercentage rate={result.successRate} plannerMode={plannerMode} />}
+                detail={t("goals:risk_lab.results.of_simulated_paths")}
               />
               <SimulationMetric
                 label={
@@ -1087,7 +1085,8 @@ function MonteCarloDistributionSection({
                   result.finalPortfolioAtHorizon.p10,
                   plan.currency,
                 )}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 10,
                   age: plan.personal.planningHorizonAge,
                 })}
                 tone={result.finalPortfolioAtHorizon.p10 > 0 ? "default" : "bad"}
@@ -1098,7 +1097,8 @@ function MonteCarloDistributionSection({
                   result.finalPortfolioAtHorizon.p50,
                   plan.currency,
                 )}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 50,
                   age: plan.personal.planningHorizonAge,
                 })}
               />
@@ -1108,7 +1108,8 @@ function MonteCarloDistributionSection({
                   result.finalPortfolioAtHorizon.p90,
                   plan.currency,
                 )}
-                detail={t("goals:risk_lab.chart.age_detail", {
+                detail={t("goals:risk_lab.chart.percentile_at_age", {
+                  percentile: 90,
                   age: plan.personal.planningHorizonAge,
                 })}
                 tone="good"
@@ -1400,14 +1401,19 @@ function DecisionHeatmap({
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
                         <div className="text-[10px] font-semibold uppercase tracking-wider">
-                          {matrix.rowLabel} × {matrix.columnLabel}
+                          {localizedBackendLabel(t, matrix.rowLabel)} ×{" "}
+                          {localizedBackendLabel(t, matrix.columnLabel)}
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
-                          <span className="text-muted-foreground">{matrix.rowLabel}</span>
+                          <span className="text-muted-foreground">
+                            {localizedBackendLabel(t, matrix.rowLabel)}
+                          </span>
                           <span className="text-right">
                             {formatRow(rowValue, matrix.rowLabels[row] ?? "")}
                           </span>
-                          <span className="text-muted-foreground">{matrix.columnLabel}</span>
+                          <span className="text-muted-foreground">
+                            {localizedBackendLabel(t, matrix.columnLabel)}
+                          </span>
                           <span className="text-right">
                             {formatColumn(columnValue, matrix.columnLabels[column] ?? "")}
                           </span>
@@ -1459,7 +1465,7 @@ function DecisionHeatmap({
                     className="text-muted-foreground/80 mx-auto block whitespace-nowrap text-center text-[11px] font-normal leading-none sm:text-xs"
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
-                    {matrix.rowLabel}
+                    {localizedBackendLabel(t, matrix.rowLabel)}
                   </span>
                 </td>
               )}
@@ -1473,7 +1479,7 @@ function DecisionHeatmap({
               colSpan={matrix.columnValues.length}
               className="text-muted-foreground/80 px-1 pt-1.5 text-center text-[11px] font-normal leading-none sm:text-xs"
             >
-              {matrix.columnLabel}
+              {localizedBackendLabel(t, matrix.columnLabel)}
             </th>
             <th className="w-3 sm:w-4" />
           </tr>
@@ -1695,6 +1701,7 @@ function SorrChart({
   retirementStartAge: number;
 }) {
   const formatting = useAmountFormatting();
+  const { t } = useTranslation();
   const maxLen = Math.max(...scenarios.map((scenario) => scenario.portfolioPath.length));
   const data = Array.from({ length: maxLen }, (_, index) => {
     const entry: Record<string, number> = { age: retirementStartAge + index };
@@ -1734,6 +1741,7 @@ function SorrChart({
           <Line
             key={scenario.label}
             dataKey={scenario.label}
+            name={localizedBackendLabel(t, scenario.label)}
             stroke={SORR_COLORS[index % SORR_COLORS.length]}
             dot={false}
             activeDot={{ r: 4, stroke: "hsl(var(--card))", strokeWidth: 2 }}
@@ -1858,7 +1866,7 @@ function AdvancedSection({
                 </p>
                 <p className="mt-1 font-semibold tabular-nums">
                   {hardestPath && hardestPathRiskAge
-                    ? `${hardestPath.label} @ ${hardestPathRiskAge}`
+                    ? `${localizedBackendLabel(t, hardestPath.label)} @ ${hardestPathRiskAge}`
                     : t("goals:risk_lab.results.none")}
                 </p>
               </div>
@@ -1898,7 +1906,9 @@ function AdvancedSection({
                       className="size-2 shrink-0 rounded-full"
                       style={{ backgroundColor: SORR_COLORS[index % SORR_COLORS.length] }}
                     />
-                    <span className="text-muted-foreground truncate">{scenario.label}</span>
+                    <span className="text-muted-foreground truncate">
+                      {localizedBackendLabel(t, scenario.label)}
+                    </span>
                   </span>
                   <span
                     className={cn(

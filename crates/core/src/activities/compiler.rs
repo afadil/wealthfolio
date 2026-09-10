@@ -149,7 +149,7 @@ impl DefaultActivityCompiler {
                         // Stored income amount is already final cash. When the
                         // acquisition price is missing, all of that final cash
                         // is what the synthetic purchase can reinvest.
-                        Some(amount / quantity)
+                        amount.checked_div(quantity)
                     }
                 })
             })
