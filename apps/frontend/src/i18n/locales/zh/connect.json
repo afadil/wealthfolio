@@ -220,6 +220,9 @@
     "lastUsed": "上次使用"
   },
   "subscription": {
+    "syncPausedTooltip": "同步已暂停 — 需要有效订阅",
+    "syncPausedTitle": "同步已暂停",
+    "syncPausedDescription": "同步需要有效订阅。您的本地数据和待同步的更改会保留。",
     "comingSoon": "敬请期待",
     "getStarted": "开始使用",
     "perMonthShort": "月",

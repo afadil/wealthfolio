@@ -239,6 +239,9 @@
     "lastUsed": "Usado pela última vez"
   },
   "subscription": {
+    "syncPausedTooltip": "Sincronização pausada — assinatura ativa necessária",
+    "syncPausedTitle": "A sincronização está pausada",
+    "syncPausedDescription": "É necessária uma assinatura ativa para sincronizar. Seus dados locais e alterações pendentes são preservados.",
     "comingSoon": "Em breve",
     "getStarted": "Começar",
     "perMonthShort": "mês",

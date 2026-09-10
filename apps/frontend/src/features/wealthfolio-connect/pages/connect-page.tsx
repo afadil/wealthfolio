@@ -1,3 +1,5 @@
+import { ConnectedView } from "../components/connected-view";
+import { isSubscriptionStatusActive } from "../lib/plan-capabilities";
 import { openUrlInBrowser, syncTriggerCycle } from "@/adapters";
 import { Page, PageContent, PageHeader } from "@/components/page";
 import { useDevices, useSyncStatus } from "@/features/devices-sync/hooks";
@@ -149,9 +151,7 @@ export default function ConnectPage() {
   }, [localAccounts]);
 
   const hasSubscription = useMemo(() => {
-    if (!userInfo?.team) return false;
-    const subStatus = userInfo.team.subscription_status;
-    return subStatus === "active" || subStatus === "trialing";
+    return isSubscriptionStatusActive(userInfo?.team?.subscription_status);
   }, [userInfo]);
 
   if (isInitializing) {
@@ -221,7 +221,7 @@ export default function ConnectPage() {
       <Page>
         <PageHeader heading={t("connect:page.title")} />
         <PageContent>
-          <ConnectEmptyState />
+          {isEnabled && isConnected ? <ConnectedView /> : <ConnectEmptyState />}
         </PageContent>
       </Page>
     );

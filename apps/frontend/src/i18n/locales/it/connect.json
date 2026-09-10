@@ -239,6 +239,9 @@
     "lastUsed": "Usato l'ultima volta"
   },
   "subscription": {
+    "syncPausedTooltip": "Sincronizzazione in pausa — abbonamento attivo necessario",
+    "syncPausedTitle": "La sincronizzazione è in pausa",
+    "syncPausedDescription": "Per sincronizzare è necessario un abbonamento attivo. I dati locali e le modifiche in sospeso vengono conservati.",
     "comingSoon": "Prossimamente",
     "getStarted": "Inizia",
     "perMonthShort": "mese",

@@ -222,6 +222,9 @@
     "lastUsed": "上次使用"
   },
   "subscription": {
+    "syncPausedTooltip": "同步已暫停 — 需要有效訂閱",
+    "syncPausedTitle": "同步已暫停",
+    "syncPausedDescription": "同步需要有效訂閱。您的本機資料和待同步的變更會保留。",
     "comingSoon": "敬請期待",
     "getStarted": "開始使用",
     "perMonthShort": "月",

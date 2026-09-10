@@ -6,6 +6,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import { formatDate } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -16,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/compone
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useCallback, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { hasBrokerSync } from "../lib/plan-capabilities";
+import { hasBrokerSync, isSubscriptionStatusActive } from "../lib/plan-capabilities";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
 import {
   listBrokerAccounts,
@@ -376,9 +377,7 @@ export function ConnectedView() {
   const isServiceUnavailable = !!error && !isLoadingUserInfo && !userInfo;
 
   // Check if user has an active subscription
-  const hasSubscription =
-    userInfo?.team?.subscription_status === "active" ||
-    userInfo?.team?.subscription_status === "trialing";
+  const hasSubscription = isSubscriptionStatusActive(userInfo?.team?.subscription_status);
 
   // Check if user's plan includes broker sync
   const showBrokerSync = hasBrokerSync(userInfo);
@@ -518,11 +517,18 @@ export function ConnectedView() {
 
       {/* Show Subscription Plans if user has no active subscription (keep mounted during refresh) */}
       {!isServiceUnavailable && !hasSubscription && !!userInfo && (
-        <SubscriptionPlans
-          enabled={isConnected && !hasSubscription}
-          onRefresh={refetchUserInfo}
-          isRefreshing={isLoadingUserInfo}
-        />
+        <>
+          <Alert role="status" className="bg-muted/30">
+            <Icons.PauseCircle className="h-4 w-4" aria-hidden="true" />
+            <AlertTitle>{t("connect:subscription.syncPausedTitle")}</AlertTitle>
+            <AlertDescription>{t("connect:subscription.syncPausedDescription")}</AlertDescription>
+          </Alert>
+          <SubscriptionPlans
+            enabled={isConnected && !hasSubscription}
+            onRefresh={refetchUserInfo}
+            isRefreshing={isLoadingUserInfo}
+          />
+        </>
       )}
 
       {/* Broker Connections Card - Only show if user has broker sync */}

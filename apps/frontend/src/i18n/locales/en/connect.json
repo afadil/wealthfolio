@@ -222,6 +222,9 @@
     "lastUsed": "Last used"
   },
   "subscription": {
+    "syncPausedTooltip": "Sync paused — active subscription required",
+    "syncPausedTitle": "Sync is paused",
+    "syncPausedDescription": "An active subscription is required to sync. Your local data and pending changes are preserved.",
     "comingSoon": "Coming Soon",
     "getStarted": "Get Started",
     "perMonthShort": "mo",
