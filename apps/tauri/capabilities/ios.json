@@ -1,6 +1,6 @@
 {
   "identifier": "ios-mobile-share-capability",
-  "description": "iOS mobile share permission",
+  "description": "iOS mobile share and web authentication permissions",
   "local": true,
   "windows": [
     "main"
@@ -9,6 +9,8 @@
     "iOS"
   ],
   "permissions": [
-    "mobile-share:default"
+    "mobile-share:default",
+    "web-auth:default",
+    "web-auth:allow-authenticate"
   ]
 }
