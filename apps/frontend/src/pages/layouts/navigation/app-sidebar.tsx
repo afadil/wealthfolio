@@ -25,6 +25,12 @@ interface AppSidebarProps {
 
 const modKey = isAppleDevice() ? "⌘" : "Ctrl";
 
+// Rail items are painted from the theme's sidebar tokens, not the page's.
+const railItem =
+  "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground dark:hover:bg-sidebar-accent/60";
+const railItemActive =
+  "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent";
+
 export function AppSidebar({ navigation }: AppSidebarProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
@@ -34,7 +40,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
   return (
     <div
       className={cn({
-        "light:bg-secondary/50 hidden h-full border-r pt-12 transition-[width] duration-300 ease-in-out md:flex md:flex-shrink-0 md:overflow-hidden": true,
+        "bg-sidebar text-sidebar-foreground border-sidebar-border hidden h-full border-r pt-12 transition-[width] duration-300 ease-in-out md:flex md:flex-shrink-0 md:overflow-hidden": true,
         "md:w-sidebar": !collapsed,
         "md:w-sidebar-collapsed": collapsed,
       })}
@@ -68,7 +74,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
 
                   <span
                     className={cn(
-                      "text-md text-foreground/90 ml-2 font-serif text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
+                      "text-md text-sidebar-foreground/90 ml-2 font-serif text-xl font-bold transition-opacity delay-100 duration-300 ease-in-out",
                       {
                         "sr-only opacity-0": collapsed,
                         "block opacity-100": !collapsed,
@@ -97,10 +103,11 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                     document.dispatchEvent(event);
                   }}
                   className={cn(
-                    "text-foreground [&_svg]:size-5! mb-4 h-12 transition-all duration-300",
+                    railItem,
+                    "[&_svg]:size-5! mb-4 h-12 transition-all duration-300",
                     collapsed
                       ? "justify-center rounded-md"
-                      : "bg-muted/50 hover:bg-muted/80 justify-start rounded-full px-4 shadow-none",
+                      : "bg-sidebar-accent/50 hover:bg-sidebar-accent/80 justify-start rounded-full px-4 shadow-none",
                   )}
                   title={t("common:layout.search_shortcut", { shortcut: `${modKey}+K` })}
                 >
@@ -109,7 +116,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                   <span
                     className={cn({
-                      "text-muted-foreground ml-2 flex-1 text-left text-sm transition-opacity delay-100 duration-300 ease-in-out": true,
+                      "text-sidebar-foreground/70 ml-2 flex-1 text-left text-sm transition-opacity delay-100 duration-300 ease-in-out": true,
                       "sr-only opacity-0": collapsed,
                       "block opacity-100": !collapsed,
                     })}
@@ -117,7 +124,7 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                     {t("common:layout.search")}
                   </span>
                   {!collapsed && (
-                    <kbd className="bg-background text-muted-foreground pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
+                    <kbd className="bg-sidebar text-sidebar-foreground/70 border-sidebar-border pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100">
                       <span className="text-xs">{modKey}</span>K
                     </kbd>
                   )}
@@ -157,7 +164,8 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   variant="ghost"
                   onClick={logout}
                   className={cn(
-                    "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+                    railItem,
+                    "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
                     collapsed ? "justify-center" : "justify-start",
                   )}
                   title={t("common:layout.logout")}
@@ -176,13 +184,13 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   </span>
                 </Button>
               )}
-              <Separator className="mt-0" />
+              <Separator className="bg-sidebar-border mt-0" />
               <div className="flex justify-end">
                 <Button
                   title={t("common:layout.toggle_sidebar")}
                   variant="ghost"
                   onClick={() => setCollapsed(!collapsed)}
-                  className="text-muted-foreground [&_svg]:size-5! cursor-pointer rounded-md hover:bg-transparent"
+                  className="text-sidebar-foreground/70 hover:text-sidebar-foreground [&_svg]:size-5! cursor-pointer rounded-md hover:bg-transparent"
                   aria-label={
                     collapsed
                       ? t("common:layout.expand_sidebar")
@@ -233,7 +241,7 @@ function PinnedAddonNavItem({ item, collapsed, onSetPinned }: PinnedAddonNavItem
             type="button"
             variant="ghost"
             size="icon"
-            className="hover:bg-accent pointer-events-none absolute right-1 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full opacity-0 transition-opacity focus:pointer-events-auto focus:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+            className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground pointer-events-none absolute right-1 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-full opacity-0 transition-opacity focus:pointer-events-auto focus:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
             title={t("common:layout.addon_options", { name: item.title })}
             aria-label={t("common:layout.addon_options", { name: item.title })}
           >
@@ -268,7 +276,8 @@ function NavItem({ item, collapsed, className, ...props }: NavItemProps) {
       variant={isActive ? "secondary" : "ghost"}
       asChild
       className={cn(
-        "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+        isActive ? railItemActive : railItem,
+        "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
         collapsed ? "justify-center" : "justify-start",
         className,
       )}
@@ -314,7 +323,8 @@ function AddonsMenu({ addons, collapsed, onSetPinned }: AddonsMenuProps) {
         <Button
           variant={hasActiveAddon ? "secondary" : "ghost"}
           className={cn(
-            "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+            hasActiveAddon ? railItemActive : railItem,
+            "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
             collapsed ? "justify-center" : "justify-start",
           )}
         >

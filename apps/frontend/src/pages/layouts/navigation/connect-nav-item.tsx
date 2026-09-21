@@ -43,7 +43,10 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
           variant={isActive ? "secondary" : "ghost"}
           asChild
           className={cn(
-            "text-foreground [&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent dark:hover:bg-sidebar-accent"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground dark:hover:bg-sidebar-accent/60",
+            "[&_svg]:size-5! mb-1 h-12 rounded-md transition-all duration-300",
             collapsed ? "justify-center" : "justify-start",
           )}
         >
