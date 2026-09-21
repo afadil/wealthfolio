@@ -1,0 +1,19 @@
+{
+  "light": {
+    "secondary-foreground": "hsl(50 3% 36%)",
+    "muted-foreground": "hsl(50 3% 39%)",
+    "accent-foreground": "hsl(50 3% 39%)",
+    "sidebar-accent-foreground": "hsl(50 3% 39%)",
+    "success": "hsl(73 84% 26.7%)",
+    "gain": "hsl(73 84% 26.7%)",
+    "warning-foreground": "#242014"
+  },
+  "dark": {
+    "secondary-foreground": "hsl(43 3% 60.3%)",
+    "muted-foreground": "hsl(43 3% 55%)",
+    "accent-foreground": "hsl(43 3% 55%)",
+    "sidebar-accent-foreground": "hsl(43 3% 55%)",
+    "destructive": "hsl(5 61% 54.3%)",
+    "loss": "hsl(5 61% 54.3%)"
+  }
+}
