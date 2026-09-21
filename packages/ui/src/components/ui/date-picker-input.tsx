@@ -1,3 +1,4 @@
+import { fieldStyles } from "./field-styles";
 import { CalendarDate, CalendarDateTime, getLocalTimeZone, parseDate, parseDateTime } from "@internationalized/date";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
@@ -123,8 +124,9 @@ export function DatePickerInput({
     >
       <Group
         className={cn(
-          "dark:bg-input/30 border-input ring-offset-background bg-input-bg h-input-height flex w-full flex-nowrap items-center whitespace-nowrap rounded-md border px-3 py-1 text-sm",
+          "ring-offset-background flex w-full flex-nowrap items-center whitespace-nowrap",
           "focus-within:ring-ring focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2",
+          fieldStyles,
           disabled && "cursor-not-allowed opacity-50",
         )}
         data-testid={testId}
@@ -145,7 +147,7 @@ export function DatePickerInput({
         </Button>
       </Group>
       <Popover
-        className="bg-background text-popover-foreground data-entering:animate-in data-exiting:animate-out data-entering:fade-in-0 data-exiting:fade-out-0 data-entering:zoom-in-95 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 outline-hidden z-50 rounded-lg border shadow-lg"
+        className="bg-background text-popover-foreground data-entering:animate-in data-exiting:animate-out data-entering:fade-in-0 data-exiting:fade-out-0 data-entering:zoom-in-95 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 outline-hidden rounded-(--theme-popover-radius,var(--radius)) z-50 border shadow-lg"
         offset={4}
         onOpenChange={(isOpen: boolean) => {
           if (!isOpen && onInteractionEnd) {

@@ -54,7 +54,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "bg-muted text-muted-foreground inline-flex h-10 items-center justify-center rounded-md p-1",
+      "bg-muted text-muted-foreground rounded-(--theme-segmented-radius,calc(var(--radius)-2px)) inline-flex h-10 items-center justify-center p-1",
       className,
     )}
     {...props}
@@ -75,7 +75,7 @@ const TabsTrigger = React.forwardRef<
       ref={ref}
       value={value}
       className={cn(
-        "ring-offset-background focus-visible:ring-ring text-muted-foreground data-[state=active]:text-foreground relative inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "ring-offset-background focus-visible:ring-ring text-muted-foreground data-[state=active]:text-foreground rounded-(--theme-segmented-radius,calc(var(--radius)-4px)) relative inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
         "isolate overflow-hidden",
         className,
       )}

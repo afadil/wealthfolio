@@ -1,3 +1,4 @@
+import { fieldStyles } from "./field-styles";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -30,10 +31,7 @@ export function DatePickerWithRange({ date, onDateChange, className }: DatePicke
           <Button
             id="date"
             variant={"outline"}
-            className={cn(
-              "h-input-height w-[300px] justify-start text-left font-normal",
-              !date && "text-muted-foreground",
-            )}
+            className={cn("w-[300px] justify-start text-left", fieldStyles, !date && "text-muted-foreground")}
           >
             <Icons.CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (

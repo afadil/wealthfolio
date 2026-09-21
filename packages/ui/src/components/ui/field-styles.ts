@@ -1,0 +1,3 @@
+/** Shared single-line form geometry and surface; callers may override for compact controls. */
+export const fieldStyles =
+  "h-(--theme-control-height,var(--input-height,2.5rem)) max-sm:min-h-11 pointer-coarse:min-h-11 rounded-(--theme-control-radius,calc(var(--radius)-2px)) border border-input border-x-[length:var(--theme-field-side-border,1px)] border-t-[length:var(--theme-field-side-border,1px)] bg-(--theme-field-background,var(--input-bg)) dark:bg-(--theme-field-background-dark,color-mix(in_oklab,var(--input)_30%,transparent)) shadow-(--theme-field-shadow,0_1px_2px_0_rgb(0_0_0/0.05)) px-3 has-[>svg]:px-3 py-(--theme-control-padding,0.375rem) text-base md:text-sm font-normal";

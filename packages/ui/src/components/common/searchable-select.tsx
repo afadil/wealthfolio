@@ -1,3 +1,4 @@
+import { fieldStyles } from "../ui/field-styles";
 import * as React from "react";
 import { Icons } from "../ui/icons";
 import { cn } from "../../lib/utils";
@@ -45,14 +46,14 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between rounded-md font-normal", className)}
+          className={cn("w-full justify-between", fieldStyles, className)}
           disabled={disabled}
         >
           <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
           <Icons.ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("w-[var(--radix-popover-trigger-width)] p-0", contentClassName)}>
+      <PopoverContent className={cn("w-(--radix-popover-trigger-width) p-0", contentClassName)}>
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="h-9" />
           <CommandEmpty>{emptyMessage}</CommandEmpty>

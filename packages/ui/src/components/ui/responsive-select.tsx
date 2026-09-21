@@ -1,3 +1,4 @@
+import { fieldStyles } from "./field-styles";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useIsMobile as defaultUseIsMobile } from "../../hooks/use-mobile";
@@ -73,8 +74,9 @@ export function ResponsiveSelect({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-between truncate rounded-md font-normal",
+            "w-full justify-between truncate",
             !selectedOption && "text-muted-foreground",
+            fieldStyles,
             triggerClassName,
           )}
           onClick={() => setOpen(true)}

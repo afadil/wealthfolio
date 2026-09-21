@@ -32,7 +32,7 @@ export function FacetedSearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 h-8 w-full rounded-md pl-8 pr-8 text-sm outline-none transition-colors",
+          "shadow-inner-xs bg-muted/90 hover:bg-muted/80 rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-8 w-full pl-8 pr-8 text-sm outline-none transition-colors",
           "placeholder:text-muted-foreground",
           "focus:ring-ring/50 focus:ring-2",
         )}

@@ -18,10 +18,10 @@ const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-
       lg: "gap-1.5 p-1",
     },
     rounded: {
-      full: "rounded-full",
-      lg: "rounded-lg",
-      md: "rounded-md",
-      sm: "rounded-sm",
+      full: "rounded-(--theme-segmented-radius,9999px)",
+      lg: "rounded-(--theme-segmented-radius,var(--radius))",
+      md: "rounded-(--theme-segmented-radius,calc(var(--radius)-2px))",
+      sm: "rounded-(--theme-segmented-radius,calc(var(--radius)-4px))",
       none: "rounded-none",
     },
   },
@@ -33,7 +33,7 @@ const animatedToggleVariants = cva("relative inline-flex items-center scrollbar-
 });
 
 const animatedToggleItemVariants = cva(
-  "relative z-10 flex-shrink-0 font-medium transition-colors cursor-pointer touch-manipulation select-none focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+  "relative z-10 shrink-0 font-medium transition-colors cursor-pointer touch-manipulation select-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2",
   {
     variants: {
       size: {
@@ -45,10 +45,10 @@ const animatedToggleItemVariants = cva(
         lg: "h-10 px-5 text-base",
       },
       rounded: {
-        full: "rounded-full",
-        lg: "rounded-lg",
-        md: "rounded-md",
-        sm: "rounded-sm",
+        full: "rounded-(--theme-segmented-radius,9999px)",
+        lg: "rounded-(--theme-segmented-radius,var(--radius))",
+        md: "rounded-(--theme-segmented-radius,calc(var(--radius)-2px))",
+        sm: "rounded-(--theme-segmented-radius,calc(var(--radius)-4px))",
         none: "rounded-none",
       },
     },
@@ -102,14 +102,14 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
 
   const roundedClass =
     rounded === "lg"
-      ? "rounded-lg"
+      ? "rounded-(--theme-segmented-radius,var(--radius))"
       : rounded === "md"
-        ? "rounded-md"
+        ? "rounded-(--theme-segmented-radius,calc(var(--radius)-2px))"
         : rounded === "sm"
-          ? "rounded-sm"
+          ? "rounded-(--theme-segmented-radius,calc(var(--radius)-4px))"
           : rounded === "none"
             ? "rounded-none"
-            : "rounded-full";
+            : "rounded-(--theme-segmented-radius,9999px)";
 
   return (
     <div

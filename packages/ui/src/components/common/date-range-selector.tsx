@@ -182,13 +182,13 @@ export function DateRangeSelector({ value, onChange, hiddenRanges = [], asOf = n
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
               <div className="grid grid-cols-2 gap-3">
-                <div className="border-border/70 bg-muted/30 rounded-lg border px-3 py-2">
+                <div className="border-border/70 bg-muted/30 rounded-(--theme-card-radius,var(--radius)) border px-3 py-2">
                   <div className="text-muted-foreground text-xs font-medium">{t("ui:dateRange.start", "Start")}</div>
                   <div className="text-foreground mt-1 truncate text-sm font-medium">
                     {formatRangeDate(draftRange?.from)}
                   </div>
                 </div>
-                <div className="border-border/70 bg-muted/30 rounded-lg border px-3 py-2">
+                <div className="border-border/70 bg-muted/30 rounded-(--theme-card-radius,var(--radius)) border px-3 py-2">
                   <div className="text-muted-foreground text-xs font-medium">{t("ui:dateRange.end", "End")}</div>
                   <div className="text-foreground mt-1 truncate text-sm font-medium">
                     {formatRangeDate(draftRange?.to)}

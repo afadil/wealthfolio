@@ -146,10 +146,12 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
     if (isMobile) {
       return (
         <SheetContent
+          ref={ref}
+          {...props}
           side={side}
           showCloseButton={showCloseButton}
           onEscapeKeyDown={handleEscapeKeyDown}
-          className={cn(mobileClassName, "!rounded-t-4xl mx-1", className)}
+          className={cn(mobileClassName, "rounded-t-(--theme-dialog-radius,2rem)! mx-1", className)}
         >
           {children}
         </SheetContent>
@@ -164,7 +166,7 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
           data-slot="dialog-content"
           onEscapeKeyDown={handleEscapeKeyDown}
           className={cn(
-            "bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 [&>*]:min-w-0",
+            "bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-(--theme-dialog-radius,var(--radius)) shadow-(--theme-overlay-shadow,0_10px_15px_-3px_rgb(0_0_0/0.1),0_4px_6px_-4px_rgb(0_0_0/0.1)) fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 duration-200 [&>*]:min-w-0",
             className,
           )}
           {...props}

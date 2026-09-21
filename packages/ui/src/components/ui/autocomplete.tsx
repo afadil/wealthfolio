@@ -1,3 +1,4 @@
+import { fieldStyles } from "./field-styles";
 import { Command as CommandPrimitive } from "cmdk";
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
 import { CommandGroup, CommandItem, CommandList, CommandInput } from "./command";
@@ -109,7 +110,12 @@ export const AutoComplete = ({
 
   return (
     <CommandPrimitive onKeyDown={handleKeyDown}>
-      <div className="border-input bg-input-bg dark:bg-input/30 ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-input-height flex w-full rounded-md border py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+      <div
+        className={cn(
+          fieldStyles,
+          "flex w-full p-0 [&>[data-cmdk-input-wrapper]]:h-full [&>[data-cmdk-input-wrapper]]:w-full [&>[data-cmdk-input-wrapper]]:border-0",
+        )}
+      >
         <CommandInput
           ref={inputRef}
           value={inputValue}

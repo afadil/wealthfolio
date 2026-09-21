@@ -1,3 +1,4 @@
+import { fieldStyles } from "./field-styles";
 import {
   composeRenderProps,
   DateFieldProps,
@@ -44,8 +45,10 @@ function DateSegment({ className, ...props }: DateSegmentProps) {
   );
 }
 
-const dateInputStyle =
-  "relative inline-flex h-input-height w-full items-center overflow-hidden whitespace-nowrap rounded-md border border-input bg-input-bg dark:bg-input/30 px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none data-focus-within:border-ring data-focus-within:ring-ring/50 data-focus-within:ring-[3px] data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 data-focus-within:has-aria-invalid:border-destructive";
+const dateInputStyle = cn(
+  "relative inline-flex w-full items-center overflow-hidden whitespace-nowrap transition-[color,box-shadow] outline-none data-focus-within:border-ring data-focus-within:ring-ring/50 data-focus-within:ring-[3px] data-focus-within:has-aria-invalid:ring-destructive/20 dark:data-focus-within:has-aria-invalid:ring-destructive/40 data-focus-within:has-aria-invalid:border-destructive",
+  fieldStyles,
+);
 
 interface DateInputProps extends DateInputPropsRac {
   className?: string;
