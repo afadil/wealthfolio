@@ -1,0 +1,286 @@
+/* @name Signature */
+:root {
+  /* Private-wealth charcoal and bronze, taken from the logo and the startup
+     screen: a bronze glass action with a cream label, cream-gold accents and a
+     gold-and-graphite chart set. Light mode keeps the bronze on neutral white.
+     Green is kept to gains. */
+  --radius: 0.75rem;
+  --theme-card-radius: 1.25rem;
+  --theme-dialog-radius: 1.5rem;
+  --theme-popover-radius: 1rem;
+  --theme-control-radius: 0.75rem;
+  --theme-button-radius: 0.875rem;
+  --theme-segmented-radius: 0.75rem;
+  --theme-badge-radius: 0.5rem;
+  --theme-control-height: 2.5rem;
+  --theme-panel-padding: 1.5rem;
+  --theme-row-padding: 0.875rem;
+  --theme-card-side-border: 0px;
+  --theme-card-bottom-border: 0px;
+  /* A transparent shadow, not `none`: `none` inside Tailwind's composed
+     box-shadow list invalidates it and takes the focus ring with it. */
+  --theme-card-shadow:
+    0 0 0 1px rgb(16 15 15 / 0.04), 0 1px 2px rgb(16 15 15 / 0.04),
+    0 12px 32px -14px rgb(16 15 15 / 0.14);
+  --theme-field-shadow: 0 0 #0000;
+  --theme-overlay-shadow: 0 0 0 1px rgb(16 15 15 / 0.06), 0 24px 56px -16px rgb(16 15 15 / 0.25);
+  --theme-field-side-border: 1px;
+  --theme-field-background: var(--input-bg);
+  --theme-field-background-dark: var(--input-bg);
+  --theme-image-tint: var(--primary);
+  --theme-image-tint-opacity: 0.1;
+  /* Inter throughout. The app's default font setting is font-mono, so mono is
+     routed to Inter too; real code keeps JetBrains Mono below. */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-sans);
+  --background: #f4f4f3;
+  --foreground: #100f0f;
+  --card: #ffffff;
+  --card-foreground: #100f0f;
+  --popover: #ffffff;
+  --popover-foreground: #100f0f;
+  /* The logo disc: bronze, cream label. Buttons layer its gradient on top. */
+  --primary: #3f3524;
+  --primary-foreground: #f7ecd6;
+  --secondary: #ebeae8;
+  --secondary-foreground: #2a2419;
+  --muted: #ebeae8;
+  --muted-foreground: #5c5a55;
+  --accent: #ebeae8;
+  --accent-foreground: #100f0f;
+  --destructive: #a8261d;
+  --destructive-foreground: #ffffff;
+  --success: #2f6b4a;
+  --success-foreground: #ffffff;
+  --warning: #8a5a12;
+  --warning-foreground: #ffffff;
+  --border: #e4e3e0;
+  --input: #d7d5d1;
+  --input-bg: #ffffff;
+  --ring: #a8844c;
+  /* Bronze, gold, graphite, ink, sand, umber, slate, antique gold, ash. */
+  --chart-1: #3f3524;
+  --chart-2: #b08a4a;
+  --chart-3: #6b7079;
+  --chart-4: #100f0f;
+  --chart-5: #d9c29a;
+  --chart-6: #7a6a52;
+  --chart-7: #9aa0a8;
+  --chart-8: #c9a86a;
+  --chart-9: #cfccc6;
+  --chart-stone: #cfccc6;
+  --chart-benchmark: #5c5a55;
+  --chart-grid: #e4e3e0;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #26241f;
+  --sidebar-primary: #3f3524;
+  --sidebar-primary-foreground: #f7ecd6;
+  --sidebar-accent: #f0efec;
+  --sidebar-accent-foreground: #3f3524;
+  --sidebar-border: #e8e7e4;
+  --sidebar-ring: #a8844c;
+  --toast-border: #e4e3e0;
+  --gain: #2f6b4a;
+  --loss: #a8261d;
+  --flat: #5c5a55;
+  --heatmap-accent: #2f6b4a;
+  --heatmap-positive-low: #e5ece7;
+  --heatmap-positive-high: #98b3a2;
+  --heatmap-negative-low: #f5e3e0;
+  --heatmap-negative-high: #d19a92;
+  --heatmap-label-dark: #100f0f;
+  --heatmap-label-light: #ffffff;
+  --status-warn: #8a5a12;
+  --event-default: #3f3524;
+  --event-today: #b08a4a;
+  --spending-accent: #3f3524;
+  --spending-deep: #3f3524;
+  --spending-mid: #c9b48c;
+  --destructive-control: #a8261d;
+  --destructive-control-hover: #8c1f18;
+  --destructive-control-foreground: #ffffff;
+}
+
+/* Dark: the startup screen's charcoal, the same bronze action, cream-gold
+   accents. */
+.dark {
+  --theme-card-shadow:
+    inset 0 1px 0 rgb(255 252 240 / 0.04), 0 0 0 1px rgb(255 252 240 / 0.05),
+    0 12px 32px -14px rgb(0 0 0 / 0.6);
+  --theme-overlay-shadow: 0 0 0 1px var(--border), 0 24px 60px -16px rgb(0 0 0 / 0.7);
+  --background: #100f0f;
+  --foreground: #fffcf0;
+  --card: #1a1918;
+  --card-foreground: #fffcf0;
+  --popover: #201f1d;
+  --popover-foreground: #fffcf0;
+  --primary: #3f3524;
+  --primary-foreground: #f7ecd6;
+  --secondary: #232220;
+  --secondary-foreground: #ece6d6;
+  --muted: #1d1c1b;
+  --muted-foreground: #a09c93;
+  --accent: #252321;
+  --accent-foreground: #fffcf0;
+  --destructive: #ec8a7e;
+  --destructive-foreground: #230a07;
+  --success: #86bf9c;
+  --success-foreground: #08140d;
+  --warning: #e8b262;
+  --warning-foreground: #1a1203;
+  --border: #2a2826;
+  --input: #36332f;
+  --input-bg: #1a1918;
+  --ring: #d9b77a;
+  --chart-1: #e6cf9f;
+  --chart-2: #b08a4a;
+  --chart-3: #8a8f99;
+  --chart-4: #f5f1e8;
+  --chart-5: #7a6a52;
+  --chart-6: #c9a86a;
+  --chart-7: #5c6470;
+  --chart-8: #d8c3a0;
+  --chart-9: #4a4640;
+  --chart-stone: #5a5650;
+  --chart-benchmark: #a09c93;
+  --chart-grid: #2a2826;
+  --sidebar: #0c0b0b;
+  --sidebar-foreground: #cfcac0;
+  --sidebar-primary: #3f3524;
+  --sidebar-primary-foreground: #f7ecd6;
+  --sidebar-accent: #1d1c1b;
+  --sidebar-accent-foreground: #efdcb6;
+  --sidebar-border: #1a1918;
+  --sidebar-ring: #d9b77a;
+  --toast-border: #36332f;
+  --gain: #86bf9c;
+  --loss: #ec8a7e;
+  --flat: #a09c93;
+  --heatmap-accent: #86bf9c;
+  --heatmap-positive-low: #1c2420;
+  --heatmap-positive-high: #4c6b57;
+  --heatmap-negative-low: #2a1d1b;
+  --heatmap-negative-high: #7e4a42;
+  --heatmap-label-dark: #100f0f;
+  --heatmap-label-light: #fffcf0;
+  --status-warn: #e8b262;
+  --event-default: #b08a4a;
+  --event-today: #e6cf9f;
+  --spending-accent: #e6cf9f;
+  --spending-deep: #e6cf9f;
+  --spending-mid: #7a6a52;
+  --destructive-control: #ec8a7e;
+  --destructive-control-hover: #f2a398;
+  --destructive-control-foreground: #230a07;
+}
+
+/* Figures align in columns; headings are set tight and medium-weight. */
+:root body {
+  font-variant-numeric: tabular-nums;
+}
+:root :is(code, pre, kbd, samp) {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+:root :is(h1, h2) {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons take the logo's material in both modes: a bronze disc lit from
+   above with a glass rim and a cream label. `[data-variant][data-size]` also
+   reaches asChild triggers; list items share those attributes and are left
+   alone. A box-shadow written here replaces Tailwind's composed focus ring,
+   so these stand down while the control has keyboard focus. */
+:root [data-variant][data-size]:not([data-slot="item"]) {
+  transition-property: color, background-color, box-shadow, filter, opacity;
+  transition-duration: 160ms;
+}
+:root [data-variant="default"][data-size]:not([data-slot="item"]) {
+  background-image: linear-gradient(180deg, #5a4b32 0%, #3f3524 55%, #332a1b 100%);
+}
+:root [data-variant="default"][data-size]:not([data-slot="item"], :disabled, :focus-visible) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 236 200 / 0.22),
+    inset 0 0 0 1px rgb(232 196 143 / 0.22),
+    0 1px 2px rgb(33 26 14 / 0.2),
+    0 6px 16px -8px rgb(33 26 14 / 0.45);
+}
+:root [data-variant="default"][data-size]:not([data-slot="item"], :disabled):hover {
+  filter: brightness(1.15);
+}
+.dark [data-variant="default"][data-size]:not([data-slot="item"], :disabled, :focus-visible) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 236 200 / 0.2),
+    inset 0 0 0 1px rgb(232 196 143 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 8px 20px -10px rgb(0 0 0 / 0.7);
+}
+/* Disabled actions drop the material rather than dimming it. */
+:root [data-variant="default"][data-size]:not([data-slot="item"]):disabled {
+  background-image: none;
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+/* Destructive keeps its flat red but shares the lit rim. */
+:root [data-variant="destructive"][data-size]:not([data-slot="item"], :disabled, :focus-visible) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0) 60%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 1px 2px rgb(0 0 0 / 0.15);
+}
+
+/* Outline and secondary: frosted glass, a lit top edge and a translucent rim.
+   Zeroing --tw-shadow rather than box-shadow keeps Tailwind's composed list
+   valid, so the focus ring still renders. */
+:root
+  :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
+    [data-slot="item"],
+    [aria-pressed]
+  ) {
+  border: 1px solid rgb(16 15 15 / 0.09);
+  background-color: rgb(255 255 255 / 0.7);
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0) 60%);
+  --tw-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(16 15 15 / 0.06);
+}
+:root
+  :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
+    [data-slot="item"],
+    [aria-pressed]
+  ):hover {
+  background-color: #ffffff;
+  border-color: rgb(16 15 15 / 0.16);
+}
+.dark
+  :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
+    [data-slot="item"],
+    [aria-pressed]
+  ) {
+  border-color: rgb(255 252 240 / 0.12);
+  background-color: rgb(255 252 240 / 0.04);
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0) 60%);
+  --tw-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 1px 2px rgb(0 0 0 / 0.35);
+}
+.dark
+  :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
+    [data-slot="item"],
+    [aria-pressed]
+  ):hover {
+  background-color: rgb(255 252 240 / 0.08);
+  border-color: rgb(255 252 240 / 0.2);
+}
+
+/* Selected tab and segment thumbs get the same lit glass edge. */
+:root :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 0 0 1px rgb(16 15 15 / 0.07),
+    0 2px 6px -2px rgb(16 15 15 / 0.14);
+}
+.dark :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 0 1px rgb(255 252 240 / 0.1),
+    0 2px 8px -2px rgb(0 0 0 / 0.55);
+}
