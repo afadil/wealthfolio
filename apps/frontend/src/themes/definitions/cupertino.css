@@ -1,0 +1,442 @@
+/* @name Cupertino */
+:root {
+  /* Geometry follows iOS 26.5: 26pt grouped corners, capsule controls, 44pt
+     touch targets, and nested radii kept concentric with their containers. */
+  --radius: 1.125rem;
+  --theme-card-radius: 1.625rem;
+  --theme-dialog-radius: 2.25rem;
+  --theme-popover-radius: 1.375rem;
+  --theme-control-radius: 0.875rem;
+  --theme-button-radius: 9999px;
+  --theme-segmented-radius: 9999px;
+  --theme-badge-radius: 9999px;
+  --theme-control-height: 2.75rem;
+  --theme-control-padding: 0.625rem;
+  --theme-panel-padding: 1.25rem;
+  --theme-row-padding: 0.9375rem;
+  --theme-image-tint: var(--primary);
+  --theme-image-tint-opacity: 0.12;
+  /* SF Pro through the system stack. The app's default font setting is
+     font-mono, so mono is routed to SF Pro too; real code keeps SF Mono below. */
+  --theme-font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
+    "Inter Variable", system-ui, sans-serif;
+  --theme-font-mono: var(--theme-font-sans);
+  --font-sans: var(--theme-font-sans);
+  --font-mono: var(--theme-font-sans);
+  --font-serif: "New York", ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  /* Depth, not outlines: borderless grouped cards lifted by a hairline and a
+     short, low-opacity ambient shadow that survives clipping parents. */
+  --theme-card-side-border: 0px;
+  --theme-card-bottom-border: 0px;
+  --theme-card-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px -10px rgb(0 0 0 / 0.1);
+  --theme-overlay-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.06), 0 24px 60px -12px rgb(0 0 0 / 0.24);
+  /* A transparent shadow, not `none`: `none` inside Tailwind's composed
+     box-shadow list invalidates it and takes the focus ring with it. */
+  --theme-field-side-border: 1px;
+  --theme-field-shadow: 0 0 #0000;
+  --theme-field-background: var(--input-bg);
+  --theme-field-background-dark: var(--input-bg);
+  /* systemGroupedBackground page, secondarySystemGroupedBackground cells. */
+  --background: #f2f2f7;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  /* Apple's CTA blue: systemBlue #007AFF only reaches 4.0:1 under white. */
+  --primary: #0071e3;
+  --primary-foreground: #ffffff;
+  /* iOS "bordered" button: gray fill, tint label. */
+  --secondary: #e9e9ee;
+  --secondary-foreground: #0060c0;
+  /* systemGray5 track, so segmented thumbs and skeletons read on white. */
+  --muted: #e5e5ea;
+  --muted-foreground: #636366;
+  --accent: #e9e9ee;
+  --accent-foreground: #000000;
+  --destructive: #d70015;
+  --destructive-foreground: #ffffff;
+  --success: #1b7a33;
+  --success-foreground: #ffffff;
+  --warning: #c93400;
+  --warning-foreground: #ffffff;
+  --border: #dcdce1;
+  --input: #e3e3e8;
+  /* tertiarySystemFill: translucent, so fields read on the page and on cards. */
+  --input-bg: rgba(118, 118, 128, 0.12);
+  --ring: #0071e3;
+  --chart-1: #007aff;
+  --chart-2: #5856d6;
+  --chart-3: #30b0c7;
+  --chart-4: #ff9500;
+  --chart-5: #af52de;
+  --chart-6: #a2845e;
+  --chart-7: #ff2d55;
+  --chart-8: #00c7be;
+  --chart-9: #8e8e93;
+  --chart-stone: #8e8e93;
+  --chart-benchmark: #8e8e93;
+  --chart-grid: #e5e5ea;
+  --chart-cursor: rgba(0, 0, 0, 0.04);
+  --bar-stripe: rgba(255, 255, 255, 0.3);
+  --sidebar: #ebebf0;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #0071e3;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dfdfe4;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #dcdce1;
+  --sidebar-ring: #0071e3;
+  --toast-success-bg: #e8f6ec;
+  --toast-success-fg: #1b7a33;
+  --toast-success-border: #bfe3c9;
+  --toast-error-bg: #fdecea;
+  --toast-error-fg: #b3000f;
+  --toast-error-border: #f5c2bd;
+  --toast-warning-bg: #fff2df;
+  --toast-warning-fg: #9a4a00;
+  --toast-warning-border: #f6d3a3;
+  --toast-info-bg: #e7f0fc;
+  --toast-info-fg: #0058b3;
+  --toast-info-border: #bcd6f5;
+  --gain: #1b7a33;
+  --loss: #d70015;
+  --flat: #636366;
+  --status-warn: #c93400;
+  --fi-stream-1: #007aff;
+  --fi-stream-2: #5856d6;
+  --fi-stream-3: #30b0c7;
+  --fi-stream-4: #af52de;
+  --fi-stream-5: #00c7be;
+  --heatmap-accent: #007aff;
+  --event-default: #007aff;
+  --event-today: #ff9500;
+  --spending-accent: #007aff;
+  --spending-deep: #0060c0;
+  --spending-mid: #5ac8fa;
+  /* Light tiles render at full opacity, so the ramp stays soft. */
+  --heatmap-positive-low: #eaf6ed;
+  --heatmap-positive-high: #6cbf83;
+  --heatmap-negative-low: #fdeceb;
+  --heatmap-negative-high: #ec7c74;
+  --heatmap-label-dark: #1c1c1e;
+  --heatmap-label-light: #ffffff;
+  --destructive-control: #d70015;
+  --destructive-control-hover: #b8000f;
+  --destructive-control-foreground: #ffffff;
+  --liquid-glass-bg: rgba(250, 250, 252, 0.8);
+  --liquid-glass-border: rgba(0, 0, 0, 0.08);
+}
+
+.dark {
+  --theme-card-shadow:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.06), 0 0 0 0.5px rgb(255 255 255 / 0.04),
+    0 6px 20px -10px rgb(0 0 0 / 0.5);
+  --theme-overlay-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.1), 0 24px 60px -12px rgb(0 0 0 / 0.7);
+  /* True-black page for OLED; elevation is carried by lighter surfaces. */
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #1c1c1e;
+  --card-foreground: #ffffff;
+  --popover: #2c2c2e;
+  --popover-foreground: #ffffff;
+  --primary: #0073e6;
+  --primary-foreground: #ffffff;
+  --secondary: #2c2c2e;
+  --secondary-foreground: #409cff;
+  --muted: #2c2c2e;
+  --muted-foreground: #98989f;
+  --accent: #2c2c2e;
+  --accent-foreground: #ffffff;
+  /* Clears 4.5:1 both as a fill under white and as text on black. */
+  --destructive: #e5192b;
+  --destructive-foreground: #ffffff;
+  --success: #1c8339;
+  --success-foreground: #ffffff;
+  --warning: #ff9f0a;
+  --warning-foreground: #000000;
+  --border: #38383a;
+  --input: #39393d;
+  /* secondarySystemFill: over black, 0.24 matched the card and read as one. */
+  --input-bg: rgba(118, 118, 128, 0.32);
+  --ring: #0a84ff;
+  --chart-1: #0a84ff;
+  --chart-2: #5e5ce6;
+  --chart-3: #40c8e0;
+  --chart-4: #ff9f0a;
+  --chart-5: #bf5af2;
+  --chart-6: #ac8e68;
+  --chart-7: #ff375f;
+  --chart-8: #63e6e2;
+  --chart-9: #8e8e93;
+  --chart-stone: #8e8e93;
+  --chart-benchmark: #8e8e93;
+  --chart-grid: #2c2c2e;
+  --chart-cursor: rgba(255, 255, 255, 0.06);
+  --bar-stripe: rgba(0, 0, 0, 0.25);
+  --sidebar: #161618;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #0073e6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2c2c2e;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #2c2c2e;
+  --sidebar-ring: #0a84ff;
+  --toast-success-bg: #0f2415;
+  --toast-success-fg: #30d158;
+  --toast-success-border: #1d4a2a;
+  --toast-error-bg: #2c1210;
+  --toast-error-fg: #ff6961;
+  --toast-error-border: #5c2320;
+  --toast-warning-bg: #2a1d08;
+  --toast-warning-fg: #ffb340;
+  --toast-warning-border: #5a3d0d;
+  --toast-info-bg: #0b1f36;
+  --toast-info-fg: #409cff;
+  --toast-info-border: #173e66;
+  --gain: #30d158;
+  --loss: #ff453a;
+  --flat: #98989f;
+  --status-warn: #ff9f0a;
+  --fi-stream-1: #0a84ff;
+  --fi-stream-2: #5e5ce6;
+  --fi-stream-3: #40c8e0;
+  --fi-stream-4: #bf5af2;
+  --fi-stream-5: #63e6e2;
+  --heatmap-accent: #0a84ff;
+  --event-default: #0a84ff;
+  --event-today: #ff9f0a;
+  --spending-accent: #0a84ff;
+  --spending-deep: #409cff;
+  --spending-mid: #64d2ff;
+  /* Dark tiles composite at 0.45 over the card: small moves recede into the
+     surface, large ones carry the system green and red. */
+  --heatmap-positive-low: #1e3325;
+  --heatmap-positive-high: #30d158;
+  --heatmap-negative-low: #3a1f1d;
+  --heatmap-negative-high: #ff453a;
+  --heatmap-label-dark: #1c1c1e;
+  --heatmap-label-light: #ffffff;
+  --destructive-control: #e5192b;
+  --destructive-control-hover: #b8000f;
+  --destructive-control-foreground: #ffffff;
+  --liquid-glass-bg: rgba(28, 28, 30, 0.72);
+  --liquid-glass-border: rgba(255, 255, 255, 0.12);
+}
+
+/* Typography: tabular figures so values never jitter; real code stays mono.
+   WebKit sizes SF optically, so headings keep the system's own tracking. */
+:root body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+:root :is(code, pre, kbd, samp) {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+:root h1 {
+  font-weight: 700;
+  letter-spacing: normal;
+}
+:root h2 {
+  letter-spacing: normal;
+}
+/* iOS 26 section headers are sentence case at natural tracking. Requiring a
+   tracking class spares uppercase used for meaning (e.g. exchange codes). */
+:root [class*="uppercase"][class*="text-muted-foreground"][class*="tracking-"] {
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* 11pt floor for secondary labels. */
+:root
+  [class*="uppercase"][class*="text-muted-foreground"]:is(
+    [class*="text-[9px]"],
+    [class*="text-[10px]"]
+  ) {
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+}
+
+/* Grouped cells carry no outline; separation comes from surface and shadow.
+   Sheets sit one elevation step above the page, as in iOS. */
+:root [data-slot="card"] {
+  border-width: 0;
+}
+:root :is([data-slot="dialog-content"], [data-slot="sheet-content"]) {
+  border-color: transparent;
+}
+.dark [data-slot="sheet-content"] {
+  background-color: #1c1c1e;
+}
+/* Lighter dimming than the web default. The sheet overlay has no data-slot,
+   so it is matched by its utility classes. */
+:root :is([data-slot="dialog-overlay"], [class*="fixed"][class*="inset-0"][class*="bg-black/80"]) {
+  background-color: rgb(0 0 0 / 0.28);
+}
+.dark :is([data-slot="dialog-overlay"], [class*="fixed"][class*="inset-0"][class*="bg-black/80"]) {
+  background-color: rgb(0 0 0 / 0.55);
+}
+/* Filled text fields, as in iOS forms. Invalid state keeps its red edge. */
+:root
+  :is([data-slot="input"], [data-slot="select-trigger"], [data-slot="textarea"]):not(
+    [aria-invalid="true"]
+  ) {
+  border-color: transparent;
+}
+
+/* Buttons. `[data-variant][data-size]` also reaches asChild triggers, which
+   swap data-slot for their own. List items share those attributes and are
+   left alone. */
+:root [data-variant][data-size]:not([data-slot="item"]) {
+  transition-property: color, background-color, box-shadow, transform, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+:root [data-variant][data-size]:not([data-slot="item"]):active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* Semibold labels, easing from 16px on phones to 14px on desktop without a
+   media query. Field triggers and segments keep their own size. */
+:root
+  :is(
+    [data-variant="default"],
+    [data-variant="secondary"],
+    [data-variant="destructive"],
+    [data-variant="outline"]
+  ):is([data-size="default"], [data-size="lg"]):not(
+    [aria-pressed],
+    [role="combobox"],
+    [class*="justify-between"],
+    [class*="text-left"],
+    [data-slot="item"]
+  ) {
+  font-size: clamp(0.875rem, 1.1rem - 0.25vw, 1rem);
+  font-weight: 600;
+}
+/* A box-shadow written here replaces Tailwind's composed focus ring, so these
+   stand down while the control has keyboard focus. */
+:root [data-variant="default"][data-size]:not(:disabled, :focus-visible) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(0 0 0 / 0.06),
+    0 1px 2px rgb(0 0 0 / 0.1);
+}
+/* Bordered: translucent fill. Zeroing --tw-shadow rather than box-shadow keeps
+   the composed list valid, so the ring still renders and fields stay equal. */
+:root [data-variant="outline"][data-size]:not([data-slot="item"]) {
+  border-color: transparent;
+  background-color: var(--input-bg);
+  --tw-shadow: 0 0 #0000;
+}
+:root [data-variant="outline"][data-size]:not([data-slot="item"]):hover {
+  background-color: rgb(118 118 128 / 0.2);
+}
+.dark [data-variant="outline"][data-size]:not([data-slot="item"]):hover {
+  background-color: rgb(118 118 128 / 0.42);
+}
+
+/* Segmented controls: one 32pt item height (UISegmentedControl), a raised thumb
+   on a filled capsule track. A 44pt hit area needs a component change: the
+   groups scroll horizontally, which clips any overflowing tap target. */
+:root :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+  background-color: #ffffff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.04),
+    0 3px 8px rgb(0 0 0 / 0.12),
+    0 3px 1px rgb(0 0 0 / 0.04);
+}
+.dark :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+  background-color: #636366;
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.3);
+}
+:root [role="group"]:has(> [data-slot="button"][aria-pressed]) {
+  gap: 0;
+  padding: 2px;
+  border-radius: 9999px;
+  background-color: var(--muted);
+}
+:root [role="group"] > [data-slot="button"][aria-pressed] {
+  position: relative;
+  height: 2rem;
+  min-height: 2rem;
+}
+:root [role="group"] > [data-slot="button"][aria-pressed="true"] {
+  background-color: #ffffff;
+  color: var(--foreground);
+}
+:root [role="group"] > [data-slot="button"][aria-pressed="true"]:not(:focus-visible) {
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.04),
+    0 3px 8px rgb(0 0 0 / 0.12);
+}
+.dark [role="group"] > [data-slot="button"][aria-pressed="true"] {
+  background-color: #636366;
+}
+.dark [role="group"] > [data-slot="button"][aria-pressed="true"]:not(:focus-visible) {
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.3);
+}
+
+/* Switches: 51×31 with a 27pt white thumb, green when on. The component's
+   translate-x-5 still lands exactly: inner 47 − thumb 27 = 20px. */
+:root [role="switch"][data-state="checked"] {
+  background-color: #34c759;
+}
+.dark [role="switch"][data-state="checked"] {
+  background-color: #30d158;
+}
+:root [role="switch"][data-state="unchecked"] {
+  background-color: rgb(120 120 128 / 0.16);
+}
+.dark [role="switch"][data-state="unchecked"] {
+  background-color: rgb(120 120 128 / 0.32);
+}
+:root [role="switch"][class*="w-11"] {
+  width: 3.1875rem;
+  height: 1.9375rem;
+}
+:root [role="switch"][class*="w-11"] > span {
+  width: 1.6875rem;
+  height: 1.6875rem;
+}
+:root [role="switch"] > span {
+  background-color: #ffffff;
+  box-shadow:
+    0 3px 8px rgb(0 0 0 / 0.15),
+    0 3px 1px rgb(0 0 0 / 0.06);
+}
+
+/* Liquid Glass (iOS 27 refinement): deeper diffusion, specular light on the
+   rim rather than a diagonal wash, darkened outer edge. */
+:root .liquid-glass {
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.75),
+    inset 0 -0.5px 0 rgb(0 0 0 / 0.05),
+    0 0 0 0.5px rgb(0 0 0 / 0.1),
+    0 12px 32px -8px rgb(0 0 0 / 0.2);
+}
+.dark .liquid-glass {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 -0.5px 0 rgb(0 0 0 / 0.4),
+    0 0 0 0.5px rgb(0 0 0 / 0.6),
+    0 12px 32px -8px rgb(0 0 0 / 0.6);
+}
+:root .liquid-glass::before {
+  background: none;
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.5);
+}
+.dark .liquid-glass::before {
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.14);
+}
+:root [data-radix-popper-content-wrapper] > :is([role="menu"], [role="listbox"], [role="dialog"]) {
+  background-color: color-mix(in srgb, var(--popover) 82%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border-color: transparent;
+}

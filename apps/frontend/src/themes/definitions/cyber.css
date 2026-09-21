@@ -1,0 +1,199 @@
+/* @name Cyber */
+:root {
+  --radius: 0.25rem;
+  --theme-control-radius: 0.25rem;
+  --theme-button-radius: 0.25rem;
+  --theme-segmented-radius: 0.25rem;
+  --theme-card-radius: 0.25rem;
+  --theme-dialog-radius: 0.25rem;
+  --theme-popover-radius: 0.25rem;
+  --theme-badge-radius: 0.125rem;
+  --theme-control-height: 2.5rem;
+  --theme-panel-padding: 1.25rem;
+  --theme-row-padding: 0.75rem;
+  --theme-image-tint: var(--primary);
+  --theme-image-tint-opacity: 0.18;
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Elevation reads as emission: a hairline in the accent hue plus a soft bloom. */
+  --theme-card-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent),
+    0 4px 24px color-mix(in srgb, var(--primary) 8%, transparent);
+  --theme-field-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent);
+  --theme-overlay-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent),
+    0 16px 48px color-mix(in srgb, var(--primary) 16%, transparent);
+  --theme-card-side-border: 1px;
+  --theme-card-bottom-border: 1px;
+  --theme-field-side-border: 1px;
+  --theme-field-background: var(--input-bg);
+  --theme-field-background-dark: color-mix(in oklab, var(--input) 30%, transparent);
+  --background: #f2f7f9;
+  --foreground: #0d2129;
+  --card: #ffffff;
+  --card-foreground: #0d2129;
+  --popover: #ffffff;
+  --popover-foreground: #0d2129;
+  --primary: #1c6c66;
+  --primary-foreground: #ffffff;
+  --secondary: #d9e8ec;
+  --secondary-foreground: #234c57;
+  --muted: #e3eef1;
+  --muted-foreground: #3d616c;
+  --accent: #d5eae8;
+  --accent-foreground: #12403c;
+  --destructive: #a3266b;
+  --destructive-foreground: #ffffff;
+  --success: #1c6c66;
+  --success-foreground: #ffffff;
+  --warning: #6f5206;
+  --warning-foreground: #ffffff;
+  --border: #c2d9de;
+  --input: #a4c3ca;
+  --input-bg: #ffffff;
+  --ring: #1c6c66;
+  /* Flexoki extended: cyan / blue / purple / magenta. */
+  --chart-1: #1c6c66;
+  --chart-2: #205ea6;
+  --chart-3: #735eb5;
+  --chart-4: #b74583;
+  --chart-5: #3aa99f;
+  --chart-6: #4385be;
+  --chart-7: #8b7ec8;
+  --chart-8: #ce5d97;
+  --chart-9: #6f9aa6;
+  --chart-stone: #6f9aa6;
+  --chart-benchmark: #205ea6;
+  --chart-grid: #cfe2e6;
+  --sidebar: #e9f3f5;
+  --sidebar-foreground: #0d2129;
+  --sidebar-primary: #1c6c66;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d5eae8;
+  --sidebar-accent-foreground: #12403c;
+  --sidebar-border: #c2d9de;
+  --sidebar-ring: #1c6c66;
+  --toast-border: #c2d9de;
+  --gain: #1c6c66;
+  --loss: #a3266b;
+  --flat: #3d616c;
+  --fi-stream-1: #1c6c66;
+  --fi-stream-2: #205ea6;
+  --fi-stream-3: #735eb5;
+  --fi-stream-4: #b74583;
+  --fi-stream-5: #3aa99f;
+  --heatmap-accent: #1c6c66;
+  --status-warn: #205ea6;
+  --event-default: #1c6c66;
+  --event-today: #b74583;
+  --heatmap-positive-low: #a2dece;
+  --heatmap-positive-high: #1c6c66;
+  --heatmap-negative-low: #f9b9cf;
+  --heatmap-negative-high: #87285e;
+  --heatmap-label-dark: #06201e;
+  --heatmap-label-light: #f2f8f9;
+  --spending-accent: #1c6c66;
+  --spending-deep: #1c6c66;
+  --spending-mid: #205ea6;
+  --destructive-control: #a3266b;
+  --destructive-control-hover: #871f58;
+  --destructive-control-foreground: #ffffff;
+  --performance-series-1: #1c6c66;
+  --performance-series-2: #205ea6;
+  --performance-series-3: #735eb5;
+  --performance-series-4: #b74583;
+  --performance-series-5: #3aa99f;
+  --performance-series-6: #4385be;
+  --performance-series-7: #8b7ec8;
+  --performance-series-8: #ce5d97;
+}
+
+/* After dark the grid lights up — this is the mode the theme was drawn for. */
+.dark {
+  --background: #0b0f14;
+  --foreground: #d3e3e8;
+  --card: #111820;
+  --card-foreground: #d3e3e8;
+  --popover: #151d26;
+  --popover-foreground: #d3e3e8;
+  --primary: #5abdac;
+  --primary-foreground: #04100f;
+  --secondary: #1c2733;
+  --secondary-foreground: #9fc3cf;
+  --muted: #131b24;
+  --muted-foreground: #92adbb;
+  --accent: #17222d;
+  --accent-foreground: #87d3c3;
+  --destructive: #ce5d97;
+  --destructive-foreground: #1a0713;
+  --success: #5abdac;
+  --success-foreground: #04100f;
+  --warning: #d0a215;
+  --warning-foreground: #1a1403;
+  --border: #1f2c39;
+  --input: #2a3947;
+  --input-bg: #111820;
+  --ring: #3aa99f;
+  --chart-1: #5abdac;
+  --chart-2: #66a0c8;
+  --chart-3: #a699d0;
+  --chart-4: #ce5d97;
+  --chart-5: #87d3c3;
+  --chart-6: #4385be;
+  --chart-7: #8b7ec8;
+  --chart-8: #e0879f;
+  --chart-9: #7f9fae;
+  --chart-stone: #7f9fae;
+  --chart-benchmark: #66a0c8;
+  --chart-grid: #1f2c39;
+  --sidebar: #080c11;
+  --sidebar-foreground: #d3e3e8;
+  --sidebar-primary: #5abdac;
+  --sidebar-primary-foreground: #04100f;
+  --sidebar-accent: #17222d;
+  --sidebar-accent-foreground: #87d3c3;
+  --sidebar-border: #1f2c39;
+  --sidebar-ring: #3aa99f;
+  --toast-border: #2a3947;
+  --gain: #5abdac;
+  --loss: #ce5d97;
+  --flat: #92adbb;
+  --fi-stream-1: #5abdac;
+  --fi-stream-2: #66a0c8;
+  --fi-stream-3: #a699d0;
+  --fi-stream-4: #ce5d97;
+  --fi-stream-5: #87d3c3;
+  --heatmap-accent: #3aa99f;
+  --status-warn: #4385be;
+  --event-default: #3aa99f;
+  --event-today: #ce5d97;
+  --heatmap-positive-low: #a2dece;
+  --heatmap-positive-high: #1c6c66;
+  --heatmap-negative-low: #f9b9cf;
+  --heatmap-negative-high: #87285e;
+  --heatmap-label-dark: #06201e;
+  --heatmap-label-light: #f2f8f9;
+  --spending-accent: #3aa99f;
+  --spending-deep: #3aa99f;
+  --spending-mid: #66a0c8;
+  --destructive-control: #ce5d97;
+  --destructive-control-hover: #d976a9;
+  --destructive-control-foreground: #1a0713;
+  --performance-series-1: #5abdac;
+  --performance-series-2: #66a0c8;
+  --performance-series-3: #a699d0;
+  --performance-series-4: #ce5d97;
+  --performance-series-5: #87d3c3;
+  --performance-series-6: #4385be;
+  --performance-series-7: #8b7ec8;
+  --performance-series-8: #e0879f;
+}
+
+/* Neon: primary actions emit, focus rings bloom, active nav icons burn in. */
+:root .bg-primary {
+  box-shadow: 0 0 14px 1px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+:root [aria-current="page"] svg {
+  color: var(--primary);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--primary) 70%, transparent));
+}
