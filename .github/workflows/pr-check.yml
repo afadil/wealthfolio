@@ -97,6 +97,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate curated themes
+        run: |
+          pnpm themes:generate
+          pnpm themes:check
+          pnpm themes:test
+          pnpm themes:contrast
+
       - name: Build package types
         run: pnpm run build:types
 
@@ -115,6 +122,9 @@ jobs:
 
       - name: Install addon sandbox browsers
         run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Run design system browser tests
+        run: pnpm test:e2e:design-system
 
       - name: Run net worth layout regression tests
         run: pnpm test:e2e:net-worth

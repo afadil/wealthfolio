@@ -103,6 +103,9 @@ apps/tauri/gen/android/captures/
 ehthumbs.db
 Thumbs.db
 
+# Local design-system runs and disposable build probes
+/.local/design-system/
+
 # Playwright
 /test-results/
 /playwright-report/
@@ -123,3 +126,8 @@ apps/tauri/db/
 tasks
 **/*.local.md
 wealthfolio.db
+
+# Curated theme outputs are scoped from theme CSS before dev/build/test.
+apps/frontend/src/themes/generated/
+apps/frontend/public/themes.css
+apps/frontend/public/theme-bootstrap.js

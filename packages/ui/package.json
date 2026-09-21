@@ -46,7 +46,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup && pnpm run build:types",
+    "build": "tsup && node scripts/build-styles.mjs && pnpm run build:types",
     "dev": "tsup --watch",
     "clean": "rm -rf dist",
     "lint": "eslint .",

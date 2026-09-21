@@ -142,10 +142,17 @@ All standard shadcn/ui components with Wealthfolio's Flexoki theme applied:
 ## Theming
 
 The components use CSS variables for theming. The main app provides the theme
-context, so addons automatically inherit the current theme (light/dark mode).
+context, so addons inherit the selected curated palette and resolved light/dark
+mode.
 
-The host theme is defined in `apps/frontend/src/globals.css` and is loaded into
-the addon sandbox by `apps/frontend/src/addons/iframe/addon-sandbox-entry.tsx`.
+Curated palettes are data definitions in the frontend. The shared semantic
+mapping lives in `packages/ui/src/theme-mapping.css`; the host supplies complete
+CSS color values from `apps/frontend/src/globals.css`, which is loaded into the
+addon sandbox by `apps/frontend/src/addons/iframe/addon-sandbox-entry.tsx`.
+Updates here automatically apply to:
+
+- Main application
+- All addons using `@wealthfolio/ui`
 
 ## Development
 
@@ -179,53 +186,31 @@ npx shadcn-ui@latest add button
 
 #### Updating Components
 
-When updating shared components:
+Wealthfolio owns and adapts its component source. Generate pinned upstream
+references in a separate scratch project, inspect the differences, and manually
+port justified changes with behavior and public-API verification. Do not bulk
+regenerate or apply presets over this package. Production remains on Radix; the
+experimental Base UI pilot has unresolved WebKit focus/dismissal failures and
+does not establish native mobile parity. Keep financial/date behavior, addon
+APIs and theme-owned geometry intact when evaluating replacements. See
+[theme contributions](../../docs/theme-contributing.md) for the token contract.
 
-1. Edit in `packages/ui/src/components/`
-2. Build the package: `cd packages/ui && npm run build`
-3. Components automatically available to addons
+### Stylesheet contract
 
-### Development Workflow
+Import `@wealthfolio/ui/styles` into a Tailwind v4 build. The published
+stylesheet is Tailwind source, not precompiled utility CSS; the host must
+include Tailwind v4 in its toolchain. The UI package build copies both the
+stylesheet and its shared token mapping into `dist`. It supplies no palette
+defaults, so it never overrides a host palette. Standalone hosts must supply
+semantic color variables and shared geometry such as `--radius` and
+`--input-height`; Wealthfolio addons receive these through the existing host
+theme snapshot. Color variables contain full CSS colors, not raw HSL channels.
+Curated theme contribution instructions are in the repository’s
+`docs/theme-contributing.md`.
 
-#### Adding New Component
-
-1. `cd packages/ui`
-2. `npx shadcn-ui@latest add [component]`
-3. Customize if needed for Wealthfolio
-4. Export in `src/index.ts`
-5. Build and test with addons
-
-#### Updating Existing Component
-
-1. Edit in `packages/ui/src/components/`
-2. `npm run build`
-3. Test with addons
-4. Update version if breaking changes
-
-## Best Practices
-
-### For Addon Developers
-
-1. Always import from `@wealthfolio/ui` instead of creating custom components
-2. Import styles once in your main addon file
-3. Use provided utility functions for consistent styling
-4. Leverage financial components for data display
-
-### For Core Development
-
-1. Add new components to UI package, not main app
-2. Use semantic versioning for UI package updates
-3. Test changes against official addons
-4. Document new components in README
-
-## Updating Components
-
-```bash
-cd packages/ui
-npx shadcn-ui@latest add [component]
-npx shadcn@latest add accordion alert-dialog alert avatar badge button calendar checkbox collapsible command  dialog dropdown-menu form hover-card  input label popover progress radio-group scroll-area select separator sheet skeleton switch table tabs textarea toggle-group toggle tooltip
-npm run build
-```
-
-This strategy ensures consistent UI/UX across the entire Wealthfolio ecosystem
-while maintaining developer efficiency and user experience.
+Financial display tokens `gain`, `loss` and `flat` fall back to the existing
+`success`, `destructive` and `foreground` variables when absent. Destructive
+controls accept separate background, hover and foreground tokens, with legacy
+color/opacity fallbacks for older hosts. This separates financial loss colors
+from destructive control contrast without requiring existing hosts to adopt new
+tokens immediately.

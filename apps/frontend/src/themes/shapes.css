@@ -1,0 +1,16 @@
+/* Defaults live in component classes so caller overrides remain effective. */
+:root[data-theme] h1 {
+  letter-spacing: -0.035em;
+}
+:root[data-theme] h2 {
+  letter-spacing: -0.025em;
+}
+:root[data-theme] label:has(:is([role="switch"], [role="checkbox"])) {
+  min-height: 2.75rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

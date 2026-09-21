@@ -37,12 +37,17 @@
     "tsc": "tsc -b",
     "type-check": "pnpm run build:types && pnpm -r type-check",
     "type-check:root": "pnpm --filter frontend type-check",
-    "check": "pnpm format:check && pnpm lint:quiet && pnpm type-check",
+    "check": "pnpm themes:generate && pnpm themes:check && pnpm format:check && pnpm lint:quiet && pnpm type-check",
     "publish:sdk": "cd packages/addon-sdk && npm publish --access public",
     "publish:ui": "cd packages/ui && npm publish --access public",
     "publish:addon-dev-tools": "cd packages/addon-dev-tools && npm publish --access public",
     "addon:create": "cd packages/addon-dev-tools && node cli.js create",
-    "addon:dev": "cd packages/addon-dev-tools && node dev-server.js"
+    "addon:dev": "cd packages/addon-dev-tools && node dev-server.js",
+    "themes:generate": "pnpm --filter frontend themes:generate",
+    "themes:check": "pnpm --filter frontend themes:check",
+    "themes:contrast": "pnpm --filter frontend themes:contrast",
+    "themes:test": "pnpm --filter frontend themes:test",
+    "test:e2e:design-system": "playwright test --config playwright.design-system.config.ts"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.1",

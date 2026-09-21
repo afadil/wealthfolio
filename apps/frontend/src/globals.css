@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "../public/themes.css";
+@import "../../../packages/ui/src/theme-mapping.css";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 @source "../../../packages/ui/src";
@@ -212,66 +214,19 @@
 
 @theme inline {
   /* Spacing/Sizing theme tokens - inherit from CSS variables */
-  --spacing-input-height: var(--input-height);
+  --spacing-input-height: var(--theme-control-height, var(--input-height));
   --spacing-button-height: var(--button-height);
   --spacing-sheet-padding: var(--sheet-padding);
   --font-size-sheet-title: var(--sheet-title-size);
   --font-size-input: var(--font-size-base);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-md: max(0px, calc(var(--radius) - 2px));
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Semantic colors */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
+  /* Fixed brand colour for the Connect login; not part of the theme contract. */
   --color-connect-brand: var(--connect-brand);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-input-bg: var(--input-bg);
-  --color-ring: var(--ring);
-
-  /* Chart colors */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-chart-6: var(--chart-6);
-  --color-chart-7: var(--chart-7);
-  --color-chart-8: var(--chart-8);
-  --color-chart-9: var(--chart-9);
-
-  /* Sidebar colors */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 
   /* Custom color palettes */
   --color-blue-50: #e1eceb;
@@ -404,59 +359,6 @@
   --flexoki-ye: 45 99% 34%;
   --flexoki-bl: 214 67% 39%;
 
-  /* Shadcn tokens as full HSL colors */
-  --background: hsl(var(--flexoki-bg));
-  --foreground: hsl(var(--flexoki-tx));
-  --card: hsl(var(--flexoki-bg-2));
-  --card-foreground: hsl(var(--flexoki-tx));
-  --popover: hsl(var(--flexoki-bg-2));
-  --popover-foreground: hsl(var(--flexoki-tx));
-  --primary: hsl(var(--flexoki-tx));
-  --primary-foreground: hsl(var(--flexoki-bg));
-  --secondary: hsl(var(--flexoki-ui-2));
-  --secondary-foreground: hsl(var(--flexoki-tx-2));
-  --muted: hsl(var(--flexoki-ui));
-  --muted-foreground: hsl(var(--flexoki-tx-2));
-  --accent: hsl(var(--flexoki-ui));
-  --accent-foreground: hsl(var(--flexoki-tx-2));
-  --destructive: hsl(var(--flexoki-re));
-  --destructive-foreground: hsl(var(--flexoki-bg));
-  --success: hsl(var(--flexoki-gr));
-  --success-foreground: hsl(var(--flexoki-bg));
-  --warning: hsl(var(--flexoki-ye));
-  --warning-foreground: hsl(var(--flexoki-bg));
-  --info: hsl(var(--flexoki-bl));
-  --info-foreground: hsl(var(--flexoki-bg));
-  --border: hsl(var(--flexoki-ui));
-  --input: hsl(var(--flexoki-ui));
-  --input-bg: hsl(var(--flexoki-bg));
-  --ring: hsl(var(--flexoki-ui-3));
-
-  /* Charts (allocation palette: forest / sage / sand / clay / plum + stone) */
-  --chart-1: #355c4c;
-  --chart-2: #7e9f8c;
-  --chart-3: #cbba8c;
-  --chart-4: #c08a5f;
-  --chart-5: #9a7e92;
-  --chart-6: hsl(49 7% 70%);
-  --chart-7: hsl(55 10% 79%);
-  --chart-8: hsl(50 14% 83%);
-  --chart-9: hsl(51 21% 88%);
-  --chart-stone: #b1aa9a;
-
-  /* Sidebar (full hsl colors) */
-  --sidebar: hsl(var(--flexoki-bg));
-  --sidebar-foreground: hsl(var(--flexoki-tx));
-  --sidebar-primary: hsl(var(--flexoki-tx));
-  --sidebar-primary-foreground: hsl(var(--flexoki-bg));
-  --sidebar-accent: hsl(var(--flexoki-ui));
-  --sidebar-accent-foreground: hsl(var(--flexoki-tx-2));
-  --sidebar-border: hsl(var(--flexoki-ui));
-  --sidebar-ring: hsl(var(--flexoki-ui-3));
-
-  --liquid-glass-bg: rgba(255, 255, 255, 0.05);
-  --liquid-glass-border: rgba(255, 255, 255, 0.1);
-
   --inset-top: env(safe-area-inset-top, 0px);
   --inset-right: env(safe-area-inset-right, 0px);
   --inset-bottom: env(safe-area-inset-bottom, 0px);
@@ -468,23 +370,6 @@
   --mobile-safe-area-bottom: min(env(safe-area-inset-bottom, 0px), 44px);
   --mobile-nav-bottom-offset: max(var(--mobile-nav-gap), var(--mobile-safe-area-bottom));
   --mobile-nav-total-offset: calc(var(--mobile-nav-ui-height) + var(--mobile-nav-bottom-offset));
-
-  /* Sonner toast overrides - solid backgrounds for better readability */
-  --toast-bg: hsl(var(--flexoki-bg-2));
-  --toast-fg: hsl(var(--flexoki-tx));
-  --toast-border: hsl(var(--flexoki-ui-2));
-  --toast-success-bg: var(--color-green-50);
-  --toast-success-fg: var(--color-green-700);
-  --toast-success-border: var(--color-green-200);
-  --toast-error-bg: var(--color-red-50);
-  --toast-error-fg: var(--color-red-700);
-  --toast-error-border: var(--color-red-200);
-  --toast-warning-bg: var(--color-orange-50);
-  --toast-warning-fg: var(--color-orange-700);
-  --toast-warning-border: var(--color-orange-200);
-  --toast-info-bg: var(--color-blue-50);
-  --toast-info-fg: var(--color-blue-700);
-  --toast-info-border: var(--color-blue-200);
 }
 
 .dark {
@@ -501,40 +386,6 @@
   --flexoki-re: 5 61% 54%;
   --flexoki-gr: 72 46% 41%;
   --flexoki-ye: 45 82% 45%;
-  --flexoki-bl: 210 47% 50%;
-
-  /* Dark chart palette — same semantic hues as light (forest / sage / sand /
-     clay / plum + stone), tuned for the dark surface: forest is lifted for
-     contrast, the stones are pulled down so they stay calm instead of glaring. */
-  --chart-1: hsl(156 28% 44%);
-  --chart-2: #7e9f8c;
-  --chart-3: #cbba8c;
-  --chart-4: #c08a5f;
-  --chart-5: #9a7e92;
-  --chart-6: hsl(49 8% 60%);
-  --chart-7: hsl(55 10% 67%);
-  --chart-8: hsl(50 13% 72%);
-  --chart-9: hsl(51 18% 77%);
-  --chart-stone: hsl(49 8% 60%);
-
-  /* Sonner toast overrides for dark mode - solid backgrounds for better readability */
-  --toast-bg: hsl(var(--flexoki-bg-2));
-  --toast-fg: hsl(var(--flexoki-tx));
-  --toast-border: hsl(var(--flexoki-ui-2));
-  --toast-success-bg: var(--color-green-950);
-  --toast-success-fg: var(--color-green-100);
-  --toast-success-border: var(--color-green-800);
-  --toast-error-bg: var(--color-red-950);
-  --toast-error-fg: var(--color-red-200);
-  --toast-error-border: var(--color-red-800);
-  --toast-warning-bg: var(--color-orange-950);
-  --toast-warning-fg: var(--color-orange-200);
-  --toast-warning-border: var(--color-orange-800);
-  --toast-info-bg: var(--color-blue-950);
-  --toast-info-fg: var(--color-blue-200);
-  --toast-info-border: var(--color-blue-800);
-
-  --input: hsl(var(--flexoki-ui-2));
 }
 
 @layer base {
@@ -784,7 +635,7 @@ body.qr-scan-active > .qr-overlay {
 
   .json-preview .json-number:hover {
     background-color: hsl(var(--primary) / 0.15);
-    color: hsl(var(--primary));
+    color: var(--primary);
   }
 
   /* Desktop responsive adjustments */
@@ -1057,7 +908,7 @@ summary {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: hsl(var(--flexoki-tx-2));
+  background: var(--muted-foreground);
   border: 2px solid var(--color-card);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   cursor: grab;
@@ -1069,70 +920,24 @@ summary {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: hsl(var(--flexoki-tx-2));
+  background: var(--muted-foreground);
   border: 2px solid var(--color-card);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   cursor: grab;
-}
-
-/* Olive palette for retirement-planner income streams.
-   All hues live in the olive / green-yellow band (95–140) so nothing reads as brown.
-   Differentiation comes from L and hue-shifts inside that band.
-   Light mode uses darker L for contrast on cream cards; .dark lifts L for dark cards. */
-:root {
-  --fi-stream-1: oklch(0.52 0.1 100); /* warm yellow-olive */
-  --fi-stream-2: oklch(0.46 0.09 125); /* mid olive */
-  --fi-stream-3: oklch(0.6 0.07 140); /* sage */
-  --fi-stream-4: oklch(0.56 0.09 110); /* standard olive */
-  --fi-stream-5: oklch(0.5 0.08 135); /* deep cool olive */
-}
-.dark {
-  --fi-stream-1: oklch(0.78 0.11 100);
-  --fi-stream-2: oklch(0.72 0.1 125);
-  --fi-stream-3: oklch(0.82 0.07 140);
-  --fi-stream-4: oklch(0.75 0.09 110);
-  --fi-stream-5: oklch(0.7 0.09 135);
 }
 
 /* When-you-spend heatmap (apps/frontend/src/features/spending). Forest accent
    in light mode, bright leaf in dark; per-mode opacity floor so the dimmest
    cells stay legible against either background. */
 :root {
-  --heatmap-accent: oklch(0.4 0.07 150);
   --heatmap-empty-opacity: 0.07;
   --heatmap-min-opacity: 0.18;
   --heatmap-range-opacity: 0.75;
 }
 .dark {
-  --heatmap-accent: oklch(0.78 0.13 150);
   --heatmap-empty-opacity: 0.1;
   --heatmap-min-opacity: 0.25;
   --heatmap-range-opacity: 0.7;
-}
-
-/* Spending-module shared chart tokens. --status-warn is the "approaching
-   budget" amber (was #C28B47); --bar-stripe is the diagonal-stripe overlay on
-   budget meters; --chart-cursor is the Recharts hover-cursor tint. */
-:root {
-  --status-warn: oklch(0.66 0.11 60);
-  --bar-stripe: rgba(255, 255, 255, 0.25);
-  --chart-cursor: rgba(0, 0, 0, 0.04);
-}
-.dark {
-  --status-warn: oklch(0.78 0.13 70);
-  --bar-stripe: rgba(0, 0, 0, 0.25);
-  --chart-cursor: rgba(255, 255, 255, 0.06);
-}
-
-/* Events timeline — fallback tag color when an event type has no user-picked
-   color, plus the "today" marker color. */
-:root {
-  --event-default: oklch(0.4 0.07 150);
-  --event-today: oklch(0.78 0.13 90);
-}
-.dark {
-  --event-default: oklch(0.78 0.13 150);
-  --event-today: oklch(0.85 0.16 90);
 }
 
 /* Shared pairing progress animation for source and receiving devices. */
