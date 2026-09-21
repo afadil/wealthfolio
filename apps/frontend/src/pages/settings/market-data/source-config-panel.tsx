@@ -525,7 +525,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                     </FormLabel>
                     <FormControl>
                       <select
-                        className="bg-background border-input ring-offset-background focus-visible:ring-ring flex h-9 w-[180px] rounded-md border px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="bg-background border-input ring-offset-background focus-visible:ring-ring rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex h-9 w-[180px] border px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         {...field}
                         onChange={(e) => {
                           field.onChange(e.target.value as "GET" | "POST");

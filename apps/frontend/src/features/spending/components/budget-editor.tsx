@@ -1065,7 +1065,7 @@ function GroupEditDialogBody({
                   value={draftStartingBalance}
                   onChange={(event) => setDraftStartingBalance(event.target.value)}
                   placeholder="0"
-                  className="bg-background border-input focus-visible:ring-ring/40 text-foreground placeholder:text-muted-foreground/70 h-8 w-full rounded-md border px-2 text-right text-xs tabular-nums outline-none focus-visible:ring-2"
+                  className="bg-background border-input focus-visible:ring-ring/40 text-foreground placeholder:text-muted-foreground/70 rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-8 w-full border px-2 text-right text-xs tabular-nums outline-none focus-visible:ring-2"
                 />
               </div>
             </div>
@@ -1637,7 +1637,7 @@ function CopyFromMonthRow({
           : t("spending:budgetEditor.copyPreserve")}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="bg-background border-input flex items-center rounded-md border px-2">
+        <div className="bg-background border-input rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex items-center border px-2">
           <Icons.Calendar className="text-muted-foreground h-3.5 w-3.5" />
           <input
             type="month"

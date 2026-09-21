@@ -36,7 +36,7 @@ import { MoneyFlowSection } from "./money-flow-section";
 // ─── shared chrome ────────────────────────────────────────────────────────
 
 const CARD_CLASS =
-  "border-border/60 bg-card/40 bg-gradient-to-br from-white/[0.07] via-transparent to-black/[0.04] dark:from-white/[0.025] dark:to-black/[0.06] rounded-2xl border p-5 backdrop-blur-xl";
+  "border-border/60 bg-card/40 bg-gradient-to-br from-white/[0.07] via-transparent to-black/4 dark:from-white/2.5 dark:to-black/6 rounded-(--theme-card-radius,1rem) border p-5 backdrop-blur-xl";
 const LABEL_CLASS =
   "text-muted-foreground/70 text-[10px] font-semibold uppercase tracking-[0.12em]";
 const SAVINGS_GROUP_KEY = "savings";
@@ -981,7 +981,7 @@ function BreakdownCanvas({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={t("spending:whereIAm.sortByLabel", { label: t(SORT_LABEL_KEYS[sort]) })}
-              className="bg-secondary text-foreground hover:bg-secondary/80 inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ring)]"
+              className="bg-secondary text-foreground hover:bg-secondary/80 focus-visible:ring-(--ring) inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium tabular-nums focus-visible:outline-none focus-visible:ring-1"
             >
               {t(SORT_LABEL_KEYS[sort])}
               <Icons.ChevronDown className="size-3 opacity-60" />
@@ -1034,7 +1034,7 @@ function BreakdownCanvas({
         })}
       </div>
 
-      <div className="md:border-border/60 md:bg-card/40 md:overflow-hidden md:rounded-2xl md:border md:backdrop-blur-xl">
+      <div className="md:border-border/60 md:bg-card/40 md:rounded-(--theme-card-radius,1rem) md:overflow-hidden md:border md:backdrop-blur-xl">
         <CategoryHierarchyTable
           breakdown={filteredBreakdown}
           priorBreakdown={priorBreakdown}

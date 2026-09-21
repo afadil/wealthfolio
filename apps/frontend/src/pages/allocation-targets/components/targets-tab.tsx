@@ -1105,7 +1105,7 @@ function TargetEditor({
                 <div className="text-foreground mb-2 text-[12.5px] font-medium">
                   {t("allocation:editor.minTradeAmount")}
                 </div>
-                <div className="border-input bg-background focus-within:ring-ring flex h-9 items-center rounded-md border px-3 focus-within:ring-2">
+                <div className="border-input bg-background focus-within:ring-ring rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex h-9 items-center border px-3 focus-within:ring-2">
                   <input
                     type="number"
                     min="0"
@@ -1129,7 +1129,7 @@ function TargetEditor({
                 <div className="text-foreground mb-2 text-[12.5px] font-medium">
                   {t("allocation:editor.maxTurnover")}
                 </div>
-                <div className="border-input bg-background focus-within:ring-ring flex h-9 items-center rounded-md border px-3 focus-within:ring-2">
+                <div className="border-input bg-background focus-within:ring-ring rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex h-9 items-center border px-3 focus-within:ring-2">
                   <input
                     type="number"
                     min="0"

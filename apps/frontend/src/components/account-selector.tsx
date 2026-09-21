@@ -1,3 +1,4 @@
+import { fieldStyles } from "@wealthfolio/ui/components/ui/field-styles";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Command,
@@ -206,7 +207,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
       switch (variant) {
         case "card":
           return (
-            <div className="border-border bg-background/50 h-full w-full rounded-lg border border-dashed p-2">
+            <div className="border-border bg-background/50 rounded-(--theme-card-radius,var(--radius)) h-full w-full border border-dashed p-2">
               <div className="flex flex-col items-center justify-center space-y-1">
                 <Skeleton className="h-8 w-8 rounded-full" />
                 <div className="space-y-0.5 text-center">
@@ -254,7 +255,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               aria-expanded={open}
               aria-label={t("common:component.select_an_account")}
               className={cn(
-                "h-full w-full justify-center rounded-lg border p-2 transition-colors",
+                "rounded-(--theme-card-radius,var(--radius)) h-full w-full justify-center border p-2 transition-colors",
                 !selectedAccount && "border-dashed",
                 open
                   ? "border-primary bg-primary/5"
@@ -347,7 +348,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               aria-label={iconOnly ? t("common:component.select_account") : undefined}
               size={iconOnly ? "icon" : "sm"}
               className={cn(
-                "bg-secondary/30 hover:bg-muted/80 flex items-center rounded-full border-none",
+                "bg-secondary/30 hover:bg-muted/80 rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex items-center border-none",
                 iconOnly ? "h-9 w-9 p-0" : "h-10 gap-1.5 px-3 py-1 text-sm font-medium",
                 className,
               )}
@@ -393,7 +394,8 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               role="combobox"
               aria-expanded={open}
               className={cn(
-                "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                "ring-offset-background placeholder:text-muted-foreground focus:ring-ring flex w-full items-center justify-between focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+                fieldStyles,
                 className,
               )}
             >
@@ -425,7 +427,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
               aria-expanded={open}
               aria-label={iconOnly ? t("common:component.add_account") : undefined}
               className={cn(
-                "bg-secondary/30 hover:bg-muted/80 flex items-center gap-1.5 rounded-md border-dashed text-sm font-medium",
+                "bg-secondary/30 hover:bg-muted/80 rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex items-center gap-1.5 border-dashed text-sm font-medium",
                 iconOnly ? "h-9 w-9 p-0" : "h-8 px-3 py-1",
                 className,
               )}

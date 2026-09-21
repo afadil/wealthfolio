@@ -15,7 +15,8 @@ import { useAmountFormatting } from "@wealthfolio/ui";
 import { getVisibleSpendingAmount } from "../../../lib/constants";
 import { createZonedDayHourFormatter, type ZonedDayHour } from "../../../lib/timezone";
 
-const CARD_CLASS = "border-border/60 bg-card/40 rounded-2xl border p-5 backdrop-blur-xl";
+const CARD_CLASS =
+  "border-border/60 bg-card/40 rounded-(--theme-card-radius,1rem) border p-5 backdrop-blur-xl";
 const LABEL_CLASS = "text-muted-foreground/70 text-[10px] font-normal uppercase tracking-[0.12em]";
 
 const DAY_NAME_KEYS = [
@@ -229,7 +230,7 @@ function Row({
               key={i}
               type="button"
               onClick={() => onCellClick(weekdayIndex, startHour, Math.min(24, endHour + 1))}
-              className="aspect-square rounded-[3px] transition-all hover:scale-110 hover:ring-1 hover:ring-[var(--ring)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ring)]"
+              className="hover:ring-(--ring) focus-visible:ring-(--ring) aspect-square rounded-[3px] transition-all hover:scale-110 hover:ring-1 focus-visible:outline-none focus-visible:ring-1"
               style={{ backgroundColor: "var(--heatmap-accent)", opacity }}
               title={label}
               aria-label={label}

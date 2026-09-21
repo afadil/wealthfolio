@@ -145,8 +145,11 @@ export function AdvancedOptionsSection<TFieldValues extends FieldValues = FieldV
       onOpenChange={setIsOpen}
       className={cn(
         "w-full",
-        dashed && "border-border rounded-lg border border-dashed px-4 py-1",
-        !dashed && isMobile && "bg-muted/30 rounded-md border px-3 py-2",
+        dashed &&
+          "border-border rounded-(--theme-card-radius,var(--radius)) border border-dashed px-4 py-1",
+        !dashed &&
+          isMobile &&
+          "bg-muted/30 rounded-(--theme-card-radius,calc(var(--radius)-2px)) border px-3 py-2",
       )}
     >
       <CollapsibleTrigger asChild>

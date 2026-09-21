@@ -55,8 +55,8 @@ export const Thread: FC<ThreadProps> = ({ composerActions }) => {
             }}
           />
           {/* Spacer to prevent last message from being hidden behind sticky composer + mobile nav */}
-          <div className="h-[var(--mobile-nav-total-offset)] shrink-0 md:h-0" />
-          <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) sticky bottom-[var(--mobile-nav-total-offset)] z-10 mx-auto mt-auto flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:bottom-0 md:pb-6">
+          <div className="h-(--mobile-nav-total-offset) shrink-0 md:h-0" />
+          <ThreadPrimitive.ViewportFooter className="aui-thread-viewport-footer bg-background max-w-(--thread-max-width) bottom-(--mobile-nav-total-offset) sticky z-10 mx-auto mt-auto flex w-full flex-col gap-4 overflow-visible rounded-t-3xl pb-4 md:bottom-0 md:pb-6">
             <ThreadScrollToBottom />
             <Composer composerActions={composerActions} />
             <p className="text-muted-foreground/70 text-center text-xs">
@@ -157,7 +157,7 @@ const Composer: FC<ComposerProps> = ({ composerActions }) => {
   const { t } = useTranslation();
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 dark:bg-background shadow-xs flex w-full flex-col rounded-3xl border px-1 pt-2 outline-none transition-[color,box-shadow] has-[textarea:focus-visible]:ring-[3px] data-[dragging=true]:border-dashed">
+      <ComposerPrimitive.AttachmentDropzone className="aui-composer-attachment-dropzone border-input bg-background has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-ring/50 data-[dragging=true]:border-ring data-[dragging=true]:bg-accent/50 dark:bg-background shadow-xs rounded-(--theme-card-radius,1.5rem) flex w-full flex-col border px-1 pt-2 outline-none transition-[color,box-shadow] has-[textarea:focus-visible]:ring-[3px] data-[dragging=true]:border-dashed">
         <ComposerAttachments />
         <ComposerPrimitive.Input
           placeholder={t("ai:thread.composerPlaceholder")}
@@ -376,7 +376,7 @@ const UserMessage: FC = () => {
       <UserMessageAttachments />
 
       <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
-        <div className="aui-user-message-content bg-muted text-foreground wrap-break-word rounded-3xl px-5 py-2.5 text-sm">
+        <div className="aui-user-message-content bg-muted text-foreground wrap-break-word rounded-(--theme-card-radius,1.5rem) px-5 py-2.5 text-sm">
           <MessagePrimitive.Parts
             components={{
               Reasoning: Reasoning,

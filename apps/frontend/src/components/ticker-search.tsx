@@ -1,3 +1,4 @@
+import { fieldStyles } from "@wealthfolio/ui/components/ui/field-styles";
 import { searchTicker } from "@/adapters";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { debounce } from "@/lib/debounce";
@@ -484,7 +485,9 @@ const TickerSearchInput = forwardRef<HTMLButtonElement, SearchProps>(
               variant="outline"
               role="combobox"
               className={cn(
-                "min-h-input-height h-auto w-full justify-between rounded-md px-3 py-2",
+                "min-h-input-height h-auto w-full justify-between",
+                fieldStyles,
+                "min-h-input-height h-auto",
                 open && "ring-ring ring-2",
                 className,
               )}

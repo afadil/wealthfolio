@@ -49,7 +49,7 @@ export function DashboardCard({
           ) : null)}
       </div>
       <div
-        className={`border-border/40 rounded-xl border backdrop-blur-xl ${elevated ? "bg-card/90 shadow-xs" : "bg-card/70"} ${padded ? "p-3 md:p-4" : ""} ${className ?? ""}`}
+        className={`border-border/40 rounded-(--theme-card-radius,calc(var(--radius)+4px)) border border-x-[length:var(--theme-card-side-border,1px)] border-b-[length:var(--theme-card-bottom-border,1px)] backdrop-blur-xl ${elevated ? "bg-card/90 shadow-(--theme-card-shadow,0_1px_2px_0_rgb(0_0_0/0.05))" : "bg-card/70"} ${padded ? "p-3 md:p-4" : ""} ${className ?? ""}`}
       >
         {children}
       </div>

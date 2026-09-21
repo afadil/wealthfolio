@@ -1,3 +1,4 @@
+import { fieldStyles } from "@wealthfolio/ui/components/ui/field-styles";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -545,13 +546,13 @@ export function CashActivityForm({
                                       <label
                                         htmlFor={`spending-mobile-type-${type}`}
                                         className={cn(
-                                          "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all",
+                                          "rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex cursor-pointer items-start gap-3 border p-4 transition-all",
                                           "hover:bg-muted/50",
                                           "peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5",
                                           "active:scale-[0.98]",
                                         )}
                                       >
-                                        <div className="mt-0.5 flex-shrink-0">
+                                        <div className="mt-0.5 shrink-0">
                                           <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full transition-colors">
                                             <Icon className="text-muted-foreground h-5 w-5" />
                                           </div>
@@ -618,7 +619,7 @@ export function CashActivityForm({
                             <Button
                               type="button"
                               variant="outline"
-                              className="w-full justify-start gap-2"
+                              className="rounded-(--theme-control-radius,calc(var(--radius)-2px)) w-full justify-start gap-2"
                               disabled={!watchAccountId}
                               onClick={handleTransferAction}
                             >
@@ -634,14 +635,14 @@ export function CashActivityForm({
                       <button
                         type="button"
                         className={cn(
-                          "flex w-full items-start gap-3 rounded-lg border p-4 text-left transition-all",
+                          "rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex w-full items-start gap-3 border p-4 text-left transition-all",
                           "hover:bg-muted/50 active:scale-[0.98]",
                           "disabled:cursor-not-allowed disabled:opacity-50",
                         )}
                         disabled={!watchAccountId}
                         onClick={handleTransferAction}
                       >
-                        <div className="mt-0.5 flex-shrink-0">
+                        <div className="mt-0.5 shrink-0">
                           <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full transition-colors">
                             <Icons.ArrowLeftRight className="text-muted-foreground h-5 w-5" />
                           </div>
@@ -712,7 +713,7 @@ export function CashActivityForm({
                               {isNeutralBucket ? t("spending:filters.category") : categoryLabel}
                             </FormLabel>
                             {isNeutralBucket ? (
-                              <div className="border-input bg-muted/40 text-muted-foreground h-input-height flex items-center rounded-md border px-3 py-2 text-sm">
+                              <div className="border-input bg-muted/40 text-muted-foreground h-input-height rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex items-center border px-3 py-2 text-sm">
                                 {t("spending:cashForm.neutralTransfer")}
                               </div>
                             ) : (
@@ -725,7 +726,10 @@ export function CashActivityForm({
                                   <FormControl>
                                     <button
                                       type="button"
-                                      className="border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                                      className={cn(
+                                        "border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex w-full items-center justify-between border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+                                        fieldStyles,
+                                      )}
                                       aria-label={
                                         currentCat
                                           ? t("spending:transactions.changeCategory", {
@@ -778,7 +782,10 @@ export function CashActivityForm({
                         trigger={
                           <button
                             type="button"
-                            className="border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            className={cn(
+                              "border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex w-full items-center justify-between border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+                              fieldStyles,
+                            )}
                             aria-label={
                               eventId && eventsById.get(eventId)
                                 ? t("spending:transactions.changeEvent", {

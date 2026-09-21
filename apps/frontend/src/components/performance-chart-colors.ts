@@ -1,10 +1,11 @@
+// Separate from allocation colors to preserve the existing Flexoki performance palette.
 export const PERFORMANCE_CHART_COLORS = [
-  "#4385BE", // blue-400
-  "#CE5D97", // magenta-400
-  "#3AA99F", // cyan-400
-  "#8B7EC8", // purple-400
-  "#879A39", // green-400
-  "#D0A215", // yellow-500
-  "#DA702C", // orange-400
-  "#D14D41", // red-400
+  "var(--performance-series-1, #4385BE)",
+  "var(--performance-series-2, #CE5D97)",
+  "var(--performance-series-3, #3AA99F)",
+  "var(--performance-series-4, #8B7EC8)",
+  "var(--performance-series-5, #879A39)",
+  "var(--performance-series-6, #D0A215)",
+  "var(--performance-series-7, #DA702C)",
+  "var(--performance-series-8, #D14D41)",
 ] as const;

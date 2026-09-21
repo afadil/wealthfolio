@@ -259,7 +259,6 @@ export function SymbolSearch<TFieldValues extends FieldValues = FieldValues>({
             {isManualAsset ? (
               <Input
                 placeholder={t("activity:symbol_placeholder")}
-                className="h-10"
                 {...field}
                 onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                 aria-label={resolvedLabel}

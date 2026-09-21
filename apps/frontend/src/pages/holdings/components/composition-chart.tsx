@@ -29,20 +29,81 @@ function noop() {
   return undefined;
 }
 
-function getDarkModeSnapshot(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.documentElement.classList.contains("dark");
+interface TreemapPalette {
+  positiveLow: number[];
+  positiveHigh: number[];
+  negativeLow: number[];
+  negativeHigh: number[];
+  labelDark: number[];
+  labelLight: number[];
+  surface: number[];
+  isDark: boolean;
 }
 
-function subscribeToDarkModeChange(onStoreChange: () => void): () => void {
+const paletteTokens = {
+  positiveLow: "heatmap-positive-low",
+  positiveHigh: "heatmap-positive-high",
+  negativeLow: "heatmap-negative-low",
+  negativeHigh: "heatmap-negative-high",
+  labelDark: "heatmap-label-dark",
+  labelLight: "heatmap-label-light",
+  surface: "card",
+} as const;
+
+const fallbackPalette: TreemapPalette = {
+  positiveLow: [205, 217, 191],
+  positiveHigh: [53, 92, 76],
+  negativeLow: [233, 179, 168],
+  negativeHigh: [209, 78, 66],
+  labelDark: [28, 42, 36],
+  labelLight: [245, 243, 236],
+  surface: [250, 248, 235],
+  isDark: false,
+};
+let paletteKey = "";
+let paletteSnapshot = fallbackPalette;
+
+export function getTreemapPaletteSnapshot(): TreemapPalette {
+  if (typeof document === "undefined") return fallbackPalette;
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+  const colors = Object.values(paletteTokens).map((token) =>
+    style.getPropertyValue(`--${token}`).trim(),
+  );
+  const isDark = root.classList.contains("dark");
+  const key = JSON.stringify([root.dataset.theme, isDark, colors]);
+  if (key === paletteKey) return paletteSnapshot;
+
+  // Canvas resolves supported CSS color spaces into sRGB for the existing ramp.
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const next = { ...fallbackPalette, isDark };
+  if (context) {
+    Object.keys(paletteTokens).forEach((name, index) => {
+      if (!colors[index]) return;
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = colors[index];
+      context.fillRect(0, 0, 1, 1);
+      next[name as keyof typeof paletteTokens] = Array.from(
+        context.getImageData(0, 0, 1, 1).data,
+      ).slice(0, 3);
+    });
+  }
+  paletteKey = key;
+  paletteSnapshot = next;
+  return paletteSnapshot;
+}
+
+export function subscribeToTreemapTheme(onStoreChange: () => void): () => void {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") {
     return noop;
   }
-
   const observer = new MutationObserver(onStoreChange);
   observer.observe(document.documentElement, {
     attributes: true,
-    attributeFilter: ["class"],
+    attributeFilter: ["class", "data-theme", "style"],
   });
   return () => observer.disconnect();
 }
@@ -72,27 +133,20 @@ const DisplayModeToggle: React.FC<{
   );
 };
 
-// Treemap heatmap palette — symbols colored by return.
-// Matches the "Allocation Concept E - Unified" design: gains lerp from a light
-// sage to a deep green, losses from a light clay to a deep red.
-const POS_LO = [205, 217, 191]; // #cdd9bf
-const POS_HI = [53, 92, 76]; // #355c4c
-// Loss ramp tuned to the theme's --destructive (flexoki red). NEG_HI matches the
-// dark-mode token hsl(5 61% 54%) = #d14e42; NEG_LO is a saturated tint of the same
-// hue so small losses read red-tinted instead of washed-out pink.
-const NEG_LO = [233, 179, 168]; // #e9b3a8
-const NEG_HI = [209, 78, 66]; // #d14e42
-
 const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
 
-// Label colors picked from tile luminance (not the theme) so text stays legible
-// on every shade. Dark mode uses translucent tiles, so it always needs light text.
-const TILE_TEXT_DARK = "#1c2a24";
-const TILE_TEXT_LIGHT = "#f5f3ec";
+function luminance(color: number[]): number {
+  const linear = color.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
 
-interface TreemapTile {
-  fill: string;
-  isLightTile: boolean; // bright fill → use dark text
+export function tileContrast(label: number[], background: number[]): number {
+  const a = luminance(label);
+  const b = luminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 // Shade by return using a saturating curve `t = m / (m + k)` that maps
@@ -100,9 +154,15 @@ interface TreemapTile {
 // instead of collapsing into a single shade. `k` is the return magnitude that
 // maps to the mid-tone (losses ramp ~2× faster, matching the design). Values
 // are fractions: 0.5 = +50%, 0.025 = +2.5% for the smaller daily returns.
-function getTreemapColor(gain: number, returnType: ReturnType): TreemapTile {
+export function getTreemapColor(
+  gain: number,
+  returnType: ReturnType,
+  palette: TreemapPalette = fallbackPalette,
+) {
   const isGain = isNaN(gain) || gain >= 0;
-  const [lo, hi] = isGain ? [POS_LO, POS_HI] : [NEG_LO, NEG_HI];
+  const [lo, hi] = isGain
+    ? [palette.positiveLow, palette.positiveHigh]
+    : [palette.negativeLow, palette.negativeHigh];
   const k = isGain
     ? returnType === "daily"
       ? 0.025
@@ -114,9 +174,27 @@ function getTreemapColor(gain: number, returnType: ReturnType): TreemapTile {
   const m = isNaN(gain) ? 0 : Math.abs(gain);
   const t = m / (m + k);
   const c = lo.map((v, i) => lerp(v, hi[i], t));
-  // Perceived luminance (ITU-R BT.601); >150 reads as a light tile.
-  const luminance = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
-  return { fill: `rgb(${c.join(",")})`, isLightTile: luminance > 150 };
+  const opacity = palette.isDark ? 0.45 : 1;
+  const composited = c.map(
+    (channel, index) => channel * opacity + palette.surface[index] * (1 - opacity),
+  );
+  let label =
+    tileContrast(palette.labelDark, composited) >= tileContrast(palette.labelLight, composited)
+      ? palette.labelDark
+      : palette.labelLight;
+  // Preserve curated labels wherever they work; mid-tone tiles can require a
+  // neutral label to reach normal-text contrast without altering financial fill.
+  if (tileContrast(label, composited) < 4.5) {
+    label =
+      tileContrast([0, 0, 0], composited) >= tileContrast([255, 255, 255], composited)
+        ? [0, 0, 0]
+        : [255, 255, 255];
+  }
+  return {
+    fill: `rgb(${c.join(",")})`,
+    textColor: `rgb(${label.join(",")})`,
+    contrast: tileContrast(label, composited),
+  };
 }
 
 // Function to truncate text based on available width
@@ -146,7 +224,7 @@ interface CustomizedContentProps {
   gain?: number;
   displayMode?: DisplayMode;
   returnType?: ReturnType;
-  isDark?: boolean;
+  palette?: TreemapPalette;
 }
 
 const CustomizedContent: FC<CustomizedContentProps> = ({
@@ -161,13 +239,12 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
   gain = 0,
   displayMode = "symbol",
   returnType = "daily",
-  isDark = false,
+  palette = fallbackPalette,
 }) => {
   const formatting = useNumberFormatting();
   const fontSize = Math.min(width, height) < 80 ? Math.min(width, height) * 0.16 : 13;
   const fontSize2 = Math.min(width, height) < 80 ? Math.min(width, height) * 0.14 : 12;
-  const { fill: fillColor, isLightTile } = getTreemapColor(gain, returnType);
-  const textColor = isDark || !isLightTile ? TILE_TEXT_LIGHT : TILE_TEXT_DARK;
+  const { fill: fillColor, textColor } = getTreemapColor(gain, returnType, palette);
 
   // Determine what text to display based on mode
   const displayText = displayMode === "name" && name ? name : symbol;
@@ -191,7 +268,7 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
           fill: depth === 1 ? fillColor : undefined,
           // Soften tiles in dark mode so they blend into the background instead
           // of reading as bright rectangles on near-black.
-          fillOpacity: depth === 1 && isDark ? 0.45 : undefined,
+          fillOpacity: depth === 1 && palette.isDark ? 0.45 : undefined,
           cursor: "pointer",
         }}
       />
@@ -328,7 +405,11 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
   );
   const { settings } = useSettingsContext();
   const { t } = useTranslation();
-  const isDark = useSyncExternalStore(subscribeToDarkModeChange, getDarkModeSnapshot, () => false);
+  const palette = useSyncExternalStore(
+    subscribeToTreemapTheme,
+    getTreemapPaletteSnapshot,
+    () => fallbackPalette,
+  );
 
   const toggleDisplayMode = () => {
     setDisplayMode(displayMode === "symbol" ? "name" : "symbol");
@@ -442,7 +523,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
                 {...props}
                 displayMode={displayMode}
                 returnType={returnType}
-                isDark={isDark}
+                palette={palette}
               />
             )}
           >

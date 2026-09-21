@@ -9,9 +9,10 @@ export type Palette = {
 export const FOREST_THEME: Palette = {
   key: "forest",
   label: "Forest",
-  hsl: "hsl(155 32% 26%)",
-  deep: "#2A573F",
-  mid: "#71A290",
+  hsl: "var(--spending-accent)",
+  deep: "var(--spending-deep)",
+  mid: "var(--spending-mid)",
 };
 
-export const themeBg = (p: Palette, alpha: number): string => p.hsl.replace(")", ` / ${alpha})`);
+export const themeBg = (p: Palette, alpha: number): string =>
+  `color-mix(in srgb, ${p.hsl} ${alpha * 100}%, transparent)`;

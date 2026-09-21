@@ -249,7 +249,7 @@ const HoldingRow = memo(
                     }}
                     value={tickerField.value}
                     placeholder={t("activity:search_ticker_placeholder")}
-                    className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 truncate rounded-md border text-sm focus:border"
+                    className="focus:border-input focus:bg-background bg-muted/40 border-border/40 rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-9 truncate border text-sm focus:border"
                     data-testid={`bulk-holding-ticker-${index}`}
                   />
                 )}
@@ -279,7 +279,7 @@ const HoldingRow = memo(
               <QuantityInput
                 {...sharesField}
                 placeholder={t("activity:form.bulk_placeholder_shares")}
-                className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 rounded-md border text-sm focus:border"
+                className="focus:border-input focus:bg-background bg-muted/40 border-border/40 rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-9 border text-sm focus:border"
                 onKeyDown={handleSharesKeyDown}
                 data-testid={`bulk-holding-shares-${index}`}
               />
@@ -296,7 +296,7 @@ const HoldingRow = memo(
               <MoneyInput
                 {...priceField}
                 placeholder={t("activity:form.bulk_placeholder_avg_cost")}
-                className="focus:border-input focus:bg-background bg-muted/40 border-border/40 h-9 rounded-md border text-sm focus:border"
+                className="focus:border-input focus:bg-background bg-muted/40 border-border/40 rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-9 border text-sm focus:border"
                 onKeyDown={handleCostKeyDown}
                 data-testid={`bulk-holding-cost-${index}`}
               />

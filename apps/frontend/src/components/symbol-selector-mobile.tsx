@@ -1,3 +1,4 @@
+import { fieldStyles } from "@wealthfolio/ui/components/ui/field-styles";
 import { searchTicker } from "@/adapters";
 import { getExchangeDisplayName } from "@/lib/constants";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -178,7 +179,8 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
               role="combobox"
               size="lg"
               className={cn(
-                "w-full justify-between truncate rounded-md font-normal",
+                "w-full justify-between truncate rounded-md",
+                fieldStyles,
                 !value && "text-muted-foreground",
                 className,
               )}
@@ -319,7 +321,7 @@ export const SymbolSelectorMobile = forwardRef<HTMLButtonElement, SymbolSelector
                         placeholder={t("common:search_symbols")}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-14 w-full rounded-md border px-4 py-3 pl-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        className="bg-background border-input ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring rounded-(--theme-control-radius,calc(var(--radius)-2px)) h-14 w-full border px-4 py-3 pl-12 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         autoFocus
                       />
                     </div>

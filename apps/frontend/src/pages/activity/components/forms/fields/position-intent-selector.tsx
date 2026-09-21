@@ -54,7 +54,7 @@ export function PositionIntentSelector<TFieldValues extends FieldValues = FieldV
           role="group"
           aria-label={t("activity:form.position")}
           className={cn(
-            "bg-muted grid h-10 w-full grid-cols-2 gap-1 rounded-lg p-1",
+            "bg-muted rounded-(--theme-segmented-radius,var(--radius)) grid h-10 w-full grid-cols-2 gap-1 p-1",
             hideLabel ? "h-9 sm:w-44" : "sm:w-56",
           )}
         >
@@ -68,7 +68,7 @@ export function PositionIntentSelector<TFieldValues extends FieldValues = FieldV
                 aria-pressed={isSelected}
                 onClick={() => field.onChange(intent.value)}
                 className={cn(
-                  "flex cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium transition-colors",
+                  "flex cursor-pointer items-center justify-center rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] px-4 text-sm font-medium transition-colors",
                   "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                   isSelected
                     ? "bg-background text-foreground shadow-sm"

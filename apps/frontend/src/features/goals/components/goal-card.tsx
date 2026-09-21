@@ -160,7 +160,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
     <Link to={`/goals/${goal.id}`} className="group block">
       <Card className="overflow-hidden p-0 transition-shadow hover:shadow-md">
         {/* Top cover image panel */}
-        <div className="bg-secondary/50 relative h-[156px] overflow-hidden">
+        <div className="bg-secondary/50 relative isolate h-[156px] overflow-hidden">
           <img
             src={coverImage}
             alt=""
@@ -173,6 +173,17 @@ export function GoalCard({ goal }: { goal: Goal }) {
 
           {/* Dark-mode blend: softens bright image bg against the dark card */}
           <div className="pointer-events-none absolute inset-0 hidden bg-black/30 mix-blend-multiply dark:block" />
+
+          {/* Theme tint affects the cover only, leaving captions and status colors intact. */}
+          <div
+            aria-hidden="true"
+            data-slot="goal-image-tint"
+            className="pointer-events-none absolute inset-0 mix-blend-multiply"
+            style={{
+              backgroundColor: "var(--theme-image-tint, transparent)",
+              opacity: "var(--theme-image-tint-opacity, 0)",
+            }}
+          />
 
           {/* Bottom gradient — quote legibility in both themes */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 via-black/20 via-60% to-transparent" />

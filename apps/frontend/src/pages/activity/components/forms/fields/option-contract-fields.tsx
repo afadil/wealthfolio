@@ -219,7 +219,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
           return (
             <FormItem>
               <FormControl>
-                <div className="bg-muted relative flex items-center gap-1 rounded-lg p-1">
+                <div className="bg-muted rounded-(--theme-segmented-radius,var(--radius)) relative flex items-center gap-1 p-1">
                   {optionTypes.map((option) => {
                     const isSelected = field.value === option.value;
                     return (
@@ -228,7 +228,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                         type="button"
                         onClick={() => field.onChange(option.value)}
                         className={cn(
-                          "relative z-10 flex flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                          "relative z-10 flex flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] px-4 py-2 text-sm font-medium transition-colors",
                           "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                           isSelected
                             ? "text-foreground"
@@ -238,7 +238,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                         {isSelected && (
                           <motion.div
                             layoutId={`option-type-indicator-${optionTypeId}`}
-                            className="bg-background absolute inset-0 -z-10 rounded-md shadow-sm"
+                            className="bg-background absolute inset-0 -z-10 rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] shadow-sm"
                             initial={false}
                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
                           />
@@ -283,7 +283,6 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                   {...field}
                   value={field.value as number | undefined}
                   maxDecimalPlaces={3}
-                  className="h-10"
                   aria-label={t("activity:form.strike_price")}
                 />
               </FormControl>

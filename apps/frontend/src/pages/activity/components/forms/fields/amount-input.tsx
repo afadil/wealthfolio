@@ -79,11 +79,11 @@ export function AmountInput<TFieldValues extends FieldValues = FieldValues>({
             )}
           </div>
           {currency ? (
-            <InputGroup className="bg-input-bg h-input-height shadow-xs min-w-0 rounded-md">
+            <InputGroup className="min-w-0">
               <FormControl>
                 <MoneyInput
                   data-slot="input-group-control"
-                  className="aria-invalid:ring-0 min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0"
+                  className="aria-invalid:ring-0 pointer-coarse:min-h-0 h-full min-h-0 min-w-0 flex-1 rounded-none border-0 bg-transparent shadow-none ring-0 focus-visible:ring-0 max-sm:min-h-0 dark:bg-transparent"
                   ref={field.ref}
                   name={field.name}
                   value={field.value}

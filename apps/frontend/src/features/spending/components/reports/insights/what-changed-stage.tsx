@@ -36,7 +36,8 @@ import type {
 import { CategoryIcon } from "../../category-chips";
 import { formatPercentValue } from "./format";
 
-const CARD_CLASS = "border-border/60 bg-card/40 rounded-2xl border p-5 backdrop-blur-xl";
+const CARD_CLASS =
+  "border-border/60 bg-card/40 rounded-(--theme-card-radius,1rem) border p-5 backdrop-blur-xl";
 const LABEL_CLASS =
   "text-muted-foreground/70 text-[10px] font-semibold uppercase tracking-[0.12em]";
 
@@ -736,7 +737,7 @@ function ComparisonTable({
   const hidePct = periodState.kind === "no_prior_period";
 
   return (
-    <div className="border-border/60 bg-card/40 overflow-x-auto rounded-2xl border backdrop-blur-xl">
+    <div className="border-border/60 bg-card/40 rounded-(--theme-card-radius,1rem) overflow-x-auto border backdrop-blur-xl">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-border/40 text-muted-foreground/70 border-b text-[10px] font-semibold uppercase tracking-[0.12em]">

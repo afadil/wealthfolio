@@ -90,11 +90,12 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
         role="combobox"
         aria-expanded={open}
         className={cn(
-          "flex items-center gap-2 font-medium",
+          "rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex items-center gap-2 font-medium",
           triggerVariant === "input"
-            ? "bg-background/70 text-foreground hover:bg-background/70 focus-visible:border-foreground w-full justify-between rounded-lg border px-3 py-2.5 text-[14px] font-semibold shadow-none"
-            : "bg-secondary/30 hover:bg-muted/80 rounded-full border-none",
-          triggerVariant === "icon" && "bg-secondary/50 h-8 w-8 justify-center rounded-full p-0",
+            ? "bg-background/70 text-foreground hover:bg-background/70 focus-visible:border-foreground w-full justify-between border px-3 py-2.5 text-[14px] font-semibold shadow-none"
+            : "bg-secondary/30 hover:bg-muted/80 border-none",
+          triggerVariant === "icon" &&
+            "bg-secondary/50 rounded-(--theme-button-radius,9999px) h-8 w-8 justify-center p-0",
           triggerVariant === "default" &&
             (isMobile
               ? "h-9 w-9 justify-center p-0"

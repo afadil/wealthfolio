@@ -50,7 +50,12 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
   };
 
   return (
-    <div className={cn("bg-muted relative flex items-center gap-1 rounded-lg p-1", className)}>
+    <div
+      className={cn(
+        "bg-muted rounded-(--theme-segmented-radius,var(--radius)) relative flex items-center gap-1 p-1",
+        className,
+      )}
+    >
       {assetTypes.map((type) => {
         const Icon = Icons[type.icon];
         const isSelected = field.value === type.value;
@@ -61,7 +66,7 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
             onClick={() => handleSelect(type.value)}
             type="button"
             className={cn(
-              "relative z-10 flex flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+              "relative z-10 flex flex-1 cursor-pointer select-none items-center justify-center gap-2 rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] px-4 py-2 text-sm font-medium transition-colors",
               "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
               isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
@@ -69,7 +74,7 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
             {isSelected && (
               <motion.div
                 layoutId={`asset-type-indicator-${uniqueId}`}
-                className="bg-background absolute inset-0 -z-10 rounded-md shadow-sm"
+                className="bg-background absolute inset-0 -z-10 rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] shadow-sm"
                 initial={false}
                 transition={{
                   type: "spring",

@@ -53,7 +53,7 @@ export function TimezoneInput({ value, onChange, timezones, placeholder }: Timez
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "h-input-height w-full justify-between rounded-md",
+            "h-input-height rounded-(--theme-control-radius,calc(var(--radius)-2px)) w-full justify-between",
             !value && "text-muted-foreground",
           )}
         >

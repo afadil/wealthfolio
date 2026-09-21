@@ -100,7 +100,7 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                       })
                 }
                 className={cn(
-                  "border-input bg-card hover:bg-muted/50 group flex w-full items-center gap-3 rounded-lg border py-2.5 pl-3 text-left transition-colors sm:w-auto sm:min-w-[160px]",
+                  "border-input bg-card hover:bg-muted/50 rounded-(--theme-control-radius,var(--radius)) group flex w-full items-center gap-3 border py-2.5 pl-3 text-left transition-colors sm:w-auto sm:min-w-[160px]",
                   "focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
                   "disabled:cursor-not-allowed disabled:opacity-60",
                   preset.installed && "border-success/40 bg-success/5",

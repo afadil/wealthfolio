@@ -1,3 +1,5 @@
+import { cn } from "@wealthfolio/ui/lib/utils";
+import { fieldStyles } from "@wealthfolio/ui/components/ui/field-styles";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -376,7 +378,10 @@ export function EventFormDialog({
                                     })
                                   : t("spending:eventForm.selectEventType")
                               }
-                              className="border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+                              className={cn(
+                                "border-input bg-input-bg dark:bg-input/30 hover:bg-accent/30 ring-offset-background focus:ring-ring h-input-height rounded-(--theme-control-radius,calc(var(--radius)-2px)) flex w-full items-center justify-between border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2",
+                                fieldStyles,
+                              )}
                             >
                               {selectedType ? (
                                 <span className="flex min-w-0 items-center gap-2">

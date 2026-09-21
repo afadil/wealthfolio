@@ -18,7 +18,8 @@ import type { EventSpendingSummary } from "../../../types/event";
 import { useEventDialog } from "../../event-dialog-provider";
 import { getEventColors } from "./event-colors";
 
-const CARD_CLASS = "border-border/60 bg-card/40 rounded-2xl border p-4 backdrop-blur-xl";
+const CARD_CLASS =
+  "border-border/60 bg-card/40 rounded-(--theme-card-radius,1rem) border p-4 backdrop-blur-xl";
 const LABEL_CLASS = "text-muted-foreground/70 text-[10px] font-normal uppercase tracking-[0.12em]";
 
 interface Props {

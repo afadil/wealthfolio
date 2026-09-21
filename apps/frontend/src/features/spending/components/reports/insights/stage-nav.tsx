@@ -35,7 +35,7 @@ export function StageNav({ stage, onStageChange }: StageNavProps) {
   return (
     <nav
       aria-label={t("spending:insights.stagesLabel")}
-      className="border-border/60 bg-card/40 flex items-center gap-1 overflow-x-auto rounded-2xl border p-1 backdrop-blur-xl"
+      className="border-border/60 bg-card/40 rounded-(--theme-card-radius,1rem) flex items-center gap-1 overflow-x-auto border p-1 backdrop-blur-xl"
     >
       {STAGES.map((s) => {
         const active = stage === s.id;
