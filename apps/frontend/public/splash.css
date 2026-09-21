@@ -204,6 +204,12 @@ html:not(.profile-opening) #root:empty::before,
   }
 }
 
+/* The branded splash stays dark until React renders the application. */
+body:has(#root:not(:empty)) {
+  background-color: var(--background, #100f0f);
+  color: var(--foreground, #fafafa);
+}
+
 /*
  * Keep the root positioned without creating a stacking context. Normal root
  * content still paints above the body background, while fixed host navigation

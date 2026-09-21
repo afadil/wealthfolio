@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { generate } from "./theme-generate.mjs";
 
 const forwardedViteArgs = process.argv.slice(2);
 const children = new Set();
@@ -25,6 +26,10 @@ async function stop(code) {
 process.once("SIGINT", () => void stop(130));
 process.once("SIGTERM", () => void stop(143));
 
+await generate();
+const themeWatcher = spawnPnpm(["exec", "node", "scripts/theme-generate.mjs", "--watch"]);
+themeWatcher.once("exit", (code) => void stop(typeof code === "number" ? code : 1));
+
 const initialBuild = spawnPnpm([
   "exec",
   "vite",
@@ -34,7 +39,7 @@ const initialBuild = spawnPnpm([
 ]);
 const [initialCode] = await once(initialBuild, "exit");
 if (initialCode !== 0) {
-  process.exitCode = typeof initialCode === "number" ? initialCode : 1;
+  await stop(typeof initialCode === "number" ? initialCode : 1);
 } else {
   const runtimeWatcher = spawnPnpm([
     "exec",

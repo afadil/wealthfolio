@@ -7,6 +7,8 @@ pub const INSIGHTS_OVERVIEW_LAYOUT_KEY: &str = "insights_overview_layout";
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    #[serde(default = "default_theme_id")]
+    pub theme_id: String,
     pub theme: String,
     pub font: String,
     pub language: String,
@@ -26,9 +28,14 @@ pub struct Settings {
     pub insights_overview_layout: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+fn default_theme_id() -> String {
+    "flexoki".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            theme_id: default_theme_id(),
             theme: "light".to_string(),
             font: "font-mono".to_string(),
             language: "en".to_string(),
@@ -49,6 +56,7 @@ impl Default for Settings {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsUpdate {
+    pub theme_id: Option<String>,
     pub theme: Option<String>,
     pub font: Option<String>,
     pub language: Option<String>,
@@ -76,4 +84,40 @@ pub struct Sort {
 pub struct AppSetting {
     pub setting_key: String,
     pub setting_value: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_settings_json_defaults_palette_without_changing_appearance() {
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("themeId");
+        value["theme"] = serde_json::json!("system");
+        value["font"] = serde_json::json!("font-serif");
+
+        let settings: Settings = serde_json::from_value(value).unwrap();
+        assert_eq!(settings.theme_id, "flexoki");
+        assert_eq!(settings.theme, "system");
+        assert_eq!(settings.font, "font-serif");
+    }
+
+    #[test]
+    fn unknown_palette_round_trips_and_omitted_updates_remain_partial() {
+        let settings = Settings {
+            theme_id: "future-palette".to_string(),
+            ..Settings::default()
+        };
+        let json = serde_json::to_value(settings).unwrap();
+        assert_eq!(json["themeId"], "future-palette");
+        let restored: Settings = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.theme_id, "future-palette");
+
+        let update: SettingsUpdate =
+            serde_json::from_value(serde_json::json!({ "theme": "dark" })).unwrap();
+        assert!(update.theme_id.is_none());
+        assert!(update.font.is_none());
+        assert_eq!(update.theme.as_deref(), Some("dark"));
+    }
 }

@@ -919,6 +919,8 @@ export interface Settings {
   insightsOverviewLayout?: Record<string, unknown> | null;
   /** Read-only restore state, absent on older backends. */
   restoreReconnectRequired?: boolean;
+  /** Absent on older hosts; the provider resolves missing IDs to Flexoki. */
+  themeId?: string;
   theme: string;
   font: string;
   language: string;

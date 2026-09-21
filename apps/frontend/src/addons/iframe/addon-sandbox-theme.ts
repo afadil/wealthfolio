@@ -1,4 +1,5 @@
 export interface AddonThemeSnapshot {
+  themeId?: string;
   backgroundColor: string;
   colorScheme: string;
   cssVariables: Record<string, string>;
@@ -25,6 +26,7 @@ export function collectAddonThemeSnapshot(): AddonThemeSnapshot {
   }
 
   return {
+    themeId: document.documentElement.getAttribute("data-theme") ?? undefined,
     backgroundColor: bodyStyle.backgroundColor || rootStyle.backgroundColor || "transparent",
     colorScheme: rootStyle.colorScheme || themeClass,
     cssVariables,
@@ -41,6 +43,9 @@ export function applyHostTheme(theme?: Partial<AddonThemeSnapshot>) {
   }
 
   const htmlElement = document.documentElement;
+  if (theme.themeId !== undefined) {
+    htmlElement.setAttribute("data-theme", theme.themeId);
+  }
   if (theme.themeClass) {
     htmlElement.classList.remove("light", "dark");
     htmlElement.classList.add(theme.themeClass);

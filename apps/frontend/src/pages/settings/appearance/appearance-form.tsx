@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
+import { CuratedThemeSelector } from "@/components/curated-theme-selector";
+import { isThemeId } from "@/themes/generated/registry";
 import { FontSelector } from "@/components/font-selector";
 import { NavigationStyleSelector } from "@/components/navigation-style-selector";
 import { ThemeSelector } from "@/components/theme-selector";
@@ -41,14 +43,14 @@ export function AppearanceForm() {
     }),
     menuBarVisible: z.boolean(),
   });
-  const defaultValues: Partial<AppearanceFormValues> = {
-    theme: settings?.theme as AppearanceFormValues["theme"],
-    font: settings?.font as AppearanceFormValues["font"],
+  const defaultValues: AppearanceFormValues = {
+    theme: (settings?.theme ?? "system") as AppearanceFormValues["theme"],
+    font: (settings?.font ?? "font-mono") as AppearanceFormValues["font"],
     menuBarVisible: settings?.menuBarVisible ?? true,
   };
   const form = useForm<AppearanceFormValues>({
     resolver: zodResolver(appearanceFormSchema),
-    defaultValues,
+    values: defaultValues,
   });
 
   function handlePartialUpdate(data: Partial<AppearanceFormValues>) {
@@ -92,7 +94,9 @@ export function AppearanceForm() {
           render={({ field }) => (
             <FormItem className="space-y-3">
               <div className="space-y-1">
-                <FormLabel className="text-base font-medium">{t("settings:theme")}</FormLabel>
+                <FormLabel className="text-base font-medium">
+                  {t("settings:appearance_mode_title")}
+                </FormLabel>
                 <FormDescription className="text-sm">
                   {t("settings:appearance_theme_description")}
                 </FormDescription>
@@ -111,6 +115,25 @@ export function AppearanceForm() {
             </FormItem>
           )}
         />
+
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-medium">{t("settings:appearance_palette_title")}</h2>
+            <p className="text-muted-foreground text-sm">
+              {t("settings:appearance_palette_description")}
+            </p>
+          </div>
+          <CuratedThemeSelector
+            value={settings?.themeId}
+            onChange={(themeId) => {
+              if (isThemeId(themeId)) {
+                updateSettings({ themeId }).catch((error) => {
+                  console.error("Failed to update appearance settings:", error);
+                });
+              }
+            }}
+          />
+        </section>
 
         {!isMobile && (
           <div className="space-y-3">

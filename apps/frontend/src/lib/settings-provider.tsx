@@ -6,6 +6,8 @@ import { isTauri, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
+import { isThemeId, resolveThemeId } from "@/themes/generated/registry";
+
 import { getPlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
@@ -20,6 +22,7 @@ interface ExtendedSettingsContextType extends SettingsContextType {
       Pick<
         Settings,
         | "theme"
+        | "themeId"
         | "font"
         | "language"
         | "formattingRegion"
@@ -36,7 +39,9 @@ interface ExtendedSettingsContextType extends SettingsContextType {
   refetch: () => Promise<void>;
 }
 
-const SettingsContext = createContext<ExtendedSettingsContextType | undefined>(undefined);
+// Allow isolated component previews without mounting settings persistence effects.
+// eslint-disable-next-line react-refresh/only-export-components
+export const SettingsContext = createContext<ExtendedSettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { data, error, isLoading, isError, refetch } = useSettings();
@@ -61,6 +66,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       Pick<
         Settings,
         | "theme"
+        | "themeId"
         | "font"
         | "language"
         | "formattingRegion"
@@ -75,6 +81,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     >,
   ) => {
     if (!settings) throw new Error("Settings not loaded");
+    if (updates.themeId !== undefined && !isThemeId(updates.themeId)) {
+      throw new Error("Unknown theme selection");
+    }
     await updateMutation.mutateAsync(updates);
   };
 
@@ -84,7 +93,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       void applySettingsToDocument(data)
         .then(() => {
           if (!cancelled) {
-            setSettings(data);
+            setSettings({ ...data, themeId: data.themeId ?? "flexoki" });
             setAppearanceReady(true);
             setAppearanceError(undefined);
           }
@@ -193,6 +202,10 @@ export function useSettingsContext() {
 }
 // Keep references to system theme listeners so we can clean up when switching modes
 let appearanceGeneration = 0;
+// Bumped only when OS theme listeners are torn down. Palette/font-only calls skip
+// re-registering listeners, so listener guards must not use the per-call counter.
+let themeGeneration = 0;
+let activeThemeMode: string | null = null;
 let tauriThemeUnlisten: (() => void) | null = null;
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryUnsubscribe: (() => void) | null = null;
@@ -206,6 +219,8 @@ function applyResolvedTheme(resolved: "light" | "dark") {
 
 // Cleanup any existing system listeners
 function cleanupSystemThemeListeners() {
+  themeGeneration += 1;
+  activeThemeMode = null;
   if (tauriThemeUnlisten) {
     try {
       tauriThemeUnlisten();
@@ -248,6 +263,9 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   document.documentElement.setAttribute("lang", language);
   document.documentElement.setAttribute("dir", i18n.dir(language));
 
+  const requestedThemeId = newSettings.themeId ?? "flexoki";
+  document.documentElement.dataset.theme = resolveThemeId(requestedThemeId);
+
   // Font classes
   document.body.classList.remove("font-mono", "font-sans", "font-serif");
   document.body.classList.add(newSettings.font);
@@ -255,13 +273,18 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   // Cache pre-auth presentation settings so bootstrap UI does not flash defaults.
   try {
     localStorage.setItem("wealthfolio-theme", newSettings.theme);
+    localStorage.setItem("wealthfolio-theme-id", requestedThemeId);
+    localStorage.setItem("wealthfolio-font", newSettings.font);
     localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
   } catch {
     // noop – localStorage may be unavailable
   }
 
-  // Always clean up previous listeners before applying a new theme mode
+  // Palette/font updates do not need to re-register OS listeners.
+  if (activeThemeMode === newSettings.theme) return;
   cleanupSystemThemeListeners();
+  activeThemeMode = newSettings.theme;
+  const generation = themeGeneration;
 
   // Handle theme mode
   if (newSettings.theme === "system") {
@@ -291,19 +314,20 @@ const applySettingsToDocument = async (newSettings: Settings) => {
     (async () => {
       try {
         const currentWindow = await getDesktopWindow();
-        if (!currentWindow || application !== appearanceGeneration) return;
+        if (!currentWindow || generation !== themeGeneration) return;
         await currentWindow.setTheme(null);
+        if (generation !== themeGeneration) return;
         const current = await currentWindow.theme();
-        if (application !== appearanceGeneration) return;
+        if (generation !== themeGeneration) return;
         if (current === "dark" || current === "light") {
           applyResolvedTheme(current);
         }
         const unlisten = await currentWindow.onThemeChanged(({ payload }) => {
-          if (application !== appearanceGeneration) return;
+          if (generation !== themeGeneration) return;
           const next = payload === "dark" ? "dark" : "light";
           applyResolvedTheme(next);
         });
-        if (application !== appearanceGeneration) unlisten();
+        if (generation !== themeGeneration) unlisten();
         else tauriThemeUnlisten = unlisten;
       } catch {
         logger.error("Error setting window theme.");
@@ -322,7 +346,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   (async () => {
     try {
       const currentWindow = await getDesktopWindow();
-      if (!currentWindow || application !== appearanceGeneration) return;
+      if (!currentWindow || generation !== themeGeneration) return;
       await currentWindow.setTheme(explicit);
     } catch {
       logger.error("Error setting window theme.");

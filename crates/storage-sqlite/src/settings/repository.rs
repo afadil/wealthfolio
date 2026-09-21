@@ -38,6 +38,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
 
         for (key, value) in all_settings {
             match key.as_str() {
+                "theme_id" => settings.theme_id = value,
                 "theme" => settings.theme = value,
                 "font" => settings.font = value,
                 "language" => settings.language = value,
@@ -74,6 +75,16 @@ impl SettingsRepositoryTrait for SettingsRepository {
         let settings = new_settings.clone();
         self.writer
             .exec_tx(move |tx| {
+                if let Some(ref theme_id) = settings.theme_id {
+                    diesel::replace_into(app_settings)
+                        .values(&AppSettingDB {
+                            setting_key: "theme_id".to_string(),
+                            setting_value: theme_id.clone(),
+                        })
+                        .execute(tx.conn())
+                        .map_err(StorageError::from)?;
+                }
+
                 if let Some(ref theme) = settings.theme {
                     diesel::replace_into(app_settings)
                         .values(&AppSettingDB {
@@ -213,6 +224,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             Err(diesel::result::Error::NotFound) => {
                 // Return default values for known settings
                 let default_value = match setting_key_param {
+                    "theme_id" => "flexoki",
                     "theme" => "light",
                     "font" => "font-mono",
                     "language" => "en",
@@ -430,5 +442,37 @@ mod tests {
             repo.get_setting(INSIGHTS_OVERVIEW_LAYOUT_KEY).unwrap(),
             r#"{"version":6}"#
         );
+    }
+
+    #[tokio::test]
+    async fn palette_defaults_and_partial_updates_preserve_unknown_ids() {
+        let (repo, _dir) = setup().await;
+        assert_eq!(repo.get_setting("theme_id").unwrap(), "flexoki");
+        assert_eq!(repo.get_settings().unwrap().theme_id, "flexoki");
+
+        let palette_update: SettingsUpdate = serde_json::from_value(serde_json::json!({
+            "themeId": "future-palette",
+            "theme": "system",
+            "font": "font-serif"
+        }))
+        .unwrap();
+        repo.update_settings(&palette_update).await.unwrap();
+        let mode_update: SettingsUpdate =
+            serde_json::from_value(serde_json::json!({ "theme": "dark" })).unwrap();
+        repo.update_settings(&mode_update).await.unwrap();
+
+        let settings = repo.get_settings().unwrap();
+        assert_eq!(settings.theme_id, "future-palette");
+        assert_eq!(repo.get_setting("theme_id").unwrap(), "future-palette");
+        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.font, "font-serif");
+
+        let palette_update: SettingsUpdate =
+            serde_json::from_value(serde_json::json!({ "themeId": "mist" })).unwrap();
+        repo.update_settings(&palette_update).await.unwrap();
+        let settings = repo.get_settings().unwrap();
+        assert_eq!(settings.theme_id, "mist");
+        assert_eq!(settings.theme, "dark");
+        assert_eq!(settings.font, "font-serif");
     }
 }

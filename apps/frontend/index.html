@@ -20,10 +20,12 @@
          here makes Tauri nonce the CSP style-src at runtime, which disables
          'unsafe-inline' and breaks runtime-injected styles (NumberFlow, sonner,
          addon CSS) in packaged builds. See public/splash.css. -->
+    <link rel="stylesheet" href="/themes.css" />
     <link rel="stylesheet" href="/splash.css" />
   </head>
 
   <body class="overflow-x-hidden font-mono">
+    <script src="/theme-bootstrap.js"></script>
     <script>
       // Apply cached theme before first paint to prevent flash on login screen
       (function () {
