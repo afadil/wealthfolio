@@ -474,12 +474,13 @@ export function QuoteHistoryDataGrid({
                             {t("asset:quoteGrid.close")}
                           </label>
                           <MoneyInput
-                            value={entry.close}
+                            value={entry.close || ""}
                             maxDecimalPlaces={QUOTE_DECIMAL_PRECISION}
                             placeholder="0"
-                            onValueChange={(value) =>
-                              handleMobileFieldChange(entry.id, "close", value ?? 0)
-                            }
+                            onValueChange={(value, isUserEdit) => {
+                              if (!isUserEdit) return;
+                              handleMobileFieldChange(entry.id, "close", value ?? 0);
+                            }}
                           />
                         </div>
                         <div>
@@ -487,12 +488,13 @@ export function QuoteHistoryDataGrid({
                             {t("asset:quoteGrid.open")}
                           </label>
                           <MoneyInput
-                            value={entry.open}
+                            value={entry.open || ""}
                             maxDecimalPlaces={QUOTE_DECIMAL_PRECISION}
                             placeholder="0"
-                            onValueChange={(value) =>
-                              handleMobileFieldChange(entry.id, "open", value ?? 0)
-                            }
+                            onValueChange={(value, isUserEdit) => {
+                              if (!isUserEdit) return;
+                              handleMobileFieldChange(entry.id, "open", value ?? 0);
+                            }}
                           />
                         </div>
                         <div>
@@ -500,12 +502,13 @@ export function QuoteHistoryDataGrid({
                             {t("asset:quoteGrid.high")}
                           </label>
                           <MoneyInput
-                            value={entry.high}
+                            value={entry.high || ""}
                             maxDecimalPlaces={QUOTE_DECIMAL_PRECISION}
                             placeholder="0"
-                            onValueChange={(value) =>
-                              handleMobileFieldChange(entry.id, "high", value ?? 0)
-                            }
+                            onValueChange={(value, isUserEdit) => {
+                              if (!isUserEdit) return;
+                              handleMobileFieldChange(entry.id, "high", value ?? 0);
+                            }}
                           />
                         </div>
                         <div>
@@ -513,12 +516,13 @@ export function QuoteHistoryDataGrid({
                             {t("asset:quoteGrid.low")}
                           </label>
                           <MoneyInput
-                            value={entry.low}
+                            value={entry.low || ""}
                             maxDecimalPlaces={QUOTE_DECIMAL_PRECISION}
                             placeholder="0"
-                            onValueChange={(value) =>
-                              handleMobileFieldChange(entry.id, "low", value ?? 0)
-                            }
+                            onValueChange={(value, isUserEdit) => {
+                              if (!isUserEdit) return;
+                              handleMobileFieldChange(entry.id, "low", value ?? 0);
+                            }}
                           />
                         </div>
                         <div>
@@ -526,12 +530,13 @@ export function QuoteHistoryDataGrid({
                             {t("asset:quoteGrid.volume")}
                           </label>
                           <MoneyInput
-                            value={entry.volume}
+                            value={entry.volume || ""}
                             maxDecimalPlaces={0}
                             placeholder="0"
-                            onValueChange={(value) =>
-                              handleMobileFieldChange(entry.id, "volume", value ?? 0)
-                            }
+                            onValueChange={(value, isUserEdit) => {
+                              if (!isUserEdit) return;
+                              handleMobileFieldChange(entry.id, "volume", value ?? 0);
+                            }}
                           />
                         </div>
                       </div>

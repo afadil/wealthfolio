@@ -282,7 +282,7 @@ export function OptionContractFields<TFieldValues extends FieldValues = FieldVal
                 <MoneyInput
                   {...field}
                   value={field.value as number | undefined}
-                  maxDecimalPlaces={2}
+                  maxDecimalPlaces={3}
                   className="h-10"
                   aria-label={t("activity:form.strike_price")}
                 />
