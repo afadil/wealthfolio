@@ -29,6 +29,7 @@ const FORMATTING_REGION_OPTIONS = [
   ["IN", "india"],
   ["FR", "france"],
   ["DE", "germany"],
+  ["AT", "austria"],
   ["CH", "switzerland"],
   ["ES", "spain"],
   ["MX", "mexico"],
@@ -39,6 +40,8 @@ const FORMATTING_REGION_OPTIONS = [
   ["JP", "japan"],
   ["KR", "southKorea"],
   ["IT", "italy"],
+  ["RO", "romania"],
+  ["BG", "bulgaria"],
 ] as const;
 
 export function LanguageRegionSettings() {
