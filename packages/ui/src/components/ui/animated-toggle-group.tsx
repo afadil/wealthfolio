@@ -39,7 +39,8 @@ const animatedToggleItemVariants = cva(
       size: {
         default: "h-8 px-4 text-sm",
         xs: "h-7 px-2.5 md:px-3 text-xs",
-        compact: "h-8 px-3 text-xs",
+        // Phone period rows: the padding shrinks so nine proportional labels fit at 360px.
+        compact: "h-8 px-[clamp(0.375rem,2vw,0.75rem)] text-xs",
         sm: "h-8 px-3.5 text-xs",
         md: "h-9 px-4.5 text-sm",
         lg: "h-10 px-5 text-base",
