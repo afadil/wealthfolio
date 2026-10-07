@@ -81,6 +81,8 @@
   --heatmap-negative-high: #a82424;
   --heatmap-label-dark: #061809;
   --heatmap-label-light: #f1fff2;
+  /* Phosphor green for "below target"; over target stays red. */
+  --allocation-under: var(--primary);
 }
 
 .dark {

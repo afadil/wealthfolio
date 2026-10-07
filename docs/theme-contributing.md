@@ -80,6 +80,10 @@ role that ends in another family or points at another role. To suggest a font,
 add `/* @font font-sans */` (or `font-serif`, `font-mono`): choosing the theme
 also sets the Font setting, which the user can change afterwards.
 
+Target allocation drift uses `--allocation-over` and `--allocation-under`. They
+default to the theme's destructive and info text colours; override them when
+those clash with the palette.
+
 Theme selection remains
 `{ themeId: "flexoki", theme: "system", font: "font-sans" }`. Unknown saved IDs
 render Flexoki without overwriting the preference. Appearance stays
@@ -95,7 +99,7 @@ from the [tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r)
 [theme attribution](../apps/frontend/src/themes/NOTICE.md).
 
 The generated report checks normal-text pairs at 4.5:1, including destructive
-control states composited on canvas/card surfaces. It also checks the
+control states and target-allocation text on cards. It also checks the
 composition heatmap as it is drawn (dark tiles at 0.45 opacity over the card):
 mid-tone gain and loss tiles must differ in hue, not only in lightness (OKLab
 chroma distance of at least 0.06), and each must stand off the card (OKLab
@@ -103,3 +107,8 @@ distance of at least 0.1). Every shipped theme passes, with no exemptions or
 silent recoloring. Line-chart series distinguishability, native/mobile behavior
 and assistive technology need separate review; passing these checks is not
 complete accessibility certification.
+
+App code must take colours from theme tokens. `pnpm colors:check` counts raw
+Tailwind palette classes and hex literals per file and fails if any file gains
+one. After removing some, run `pnpm colors:check --update` to lower the
+baseline.

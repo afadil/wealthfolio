@@ -30,6 +30,8 @@ export const contrastPairs = [
   ["gain", "background"],
   ["loss", "background"],
   ["flat", "background"],
+  ["allocation-over", "card"],
+  ["allocation-under", "card"],
   ...["background", "card"].flatMap((canvas) =>
     ["destructive-control", "destructive-control-hover"].map((background) => [
       "destructive-control-foreground",

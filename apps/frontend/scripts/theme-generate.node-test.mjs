@@ -201,6 +201,8 @@ test("preserves Flexoki's pre-migration colors in both modes", async () => {
     flexoki: "c20cb45a31697da5bd80000c189d84a678efaffdf958bf947398783c13117685",
   };
   const { themes, colorTokens } = await loadThemes();
+  // Roles added after the migration have no legacy value; the audits cover them.
+  const legacyTokens = colorTokens.filter((token) => !token.startsWith("allocation-"));
   for (const [id, hash] of Object.entries(expected)) {
     const theme = themes.find((t) => t.id === id);
     assert.ok(theme, id);
@@ -208,7 +210,7 @@ test("preserves Flexoki's pre-migration colors in both modes", async () => {
       .update(
         JSON.stringify(
           ["light", "dark"].map((mode) =>
-            colorTokens.map((token) => parseColor(theme[mode][token])),
+            legacyTokens.map((token) => parseColor(theme[mode][token])),
           ),
         ),
       )

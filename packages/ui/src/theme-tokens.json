@@ -2,6 +2,8 @@
   "colorTokens": [
     "accent",
     "accent-foreground",
+    "allocation-over",
+    "allocation-under",
     "background",
     "bar-stripe",
     "border",

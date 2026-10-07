@@ -47,6 +47,9 @@
   --gain: var(--success);
   --loss: var(--destructive);
   --flat: var(--foreground);
+  /* Target allocation drift beyond the band, as text on cards. */
+  --allocation-over: var(--destructive);
+  --allocation-under: var(--toast-info-fg);
   --chart-cash: var(--chart-stone);
   --chart-benchmark: #587898;
   --chart-grid: var(--border);
@@ -116,6 +119,8 @@
   --gain: var(--success);
   --loss: var(--destructive);
   --flat: var(--foreground);
+  --allocation-over: var(--toast-error-fg);
+  --allocation-under: var(--toast-info-fg);
   --chart-cash: var(--chart-stone);
   --chart-benchmark: #98b6d3;
   --chart-grid: var(--border);

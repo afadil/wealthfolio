@@ -37,7 +37,8 @@
     "themes:generate": "node scripts/theme-generate.mjs",
     "themes:check": "node scripts/theme-generate.mjs --check",
     "themes:contrast": "node scripts/theme-generate.mjs --contrast",
-    "themes:test": "node --test scripts/theme-generate.node-test.mjs"
+    "themes:test": "node --test scripts/theme-generate.node-test.mjs",
+    "colors:check": "node scripts/raw-color-check.mjs"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.11.58",

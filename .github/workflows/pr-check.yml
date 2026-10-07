@@ -103,6 +103,7 @@ jobs:
           pnpm themes:check
           pnpm themes:test
           pnpm themes:contrast
+          pnpm colors:check
 
       - name: Build package types
         run: pnpm run build:types

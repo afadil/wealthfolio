@@ -599,8 +599,8 @@ const SpentThisPeriodCard: FC<SpentThisPeriodCardProps> = ({
               Math.abs(deltaPct) < 1
                 ? "bg-muted/50 text-muted-foreground"
                 : deltaPct > 0
-                  ? "bg-amber-100/60 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
-                  : "bg-success/15 text-success",
+                  ? "bg-toast-warning-bg text-toast-warning-fg"
+                  : "bg-toast-success-bg text-toast-success-fg",
             )}
           >
             {formatPercentValue(deltaPct, numberFormatting, { digits: 0, signDisplay: "always" })}{" "}

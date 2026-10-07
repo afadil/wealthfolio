@@ -140,7 +140,7 @@ export function DriftDriversCard({
                     <span
                       className={cn(
                         "shrink-0 text-[12.5px] font-bold tabular-nums",
-                        driver.isOver ? "text-destructive" : "text-blue-600 dark:text-blue-400",
+                        driver.isOver ? "text-allocation-over" : "text-allocation-under",
                       )}
                     >
                       {driver.drift}

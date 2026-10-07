@@ -37,7 +37,7 @@
     "tsc": "tsc -b",
     "type-check": "pnpm run build:types && pnpm -r type-check",
     "type-check:root": "pnpm --filter frontend type-check",
-    "check": "pnpm themes:generate && pnpm themes:check && pnpm format:check && pnpm lint:quiet && pnpm type-check",
+    "check": "pnpm themes:generate && pnpm themes:check && pnpm colors:check && pnpm format:check && pnpm lint:quiet && pnpm type-check",
     "publish:sdk": "cd packages/addon-sdk && npm publish --access public",
     "publish:ui": "cd packages/ui && npm publish --access public",
     "publish:addon-dev-tools": "cd packages/addon-dev-tools && npm publish --access public",
@@ -47,6 +47,7 @@
     "themes:check": "pnpm --filter frontend themes:check",
     "themes:contrast": "pnpm --filter frontend themes:contrast",
     "themes:test": "pnpm --filter frontend themes:test",
+    "colors:check": "pnpm --filter frontend colors:check",
     "test:e2e:design-system": "playwright test --config playwright.design-system.config.ts"
   },
   "devDependencies": {
