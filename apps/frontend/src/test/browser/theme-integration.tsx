@@ -6,6 +6,7 @@ import { SettingsProvider, useSettingsContext } from "@/lib/settings-provider";
 import { installProfileSession } from "@/features/profiles/session";
 import { CuratedThemeSelector } from "@/components/curated-theme-selector";
 import { FontSelector } from "@/components/font-selector";
+import { themeSelectionUpdate } from "@/themes/selection";
 import { AddonIframeManager } from "@/addons/iframe/addon-iframe-manager";
 import { Button, Card, CardContent, Input } from "@wealthfolio/ui";
 import "@/i18n/i18n";
@@ -68,7 +69,7 @@ export function Fixture() {
       <p>Synthetic settings backend required. No portfolio data.</p>
       <CuratedThemeSelector
         value={settings.themeId}
-        onChange={(themeId) => void updateSettings({ themeId })}
+        onChange={(themeId) => void updateSettings(themeSelectionUpdate(themeId))}
       />
       <label>
         Appearance mode{" "}

@@ -216,3 +216,34 @@ test("preserves Flexoki's pre-migration colors in both modes", async () => {
     assert.equal(actual, hash, id);
   }
 });
+
+test("font roles keep their generic family and @font suggests one", async (t) => {
+  const dir = await workspace(t);
+  const renamed = fixtureCss.replace("@name Flexoki", "@name Example");
+  for (const [id, source, error] of [
+    [
+      "remap",
+      renamed + "\n:root { --font-mono: var(--font-sans); }",
+      /--font-mono must end with monospace/,
+    ],
+    [
+      "sans",
+      renamed + '\n:root { --font-sans: "JetBrains Mono", monospace; }',
+      /--font-sans must end/,
+    ],
+    ["unknown", renamed.replace("@font font-mono", "@font font-cursive"), /@font must be one of/],
+  ]) {
+    const path = resolve(dir, `${id}.css`);
+    await writeFile(path, source);
+    await assert.rejects(loadThemes(dir), error);
+    await rm(path);
+  }
+  await writeFile(
+    resolve(dir, "example.css"),
+    renamed.replace("@font font-mono", "@font font-sans") +
+      '\n:root { --font-mono: ui-monospace, "SF Mono", monospace; }',
+  );
+  const { themes } = await loadThemes(dir);
+  assert.equal(themes.find(({ id }) => id === "example").font, "font-sans");
+  assert.equal(themes.find(({ id }) => id === "flexoki").font, "font-mono");
+});

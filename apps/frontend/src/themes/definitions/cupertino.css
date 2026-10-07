@@ -1,4 +1,5 @@
 /* @name Cupertino */
+/* @font font-sans */
 :root {
   /* Geometry follows iOS 26.5: 26pt grouped corners, capsule controls, 44pt
      touch targets, and nested radii kept concentric with their containers. */
@@ -16,14 +17,13 @@
   --theme-row-padding: 0.9375rem;
   --theme-image-tint: var(--primary);
   --theme-image-tint-opacity: 0.12;
-  /* SF Pro through the system stack. The app's default font setting is
-     font-mono, so mono is routed to SF Pro too; real code keeps SF Mono below. */
+  /* Apple's system faces for each role. Choosing the theme suggests Sans (SF
+     Pro); the Font setting still decides the role. */
   --theme-font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
     "Inter Variable", system-ui, sans-serif;
-  --theme-font-mono: var(--theme-font-sans);
   --font-sans: var(--theme-font-sans);
-  --font-mono: var(--theme-font-sans);
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
   --font-serif: "New York", ui-serif, Georgia, Cambria, "Times New Roman", serif;
   /* Depth, not outlines: borderless grouped cards lifted by a hairline and a
      short, low-opacity ambient shadow that survives clipping parents. */

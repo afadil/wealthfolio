@@ -5,6 +5,7 @@ import * as z from "zod";
 
 import { CuratedThemeSelector } from "@/components/curated-theme-selector";
 import { isThemeId } from "@/themes/generated/registry";
+import { themeSelectionUpdate } from "@/themes/selection";
 import { FontSelector } from "@/components/font-selector";
 import { NavigationStyleSelector } from "@/components/navigation-style-selector";
 import { ThemeSelector } from "@/components/theme-selector";
@@ -127,7 +128,7 @@ export function AppearanceForm() {
             value={settings?.themeId}
             onChange={(themeId) => {
               if (isThemeId(themeId)) {
-                updateSettings({ themeId }).catch((error) => {
+                updateSettings(themeSelectionUpdate(themeId)).catch((error) => {
                   console.error("Failed to update appearance settings:", error);
                 });
               }

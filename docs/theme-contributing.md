@@ -71,7 +71,14 @@ segments; optional `--theme-button-radius`, `--theme-segmented-radius`,
 `--theme-badge-radius` retain specialized geometry. `--theme-control-height`,
 padding, surface and shadow variables allow density/elevation overrides. Flexoki
 retains 8px fields, pill buttons/segments and its original card/dialog
-fallbacks. No theme should overwrite the user's selected font class.
+fallbacks.
+
+Fonts belong to the user. A theme may choose the typeface for each role
+(`--font-sans`, `--font-serif`, `--font-mono`), but each role must keep its
+generic family, so Mono always renders a monospace face. The generator rejects a
+role that ends in another family or points at another role. To suggest a font,
+add `/* @font font-sans */` (or `font-serif`, `font-mono`): choosing the theme
+also sets the Font setting, which the user can change afterwards.
 
 Theme selection remains
 `{ themeId: "flexoki", theme: "system", font: "font-sans" }`. Unknown saved IDs
