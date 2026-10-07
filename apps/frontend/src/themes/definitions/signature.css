@@ -157,10 +157,11 @@
   --loss: #ec8a7e;
   --flat: #a09c93;
   --heatmap-accent: #86bf9c;
-  --heatmap-positive-low: #1c2420;
-  --heatmap-positive-high: #4c6b57;
-  --heatmap-negative-low: #2a1d1b;
-  --heatmap-negative-high: #7e4a42;
+  /* Tiles are drawn at 0.45 over the card, so the ramp ends at gain and loss. */
+  --heatmap-positive-low: #213a2c;
+  --heatmap-positive-high: #86bf9c;
+  --heatmap-negative-low: #44272a;
+  --heatmap-negative-high: #ec8a7e;
   --heatmap-label-dark: #100f0f;
   --heatmap-label-light: #fffcf0;
   --status-warn: #e8b262;

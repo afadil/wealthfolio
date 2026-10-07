@@ -247,3 +247,31 @@ test("font roles keep their generic family and @font suggests one", async (t) =>
   assert.equal(themes.find(({ id }) => id === "example").font, "font-sans");
   assert.equal(themes.find(({ id }) => id === "flexoki").font, "font-mono");
 });
+
+test("heatmap tiles keep gain and loss apart by hue and stand off the card", async () => {
+  const { auditHeatmap } = await import("./theme-generate.mjs");
+  // Newspaper's former ink ramps: different lightness, no hue.
+  const grey = structuredClone(fixture);
+  for (const mode of ["light", "dark"])
+    Object.assign(grey[mode], {
+      "heatmap-positive-low": "#e1ded6",
+      "heatmap-positive-high": "#2d2b28",
+      "heatmap-negative-low": "#e1ded6",
+      "heatmap-negative-high": "#78736a",
+    });
+  assert.ok(
+    auditHeatmap([{ id: "grey", ...grey }]).some(
+      ({ check, pass }) => check === "heatmap-sign" && !pass,
+    ),
+  );
+  const flat = structuredClone(fixture);
+  for (const token of ["positive-low", "positive-high", "negative-low", "negative-high"])
+    flat.dark[`heatmap-${token}`] = flat.dark.card;
+  assert.ok(
+    auditHeatmap([{ id: "flat", ...flat }]).some(
+      ({ mode, check, pass }) => mode === "dark" && check.endsWith("visibility") && !pass,
+    ),
+  );
+  const { themes } = await loadThemes();
+  assert.ok(auditHeatmap(themes).every(({ pass }) => pass));
+});

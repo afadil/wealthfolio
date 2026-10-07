@@ -294,7 +294,7 @@ const CustomizedContent: FC<CustomizedContentProps> = ({
             y={y + height / 2 + fontSize}
             textAnchor="middle"
             fill={textColor}
-            className="text- font-thin"
+            className="tabular-nums"
             style={{
               fontSize: fontSize2,
             }}

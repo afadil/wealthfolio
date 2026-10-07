@@ -84,10 +84,11 @@
   --status-warn: #63490a;
   --event-default: #35332d;
   --event-today: #8a1c15;
-  --heatmap-positive-low: #e1ded6;
-  --heatmap-positive-high: #2d2b28;
-  --heatmap-negative-low: #e1ded6;
-  --heatmap-negative-high: #78736a;
+  /* Gain and loss inks from the financial pages, fading into the paper. */
+  --heatmap-positive-low: #dfe3d8;
+  --heatmap-positive-high: #2f5233;
+  --heatmap-negative-low: #ebdcd6;
+  --heatmap-negative-high: #8a1c15;
   --heatmap-label-dark: #171614;
   --heatmap-label-light: #fbfaf6;
   --spending-accent: #35332d;
@@ -165,10 +166,10 @@
   --status-warn: #d9b96b;
   --event-default: #c4bfb1;
   --event-today: #d8695c;
-  --heatmap-positive-low: #3a3730;
-  --heatmap-positive-high: #ede9de;
-  --heatmap-negative-low: #3a3730;
-  --heatmap-negative-high: #8d8779;
+  --heatmap-positive-low: #273c29;
+  --heatmap-positive-high: #9dbb96;
+  --heatmap-negative-low: #4a2a28;
+  --heatmap-negative-high: #d8695c;
   --heatmap-label-dark: #141310;
   --heatmap-label-light: #f4f2ec;
   --spending-accent: #c4bfb1;

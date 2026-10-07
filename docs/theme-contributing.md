@@ -95,7 +95,11 @@ from the [tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r)
 [theme attribution](../apps/frontend/src/themes/NOTICE.md).
 
 The generated report checks normal-text pairs at 4.5:1, including destructive
-control states composited on canvas/card surfaces. Every shipped theme passes,
-with no exemptions or silent recoloring. Chart distinguishability, native/mobile
-behavior and assistive technology need separate review; passing this check is
-not complete accessibility certification.
+control states composited on canvas/card surfaces. It also checks the
+composition heatmap as it is drawn (dark tiles at 0.45 opacity over the card):
+mid-tone gain and loss tiles must differ in hue, not only in lightness (OKLab
+chroma distance of at least 0.06), and each must stand off the card (OKLab
+distance of at least 0.1). Every shipped theme passes, with no exemptions or
+silent recoloring. Line-chart series distinguishability, native/mobile behavior
+and assistive technology need separate review; passing these checks is not
+complete accessibility certification.
