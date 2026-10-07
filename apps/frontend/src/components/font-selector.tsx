@@ -1,3 +1,4 @@
+import { SelectionCard } from "@/components/selection-card";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -33,21 +34,20 @@ export function FontSelector({ value, onChange, className }: FontSelectorProps) 
         <button
           key={font.value}
           type="button"
+          aria-pressed={value === font.value}
           onClick={() => onChange(font.value)}
-          className={cn(
-            "hover:bg-accent/50 relative flex flex-col items-center justify-center rounded-lg border-2 p-3 transition-all duration-200 sm:p-4",
-            value === font.value
-              ? "border-primary bg-accent/30"
-              : "border-muted hover:border-accent",
-          )}
+          className="focus-visible:ring-ring rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
-          <div className={cn("mb-1 text-xl font-medium sm:text-2xl", font.value)}>
-            {font.preview}
-          </div>
-          <div className="text-xs font-medium sm:text-sm">{t(`common:${font.labelKey}`)}</div>
-          {value === font.value && (
-            <div className="bg-primary absolute right-2 top-2 h-1.5 w-1.5 rounded-full" />
-          )}
+          <SelectionCard selected={value === font.value} label={t(`common:${font.labelKey}`)}>
+            <div
+              className={cn(
+                "flex h-14 items-center justify-center text-xl font-medium sm:h-16 sm:text-2xl",
+                font.value,
+              )}
+            >
+              {font.preview}
+            </div>
+          </SelectionCard>
         </button>
       ))}
     </div>

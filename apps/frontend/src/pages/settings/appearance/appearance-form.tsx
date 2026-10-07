@@ -106,6 +106,7 @@ export function AppearanceForm() {
               <FormControl>
                 <ThemeSelector
                   value={field.value}
+                  themeId={settings?.themeId}
                   onChange={(value) => {
                     field.onChange(value);
                     handlePartialUpdate({ theme: value as AppearanceFormValues["theme"] });

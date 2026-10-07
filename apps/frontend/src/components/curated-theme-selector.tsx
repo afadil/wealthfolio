@@ -1,7 +1,7 @@
 import { type CSSProperties, useId } from "react";
 import { useTranslation } from "react-i18next";
-import { Icons } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
+import { SelectionCard } from "@/components/selection-card";
 import { isThemeId, resolveThemeId, themes } from "@/themes/generated/registry";
 
 interface ThemePreviewProps {
@@ -110,13 +110,10 @@ export function CuratedThemeSelector({ value, onChange, className }: CuratedThem
               }}
               className="peer sr-only"
             />
-            <div
-              className={cn(
-                "peer-focus:ring-ring block overflow-hidden rounded-xl border-2 transition-colors duration-200 peer-focus:ring-2 peer-focus:ring-offset-2 forced-colors:peer-focus:outline-2 forced-colors:peer-focus:outline-offset-2 forced-colors:peer-focus:outline-[Highlight]",
-                isSelected
-                  ? "border-primary ring-primary/20 ring-2"
-                  : "border-border hover:border-primary/50",
-              )}
+            <SelectionCard
+              selected={isSelected}
+              label={theme.name}
+              className="peer-focus:ring-ring peer-focus:ring-2 peer-focus:ring-offset-2 forced-colors:peer-focus:outline-2 forced-colors:peer-focus:outline-offset-2 forced-colors:peer-focus:outline-[Highlight]"
             >
               <div className="dark:hidden">
                 <ThemePreview tokens={theme.light} variables={theme.variables.light} />
@@ -124,23 +121,7 @@ export function CuratedThemeSelector({ value, onChange, className }: CuratedThem
               <div className="hidden dark:block">
                 <ThemePreview tokens={theme.dark} variables={theme.variables.dark} />
               </div>
-              <span
-                className={cn(
-                  "relative flex items-center justify-center py-2.5 text-sm font-medium sm:py-3",
-                  isSelected ? "bg-primary/10" : "bg-muted/50",
-                )}
-              >
-                {theme.name}
-                {isSelected && (
-                  <span
-                    aria-hidden="true"
-                    className="bg-primary absolute right-2 rounded-full p-0.5"
-                  >
-                    <Icons.Check className="text-primary-foreground h-3 w-3" />
-                  </span>
-                )}
-              </span>
-            </div>
+            </SelectionCard>
           </label>
         );
       })}
