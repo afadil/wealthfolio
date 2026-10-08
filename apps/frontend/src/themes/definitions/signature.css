@@ -241,12 +241,14 @@
 }
 
 /* Outline and secondary: frosted glass, a lit top edge and a translucent rim.
+   Field triggers (role=combobox) keep the field surface so they match inputs.
    Zeroing --tw-shadow rather than box-shadow keeps Tailwind's composed list
    valid, so the focus ring still renders. */
 :root
   :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
     [data-slot="item"],
-    [aria-pressed]
+    [aria-pressed],
+    [role="combobox"]
   ) {
   border: 1px solid rgb(16 15 15 / 0.09);
   background-color: rgb(255 255 255 / 0.7);
@@ -256,7 +258,8 @@
 :root
   :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
     [data-slot="item"],
-    [aria-pressed]
+    [aria-pressed],
+    [role="combobox"]
   ):hover {
   background-color: #ffffff;
   border-color: rgb(16 15 15 / 0.16);
@@ -264,7 +267,8 @@
 .dark
   :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
     [data-slot="item"],
-    [aria-pressed]
+    [aria-pressed],
+    [role="combobox"]
   ) {
   border-color: rgb(255 252 240 / 0.12);
   background-color: rgb(255 252 240 / 0.04);
@@ -274,7 +278,8 @@
 .dark
   :is([data-variant="outline"], [data-variant="secondary"])[data-size]:not(
     [data-slot="item"],
-    [aria-pressed]
+    [aria-pressed],
+    [role="combobox"]
   ):hover {
   background-color: rgb(255 252 240 / 0.08);
   border-color: rgb(255 252 240 / 0.2);

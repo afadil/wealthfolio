@@ -71,6 +71,9 @@ export function ResponsiveSelect({
           id={id}
           aria-label={ariaLabel}
           type="button"
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="dialog"
           variant="outline"
           disabled={disabled}
           className={cn(
