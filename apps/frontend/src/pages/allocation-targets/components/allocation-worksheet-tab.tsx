@@ -65,7 +65,7 @@ import { useEligibleHoldingsSelection } from "../hooks/use-eligible-holdings";
 import { AmountsList, type AmountsRowModel } from "./allocation-worksheet-amounts-list";
 import { cashToUse, editableAmounts } from "./allocation-worksheet-cash";
 import { createHighlightStore, HighlightStoreContext } from "./allocation-worksheet-highlight";
-import { rowStatus } from "./allocation-worksheet-amounts";
+import { rowStatus, type PlacementProblem } from "./allocation-worksheet-amounts";
 import { ImpactRail } from "./allocation-worksheet-impact-rail";
 import { csvFile, toCsv, toTsv, worksheetExportRows } from "./allocation-worksheet-export";
 import { ReviewPanel } from "./allocation-worksheet-review";
@@ -76,6 +76,7 @@ import {
   AMOUNT_EPSILON,
   decimalInputOrZero,
   eligibleAccountIdsForChange,
+  estimatedFunding,
   externalContributionFor,
   formatDecimalInput,
   formatSignedAmount,
@@ -91,6 +92,7 @@ import {
   unitPriceMoved,
   type PositionAdjustment,
   type PositionAdjustments,
+  type RowPlacementLedger,
   type PositionCategoryExposure,
   type WorksheetEditMode,
   type WorksheetGenerationInputs,
@@ -147,6 +149,8 @@ interface PreparedWorksheet {
   rowIssues: Map<string, PreparedWorksheetIssue>;
   /** Where each change with a choice of accounts sits, keyed by asset. */
   placedAccountIds: Map<string, string[]>;
+  /** What each change places in each account, as entered or implied, keyed by asset. */
+  placements: Map<string, RowPlacementLedger>;
   increaseTotal: number;
   reductionTotal: number;
 }
@@ -155,6 +159,8 @@ interface PreparedWorksheetIssue {
   message: string;
   kind: "cash" | "position" | "allocation";
   assetId?: string;
+  /** For an allocation issue, what exactly keeps the change out. */
+  placement?: PlacementProblem;
 }
 
 interface WorksheetCalculationError {
@@ -794,6 +800,11 @@ export function AllocationWorksheetTab({
     `${draftStorageKey ?? ""}:${[...changeAccountIds].sort().join(",")}`,
   );
 
+  const cryptoAssetIds = useMemo(
+    () =>
+      new Set(assets.filter((asset) => asset.instrumentType === "CRYPTO").map((asset) => asset.id)),
+    [assets],
+  );
   const eligibleAssets = useMemo(
     () =>
       assets
@@ -1125,10 +1136,15 @@ export function AllocationWorksheetTab({
   }
 
   function accountsForChange(position: WorksheetPosition, changeAmount: number): Account[] {
+    // A crypto account takes only crypto; it can still take more of what it
+    // already holds. Technical eligibility, not a preference between accounts.
+    const isCrypto = cryptoAssetIds.has(position.assetId);
     return eligibleAccountIdsForChange(
       changeAmount,
       position.accountHoldings.map((holding) => holding.accountId),
       changeAccountIds,
+      (accountId) =>
+        isCrypto || accountById.get(accountId)?.accountType !== AccountType.CRYPTOCURRENCY,
     ).flatMap((accountId) => {
       const account = accountById.get(accountId);
       return account ? [account] : [];
@@ -1142,6 +1158,7 @@ export function AllocationWorksheetTab({
     let issue: PreparedWorksheetIssue | undefined = cashIssue;
     const rowIssues = new Map<string, PreparedWorksheetIssue>();
     const placedAccountIds = new Map<string, string[]>();
+    const placements = new Map<string, RowPlacementLedger>();
     // The first issue blocks the preview; every row keeps its own for its status.
     const flag = (rowIssue: PreparedWorksheetIssue) => {
       issue ??= rowIssue;
@@ -1191,21 +1208,7 @@ export function AllocationWorksheetTab({
           message: t("allocation:worksheet.noEligibleAccountIssue", { symbol: position.symbol }),
           kind: "allocation",
           assetId: position.assetId,
-        });
-        continue;
-      }
-
-      const hasInvalidAccountAmount =
-        eligibleAccounts.length > 1 &&
-        eligibleAccounts.some((account) => {
-          const value = adjustment.accountAmounts[account.id] ?? "";
-          return value.trim() !== "" && !Number.isFinite(parseDecimalInput(value));
-        });
-      if (hasInvalidAccountAmount) {
-        flag({
-          message: t("allocation:worksheet.invalidAccountAmount", { symbol: position.symbol }),
-          kind: "allocation",
-          assetId: position.assetId,
+          placement: { reason: "no_account" },
         });
         continue;
       }
@@ -1228,6 +1231,33 @@ export function AllocationWorksheetTab({
                   ),
                 }))
                 .filter((allocation) => allocation.amount >= AMOUNT_EPSILON);
+      // What this change places, even before it is complete: other changes'
+      // funding estimates count it.
+      const sign = changeAmount > 0 ? 1 : -1;
+      const ledger = {
+        byAccount: new Map(
+          allocations.map((allocation) => [allocation.accountId, sign * allocation.amount]),
+        ),
+        isValid: false,
+      };
+      placements.set(position.assetId, ledger);
+
+      const hasInvalidAccountAmount =
+        eligibleAccounts.length > 1 &&
+        eligibleAccounts.some((account) => {
+          const value = adjustment.accountAmounts[account.id] ?? "";
+          return value.trim() !== "" && !Number.isFinite(parseDecimalInput(value));
+        });
+      if (hasInvalidAccountAmount) {
+        flag({
+          message: t("allocation:worksheet.invalidAccountAmount", { symbol: position.symbol }),
+          kind: "allocation",
+          assetId: position.assetId,
+          placement: { reason: "invalid" },
+        });
+        continue;
+      }
+
       const allocatedAmount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
       // Under a whole-unit policy the last fraction of a unit buys nothing, so
       // no account can take it. Demanding it be placed would leave the
@@ -1236,11 +1266,9 @@ export function AllocationWorksheetTab({
       const positionUnitPrice = unitPriceFor(position);
       const unplaceable =
         profile.wholeSharesOnly && positionUnitPrice ? Math.max(0.02, positionUnitPrice) : 0.02;
-      if (
-        eligibleAccounts.length > 1 &&
-        (requestedAmount - allocatedAmount > unplaceable ||
-          allocatedAmount - requestedAmount > 0.02)
-      ) {
+      const shortfall = requestedAmount - allocatedAmount;
+      const excess = allocatedAmount - requestedAmount;
+      if (eligibleAccounts.length > 1 && (shortfall > unplaceable || excess > 0.02)) {
         flag({
           message: t("allocation:worksheet.allocateAccountsIssue", {
             symbol: position.symbol,
@@ -1248,9 +1276,16 @@ export function AllocationWorksheetTab({
           }),
           kind: "allocation",
           assetId: position.assetId,
+          placement:
+            excess > 0.02
+              ? { reason: "over", amount: excess }
+              : allocatedAmount < AMOUNT_EPSILON
+                ? { reason: "not_placed" }
+                : { reason: "left", amount: shortfall },
         });
         continue;
       }
+      ledger.isValid = true;
       if (eligibleAccounts.length > 1) {
         placedAccountIds.set(
           position.assetId,
@@ -1279,7 +1314,15 @@ export function AllocationWorksheetTab({
       }
     }
 
-    return { lines, issue, rowIssues, placedAccountIds, increaseTotal, reductionTotal };
+    return {
+      lines,
+      issue,
+      rowIssues,
+      placedAccountIds,
+      placements,
+      increaseTotal,
+      reductionTotal,
+    };
   })();
   const isPreviewUpdating =
     worksheet.isPending || (isResultStale && !prepared.issue && calculationError === null);
@@ -1317,6 +1360,16 @@ export function AllocationWorksheetTab({
   const resolvedPriceByAsset = new Map(
     (result?.lines ?? []).map((line) => [line.assetId, line.unitPrice]),
   );
+  // What each chosen account brings to its own changes (§6), once its cash is
+  // read: the cash it deploys and its contribution.
+  const fundingBase: Record<string, number> | undefined = cash.isKnown
+    ? Object.fromEntries(
+        changeAccountIds.map((accountId) => [
+          accountId,
+          (cash.byAccount[accountId] ?? 0) + (externalContribution[accountId] ?? 0),
+        ]),
+      )
+    : undefined;
   const amountsRows: AmountsRowModel[] = positions.map((position) => {
     const unitPrice = resolvedPriceByAsset.get(position.assetId) ?? unitPriceFor(position);
     const adjustment = adjustments[position.assetId];
@@ -1362,14 +1415,26 @@ export function AllocationWorksheetTab({
       }),
       asset: eligibleAssets.find((item) => item.id === position.assetId),
       isExpanded: expandedAssetIds.has(position.assetId),
-      placement:
-        Math.abs(changeAmount) >= AMOUNT_EPSILON
-          ? {
-              accounts: accountsForChange(position, changeAmount),
-              impliedAccountId: impliedAccountIdFor(position, changeAmount),
-              unitPrice,
-            }
-          : undefined,
+      placement: (() => {
+        if (Math.abs(changeAmount) < AMOUNT_EPSILON) return undefined;
+        const accounts = accountsForChange(position, changeAmount);
+        return {
+          accounts,
+          impliedAccountId: impliedAccountIdFor(position, changeAmount),
+          unitPrice,
+          // Only an open allocation reads them.
+          fundingEstimates:
+            fundingBase && expandedAssetIds.has(position.assetId)
+              ? estimatedFunding(
+                  fundingBase,
+                  prepared.placements,
+                  position.assetId,
+                  accounts.map((account) => account.id),
+                )
+              : undefined,
+          problem: prepared.rowIssues.get(position.assetId)?.placement,
+        };
+      })(),
     };
   });
   const flaggedAssetIds = new Set([...warningsByAsset.keys(), ...prepared.rowIssues.keys()]);

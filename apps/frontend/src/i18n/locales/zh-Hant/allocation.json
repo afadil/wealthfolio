@@ -212,7 +212,6 @@
     "account": "帳戶",
     "accountAllocation": "依帳戶分配",
     "accountAmountLabel": "{{account}} 的金額",
-    "accountCashSummary": "已記錄現金 {{amount}}",
     "accountCount_one": "{{count}} 個帳戶",
     "accountCount_other": "{{count}} 個帳戶",
     "accountHoldingSummary": "持有 {{amount}} · {{quantity}} 單位",
@@ -320,7 +319,6 @@
     "unresolvedTitle": "未解決金額",
     "updatingFromSources": "正在根據已記錄的持有部位、價格和分類更新…",
     "updatingPreview": "正在更新…",
-    "useRemaining": "使用剩餘金額",
     "warningCount_one": "此預覽中有 {{count}} 項需要檢閱",
     "warningCount_other": "此預覽中有 {{count}} 項需要檢閱",
     "collapsedRows_one": "{{count}} 個證券無調整",
@@ -337,7 +335,6 @@
     "classFiguresTitle": "目前 → 預計 / 目標（%）",
     "weight": "權重",
     "status": "狀態",
-    "needsAccount": "需要選取帳戶",
     "checkAmount": "請檢查金額",
     "roundedTo": "取整為 {{amount}}",
     "priceFrom": "{{date}} 的價格",
@@ -454,6 +451,18 @@
       "insufficientFunding": "增加額 {{amount}} 超過所選現金與減少所得的 {{funding}}。",
       "accountFunding": "{{account}} 中的增加額 {{amount}} 超過該帳戶自身可負擔的 {{funding}}；不假設帳戶之間轉帳。",
       "turnoverExceeded": "減少額佔目前價值的 {{share}}，超過您的周轉上限 {{limit}}。"
-    }
+    },
+    "placementNoAccount": "沒有符合條件的帳戶",
+    "placementInvalid": "請檢查各帳戶金額",
+    "placementNotPlaced": "選擇帳戶",
+    "placementLeft": "還剩 {{amount}} 待分配",
+    "accountCanFund": "約可負擔 {{amount}}",
+    "accountFundingPending": "正在讀取現金…",
+    "accountFundingDeficit": "其他調整超出其估計資金約 {{amount}}",
+    "placementCanFundTotal": "這些帳戶約可負擔 {{requested}} 中的 {{amount}}。",
+    "allocationAcceptedUnplaced": "{{amount}} 未分配，已接受",
+    "allocationAcceptedOver": "多出 {{amount}}，已接受",
+    "useAmount": "使用 {{amount}}",
+    "useAmountIn": "在 {{account}} 中使用 {{amount}}"
   }
 }

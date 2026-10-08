@@ -209,7 +209,6 @@
     "account": "口座",
     "accountAllocation": "口座別の配分",
     "accountAmountLabel": "{{account}}の金額",
-    "accountCashSummary": "記録済みの現金 {{amount}}",
     "accountCount_other": "{{count}}口座",
     "accountHoldingSummary": "保有 {{amount}} · {{quantity}}口",
     "accountUnitsSummary": "≈ {{quantity}}口",
@@ -314,7 +313,6 @@
     "unresolvedTitle": "未解決の金額",
     "updatingFromSources": "記録済みの保有銘柄、価格、分類から更新中…",
     "updatingPreview": "更新中…",
-    "useRemaining": "残りを使う",
     "warningCount_other": "このプレビューで確認すべき点が{{count}}件あります",
     "collapsedRows_other": "調整のない銘柄 {{count}}件",
     "collapsedTouching_other": "うち{{count}}件が{{category}}に関係",
@@ -328,7 +326,6 @@
     "classFiguresTitle": "現在 → 予測 / 目標（%）",
     "weight": "比率",
     "status": "状態",
-    "needsAccount": "口座の指定が必要",
     "checkAmount": "金額を確認",
     "roundedTo": "{{amount}}に端数調整",
     "priceFrom": "{{date}}時点の価格",
@@ -444,6 +441,18 @@
       "insufficientFunding": "増加額 {{amount}} が、選択した現金と削減による資金 {{funding}} を超えています。",
       "accountFunding": "{{account}} の増加額 {{amount}} が、この口座単独で賄える {{funding}} を超えています。口座間の移動は想定していません。",
       "turnoverExceeded": "削減額が現在価値の {{share}} に達し、回転率の上限 {{limit}} を超えています。"
-    }
+    },
+    "placementNoAccount": "対象の口座がありません",
+    "placementInvalid": "口座ごとの金額を確認してください",
+    "placementNotPlaced": "口座を選択",
+    "placementLeft": "残り {{amount}} を割り当て",
+    "accountCanFund": "約 {{amount}} を賄えます",
+    "accountFundingPending": "現金を読み込み中…",
+    "accountFundingDeficit": "他の調整が推定資金を約 {{amount}} 上回っています",
+    "placementCanFundTotal": "これらの口座で {{requested}} のうち約 {{amount}} を賄えます。",
+    "allocationAcceptedUnplaced": "{{amount}} 未配置（許容）",
+    "allocationAcceptedOver": "{{amount}} 超過（許容）",
+    "useAmount": "{{amount}} を使う",
+    "useAmountIn": "{{account}} で {{amount}} を使う"
   }
 }

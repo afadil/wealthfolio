@@ -212,7 +212,6 @@
     "account": "Account",
     "accountAllocation": "Account allocation",
     "accountAmountLabel": "Amount for {{account}}",
-    "accountCashSummary": "{{amount}} cash recorded",
     "accountCount_one": "{{count}} account",
     "accountCount_other": "{{count}} accounts",
     "accountHoldingSummary": "Holds {{amount}} · {{quantity}} units",
@@ -320,7 +319,6 @@
     "unresolvedTitle": "Unresolved amounts",
     "updatingFromSources": "Updating from recorded holdings, prices, and classifications…",
     "updatingPreview": "Updating…",
-    "useRemaining": "Use remaining",
     "warningCount_one": "{{count}} thing to review about this preview",
     "warningCount_other": "{{count}} things to review about this preview",
     "collapsedRows_one": "{{count}} security with no adjustment",
@@ -337,7 +335,6 @@
     "classFiguresTitle": "Current → projected / target, in %",
     "weight": "Weight",
     "status": "Status",
-    "needsAccount": "Needs an account",
     "checkAmount": "Check the amount",
     "roundedTo": "Rounded to {{amount}}",
     "priceFrom": "Price from {{date}}",
@@ -456,6 +453,18 @@
       "insufficientFunding": "Increases of {{amount}} exceed the {{funding}} of selected cash and reduction proceeds.",
       "accountFunding": "Increases of {{amount}} in {{account}} exceed the {{funding}} it can fund on its own; no transfer between accounts is assumed.",
       "turnoverExceeded": "Reductions come to {{share}} of current value, above your {{limit}} turnover cap."
-    }
+    },
+    "placementNoAccount": "No eligible account",
+    "placementInvalid": "Check account amounts",
+    "placementNotPlaced": "Choose accounts",
+    "placementLeft": "{{amount}} left to allocate",
+    "accountCanFund": "Can fund about {{amount}}",
+    "accountFundingPending": "Reading cash…",
+    "accountFundingDeficit": "Other adjustments exceed its estimated funding by about {{amount}}",
+    "placementCanFundTotal": "These accounts can fund about {{amount}} of the {{requested}}.",
+    "allocationAcceptedUnplaced": "{{amount}} unplaced, accepted",
+    "allocationAcceptedOver": "{{amount}} over, accepted",
+    "useAmount": "Use {{amount}}",
+    "useAmountIn": "Use {{amount}} in {{account}}"
   }
 }

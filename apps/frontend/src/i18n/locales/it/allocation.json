@@ -217,7 +217,6 @@
     "account": "Conto",
     "accountAllocation": "Ripartizione per conto",
     "accountAmountLabel": "Importo per {{account}}",
-    "accountCashSummary": "{{amount}} di liquidità registrata",
     "accountCount_one": "{{count}} conto",
     "accountCount_other": "{{count}} conti",
     "accountCount_many": "{{count}} conti",
@@ -328,7 +327,6 @@
     "unresolvedTitle": "Importi non risolti",
     "updatingFromSources": "Aggiornamento da posizioni, prezzi e classificazioni registrati…",
     "updatingPreview": "Aggiornamento…",
-    "useRemaining": "Usa il resto",
     "warningCount_one": "{{count}} punto da verificare in questa anteprima",
     "warningCount_other": "{{count}} punti da verificare in questa anteprima",
     "warningCount_many": "{{count}} punti da verificare in questa anteprima",
@@ -348,7 +346,6 @@
     "classFiguresTitle": "Attuale → previsto / obiettivo, in %",
     "weight": "Peso",
     "status": "Stato",
-    "needsAccount": "Serve un conto",
     "checkAmount": "Verifica l'importo",
     "roundedTo": "Arrotondato a {{amount}}",
     "priceFrom": "Prezzo del {{date}}",
@@ -470,6 +467,18 @@
       "insufficientFunding": "Gli aumenti di {{amount}} superano i {{funding}} di liquidità selezionata e proventi delle riduzioni.",
       "accountFunding": "Gli aumenti di {{amount}} in {{account}} superano i {{funding}} che il conto può finanziare da solo; non si presume alcun trasferimento tra conti.",
       "turnoverExceeded": "Le riduzioni ammontano al {{share}} del valore attuale, oltre il tuo limite di rotazione del {{limit}}."
-    }
+    },
+    "placementNoAccount": "Nessun conto idoneo",
+    "placementInvalid": "Controlla gli importi per conto",
+    "placementNotPlaced": "Scegli i conti",
+    "placementLeft": "{{amount}} ancora da assegnare",
+    "accountCanFund": "Può finanziare circa {{amount}}",
+    "accountFundingPending": "Lettura della liquidità…",
+    "accountFundingDeficit": "Altre rettifiche superano il suo finanziamento stimato di circa {{amount}}",
+    "placementCanFundTotal": "Questi conti possono finanziare circa {{amount}} dei {{requested}}.",
+    "allocationAcceptedUnplaced": "{{amount}} non collocato, accettato",
+    "allocationAcceptedOver": "{{amount}} in più, accettato",
+    "useAmount": "Usa {{amount}}",
+    "useAmountIn": "Usa {{amount}} in {{account}}"
   }
 }

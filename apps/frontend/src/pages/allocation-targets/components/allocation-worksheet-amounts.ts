@@ -1,3 +1,5 @@
+import type { TFunction } from "i18next";
+
 /** A row or an asset class the user points at or selects in the Amounts panel. */
 export type HighlightTarget =
   | { kind: "row"; assetId: string }
@@ -110,6 +112,15 @@ export function trackPosition(weightBps: number, targetBps: number, halfWindowBp
  * The units an amount comes to at a unit price. Under a whole-unit policy the
  * core floors the quantity, so that is what the row shows.
  */
+/**
+ * Units as read beside an amount: two decimals, or enough digits that a small
+ * quantity, such as a fraction of a coin, does not read as zero.
+ */
+export function displayUnits(units: number): number {
+  if (!Number.isFinite(units) || units === 0) return 0;
+  return Math.abs(units) >= 1 ? Math.round(units * 100) / 100 : Number(units.toPrecision(3));
+}
+
 export function unitsFor(amount: number, unitPrice: number, wholeUnits: boolean): number {
   const units = Math.abs(amount) / unitPrice;
   // Tolerates the float residue of an amount that is an exact multiple.
@@ -144,9 +155,40 @@ export function changeInCategory(change: number, weightBps: number): number {
   return (change * weightBps) / 10_000;
 }
 
+/**
+ * Why a change with a choice of accounts cannot be previewed yet, as the
+ * worksheet's own check decides it (§6).
+ */
+export type PlacementProblem =
+  | { reason: "no_account" }
+  | { reason: "invalid" }
+  | { reason: "not_placed" }
+  | { reason: "left"; amount: number }
+  | { reason: "over"; amount: number };
+
+/** What keeps a change out of the preview, as the row's status says it. */
+export function describePlacementProblem(
+  problem: PlacementProblem,
+  t: TFunction,
+  formatAmount: (amount: number) => string,
+): string {
+  switch (problem.reason) {
+    case "no_account":
+      return t("allocation:worksheet.placementNoAccount");
+    case "invalid":
+      return t("allocation:worksheet.placementInvalid");
+    case "not_placed":
+      return t("allocation:worksheet.placementNotPlaced");
+    case "left":
+      return t("allocation:worksheet.placementLeft", { amount: formatAmount(problem.amount) });
+    case "over":
+      return t("allocation:worksheet.overAllocatedBy", { amount: formatAmount(problem.amount) });
+  }
+}
+
 /** The one fact a row's Status cell states, most pressing first. */
 export type RowStatus =
-  | { kind: "needs_account" }
+  | { kind: "placement"; problem: PlacementProblem }
   | { kind: "check_amount"; message: string }
   | { kind: "price_required" }
   | { kind: "warnings"; messages: readonly string[] }
@@ -157,7 +199,11 @@ export type RowStatus =
 
 export interface RowStatusFacts {
   /** What keeps this row out of the preview, if anything. */
-  issue?: { kind: "cash" | "position" | "allocation"; message: string };
+  issue?: {
+    kind: "cash" | "position" | "allocation";
+    message: string;
+    placement?: PlacementProblem;
+  };
   /** An added security with no price to size it at. */
   needsPrice: boolean;
   /** The preview's warnings about this row's lines. */
@@ -177,7 +223,9 @@ export interface RowStatusFacts {
  * first, then what the preview says, then where the change sits.
  */
 export function rowStatus(facts: RowStatusFacts): RowStatus | null {
-  if (facts.issue?.kind === "allocation") return { kind: "needs_account" };
+  if (facts.issue?.kind === "allocation") {
+    return { kind: "placement", problem: facts.issue.placement ?? { reason: "not_placed" } };
+  }
   if (facts.issue) return { kind: "check_amount", message: facts.issue.message };
   if (facts.needsPrice) return { kind: "price_required" };
   if (facts.warnings.length > 0) return { kind: "warnings", messages: facts.warnings };

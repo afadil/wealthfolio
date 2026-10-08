@@ -209,7 +209,6 @@
     "account": "계좌",
     "accountAllocation": "계좌별 배분",
     "accountAmountLabel": "{{account}} 금액",
-    "accountCashSummary": "기록된 현금 {{amount}}",
     "accountCount_other": "계좌 {{count}}개",
     "accountHoldingSummary": "보유 {{amount}} · {{quantity}}주",
     "accountUnitsSummary": "≈ {{quantity}}주",
@@ -314,7 +313,6 @@
     "unresolvedTitle": "미해결 금액",
     "updatingFromSources": "기록된 보유 종목, 가격, 분류로 업데이트하는 중…",
     "updatingPreview": "업데이트 중…",
-    "useRemaining": "남은 금액 사용",
     "warningCount_other": "이 미리보기에서 검토할 항목 {{count}}개",
     "collapsedRows_other": "조정이 없는 종목 {{count}}개",
     "collapsedTouching_other": "그중 {{count}}개가 {{category}}에 해당",
@@ -328,7 +326,6 @@
     "classFiguresTitle": "현재 → 예상 / 목표 (%)",
     "weight": "비중",
     "status": "상태",
-    "needsAccount": "계좌 지정 필요",
     "checkAmount": "금액 확인",
     "roundedTo": "{{amount}}(으)로 반올림",
     "priceFrom": "{{date}} 기준 가격",
@@ -444,6 +441,18 @@
       "insufficientFunding": "증가액 {{amount}}가 선택한 현금과 축소 대금 {{funding}}를 초과합니다.",
       "accountFunding": "{{account}}의 증가액 {{amount}}가 이 계좌가 자체적으로 충당할 수 있는 {{funding}}를 초과합니다. 계좌 간 이체는 가정하지 않습니다.",
       "turnoverExceeded": "축소액이 현재 가치의 {{share}}로, 회전율 한도 {{limit}}를 넘습니다."
-    }
+    },
+    "placementNoAccount": "대상 계좌 없음",
+    "placementInvalid": "계좌별 금액을 확인하세요",
+    "placementNotPlaced": "계좌 선택",
+    "placementLeft": "{{amount}} 배분 남음",
+    "accountCanFund": "약 {{amount}} 충당 가능",
+    "accountFundingPending": "현금을 읽는 중…",
+    "accountFundingDeficit": "다른 조정액이 추정 자금을 약 {{amount}} 초과합니다",
+    "placementCanFundTotal": "이 계좌들은 {{requested}} 중 약 {{amount}}를 충당할 수 있습니다.",
+    "allocationAcceptedUnplaced": "{{amount}} 미배치, 허용됨",
+    "allocationAcceptedOver": "{{amount}} 초과, 허용됨",
+    "useAmount": "{{amount}} 사용",
+    "useAmountIn": "{{account}}에서 {{amount}} 사용"
   }
 }

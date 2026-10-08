@@ -153,16 +153,21 @@ export function planningTotal(
  * The accounts a change may be placed in (§6).
  *
  * A reduction is drawn from the accounts that hold the security, which is a
- * fact. An increase may go to any account in scope: already holding the
- * security is not a reason to favour one account over another.
+ * fact. An increase may go to any account in scope that can technically take
+ * the security: already holding it is not a reason to favour one account over
+ * another, and an account that holds it can always take more.
  */
 export function eligibleAccountIdsForChange(
   changeAmount: number,
   heldAccountIds: readonly string[],
   accountIds: readonly string[],
+  /** Whether an account that does not hold the security can take it. */
+  canReceive: (accountId: string) => boolean = () => true,
 ): string[] {
-  if (changeAmount >= 0) return [...accountIds];
   const held = new Set(heldAccountIds);
+  if (changeAmount >= 0) {
+    return accountIds.filter((accountId) => held.has(accountId) || canReceive(accountId));
+  }
   return accountIds.filter((accountId) => held.has(accountId));
 }
 
@@ -293,6 +298,52 @@ export function unitPriceMoved(now: number, calculatedWith: number): boolean {
 }
 
 /** Cash not yet recorded, keyed by the account it would arrive in. */
+/** What one change places in each account: positive increases, negative reductions. */
+export interface RowPlacementLedger {
+  byAccount: ReadonlyMap<string, number>;
+  /** The worksheet's check accepts this change's placement as entered. */
+  isValid: boolean;
+}
+
+export interface AccountFundingEstimate {
+  /** What the account can still fund, never below zero. */
+  capacity: number;
+  /** How far the other changes already exceed its funding. */
+  deficit: number;
+}
+
+/**
+ * What each account can still fund for one change, estimated from what the
+ * page holds (§6): the cash it deploys and its contribution, plus what valid
+ * reductions elsewhere raise in it, minus what other changes already place in
+ * it, partly placed ones included. The change itself is left out. Each account
+ * stands alone, so a shortfall in one is never offset by another. The preview
+ * still decides: it resolves whole units and held quantities.
+ */
+export function estimatedFunding(
+  fundingByAccount: Readonly<Record<string, number>>,
+  ledgers: ReadonlyMap<string, RowPlacementLedger>,
+  excludeAssetId: string,
+  accountIds: readonly string[],
+): Map<string, AccountFundingEstimate> {
+  const estimates = new Map<string, AccountFundingEstimate>();
+  for (const accountId of accountIds) {
+    let balance = fundingByAccount[accountId] ?? 0;
+    for (const [assetId, ledger] of ledgers) {
+      if (assetId === excludeAssetId) continue;
+      const amount = ledger.byAccount.get(accountId) ?? 0;
+      // An increase reserves what it places even while its row is incomplete;
+      // a reduction only adds what a valid placement raises.
+      if (amount > 0 || ledger.isValid) balance -= amount;
+    }
+    estimates.set(accountId, {
+      capacity: Math.max(0, balance),
+      deficit: Math.max(0, -balance),
+    });
+  }
+  return estimates;
+}
+
 export function externalContributionFor(
   accountIds: readonly string[],
   entered: Readonly<Record<string, string>>,

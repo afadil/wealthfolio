@@ -9,6 +9,8 @@ import { AccountAllocation } from "./allocation-worksheet-account-allocation";
 import { StepperField } from "./allocation-worksheet-stepper-field";
 import {
   activeTarget,
+  describePlacementProblem,
+  displayUnits,
   partialShareBps,
   partitionAmountsRows,
   rowEmphasis,
@@ -16,6 +18,7 @@ import {
   stepByUnits,
   unitsFor,
   type HighlightTarget,
+  type PlacementProblem,
   type RowStatus,
 } from "./allocation-worksheet-amounts";
 import { useHighlight, useHighlightActions } from "./allocation-worksheet-highlight";
@@ -26,6 +29,7 @@ import {
   formatDecimalInput,
   formatSignedAmount,
   UNCLASSIFIED_CATEGORY_ID,
+  type AccountFundingEstimate,
   type PositionAdjustment,
   type WorksheetEditMode,
   type WorksheetPosition,
@@ -50,7 +54,15 @@ export interface AmountsRowModel {
   isExpanded: boolean;
   /** Where the change may be placed, while there is one. */
   placement:
-    | { accounts: Account[]; impliedAccountId: string | undefined; unitPrice: number | undefined }
+    | {
+        accounts: Account[];
+        impliedAccountId: string | undefined;
+        unitPrice: number | undefined;
+        /** What each account can still fund for it; absent while cash is read. */
+        fundingEstimates: ReadonlyMap<string, AccountFundingEstimate> | undefined;
+        /** What the worksheet's check says keeps it out, if anything. */
+        problem: PlacementProblem | undefined;
+      }
     | undefined;
 }
 
@@ -507,7 +519,7 @@ function AmountRow({
                     count: unitsFor(changeAmount, unitPrice, wholeSharesOnly),
                     // An estimate: two decimals say enough.
                     quantity: formatQuantity(
-                      Math.round(unitsFor(changeAmount, unitPrice, wholeSharesOnly) * 100) / 100,
+                      displayUnits(unitsFor(changeAmount, unitPrice, wholeSharesOnly)),
                     ),
                     price: formatPrice(unitPrice, currency),
                   })
@@ -574,6 +586,8 @@ function AmountRow({
           unitPrice={placement.unitPrice}
           wholeSharesOnly={wholeSharesOnly}
           impliedAccountId={placement.impliedAccountId}
+          fundingEstimates={placement.fundingEstimates}
+          problem={placement.problem}
           onAmountChange={(accountId, value) =>
             actions.onAccountAmountChange(position.assetId, accountId, value)
           }
@@ -611,7 +625,7 @@ function RowStatusCell({
   const warning = "text-amber-800 dark:text-amber-200";
   const linkClass = "max-w-full truncate text-left underline-offset-4 hover:underline";
   switch (status.kind) {
-    case "needs_account":
+    case "placement":
       // The account allocation opens from here until Placement has its own panel.
       return (
         <button
@@ -620,7 +634,7 @@ function RowStatusCell({
           onClick={onToggleExpanded}
           className={cn(linkClass, "font-medium", warning)}
         >
-          {t("allocation:worksheet.needsAccount")}
+          {describePlacementProblem(status.problem, t, (amount) => formatAmount(amount, currency))}
         </button>
       );
     case "check_amount":

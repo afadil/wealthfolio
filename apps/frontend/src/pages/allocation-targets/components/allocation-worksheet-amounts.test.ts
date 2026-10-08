@@ -4,6 +4,7 @@ import {
   activeTarget,
   categoryEmphasis,
   changeInCategory,
+  displayUnits,
   partialShareBps,
   partitionAmountsRows,
   rowEmphasis,
@@ -209,7 +210,18 @@ describe("Amounts row status", () => {
     };
     expect(
       rowStatus({ ...facts, issue: { kind: "allocation", message: "Allocate the full change" } }),
-    ).toEqual({ kind: "needs_account" });
+    ).toEqual({ kind: "placement", problem: { reason: "not_placed" } });
+    // The check's own reason travels with it, so the status says what is wrong.
+    expect(
+      rowStatus({
+        ...facts,
+        issue: {
+          kind: "allocation",
+          message: "Allocate the full change",
+          placement: { reason: "over", amount: 0.32 },
+        },
+      }),
+    ).toEqual({ kind: "placement", problem: { reason: "over", amount: 0.32 } });
     expect(
       rowStatus({ ...facts, issue: { kind: "position", message: "Enter a valid change" } }),
     ).toEqual({ kind: "check_amount", message: "Enter a valid change" });
@@ -266,5 +278,14 @@ describe("Amounts collapsed rows", () => {
     expect(partition.open.map((item) => item.assetId)).toEqual(["iau", "bnd"]);
     expect(partition.collapsed.map((item) => item.assetId)).toEqual(["vti"]);
     expect(partition.collapsedValue).toBe(900);
+  });
+});
+
+describe("displayUnits", () => {
+  it("reads two decimals from one unit up, and keeps a small quantity from reading as zero", () => {
+    expect(displayUnits(325.6875)).toBe(325.69);
+    expect(displayUnits(0.32)).toBe(0.32);
+    expect(displayUnits(0.0030057)).toBe(0.00301);
+    expect(displayUnits(0)).toBe(0);
   });
 });

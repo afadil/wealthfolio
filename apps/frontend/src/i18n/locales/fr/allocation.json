@@ -217,7 +217,6 @@
     "account": "Compte",
     "accountAllocation": "Répartition par compte",
     "accountAmountLabel": "Montant pour {{account}}",
-    "accountCashSummary": "{{amount}} de trésorerie enregistrée",
     "accountCount_one": "{{count}} compte",
     "accountCount_other": "{{count}} comptes",
     "accountCount_many": "{{count}} comptes",
@@ -328,7 +327,6 @@
     "unresolvedTitle": "Montants non résolus",
     "updatingFromSources": "Mise à jour à partir des positions, prix et classifications enregistrés…",
     "updatingPreview": "Mise à jour…",
-    "useRemaining": "Utiliser le reste",
     "warningCount_one": "{{count}} point à vérifier dans cet aperçu",
     "warningCount_other": "{{count}} points à vérifier dans cet aperçu",
     "warningCount_many": "{{count}} points à vérifier dans cet aperçu",
@@ -348,7 +346,6 @@
     "classFiguresTitle": "Actuel → projeté / cible, en %",
     "weight": "Poids",
     "status": "Statut",
-    "needsAccount": "Compte à choisir",
     "checkAmount": "Montant à vérifier",
     "roundedTo": "Arrondi à {{amount}}",
     "priceFrom": "Prix du {{date}}",
@@ -470,6 +467,18 @@
       "insufficientFunding": "Les hausses de {{amount}} dépassent les {{funding}} de trésorerie choisie et de produits des réductions.",
       "accountFunding": "Les hausses de {{amount}} dans {{account}} dépassent les {{funding}} que ce compte peut financer seul ; aucun transfert entre comptes n'est supposé.",
       "turnoverExceeded": "Les réductions représentent {{share}} de la valeur actuelle, au-dessus de votre plafond de rotation de {{limit}}."
-    }
+    },
+    "placementNoAccount": "Aucun compte éligible",
+    "placementInvalid": "Vérifiez les montants par compte",
+    "placementNotPlaced": "Choisissez les comptes",
+    "placementLeft": "{{amount}} restant à répartir",
+    "accountCanFund": "Peut financer environ {{amount}}",
+    "accountFundingPending": "Lecture de la trésorerie…",
+    "accountFundingDeficit": "D'autres ajustements dépassent son financement estimé d'environ {{amount}}",
+    "placementCanFundTotal": "Ces comptes peuvent financer environ {{amount}} sur les {{requested}}.",
+    "allocationAcceptedUnplaced": "{{amount}} non placé, accepté",
+    "allocationAcceptedOver": "{{amount}} en trop, accepté",
+    "useAmount": "Utiliser {{amount}}",
+    "useAmountIn": "Utiliser {{amount}} dans {{account}}"
   }
 }

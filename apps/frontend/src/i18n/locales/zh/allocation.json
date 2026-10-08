@@ -209,7 +209,6 @@
     "account": "账户",
     "accountAllocation": "按账户分配",
     "accountAmountLabel": "{{account}} 的金额",
-    "accountCashSummary": "已记录现金 {{amount}}",
     "accountCount_other": "{{count}} 个账户",
     "accountHoldingSummary": "持有 {{amount}} · {{quantity}} 份",
     "accountUnitsSummary": "≈ {{quantity}} 份",
@@ -314,7 +313,6 @@
     "unresolvedTitle": "未解决金额",
     "updatingFromSources": "正在根据已记录的持仓、价格和分类更新…",
     "updatingPreview": "正在更新…",
-    "useRemaining": "使用剩余金额",
     "warningCount_other": "此预览中有 {{count}} 项需要审阅",
     "collapsedRows_other": "{{count}} 个证券无调整",
     "collapsedTouching_other": "其中 {{count}} 个涉及{{category}}",
@@ -328,7 +326,6 @@
     "classFiguresTitle": "当前 → 预计 / 目标（%）",
     "weight": "权重",
     "status": "状态",
-    "needsAccount": "需要选择账户",
     "checkAmount": "请检查金额",
     "roundedTo": "取整为 {{amount}}",
     "priceFrom": "{{date}} 的价格",
@@ -444,6 +441,18 @@
       "insufficientFunding": "增加额 {{amount}} 超过所选现金与减少所得的 {{funding}}。",
       "accountFunding": "{{account}} 中的增加额 {{amount}} 超过该账户自身可承担的 {{funding}}；不假设账户之间转账。",
       "turnoverExceeded": "减少额占当前价值的 {{share}}，超过您的周转上限 {{limit}}。"
-    }
+    },
+    "placementNoAccount": "没有符合条件的账户",
+    "placementInvalid": "请检查各账户金额",
+    "placementNotPlaced": "选择账户",
+    "placementLeft": "还剩 {{amount}} 待分配",
+    "accountCanFund": "约可承担 {{amount}}",
+    "accountFundingPending": "正在读取现金…",
+    "accountFundingDeficit": "其他调整超出其估计资金约 {{amount}}",
+    "placementCanFundTotal": "这些账户约可承担 {{requested}} 中的 {{amount}}。",
+    "allocationAcceptedUnplaced": "{{amount}} 未分配，已接受",
+    "allocationAcceptedOver": "多出 {{amount}}，已接受",
+    "useAmount": "使用 {{amount}}",
+    "useAmountIn": "在 {{account}} 中使用 {{amount}}"
   }
 }

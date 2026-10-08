@@ -5,7 +5,12 @@ import { useTranslation } from "react-i18next";
 import type { Account, WorksheetAccountFunding } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { stepByUnits } from "./allocation-worksheet-amounts";
+import {
+  describePlacementProblem,
+  displayUnits,
+  stepByUnits,
+  type PlacementProblem,
+} from "./allocation-worksheet-amounts";
 import { StepperField } from "./allocation-worksheet-stepper-field";
 import {
   allocationProgress,
@@ -14,6 +19,7 @@ import {
   decimalInputOrZero,
   formatDecimalInput,
   placementAccountIds,
+  type AccountFundingEstimate,
   type PositionAdjustment,
   type WorksheetPosition,
 } from "./allocation-worksheet-utils";
@@ -30,6 +36,10 @@ interface AccountAllocationProps {
   wholeSharesOnly: boolean;
   /** The sole eligible account recording this security, which takes the change until the user splits it (§6). */
   impliedAccountId: string | undefined;
+  /** What each account can still fund for this change; absent while cash is read. */
+  fundingEstimates: ReadonlyMap<string, AccountFundingEstimate> | undefined;
+  /** What the worksheet's check says keeps this change out, if anything. */
+  problem: PlacementProblem | undefined;
   onAmountChange: (accountId: string, value: string) => void;
 }
 
@@ -47,6 +57,8 @@ export function AccountAllocation({
   unitPrice,
   wholeSharesOnly,
   impliedAccountId,
+  fundingEstimates,
+  problem,
   onAmountChange,
 }: AccountAllocationProps) {
   const { t } = useTranslation();
@@ -78,11 +90,8 @@ export function AccountAllocation({
     accounts.length === 1
       ? requested
       : accounts.reduce((sum, account) => sum + amountFor(account.id), 0);
-  const { remaining, overallocated, isFullyAllocated } = allocationProgress(
-    requested,
-    assigned,
-    AMOUNT_EPSILON,
-  );
+  const { isFullyAllocated } = allocationProgress(requested, assigned, AMOUNT_EPSILON);
+  const difference = requested - assigned;
   const isReduce = changeAmount < 0;
   const { shown, hidden } = placementAccountIds(
     accounts.map((account) => account.id),
@@ -96,6 +105,39 @@ export function AccountAllocation({
   const listedAccounts = showOtherAccounts
     ? accounts
     : accounts.filter((account) => shown.includes(account.id));
+  // The listed accounts' own funding, side by side: a fact about each, never
+  // pooled across accounts and never a ranking of them (§6).
+  const listedCapacity =
+    !isReduce && accounts.length > 1 && fundingEstimates
+      ? listedAccounts.reduce(
+          (sum, account) => sum + (fundingEstimates.get(account.id)?.capacity ?? 0),
+          0,
+        )
+      : undefined;
+  const format = (amount: number) => formatAmount(amount, currency);
+  // The badge follows the worksheet's own check, so it never calls a change
+  // blocked that the check accepts, or the reverse.
+  const badge: { text: string; tone: "done" | "accepted" | "problem" | "over" } = problem
+    ? {
+        text:
+          problem.reason === "left"
+            ? t("allocation:worksheet.remainingToAllocate", { amount: format(problem.amount) })
+            : problem.reason === "not_placed"
+              ? t("allocation:worksheet.remainingToAllocate", { amount: format(requested) })
+              : describePlacementProblem(problem, t, format),
+        tone: problem.reason === "over" ? "over" : "problem",
+      }
+    : Math.abs(difference) < AMOUNT_EPSILON
+      ? { text: t("allocation:worksheet.fullyAllocated"), tone: "done" }
+      : {
+          text:
+            difference > 0
+              ? t("allocation:worksheet.allocationAcceptedUnplaced", {
+                  amount: format(difference),
+                })
+              : t("allocation:worksheet.allocationAcceptedOver", { amount: format(-difference) }),
+          tone: "accepted",
+        };
   // Which accounts record the security is a fact about the portfolio, so it is
   // stated whether or not the user has since placed the change by hand. Only
   // the first sentence — that the app placed it — depends on that.
@@ -121,28 +163,28 @@ export function AccountAllocation({
             {t("allocation:worksheet.accountAllocation")}
           </p>
           <p className="text-muted-foreground mt-1 text-xs">{t(hint, { account: holderName })}</p>
+          {listedCapacity !== undefined && listedCapacity < requested - 0.02 && (
+            <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+              {t("allocation:worksheet.placementCanFundTotal", {
+                amount: format(listedCapacity),
+                requested: format(requested),
+              })}
+            </p>
+          )}
         </div>
-        {/* Colour means a problem here; a complete allocation is not one. */}
+        {/* Colour means a problem here; a complete or accepted allocation is not one. */}
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px]",
-            isFullyAllocated
-              ? "text-foreground border"
-              : overallocated > AMOUNT_EPSILON
-                ? "bg-red-100 text-red-900 dark:bg-red-950/35 dark:text-red-200"
-                : "bg-amber-100 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200",
+            badge.tone === "done" && "text-foreground border",
+            badge.tone === "accepted" && "text-muted-foreground border",
+            badge.tone === "over" && "bg-red-100 text-red-900 dark:bg-red-950/35 dark:text-red-200",
+            badge.tone === "problem" &&
+              "bg-amber-100 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200",
           )}
         >
-          {isFullyAllocated && <Icons.Check className="h-3 w-3" />}
-          {isFullyAllocated
-            ? t("allocation:worksheet.fullyAllocated")
-            : overallocated > AMOUNT_EPSILON
-              ? t("allocation:worksheet.overAllocatedBy", {
-                  amount: formatAmount(overallocated, currency),
-                })
-              : t("allocation:worksheet.remainingToAllocate", {
-                  amount: formatAmount(remaining, currency),
-                })}
+          {badge.tone === "done" && <Icons.Check className="h-3 w-3" />}
+          {badge.text}
         </span>
       </div>
 
@@ -155,19 +197,26 @@ export function AccountAllocation({
         {listedAccounts.map((account) => {
           const holding = position.accountHoldings.find((item) => item.accountId === account.id);
           const funding = fundingByAccount.get(account.id);
+          const estimate = fundingEstimates?.get(account.id);
           const currentAmount = amountFor(account.id);
           const rowRemaining = Math.max(0, requested - (assigned - currentAmount));
+          // What this account can take of the change: what is left, capped by
+          // what it can fund (an increase) or holds (a reduction). The user picks
+          // the account; the amount is that account's own arithmetic (§6).
+          // Funding not read yet leaves the cap off.
+          const accountCap = isReduce ? (holding?.value ?? 0) : estimate?.capacity;
+          const cappedAmount =
+            accountCap === undefined ? rowRemaining : Math.min(rowRemaining, accountCap);
           // The unit price is derived from the recorded holding rather than the
           // quote the core resolves against, so the floor gets a tolerance and
-          // never drops a unit over the last decimal. A remainder that buys
+          // never drops a unit over the last decimal. An amount that buys
           // nothing is still offered: the core reports such a line now, and
           // withholding the button only forces the same amount in by hand.
-          const wholeUnitRemaining =
+          const wholeUnitAmount =
             wholeSharesOnly && unitPrice
-              ? Math.floor(rowRemaining / unitPrice + 1e-9) * unitPrice
-              : rowRemaining;
-          const remainingToUse =
-            wholeUnitRemaining > AMOUNT_EPSILON ? wholeUnitRemaining : rowRemaining;
+              ? Math.floor(cappedAmount / unitPrice + 1e-9) * unitPrice
+              : cappedAmount;
+          const amountToUse = wholeUnitAmount > AMOUNT_EPSILON ? wholeUnitAmount : cappedAmount;
           const currentUnits = unitPrice ? currentAmount / unitPrice : undefined;
           return (
             <div
@@ -191,11 +240,22 @@ export function AccountAllocation({
                       quantity: formatQuantity(holding.quantity),
                     })}
                   {holding && !isReduce && " · "}
+                  {/* An estimate from the page's own figures; the preview then
+                      resolves whole units and says what it found. */}
                   {!isReduce &&
-                    t("allocation:worksheet.accountCashSummary", {
-                      amount: formatAmount(funding?.availableCash ?? 0, currency),
-                    })}
+                    (estimate
+                      ? t("allocation:worksheet.accountCanFund", {
+                          amount: format(estimate.capacity),
+                        })
+                      : t("allocation:worksheet.accountFundingPending"))}
                 </p>
+                {!isReduce && estimate && estimate.deficit >= AMOUNT_EPSILON && (
+                  <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200">
+                    {t("allocation:worksheet.accountFundingDeficit", {
+                      amount: format(estimate.deficit),
+                    })}
+                  </p>
+                )}
                 {funding && funding.remaining < -AMOUNT_EPSILON && (
                   <p className="mt-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-200">
                     {t("allocation:worksheet.fundingNeeded", {
@@ -248,17 +308,22 @@ export function AccountAllocation({
                         inputMode="decimal"
                         placeholder="0"
                       />
-                      {/* Offered only while some of the change is still unplaced. */}
-                      {!isFullyAllocated && rowRemaining > AMOUNT_EPSILON && (
+                      {/* Offered only while it would add to this account: it says the
+                          amount, so nothing about it has to be guessed. */}
+                      {!isFullyAllocated && amountToUse > currentAmount + AMOUNT_EPSILON && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 px-2 text-[11px]"
+                          className="h-8 px-2 font-mono text-[11px] tabular-nums"
+                          aria-label={t("allocation:worksheet.useAmountIn", {
+                            amount: format(amountToUse),
+                            account: account.name,
+                          })}
                           onClick={() =>
-                            onAmountChange(account.id, formatDecimalInput(remainingToUse, 6))
+                            onAmountChange(account.id, formatDecimalInput(amountToUse, 6))
                           }
                         >
-                          {t("allocation:worksheet.useRemaining")}
+                          {t("allocation:worksheet.useAmount", { amount: format(amountToUse) })}
                         </Button>
                       )}
                     </>
@@ -268,9 +333,7 @@ export function AccountAllocation({
                   <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
                     {t("allocation:worksheet.accountUnitsSummary", {
                       quantity: formatQuantity(
-                        wholeSharesOnly
-                          ? Math.floor(currentUnits)
-                          : Math.round(currentUnits * 100) / 100,
+                        wholeSharesOnly ? Math.floor(currentUnits) : displayUnits(currentUnits),
                       ),
                     })}
                   </span>

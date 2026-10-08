@@ -212,7 +212,6 @@
     "account": "Konto",
     "accountAllocation": "Aufteilung nach Konto",
     "accountAmountLabel": "Betrag für {{account}}",
-    "accountCashSummary": "{{amount}} Bargeld erfasst",
     "accountCount_one": "{{count}} Konto",
     "accountCount_other": "{{count}} Konten",
     "accountHoldingSummary": "Hält {{amount}} · {{quantity}} Anteile",
@@ -320,7 +319,6 @@
     "unresolvedTitle": "Offene Beträge",
     "updatingFromSources": "Aktualisierung aus erfassten Beständen, Preisen und Klassifizierungen…",
     "updatingPreview": "Wird aktualisiert…",
-    "useRemaining": "Rest verwenden",
     "warningCount_one": "{{count}} Punkt zu dieser Vorschau prüfen",
     "warningCount_other": "{{count}} Punkte zu dieser Vorschau prüfen",
     "collapsedRows_one": "{{count}} Wertpapier ohne Anpassung",
@@ -337,7 +335,6 @@
     "classFiguresTitle": "Aktuell → Prognose / Ziel, in %",
     "weight": "Gewicht",
     "status": "Status",
-    "needsAccount": "Konto wählen",
     "checkAmount": "Betrag prüfen",
     "roundedTo": "Gerundet auf {{amount}}",
     "priceFrom": "Preis vom {{date}}",
@@ -456,6 +453,18 @@
       "insufficientFunding": "Erhöhungen von {{amount}} übersteigen die {{funding}} aus gewähltem Bargeld und Erlösen aus Reduzierungen.",
       "accountFunding": "Erhöhungen von {{amount}} in {{account}} übersteigen die {{funding}}, die das Konto selbst finanzieren kann; Übertragungen zwischen Konten werden nicht angenommen.",
       "turnoverExceeded": "Reduzierungen betragen {{share}} des aktuellen Werts, mehr als Ihre Umschlagsgrenze von {{limit}}."
-    }
+    },
+    "placementNoAccount": "Kein geeignetes Konto",
+    "placementInvalid": "Kontobeträge prüfen",
+    "placementNotPlaced": "Konten wählen",
+    "placementLeft": "Noch {{amount}} zuzuordnen",
+    "accountCanFund": "Kann etwa {{amount}} finanzieren",
+    "accountFundingPending": "Bargeld wird gelesen…",
+    "accountFundingDeficit": "Andere Anpassungen übersteigen seine geschätzte Finanzierung um etwa {{amount}}",
+    "placementCanFundTotal": "Diese Konten können etwa {{amount}} der {{requested}} finanzieren.",
+    "allocationAcceptedUnplaced": "{{amount}} nicht platziert, akzeptiert",
+    "allocationAcceptedOver": "{{amount}} zu viel, akzeptiert",
+    "useAmount": "{{amount}} verwenden",
+    "useAmountIn": "{{amount}} in {{account}} verwenden"
   }
 }

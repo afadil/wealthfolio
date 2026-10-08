@@ -217,7 +217,6 @@
     "account": "Conta",
     "accountAllocation": "Distribuição por conta",
     "accountAmountLabel": "Valor para {{account}}",
-    "accountCashSummary": "{{amount}} em caixa registrado",
     "accountCount_one": "{{count}} conta",
     "accountCount_other": "{{count}} contas",
     "accountCount_many": "{{count}} contas",
@@ -328,7 +327,6 @@
     "unresolvedTitle": "Valores não resolvidos",
     "updatingFromSources": "Atualizando a partir de posições, preços e classificações registrados…",
     "updatingPreview": "Atualizando…",
-    "useRemaining": "Usar o restante",
     "warningCount_one": "{{count}} ponto a revisar nesta prévia",
     "warningCount_other": "{{count}} pontos a revisar nesta prévia",
     "warningCount_many": "{{count}} pontos a revisar nesta prévia",
@@ -348,7 +346,6 @@
     "classFiguresTitle": "Atual → projetado / meta, em %",
     "weight": "Peso",
     "status": "Status",
-    "needsAccount": "Falta uma conta",
     "checkAmount": "Verifique o valor",
     "roundedTo": "Arredondado para {{amount}}",
     "priceFrom": "Preço de {{date}}",
@@ -470,6 +467,18 @@
       "insufficientFunding": "Aumentos de {{amount}} excedem os {{funding}} de caixa selecionado e recursos das reduções.",
       "accountFunding": "Aumentos de {{amount}} em {{account}} excedem os {{funding}} que ela pode financiar sozinha; nenhuma transferência entre contas é presumida.",
       "turnoverExceeded": "As reduções somam {{share}} do valor atual, acima do seu limite de rotatividade de {{limit}}."
-    }
+    },
+    "placementNoAccount": "Nenhuma conta elegível",
+    "placementInvalid": "Verifique os valores por conta",
+    "placementNotPlaced": "Escolha as contas",
+    "placementLeft": "Faltam {{amount}} para alocar",
+    "accountCanFund": "Pode financiar cerca de {{amount}}",
+    "accountFundingPending": "Lendo o caixa…",
+    "accountFundingDeficit": "Outros ajustes excedem o financiamento estimado dela em cerca de {{amount}}",
+    "placementCanFundTotal": "Estas contas podem financiar cerca de {{amount}} dos {{requested}}.",
+    "allocationAcceptedUnplaced": "{{amount}} não alocado, aceito",
+    "allocationAcceptedOver": "{{amount}} a mais, aceito",
+    "useAmount": "Usar {{amount}}",
+    "useAmountIn": "Usar {{amount}} em {{account}}"
   }
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CalculatedAdjustments } from "@/lib/types";
 import {
+  estimatedFunding,
   adjustmentsFromCalculated,
   allocationProgress,
   amountAtRest,
@@ -85,6 +86,17 @@ describe("eligible accounts for a change", () => {
 
   it("draws a reduction only from the accounts that hold the security", () => {
     expect(eligibleAccountIdsForChange(-500, ["acc-2"], ["acc-1", "acc-2"])).toEqual(["acc-2"]);
+  });
+
+  it("keeps an increase out of an account that cannot take it, unless it already holds it", () => {
+    const notCrypto = (accountId: string) => accountId !== "kraken";
+    expect(
+      eligibleAccountIdsForChange(500, ["acc-1"], ["acc-1", "kraken", "acc-2"], notCrypto),
+    ).toEqual(["acc-1", "acc-2"]);
+    expect(eligibleAccountIdsForChange(500, ["kraken"], ["acc-1", "kraken"], notCrypto)).toEqual([
+      "acc-1",
+      "kraken",
+    ]);
   });
 });
 
@@ -239,5 +251,52 @@ describe("generation inputs fingerprint", () => {
     expect(generationInputsKey({ ...inputs, eligibleAssetIds: [] })).not.toBe(
       generationInputsKey({ ...inputs, eligibleAssetIds: undefined }),
     );
+  });
+});
+
+describe("estimatedFunding", () => {
+  const ledger = (entries: [string, number][], isValid = true) => ({
+    byAccount: new Map(entries),
+    isValid,
+  });
+
+  it("leaves the change itself out and reserves what other changes place", () => {
+    const estimates = estimatedFunding(
+      { brokerage: 1000, roth: 500 },
+      new Map([
+        ["aapl", ledger([["brokerage", 400]])],
+        // An incomplete placement still reserves what it already places.
+        ["vti", ledger([["brokerage", 100]], false)],
+        ["msft", ledger([["roth", 9999]])],
+      ]),
+      "msft",
+      ["brokerage", "roth"],
+    );
+    expect(estimates.get("brokerage")).toEqual({ capacity: 500, deficit: 0 });
+    expect(estimates.get("roth")).toEqual({ capacity: 500, deficit: 0 });
+  });
+
+  it("adds what valid reductions raise, and nothing from an invalid one", () => {
+    const estimates = estimatedFunding(
+      { brokerage: 0 },
+      new Map([
+        ["bnd", ledger([["brokerage", -300]])],
+        ["vnq", ledger([["brokerage", -1000]], false)],
+      ]),
+      "aapl",
+      ["brokerage"],
+    );
+    expect(estimates.get("brokerage")).toEqual({ capacity: 300, deficit: 0 });
+  });
+
+  it("states an account's shortfall on its own, never offset by another account", () => {
+    const estimates = estimatedFunding(
+      { brokerage: 0, roth: 1500 },
+      new Map([["aapl", ledger([["brokerage", 1000]])]]),
+      "vti",
+      ["brokerage", "roth"],
+    );
+    expect(estimates.get("brokerage")).toEqual({ capacity: 0, deficit: 1000 });
+    expect(estimates.get("roth")).toEqual({ capacity: 1500, deficit: 0 });
   });
 });

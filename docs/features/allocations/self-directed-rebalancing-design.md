@@ -287,7 +287,18 @@ entered"). See §7.
 - **Funding is validated per account.** An increase in one account cannot be
   funded by cash recorded in another; no transfer between accounts is assumed or
   implied.
-- Account type, tax wrapper and contribution room are never inputs.
+- **While a change is placed, each account states what it can still fund for
+  it**, as an estimate: the cash it deploys and its contribution, plus what
+  valid reductions elsewhere raise in it, minus what other changes already place
+  in it, partly placed ones included. A shortfall in one account is stated on
+  its own and never offset by another. The estimate is a fact beside every
+  account, not a ranking or a pick; the preview then resolves whole units and
+  confirms.
+- Tax treatment, tax wrapper and contribution room are never inputs, and the app
+  never picks or ranks accounts. Which kinds of account can hold a security
+  still decides eligibility: cash accounts take no security change, a crypto
+  account takes an increase only in crypto or in what it already holds, and
+  increase constraints exclude the accounts they name.
   `crates/agent-tools/src/tools/contribution_limits.rs` must not be wired into
   this.
 

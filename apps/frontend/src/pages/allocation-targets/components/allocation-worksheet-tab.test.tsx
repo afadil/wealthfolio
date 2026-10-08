@@ -648,7 +648,7 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
 
     // The row states the fact, and opens the account allocation from there.
     expect(screen.queryByText("Account allocation")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Needs an account" }));
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
     const allocation = screen
       .getByText("Account allocation")
       .closest<HTMLElement>("[data-account-allocation]")!;
@@ -660,12 +660,85 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     expect(previewMock).not.toHaveBeenCalled();
   });
 
+  it("states what each account can fund while the change waits to be placed", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+
+    // The change blocks the preview, yet each account's cash is known from Setup.
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+    expect(within(allocation).getByText(/Can fund about \$2,000\.00/)).toBeInTheDocument();
+    expect(within(allocation).getByText(/Can fund about \$0\.00/)).toBeInTheDocument();
+    expect(within(allocation).queryByText(/cash recorded/)).not.toBeInTheDocument();
+    // Brokerage can take all of it; Retirement can fund none of it.
+    expect(
+      within(allocation).getByRole("button", { name: "Use $1,200.00 in Brokerage" }),
+    ).toBeInTheDocument();
+    expect(
+      within(allocation).queryByRole("button", { name: /^Use .* in Retirement$/ }),
+    ).not.toBeInTheDocument();
+    // Together they can fund it, so there is nothing to say about a shortfall.
+    expect(within(allocation).queryByText(/These accounts can fund/)).not.toBeInTheDocument();
+  });
+
+  it("says how far the account amounts are from the adjustment", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+
+    await user.type(within(allocation).getByLabelText("Amount for Brokerage"), "1000");
+    expect(screen.getByRole("button", { name: "$200.00 left to allocate" })).toBeInTheDocument();
+
+    await user.type(within(allocation).getByLabelText("Amount for Retirement"), "300");
+    expect(
+      screen.getByRole("button", { name: "$100.00 more than the adjustment" }),
+    ).toBeInTheDocument();
+    expect(within(allocation).getByText("$100.00 more than the adjustment")).toBeInTheDocument();
+  });
+
+  it("states when the listed accounts cannot fund the change between them", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      recordedCashByAccount: { "acc-1": 500, "acc-2": 0 },
+    });
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+    expect(
+      within(allocation).getByText("These accounts can fund about $500.00 of the $1,200.00."),
+    ).toBeInTheDocument();
+
+    // Each account offers what it can take of the change, by its own figures; an
+    // account that can fund nothing offers nothing, and nothing picks for the user.
+    expect(
+      within(allocation).queryByRole("button", { name: /^Use .* in Retirement$/ }),
+    ).not.toBeInTheDocument();
+    await user.click(within(allocation).getByRole("button", { name: "Use $500.00 in Brokerage" }));
+    expect(within(allocation).getByLabelText("Amount for Brokerage")).toHaveValue("500.00");
+    expect(screen.getByRole("button", { name: "$700.00 left to allocate" })).toBeInTheDocument();
+  });
+
   it("steps an account's amount one unit at a time inside the allocation", async () => {
     accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
     heldAccountIds.current = ["acc-1", "acc-2"];
     const user = await renderWorksheet();
     await calculateFromTarget(user);
-    await user.click(screen.getByRole("button", { name: "Needs an account" }));
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
     const allocation = screen
       .getByText("Account allocation")
       .closest<HTMLElement>("[data-account-allocation]")!;
@@ -700,9 +773,7 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
       .closest<HTMLElement>("[data-account-allocation]")!;
     expect(within(allocation).getByText("Fully allocated")).toBeInTheDocument();
     // Nothing is left to place, so nothing offers to place the rest.
-    expect(
-      within(allocation).queryByRole("button", { name: "Use remaining" }),
-    ).not.toBeInTheDocument();
+    expect(within(allocation).queryByRole("button", { name: /^Use / })).not.toBeInTheDocument();
     expect(within(allocation).getByLabelText("Amount for Brokerage")).toHaveValue("1200.00");
     // An account without the security waits behind a link, and can still take it.
     expect(within(allocation).queryByLabelText("Amount for Retirement")).not.toBeInTheDocument();
@@ -1112,7 +1183,7 @@ describe("AllocationWorksheetTab Setup cash (§6)", () => {
     await user.click(screen.getByRole("checkbox", { name: "Include Joint" }));
     await calculateFromTarget(user);
     // VTI waits for an account, so the worksheet cannot be previewed.
-    expect(screen.getByRole("button", { name: "Needs an account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose accounts" })).toBeInTheDocument();
 
     await goTo(user, "Setup");
     previewMock.mockClear();

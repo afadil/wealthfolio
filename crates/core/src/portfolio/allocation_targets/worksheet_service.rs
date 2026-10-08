@@ -21,7 +21,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::accounts::{account_types, Account, AccountServiceTrait};
-use crate::assets::{Asset, AssetServiceTrait};
+use crate::assets::{Asset, AssetServiceTrait, InstrumentType};
 use crate::errors::{DatabaseError, Error as CoreError, Result as CoreResult, ValidationError};
 use crate::fx::{
     denormalization_multiplier, normalize_currency_code, ExchangeRate, FxServiceTrait,
@@ -307,6 +307,15 @@ impl AllocationWorksheetService {
             account.account_type.as_str(),
             account_types::SECURITIES | account_types::CRYPTOCURRENCY
         )
+    }
+
+    /// Whether an account can take an increase in an asset it does not hold
+    /// yet (§6): a crypto account takes only crypto. Technical eligibility, not
+    /// a preference between accounts; an account that already holds the asset
+    /// can always take more.
+    fn can_receive(account: &Account, asset: &Asset) -> bool {
+        account.account_type != account_types::CRYPTOCURRENCY
+            || asset.instrument_type == Some(InstrumentType::Crypto)
     }
 
     /// The accounts the user chose to change, validated against the target's
@@ -897,25 +906,36 @@ impl AllocationWorksheetService {
         securities
     }
 
-    /// The accounts each security may be increased in (§6): selected, and not
-    /// blocked from receiving it. Account type, tax wrapper and contribution
-    /// room are never inputs.
+    /// The accounts each security may be increased in (§6): selected, able to
+    /// hold it, and not blocked from receiving it. Tax treatment, tax wrapper
+    /// and contribution room are never inputs.
     fn eligible_accounts(
         securities: &[SecurityInput],
-        account_ids: &[String],
+        accounts: &[AccountSource],
+        assets_by_id: &HashMap<String, Asset>,
         constraints: &[AllocationTargetConstraint],
     ) -> HashMap<String, Vec<String>> {
         securities
             .iter()
             .map(|security| {
+                let asset = assets_by_id.get(&security.asset_id);
                 let classified: Vec<String> = security
                     .category_values
                     .iter()
                     .filter(|(category_id, _)| category_id != UNKNOWN_CATEGORY_ID)
                     .map(|(category_id, _)| category_id.clone())
                     .collect();
-                let accounts = account_ids
+                let eligible = accounts
                     .iter()
+                    .map(|source| &source.account)
+                    .filter(|account| {
+                        let holds = security
+                            .positions
+                            .iter()
+                            .any(|position| position.account_id == account.id);
+                        holds || asset.is_none_or(|asset| Self::can_receive(account, asset))
+                    })
+                    .map(|account| account.id.clone())
                     .filter(|account_id| {
                         !Self::is_blocked(
                             constraints,
@@ -925,9 +945,8 @@ impl AllocationWorksheetService {
                             &classified,
                         )
                     })
-                    .cloned()
                     .collect();
-                (security.asset_id.clone(), accounts)
+                (security.asset_id.clone(), eligible)
             })
             .collect()
     }
@@ -1029,7 +1048,12 @@ impl AllocationWorksheetService {
         let assigned = assign_accounts(
             &limited.lines,
             &securities,
-            &Self::eligible_accounts(&securities, &account_ids, &sources.constraints),
+            &Self::eligible_accounts(
+                &securities,
+                &sources.accounts,
+                &sources.assets_by_id,
+                &sources.constraints,
+            ),
             target.whole_shares_only,
             min_line_amount,
         );
@@ -1220,6 +1244,27 @@ impl AllocationWorksheetService {
                     &line.line_id,
                     "selected asset is not an active tracked investment security",
                 ));
+            }
+            if matches!(line.direction, WorksheetDirection::Increase) {
+                let holds = holdings_by_account
+                    .get(&line.account_id)
+                    .into_iter()
+                    .flatten()
+                    .any(|holding| {
+                        holding.holding_type != HoldingType::Cash
+                            && Self::asset_key(holding) == line.asset_id
+                    });
+                let account = sources
+                    .accounts
+                    .iter()
+                    .map(|source| &source.account)
+                    .find(|account| account.id == line.account_id);
+                if !holds && account.is_some_and(|account| !Self::can_receive(account, asset)) {
+                    return Err(Self::line_invalid(
+                        &line.line_id,
+                        "a crypto account cannot receive this security",
+                    ));
+                }
             }
             let (snapshot, quote) = Self::quote_for_line(line, &sources.quote_snapshots)?;
             let (fx_rate, fx_source, line_fx_rates) = Self::resolve_fx_source(
@@ -2056,6 +2101,20 @@ mod tests {
         ids.iter().map(|id| (id.to_string(), asset(id))).collect()
     }
 
+    fn bare_source(id: &str, account_type: &str) -> AccountSource {
+        AccountSource {
+            account: account(id, account_type),
+            contributions: TaxonomyHoldingContributions {
+                taxonomy_id: "asset_classes".to_string(),
+                taxonomy_name: "asset_classes".to_string(),
+                total_value: Decimal::ZERO,
+                currency: "USD".to_string(),
+                contributions: vec![],
+            },
+            holdings: vec![],
+        }
+    }
+
     fn account(id: &str, account_type: &str) -> Account {
         Account {
             id: id.to_string(),
@@ -2456,7 +2515,14 @@ mod tests {
                         }
                     }
                     AccountSource {
-                        account: account(account_id, account_types::SECURITIES),
+                        account: account(
+                            account_id,
+                            if account_id.starts_with("crypto") {
+                                account_types::CRYPTOCURRENCY
+                            } else {
+                                account_types::SECURITIES
+                            },
+                        ),
                         contributions: TaxonomyHoldingContributions {
                             taxonomy_id: self.taxonomy_id.to_string(),
                             taxonomy_name: self.taxonomy_id.to_string(),
@@ -3332,11 +3398,92 @@ mod tests {
 
         let eligible = AllocationWorksheetService::eligible_accounts(
             &securities,
-            &["acc-1".to_string(), "acc-2".to_string()],
+            &[
+                bare_source("acc-1", account_types::SECURITIES),
+                bare_source("acc-2", account_types::SECURITIES),
+            ],
+            &assets(&["vti"]),
             &constraints,
         );
 
         assert_eq!(eligible["vti"], vec!["acc-1".to_string()]);
+    }
+
+    #[test]
+    fn a_crypto_account_takes_only_crypto_unless_it_already_holds_the_asset() {
+        let security = |asset_id: &str, held_in: &[&str]| SecurityInput {
+            asset_id: asset_id.to_string(),
+            symbol: asset_id.to_ascii_uppercase(),
+            unit_price: Some(dec!(100)),
+            is_eligible_for_increase: true,
+            category_values: vec![("EQUITY".to_string(), dec!(1000))],
+            positions: held_in
+                .iter()
+                .map(|account_id| PositionInput {
+                    account_id: account_id.to_string(),
+                    quantity: dec!(1),
+                    can_reduce: true,
+                })
+                .collect(),
+        };
+        let mut assets_by_id = assets(&["vti", "voo"]);
+        let mut btc = asset("btc");
+        btc.instrument_type = Some(InstrumentType::Crypto);
+        assets_by_id.insert("btc".to_string(), btc);
+
+        let eligible = AllocationWorksheetService::eligible_accounts(
+            &[
+                security("vti", &[]),
+                security("btc", &[]),
+                security("voo", &["crypto-1"]),
+            ],
+            &[
+                bare_source("acc-1", account_types::SECURITIES),
+                bare_source("crypto-1", account_types::CRYPTOCURRENCY),
+            ],
+            &assets_by_id,
+            &[],
+        );
+
+        // Technical eligibility, not a preference: a crypto account takes no
+        // stock, a securities account may hold crypto, and an account that
+        // already holds something can take more of it.
+        assert_eq!(eligible["vti"], vec!["acc-1".to_string()]);
+        assert_eq!(
+            eligible["btc"],
+            vec!["acc-1".to_string(), "crypto-1".to_string()]
+        );
+        assert_eq!(
+            eligible["voo"],
+            vec!["acc-1".to_string(), "crypto-1".to_string()]
+        );
+    }
+
+    #[test]
+    fn the_preview_refuses_a_security_in_a_crypto_account_that_does_not_hold_it() {
+        let mut portfolio = brokerage(7000, 3000, 0);
+        portfolio.account_ids = vec!["acc-1", "crypto-1"];
+        let increase = |account_id: &str| AllocationWorksheetLineInput {
+            line_id: format!("vti-{account_id}"),
+            direction: WorksheetDirection::Increase,
+            asset_id: "vti".to_string(),
+            account_id: account_id.to_string(),
+            input_mode: WorksheetInputMode::Amount,
+            value: dec!(100),
+        };
+
+        let error = portfolio
+            .preview(tracked(dec!(0)), vec![increase("crypto-1")])
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("a crypto account cannot receive this security"),
+            "{error}"
+        );
+        assert!(portfolio
+            .preview(tracked(dec!(0)), vec![increase("acc-1")])
+            .is_ok());
     }
 
     #[test]
