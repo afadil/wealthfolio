@@ -2,6 +2,7 @@ import type {
   AllocationWorksheetLineResult,
   AllocationWorksheetResult,
   CalculatedAdjustments,
+  WorksheetWarning,
 } from "@/lib/types";
 
 /** A number written with a fixed count of decimals, the way sums are read. */
@@ -61,6 +62,8 @@ export interface WorksheetExportInput {
   accountIds: readonly string[];
   trackedCashToUse: number;
   externalCash: number;
+  /** A warning in the user's language and number format. */
+  describeWarning: (warning: WorksheetWarning) => string;
 }
 
 function lineCategory(line: AllocationWorksheetLineResult): string {
@@ -148,7 +151,7 @@ export function worksheetExportRows(
     if (!warning.lineId) continue;
     warningsByLine.set(warning.lineId, [
       ...(warningsByLine.get(warning.lineId) ?? []),
-      warning.message,
+      input.describeWarning(warning),
     ]);
   }
   const lines = [...result.lines].sort(
@@ -241,7 +244,7 @@ export function worksheetExportRows(
     ...(labels.outOfDate ? [context(labels.note, labels.outOfDate)] : []),
   );
   result.warnings.forEach((warning, index) => {
-    rows.push(context(index === 0 ? labels.warnings : "", warning.message));
+    rows.push(context(index === 0 ? labels.warnings : "", input.describeWarning(warning)));
   });
   rows.push(context(labels.limitationsTitle, labels.limitations));
   return rows;

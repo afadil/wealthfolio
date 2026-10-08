@@ -2838,6 +2838,12 @@ export interface WorksheetCashInput {
   trackedCashToUse: number;
   /** Hypothetical cash not recorded anywhere, keyed by the account it would arrive in. */
   externalContribution: Record<string, number>;
+  /**
+   * Tracked cash each selected account may spend. When present it replaces
+   * `trackedCashToUse`: an account left out spends none, and each account's
+   * funding is checked against its own amount.
+   */
+  trackedCashByAccount?: Record<string, number>;
 }
 
 export interface AllocationWorksheetLineInput {
@@ -2859,13 +2865,30 @@ export type WorksheetWarningKind =
   | "turnover_exceeded"
   | "avoid_constraint"
   | "insufficient_funding"
-  | "account_funding";
+  | "account_funding"
+  | "cash_unavailable"
+  | "below_one_unit";
+
+/** The figures a warning states. Amounts are in the planning currency. */
+export interface WorksheetWarningFacts {
+  amount?: number;
+  limit?: number;
+  unitPrice?: number;
+  shareBps?: number;
+  limitBps?: number;
+  accountId?: string;
+  /** The date a dated price or rate is from. */
+  asOf?: string;
+  reason?: string;
+}
 
 export interface WorksheetWarning {
   id: string;
   kind: WorksheetWarningKind;
   lineId?: string | null;
+  /** The core's English wording; the worksheet words the facts itself. */
   message: string;
+  facts?: WorksheetWarningFacts;
   acknowledgementRequired: boolean;
 }
 
@@ -2945,6 +2968,8 @@ export interface AllocationWorksheetResult {
   sourceFingerprint: string;
   resolvedAccountIds: string[];
   observedTrackedCash: number;
+  /** What each selected account records, before any amount set for it. */
+  recordedCashByAccount: Record<string, number>;
   trackedCashToUse: number;
   externalContribution: number;
   increaseTotal: number;

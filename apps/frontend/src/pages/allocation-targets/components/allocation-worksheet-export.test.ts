@@ -135,6 +135,7 @@ function csvLines(overrides: Partial<WorksheetExportLabels> = {}) {
       accountIds: ["acc-1", "acc-2"],
       trackedCashToUse: 900,
       externalCash: 300.5,
+      describeWarning: (warning) => warning.message,
     },
     { ...labels, ...overrides },
   );

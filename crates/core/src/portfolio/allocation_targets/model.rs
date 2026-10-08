@@ -580,6 +580,13 @@ pub struct WorksheetCashInput {
     /// split has to be stated, since no transfer between accounts is assumed.
     #[serde(default)]
     pub external_contribution: std::collections::HashMap<String, Decimal>,
+    /// The tracked cash each selected account may spend, keyed by account (§6).
+    /// When present it replaces `tracked_cash_to_use`: each amount is met with
+    /// what that account records, an account left out spends none, and the
+    /// total is their sum. Each account's funding is then checked against its
+    /// own amount rather than everything it records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracked_cash_by_account: Option<std::collections::HashMap<String, Decimal>>,
 }
 
 impl WorksheetCashInput {
@@ -648,8 +655,40 @@ pub struct WorksheetWarning {
     pub id: String,
     pub kind: WorksheetWarningKind,
     pub line_id: Option<String>,
+    /// The warning in English, with its figures as the core holds them.
     pub message: String,
+    /// The figures `message` states, so a client can word and format them in
+    /// the user's own language and number format.
+    #[serde(default)]
+    pub facts: WorksheetWarningFacts,
     pub acknowledgement_required: bool,
+}
+
+/// What a warning is about, by kind. Amounts are in the planning currency;
+/// shares are in basis points.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorksheetWarningFacts {
+    /// The amount the warning is about: deployed, asked for, or resolved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<Decimal>,
+    /// The amount it is measured against: available, recorded, or a minimum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit_price: Option<Decimal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub share_bps: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_bps: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+    /// The date a dated price or rate is from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub as_of: Option<String>,
+    /// The user's own words, such as an Avoid constraint's reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -746,6 +785,9 @@ pub struct AllocationWorksheetResult {
     pub source_fingerprint: String,
     pub resolved_account_ids: Vec<String>,
     pub observed_tracked_cash: Decimal,
+    /// What each selected account records, before any amount the user set for
+    /// it. `observed_tracked_cash` is their sum.
+    pub recorded_cash_by_account: std::collections::HashMap<String, Decimal>,
     pub tracked_cash_to_use: Decimal,
     pub external_contribution: Decimal,
     pub increase_total: Decimal,

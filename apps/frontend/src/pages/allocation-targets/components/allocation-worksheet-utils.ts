@@ -243,6 +243,39 @@ export function adjustmentsFromCalculated(calculated: CalculatedAdjustments): Po
 }
 
 /**
+ * The worksheet still holds the calculated amounts, so recalculating would
+ * replace nothing the user entered (§5). Compared as numbers: a value only
+ * reformatted is not an edit.
+ */
+export function isAsCalculated(
+  adjustments: PositionAdjustments,
+  calculated: CalculatedAdjustments,
+): boolean {
+  const expected = adjustmentsFromCalculated(calculated);
+  const same = (left: string | undefined, right: string | undefined) =>
+    left !== undefined &&
+    right !== undefined &&
+    Math.abs(decimalInputOrZero(left) - decimalInputOrZero(right)) < AMOUNT_EPSILON;
+  const assetIds = new Set([...Object.keys(adjustments), ...Object.keys(expected)]);
+  for (const assetId of assetIds) {
+    const actual = adjustments[assetId];
+    const wanted = expected[assetId];
+    if (!actual || !wanted) return false;
+    if (actual.inputMode !== wanted.inputMode || !same(actual.inputValue, wanted.inputValue)) {
+      return false;
+    }
+    const accountIds = new Set([
+      ...Object.keys(actual.accountAmounts),
+      ...Object.keys(wanted.accountAmounts),
+    ]);
+    for (const accountId of accountIds) {
+      if (!same(actual.accountAmounts[accountId], wanted.accountAmounts[accountId])) return false;
+    }
+  }
+  return true;
+}
+
+/**
  * How far a unit price may move before the worksheet stops matching its
  * calculation. Prices move all day and are synced when the app opens; a
  * smaller move only changes the estimated quantities, which the preview
@@ -279,6 +312,8 @@ export interface WorksheetGenerationInputs {
   mode: WorksheetMode;
   rule: AllocationRule;
   trackedCashToUse: number;
+  /** What each account may spend, once the cash it records is known. */
+  trackedCashByAccount?: Readonly<Record<string, number>>;
   externalContribution: Readonly<Record<string, number>>;
   /** Omitted means every recorded security; an empty list is a different, valid selection. */
   eligibleAssetIds?: readonly string[];
@@ -303,6 +338,14 @@ export function generationInputsKey(inputs: WorksheetGenerationInputs): string {
       .filter(([, amount]) => amount > 0)
       .sort(([left], [right]) => left.localeCompare(right)),
     inputs.eligibleAssetIds === undefined ? null : [...inputs.eligibleAssetIds].sort(),
+    // Set once the cash each account records is known.
+    ...(inputs.trackedCashByAccount
+      ? [
+          Object.entries(inputs.trackedCashByAccount).sort(([left], [right]) =>
+            left.localeCompare(right),
+          ),
+        ]
+      : []),
   ]);
 }
 

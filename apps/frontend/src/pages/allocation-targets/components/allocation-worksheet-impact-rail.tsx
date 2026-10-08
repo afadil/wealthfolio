@@ -1,7 +1,12 @@
 import { Button, Card, CardContent, Icons, useAmountFormatting } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
 
-import type { AllocationWorksheetResult, CalculatedAdjustments, DriftReport } from "@/lib/types";
+import type {
+  AllocationWorksheetResult,
+  CalculatedAdjustments,
+  DriftReport,
+  WorksheetWarning,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import {
@@ -49,6 +54,8 @@ interface ImpactRailProps {
   onCalculate: () => void;
   onReviewIssue: () => void;
   onClassifySecurity: (lineId: string) => void;
+  /** A warning in the user's language and number format. */
+  describeWarning: (warning: WorksheetWarning) => string;
 }
 
 function formatWeight(bps: number): string {
@@ -99,6 +106,7 @@ export function ImpactRail({
   onCalculate,
   onReviewIssue,
   onClassifySecurity,
+  describeWarning,
 }: ImpactRailProps) {
   const { t } = useTranslation();
   const { formatAmount } = useAmountFormatting();
@@ -126,6 +134,14 @@ export function ImpactRail({
   const unclassifiedBps =
     activeRow?.shares.find((share) => share.categoryId === UNCLASSIFIED_CATEGORY_ID)?.weightBps ??
     0;
+  const unclassifiedNote = !activeRow
+    ? undefined
+    : unclassifiedBps >= 10_000
+      ? t("allocation:worksheet.rowUnclassified", { symbol: activeRow.symbol })
+      : t("allocation:worksheet.rowPartlyClassified", {
+          share: formatShare(unclassifiedBps),
+          symbol: activeRow.symbol,
+        });
   const unresolvedByCategory = new Map(unresolved.map((item) => [item.categoryId, item]));
   const halfWindow = trackHalfWindowBps(classes);
 
@@ -183,12 +199,20 @@ export function ImpactRail({
             })}
           </p>
           <div className="text-muted-foreground mt-2 space-y-1 font-mono text-xs">
-            <p>
-              {/* In %, like every other difference on the allocation pages. */}
-              {t("allocation:worksheet.largestDifference", {
-                amount: `${(largestDifference / 100).toFixed(1)}%`,
-              })}
-            </p>
+            {/* Pointing at a row never adds a line: what part of it has no
+                category takes this line's place, so the classes stay put. */}
+            {activeRow && unclassifiedBps > 0 ? (
+              <p className="truncate text-amber-800 dark:text-amber-200" title={unclassifiedNote}>
+                {unclassifiedNote}
+              </p>
+            ) : (
+              <p>
+                {/* In %, like every other difference on the allocation pages. */}
+                {t("allocation:worksheet.largestDifference", {
+                  amount: `${(largestDifference / 100).toFixed(1)}%`,
+                })}
+              </p>
+            )}
             {result && (
               <p>
                 {t("allocation:worksheet.totalAdjusted", {
@@ -197,16 +221,6 @@ export function ImpactRail({
               </p>
             )}
           </div>
-          {activeRow && unclassifiedBps > 0 && (
-            <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
-              {unclassifiedBps >= 10_000
-                ? t("allocation:worksheet.rowUnclassified", { symbol: activeRow.symbol })
-                : t("allocation:worksheet.rowPartlyClassified", {
-                    share: formatShare(unclassifiedBps),
-                    symbol: activeRow.symbol,
-                  })}
-            </p>
-          )}
         </div>
 
         <div
@@ -269,8 +283,17 @@ export function ImpactRail({
                       )
                     : undefined
                 }
+                netChange={
+                  Math.abs(item.projectedValue - item.currentValue) >= AMOUNT_EPSILON
+                    ? formatSignedAmount(
+                        item.projectedValue - item.currentValue,
+                        report.baseCurrency,
+                        formatAmount,
+                      )
+                    : undefined
+                }
                 note={
-                  !activeRow && unresolvedAmount
+                  unresolvedAmount
                     ? t("allocation:worksheet.unresolvedInClass", {
                         amount: formatSignedAmount(
                           unresolvedAmount.amount,
@@ -298,26 +321,35 @@ export function ImpactRail({
                   {calculationError.description}
                 </p>
               )}
+              {!issueMessage && (
+                <button
+                  type="button"
+                  disabled={isCalculating || firstUseOpen}
+                  onClick={onCalculate}
+                  className="text-foreground mt-2 text-xs font-medium underline underline-offset-2 disabled:opacity-50"
+                >
+                  {t("allocation:worksheet.retryPreview")}
+                </button>
+              )}
             </div>
           )}
-          {!calculationError && issueMessage && (
-            <p className="text-muted-foreground text-xs leading-relaxed">{issueMessage}</p>
-          )}
-          {(issueMessage || calculationError) && (
-            <Button
-              className="w-full"
-              disabled={isCalculating || firstUseOpen}
-              onClick={issueMessage ? onReviewIssue : onCalculate}
-            >
-              {issueMessage ? (
-                <Icons.AlertCircle className="mr-1.5 h-4 w-4" />
-              ) : (
-                <Icons.BarChart className="mr-1.5 h-4 w-4" />
-              )}
-              {issueMessage
-                ? t("allocation:worksheet.goToIssue")
-                : t("allocation:worksheet.retryPreview")}
-            </Button>
+          {/* What to fix is a line with its way there; the step's one primary
+              action sits under this card. */}
+          {issueMessage && (
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-amber-800 dark:text-amber-200">
+              <Icons.AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {!calculationError && <>{issueMessage} </>}
+                <button
+                  type="button"
+                  disabled={firstUseOpen}
+                  onClick={onReviewIssue}
+                  className="font-medium underline underline-offset-2 disabled:opacity-50"
+                >
+                  {t("allocation:worksheet.goToIssue")}
+                </button>
+              </span>
+            </p>
           )}
 
           {isCalculating && !issueMessage && (
@@ -335,7 +367,7 @@ export function ImpactRail({
               <ul className="mt-2 space-y-2 text-xs text-amber-950/75 dark:text-amber-100/75">
                 {result.warnings.map((warning) => (
                   <li key={warning.id}>
-                    • {warning.message}
+                    • {describeWarning(warning)}
                     {(warning.kind === "partial_classification" ||
                       warning.kind === "unclassified_asset") &&
                       warning.lineId && (
@@ -369,7 +401,10 @@ interface ImpactClassRowProps {
   shareText: string | undefined;
   /** The active row's change that lands in this class. */
   shareAmount: string | undefined;
+  /** What stays unresolved in this class. */
   note: string | undefined;
+  /** How much the class's value moves, signed. */
+  netChange: string | undefined;
 }
 
 function ImpactClassRow({
@@ -380,6 +415,7 @@ function ImpactClassRow({
   shareText,
   shareAmount,
   note,
+  netChange,
 }: ImpactClassRowProps) {
   const { t } = useTranslation();
   const { point, unpoint, toggleSelected } = useHighlightActions();
@@ -457,15 +493,33 @@ function ImpactClassRow({
           style={{ left: `${projectedAt}%`, background: item.color }}
         />
       </span>
-      {shareText && (
-        <span className="mt-1.5 flex justify-between gap-2 text-[11px]">
-          <span className="font-semibold">{shareText}</span>
-          {shareAmount && <span className="font-mono tabular-nums">{shareAmount}</span>}
-        </span>
-      )}
-      {note && (
-        <span className="mt-1.5 block text-[11px] text-amber-800 dark:text-amber-200">{note}</span>
-      )}
+      {/* One line, always there, so pointing at a row never changes a class's
+          height and the column never shifts under the pointer: the pointed
+          row's share of the class, else what stays unresolved in it, else how
+          much it moves. */}
+      <span
+        data-class-detail
+        title={shareText ?? note ?? undefined}
+        className="mt-1.5 flex h-4 items-center justify-between gap-2 text-[11px] leading-4"
+      >
+        {shareText ? (
+          <>
+            <span className="truncate font-semibold">{shareText}</span>
+            {shareAmount && <span className="shrink-0 font-mono tabular-nums">{shareAmount}</span>}
+          </>
+        ) : note ? (
+          <span className="truncate text-amber-800 dark:text-amber-200">{note}</span>
+        ) : netChange ? (
+          <>
+            <span className="text-muted-foreground truncate">
+              {t("allocation:worksheet.classNetChange")}
+            </span>
+            <span className="text-muted-foreground shrink-0 font-mono tabular-nums">
+              {netChange}
+            </span>
+          </>
+        ) : null}
+      </span>
     </button>
   );
 }

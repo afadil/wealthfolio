@@ -127,8 +127,10 @@ not fall back to a security the user did not choose.
 
 ### 4.2 Security allocation rule
 
-One rule ships first: **Allocate by current holding proportions**. The user
-selects it explicitly; it is not a default that happens invisibly.
+One rule ships first: **Allocate by current holding proportions**. With one rule
+there is nothing to choose, so Setup states it with the eligible securities
+instead of asking the user to pick it; it is never applied out of sight. A
+second rule turns that statement into an explicit choice.
 
 For category `c`:
 
@@ -254,6 +256,11 @@ values comes from.
   longer matching those inputs and offers **Recalculate from target**. It never
   regenerates on its own, so an edited worksheet is never overwritten without
   the user asking.
+- Setup's one action, **Next: Adjust positions**, goes through Recalculate from
+  target when there is no calculation yet or the inputs changed. While the
+  worksheet still holds the calculated amounts it recalculates directly; once
+  the user has edited them it asks first, and keeping the edits moves on without
+  recalculating.
 - **An edit that breaks a limit is reported, not corrected.** Taking the
   worksheet past the turnover cap, below the minimum line size or over the
   available funding produces a warning on the result and leaves the numbers as

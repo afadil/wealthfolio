@@ -45,7 +45,8 @@ use super::model::{
     CalculatedAdjustments, ConstraintAction, ConstraintEffect, ConstraintSubjectType, DriftReport,
     GenerateCalculatedAdjustmentsInput, WorksheetCashInput, WorksheetCategoryExposure,
     WorksheetCategoryResult, WorksheetDirection, WorksheetInputMode, WorksheetMode,
-    WorksheetPricingSource, WorksheetSourceRecord, WorksheetWarning, WorksheetWarningKind,
+    WorksheetPricingSource, WorksheetSourceRecord, WorksheetWarning, WorksheetWarningFacts,
+    WorksheetWarningKind,
 };
 use super::target_service::AllocationTargetServiceTrait;
 use super::worksheet_calculator::{
@@ -170,6 +171,7 @@ impl AllocationWorksheetService {
         line_id: Option<&str>,
         suffix: &str,
         message: String,
+        facts: WorksheetWarningFacts,
     ) -> WorksheetWarning {
         let kind_key = format!("{kind:?}").to_ascii_lowercase();
         WorksheetWarning {
@@ -177,6 +179,7 @@ impl AllocationWorksheetService {
             kind,
             line_id: line_id.map(str::to_string),
             message,
+            facts,
             acknowledgement_required: true,
         }
     }
@@ -191,6 +194,47 @@ impl AllocationWorksheetService {
     /// never fails a check its own generation passed.
     fn tracked_cash_to_use(selected: Decimal, deployable: Decimal) -> Decimal {
         selected.clamp(Decimal::ZERO, deployable.max(Decimal::ZERO))
+    }
+
+    /// The tracked cash each account may spend, and their total (§6).
+    ///
+    /// Without amounts per account, each account may spend what it records and
+    /// the single total is met with what they record together. With them, each
+    /// account spends its own amount, met with what it records, and the total
+    /// is their sum, so cash an account keeps back never funds another.
+    fn usable_cash(
+        cash: &WorksheetCashInput,
+        recorded_by_account: &HashMap<String, Decimal>,
+    ) -> (HashMap<String, Decimal>, Decimal) {
+        let Some(requested) = &cash.tracked_cash_by_account else {
+            let total = Self::tracked_cash_to_use(
+                cash.tracked_cash_to_use,
+                recorded_by_account.values().copied().sum::<Decimal>(),
+            );
+            return (recorded_by_account.clone(), total);
+        };
+        let usable: HashMap<String, Decimal> = recorded_by_account
+            .iter()
+            .map(|(account_id, recorded)| {
+                let asked = requested.get(account_id).copied().unwrap_or(Decimal::ZERO);
+                (
+                    account_id.clone(),
+                    Self::tracked_cash_to_use(asked, *recorded),
+                )
+            })
+            .collect();
+        let total = usable.values().copied().sum::<Decimal>();
+        (usable, total)
+    }
+
+    /// The tracked cash the user asked for, before it is met with what the
+    /// accounts record.
+    fn requested_tracked_cash(cash: &WorksheetCashInput) -> Decimal {
+        cash.tracked_cash_by_account
+            .as_ref()
+            .map_or(cash.tracked_cash_to_use, |amounts| {
+                amounts.values().copied().sum()
+            })
     }
 
     fn bps(value: Decimal, total: Decimal) -> i32 {
@@ -345,10 +389,16 @@ impl AllocationWorksheetService {
     }
 
     fn validate_cash(cash: &WorksheetCashInput, account_ids: &[String]) -> CoreResult<()> {
+        let tracked_by_account = cash.tracked_cash_by_account.as_ref();
         if cash.tracked_cash_to_use < Decimal::ZERO
             || cash
                 .external_contribution
                 .values()
+                .chain(
+                    tracked_by_account
+                        .into_iter()
+                        .flat_map(|amounts| amounts.values()),
+                )
                 .any(|amount| *amount < Decimal::ZERO)
         {
             return Err(Self::invalid("Worksheet cash values must be non-negative"));
@@ -357,6 +407,16 @@ impl AllocationWorksheetService {
             if !account_ids.contains(account_id) {
                 return Err(Self::invalid(format!(
                     "External contribution for account {account_id} is outside the selected accounts"
+                )));
+            }
+        }
+        for account_id in tracked_by_account
+            .into_iter()
+            .flat_map(|amounts| amounts.keys())
+        {
+            if !account_ids.contains(account_id) {
+                return Err(Self::invalid(format!(
+                    "Cash to use for account {account_id} is outside the selected accounts"
                 )));
             }
         }
@@ -888,12 +948,10 @@ impl AllocationWorksheetService {
 
         let account_ids = Self::account_ids(&sources.accounts);
         Self::validate_cash(&input.cash, &account_ids)?;
-        let cash_by_account =
+        let recorded_by_account =
             Self::available_cash_by_account(&target.taxonomy_id, &sources.accounts);
-        let tracked_cash_to_use = Self::tracked_cash_to_use(
-            input.cash.tracked_cash_to_use,
-            cash_by_account.values().copied().sum::<Decimal>(),
-        );
+        let (cash_by_account, tracked_cash_to_use) =
+            Self::usable_cash(&input.cash, &recorded_by_account);
 
         // An empty allowlist is a valid state, not an error (§4.1): every
         // increase it leaves unplaced becomes an unresolved category amount.
@@ -1077,11 +1135,11 @@ impl AllocationWorksheetService {
             ));
         }
 
-        let cash_by_account =
+        let recorded_by_account =
             Self::available_cash_by_account(&target.taxonomy_id, &sources.accounts);
-        let observed_tracked_cash = cash_by_account.values().copied().sum::<Decimal>();
-        let tracked_cash_to_use =
-            Self::tracked_cash_to_use(input.cash.tracked_cash_to_use, observed_tracked_cash);
+        let observed_tracked_cash = recorded_by_account.values().copied().sum::<Decimal>();
+        let (cash_by_account, tracked_cash_to_use) =
+            Self::usable_cash(&input.cash, &recorded_by_account);
 
         let holdings_by_account = Self::holdings_by_account(&sources.accounts);
         let top_level = if AllocationService::rollup_to_top_level(&target.taxonomy_id) {
@@ -1119,15 +1177,20 @@ impl AllocationWorksheetService {
 
         let external_total = input.cash.external_total();
         let mut warnings = Vec::new();
-        if input.cash.tracked_cash_to_use > tracked_cash_to_use {
+        let requested_tracked_cash = Self::requested_tracked_cash(&input.cash);
+        if requested_tracked_cash > tracked_cash_to_use {
             warnings.push(Self::warning(
                 WorksheetWarningKind::CashUnavailable,
                 None,
                 "cash-unavailable",
                 format!(
-                    "Deployed the {tracked_cash_to_use} of cash the chosen accounts record, not the {} asked for.",
-                    input.cash.tracked_cash_to_use
+                    "Deployed the {tracked_cash_to_use} of cash the chosen accounts record, not the {requested_tracked_cash} asked for."
                 ),
+                WorksheetWarningFacts {
+                    amount: Some(tracked_cash_to_use),
+                    limit: Some(requested_tracked_cash),
+                    ..Default::default()
+                },
             ));
         }
         if external_total > Decimal::ZERO {
@@ -1136,6 +1199,10 @@ impl AllocationWorksheetService {
                 None,
                 "external-cash",
                 format!("Includes {external_total} of hypothetical cash not currently recorded."),
+                WorksheetWarningFacts {
+                    amount: Some(external_total),
+                    ..Default::default()
+                },
             ));
         }
 
@@ -1237,6 +1304,10 @@ impl AllocationWorksheetService {
                                 .map(|reason| format!(" ({reason})"))
                                 .unwrap_or_default()
                         ),
+                        WorksheetWarningFacts {
+                            reason: constraint.reason.clone(),
+                            ..Default::default()
+                        },
                     )),
                 }
             }
@@ -1249,6 +1320,10 @@ impl AllocationWorksheetService {
                         "Uses a dated security price from {}.",
                         quote.timestamp.date_naive()
                     ),
+                    WorksheetWarningFacts {
+                        as_of: Some(quote.timestamp.date_naive().to_string()),
+                        ..Default::default()
+                    },
                 ));
             }
             if let Some(fx) = fx_source.as_ref().filter(|source| source.is_stale) {
@@ -1257,6 +1332,10 @@ impl AllocationWorksheetService {
                     Some(&line.line_id),
                     &fx.id,
                     format!("Uses a dated FX rate from {}.", fx.timestamp),
+                    WorksheetWarningFacts {
+                        as_of: Some(fx.timestamp.clone()),
+                        ..Default::default()
+                    },
                 ));
             }
             let classified_bps: i32 = line_assignments.iter().map(|item| item.weight).sum();
@@ -1267,6 +1346,7 @@ impl AllocationWorksheetService {
                     &line.asset_id,
                     "The security is unclassified; its full value is shown as unclassified exposure."
                         .to_string(),
+                    WorksheetWarningFacts::default(),
                 ));
             } else if classified_bps < 10_000 {
                 warnings.push(Self::warning(
@@ -1277,6 +1357,10 @@ impl AllocationWorksheetService {
                         "The security is classified for {classified_bps} bps; the remaining {} bps is shown as unclassified exposure.",
                         10_000 - classified_bps
                     ),
+                    WorksheetWarningFacts {
+                        share_bps: Some(classified_bps),
+                        ..Default::default()
+                    },
                 ));
             }
             if quantity.is_zero() {
@@ -1289,6 +1373,11 @@ impl AllocationWorksheetService {
                         line.value.normalize(),
                         unit_price.round_dp(4).normalize()
                     ),
+                    WorksheetWarningFacts {
+                        amount: Some(line.value),
+                        unit_price: Some(unit_price),
+                        ..Default::default()
+                    },
                 ));
             } else if min_line_amount > Decimal::ZERO && amount < min_line_amount {
                 warnings.push(Self::warning(
@@ -1298,6 +1387,11 @@ impl AllocationWorksheetService {
                     format!(
                         "Resolved amount {amount} is below your worksheet minimum of {min_line_amount}."
                     ),
+                    WorksheetWarningFacts {
+                        amount: Some(amount),
+                        limit: Some(min_line_amount),
+                        ..Default::default()
+                    },
                 ));
             }
 
@@ -1357,6 +1451,11 @@ impl AllocationWorksheetService {
                 format!(
                     "Increases of {increase_total} exceed the {funding} of selected cash and reduction proceeds."
                 ),
+                WorksheetWarningFacts {
+                    amount: Some(increase_total),
+                    limit: Some(funding),
+                    ..Default::default()
+                },
             ));
         }
 
@@ -1396,6 +1495,12 @@ impl AllocationWorksheetService {
                     shortfall.increases,
                     shortfall.increases + shortfall.remaining
                 ),
+                WorksheetWarningFacts {
+                    amount: Some(shortfall.increases),
+                    limit: Some(shortfall.increases + shortfall.remaining),
+                    account_id: Some(shortfall.account_id.clone()),
+                    ..Default::default()
+                },
             ));
         }
 
@@ -1416,6 +1521,11 @@ impl AllocationWorksheetService {
                     format!(
                         "Reductions equal {turnover_bps} bps of current value, above your {max_turnover_bps} bps worksheet guardrail."
                     ),
+                    WorksheetWarningFacts {
+                        share_bps: Some(turnover_bps),
+                        limit_bps: Some(max_turnover_bps),
+                        ..Default::default()
+                    },
                 ));
             }
         }
@@ -1698,6 +1808,7 @@ impl AllocationWorksheetService {
             source_fingerprint,
             resolved_account_ids: input.account_ids.clone(),
             observed_tracked_cash,
+            recorded_cash_by_account: recorded_by_account,
             tracked_cash_to_use,
             external_contribution: external_total,
             increase_total,
@@ -1921,6 +2032,7 @@ mod tests {
     use crate::assets::AssetKind;
     use crate::portfolio::allocation_targets::{
         AllocationRule, BandType, DriftRow, DriftStatus, RebalanceGoal, ScopeType, TriggerType,
+        WorksheetAccountFunding,
     };
     use crate::portfolio::holdings::{Instrument, MonetaryValue};
     use crate::quotes::Quote;
@@ -2453,7 +2565,21 @@ mod tests {
     fn tracked(amount: Decimal) -> WorksheetCashInput {
         WorksheetCashInput {
             tracked_cash_to_use: amount,
-            external_contribution: HashMap::new(),
+            ..Default::default()
+        }
+    }
+
+    /// Cash to use set account by account, as the worksheet's Setup sends it.
+    fn tracked_by_account(amounts: &[(&str, Decimal)]) -> WorksheetCashInput {
+        WorksheetCashInput {
+            tracked_cash_to_use: amounts.iter().map(|(_, amount)| *amount).sum(),
+            tracked_cash_by_account: Some(
+                amounts
+                    .iter()
+                    .map(|(account_id, amount)| (account_id.to_string(), *amount))
+                    .collect(),
+            ),
+            ..Default::default()
         }
     }
 
@@ -2559,6 +2685,7 @@ mod tests {
         let cash = WorksheetCashInput {
             tracked_cash_to_use: Decimal::ZERO,
             external_contribution: HashMap::from([("acc-1".to_string(), dec!(1000))]),
+            ..Default::default()
         };
 
         let result = AllocationWorksheetService::preview(
@@ -2754,6 +2881,33 @@ mod tests {
         ));
         assert!(has_warning(&result, WorksheetWarningKind::AccountFunding));
         assert_eq!(result.account_funding[0].remaining, dec!(-2000));
+
+        // Each warning carries the figures it states, for the client to word
+        // and format; the English message is only a fallback.
+        let warning_of = |kind: WorksheetWarningKind| {
+            result
+                .warnings
+                .iter()
+                .find(|warning| warning.kind == kind)
+                .unwrap()
+        };
+        let funding = &warning_of(WorksheetWarningKind::InsufficientFunding).facts;
+        assert_eq!(funding.amount, Some(result.increase_total));
+        assert_eq!(
+            funding.limit,
+            Some(result.increase_total + result.cash_remaining)
+        );
+        let shortfall = &result.account_funding[0];
+        let account = &warning_of(WorksheetWarningKind::AccountFunding).facts;
+        assert_eq!(
+            account.account_id.as_deref(),
+            Some(shortfall.account_id.as_str())
+        );
+        assert_eq!(account.amount, Some(shortfall.increases));
+        assert_eq!(
+            account.limit,
+            Some(shortfall.increases + shortfall.remaining)
+        );
     }
 
     #[test]
@@ -2838,6 +2992,144 @@ mod tests {
             &result,
             WorksheetWarningKind::InsufficientFunding
         ));
+    }
+
+    /// Two accounts on asset classes, each recording 1000 in the cash sleeve.
+    fn two_accounts_with_cash() -> Portfolio {
+        Portfolio {
+            taxonomy_id: "asset_classes",
+            categories: vec![
+                ("EQUITY", dec!(6000), 7000, false),
+                ("FIXED_INCOME", dec!(2000), 3000, false),
+                ("CASH", dec!(2000), 0, true),
+            ],
+            total_value: dec!(10000),
+            account_ids: vec!["acc-1", "acc-2"],
+            positions: vec![
+                position("vti", "acc-1", "EQUITY", dec!(60)),
+                position("bnd", "acc-2", "FIXED_INCOME", dec!(20)),
+            ],
+            cash: vec![
+                CashBalance {
+                    account_id: "acc-1",
+                    category_id: Some("CASH"),
+                    amount: dec!(1000),
+                },
+                CashBalance {
+                    account_id: "acc-2",
+                    category_id: Some("CASH"),
+                    amount: dec!(1000),
+                },
+            ],
+            allow_sells: true,
+        }
+    }
+
+    fn funding_of<'a>(
+        result: &'a AllocationWorksheetResult,
+        account_id: &str,
+    ) -> &'a WorksheetAccountFunding {
+        result
+            .account_funding
+            .iter()
+            .find(|funding| funding.account_id == account_id)
+            .unwrap_or_else(|| panic!("no funding for {account_id}"))
+    }
+
+    #[test]
+    fn cash_set_per_account_is_what_each_account_can_fund() {
+        let portfolio = two_accounts_with_cash();
+        let result = portfolio
+            .preview(
+                tracked_by_account(&[("acc-1", dec!(400)), ("acc-2", dec!(1000))]),
+                vec![AllocationWorksheetLineInput {
+                    line_id: "vti-acc-1".to_string(),
+                    direction: WorksheetDirection::Increase,
+                    asset_id: "vti".to_string(),
+                    account_id: "acc-1".to_string(),
+                    input_mode: WorksheetInputMode::Amount,
+                    value: dec!(600),
+                }],
+            )
+            .unwrap();
+
+        // What the accounts record is reported as it is; what they may spend
+        // is what the user set for each.
+        assert_eq!(result.observed_tracked_cash, dec!(2000));
+        assert_eq!(
+            result.recorded_cash_by_account.get("acc-1"),
+            Some(&dec!(1000))
+        );
+        assert_eq!(result.tracked_cash_to_use, dec!(1400));
+        let first = funding_of(&result, "acc-1");
+        assert_eq!(first.available_cash, dec!(400));
+        assert_eq!(first.remaining, dec!(-200));
+        // The 1000 acc-2 keeps unspent does not fund acc-1's increase.
+        assert!(has_warning(&result, WorksheetWarningKind::AccountFunding));
+        assert!(!has_warning(
+            &result,
+            WorksheetWarningKind::InsufficientFunding
+        ));
+    }
+
+    #[test]
+    fn cash_set_per_account_is_met_with_what_each_account_records() {
+        let portfolio = two_accounts_with_cash();
+        // acc-1 records 1000 of the 1500 asked; acc-2 is left out, so it
+        // spends none of its own.
+        let result = portfolio
+            .preview(tracked_by_account(&[("acc-1", dec!(1500))]), Vec::new())
+            .unwrap();
+
+        assert_eq!(result.tracked_cash_to_use, dec!(1000));
+        assert_eq!(funding_of(&result, "acc-1").available_cash, dec!(1000));
+        assert_eq!(funding_of(&result, "acc-2").available_cash, Decimal::ZERO);
+        assert_eq!(
+            result.recorded_cash_by_account.get("acc-2"),
+            Some(&dec!(1000))
+        );
+        assert!(has_warning(&result, WorksheetWarningKind::CashUnavailable));
+    }
+
+    #[test]
+    fn the_calculation_deploys_the_cash_set_per_account() {
+        let portfolio = two_accounts_with_cash();
+        let deployed = |calculated: &CalculatedAdjustments| {
+            calculated
+                .adjustments
+                .iter()
+                .map(|line| line.amount)
+                .sum::<Decimal>()
+        };
+        let per_account = portfolio
+            .generate(
+                WorksheetMode::InvestCash,
+                tracked_by_account(&[("acc-1", dec!(300)), ("acc-2", dec!(200))]),
+            )
+            .unwrap();
+        let one_total = portfolio
+            .generate(WorksheetMode::InvestCash, tracked(dec!(500)))
+            .unwrap();
+
+        assert_eq!(deployed(&per_account), dec!(500));
+        assert_eq!(deployed(&per_account), deployed(&one_total));
+    }
+
+    #[test]
+    fn cash_set_per_account_must_name_selected_accounts_and_be_non_negative() {
+        let portfolio = two_accounts_with_cash();
+        assert!(portfolio
+            .preview(tracked_by_account(&[("acc-3", dec!(100))]), Vec::new())
+            .is_err());
+        assert!(portfolio
+            .preview(tracked_by_account(&[("acc-1", dec!(-1))]), Vec::new())
+            .is_err());
+        assert!(portfolio
+            .generate(
+                WorksheetMode::InvestCash,
+                tracked_by_account(&[("acc-3", dec!(100))])
+            )
+            .is_err());
     }
 
     #[test]

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { HoldingType } from "@/lib/constants";
 import type { Holding } from "@/lib/types";
-import { EligibleHoldingsSelector } from "./eligible-holdings-selector";
+import { EligibleHoldingsSelector, type TargetCategories } from "./eligible-holdings-selector";
 import { getEligibleHoldings, groupEligibleHoldings } from "./eligible-holdings";
 
 if (typeof ResizeObserver === "undefined") {
@@ -56,7 +56,19 @@ const ACCOUNT_NAMES = new Map([
   ["account-2", "Retirement"],
 ]);
 
-function Harness({ holdings }: { holdings: Holding[] }) {
+function Harness({
+  holdings,
+  categories,
+  variant,
+  rule,
+  limits,
+}: {
+  holdings: Holding[];
+  categories?: TargetCategories;
+  variant?: "field" | "chip" | "card";
+  rule?: string;
+  limits?: string[];
+}) {
   const [excludedAssetIds, setExcludedAssetIds] = useState<Set<string>>(new Set());
   return (
     <EligibleHoldingsSelector
@@ -75,6 +87,10 @@ function Harness({ holdings }: { holdings: Holding[] }) {
         setExcludedAssetIds(new Set(getEligibleHoldings(holdings).map((row) => row.assetId)))
       }
       accountNames={ACCOUNT_NAMES}
+      categories={categories}
+      variant={variant}
+      rule={rule}
+      limits={limits}
     />
   );
 }
@@ -219,5 +235,81 @@ describe("EligibleHoldingsSelector", () => {
     expect(screen.getByRole("button", { name: /Eligible securities/ })).toHaveTextContent(
       "All securities selected",
     );
+  });
+
+  it("groups by the target's categories and says which one would be left unresolved", async () => {
+    const user = userEvent.setup();
+    const categories: TargetCategories = {
+      order: [
+        { id: "EQUITY", name: "Equity", isBelowTarget: false },
+        { id: "FIXED_INCOME", name: "Fixed income", isBelowTarget: true },
+      ],
+      byAsset: new Map([
+        ["asset-vti", ["EQUITY"]],
+        ["asset-bond", ["FIXED_INCOME"]],
+      ]),
+    };
+    render(<Harness holdings={holdings} categories={categories} />);
+    await user.click(screen.getByRole("button", { name: /Eligible securities/ }));
+
+    expect(screen.getByText("Equity · 1/1")).toBeInTheDocument();
+    expect(screen.getByText("Fixed income · 1/1")).toBeInTheDocument();
+    // A security the target does not classify sits apart.
+    expect(screen.getByText("Not in this target's categories")).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing eligible/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("option", { name: /BND.*Bond fund/i }));
+    expect(screen.getByText("Fixed income · 0/1")).toBeInTheDocument();
+    expect(
+      screen.getByText("Nothing eligible: this category's share stays unresolved."),
+    ).toBeInTheDocument();
+  });
+
+  it("as a card, shows the selection and changes it in place", async () => {
+    const user = userEvent.setup();
+    const categories: TargetCategories = {
+      order: [
+        { id: "FIXED_INCOME", name: "Fixed income", isBelowTarget: true },
+        { id: "EQUITY", name: "Equity", isBelowTarget: false },
+      ],
+      byAsset: new Map([
+        ["asset-vti", ["EQUITY"]],
+        ["asset-bond", ["FIXED_INCOME"]],
+      ]),
+    };
+    render(
+      <Harness
+        holdings={holdings}
+        categories={categories}
+        variant="card"
+        rule="Split by what you hold."
+        limits={["Whole units only"]}
+      />,
+    );
+
+    // Folded, it says how many securities can receive changes and nothing more.
+    const card = screen.getByRole("button", { name: /Eligible securities/ });
+    expect(card).toHaveAttribute("aria-expanded", "false");
+    expect(card).toHaveTextContent("3 of 3 selected");
+    expect(screen.queryByText("Split by what you hold.")).not.toBeInTheDocument();
+
+    await user.click(card);
+    expect(screen.getByText("Split by what you hold.")).toBeInTheDocument();
+    expect(screen.getByText("Whole units only")).toBeInTheDocument();
+    expect(screen.getAllByRole("group").map((group) => group.getAttribute("aria-label"))).toEqual([
+      "Fixed income · 1/1",
+      "Equity · 1/1",
+      "Not in this target's categories",
+    ]);
+
+    await user.click(screen.getByRole("checkbox", { name: /BND.*Bond fund/i }));
+    expect(screen.getByRole("checkbox", { name: /BND.*Bond fund/i })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    expect(card).toHaveTextContent("2 of 3 selected");
+    expect(
+      screen.getByText("Nothing eligible: this category's share stays unresolved."),
+    ).toBeInTheDocument();
   });
 });

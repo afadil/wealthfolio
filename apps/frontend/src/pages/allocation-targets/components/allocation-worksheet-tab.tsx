@@ -2,6 +2,7 @@ import { useQueries } from "@tanstack/react-query";
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -20,11 +21,8 @@ import {
   PopoverContent,
   PopoverTrigger,
   Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
   useAmountFormatting,
+  useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -54,6 +52,7 @@ import type {
   Holding,
   TaxonomyCategory,
   WorksheetMode,
+  WorksheetWarning,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useAssets } from "@/pages/asset/hooks/use-assets";
@@ -64,11 +63,14 @@ import { useAllocationWorksheet } from "../hooks/use-allocation-worksheet";
 import { useCalculatedAdjustments } from "../hooks/use-calculated-adjustments";
 import { useEligibleHoldingsSelection } from "../hooks/use-eligible-holdings";
 import { AmountsList, type AmountsRowModel } from "./allocation-worksheet-amounts-list";
+import { cashToUse, editableAmounts } from "./allocation-worksheet-cash";
 import { createHighlightStore, HighlightStoreContext } from "./allocation-worksheet-highlight";
 import { rowStatus } from "./allocation-worksheet-amounts";
 import { ImpactRail } from "./allocation-worksheet-impact-rail";
 import { csvFile, toCsv, toTsv, worksheetExportRows } from "./allocation-worksheet-export";
 import { ReviewPanel } from "./allocation-worksheet-review";
+import { WorksheetSetup } from "./allocation-worksheet-setup";
+import { describeWarning, type WarningFormatting } from "./allocation-worksheet-warnings";
 import {
   adjustmentsFromCalculated,
   AMOUNT_EPSILON,
@@ -79,6 +81,7 @@ import {
   formatSignedAmount,
   generationInputsKey,
   impactClasses,
+  isAsCalculated,
   parseDecimalInput,
   planningTotal,
   PRICE_MOVE_THRESHOLD,
@@ -93,14 +96,15 @@ import {
   type WorksheetGenerationInputs,
   type WorksheetPosition,
 } from "./allocation-worksheet-utils";
-import { EligibleHoldingsSelector } from "./eligible-holdings-selector";
+import { EligibleHoldingsSelector, type TargetCategories } from "./eligible-holdings-selector";
 import { accountScopeKey } from "./target-scope";
 
 const DISCLOSURE_STORAGE_KEY = "wealthfolio:rebalancing-worksheet-disclosure:v2";
 const DRAFT_STORAGE_PREFIX = "wealthfolio:rebalancing-worksheet-draft:v3";
 const DISCLOSURE_VERSION = 2;
 const DRAFT_VERSION = 4;
-const CASH_PRESETS = [0.25, 0.5, 0.75, 1] as const;
+/** No account's cash has been read yet. */
+const NO_RECORDED_CASH: Readonly<Record<string, number>> = {};
 const AUTO_CALCULATE_DEBOUNCE_MS = 500;
 
 type WorksheetPanel = "setup" | "amounts" | "review";
@@ -127,6 +131,8 @@ interface WorksheetDraft {
   rule: AllocationRule | null;
   /** `null` follows the cash the chosen accounts record. */
   trackedCash: string | null;
+  /** Cash to deploy set account by account; absent or `null` while one share applies. */
+  cashByAccount?: Record<string, string> | null;
   externalCash: Record<string, string>;
   selectedAccountIds: string[];
   addedAssetIds: string[];
@@ -208,6 +214,7 @@ function readWorksheetDraft(storageKey: string): WorksheetDraft | null {
       (draft.mode !== "invest_cash" && draft.mode !== "rebalance") ||
       (draft.rule !== null && draft.rule !== "current_holding_proportions") ||
       (draft.trackedCash !== null && typeof draft.trackedCash !== "string") ||
+      (draft.cashByAccount != null && typeof draft.cashByAccount !== "object") ||
       !draft.externalCash ||
       typeof draft.externalCash !== "object" ||
       !Array.isArray(draft.selectedAccountIds) ||
@@ -391,388 +398,6 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
     <p className="text-muted-foreground font-mono text-[11px] uppercase tracking-[0.16em]">
       {children}
     </p>
-  );
-}
-
-interface CalculationControlProps {
-  mode: WorksheetMode;
-  allowSells: boolean;
-  onModeChange: (mode: WorksheetMode) => void;
-  rule: AllocationRule | null;
-  onRuleChange: (rule: AllocationRule) => void;
-  holdings: Holding[];
-  excludedAssetIds: ReadonlySet<string>;
-  onToggleAsset: (assetId: string) => void;
-  onSelectAllAssets: () => void;
-  onClearAssets: () => void;
-  accountNames: ReadonlyMap<string, string>;
-}
-
-function CalculationControl({
-  mode,
-  allowSells,
-  onModeChange,
-  rule,
-  onRuleChange,
-  holdings,
-  excludedAssetIds,
-  onToggleAsset,
-  onSelectAllAssets,
-  onClearAssets,
-  accountNames,
-}: CalculationControlProps) {
-  const { t } = useTranslation();
-  const modes: { value: WorksheetMode; label: string; hint: string }[] = [
-    {
-      value: "invest_cash",
-      label: t("allocation:worksheet.modeInvestCash"),
-      hint: t("allocation:worksheet.modeInvestCashHint"),
-    },
-    {
-      value: "rebalance",
-      label: t("allocation:worksheet.modeRebalance"),
-      hint: t("allocation:worksheet.modeRebalanceHint"),
-    },
-  ];
-  const activeMode = modes.find((option) => option.value === mode);
-  const ruleSelected = rule === "current_holding_proportions";
-
-  // One column of labels to read down, each control beside its label and its
-  // description beside the control, to keep Setup short.
-  return (
-    <div id="worksheet-calculation" className="min-w-0 divide-y px-5 py-1 sm:px-6">
-      <SetupRow label={t("allocation:worksheet.modeLabel")}>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="border-border bg-muted/20 inline-flex shrink-0 rounded-full border p-1">
-            {modes.map((option) => {
-              const disabled = option.value === "rebalance" && !allowSells;
-              const button = (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={mode === option.value}
-                  disabled={disabled}
-                  onClick={() => onModeChange(option.value)}
-                  className={cn(
-                    "rounded-full px-4 py-1.5 font-mono text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                    mode === option.value
-                      ? "bg-foreground text-background"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-              if (!disabled) return button;
-              return (
-                <TooltipProvider key={option.value} delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>{button}</span>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("allocation:mode.enableSellsTip")}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </div>
-          {activeMode && (
-            <p className="text-muted-foreground min-w-0 flex-1 basis-56 text-xs leading-relaxed">
-              {activeMode.hint}
-            </p>
-          )}
-        </div>
-      </SetupRow>
-
-      {/* One rule ships, but it is still chosen explicitly (§4.2), like an account. */}
-      <SetupRow label={t("allocation:worksheet.ruleLabel")}>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            aria-pressed={ruleSelected}
-            onClick={() => onRuleChange("current_holding_proportions")}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 font-mono text-xs transition-colors",
-              ruleSelected
-                ? "border-foreground bg-foreground text-background"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
-                ruleSelected ? "border-background" : "border-current/40",
-              )}
-            >
-              {ruleSelected && <Icons.Check className="h-2.5 w-2.5" />}
-            </span>
-            {t("allocation:worksheet.ruleCurrentHoldingProportions")}
-          </button>
-          <p className="text-muted-foreground min-w-0 flex-1 basis-56 text-xs leading-relaxed">
-            {t("allocation:worksheet.ruleCurrentHoldingProportionsHint")}
-          </p>
-        </div>
-      </SetupRow>
-
-      <SetupRow label={t("allocation:eligibleHoldings.label")}>
-        <EligibleHoldingsSelector
-          holdings={holdings}
-          excludedAssetIds={excludedAssetIds}
-          onToggle={onToggleAsset}
-          onSelectAll={onSelectAllAssets}
-          onClear={onClearAssets}
-          accountNames={accountNames}
-        />
-      </SetupRow>
-    </div>
-  );
-}
-
-/** A Setup input: its label in a column of its own, one column on narrow screens. */
-function SetupRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-x-6 gap-y-2 py-3.5 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)] sm:items-center">
-      <Eyebrow>{label}</Eyebrow>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
-
-interface AccountsControlProps {
-  accounts: Account[];
-  selectedAccountIds: string[];
-  onToggle: (accountId: string) => void;
-  onSelectAll: () => void;
-}
-
-/** Which accounts the worksheet may change (§6). Cash accounts never appear. */
-function AccountsControl({
-  accounts,
-  selectedAccountIds,
-  onToggle,
-  onSelectAll,
-}: AccountsControlProps) {
-  const { t } = useTranslation();
-  const allSelected = selectedAccountIds.length === accounts.length;
-
-  return (
-    <div id="worksheet-accounts" className="min-w-0 p-5 sm:p-6 lg:border-r">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Eyebrow>{t("allocation:worksheet.accountsLabel")}</Eyebrow>
-        <button
-          type="button"
-          disabled={allSelected}
-          onClick={onSelectAll}
-          className="text-foreground text-xs underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-35"
-        >
-          {t("allocation:worksheet.selectAllAccounts")}
-        </button>
-      </div>
-      <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-        {t("allocation:worksheet.accountsHint")}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {accounts.map((account) => {
-          const selected = selectedAccountIds.includes(account.id);
-          return (
-            <button
-              key={account.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onToggle(account.id)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 font-mono text-xs transition-colors",
-                selected
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-              )}
-            >
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex h-3.5 w-3.5 items-center justify-center rounded-full border",
-                  selected ? "border-background" : "border-current/40",
-                )}
-              >
-                {selected && <Icons.Check className="h-2.5 w-2.5" />}
-              </span>
-              {account.name}
-            </button>
-          );
-        })}
-      </div>
-      {selectedAccountIds.length === 0 && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          {t("allocation:worksheet.selectAccountIssue")}
-        </p>
-      )}
-    </div>
-  );
-}
-
-interface CashControlProps {
-  /** What the chosen accounts record, as the core counts it. */
-  availableCash: number | undefined;
-  trackedCash: string | null;
-  onTrackedCashChange: (value: string) => void;
-  accounts: Account[];
-  externalCash: Record<string, string>;
-  onExternalCashChange: (accountId: string, value: string) => void;
-  currency: string;
-}
-
-/**
- * The cash the worksheet may deploy, bounded by what the chosen accounts
- * actually record (§6).
- *
- * `availableCash` is unknown until the core has answered for this selection.
- * The drift report's figure is never substituted for it: that one spans the
- * whole scope and counts cash accounts, which hold no securities and cannot
- * fund one elsewhere with no transfer assumed.
- */
-function CashControl({
-  availableCash,
-  trackedCash,
-  onTrackedCashChange,
-  accounts,
-  externalCash,
-  onExternalCashChange,
-  currency,
-}: CashControlProps) {
-  const { t } = useTranslation();
-  const { formatAmount, currencyFractionDigits } = useAmountFormatting();
-  const fractionDigits = currencyFractionDigits(currency);
-  // Nothing entered yet deploys all of it: the cash is already there, and
-  // lowering it is one edit away.
-  const displayValue =
-    trackedCash ??
-    (availableCash === undefined ? "" : formatDecimalInput(availableCash, fractionDigits));
-  const selectedCash = Math.max(0, decimalInputOrZero(displayValue));
-  const ceiling = availableCash ?? 0;
-  const exceedsAvailable =
-    availableCash !== undefined && selectedCash > availableCash + AMOUNT_EPSILON;
-  const sliderPercentage = ceiling > 0 ? Math.min(100, (selectedCash / ceiling) * 100) : 0;
-
-  return (
-    <div id="worksheet-cash" className="min-w-0 p-5 sm:p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Eyebrow>{t("allocation:worksheet.cashToDeploy")}</Eyebrow>
-        <span className="text-muted-foreground font-mono text-xs">
-          {availableCash === undefined
-            ? t("allocation:worksheet.cashAvailablePending")
-            : t("allocation:worksheet.ofObservedCash", {
-                amount: formatAmount(availableCash, currency),
-              })}
-        </span>
-      </div>
-
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-muted-foreground text-sm">{currency}</span>
-        <input
-          aria-label={t("allocation:worksheet.cashToDeploy")}
-          value={displayValue}
-          onChange={(event) => onTrackedCashChange(event.target.value)}
-          onBlur={() => {
-            if (exceedsAvailable) {
-              onTrackedCashChange(formatDecimalInput(ceiling, fractionDigits));
-            }
-          }}
-          inputMode="decimal"
-          placeholder="0"
-          className="placeholder:text-muted-foreground/50 min-w-0 flex-1 bg-transparent font-mono text-3xl font-semibold tabular-nums outline-none"
-        />
-      </div>
-
-      {exceedsAvailable && (
-        <p className="mt-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
-          {t("allocation:worksheet.exceedsObservedCashIssue", {
-            amount: formatAmount(ceiling, currency),
-          })}
-        </p>
-      )}
-
-      <input
-        aria-label={t("allocation:worksheet.cashSlider")}
-        type="range"
-        min={0}
-        max={ceiling || 1}
-        step={ceiling > 0 ? 10 ** -fractionDigits : 1}
-        value={Math.min(selectedCash, ceiling)}
-        disabled={ceiling <= 0}
-        onChange={(event) =>
-          onTrackedCashChange(Number.parseFloat(event.target.value).toFixed(fractionDigits))
-        }
-        className="lever-slider mt-3 block w-full disabled:cursor-not-allowed disabled:opacity-40"
-        style={{ ["--lever-pct" as string]: `${sliderPercentage}%` }}
-      />
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {CASH_PRESETS.map((fraction) => {
-          const preset = ceiling * fraction;
-          const isActive = Math.abs(preset - selectedCash) <= 0.5 + ceiling * 0.001;
-          return (
-            <button
-              key={fraction}
-              type="button"
-              disabled={ceiling <= 0}
-              onClick={() => onTrackedCashChange(preset.toFixed(fractionDigits))}
-              className={cn(
-                "rounded-full border px-3 py-1 font-mono text-xs transition-colors disabled:opacity-40",
-                isActive
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
-              )}
-            >
-              {fraction === 1
-                ? t("allocation:worksheet.allCash")
-                : `${Math.round(fraction * 100)}%`}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-5 border-t pt-4">
-        <Eyebrow>{t("allocation:worksheet.externalCash")}</Eyebrow>
-        <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-          {t(
-            accounts.length > 1
-              ? "allocation:worksheet.externalCashPerAccountHint"
-              : "allocation:worksheet.externalCashHint",
-          )}
-        </p>
-        <div className="mt-3 space-y-2">
-          {accounts.map((account) => (
-            <div
-              key={account.id}
-              className={cn(
-                "flex items-center gap-3",
-                accounts.length > 1 ? "justify-between" : "justify-start",
-              )}
-            >
-              {accounts.length > 1 && (
-                <span className="min-w-0 truncate text-xs font-medium">{account.name}</span>
-              )}
-              <div className="border-input bg-background focus-within:ring-ring flex h-9 w-44 shrink-0 items-center rounded-md border px-2.5 focus-within:ring-1">
-                <span className="text-muted-foreground mr-1.5 text-xs">{currency}</span>
-                <input
-                  aria-label={
-                    accounts.length > 1
-                      ? t("allocation:worksheet.externalCashForAccount", { account: account.name })
-                      : t("allocation:worksheet.externalCash")
-                  }
-                  value={externalCash[account.id] ?? ""}
-                  onChange={(event) => onExternalCashChange(account.id, event.target.value)}
-                  inputMode="decimal"
-                  placeholder="0"
-                  className="min-w-0 flex-1 bg-transparent text-right font-mono text-xs outline-none"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1002,6 +627,13 @@ function AddPositionButton({ assets, excludedAssetIds, onSelect }: AddPositionBu
   );
 }
 
+/**
+ * The one way a category's amount is split across its securities (§4.2). It
+ * is stated with the eligible securities, never applied out of sight; a second
+ * rule would make it a choice again.
+ */
+const SPLIT_RULE: AllocationRule = "current_holding_proportions";
+
 export function AllocationWorksheetTab({
   profile,
   driftReport,
@@ -1010,9 +642,10 @@ export function AllocationWorksheetTab({
   isSourceLoading,
 }: AllocationWorksheetTabProps) {
   const { t } = useTranslation();
-  const { formatAmount } = useAmountFormatting();
+  const { formatAmount, formatPrice, currencyFractionDigits } = useAmountFormatting();
   // The export writes numbers the way the user reads them (see toCsv).
-  const { decimalSeparator } = useNumberFormatting();
+  const { decimalSeparator, formatPercent } = useNumberFormatting();
+  const { formatCalendarDate } = useDateFormatting();
   const navigate = useNavigate();
   const worksheet = useAllocationWorksheet();
   const calculator = useCalculatedAdjustments();
@@ -1034,13 +667,18 @@ export function AllocationWorksheetTab({
   const [panel, setPanel] = useState<WorksheetPanel>("setup");
   const [editMode, setEditMode] = useState<WorksheetEditMode>("amount");
   const [mode, setMode] = useState<WorksheetMode>("invest_cash");
-  const [rule, setRule] = useState<AllocationRule | null>(null);
   // `null` follows the cash the chosen accounts record; a string is the
   // user's own figure.
   const [trackedCash, setTrackedCash] = useState<string | null>(null);
-  const [observedCashByAccounts, setObservedCashByAccounts] = useState<{
-    key: string;
-    amount: number;
+  // Cash to deploy set account by account; `null` while one share of every
+  // account's cash applies (§6).
+  const [cashByAccount, setCashByAccount] = useState<Record<string, string> | null>(null);
+  // The amounts a total last replaced, so the user can take the total back.
+  const [replacedCash, setReplacedCash] = useState<Record<string, string> | null>(null);
+  // What each account records, as the core counted it from the current sources.
+  const [recordedCash, setRecordedCash] = useState<{
+    sourceKey: string;
+    byAccount: Record<string, number>;
   } | null>(null);
   const [externalCash, setExternalCash] = useState<Record<string, string>>({});
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[] | null>(null);
@@ -1048,6 +686,7 @@ export function AllocationWorksheetTab({
   const [adjustments, setAdjustments] = useState<PositionAdjustments>({});
   const [generated, setGenerated] = useState<GeneratedAdjustments | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [replaceEditsOpen, setReplaceEditsOpen] = useState(false);
   const [expandedAssetIds, setExpandedAssetIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<AllocationWorksheetResult | null>(null);
   const [isResultStale, setIsResultStale] = useState(false);
@@ -1107,15 +746,6 @@ export function AllocationWorksheetTab({
     () => changeAccounts.map((account) => account.id),
     [changeAccounts],
   );
-  const changeAccountKey = [...changeAccountIds].sort().join("|");
-  // What the chosen accounts can deploy, as the core counts it: one rule per
-  // account and in total. The drift report's figure spans the whole scope and
-  // counts cash accounts the worksheet cannot use, so it never stands in —
-  // until the core has answered for this selection the ceiling is unknown.
-  const availableCash =
-    observedCashByAccounts?.key === changeAccountKey
-      ? Math.max(0, observedCashByAccounts.amount)
-      : undefined;
 
   const holdingQueries = useQueries({
     queries: scopedAccounts.map((account) => {
@@ -1129,6 +759,21 @@ export function AllocationWorksheetTab({
   const scopedHoldings = holdingQueries.flatMap((query) => query.data ?? []);
   const holdingsLoading = holdingQueries.some((query) => query.isPending);
   const holdingsVersion = holdingQueries.map((query) => query.dataUpdatedAt).join("|");
+  // What the chosen accounts can deploy, as the core counts it: one rule per
+  // account and in total. The drift report's figure spans the whole scope and
+  // counts cash accounts the worksheet cannot use, so it never stands in: an
+  // account's cash stays unknown until the core has read it from these sources.
+  const cashSourceKey = `${sourceVersion}:${holdingsVersion}:${exchangeRates.dataUpdatedAt}:${taxonomy.dataUpdatedAt}:${profile?.updatedAt ?? ""}`;
+  const recordedByAccount =
+    recordedCash?.sourceKey === cashSourceKey ? recordedCash.byAccount : NO_RECORDED_CASH;
+  const availableCash =
+    changeAccountIds.length > 0 &&
+    changeAccountIds.every((accountId) => recordedByAccount[accountId] !== undefined)
+      ? changeAccountIds.reduce(
+          (sum, accountId) => sum + Math.max(0, recordedByAccount[accountId] ?? 0),
+          0,
+        )
+      : undefined;
   const addedAssignmentQueries = useQueries({
     queries: addedAssetIds.map((assetId) => ({
       queryKey: QueryKeys.assetTaxonomyAssignments(assetId),
@@ -1220,8 +865,17 @@ export function AllocationWorksheetTab({
     initializedScopeRef.current = draftStorageKey;
     setEditMode(draft?.editMode ?? "amount");
     setMode(draft?.mode === "rebalance" && profile?.allowSells ? "rebalance" : "invest_cash");
-    setRule(draft?.rule ?? null);
     setTrackedCash(draft?.trackedCash ?? null);
+    setCashByAccount(
+      draft?.cashByAccount
+        ? Object.fromEntries(
+            Object.entries(draft.cashByAccount).filter(
+              ([accountId, amount]) => validAccountIds.has(accountId) && typeof amount === "string",
+            ),
+          )
+        : null,
+    );
+    setReplacedCash(null);
     setSelectedAccountIds(
       draft?.selectedAccountIds
         ? draft.selectedAccountIds.filter((accountId) => validAccountIds.has(accountId))
@@ -1267,8 +921,9 @@ export function AllocationWorksheetTab({
         savedAt: new Date().toISOString(),
         editMode,
         mode,
-        rule,
+        rule: SPLIT_RULE,
         trackedCash,
+        cashByAccount,
         externalCash,
         selectedAccountIds: changeAccountIds,
         addedAssetIds,
@@ -1290,10 +945,19 @@ export function AllocationWorksheetTab({
     externalCash,
     generated,
     mode,
-    rule,
     trackedCash,
+    cashByAccount,
     changeAccountIds,
   ]);
+
+  // The page's own sources, still arriving: a preview sent now would be
+  // replaced as soon as they settle.
+  const sourcesSettling =
+    isSourceLoading ||
+    assetsLoading ||
+    accountsLoading ||
+    holdingsLoading ||
+    latestQuotes.isFetching;
 
   // Validates and projects the worksheet as it stands. Mode, rule and eligible
   // securities are deliberately absent: they only matter when adjustments are
@@ -1304,9 +968,15 @@ export function AllocationWorksheetTab({
     setIsResultStale(true);
     setCalculationError(null);
     worksheet.reset();
-    autoCalculateTimerRef.current = setTimeout(() => {
-      void calculateRef.current?.();
-    }, AUTO_CALCULATE_DEBOUNCE_MS);
+    if (sourcesSettling) return;
+    // While the accounts' cash is unknown, the preview is what reads it, so it
+    // goes out as soon as the sources settle; once known, edits wait for a pause.
+    autoCalculateTimerRef.current = setTimeout(
+      () => {
+        void calculateRef.current?.();
+      },
+      availableCash === undefined ? 0 : AUTO_CALCULATE_DEBOUNCE_MS,
+    );
     return () => {
       if (autoCalculateTimerRef.current) clearTimeout(autoCalculateTimerRef.current);
     };
@@ -1315,6 +985,7 @@ export function AllocationWorksheetTab({
   }, [
     adjustments,
     trackedCash,
+    cashByAccount,
     // The cash the accounts record is learned from the core, and the default
     // follows it.
     availableCash,
@@ -1329,6 +1000,7 @@ export function AllocationWorksheetTab({
     taxonomy.dataUpdatedAt,
     holdingsVersion,
     firstUseOpen,
+    sourcesSettling,
   ]);
 
   if (isSourceLoading || assetsLoading || accountsLoading || holdingsLoading) {
@@ -1343,14 +1015,31 @@ export function AllocationWorksheetTab({
       funding,
     ]),
   );
+  const fractionDigits = currencyFractionDigits(currency);
+  // Each account spends its own cash (§6): a total is spent as one share of
+  // every account, or the user sets each account's amount.
+  const cash = cashToUse({
+    accountIds: changeAccountIds,
+    recordedByAccount,
+    trackedCash,
+    cashByAccount,
+    fractionDigits,
+  });
   const rawTrackedCash = trackedCash === null ? null : parseDecimalInput(trackedCash);
-  const trackedCashToUse =
-    rawTrackedCash === null
-      ? (availableCash ?? 0)
-      : Number.isFinite(rawTrackedCash)
-        ? Math.min(Math.max(0, rawTrackedCash), availableCash ?? Math.max(0, rawTrackedCash))
-        : 0;
+  // Until the core has read what the accounts record, a total stands alone and
+  // each account is checked against everything it records.
+  const trackedCashToUse = cash.isKnown
+    ? cash.total
+    : rawTrackedCash !== null && Number.isFinite(rawTrackedCash)
+      ? Math.max(0, rawTrackedCash)
+      : 0;
+  const trackedCashByAccount = cash.isKnown ? cash.byAccount : undefined;
   const externalContribution = externalContributionFor(changeAccountIds, externalCash);
+  const cashInput = {
+    trackedCashToUse,
+    externalContribution,
+    ...(trackedCashByAccount ? { trackedCashByAccount } : {}),
+  };
   const externalTotal = Object.values(externalContribution).reduce(
     (sum, amount) => sum + amount,
     0,
@@ -1365,10 +1054,10 @@ export function AllocationWorksheetTab({
   // Asking for more cash than the accounts record is not an error: the cash
   // control caps it and points the rest at the contribution input.
   const cashIssue: PreparedWorksheetIssue | undefined =
-    rawTrackedCash !== null && !Number.isFinite(rawTrackedCash)
-      ? { message: t("allocation:worksheet.invalidCashInput"), kind: "cash" }
-      : rawTrackedCash !== null && rawTrackedCash < 0
-        ? { message: t("allocation:worksheet.cashMustBePositive"), kind: "cash" }
+    cashByAccount === null && rawTrackedCash !== null && rawTrackedCash < 0
+      ? { message: t("allocation:worksheet.cashMustBePositive"), kind: "cash" }
+      : cash.isTotalInvalid || cash.invalidAccountIds.length > 0
+        ? { message: t("allocation:worksheet.invalidCashInput"), kind: "cash" }
         : changeAccountIds.some((accountId) => {
               const amount = parseDecimalInput(externalCash[accountId] ?? "");
               return !Number.isFinite(amount) || amount < 0;
@@ -1376,27 +1065,23 @@ export function AllocationWorksheetTab({
           ? { message: t("allocation:worksheet.invalidExternalCash"), kind: "cash" }
           : undefined;
 
-  const generationInputs: WorksheetGenerationInputs | null = rule
-    ? {
-        targetId: profile.id,
-        targetVersion: profile.updatedAt,
-        accountIds: changeAccountIds,
-        mode,
-        rule,
-        trackedCashToUse,
-        externalContribution,
-        eligibleAssetIds: eligibility.eligibleAssetIds,
-      }
-    : null;
+  const generationInputs: WorksheetGenerationInputs = {
+    targetId: profile.id,
+    targetVersion: profile.updatedAt,
+    accountIds: changeAccountIds,
+    mode,
+    rule: SPLIT_RULE,
+    trackedCashToUse,
+    trackedCashByAccount,
+    externalContribution,
+    eligibleAssetIds: eligibility.eligibleAssetIds,
+  };
   // The cash the accounts record comes back with the first preview, after the
-  // worksheet opens. Until then a default that follows it is unknown rather
+  // worksheet opens. Until then what each account spends is unknown rather
   // than zero, and an unknown input has not changed.
-  const cashKnown = trackedCash !== null || availableCash !== undefined;
+  const cashKnown = cash.isKnown;
   const inputsChanged = Boolean(
-    generated &&
-    generationInputs &&
-    cashKnown &&
-    generated.inputsKey !== generationInputsKey(generationInputs),
+    generated && cashKnown && generated.inputsKey !== generationInputsKey(generationInputs),
   );
   // A calculated line whose price moved by more than PRICE_MOVE_THRESHOLD no
   // longer matches what was calculated. An addition to §5's list of inputs;
@@ -1413,11 +1098,13 @@ export function AllocationWorksheetTab({
   const outOfDateMessage = inputsChanged
     ? t("allocation:worksheet.inputsChanged")
     : t("allocation:worksheet.pricesChanged", { percent: PRICE_MOVE_THRESHOLD * 100 });
-  const generationIssue = !rule
-    ? t("allocation:worksheet.chooseRuleIssue")
-    : changeAccountIds.length === 0
+  const generationIssue =
+    changeAccountIds.length === 0
       ? t("allocation:worksheet.selectAccountIssue")
-      : cashIssue?.message;
+      : // Calculating before the accounts' cash is read would deploy none of it.
+        !cash.isKnown
+        ? t("allocation:worksheet.cashReading")
+        : cashIssue?.message;
 
   /**
    * The account an increase lands in without the user placing it (§6): the one
@@ -1608,11 +1295,22 @@ export function AllocationWorksheetTab({
   }
 
   const lineAssetIds = new Map((result?.lines ?? []).map((line) => [line.lineId, line.assetId]));
+  // The core sends each warning's figures; they are worded here, in the
+  // user's language and number format.
+  const warningFormat: WarningFormatting = {
+    amount: (value) => formatAmount(value, currency),
+    price: (value) => formatPrice(value, currency),
+    percent: (fraction, digits) => formatPercent(fraction, { digits }),
+    date: (isoDate) => formatCalendarDate(isoDate),
+    accountName: (accountId) => accountNames.get(accountId) ?? accountId,
+  };
+  const wordWarning = (warning: WorksheetWarning) =>
+    describeWarning(warning, { lines: result?.lines ?? [] }, warningFormat, t);
   const warningsByAsset = new Map<string, string[]>();
   for (const warning of result && !isResultStale ? result.warnings : []) {
     const assetId = warning.lineId ? lineAssetIds.get(warning.lineId) : undefined;
     if (assetId)
-      warningsByAsset.set(assetId, [...(warningsByAsset.get(assetId) ?? []), warning.message]);
+      warningsByAsset.set(assetId, [...(warningsByAsset.get(assetId) ?? []), wordWarning(warning)]);
   }
   // The price the core resolved a line at, when the preview has one: the unit
   // a step adds is then the unit the core places.
@@ -1772,7 +1470,7 @@ export function AllocationWorksheetTab({
   }
 
   async function recalculateFromTarget() {
-    if (!generationInputs || generationIssue) return;
+    if (generationIssue) return;
     setGenerateError(null);
     try {
       const calculated = await calculator.mutateAsync({
@@ -1780,7 +1478,7 @@ export function AllocationWorksheetTab({
         filter: accountScope,
         mode: generationInputs.mode,
         rule: generationInputs.rule,
-        cash: { trackedCashToUse, externalContribution },
+        cash: cashInput,
         selectedAccountIds: changeAccountIds,
         eligibleAssetIds: generationInputs.eligibleAssetIds,
       });
@@ -1827,7 +1525,12 @@ export function AllocationWorksheetTab({
   async function calculate() {
     // A worksheet with no adjustments is valid: it projects the allocation as
     // it stands today.
-    if (prepared.issue || firstUseOpen) return;
+    if (firstUseOpen) return;
+    // A row that cannot be previewed yet must not hide what the selected
+    // accounts record. The same preview without lines reads it, and its result
+    // stays out of Adjust and Review.
+    const cashOnly = Boolean(prepared.issue);
+    if (cashOnly && cash.isKnown) return;
     if (autoCalculateTimerRef.current) clearTimeout(autoCalculateTimerRef.current);
     setCalculationError(null);
     const calculationVersion = calculationVersionRef.current;
@@ -1835,14 +1538,24 @@ export function AllocationWorksheetTab({
       const data = await worksheet.mutateAsync({
         targetId: profile!.id,
         filter: accountScope,
-        cash: { trackedCashToUse, externalContribution },
-        lines: prepared.lines,
+        cash: cashOnly ? { trackedCashToUse: 0, externalContribution: {} } : cashInput,
+        lines: cashOnly ? [] : prepared.lines,
         selectedAccountIds: changeAccountIds,
       });
+      // What the accounts record depends on the sources alone and is filed
+      // under their key, so it stands even when an edit overtook this preview.
+      setRecordedCash((current) => ({
+        sourceKey: cashSourceKey,
+        byAccount: {
+          ...(current?.sourceKey === cashSourceKey ? current.byAccount : {}),
+          ...data.recordedCashByAccount,
+        },
+      }));
       if (calculationVersion !== calculationVersionRef.current) return;
-      setResult(data);
-      setObservedCashByAccounts({ key: changeAccountKey, amount: data.observedTrackedCash });
-      setIsResultStale(false);
+      if (!cashOnly) {
+        setResult(data);
+        setIsResultStale(false);
+      }
       setCalculationError(null);
     } catch (error) {
       if (calculationVersion !== calculationVersionRef.current) return;
@@ -1878,7 +1591,6 @@ export function AllocationWorksheetTab({
     setFirstUseOpen(false);
   }
 
-  const changedCount = amountsRows.filter((row) => row.isChanged).length;
   // Warnings and an out-of-date worksheet travel with the file; only a change
   // the review cannot include, or a result being recomputed, holds it back.
   const canExport = Boolean(result && !isResultStale && !prepared.issue && !calculationError);
@@ -1915,6 +1627,7 @@ export function AllocationWorksheetTab({
         accountIds: changeAccountIds,
         trackedCashToUse,
         externalCash: externalTotal,
+        describeWarning: wordWarning,
       },
       {
         title: t("allocation:worksheet.title"),
@@ -2014,6 +1727,154 @@ export function AllocationWorksheetTab({
     </div>
   );
 
+  // The picker groups securities by the target's categories, the ones below
+  // target first since they receive the increases, so the user sees which of
+  // them would be left with nothing eligible.
+  const targetCategories: TargetCategories | undefined = driftReport.holdings
+    ? {
+        order: driftReport.rows
+          .filter((row) => !row.isCash)
+          .map((row) => ({
+            id: row.categoryId,
+            name: row.categoryName,
+            isBelowTarget: row.valueDelta < 0,
+          }))
+          .sort((left, right) => Number(right.isBelowTarget) - Number(left.isBelowTarget)),
+        byAsset: driftReport.holdings.rows.reduce((byAsset, row) => {
+          if (row.isCash || row.isUnknownCategory) return byAsset;
+          const current = byAsset.get(row.assetId) ?? [];
+          if (!current.includes(row.categoryId))
+            byAsset.set(row.assetId, [...current, row.categoryId]);
+          return byAsset;
+        }, new Map<string, string[]>()),
+      }
+    : undefined;
+
+  // The target's limits, said once with the securities they shape.
+  const minLine = decimalInputOrZero(profile.minTradeAmount ?? "");
+  const targetLimits = [
+    profile.wholeSharesOnly ? t("allocation:worksheet.limitWholeUnits") : null,
+    minLine > 0
+      ? t("allocation:worksheet.limitMinLine", { amount: formatAmount(minLine, currency) })
+      : null,
+    profile.maxTurnoverBps
+      ? t("allocation:worksheet.limitTurnover", { percent: profile.maxTurnoverBps / 100 })
+      : null,
+  ].filter((limit): limit is string => limit !== null);
+
+  /**
+   * A total is spent as one share of every account. Amounts the user set per
+   * account give way to it, and stay one Undo away.
+   */
+  function changeCashTotal(value: string | null) {
+    if (cashByAccount !== null) {
+      setReplacedCash(cashByAccount);
+      setCashByAccount(null);
+    }
+    setTrackedCash(value);
+  }
+
+  /** Setting one account's amount sets every account's, and the total follows their sum. */
+  function changeAccountCash(accountId: string, value: string) {
+    setReplacedCash(null);
+    setCashByAccount((current) => ({
+      ...(current ?? editableAmounts(cash.byAccount, fractionDigits)),
+      [accountId]: value,
+    }));
+  }
+
+  /** Back to one share of every account, at the total the accounts add up to now. */
+  function useSameCashShare() {
+    setReplacedCash(null);
+    setCashByAccount(null);
+    setTrackedCash(
+      cash.isKnown && cash.total < cash.recordedTotal - AMOUNT_EPSILON
+        ? formatDecimalInput(cash.total, fractionDigits)
+        : null,
+    );
+  }
+
+  function undoReplacedCash() {
+    if (!replacedCash) return;
+    setCashByAccount(replacedCash);
+    setReplacedCash(null);
+  }
+
+  const nextNeedsCalculation = !generated || isOutOfDate;
+  const setupChangedMessage =
+    generated && isOutOfDate
+      ? inputsChanged
+        ? t("allocation:worksheet.setupChanged")
+        : t("allocation:worksheet.setupPricesChanged", { percent: PRICE_MOVE_THRESHOLD * 100 })
+      : null;
+
+  /**
+   * Setup's one action leads to Adjust positions, calculating on the way when
+   * there is nothing yet or the inputs changed. Edits made since the last
+   * calculation are replaced only once the user says so (§5).
+   */
+  function goToAdjust() {
+    const hasEdits =
+      generated !== null &&
+      (addedAssetIds.length > 0 || !isAsCalculated(adjustments, generated.calculated));
+    if (!nextNeedsCalculation) {
+      setPanel("amounts");
+    } else if (hasEdits) {
+      setReplaceEditsOpen(true);
+    } else {
+      void recalculateFromTarget();
+    }
+  }
+
+  const setupActions = (
+    <div className="space-y-3">
+      {generateError && (
+        <div role="alert">
+          <p className="text-destructive text-xs font-semibold">
+            {t("allocation:worksheet.generateFailed")}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{generateError}</p>
+        </div>
+      )}
+      {setupChangedMessage && (
+        <p
+          role="status"
+          className="flex items-start gap-2 text-xs leading-relaxed text-amber-800 dark:text-amber-200"
+        >
+          <Icons.AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {setupChangedMessage}
+        </p>
+      )}
+      <Button
+        className="w-full"
+        disabled={nextNeedsCalculation && (!!generationIssue || calculator.isPending)}
+        onClick={goToAdjust}
+      >
+        {calculator.isPending && <Icons.Spinner className="mr-1.5 h-4 w-4 animate-spin" />}
+        {t("allocation:worksheet.nextPanel", {
+          panel: t("allocation:worksheet.stepAmounts"),
+        })}
+        {!calculator.isPending && <Icons.ArrowRight className="ml-1.5 h-4 w-4" />}
+      </Button>
+      {!generated && (
+        <>
+          {!generationIssue && (
+            <p className="text-muted-foreground text-center text-xs">
+              {t("allocation:worksheet.calculateHint")}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setPanel("amounts")}
+            className="text-muted-foreground hover:text-foreground block w-full text-center text-xs underline-offset-4 hover:underline"
+          >
+            {t("allocation:worksheet.enterManually")}
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <AlertDialog open={firstUseOpen}>
@@ -2032,12 +1893,35 @@ export function AllocationWorksheetTab({
         </AlertDialogContent>
       </AlertDialog>
 
-      <WorksheetStepper
-        panel={panel}
-        onSelect={setPanel}
-        changedCount={changedCount}
-        isOutOfDate={isOutOfDate}
-      />
+      <AlertDialog open={replaceEditsOpen} onOpenChange={setReplaceEditsOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("allocation:worksheet.replaceEditsTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("allocation:worksheet.replaceEditsDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPanel("amounts")}>
+              {t("allocation:worksheet.keepEdits")}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => void recalculateFromTarget()}>
+              {t("allocation:worksheet.recalculate")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* The target's scope and planning currency ride on the steps' row:
+          they hold for every step and take no room of their own. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <WorksheetStepper panel={panel} onSelect={setPanel} setupChanged={setupChangedMessage} />
+        <p className="text-muted-foreground text-xs">
+          {t("allocation:worksheet.setupScope", { count: scopedAccounts.length })}
+          {" · "}
+          {t("allocation:worksheet.planningCurrency", { currency })}
+        </p>
+      </div>
 
       {/* Where amounts are read, a stale worksheet says so first. Setup offers the
           same action at the bottom, after the inputs that changed. */}
@@ -2054,105 +1938,58 @@ export function AllocationWorksheetTab({
       )}
 
       {panel === "setup" ? (
-        <>
-          <Card className="overflow-hidden">
-            <CardContent className="grid p-0 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.7fr)]">
-              <AccountsControl
-                accounts={scopedAccounts}
-                selectedAccountIds={changeAccountIds}
-                onToggle={(accountId) =>
-                  setSelectedAccountIds(
-                    changeAccountIds.includes(accountId)
-                      ? changeAccountIds.filter((id) => id !== accountId)
-                      : [...changeAccountIds, accountId],
-                  )
-                }
-                onSelectAll={() => setSelectedAccountIds(null)}
-              />
-              <CashControl
-                availableCash={availableCash}
-                trackedCash={trackedCash}
-                onTrackedCashChange={setTrackedCash}
-                accounts={changeAccounts}
-                externalCash={externalCash}
-                onExternalCashChange={(accountId, value) =>
-                  setExternalCash((current) => ({ ...current, [accountId]: value }))
-                }
-                currency={currency}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              <CalculationControl
-                mode={mode}
-                allowSells={profile.allowSells}
-                onModeChange={setMode}
-                rule={rule}
-                onRuleChange={setRule}
-                holdings={scopedHoldings}
-                excludedAssetIds={eligibility.excludedAssetIds}
-                onToggleAsset={eligibility.toggle}
-                onSelectAllAssets={eligibility.selectAll}
-                onClearAssets={eligibility.clear}
-                accountNames={accountNames}
-              />
-              <div className="bg-muted/30 flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4 sm:px-6">
-                <div className="min-w-0 flex-1 basis-80 space-y-2">
-                  {generateError && (
-                    <div role="alert">
-                      <p className="text-destructive text-xs font-semibold">
-                        {t("allocation:worksheet.generateFailed")}
-                      </p>
-                      <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                        {generateError}
-                      </p>
-                    </div>
-                  )}
-                  {!generated ? (
-                    <p className="text-muted-foreground text-xs leading-relaxed">
-                      {generationIssue ?? t("allocation:worksheet.notCalculatedDescription")}
-                    </p>
-                  ) : (
-                    // Beside the button that answers it, so both read at a glance.
-                    isOutOfDate && (
-                      <p
-                        role="status"
-                        className="rounded-lg border border-amber-400/60 bg-amber-50/80 px-3.5 py-2.5 text-xs leading-relaxed text-amber-950/80 dark:bg-amber-950/15 dark:text-amber-100/80"
-                      >
-                        {generationIssue ?? outOfDateMessage}
-                      </p>
-                    )
-                  )}
-                </div>
-                {/* Top to bottom: the inputs, then recalculating when they changed,
-                    then moving on. Calculating never happens on the way. */}
-                {generated ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {isOutOfDate && recalculateButton}
-                    <Button onClick={() => setPanel("amounts")}>
-                      {t("allocation:worksheet.nextPanel", {
-                        panel: t("allocation:worksheet.stepAmounts"),
-                      })}
-                      <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    disabled={!!generationIssue || calculator.isPending}
-                    onClick={() => void recalculateFromTarget()}
-                  >
-                    {calculator.isPending && (
-                      <Icons.Spinner className="mr-1.5 h-4 w-4 animate-spin" />
-                    )}
-                    {t("allocation:worksheet.calculateFromTarget")}
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </>
+        <WorksheetSetup
+          profile={profile}
+          driftReport={driftReport}
+          currency={currency}
+          accounts={scopedAccounts}
+          selectedAccountIds={changeAccountIds}
+          onToggleAccount={(accountId) =>
+            setSelectedAccountIds(
+              changeAccountIds.includes(accountId)
+                ? changeAccountIds.filter((id) => id !== accountId)
+                : [...changeAccountIds, accountId],
+            )
+          }
+          onSelectAllAccounts={() => setSelectedAccountIds(null)}
+          onClearAccounts={() => setSelectedAccountIds([])}
+          mode={mode}
+          onModeChange={setMode}
+          recordedByAccount={recordedByAccount}
+          cash={cash}
+          trackedCash={trackedCash}
+          cashByAccount={cashByAccount}
+          onTotalChange={changeCashTotal}
+          onAccountCashChange={changeAccountCash}
+          onUseSameShare={useSameCashShare}
+          replacedCash={replacedCash ? { onUndo: undoReplacedCash } : null}
+          externalCash={externalCash}
+          onExternalCashChange={(accountId, value) =>
+            setExternalCash((current) => ({ ...current, [accountId]: value }))
+          }
+          eligibleSecurities={
+            <EligibleHoldingsSelector
+              variant="card"
+              holdings={scopedHoldings}
+              excludedAssetIds={eligibility.excludedAssetIds}
+              onToggle={eligibility.toggle}
+              onSelectAll={eligibility.selectAll}
+              onClear={eligibility.clear}
+              accountNames={accountNames}
+              categories={targetCategories}
+              rule={t("allocation:worksheet.ruleCurrentHoldingProportionsHint")}
+              limits={targetLimits}
+            />
+          }
+          blockingIssues={[
+            changeAccountIds.length === 0 ? t("allocation:worksheet.selectAccountIssue") : null,
+            changeAccountIds.length > 0 && !cash.isKnown
+              ? t("allocation:worksheet.cashReading")
+              : null,
+            cashIssue?.message ?? null,
+          ].filter((issue): issue is string => issue !== null)}
+          actions={setupActions}
+        />
       ) : (
         <HighlightStoreContext.Provider value={highlightStore}>
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -2254,6 +2091,7 @@ export function AllocationWorksheetTab({
                   </div>
                 ) : (
                   <ReviewPanel
+                    describeWarning={wordWarning}
                     result={result}
                     isStale={isResultStale}
                     isCalculating={isPreviewUpdating}
@@ -2280,71 +2118,16 @@ export function AllocationWorksheetTab({
                       const issue = prepared.rowIssues.get(assetId);
                       if (issue) openIssue(issue);
                     }}
-                    exportActions={
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-5">
-                        <p
-                          className={cn(
-                            "min-w-0 flex-1 text-xs leading-relaxed",
-                            prepared.issue
-                              ? "text-amber-800 dark:text-amber-200"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {exportMessage}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!canExport}
-                            onClick={() => void exportWorksheet("copy")}
-                          >
-                            <Icons.Copy className="mr-1.5 h-4 w-4" />
-                            {t("allocation:worksheet.copyTable")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={!canExport}
-                            onClick={() => void exportWorksheet("csv")}
-                          >
-                            <Icons.Download className="mr-1.5 h-4 w-4" />
-                            {t("allocation:worksheet.exportCsv")}
-                          </Button>
-                        </div>
-                      </div>
-                    }
                   />
                 )}
 
                 {disclosure}
-
-                <div className="flex items-center justify-between gap-3 border-t px-4 py-3 sm:px-5">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setPanel(panel === "review" ? "amounts" : "setup")}
-                  >
-                    <Icons.ArrowLeft className="mr-1.5 h-4 w-4" />
-                    {t("allocation:worksheet.previousPanel", {
-                      panel:
-                        panel === "review"
-                          ? t("allocation:worksheet.stepAmounts")
-                          : t("allocation:worksheet.stepSetup"),
-                    })}
-                  </Button>
-                  {panel === "amounts" && (
-                    <Button onClick={() => setPanel("review")}>
-                      {t("allocation:worksheet.nextPanel", {
-                        panel: t("allocation:worksheet.stepReview"),
-                      })}
-                      <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
               </CardContent>
             </Card>
 
             <div className="space-y-4 lg:sticky lg:top-4">
               <ImpactRail
+                describeWarning={wordWarning}
                 report={driftReport}
                 result={result}
                 isStale={isResultStale}
@@ -2368,6 +2151,58 @@ export function AllocationWorksheetTab({
                   if (assetId) navigate(`/holdings/${assetId}`);
                 }}
               />
+              {/* The step's own action, under the summary it follows from, as on
+                  Setup: in view while the list scrolls, one primary at a time. */}
+              <div className="space-y-3">
+                {panel === "amounts" ? (
+                  <Button className="w-full" onClick={() => setPanel("review")}>
+                    {t("allocation:worksheet.nextPanel", {
+                      panel: t("allocation:worksheet.stepReview"),
+                    })}
+                    <Icons.ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <>
+                    <p
+                      className={cn(
+                        "text-xs leading-relaxed",
+                        prepared.issue
+                          ? "text-amber-800 dark:text-amber-200"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {exportMessage}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        disabled={!canExport}
+                        onClick={() => void exportWorksheet("copy")}
+                      >
+                        <Icons.Copy className="mr-1.5 h-4 w-4" />
+                        {t("allocation:worksheet.copyTable")}
+                      </Button>
+                      <Button disabled={!canExport} onClick={() => void exportWorksheet("csv")}>
+                        <Icons.Download className="mr-1.5 h-4 w-4" />
+                        {t("allocation:worksheet.exportCsv")}
+                      </Button>
+                    </div>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPanel(panel === "review" ? "amounts" : "setup")}
+                  className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1.5 text-xs underline-offset-4 hover:underline"
+                >
+                  <Icons.ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("allocation:worksheet.previousPanel", {
+                    panel:
+                      panel === "review"
+                        ? t("allocation:worksheet.stepAmounts")
+                        : t("allocation:worksheet.stepSetup"),
+                  })}
+                </button>
+              </div>
               {/* Review states each account's cash in its own group. */}
               {panel === "amounts" && (
                 <Card className="overflow-hidden">
@@ -2391,34 +2226,27 @@ export function AllocationWorksheetTab({
 interface WorksheetStepperProps {
   panel: WorksheetPanel;
   onSelect: (panel: WorksheetPanel) => void;
-  changedCount: number;
-  isOutOfDate: boolean;
+  /** Why Setup no longer matches the calculation, when it does not. */
+  setupChanged: string | null;
 }
 
 /**
  * Every step is a button: any panel, ahead or behind, opens on the current
  * worksheet, and nothing is calculated on the way.
  */
-function WorksheetStepper({ panel, onSelect, changedCount, isOutOfDate }: WorksheetStepperProps) {
+function WorksheetStepper({ panel, onSelect, setupChanged }: WorksheetStepperProps) {
   const { t } = useTranslation();
   const steps: { id: WorksheetPanel; label: string; note?: ReactNode }[] = [
     {
       id: "setup",
       label: t("allocation:worksheet.stepSetup"),
-      note: isOutOfDate ? (
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+      note: setupChanged ? (
+        <span title={setupChanged} className="h-1.5 w-1.5 rounded-full bg-amber-500">
+          <span className="sr-only">{setupChanged}</span>
+        </span>
       ) : undefined,
     },
-    {
-      id: "amounts",
-      label: t("allocation:worksheet.stepAmounts"),
-      note:
-        changedCount > 0 ? (
-          <span className="font-mono text-[11px] opacity-70">
-            {t("allocation:worksheet.lineCount", { count: changedCount })}
-          </span>
-        ) : undefined,
-    },
+    { id: "amounts", label: t("allocation:worksheet.stepAmounts") },
     { id: "review", label: t("allocation:worksheet.stepReview") },
   ];
 

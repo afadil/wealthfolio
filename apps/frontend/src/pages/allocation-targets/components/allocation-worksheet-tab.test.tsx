@@ -206,6 +206,8 @@ const previewResult: AllocationWorksheetResult = {
   sourceFingerprint: "fingerprint",
   resolvedAccountIds: ["acc-1"],
   observedTrackedCash: 2000,
+  // The core reports what every selected account records.
+  recordedCashByAccount: { "acc-1": 2000, "acc-2": 0 },
   trackedCashToUse: 0,
   externalContribution: 0,
   increaseTotal: 0,
@@ -283,8 +285,12 @@ async function goTo(
 }
 
 async function calculateFromTarget(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /Allocate by current holding proportions/ }));
-  await user.click(screen.getByRole("button", { name: /Calculate from target/ }));
+  // Calculating waits until the core has read what the selected accounts record.
+  await waitFor(
+    () => expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled(),
+    { timeout: 2000 },
+  );
+  await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
   await waitFor(() => expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("1200.00"));
 }
 
@@ -301,11 +307,19 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not calculate adjustments until an allocation rule is chosen", async () => {
-    await renderWorksheet();
+  it("states how amounts are split with the eligible securities rather than asking for it", async () => {
+    const user = await renderWorksheet();
+    expect(screen.queryByText(/Choose an allocation rule/)).not.toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: /Calculate from target/ })).toBeDisabled();
-    expect(generateMock).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /Eligible securities/ }));
+    expect(
+      screen.getByText(
+        /split across its eligible securities in proportion to what you already hold/,
+      ),
+    ).toBeInTheDocument();
+
+    await calculateFromTarget(user);
+    expect(generateMock.mock.lastCall?.[0]).toMatchObject({ rule: "current_holding_proportions" });
   });
 
   it("prefills the worksheet when the user recalculates from target", async () => {
@@ -313,7 +327,7 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     // The cash to deploy follows what the chosen accounts record, which the
     // core reports rather than the drift report.
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2000"),
+      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
     );
 
     await calculateFromTarget(user);
@@ -323,7 +337,11 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
       targetId: "target-1",
       mode: "invest_cash",
       rule: "current_holding_proportions",
-      cash: { trackedCashToUse: 2000, externalContribution: {} },
+      cash: {
+        trackedCashToUse: 2000,
+        trackedCashByAccount: { "acc-1": 2000 },
+        externalContribution: {},
+      },
       selectedAccountIds: ["acc-1"],
       eligibleAssetIds: undefined,
     });
@@ -402,7 +420,7 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     const user = await renderWorksheet();
     // Calculate once the cash the accounts record is known, so only prices move.
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2000"),
+      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
     );
 
     await calculateFromTarget(user);
@@ -433,7 +451,7 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     });
     const user = await renderWorksheet();
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2000"),
+      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
     );
 
     await calculateFromTarget(user);
@@ -455,10 +473,8 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
 
     await calculateFromTarget(user);
 
-    // Once calculated, Setup's button moves on; calculating again is left to
-    // the out-of-date banner.
+    // Once calculated and unchanged, Next only moves on.
     await goTo(user, "Setup");
-    expect(screen.queryByRole("button", { name: /Calculate from target/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
     expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("1200.00");
     expect(generateMock).toHaveBeenCalledTimes(1);
@@ -486,7 +502,7 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
   it("does not call the worksheet out of date while the recorded cash is still being read", async () => {
     const user = await renderWorksheet();
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2000"),
+      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
     );
     await calculateFromTarget(user);
     // Leave only once the saved draft holds the calculation.
@@ -514,7 +530,7 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     previewMock.mockResolvedValue(previewResult);
     answerPreview(previewResult);
     await waitFor(
-      () => expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2000"),
+      () => expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
       { timeout: 2000 },
     );
     expect(screen.queryByText(/Inputs changed since these adjustments/)).not.toBeInTheDocument();
@@ -541,22 +557,70 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     await user.clear(cashInput);
     await user.type(cashInput, "100");
 
-    expect(await screen.findByText(/Inputs changed since these adjustments/)).toBeInTheDocument();
-    // On Setup it is offered at the bottom, after the inputs and before Next.
-    const recalculate = screen.getByRole("button", { name: "Recalculate from target" });
-    const next = screen.getByRole("button", { name: "Next: Adjust positions" });
+    // Setup says it on its step and in one line above its one action, which
+    // stays Next.
+    const changed = "Changed since the last calculation. Next recalculates.";
     expect(
-      recalculate.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+      await within(screen.getByRole("navigation")).findByRole("button", {
+        name: new RegExp(changed),
+      }),
+    ).toHaveAccessibleName(/Setup/);
+    expect(screen.getByRole("status")).toHaveTextContent(changed);
+    expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled();
     expect(
-      recalculate.compareDocumentPosition(cashInput) & Node.DOCUMENT_POSITION_PRECEDING,
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: "Recalculate from target" }),
+    ).not.toBeInTheDocument();
 
-    // Where the amounts are read, the banner says so first; they are left alone.
+    // The steps lead on without recalculating. Where the amounts are read, the
+    // banner says so first; they are left alone.
     await goTo(user, "Adjust positions");
     expect(screen.getByText(/Inputs changed since these adjustments/)).toBeInTheDocument();
     expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("1200.00");
     expect(generateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("recalculates on Next when the inputs changed and nothing was edited", async () => {
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+
+    await goTo(user, "Setup");
+    const cashInput = screen.getByRole("textbox", { name: "Cash to deploy" });
+    await user.clear(cashInput);
+    await user.type(cashInput, "100");
+    await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
+
+    await waitFor(() => expect(generateMock).toHaveBeenCalledTimes(2));
+    expect(generateMock.mock.lastCall?.[0]).toMatchObject({ cash: { trackedCashToUse: 100 } });
+    expect(await screen.findByLabelText("Adjustment for VTI")).toHaveValue("1200.00");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("asks before Next replaces edits, and keeps them unless told otherwise", async () => {
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.clear(screen.getByLabelText("Adjustment for VTI"));
+    await user.type(screen.getByLabelText("Adjustment for VTI"), "500");
+    await user.tab();
+
+    await goTo(user, "Setup");
+    const cashInput = screen.getByRole("textbox", { name: "Cash to deploy" });
+    await user.clear(cashInput);
+    await user.type(cashInput, "100");
+    await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Replace your edits?")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Keep my edits" }));
+    expect(await screen.findByLabelText("Adjustment for VTI")).toHaveValue("500.00");
+    expect(generateMock).toHaveBeenCalledTimes(1);
+
+    await goTo(user, "Setup");
+    await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Recalculate" }),
+    );
+    await waitFor(() => expect(generateMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText("Adjustment for VTI")).toHaveValue("1200.00");
   });
 });
 
@@ -856,11 +920,12 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
     const user = await renderWorksheet();
 
-    await user.click(screen.getByRole("button", { name: "Retirement" }));
-    await user.click(
-      screen.getByRole("button", { name: /Allocate by current holding proportions/ }),
+    await user.click(screen.getByRole("checkbox", { name: "Include Retirement" }));
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled(),
+      { timeout: 2000 },
     );
-    await user.click(screen.getByRole("button", { name: /Calculate from target/ }));
+    await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
 
     await waitFor(() => expect(generateMock).toHaveBeenCalled());
     expect(generateMock.mock.lastCall?.[0]).toMatchObject({ selectedAccountIds: ["acc-1"] });
@@ -870,13 +935,13 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     accountsRef.current = [account("acc-1", "Brokerage")];
     const user = await renderWorksheet();
     const cashInput = screen.getByRole("textbox", { name: "Cash to deploy" });
-    await waitFor(() => expect(cashInput).toHaveValue("2000"));
+    await waitFor(() => expect(cashInput).toHaveValue("2,000.00"));
 
     await user.clear(cashInput);
     await user.type(cashInput, "5000");
     await user.tab();
 
-    expect(cashInput).toHaveValue("2000");
+    expect(cashInput).toHaveValue("2,000.00");
     await waitFor(() =>
       expect(previewMock.mock.lastCall?.[0]).toMatchObject({
         cash: { trackedCashToUse: 2000 },
@@ -884,11 +949,186 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     );
   });
 
-  it("asks for cash not yet recorded per account only when several are in scope", async () => {
+  it("takes cash not yet recorded in the account it would arrive in", async () => {
     accountsRef.current = [account("acc-1", "Brokerage")];
+    const user = await renderWorksheet();
+
+    await user.click(
+      screen.getByRole("button", { name: "Add cash not yet recorded to Brokerage" }),
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Cash not yet recorded in Brokerage" }),
+      "500",
+    );
+
+    await waitFor(
+      () =>
+        expect(previewMock.mock.lastCall?.[0]).toMatchObject({
+          cash: { externalContribution: { "acc-1": 500 } },
+        }),
+      { timeout: 2000 },
+    );
+  });
+});
+
+describe("AllocationWorksheetTab Setup cash (§6)", () => {
+  const twoAccounts = {
+    ...previewResult,
+    observedTrackedCash: 3000,
+    recordedCashByAccount: { "acc-1": 2000, "acc-2": 1000 },
+  };
+
+  beforeEach(() => {
+    acknowledgeDisclosure();
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    generateMock.mockReset().mockResolvedValue(calculated);
+    previewMock.mockReset().mockResolvedValue(twoAccounts);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const total = () => screen.getByRole("textbox", { name: "Cash to deploy" });
+  const fromAccount = (name: string) =>
+    screen.getByRole("textbox", { name: `Cash to deploy from ${name}` });
+
+  it("spends a total as the same share of every account's own cash", async () => {
+    const user = await renderWorksheet();
+    await waitFor(() => expect(total()).toHaveValue("3,000.00"), { timeout: 2000 });
+
+    await user.clear(total());
+    await user.type(total(), "1500");
+
+    expect(fromAccount("Brokerage")).toHaveValue("1,000.00");
+    expect(fromAccount("Retirement")).toHaveValue("500.00");
+    // The matching preset says which share applies.
+    expect(screen.getByRole("button", { name: "50%" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(
+      () =>
+        expect(previewMock.mock.lastCall?.[0]).toMatchObject({
+          cash: {
+            trackedCashToUse: 1500,
+            trackedCashByAccount: { "acc-1": 1000, "acc-2": 500 },
+          },
+        }),
+      { timeout: 2000 },
+    );
+  });
+
+  it("adds up amounts set per account into the total, and takes a total back with Undo", async () => {
+    const user = await renderWorksheet();
+    await waitFor(() => expect(fromAccount("Retirement")).toHaveValue("1,000.00"), {
+      timeout: 2000,
+    });
+
+    await user.clear(fromAccount("Retirement"));
+    await user.type(fromAccount("Retirement"), "200");
+    await user.tab();
+
+    expect(total()).toHaveValue("2,200.00");
+    expect(screen.getByText("Set per account.")).toBeInTheDocument();
+
+    // A total goes back to one share of every account, and says what it replaced.
+    await user.click(screen.getByRole("button", { name: "50%" }));
+    expect(fromAccount("Retirement")).toHaveValue("500.00");
+    expect(screen.getByText("Per-account amounts replaced.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    expect(fromAccount("Retirement")).toHaveValue("200.00");
+    expect(total()).toHaveValue("2,200.00");
+  });
+
+  it("meets an account's amount with what it records, and says where the rest goes", async () => {
+    const user = await renderWorksheet();
+    await waitFor(() => expect(fromAccount("Retirement")).toHaveValue("1,000.00"), {
+      timeout: 2000,
+    });
+
+    await user.clear(fromAccount("Retirement"));
+    await user.type(fromAccount("Retirement"), "5000");
+    expect(screen.getByText(/Enter the rest as cash not yet recorded/)).toBeInTheDocument();
+    await user.tab();
+
+    expect(fromAccount("Retirement")).toHaveValue("1,000.00");
+    expect(total()).toHaveValue("3,000.00");
+  });
+
+  it("keeps the cash a preview read when an edit overtook it", async () => {
+    const answers: ((result: AllocationWorksheetResult) => void)[] = [];
+    previewMock.mockImplementation(
+      () => new Promise<AllocationWorksheetResult>((resolve) => answers.push(resolve)),
+    );
+    const user = await renderWorksheet();
+    await waitFor(() => expect(previewMock).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+    // Leaving an account out sends a new preview before the first one answers.
+    await user.click(screen.getByRole("checkbox", { name: "Include Retirement" }));
+    await waitFor(() => expect(previewMock).toHaveBeenCalledTimes(2), { timeout: 2000 });
+
+    // What the accounts record does not depend on the edit: the first answer
+    // already says it.
+    answers[0]?.(twoAccounts);
+    await waitFor(() => expect(total()).toHaveValue("2,000.00"));
+    expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled();
+  });
+
+  it("waits for the accounts' cash before calculating", async () => {
+    let answerPreview: (result: AllocationWorksheetResult) => void = () => undefined;
+    previewMock.mockImplementation(
+      () => new Promise<AllocationWorksheetResult>((resolve) => (answerPreview = resolve)),
+    );
     await renderWorksheet();
-    expect(screen.getByRole("textbox", { name: "Cash not yet recorded" })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Cash not yet recorded in/)).not.toBeInTheDocument();
+    await waitFor(() => expect(previewMock).toHaveBeenCalled(), { timeout: 2000 });
+
+    expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeDisabled();
+    expect(screen.getByText("Reading the cash the selected accounts record…")).toBeInTheDocument();
+
+    answerPreview(twoAccounts);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled(),
+    );
+  });
+
+  it("shows no cash for an account the plan may not change", async () => {
+    const user = await renderWorksheet();
+    await waitFor(() => expect(fromAccount("Retirement")).toBeInTheDocument(), { timeout: 2000 });
+
+    await user.click(screen.getByRole("checkbox", { name: "Include Retirement" }));
+
+    expect(screen.queryByRole("textbox", { name: "Cash to deploy from Retirement" })).toBeNull();
+    expect(total()).toHaveValue("2,000.00");
+  });
+
+  it("reads a newly ticked account's cash while a line still needs an account", async () => {
+    accountsRef.current = [
+      account("acc-1", "Brokerage"),
+      account("acc-2", "Retirement"),
+      account("acc-3", "Joint"),
+    ];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await user.click(screen.getByRole("checkbox", { name: "Include Joint" }));
+    await calculateFromTarget(user);
+    // VTI waits for an account, so the worksheet cannot be previewed.
+    expect(screen.getByRole("button", { name: "Needs an account" })).toBeInTheDocument();
+
+    await goTo(user, "Setup");
+    previewMock.mockClear();
+    previewMock.mockResolvedValue({
+      ...twoAccounts,
+      recordedCashByAccount: { ...twoAccounts.recordedCashByAccount, "acc-3": 400 },
+    });
+    await user.click(screen.getByRole("checkbox", { name: "Include Joint" }));
+
+    // The same preview, without lines or cash, reads what Joint records.
+    await waitFor(() => expect(fromAccount("Joint")).toHaveValue("400.00"), { timeout: 2000 });
+    expect(previewMock.mock.lastCall?.[0]).toMatchObject({
+      lines: [],
+      cash: { trackedCashToUse: 0, externalContribution: {} },
+      selectedAccountIds: ["acc-1", "acc-2", "acc-3"],
+    });
   });
 });
 
@@ -1071,6 +1311,58 @@ describe("AllocationWorksheetTab Amounts panel", () => {
     expect(railClass("gold")).toHaveTextContent(
       "+$50.00 unresolved: no eligible security selected",
     );
+  });
+
+  it("puts each step's one way forward under the impact summary", async () => {
+    const user = await renderWorksheet(report);
+    await goTo(user, "Adjust positions");
+    const follows = (element: HTMLElement, reference: Element) =>
+      Boolean(reference.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const summary = () => document.querySelector("[data-impact-class]")!;
+
+    const next = screen.getAllByRole("button", { name: "Next: Review" });
+    expect(next).toHaveLength(1);
+    expect(follows(next[0], summary())).toBe(true);
+
+    await user.click(next[0]);
+    const exportCsv = screen.getAllByRole("button", { name: "Export CSV" });
+    expect(exportCsv).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Copy table" })).toHaveLength(1);
+    expect(follows(exportCsv[0], summary())).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Previous: Adjust positions" }));
+    expect(screen.getByRole("button", { name: "Previous: Setup" })).toBeInTheDocument();
+  });
+
+  it("never adds or removes a line in a class while a row is pointed at", async () => {
+    generateMock.mockResolvedValue({
+      ...calculated,
+      adjustments: [{ ...calculated.adjustments[0], lineId: "calc:vti", accountId: "acc-1" }],
+      unresolved: [
+        { categoryId: "gold", categoryName: "Gold", amount: 50, reason: "no_eligible_security" },
+      ],
+    });
+    const user = await renderWorksheet(report);
+    await calculateFromTarget(user);
+    const detailLines = () =>
+      [...document.querySelectorAll("[data-impact-class]")].map(
+        (element) => element.querySelectorAll("[data-class-detail]").length,
+      );
+    const resting = detailLines();
+    expect(resting.length).toBeGreaterThan(0);
+    expect(resting.every((count) => count === 1)).toBe(true);
+
+    // The pointed row's share fills a line that was already there, and what
+    // stays unresolved elsewhere does not hide meanwhile.
+    await user.hover(row("vti"));
+    await waitFor(() => expect(railClass("us")).toHaveTextContent("VTI:"));
+    expect(detailLines()).toEqual(resting);
+    expect(railClass("gold")).toHaveTextContent(
+      "+$50.00 unresolved: no eligible security selected",
+    );
+
+    await user.unhover(row("vti"));
+    expect(detailLines()).toEqual(resting);
   });
 
   it("lights both classes of a mixed fund with how much of each it is", async () => {
