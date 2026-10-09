@@ -5,6 +5,21 @@ use std::sync::Arc;
 use tempfile::tempdir;
 use wealthfolio_storage_sqlite::db::{DbAccess, DbEncryptionKey};
 
+
+/// env_clear() drops SYSTEMROOT on Windows; SQLCipher needs it to seed OpenSSL's RNG.
+trait KeepSystemRoot {
+    fn keep_systemroot(&mut self) -> &mut Self;
+}
+
+impl KeepSystemRoot for std::process::Command {
+    fn keep_systemroot(&mut self) -> &mut Self {
+        if let Some(root) = std::env::var_os("SYSTEMROOT") {
+            self.env("SYSTEMROOT", root);
+        }
+        self
+    }
+}
+
 const KEY: &str = "--------------------------------";
 
 fn cli(dir: &Path, operation: &str) -> Command {
@@ -12,7 +27,7 @@ fn cli(dir: &Path, operation: &str) -> Command {
     command
         .args(["db", operation])
         .current_dir(dir)
-        .env_clear()
+        .env_clear().keep_systemroot()
         .env("WF_DB_PATH", dir.join("app.db"));
     command
 }
