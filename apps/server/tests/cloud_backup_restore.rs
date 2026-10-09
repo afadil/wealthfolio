@@ -9,7 +9,6 @@ use std::{
 use wealthfolio_device_sync::backups::{self, BackupContext, MasterKey, RecoveryPackageHeader};
 use wealthfolio_storage_sqlite::db::{self, DbAccess, DbEncryptionKey};
 
-
 /// env_clear() drops SYSTEMROOT on Windows; SQLCipher needs it to seed OpenSSL's RNG.
 trait KeepSystemRoot {
     fn keep_systemroot(&mut self) -> &mut Self;
@@ -83,7 +82,8 @@ fn offline_recovery_requires_consent_and_preserves_destination_on_failure() {
         let mut command = Command::new(env!("CARGO_BIN_EXE_wealthfolio-server"));
         command
             .current_dir(root.path())
-            .env_clear().keep_systemroot()
+            .env_clear()
+            .keep_systemroot()
             .env("WF_DB_PATH", &destination)
             .env("WF_SECRET_KEY", BASE64.encode(instance_secret))
             .env("WF_DB_REQUIRE_ENCRYPTION", "true")
