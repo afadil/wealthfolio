@@ -68,7 +68,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: "pnpm"
+          # No `cache: pnpm`: restore plus warm install is no faster than a cold
+          # install, and each PR would save its own ~120 MB copy.
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm format:check
 
@@ -90,7 +91,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: "pnpm"
+          # No `cache: pnpm`: restore plus warm install is no faster than a cold
+          # install, and each PR would save its own ~120 MB copy.
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
