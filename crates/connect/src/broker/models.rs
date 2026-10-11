@@ -68,6 +68,10 @@ pub struct BrokerAccount {
     #[serde(rename = "type")]
     pub account_type: Option<String>,
 
+    /// The account type as provided by the brokerage (e.g., "TFSA", "RRSP", "MARGIN")
+    #[serde(default)]
+    pub raw_type: Option<String>,
+
     /// Account currency
     pub currency: Option<String>,
 
@@ -103,10 +107,6 @@ pub struct BrokerAccount {
     /// Account status: "open", "closed", "archived", "unavailable"
     #[serde(default)]
     pub status: Option<String>,
-
-    /// The account type as provided by the brokerage (e.g., "TFSA", "RRSP", "MARGIN")
-    #[serde(default)]
-    pub raw_type: Option<String>,
 
     /// Whether this is a paper (simulated) trading account
     #[serde(default)]
@@ -656,6 +656,9 @@ pub struct SyncResult {
     pub new_accounts: Option<Vec<NewAccountInfo>>,
 }
 
+/// Key of the provider account label in the account metadata written by `to_meta_json`.
+pub(super) const RAW_TYPE_META_KEY: &str = "raw_type";
+
 impl BrokerAccount {
     /// Get the currency, preferring the direct currency field, then balance currency,
     /// then base currency if provided, defaulting to USD.
@@ -687,7 +690,7 @@ impl BrokerAccount {
                 return map_broker_account_type(account_type);
             }
         }
-        // Fall back to mapping raw_type (legacy)
+        // Fall back to mapping the provider label
         map_broker_account_type(self.raw_type.as_deref().unwrap_or(""))
     }
 
@@ -712,7 +715,7 @@ impl BrokerAccount {
             "status": self.status,
             "broker_account_type": self.account_type,
             "broker_raw_type": self.raw_type,
-            "raw_type": self.raw_type,
+            RAW_TYPE_META_KEY: self.raw_type,
             "is_paper": self.is_paper,
             "sync_enabled": self.sync_enabled,
             "shared_with_household": self.shared_with_household,

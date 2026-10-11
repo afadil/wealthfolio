@@ -6,6 +6,7 @@ use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
     BrokerHoldingsResponse, HoldingsBalance, HoldingsDiff, HoldingsOptionPosition,
     HoldingsPosition, PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
+    RAW_TYPE_META_KEY,
 };
 use crate::broker_ingest::BrokerSyncState;
 use crate::broker_ingest::{ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary};
@@ -44,7 +45,7 @@ impl BrokerAccountContext {
             .as_deref()
             .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
             .and_then(|meta| {
-                meta.get("raw_type")
+                meta.get(RAW_TYPE_META_KEY)
                     .and_then(serde_json::Value::as_str)
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
