@@ -2,7 +2,7 @@ import { StartupScreen } from "@/components/startup-screen";
 import { useProfile } from "@/features/profiles/profile-context";
 import { Button } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { isDesktop, logger } from "@/adapters";
+import { isTauri, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
@@ -279,7 +279,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
 
     // On desktop, also sync with Tauri window theme + listen to OS changes.
     // Mobile windows always report light, so mobile relies on the media query.
-    if (isDesktop) {
+    if (isTauri) {
       (async () => {
         try {
           if (!(await getPlatform()).is_desktop) return;
@@ -314,7 +314,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   applyResolvedTheme(explicit);
 
   // Only call Tauri window APIs when running the desktop app for explicit modes
-  if (isDesktop) {
+  if (isTauri) {
     (async () => {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");

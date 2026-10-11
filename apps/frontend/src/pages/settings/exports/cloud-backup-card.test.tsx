@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   profile: "profile-a",
   user: "user-a",
   connected: true,
-  desktop: true,
+  tauri: true,
   mobile: false,
 }));
 vi.mock("@/adapters", () => ({
@@ -21,8 +21,8 @@ vi.mock("@/adapters", () => ({
   captureCloudBackup: mocks.capture,
   downloadCloudBackup: mocks.download,
   previewCloudBackupRestore: mocks.preview,
-  get isDesktop() {
-    return mocks.desktop;
+  get isTauri() {
+    return mocks.tauri;
   },
 }));
 vi.mock("@/features/wealthfolio-connect/providers/wealthfolio-connect-provider", () => ({
@@ -53,7 +53,7 @@ beforeEach(() => {
   mocks.profile = "profile-a";
   mocks.user = "user-a";
   mocks.connected = true;
-  mocks.desktop = true;
+  mocks.tauri = true;
   mocks.mobile = false;
   mocks.action.mockResolvedValue(status);
 });
@@ -99,7 +99,7 @@ it("requires fresh local source consent after restore instead of claiming daily 
   expect(mocks.capture).not.toHaveBeenCalled();
 });
 it("qualifies server restore instructions with the active profile and leaves confirmation enabled", async () => {
-  mocks.desktop = false;
+  mocks.tauri = false;
   mocks.profile = "b802879e-2a71-48d9-baea-f0b094b3946c";
   mocks.action.mockResolvedValue({
     ...status,

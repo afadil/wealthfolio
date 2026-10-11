@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { getAgentAccessStatus, isDesktop, isWeb } from "@/adapters";
+import { getAgentAccessStatus, isTauri, isWeb } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
@@ -122,7 +122,7 @@ export default function AgentAccessPage() {
       />
       <Separator />
 
-      {loading ? null : isDesktop && isMobile ? (
+      {loading ? null : isTauri && isMobile ? (
         <EmptyPlaceholder>
           <EmptyPlaceholder.Icon name="Brain" />
           <EmptyPlaceholder.Title>
@@ -132,7 +132,7 @@ export default function AgentAccessPage() {
             {t("settings:agentAccess.mobile_unavailable_description")}
           </EmptyPlaceholder.Description>
         </EmptyPlaceholder>
-      ) : isDesktop ? (
+      ) : isTauri ? (
         <DesktopAgentAccess />
       ) : (
         <WebAgentAccess />

@@ -29,7 +29,7 @@ import {
   cloudBackupAction,
   downloadCloudBackup,
   previewCloudBackupRestore,
-  isDesktop,
+  isTauri,
   type CloudBackupOperation,
   type CloudBackupStatus,
   type BackupImportPreview,
@@ -81,7 +81,7 @@ function BackupOverview({ data, profileName }: { data: CloudBackupStatus; profil
       )}
       <p className="text-muted-foreground text-sm leading-relaxed">
         {t(
-          state === "on" && !isDesktop
+          state === "on" && !isTauri
             ? "settings:cloud_backup_hint_on_web"
             : state === "on" && isMobile
               ? "settings:cloud_backup_hint_on_mobile"
@@ -259,7 +259,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
   const { t, i18n } = useTranslation();
   const formatting = useDateFormatting();
   const { status, profile, isMobile } = backup;
-  const canRestore = isDesktop && !isMobile;
+  const canRestore = isTauri && !isMobile;
   const active = useRef(true);
   const [flow, setFlow] = useState<Flow>();
   const [resumeAfterReplace, setResumeAfterReplace] = useState(false);
@@ -694,7 +694,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
               })}
             </ul>
           )}
-          {!isDesktop && history.length > 0 && (
+          {!isTauri && history.length > 0 && (
             <Button
               variant="link"
               className="text-muted-foreground h-auto whitespace-normal p-0 text-left text-xs font-normal"
@@ -780,7 +780,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
                               ? "settings:cloud_backup_move_description"
                               : isMobile
                                 ? "settings:cloud_backup_resume_description_mobile"
-                                : isDesktop
+                                : isTauri
                                   ? "settings:cloud_backup_resume_description"
                                   : "settings:cloud_backup_resume_description_web"
                             : "settings:cloud_backup_setup_description",
@@ -879,7 +879,7 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
                     {t(
-                      isDesktop
+                      isTauri
                         ? "settings:cloud_backup_setup_device"
                         : "settings:cloud_backup_setup_device_web",
                     )}

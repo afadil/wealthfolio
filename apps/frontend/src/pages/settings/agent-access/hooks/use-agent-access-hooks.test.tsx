@@ -7,7 +7,7 @@ import { useAgentAudit } from "./use-agent-audit";
 import { useMcpServer } from "./use-mcp-server";
 
 const adapterMocks = vi.hoisted(() => ({
-  isDesktop: true,
+  isTauri: true,
   isWeb: true,
   getMcpStatus: vi.fn(),
   setMcpEnabled: vi.fn(),

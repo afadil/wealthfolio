@@ -42,7 +42,7 @@ vi.mock("@/hooks/use-platform", () => ({
 }));
 vi.mock("tauri-plugin-web-auth-api", () => ({ authenticate: vi.fn() }));
 vi.mock("@/adapters", () => ({
-  isDesktop: true,
+  isTauri: true,
   getCurrentDeepLinks: async () => [],
   listenDeepLink: async (callback: typeof mocks.onDeepLink) => {
     mocks.onDeepLink = callback;

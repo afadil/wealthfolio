@@ -2,7 +2,7 @@ import { useDateFormatting, type FormattingApi } from "@wealthfolio/ui";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { isDesktop, openUrlInBrowser } from "@/adapters";
+import { isTauri, openUrlInBrowser } from "@/adapters";
 import {
   UPDATE_DISMISSED_KEY,
   useCheckUpdateOnStartup,
@@ -67,7 +67,6 @@ export function UpdateDialog() {
   const clearUpdate = useClearUpdate();
   const [isOpen, setIsOpen] = useState(false);
   const { install, phase, progress, error, isPending, reset } = useInstallUpdate();
-  const isDesktopEnv = isDesktop;
   const [dismissedUpdate, setDismissedUpdate] = usePersistentState<DismissedUpdate | null>(
     UPDATE_DISMISSED_KEY,
     null,
@@ -280,7 +279,7 @@ export function UpdateDialog() {
                     {t("common:component.view_changelog")}
                   </Button>
                 )}
-                {isDesktopEnv ? (
+                {isTauri ? (
                   updateInfo.isAppStoreBuild ? (
                     <Button onClick={handleOpenStore} disabled={!updateInfo.storeUrl}>
                       {t("common:component.open_app_store")}
