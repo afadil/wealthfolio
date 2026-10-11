@@ -20,8 +20,7 @@ use crate::request_metadata::{
 };
 use wealthfolio_core::errors::{Error, Result};
 
-use super::broker::{BrokerApiClient, BrokerTrackingMode};
-use crate::broker::BrokerAccountContext;
+use super::broker::{BrokerAccountContext, BrokerApiClient, BrokerTrackingMode};
 
 /// Default timeout for API requests.
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -345,29 +344,8 @@ impl ConnectApiClient {
     /// * `end_date` - Optional end date filter (YYYY-MM-DD)
     /// * `offset` - Pagination offset
     /// * `limit` - Maximum number of results per page
-    pub async fn get_account_activities(
-        &self,
-        account_id: &str,
-        tracking_mode: BrokerTrackingMode,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        offset: Option<i64>,
-        limit: Option<i64>,
-    ) -> Result<PaginatedUniversalActivity> {
-        self.get_account_activities_with_context(
-            account_id,
-            tracking_mode,
-            &BrokerAccountContext::default(),
-            start_date,
-            end_date,
-            offset,
-            limit,
-        )
-        .await
-    }
-
     #[allow(clippy::too_many_arguments)]
-    pub async fn get_account_activities_with_context(
+    pub async fn get_account_activities(
         &self,
         account_id: &str,
         tracking_mode: BrokerTrackingMode,
@@ -591,6 +569,7 @@ impl BrokerApiClient for ConnectApiClient {
         &self,
         account_id: &str,
         tracking_mode: BrokerTrackingMode,
+        context: &BrokerAccountContext,
         start_date: Option<&str>,
         end_date: Option<&str>,
         offset: Option<i64>,
@@ -598,29 +577,6 @@ impl BrokerApiClient for ConnectApiClient {
     ) -> Result<PaginatedUniversalActivity> {
         // Delegate to the inherent method
         ConnectApiClient::get_account_activities(
-            self,
-            account_id,
-            tracking_mode,
-            start_date,
-            end_date,
-            offset,
-            limit,
-        )
-        .await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn get_account_activities_with_context(
-        &self,
-        account_id: &str,
-        tracking_mode: BrokerTrackingMode,
-        context: &BrokerAccountContext,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        offset: Option<i64>,
-        limit: Option<i64>,
-    ) -> Result<PaginatedUniversalActivity> {
-        ConnectApiClient::get_account_activities_with_context(
             self,
             account_id,
             tracking_mode,
@@ -803,7 +759,15 @@ mod tests {
             let client = ConnectApiClient::new(&base_url, "test-token").unwrap();
 
             client
-                .get_account_activities("broker-account", tracking_mode, None, None, None, None)
+                .get_account_activities(
+                    "broker-account",
+                    tracking_mode,
+                    &BrokerAccountContext::default(),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
                 .await
                 .unwrap();
 
@@ -841,7 +805,7 @@ mod tests {
             start_one_request_server(200, r#"{"data":[],"pagination":{}}"#, None);
         let client = ConnectApiClient::new(&base_url, "test-token").unwrap();
         client
-            .get_account_activities_with_context(
+            .get_account_activities(
                 "broker-account",
                 BrokerTrackingMode::Transactions,
                 &BrokerAccountContext {

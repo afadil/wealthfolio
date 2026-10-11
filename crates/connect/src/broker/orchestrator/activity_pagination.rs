@@ -2,6 +2,7 @@ use chrono::{NaiveDate, Utc};
 use log::{debug, info};
 
 use super::super::progress::{SyncProgressPayload, SyncProgressReporter, SyncStatus};
+use super::super::traits::BrokerAccountContext;
 use super::super::traits::BrokerApiClient;
 use super::super::traits::BrokerTrackingMode;
 use super::{ActivityQueryWindow, ActivitySyncOutcome, SyncOrchestrator};
@@ -15,7 +16,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
         account_name: &str,
         broker_account_id: &str,
         tracking_mode: BrokerTrackingMode,
-        account_context: &super::super::traits::BrokerAccountContext,
+        account_context: &BrokerAccountContext,
         start_date: Option<&str>,
         end_date: Option<&str>,
         import_run_id: Option<String>,
@@ -41,7 +42,7 @@ impl<P: SyncProgressReporter> SyncOrchestrator<P> {
             }
 
             let page = api_client
-                .get_account_activities_with_context(
+                .get_account_activities(
                     broker_account_id,
                     tracking_mode,
                     account_context,
