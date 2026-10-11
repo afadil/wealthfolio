@@ -306,6 +306,7 @@ pub async fn generate_calculated_adjustments(
     rule: AllocationRule,
     cash: WorksheetCashInput,
     eligible_asset_ids: Option<Vec<String>>,
+    sellable_asset_ids: Option<Vec<String>>,
     selected_account_ids: Vec<String>,
     filter: AccountScopeInput,
 ) -> Result<CalculatedAdjustments, String> {
@@ -323,6 +324,7 @@ pub async fn generate_calculated_adjustments(
             rule,
             cash,
             eligible_asset_ids,
+            sellable_asset_ids,
         })
         .await
         .map_err(|e| e.to_string())

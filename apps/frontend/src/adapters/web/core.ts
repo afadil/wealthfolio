@@ -2013,16 +2013,25 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "generate_calculated_adjustments": {
-      const { targetId, mode, rule, cash, selectedAccountIds, filter, eligibleAssetIds } =
-        payload as {
-          targetId: string;
-          mode: string;
-          rule: string;
-          cash: unknown;
-          selectedAccountIds: string[];
-          filter: unknown;
-          eligibleAssetIds?: string[];
-        };
+      const {
+        targetId,
+        mode,
+        rule,
+        cash,
+        selectedAccountIds,
+        filter,
+        eligibleAssetIds,
+        sellableAssetIds,
+      } = payload as {
+        targetId: string;
+        mode: string;
+        rule: string;
+        cash: unknown;
+        selectedAccountIds: string[];
+        filter: unknown;
+        eligibleAssetIds?: string[];
+        sellableAssetIds?: string[];
+      };
       body = JSON.stringify({
         targetId,
         mode,
@@ -2031,6 +2040,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
         selectedAccountIds,
         filter,
         ...(eligibleAssetIds === undefined ? {} : { eligibleAssetIds }),
+        ...(sellableAssetIds === undefined ? {} : { sellableAssetIds }),
       });
       break;
     }

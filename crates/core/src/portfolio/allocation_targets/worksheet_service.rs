@@ -50,9 +50,9 @@ use super::model::{
 };
 use super::target_service::AllocationTargetServiceTrait;
 use super::worksheet_calculator::{
-    account_funding, account_funding_shortfalls, apply_limits, assign_accounts, remaining_cash,
-    run_sequence, turnover_cap_value, AssignedLine, CategoryTarget, LimitsInput, PositionInput,
-    SecurityInput, SequenceInput,
+    account_funding, account_funding_shortfalls, apply_limits, assign_accounts, falls_short,
+    remaining_cash, run_sequence, turnover_cap_value, AssignedLine, CategoryTarget, LimitsInput,
+    PositionInput, RestrictedFunding, SecurityInput, SequenceInput,
 };
 
 const UNKNOWN_CATEGORY_ID: &str = "__UNKNOWN__";
@@ -951,6 +951,43 @@ impl AllocationWorksheetService {
             .collect()
     }
 
+    /// The funding that can pay for only some securities (§6): what a crypto
+    /// account deploys and raises buys only what a crypto account can receive.
+    fn restricted_funding(
+        accounts: &[AccountSource],
+        securities: &[SecurityInput],
+        assets_by_id: &HashMap<String, Asset>,
+        cash_by_account: &HashMap<String, Decimal>,
+        external_cash: &HashMap<String, Decimal>,
+    ) -> RestrictedFunding {
+        let restricted: Vec<&Account> = accounts
+            .iter()
+            .map(|source| &source.account)
+            .filter(|account| account.account_type == account_types::CRYPTOCURRENCY)
+            .collect();
+        let deployed = |account_id: &String| {
+            cash_by_account.get(account_id).copied().unwrap_or_default()
+                + external_cash.get(account_id).copied().unwrap_or_default()
+        };
+        RestrictedFunding {
+            cash_by_account: restricted
+                .iter()
+                .map(|account| (account.id.clone(), deployed(&account.id)))
+                .collect(),
+            asset_ids: securities
+                .iter()
+                .filter(|security| {
+                    assets_by_id.get(&security.asset_id).is_some_and(|asset| {
+                        restricted
+                            .iter()
+                            .any(|account| Self::can_receive(account, asset))
+                    })
+                })
+                .map(|security| security.asset_id.clone())
+                .collect(),
+        }
+    }
+
     // ── Generation (§4) ──────────────────────────────────────────────────────
 
     /// The calculated adjustments, from sources already loaded.
@@ -983,7 +1020,7 @@ impl AllocationWorksheetService {
             .iter()
             .flat_map(|source| source.contributions.contributions.iter())
             .collect();
-        let securities = Self::securities_from(
+        let mut securities = Self::securities_from(
             &contributions,
             &sources.assets_by_id,
             &sources.quote_snapshots,
@@ -993,6 +1030,18 @@ impl AllocationWorksheetService {
             eligible_asset_ids.as_ref(),
             &input.base_currency,
         );
+        // §4.1 — a security the user keeps out of the sales this time is held
+        // like one under a do-not-sell constraint.
+        if let Some(sellable) = &input.sellable_asset_ids {
+            for security in securities
+                .iter_mut()
+                .filter(|security| !sellable.contains(&security.asset_id))
+            {
+                for position in &mut security.positions {
+                    position.can_reduce = false;
+                }
+            }
+        }
 
         let categories: Vec<CategoryTarget> = sources
             .drift
@@ -1042,6 +1091,13 @@ impl AllocationWorksheetService {
                 turnover_cap: turnover_cap_value(planning_total, target.max_turnover_bps),
                 min_line_amount,
                 whole_shares_only: target.whole_shares_only,
+                restricted_funding: Self::restricted_funding(
+                    &sources.accounts,
+                    &securities,
+                    &sources.assets_by_id,
+                    &cash_by_account,
+                    &input.cash.external_contribution,
+                ),
             },
         );
 
@@ -1529,7 +1585,7 @@ impl AllocationWorksheetService {
         );
         for shortfall in account_funding
             .iter()
-            .filter(|funding| funding.remaining < Decimal::ZERO)
+            .filter(|funding| falls_short(funding.remaining))
         {
             warnings.push(Self::warning(
                 WorksheetWarningKind::AccountFunding,
@@ -2573,6 +2629,16 @@ mod tests {
             mode: WorksheetMode,
             cash: WorksheetCashInput,
         ) -> CoreResult<CalculatedAdjustments> {
+            self.generate_selling(mode, cash, None)
+        }
+
+        /// The calculation with the securities it may sell named.
+        fn generate_selling(
+            &self,
+            mode: WorksheetMode,
+            cash: WorksheetCashInput,
+            sellable_asset_ids: Option<Vec<String>>,
+        ) -> CoreResult<CalculatedAdjustments> {
             AllocationWorksheetService::generate(
                 &GenerateCalculatedAdjustmentsInput {
                     target_id: "target-1".to_string(),
@@ -2584,6 +2650,7 @@ mod tests {
                     rule: AllocationRule::CurrentHoldingProportions,
                     cash,
                     eligible_asset_ids: None,
+                    sellable_asset_ids,
                 },
                 &GenerationSources {
                     target: self.target(),
@@ -3484,6 +3551,92 @@ mod tests {
         assert!(portfolio
             .preview(tracked(dec!(0)), vec![increase("acc-1")])
             .is_ok());
+    }
+
+    #[test]
+    fn a_security_kept_out_of_the_sales_is_not_reduced() {
+        // Equity holds 6000 against a 40% target of 10000, so rebalancing
+        // sells vti to buy bnd.
+        let portfolio = brokerage(4000, 4000, 2000);
+        let sells_vti = |calculated: &CalculatedAdjustments| {
+            calculated
+                .adjustments
+                .iter()
+                .any(|adjustment| adjustment.asset_id == "vti" && adjustment.amount < Decimal::ZERO)
+        };
+
+        let every = portfolio
+            .generate(WorksheetMode::Rebalance, tracked(dec!(0)))
+            .unwrap();
+        assert!(sells_vti(&every));
+
+        let kept = portfolio
+            .generate_selling(
+                WorksheetMode::Rebalance,
+                tracked(dec!(0)),
+                Some(vec!["bnd".to_string()]),
+            )
+            .unwrap();
+        assert!(!sells_vti(&kept));
+    }
+
+    #[test]
+    fn cash_in_a_crypto_account_does_not_pay_for_a_stock() {
+        // Equity and fixed income want far more than the 1500 deployed, but 500
+        // of it sits in a crypto account, which can buy neither (§6).
+        let mut portfolio = brokerage(9000, 1000, 0);
+        portfolio.account_ids = vec!["acc-1", "crypto-1"];
+        portfolio.cash.push(CashBalance {
+            account_id: "crypto-1",
+            category_id: Some("CASH"),
+            amount: dec!(500),
+        });
+
+        let calculated = portfolio
+            .generate(
+                WorksheetMode::InvestCash,
+                tracked_by_account(&[("acc-1", dec!(1000)), ("crypto-1", dec!(500))]),
+            )
+            .unwrap();
+
+        let increases: Decimal = calculated
+            .adjustments
+            .iter()
+            .filter(|adjustment| adjustment.amount > Decimal::ZERO)
+            .map(|adjustment| adjustment.amount)
+            .sum();
+        assert_eq!(increases, dec!(1000));
+        assert!(calculated.funding_shortfalls.is_empty());
+    }
+
+    #[test]
+    fn an_account_is_short_of_funding_only_by_a_cent_or_more() {
+        let portfolio = brokerage(7000, 3000, 0);
+        let increase = |value: Decimal| AllocationWorksheetLineInput {
+            line_id: "vti-acc-1".to_string(),
+            direction: WorksheetDirection::Increase,
+            asset_id: "vti".to_string(),
+            account_id: "acc-1".to_string(),
+            input_mode: WorksheetInputMode::Amount,
+            value,
+        };
+
+        // Residue far past the cent, as dividing by a price leaves it.
+        let residue = portfolio
+            .preview(
+                tracked_by_account(&[("acc-1", dec!(100))]),
+                vec![increase(dec!(100.0000000000000000000001))],
+            )
+            .unwrap();
+        assert!(!has_warning(&residue, WorksheetWarningKind::AccountFunding));
+
+        let cent = portfolio
+            .preview(
+                tracked_by_account(&[("acc-1", dec!(100))]),
+                vec![increase(dec!(100.01))],
+            )
+            .unwrap();
+        assert!(has_warning(&cent, WorksheetWarningKind::AccountFunding));
     }
 
     #[test]

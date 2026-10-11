@@ -10,7 +10,7 @@
 //! own target implies, over securities the user marked eligible, by a rule the
 //! user picked. It never ranks, scores or chooses between securities.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rust_decimal::Decimal;
 
@@ -487,6 +487,23 @@ pub struct LimitsInput {
     pub turnover_cap: Option<Decimal>,
     pub min_line_amount: Decimal,
     pub whole_shares_only: bool,
+    /// The part of the funding that can pay for only some securities.
+    pub restricted_funding: RestrictedFunding,
+}
+
+/// Funding that can pay for only some securities (§6). A crypto account takes
+/// an increase only in crypto, so the cash it deploys and what its reductions
+/// raise cannot buy anything else.
+///
+/// It can also take more of what it already holds. That is left out, so the
+/// funding is never sized past what the accounts can place.
+#[derive(Debug, Clone, Default)]
+pub struct RestrictedFunding {
+    /// The accounts whose funding is restricted, with the cash each deploys:
+    /// tracked, and not yet recorded.
+    pub cash_by_account: HashMap<String, Decimal>,
+    /// The securities that funding can pay for.
+    pub asset_ids: HashSet<String>,
 }
 
 /// One line after the limits are applied.
@@ -628,24 +645,78 @@ const FUNDING_TOLERANCE: Decimal = Decimal::from_parts(1, 0, 0, false, 6);
 /// has to be sold, not to shelter the increases it happened to fund. Scaling
 /// them all equally spends the funding down to the last unit and keeps the
 /// result independent of which pass produced a line.
-fn scale_to_funding(nets: &mut [NetAdjustment], available: Decimal) -> Option<Decimal> {
-    let total: Decimal = nets
-        .iter()
-        .filter(|net| net.amount > Decimal::ZERO)
+///
+/// Funding counts only toward the increases it can pay for (§6): `restricted`
+/// of `available` reaches only `restricted_asset_ids`, so the other increases
+/// have to fit in the rest. The one factor is the smaller of the two fits.
+fn scale_to_funding(
+    nets: &mut [NetAdjustment],
+    available: Decimal,
+    restricted: Decimal,
+    restricted_asset_ids: &HashSet<String>,
+) -> Option<Decimal> {
+    let increases = || nets.iter().filter(|net| net.amount > Decimal::ZERO);
+    let total: Decimal = increases().map(|net| net.amount).sum();
+    let unrestricted_total: Decimal = increases()
+        .filter(|net| !restricted_asset_ids.contains(&net.asset_id))
         .map(|net| net.amount)
         .sum();
+    let unrestricted_available = (available - restricted).max(Decimal::ZERO);
     // Dividing the cash across the first pass's intents can leave their sum a
     // few units in the 28th decimal over it. That is residue, not a shortfall,
     // and reporting it would state a scaling to 100% that never happened.
-    if total <= available + FUNDING_TOLERANCE || total <= Decimal::ZERO {
+    let fits = |wanted: Decimal, funding: Decimal| wanted <= funding + FUNDING_TOLERANCE;
+    if total <= Decimal::ZERO
+        || (fits(total, available) && fits(unrestricted_total, unrestricted_available))
+    {
         return None;
     }
 
-    let factor = (available / total).max(Decimal::ZERO);
+    let mut factor = available / total;
+    if unrestricted_total > Decimal::ZERO {
+        factor = factor.min(unrestricted_available / unrestricted_total);
+    }
+    let factor = factor.max(Decimal::ZERO);
     for net in nets.iter_mut().filter(|net| net.amount > Decimal::ZERO) {
         net.amount *= factor;
     }
     Some(factor)
+}
+
+/// What the restricted accounts bring to the funding: the cash they deploy, and
+/// their share of what each reduction raises. A reduction is drawn from the
+/// accounts holding the security in proportion to what each holds, as
+/// [`assign_accounts`] places it.
+fn restricted_funding_available(
+    nets: &[NetAdjustment],
+    securities: &[SecurityInput],
+    restricted: &RestrictedFunding,
+) -> Decimal {
+    let cash: Decimal = restricted.cash_by_account.values().sum();
+    let proceeds: Decimal = nets
+        .iter()
+        .filter(|net| net.amount < Decimal::ZERO)
+        .filter_map(|net| {
+            let security = securities
+                .iter()
+                .find(|security| security.asset_id == net.asset_id)?;
+            let sources = security
+                .positions
+                .iter()
+                .filter(|position| position.can_reduce && position.quantity > Decimal::ZERO);
+            let held: Decimal = sources.clone().map(|position| position.quantity).sum();
+            let held_restricted: Decimal = sources
+                .filter(|position| {
+                    restricted
+                        .cash_by_account
+                        .contains_key(&position.account_id)
+                })
+                .map(|position| position.quantity)
+                .sum();
+            (held > Decimal::ZERO).then(|| -net.amount * held_restricted / held)
+        })
+        .sum();
+    cash + proceeds
 }
 
 /// The whole units a quantity comes to.
@@ -715,7 +786,14 @@ pub fn apply_limits(
         .sum();
     let available = limits.tracked_cash + external_cash + proceeds;
 
-    let increase_factor = scale_to_funding(&mut nets, available);
+    // Step 4 — part of it may reach only some of the increases (§6).
+    let restricted = restricted_funding_available(&nets, securities, &limits.restricted_funding);
+    let increase_factor = scale_to_funding(
+        &mut nets,
+        available,
+        restricted,
+        &limits.restricted_funding.asset_ids,
+    );
 
     let mut lines: Vec<LimitedLine> = Vec::new();
     let mut below_one_unit = Vec::new();
@@ -921,6 +999,16 @@ pub fn remaining_cash(
     tracked_cash + external_cash - lines.iter().map(|line| line.amount).sum::<Decimal>()
 }
 
+/// Amounts are entered and shown to the cent.
+const FUNDING_DECIMALS: u32 = 2;
+
+/// Whether what an account has left once its lines are applied is a shortfall
+/// (§6). Counted to the cent: dividing an amount by a price leaves residue far
+/// past it, and an account spent to the cent is not short.
+pub fn falls_short(remaining: Decimal) -> bool {
+    remaining.round_dp(FUNDING_DECIMALS) < Decimal::ZERO
+}
+
 /// Checks that every increase an account was given can be funded from that
 /// account (§6).
 ///
@@ -940,7 +1028,7 @@ pub fn account_funding_shortfalls(
     let mut shortfalls: Vec<AccountFundingShortfall> =
         account_funding(lines, &[], cash_by_account, external_cash)
             .into_iter()
-            .filter(|funding| funding.remaining < Decimal::ZERO)
+            .filter(|funding| falls_short(funding.remaining))
             .map(|funding| AccountFundingShortfall {
                 available: funding.increases + funding.remaining,
                 required: funding.increases,
@@ -1257,6 +1345,7 @@ mod tests {
             turnover_cap: None,
             min_line_amount: Decimal::ZERO,
             whole_shares_only: false,
+            restricted_funding: RestrictedFunding::default(),
         }
     }
 
@@ -1492,6 +1581,91 @@ mod tests {
         assert_eq!(result.scaling.increase_factor, None);
         assert_eq!(result.increases().next().unwrap().amount, dec!(600));
         assert_eq!(result.remaining_cash, dec!(400));
+    }
+
+    /// Funding held in a crypto account, which can pay only for `btc`.
+    fn crypto_account_funding(cash: Decimal) -> RestrictedFunding {
+        RestrictedFunding {
+            cash_by_account: HashMap::from([("crypto-1".to_string(), cash)]),
+            asset_ids: HashSet::from(["btc".to_string()]),
+        }
+    }
+
+    #[test]
+    fn funding_only_crypto_can_use_does_not_pay_for_a_stock() {
+        // 1000 of cash, 400 of it in a crypto account: the stock can have 600.
+        let securities = vec![security("vti", &[("EQUITY", dec!(1000))])];
+        let mut input = limits();
+        input.tracked_cash = dec!(1000);
+        input.restricted_funding = crypto_account_funding(dec!(400));
+
+        let result = apply_limits(
+            vec![increase("vti", dec!(1000))],
+            vec![],
+            &securities,
+            &input,
+        );
+
+        assert_eq!(result.scaling.increase_factor, Some(dec!(0.6)));
+        assert_eq!(result.increases().next().unwrap().amount, dec!(600));
+        // Not redistributed: it stays where it is, as cash.
+        assert_eq!(result.remaining_cash, dec!(400));
+    }
+
+    #[test]
+    fn funding_only_crypto_can_use_still_pays_for_crypto() {
+        // 600 outside the crypto account covers the stock; the crypto account
+        // covers the coin. Nothing has to give.
+        let securities = vec![
+            security("vti", &[("EQUITY", dec!(1000))]),
+            security("btc", &[("DIGITAL_ASSETS", dec!(1000))]),
+        ];
+        let mut input = limits();
+        input.tracked_cash = dec!(1000);
+        input.restricted_funding = crypto_account_funding(dec!(400));
+
+        let result = apply_limits(
+            vec![increase("vti", dec!(600)), increase("btc", dec!(400))],
+            vec![],
+            &securities,
+            &input,
+        );
+
+        assert_eq!(result.scaling.increase_factor, None);
+        let deployed: Decimal = result.increases().map(|line| line.amount).sum();
+        assert_eq!(deployed, dec!(1000));
+    }
+
+    #[test]
+    fn what_a_crypto_account_sells_pays_only_for_crypto() {
+        // Half the coin sits in the crypto account, so half of what selling it
+        // raises lands there and cannot buy the stock.
+        let mut btc = security("btc", &[("DIGITAL_ASSETS", dec!(2000))]);
+        btc.positions = vec![
+            PositionInput {
+                account_id: "acc-1".to_string(),
+                quantity: dec!(10),
+                can_reduce: true,
+            },
+            PositionInput {
+                account_id: "crypto-1".to_string(),
+                quantity: dec!(10),
+                can_reduce: true,
+            },
+        ];
+        let securities = vec![security("vti", &[("EQUITY", dec!(1000))]), btc];
+        let mut input = limits();
+        input.restricted_funding = crypto_account_funding(Decimal::ZERO);
+
+        let result = apply_limits(
+            vec![increase("vti", dec!(400))],
+            vec![reduction("btc", dec!(400))],
+            &securities,
+            &input,
+        );
+
+        assert_eq!(result.scaling.increase_factor, Some(dec!(0.5)));
+        assert_eq!(result.increases().next().unwrap().amount, dec!(200));
     }
 
     #[test]
@@ -2068,6 +2242,30 @@ mod tests {
         let shortfalls = account_funding_shortfalls(&lines, &HashMap::new(), no_external_cash());
 
         assert!(shortfalls.is_empty());
+    }
+
+    #[test]
+    fn an_account_falls_short_only_by_a_cent_or_more() {
+        // Amounts are entered and shown to the cent. Dividing by a price leaves
+        // residue far past it, as these figures from a real worksheet did.
+        let line = |amount: Decimal| AssignedLine {
+            asset_id: "vti".to_string(),
+            account_id: Some("acc-1".to_string()),
+            amount,
+            quantity: amount / dec!(100),
+            unit_price: dec!(100),
+            is_below_minimum: false,
+        };
+        let cash = HashMap::from([("acc-1".to_string(), dec!(28772.586529999999999999999997))]);
+
+        let residue =
+            account_funding_shortfalls(&[line(dec!(28772.58653))], &cash, no_external_cash());
+        assert!(residue.is_empty());
+
+        // Six tenths of a cent shows as a cent: the amounts no longer add up.
+        let cent =
+            account_funding_shortfalls(&[line(dec!(28772.59253))], &cash, no_external_cash());
+        assert_eq!(cent.len(), 1);
     }
 
     // ── Review findings on #1612 ─────────────────────────────────────────────

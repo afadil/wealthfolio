@@ -10,8 +10,10 @@ export interface CalculatedAdjustmentsRequest {
   cash: WorksheetCashInput;
   /** Accounts the worksheet may change. */
   selectedAccountIds: readonly string[];
-  /** Omitted means every recorded security. An empty list is a valid selection. */
+  /** Securities that may be bought. Omitted means every recorded security. An empty list is a valid selection. */
   eligibleAssetIds?: readonly string[];
+  /** Securities that may be sold. Omitted means every recorded security. */
+  sellableAssetIds?: readonly string[];
 }
 
 /**
@@ -30,6 +32,7 @@ export function useCalculatedAdjustments() {
       cash,
       selectedAccountIds,
       eligibleAssetIds,
+      sellableAssetIds,
     }: CalculatedAdjustmentsRequest) =>
       generateCalculatedAdjustments(
         targetId,
@@ -39,6 +42,7 @@ export function useCalculatedAdjustments() {
         selectedAccountIds,
         filter,
         eligibleAssetIds,
+        sellableAssetIds,
       ),
   });
 }

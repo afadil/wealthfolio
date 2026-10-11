@@ -556,6 +556,11 @@ pub struct GenerateCalculatedAdjustmentsInput {
     /// that cannot be placed become unresolved category amounts (§4.4).
     #[serde(default)]
     pub eligible_asset_ids: Option<Vec<String>>,
+    /// Securities the user allows the calculation to reduce (§4.1). `None` is
+    /// every recorded security. A held security left out is not sold this time;
+    /// the do-not-sell and avoid-selling constraints apply either way.
+    #[serde(default)]
+    pub sellable_asset_ids: Option<Vec<String>>,
 }
 
 // ── Worksheet request and preview types ──────────────────────────────────────

@@ -117,8 +117,9 @@ export function canonicalizeEligibleAssetIds(
 }
 
 /**
- * Prefills the worksheet from the target. `eligibleAssetIds` omitted means every
- * recorded security; an empty list is a valid selection and is sent as such.
+ * Prefills the worksheet from the target. `eligibleAssetIds` (may be bought) and
+ * `sellableAssetIds` (may be sold) omitted mean every recorded security; an
+ * empty list is a valid selection and is sent as such.
  */
 export const generateCalculatedAdjustments = async (
   targetId: string,
@@ -128,6 +129,7 @@ export const generateCalculatedAdjustments = async (
   selectedAccountIds: readonly string[],
   filter: AccountScope,
   eligibleAssetIds?: readonly string[],
+  sellableAssetIds?: readonly string[],
 ): Promise<CalculatedAdjustments> => {
   const payload: {
     targetId: string;
@@ -137,9 +139,12 @@ export const generateCalculatedAdjustments = async (
     selectedAccountIds: string[];
     filter: AccountScope;
     eligibleAssetIds?: string[];
+    sellableAssetIds?: string[];
   } = { targetId, mode, rule, cash, selectedAccountIds: [...selectedAccountIds], filter };
   const canonicalIds = canonicalizeEligibleAssetIds(eligibleAssetIds);
   if (canonicalIds !== undefined) payload.eligibleAssetIds = canonicalIds;
+  const sellableIds = canonicalizeEligibleAssetIds(sellableAssetIds);
+  if (sellableIds !== undefined) payload.sellableAssetIds = sellableIds;
   return invoke<CalculatedAdjustments>("generate_calculated_adjustments", payload);
 };
 

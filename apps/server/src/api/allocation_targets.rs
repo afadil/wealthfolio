@@ -214,6 +214,8 @@ struct GenerateAdjustmentsBody {
     cash: WorksheetCashInput,
     #[serde(default)]
     eligible_asset_ids: Option<Vec<String>>,
+    #[serde(default)]
+    sellable_asset_ids: Option<Vec<String>>,
     selected_account_ids: Vec<String>,
     filter: AccountScope,
 }
@@ -299,6 +301,7 @@ async fn generate_adjustments(
             rule: body.rule,
             cash: body.cash,
             eligible_asset_ids: body.eligible_asset_ids,
+            sellable_asset_ids: body.sellable_asset_ids,
         })
         .await?;
     Ok(Json(adjustments))
