@@ -5,6 +5,7 @@ import type { Settings } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({
   platform: vi.fn(),
+  setTheme: vi.fn(),
   windowTheme: vi.fn(),
 }));
 vi.mock("@/adapters", () => ({
@@ -14,7 +15,7 @@ vi.mock("@/adapters", () => ({
 vi.mock("@/hooks/use-platform", () => ({ getPlatform: () => mocks.platform() }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
-    setTheme: async () => {},
+    setTheme: (theme: string | null) => mocks.setTheme(theme),
     theme: () => mocks.windowTheme(),
     onThemeChanged: async () => () => {},
   }),
@@ -46,8 +47,12 @@ const settings = {
   onboardingCompleted: true,
 } as Settings;
 
+// Lets the async window theme sync finish before checking its outcome.
+const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  settings.theme = "system";
   document.documentElement.className = "";
   // The OS prefers dark; native window themes report light, as tao does on mobile.
   vi.mocked(window.matchMedia).mockImplementation(
@@ -67,8 +72,7 @@ it("keeps the system media query theme on mobile instead of the native window th
 
   render(<SettingsProvider>content</SettingsProvider>);
 
-  await waitFor(() => expect(mocks.platform).toHaveBeenCalled());
-  await act(async () => {});
+  await settle();
   expect(document.documentElement).toHaveClass("dark");
   expect(document.documentElement).not.toHaveClass("light");
   expect(mocks.windowTheme).not.toHaveBeenCalled();
@@ -81,4 +85,24 @@ it("follows the native window theme for system mode on desktop", async () => {
 
   await waitFor(() => expect(document.documentElement).toHaveClass("light"));
   expect(mocks.windowTheme).toHaveBeenCalled();
+});
+
+it("leaves the window theme alone for explicit modes on mobile", async () => {
+  settings.theme = "dark";
+  mocks.platform.mockResolvedValue({ os: "android", is_mobile: true, is_desktop: false });
+
+  render(<SettingsProvider>content</SettingsProvider>);
+
+  await settle();
+  expect(document.documentElement).toHaveClass("dark");
+  expect(mocks.setTheme).not.toHaveBeenCalled();
+});
+
+it("sets the window theme for explicit modes on desktop", async () => {
+  settings.theme = "dark";
+  mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
+
+  render(<SettingsProvider>content</SettingsProvider>);
+
+  await waitFor(() => expect(mocks.setTheme).toHaveBeenCalledWith("dark"));
 });
