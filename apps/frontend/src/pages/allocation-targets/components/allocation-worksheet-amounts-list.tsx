@@ -60,6 +60,8 @@ export interface AmountsRowModel {
         unitPrice: number | undefined;
         /** What each account can still fund for it; absent while cash is read. */
         fundingEstimates: ReadonlyMap<string, AccountFundingEstimate> | undefined;
+        /** What each account deploys in this run, deposit included; absent while cash is read. */
+        deployedByAccount: Readonly<Record<string, number>> | undefined;
         /** What the worksheet's check says keeps it out, if anything. */
         problem: PlacementProblem | undefined;
       }
@@ -72,6 +74,8 @@ export interface AmountsRowActions {
   onRemove: (assetId: string) => void;
   onToggleExpanded: (assetId: string) => void;
   onAccountAmountChange: (assetId: string, accountId: string, value: string) => void;
+  /** Covers an account's shortfall with a deposit, when the user asks. */
+  onAddDeposit: (accountId: string, amount: number) => void;
   onPriceAction: (assetId: string, asset: Asset | undefined) => void;
 }
 
@@ -534,6 +538,7 @@ function AmountRow({
               status={status}
               accountNames={accountNames}
               currency={currency}
+              canPlace={canPlace}
               isExpanded={isExpanded}
               onToggleExpanded={() => actions.onToggleExpanded(position.assetId)}
               onPriceAction={() => actions.onPriceAction(position.assetId, asset)}
@@ -580,6 +585,7 @@ function AmountRow({
           position={position}
           changeAmount={changeAmount}
           accounts={placement.accounts}
+          accountNames={accountNames}
           adjustment={adjustment}
           currency={currency}
           fundingByAccount={fundingByAccount}
@@ -587,9 +593,16 @@ function AmountRow({
           wholeSharesOnly={wholeSharesOnly}
           impliedAccountId={placement.impliedAccountId}
           fundingEstimates={placement.fundingEstimates}
+          deployedByAccount={placement.deployedByAccount}
           problem={placement.problem}
           onAmountChange={(accountId, value) =>
             actions.onAccountAmountChange(position.assetId, accountId, value)
+          }
+          onAddDeposit={actions.onAddDeposit}
+          onUsePlaced={
+            editMode === "amount"
+              ? (amount) => stepTo(changeAmount < 0 ? -amount : amount)
+              : undefined
           }
         />
       )}
@@ -601,6 +614,8 @@ interface RowStatusCellProps {
   status: RowStatus | null;
   accountNames: ReadonlyMap<string, string>;
   currency: string;
+  /** Whether there is more than one account to place the change in. */
+  canPlace: boolean;
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onPriceAction: () => void;
@@ -612,6 +627,7 @@ function RowStatusCell({
   status,
   accountNames,
   currency,
+  canPlace,
   isExpanded,
   onToggleExpanded,
   onPriceAction,
@@ -684,6 +700,14 @@ function RowStatusCell({
         </span>
       );
     case "placed":
+      // With one account there is nothing to place: the row states where it sits.
+      if (!canPlace) {
+        return (
+          <span className="text-muted-foreground block truncate">
+            {accountNames.get(status.accountIds[0]) ?? t("allocation:worksheet.unknownAccount")}
+          </span>
+        );
+      }
       return (
         <button
           type="button"

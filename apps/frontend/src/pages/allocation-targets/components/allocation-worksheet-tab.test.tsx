@@ -8,6 +8,7 @@ import { HoldingType } from "@/lib/constants";
 import type {
   Account,
   AllocationTarget,
+  AllocationTargetConstraint,
   AllocationWorksheetResult,
   CalculatedAdjustments,
   DriftReport,
@@ -25,6 +26,7 @@ const {
   accountsRef,
   heldAccountIds,
   holdingsRef,
+  constraintsRef,
 } = vi.hoisted(() => ({
   generateMock: vi.fn(),
   previewMock: vi.fn(),
@@ -36,6 +38,8 @@ const {
   holdingsRef: { current: null as Record<string, Holding[]> | null },
   /** Which accounts record VTI, which decides whether an increase is placed for the user (§6). */
   heldAccountIds: { current: ["acc-1"] as string[] },
+  /** The target's standing rules (#1177). */
+  constraintsRef: { current: [] as AllocationTargetConstraint[] },
 }));
 
 vi.mock("../hooks/use-calculated-adjustments", () => ({
@@ -49,6 +53,7 @@ vi.mock("@/adapters", () => ({
     Promise.resolve(holdingsFor(filter.accountId)),
   ),
   getAssetTaxonomyAssignments: vi.fn(() => Promise.resolve([])),
+  listTargetConstraints: vi.fn(() => Promise.resolve(constraintsRef.current)),
   openFileSaveDialog: saveFileMock,
   canonicalizeEligibleAssetIds: (ids?: readonly string[]) =>
     ids === undefined ? undefined : [...new Set(ids)].sort(),
@@ -311,11 +316,11 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     const user = await renderWorksheet();
     expect(screen.queryByText(/Choose an allocation rule/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Eligible securities/ }));
+    // Said once, a hover away from the securities it applies to.
     expect(
-      screen.getByText(
-        /split across its eligible securities in proportion to what you already hold/,
-      ),
+      screen.getByRole("button", {
+        name: /Increases go to securities in categories below target, split by what you hold of each/,
+      }),
     ).toBeInTheDocument();
 
     await calculateFromTarget(user);
@@ -400,11 +405,32 @@ describe("AllocationWorksheetTab regeneration (§5)", () => {
     expect(screen.queryByText(/Increases were scaled/)).not.toBeInTheDocument();
 
     await goTo(user, "Review");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Copy table" })).toBeEnabled(), {
-      timeout: 2000,
-    });
-    await user.click(screen.getByRole("button", { name: "Copy table" }));
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Copy for spreadsheet" })).toBeEnabled(),
+      {
+        timeout: 2000,
+      },
+    );
+    await user.click(screen.getByRole("button", { name: "Copy for spreadsheet" }));
     expect(await navigator.clipboard.readText()).toContain(coverage);
+  });
+
+  it("rounds the units in Review as Adjust positions does", async () => {
+    generateMock.mockResolvedValue({
+      ...calculated,
+      adjustments: [{ ...calculated.adjustments[0], accountId: "acc-1" }],
+    });
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      lines: [previewLine({ lineId: "l1", estimatedAmount: 1200, quantity: 12.34518953 })],
+    });
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+
+    await goTo(user, "Review");
+
+    expect(await screen.findByText("≈ 12.35 units")).toBeInTheDocument();
+    expect(screen.queryByText(/12\.34518953/)).not.toBeInTheDocument();
   });
 
   it("marks the worksheet out of date when a price moved more than 1% since the calculation", async () => {
@@ -685,6 +711,24 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     expect(within(allocation).queryByText(/These accounts can fund/)).not.toBeInTheDocument();
   });
 
+  it("offers no amount to use while the accounts' cash is still being read", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    // The core has not answered yet, so what each account can fund is unknown.
+    previewMock.mockReturnValue(new Promise(() => undefined));
+    const user = await renderWorksheet();
+    await goTo(user, "Adjust positions");
+    await user.type(screen.getByLabelText("Adjustment for VTI"), "500");
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+    expect(within(allocation).getAllByText(/Reading cash…/)).toHaveLength(2);
+    // Offering the whole change would put it in an account that may not fund it.
+    expect(within(allocation).queryByRole("button", { name: /^Use / })).not.toBeInTheDocument();
+  });
+
   it("says how far the account amounts are from the adjustment", async () => {
     accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
     heldAccountIds.current = ["acc-1", "acc-2"];
@@ -703,6 +747,94 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
       screen.getByRole("button", { name: "$100.00 more than the adjustment" }),
     ).toBeInTheDocument();
     expect(within(allocation).getByText("$100.00 more than the adjustment")).toBeInTheDocument();
+  });
+
+  it("accepts a split that is off by under 1% rather than blocking the review", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = () =>
+      screen.getByText("Account allocation").closest<HTMLElement>("[data-account-allocation]")!;
+
+    // Under 1% of the $1,200.00 change is stated, not demanded.
+    await user.type(within(allocation()).getByLabelText("Amount for Brokerage"), "1189");
+    expect(within(allocation()).getByText("$11.00 unplaced, accepted")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /left to allocate/ })).not.toBeInTheDocument();
+
+    // More than that still has to be placed, so a half-placed change is not missed.
+    await user.clear(within(allocation()).getByLabelText("Amount for Brokerage"));
+    await user.type(within(allocation()).getByLabelText("Amount for Brokerage"), "1187");
+    expect(screen.getByRole("button", { name: "$13.00 left to allocate" })).toBeInTheDocument();
+  });
+
+  it("lets the adjustment follow what the accounts hold, in one click", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = () =>
+      screen.getByText("Account allocation").closest<HTMLElement>("[data-account-allocation]")!;
+    await user.type(within(allocation()).getByLabelText("Amount for Brokerage"), "1000");
+    await user.type(within(allocation()).getByLabelText("Amount for Retirement"), "300");
+    expect(
+      screen.getByRole("button", { name: "$100.00 more than the adjustment" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(allocation()).getByRole("button", { name: "Use $1,300.00 as the adjustment" }),
+    );
+
+    expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("1300.00");
+    expect(
+      screen.queryByRole("button", { name: /more than the adjustment/ }),
+    ).not.toBeInTheDocument();
+    // Placed for less than the adjustment, it can follow the other way too.
+    await user.clear(within(allocation()).getByLabelText("Amount for Retirement"));
+    await user.click(
+      within(allocation()).getByRole("button", { name: "Use $1,000.00 as the adjustment" }),
+    );
+    expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("1000.00");
+    expect(screen.queryByRole("button", { name: /left to allocate/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps the account amounts when the adjustment changes, unless it turns around", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+    await user.type(within(allocation).getByLabelText("Amount for Brokerage"), "1000");
+    await user.type(within(allocation).getByLabelText("Amount for Retirement"), "200");
+
+    // Trimming the total leaves the placed amounts for the user to adjust.
+    const total = screen.getByLabelText("Adjustment for VTI");
+    await user.clear(total);
+    await user.type(total, "1100");
+    expect(within(allocation).getByLabelText("Amount for Brokerage")).toHaveValue("1000.00");
+    expect(within(allocation).getByLabelText("Amount for Retirement")).toHaveValue("200.00");
+    expect(
+      screen.getByRole("button", { name: "$100.00 more than the adjustment" }),
+    ).toBeInTheDocument();
+
+    // A reduction draws on what each account holds, so the increase's split
+    // does not carry over to it...
+    await user.clear(total);
+    await user.type(total, "-500");
+    expect(screen.getByLabelText("Amount for Brokerage")).toHaveValue("");
+    expect(screen.getByLabelText("Amount for Retirement")).toHaveValue("");
+
+    // ...and comes back when the change turns back.
+    await user.clear(total);
+    await user.type(total, "1200");
+    expect(screen.getByLabelText("Amount for Brokerage")).toHaveValue("1000.00");
+    expect(screen.getByLabelText("Amount for Retirement")).toHaveValue("200.00");
+    expect(screen.getByRole("button", { name: "2 accounts" })).toBeInTheDocument();
   });
 
   it("states when the listed accounts cannot fund the change between them", async () => {
@@ -731,6 +863,95 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     await user.click(within(allocation).getByRole("button", { name: "Use $500.00 in Brokerage" }));
     expect(within(allocation).getByLabelText("Amount for Brokerage")).toHaveValue("500.00");
     expect(screen.getByRole("button", { name: "$700.00 left to allocate" })).toBeInTheDocument();
+  });
+
+  it("says where the rest of the cash is when the listed accounts cannot fund it", async () => {
+    accountsRef.current = [
+      account("acc-1", "Brokerage"),
+      account("acc-2", "Retirement"),
+      account("acc-3", "Joint"),
+    ];
+    // Brokerage and Joint hold VTI, so they are listed; Retirement has the cash.
+    heldAccountIds.current = ["acc-1", "acc-3"];
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      recordedCashByAccount: { "acc-1": 500, "acc-2": 1000, "acc-3": 0 },
+    });
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+
+    // What an account holds of the security is named as such, never as its cash.
+    expect(within(allocation).getAllByText(/10 VTI held \(\$1,000\.00\)/)).toHaveLength(2);
+    expect(
+      within(allocation).getByRole("button", { name: /What it deploys in this run, \$500\.00/ }),
+    ).toBeInTheDocument();
+    expect(within(allocation).queryByLabelText("Amount for Retirement")).not.toBeInTheDocument();
+
+    await user.click(
+      within(allocation).getByRole("button", {
+        name: "Other accounts can fund about $1,000.00 more.",
+      }),
+    );
+
+    expect(within(allocation).getByLabelText("Amount for Retirement")).toBeInTheDocument();
+  });
+
+  it("estimates each account's funding while changes are still being placed", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+
+    // VTI is not placed yet, so no preview reports funding; the page estimates it.
+    const funding = () =>
+      screen.getByText(/left by the estimate so far/).closest<HTMLElement>("div")!;
+    await waitFor(() => expect(funding()).toHaveTextContent("Brokerage≈ $2,000.00"));
+    expect(funding()).toHaveTextContent("Retirement≈ $0.00");
+
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = screen
+      .getByText("Account allocation")
+      .closest<HTMLElement>("[data-account-allocation]")!;
+    await user.type(within(allocation).getByLabelText("Amount for Brokerage"), "500");
+
+    expect(funding()).toHaveTextContent("Brokerage≈ $1,500.00");
+  });
+
+  it("covers an account's shortfall with a deposit when the user asks", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1", "acc-2"];
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      recordedCashByAccount: { "acc-1": 500, "acc-2": 0 },
+    });
+    const user = await renderWorksheet();
+    await calculateFromTarget(user);
+    await user.click(screen.getByRole("button", { name: "Choose accounts" }));
+    const allocation = () =>
+      screen.getByText("Account allocation").closest<HTMLElement>("[data-account-allocation]")!;
+
+    // All of VTI in Brokerage, which records $500.00: $700.00 short.
+    await user.type(within(allocation()).getByLabelText("Amount for Brokerage"), "1200");
+    await user.click(
+      within(allocation()).getByRole("button", {
+        name: "Add $700.00 as a deposit to Brokerage",
+      }),
+    );
+
+    await waitFor(
+      () =>
+        expect(previewMock.mock.lastCall?.[0]).toMatchObject({
+          cash: { externalContribution: { "acc-1": 700 } },
+        }),
+      { timeout: 2000 },
+    );
+    expect(
+      within(allocation()).queryByRole("button", { name: /as a deposit to Brokerage/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("steps an account's amount one unit at a time inside the allocation", async () => {
@@ -783,6 +1004,41 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     expect(within(allocation).getByLabelText("Amount for Retirement")).toHaveValue("200");
     expect(
       within(allocation).queryByRole("button", { name: "Place in another account" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("names the one account a change can only come from, with nothing to place", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    heldAccountIds.current = ["acc-1"];
+    generateMock.mockResolvedValue({
+      ...calculated,
+      adjustments: [
+        {
+          ...calculated.adjustments[0],
+          lineId: "calc:vti:acc-1",
+          direction: "reduce",
+          accountId: "acc-1",
+          amount: -500,
+          quantity: -5,
+        },
+      ],
+    });
+    const user = await renderWorksheet();
+    // A reduction is a Rebalance calculation's.
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Next: Adjust positions" })).toBeEnabled(),
+      { timeout: 2000 },
+    );
+    await user.click(screen.getByRole("button", { name: "Next: Adjust positions" }));
+    await waitFor(() => expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("-500.00"));
+
+    // Only Brokerage records VTI, so the reduction comes from there: a fact the
+    // row states, with no allocation to open.
+    const vti = document.querySelector<HTMLElement>('[data-amounts-row="vti"]')!;
+    expect(within(vti).getByText("Brokerage")).toBeInTheDocument();
+    expect(
+      within(vti).queryByRole("button", { name: "Edit account allocation" }),
     ).not.toBeInTheDocument();
   });
 
@@ -890,6 +1146,90 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     expect(totalOf(retirement)).toHaveTextContent("Total−$200.00$200.00 left");
   });
 
+  it("tells apart accounts that share a name wherever the name stands alone", async () => {
+    accountsRef.current = [
+      { ...account("acc-1", "Individual"), accountNumber: "U1234001" },
+      { ...account("acc-2", "Individual"), accountNumber: "U5678002" },
+    ];
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      lines: [
+        previewLine({ lineId: "l1", accountId: "acc-1", estimatedAmount: 1000, quantity: 10 }),
+        previewLine({ lineId: "l2", accountId: "acc-2", estimatedAmount: 200, quantity: 2 }),
+      ],
+    });
+    const user = await renderWorksheet();
+    await goTo(user, "Review");
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Copy for spreadsheet" })).toBeEnabled(),
+      {
+        timeout: 2000,
+      },
+    );
+
+    expect(document.querySelector('[data-review-account="acc-1"]')).toHaveTextContent(
+      "Individual ··4001 · 1 entry",
+    );
+    expect(document.querySelector('[data-review-account="acc-2"]')).toHaveTextContent(
+      "Individual ··8002 · 1 entry",
+    );
+    // The table is what orders are placed from, so it carries the same names.
+    await user.click(screen.getByRole("button", { name: "Copy for spreadsheet" }));
+    const copied = await navigator.clipboard.readText();
+    expect(copied).toContain("Individual ··4001\tVTI");
+    expect(copied).toContain("Individual ··8002\tVTI");
+  });
+
+  it("adds up only what accounts have left, and states each shortfall on its own", async () => {
+    accountsRef.current = [
+      account("acc-1", "Brokerage"),
+      account("acc-2", "Retirement"),
+      account("acc-3", "Savings"),
+    ];
+    previewMock.mockResolvedValue({
+      ...previewResult,
+      // Netted across accounts, which no account can spend (§6).
+      cashRemaining: -100,
+      accountFunding: [
+        {
+          accountId: "acc-1",
+          availableCash: 700,
+          externalCash: 0,
+          reductionProceeds: 0,
+          increases: 1000,
+          remaining: -300,
+        },
+        {
+          accountId: "acc-2",
+          availableCash: 200,
+          externalCash: 0,
+          reductionProceeds: 0,
+          increases: 0,
+          remaining: 200,
+        },
+        // What dividing leaves behind, far below a cent: not a shortfall.
+        {
+          accountId: "acc-3",
+          availableCash: 500,
+          externalCash: 0,
+          reductionProceeds: 0,
+          increases: 500,
+          remaining: -3e-12,
+        },
+      ],
+    } as unknown as AllocationWorksheetResult);
+    const user = await renderWorksheet();
+    await waitFor(() => expect(previewMock).toHaveBeenCalled(), { timeout: 2000 });
+    await goTo(user, "Adjust positions");
+
+    const funding = (await screen.findByText("Funding left")).parentElement!;
+    expect(funding).toHaveTextContent(
+      "$200.00left after the worksheet, across the accounts you chose.",
+    );
+    expect(within(funding).getAllByText(/Funding needed/)).toHaveLength(1);
+    expect(within(funding).getByText("Funding needed: $300.00")).toBeInTheDocument();
+  });
+
   it("lists a change that cannot be placed yet, and leads back to its row", async () => {
     accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
     heldAccountIds.current = ["acc-1", "acc-2"];
@@ -917,14 +1257,18 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     await goTo(user, "Review");
 
     // The actions move from the empty review to the result once the preview lands.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Copy table" })).toBeEnabled(), {
-      timeout: 2000,
-    });
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Copy for spreadsheet" })).toBeEnabled(),
+      {
+        timeout: 2000,
+      },
+    );
     expect(screen.getByText("Warnings and unresolved amounts are included.")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Copy table" }));
+    await user.click(screen.getByRole("button", { name: "Copy for spreadsheet" }));
     const copied = await navigator.clipboard.readText();
-    expect(copied).toContain("Brokerage\tVTI\tTotal market\t1000.00\t10");
+    // Nothing was calculated, so no line is called calculated or edited.
+    expect(copied).toContain("Brokerage\tVTI\tTotal market\t\tIncrease\t1000.00\t10");
 
     // Saved through the runtime: a native save dialog in the app, a download on the web.
     await user.click(screen.getByRole("button", { name: "Export CSV" }));
@@ -932,7 +1276,7 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
     const [file, fileName] = saveFileMock.mock.calls[0] as unknown as [Blob, string];
     expect(fileName).toBe("rebalancing-worksheet-2026-01-01.csv");
     const csv = await file.text();
-    expect(csv).toContain(`"Brokerage","VTI","Total market","1000.00","10"`);
+    expect(csv).toContain(`"Brokerage","VTI","Total market","","Increase","1000.00","10"`);
   });
 
   it("holds export back while a change is not in the review, and says why", async () => {
@@ -943,7 +1287,7 @@ describe("AllocationWorksheetTab account allocation (§6)", () => {
 
     await goTo(user, "Review");
 
-    expect(screen.getByRole("button", { name: "Copy table" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Copy for spreadsheet" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Export CSV" })).toBeDisabled();
     expect(
       screen.getByText("Export is available once every adjustment is in the review."),
@@ -1398,11 +1742,43 @@ describe("AllocationWorksheetTab Amounts panel", () => {
     await user.click(next[0]);
     const exportCsv = screen.getAllByRole("button", { name: "Export CSV" });
     expect(exportCsv).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Copy table" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Copy for spreadsheet" })).toHaveLength(1);
     expect(follows(exportCsv[0], summary())).toBe(true);
 
     await user.click(screen.getByRole("button", { name: "Previous: Adjust positions" }));
     expect(screen.getByRole("button", { name: "Previous: Setup" })).toBeInTheDocument();
+  });
+
+  it("opens each step at its top, wherever the last one was left", async () => {
+    const startedAt: Element[] = [];
+    const scroll = vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(function (
+      this: HTMLElement,
+      options?: boolean | ScrollIntoViewOptions,
+    ) {
+      if (typeof options === "object" && options.block === "start") startedAt.push(this);
+    });
+    // The worksheet's top has scrolled out of view.
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      top: -400,
+      bottom: 400,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 800,
+    } as DOMRect);
+    try {
+      const user = await renderWorksheet(report);
+      expect(startedAt).toHaveLength(0);
+
+      await user.click(screen.getByRole("button", { name: "Enter adjustments yourself" }));
+      await user.click(screen.getByRole("button", { name: "Next: Review" }));
+
+      expect(startedAt).toHaveLength(2);
+      expect(startedAt[1]).toContainElement(screen.getByRole("navigation"));
+    } finally {
+      scroll.mockRestore();
+      rect.mockRestore();
+    }
   });
 
   it("never adds or removes a line in a class while a row is pointed at", async () => {
@@ -1481,6 +1857,7 @@ describe("AllocationWorksheetTab Amounts panel", () => {
 
   it("empties a position in one go from a worded action, not an icon", async () => {
     const user = await renderWorksheet(report);
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
     await goTo(user, "Adjust positions");
 
     // Offered on the row being worked on, not on every row.
@@ -1493,6 +1870,21 @@ describe("AllocationWorksheetTab Amounts panel", () => {
 
     expect(screen.getByLabelText("Adjustment for VTI")).toHaveValue("-900.00");
     expect(within(row("vti")).getByRole("button", { name: "Reduce to zero" })).toBeDisabled();
+  });
+
+  it("reduces nothing while investing cash only, by hand included", async () => {
+    const user = await renderWorksheet(report);
+    await goTo(user, "Adjust positions");
+
+    await user.click(row("vti"));
+    expect(
+      within(row("vti")).queryByRole("button", { name: "Reduce to zero" }),
+    ).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText("Adjustment for VTI"), "-100");
+
+    expect(
+      await screen.findByText(/VTI is reduced, but Invest cash only adds/),
+    ).toBeInTheDocument();
   });
 
   it("names the marks on the class tracks", async () => {
@@ -1605,5 +1997,357 @@ describe("AllocationWorksheetTab Amounts panel", () => {
 
     expect(row("vbiax")).toHaveAttribute("data-emphasis", "none");
     expect(useAccountsMock.mock.calls.length).toBe(renders);
+  });
+});
+
+describe("AllocationWorksheetTab Setup", () => {
+  // VTI is US equity, above its target; BND is Bonds, below it.
+  const holding = (assetId: string, symbol: string, value: number): Holding =>
+    ({
+      id: `acc-1-${assetId}`,
+      accountId: "acc-1",
+      holdingType: HoldingType.SECURITY,
+      instrument: { id: assetId, symbol, name: symbol, currency: "USD" },
+      quantity: 10,
+      marketValue: { local: value, base: value },
+    }) as Holding;
+
+  const classes = [
+    { categoryId: "us", categoryName: "US equity", currentBps: 7000, targetBps: 6000, delta: 300 },
+    { categoryId: "bond", categoryName: "Bonds", currentBps: 3000, targetBps: 4000, delta: -300 },
+  ];
+
+  const report = {
+    ...driftReport,
+    rows: classes.map(({ delta, ...row }) => ({
+      ...row,
+      color: "",
+      driftBps: row.currentBps - row.targetBps,
+      currentValue: row.currentBps / 10,
+      targetValue: row.targetBps / 10,
+      valueDelta: delta,
+      effectiveBandBps: 500,
+      status: delta > 0 ? "overweight" : "underweight",
+      isRequired: false,
+      isZeroCurrent: false,
+      isCash: false,
+    })),
+    holdings: {
+      targetId: profile.id,
+      totalValue: 3000,
+      baseCurrency: "USD",
+      rows: [
+        ["vti", "VTI", "us", "US equity", 2100],
+        ["bnd", "BND", "bond", "Bonds", 900],
+      ].map(([assetId, symbol, categoryId, categoryName, value]) => ({
+        id: `${assetId}-${categoryId}`,
+        holdingId: assetId,
+        assetId,
+        accountId: "acc-1",
+        symbol,
+        name: symbol,
+        categoryId,
+        categoryName,
+        value,
+        currentPct: Number(value) / 30,
+        isUnknownCategory: false,
+        isCash: false,
+      })),
+    },
+  } as DriftReport;
+
+  const gapNote = (categoryId: string) =>
+    document.querySelector<HTMLElement>(`[data-gap-category="${categoryId}"]`)!;
+  /** The securities card starts folded to what applies to this run. */
+  const openSecurities = (user: ReturnType<typeof userEvent.setup>) =>
+    user.click(screen.getByRole("button", { name: "Change" }));
+  const neverReduced = (subjectType: "asset" | "account", subjectId: string) =>
+    ({
+      id: `${subjectType}-${subjectId}`,
+      targetId: profile.id,
+      subjectType,
+      subjectId,
+      action: "sell",
+      effect: "block",
+      createdAt: "",
+      updatedAt: "",
+    }) as AllocationTargetConstraint;
+
+  beforeEach(() => {
+    acknowledgeDisclosure();
+    accountsRef.current = [account("acc-1", "Brokerage")];
+    holdingsRef.current = { "acc-1": [holding("vti", "VTI", 2100), holding("bnd", "BND", 900)] };
+    generateMock.mockReset().mockResolvedValue(calculated);
+    previewMock.mockReset().mockResolvedValue(previewResult);
+  });
+
+  afterEach(() => {
+    holdingsRef.current = null;
+    constraintsRef.current = [];
+    vi.unstubAllGlobals();
+  });
+
+  it("moves an account taken out of the worksheet below the ones in it", async () => {
+    accountsRef.current = [
+      account("acc-1", "Brokerage"),
+      account("acc-2", "Retirement"),
+      account("acc-3", "Joint"),
+    ];
+    const user = await renderWorksheet(report);
+    const order = () =>
+      [...document.querySelectorAll("[data-worksheet-account]")].map((row) =>
+        row.getAttribute("data-worksheet-account"),
+      );
+    expect(order()).toEqual(["acc-1", "acc-2", "acc-3"]);
+
+    await user.click(screen.getByRole("checkbox", { name: "Include Brokerage" }));
+
+    expect(order()).toEqual(["acc-2", "acc-3", "acc-1"]);
+    const leftOut = screen.getByRole("group", { name: "Left out · 1" });
+    expect(within(leftOut).getByRole("checkbox", { name: "Include Brokerage" })).not.toBeChecked();
+
+    await user.click(within(leftOut).getByRole("button", { name: "Add all back" }));
+    expect(order()).toEqual(["acc-1", "acc-2", "acc-3"]);
+  });
+
+  it("says what each category's gap can reach with the securities as set", async () => {
+    const user = await renderWorksheet(report);
+    await waitFor(() => expect(gapNote("bond")).toHaveTextContent("Increases BND"));
+    // Where it is against its target, and the money signed the way it moves.
+    expect(gapNote("bond")).toHaveTextContent(/30\.0%\s*→\s*40\.0%/);
+    expect(gapNote("bond")).toHaveTextContent("+$300");
+    expect(gapNote("us")).toHaveTextContent("−$300");
+    // Coloured as on the allocation page: equity forest, then the palette's next.
+    expect(gapNote("us").querySelector("span[style]")).toHaveStyle({
+      backgroundColor: "rgb(53, 92, 76)",
+    });
+    // Adding comes first, then reducing.
+    expect(
+      [...document.querySelectorAll("[data-gap-category]")].map((row) =>
+        row.getAttribute("data-gap-category"),
+      ),
+    ).toEqual(["bond", "us"]);
+    // Invest cash adds to what is below target and leaves the rest.
+    expect(gapNote("us")).toHaveTextContent("Not reduced");
+
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    expect(gapNote("us")).toHaveTextContent("Reduces VTI");
+
+    await openSecurities(user);
+    await user.click(screen.getByRole("checkbox", { name: "Reduce VTI" }));
+    expect(gapNote("us")).toHaveTextContent("Nothing to reduce");
+    await user.click(screen.getByRole("checkbox", { name: "Increase BND" }));
+    expect(gapNote("bond")).toHaveTextContent("Nothing to increase");
+  });
+
+  it("keeps a security turned off for reductions out of what Rebalance may reduce", async () => {
+    const user = await renderWorksheet(report);
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    await openSecurities(user);
+    const reduceVti = screen.getByRole("checkbox", { name: "Reduce VTI" });
+    expect(reduceVti).toBeChecked();
+
+    await user.click(reduceVti);
+    expect(reduceVti).not.toBeChecked();
+    await calculateFromTarget(user);
+
+    // Increases are a separate choice and stay open to every security.
+    expect(generateMock.mock.lastCall?.[0]).toMatchObject({
+      mode: "rebalance",
+      sellableAssetIds: ["bnd"],
+      eligibleAssetIds: undefined,
+    });
+  });
+
+  it("sends no reductions to limit while investing cash only", async () => {
+    const user = await renderWorksheet(report);
+    await openSecurities(user);
+    // Reductions are a Rebalance choice: the column shows only with it.
+    expect(screen.queryByRole("checkbox", { name: "Reduce VTI" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    await user.click(screen.getByRole("checkbox", { name: "Reduce VTI" }));
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    await calculateFromTarget(user);
+
+    expect(generateMock.mock.lastCall?.[0]).toMatchObject({
+      mode: "invest_cash",
+      sellableAssetIds: undefined,
+    });
+  });
+
+  it("lists a fund that spans categories once, under its largest", async () => {
+    // VBIAX is 60% US equity, 40% Bonds.
+    holdingsRef.current = {
+      "acc-1": [holding("vti", "VTI", 2100), holding("vbiax", "VBIAX", 600)],
+    };
+    const spanning = {
+      ...report,
+      holdings: {
+        ...report.holdings!,
+        rows: [
+          ...report.holdings!.rows.filter((row) => row.assetId === "vti"),
+          ...[
+            ["us", "US equity", 360],
+            ["bond", "Bonds", 240],
+          ].map(([categoryId, categoryName, value]) => ({
+            ...report.holdings!.rows[0],
+            id: `vbiax-${categoryId}`,
+            holdingId: "vbiax",
+            assetId: "vbiax",
+            symbol: "VBIAX",
+            name: "VBIAX",
+            categoryId: String(categoryId),
+            categoryName: String(categoryName),
+            value: Number(value),
+          })),
+        ],
+      },
+    } as DriftReport;
+    const user = await renderWorksheet(spanning);
+    await openSecurities(user);
+
+    const usEquity = await screen.findByRole("group", { name: "US equity" });
+    expect(within(usEquity).getByText(/also Bonds/)).toBeInTheDocument();
+    // Its Bonds share is below target, so it may still be increased: a switch, not a dash.
+    expect(within(usEquity).getByRole("checkbox", { name: "Increase VBIAX" })).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox", { name: "Increase VBIAX" })).toHaveLength(1);
+  });
+
+  it("counts what sits in Unknown as reducible there, as the calculation does", async () => {
+    holdingsRef.current = {
+      "acc-1": [holding("vti", "VTI", 2100), holding("btc", "BTC", 300)],
+    };
+    const withUnknown = {
+      ...report,
+      rows: [
+        ...report.rows,
+        { ...report.rows[0], categoryId: "__UNKNOWN__", categoryName: "Unknown", valueDelta: 300 },
+      ],
+      holdings: {
+        ...report.holdings!,
+        rows: [
+          ...report.holdings!.rows,
+          {
+            ...report.holdings!.rows[0],
+            id: "btc-unknown",
+            holdingId: "btc",
+            assetId: "btc",
+            symbol: "BTC",
+            name: "BTC",
+            categoryId: "__UNKNOWN__",
+            categoryName: "Unknown",
+            value: 300,
+            isUnknownCategory: true,
+          },
+        ],
+      },
+    } as DriftReport;
+    const user = await renderWorksheet(withUnknown);
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    await openSecurities(user);
+
+    await waitFor(() => expect(gapNote("__UNKNOWN__")).toHaveTextContent("Reduces BTC"));
+    expect(
+      within(screen.getByRole("group", { name: "Unknown" })).getByRole("checkbox", {
+        name: "Reduce BTC",
+      }),
+    ).toBeChecked();
+  });
+
+  it("shows what the target never reduces instead of offering a switch it ignores", async () => {
+    constraintsRef.current = [neverReduced("asset", "vti")];
+    const user = await renderWorksheet(report);
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+
+    // VTI is US equity's only security, so nothing there can be reduced.
+    await waitFor(() => expect(gapNote("us")).toHaveTextContent("Nothing to reduce"));
+    expect(screen.getByText("Protected on the target: VTI")).toBeInTheDocument();
+
+    await openSecurities(user);
+    expect(screen.queryByRole("checkbox", { name: "Reduce VTI" })).not.toBeInTheDocument();
+    expect(screen.getByText("Protected on the target: never reduced")).toBeInTheDocument();
+    // A rule against reducing leaves increases to the user.
+    expect(screen.getByRole("checkbox", { name: "Increase BND" })).toBeChecked();
+  });
+
+  it("says on an account's row that the target never reduces its holdings", async () => {
+    accountsRef.current = [account("acc-1", "Brokerage"), account("acc-2", "Retirement")];
+    constraintsRef.current = [neverReduced("account", "acc-2")];
+    await renderWorksheet(report);
+
+    const row = (accountId: string) =>
+      document.querySelector<HTMLElement>(`[data-worksheet-account="${accountId}"]`)!;
+    await waitFor(() => expect(row("acc-2")).toHaveTextContent("never reduced"));
+    expect(row("acc-1")).not.toHaveTextContent("never reduced");
+  });
+
+  it("folds the securities to what applies to this run", async () => {
+    const user = await renderWorksheet(report);
+    await user.click(screen.getByRole("checkbox", { name: "Rebalance" }));
+    expect(screen.getByText("Nothing left out this time")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Reduce VTI" })).not.toBeInTheDocument();
+
+    await openSecurities(user);
+    await user.click(screen.getByRole("checkbox", { name: "Reduce VTI" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.getByText("Not reduced this time: VTI")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("states what each account records beside its name, whatever share it deploys", async () => {
+    const user = await renderWorksheet(report);
+    const row = () => document.querySelector<HTMLElement>('[data-worksheet-account="acc-1"]')!;
+    const details = () => row().querySelector("label")!;
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Cash to deploy" })).toHaveValue("2,000.00"),
+    );
+    expect(details()).toHaveTextContent("$2,000.00 recorded");
+
+    await user.click(screen.getByRole("button", { name: "50%" }));
+
+    // The row keeps its shape: the share shows in the field, nothing grows under it.
+    expect(details()).toHaveTextContent("$2,000.00 recorded");
+    expect(screen.getByRole("textbox", { name: "Cash to deploy from Brokerage" })).toHaveValue(
+      "1,000.00",
+    );
+  });
+
+  it("keeps the deposit field open while the keyboard moves within it", async () => {
+    const user = await renderWorksheet(report);
+    await user.click(
+      screen.getByRole("button", { name: "Add cash not yet recorded to Brokerage" }),
+    );
+    await user.keyboard("500");
+    await user.tab();
+
+    const remove = screen.getByRole("button", { name: "Remove the deposit to Brokerage" });
+    expect(remove).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(
+      screen.getByRole("button", { name: "Add cash not yet recorded to Brokerage" }),
+    ).toHaveFocus();
+    expect(screen.queryByText(/deposit$/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a security added in Setup through the calculation", async () => {
+    const user = await renderWorksheet(report);
+    await openSecurities(user);
+    await user.type(screen.getByRole("searchbox", { name: "Find or add a security" }), "VXUS");
+    await user.click(screen.getByRole("button", { name: "Add VXUS" }));
+    expect(
+      within(screen.getByRole("group", { name: "Added" })).getByRole("button", {
+        name: "Remove VXUS",
+      }),
+    ).toBeInTheDocument();
+
+    await calculateFromTarget(user);
+
+    // Not held, so the calculation gives it nothing; its amount is the user's to set.
+    expect(screen.getByLabelText("Adjustment for VXUS")).toHaveValue("");
   });
 });

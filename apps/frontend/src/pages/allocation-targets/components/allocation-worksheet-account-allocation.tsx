@@ -11,12 +11,15 @@ import {
   stepByUnits,
   type PlacementProblem,
 } from "./allocation-worksheet-amounts";
+import { InfoTip } from "./allocation-worksheet-securities";
 import { StepperField } from "./allocation-worksheet-stepper-field";
 import {
   allocationProgress,
   AMOUNT_EPSILON,
+  amountAccountCanTake,
   amountAtRest,
   decimalInputOrZero,
+  floorToDigits,
   formatDecimalInput,
   placementAccountIds,
   type AccountFundingEstimate,
@@ -28,6 +31,8 @@ interface AccountAllocationProps {
   position: WorksheetPosition;
   changeAmount: number;
   accounts: Account[];
+  /** How each account is named where its name stands alone. */
+  accountNames: ReadonlyMap<string, string>;
   adjustment: PositionAdjustment;
   currency: string;
   fundingByAccount: Map<string, WorksheetAccountFunding>;
@@ -38,9 +43,18 @@ interface AccountAllocationProps {
   impliedAccountId: string | undefined;
   /** What each account can still fund for this change; absent while cash is read. */
   fundingEstimates: ReadonlyMap<string, AccountFundingEstimate> | undefined;
+  /** What each account deploys in this run, deposit included, behind its estimate. */
+  deployedByAccount: Readonly<Record<string, number>> | undefined;
   /** What the worksheet's check says keeps this change out, if anything. */
   problem: PlacementProblem | undefined;
   onAmountChange: (accountId: string, value: string) => void;
+  /**
+   * Makes the change what the accounts hold, as an amount; absent where the
+   * change is not entered as one.
+   */
+  onUsePlaced?: (amount: number) => void;
+  /** Covers an account's shortfall with a deposit, when the user asks. */
+  onAddDeposit: (accountId: string, amount: number) => void;
 }
 
 /**
@@ -51,6 +65,7 @@ export function AccountAllocation({
   position,
   changeAmount,
   accounts,
+  accountNames,
   adjustment,
   currency,
   fundingByAccount,
@@ -58,13 +73,17 @@ export function AccountAllocation({
   wholeSharesOnly,
   impliedAccountId,
   fundingEstimates,
+  deployedByAccount,
   problem,
   onAmountChange,
+  onUsePlaced,
+  onAddDeposit,
 }: AccountAllocationProps) {
   const { t } = useTranslation();
   const { formatAmount, currencyFractionDigits } = useAmountFormatting();
   const { formatQuantity, decimalSeparator } = useNumberFormatting();
   const fractionDigits = currencyFractionDigits(currency);
+  const nameOf = (account: Account) => accountNames.get(account.id) ?? account.name;
   const [typingAccountId, setTypingAccountId] = useState<string | null>(null);
   // At the currency's precision except while it is typed in, like the row's field.
   const atRest = (accountId: string, value: string) =>
@@ -110,11 +129,30 @@ export function AccountAllocation({
   const listedCapacity =
     !isReduce && accounts.length > 1 && fundingEstimates
       ? listedAccounts.reduce(
-          (sum, account) => sum + (fundingEstimates.get(account.id)?.capacity ?? 0),
+          (sum, account) =>
+            sum + floorToDigits(fundingEstimates.get(account.id)?.capacity ?? 0, fractionDigits),
           0,
         )
       : undefined;
   const format = (amount: number) => formatAmount(amount, currency);
+  // What the accounts not listed yet could add, so a change the listed ones
+  // cannot fund says where the rest of the cash is rather than reading as a
+  // dead end. The user still picks them.
+  const otherCapacity =
+    listedCapacity !== undefined && !showOtherAccounts
+      ? accounts
+          .filter((account) => !shown.includes(account.id))
+          .reduce(
+            (sum, account) =>
+              sum + floorToDigits(fundingEstimates?.get(account.id)?.capacity ?? 0, fractionDigits),
+            0,
+          )
+      : 0;
+  const canUsePlaced =
+    onUsePlaced !== undefined &&
+    accounts.length > 1 &&
+    assigned >= AMOUNT_EPSILON &&
+    (problem?.reason === "over" || problem?.reason === "left");
   // The badge follows the worksheet's own check, so it never calls a change
   // blocked that the check accepts, or the reverse.
   const badge: { text: string; tone: "done" | "accepted" | "problem" | "over" } = problem
@@ -169,28 +207,59 @@ export function AccountAllocation({
                 amount: format(listedCapacity),
                 requested: format(requested),
               })}
+              {otherCapacity >= 0.01 && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowOtherAccounts(true)}
+                    className="text-foreground font-medium underline underline-offset-2"
+                  >
+                    {t("allocation:worksheet.placementOtherAccountsCanFund", {
+                      amount: format(otherCapacity),
+                    })}
+                  </button>
+                </>
+              )}
             </p>
           )}
         </div>
-        {/* Colour means a problem here; a complete or accepted allocation is not one. */}
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px]",
-            badge.tone === "done" && "text-foreground border",
-            badge.tone === "accepted" && "text-muted-foreground border",
-            badge.tone === "over" && "bg-red-100 text-red-900 dark:bg-red-950/35 dark:text-red-200",
-            badge.tone === "problem" &&
-              "bg-amber-100 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200",
+        <div className="flex flex-col items-end gap-1.5">
+          {/* Colour means a problem here; a complete or accepted allocation is not one. */}
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px]",
+              badge.tone === "done" && "text-foreground border",
+              badge.tone === "accepted" && "text-muted-foreground border",
+              badge.tone === "over" &&
+                "bg-red-100 text-red-900 dark:bg-red-950/35 dark:text-red-200",
+              badge.tone === "problem" &&
+                "bg-amber-100 text-amber-900 dark:bg-amber-950/35 dark:text-amber-200",
+            )}
+          >
+            {badge.tone === "done" && <Icons.Check className="h-3 w-3" />}
+            {badge.text}
+          </span>
+          {/* When the accounts hold more or less than the change, the change can
+            follow them in one step, rather than by redoing the arithmetic. The
+            accounts stay as the user placed them; none is picked. */}
+          {canUsePlaced && (
+            <button
+              type="button"
+              onClick={() => onUsePlaced?.(assigned)}
+              className="text-xs font-medium underline underline-offset-2"
+            >
+              {t("allocation:worksheet.useAsAdjustment", { amount: format(assigned) })}
+            </button>
           )}
-        >
-          {badge.tone === "done" && <Icons.Check className="h-3 w-3" />}
-          {badge.text}
-        </span>
+        </div>
       </div>
 
-      <div className="mt-3 divide-y">
+      {/* One set of columns for every account: the account, its amount, and the
+          amount it can take. Amounts line up whether or not a row offers one. */}
+      <div className="mt-3 divide-y sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto]">
         {accounts.length === 0 && (
-          <p className="text-muted-foreground py-3 text-xs leading-relaxed">
+          <p className="text-muted-foreground py-3 text-xs leading-relaxed sm:col-span-full">
             {t("allocation:worksheet.noEligibleAccounts")}
           </p>
         )}
@@ -199,33 +268,41 @@ export function AccountAllocation({
           const funding = fundingByAccount.get(account.id);
           const estimate = fundingEstimates?.get(account.id);
           const currentAmount = amountFor(account.id);
+          const need = isReduce
+            ? 0
+            : funding
+              ? Math.max(0, -funding.remaining)
+              : estimate
+                ? Math.max(0, currentAmount - (estimate.capacity - estimate.deficit))
+                : 0;
           const rowRemaining = Math.max(0, requested - (assigned - currentAmount));
           // What this account can take of the change: what is left, capped by
           // what it can fund (an increase) or holds (a reduction). The user picks
           // the account; the amount is that account's own arithmetic (§6).
-          // Funding not read yet leaves the cap off.
+          // Funding not read yet offers nothing.
           const accountCap = isReduce ? (holding?.value ?? 0) : estimate?.capacity;
-          const cappedAmount =
-            accountCap === undefined ? rowRemaining : Math.min(rowRemaining, accountCap);
-          // The unit price is derived from the recorded holding rather than the
-          // quote the core resolves against, so the floor gets a tolerance and
-          // never drops a unit over the last decimal. An amount that buys
-          // nothing is still offered: the core reports such a line now, and
-          // withholding the button only forces the same amount in by hand.
-          const wholeUnitAmount =
-            wholeSharesOnly && unitPrice
-              ? Math.floor(cappedAmount / unitPrice + 1e-9) * unitPrice
-              : cappedAmount;
-          const amountToUse = wholeUnitAmount > AMOUNT_EPSILON ? wholeUnitAmount : cappedAmount;
+          const amountToUse = amountAccountCanTake(
+            rowRemaining,
+            accountCap,
+            unitPrice,
+            wholeSharesOnly,
+            fractionDigits,
+          );
           const currentUnits = unitPrice ? currentAmount / unitPrice : undefined;
+          // Offered only while it would add to this account: it says the
+          // amount, so nothing about it has to be guessed.
+          const offersAmount =
+            accounts.length > 1 &&
+            !isFullyAllocated &&
+            amountToUse > currentAmount + AMOUNT_EPSILON;
           return (
             <div
               key={account.id}
-              className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:col-span-full sm:grid-cols-[minmax(0,1fr)_auto_8.5rem] sm:items-start sm:gap-y-0 sm:supports-[grid-template-columns:subgrid]:grid-cols-subgrid"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 sm:pr-3">
                 <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
-                  <span className="truncate">{account.name}</span>
+                  <span className="truncate">{nameOf(account)}</span>
                   {impliedHolder === account.id && (
                     <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-normal">
                       <Icons.Check className="h-2.5 w-2.5" />
@@ -234,10 +311,13 @@ export function AccountAllocation({
                   )}
                 </p>
                 <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  {/* The security this account already holds, named so it never
+                      reads as the account's cash. */}
                   {holding &&
                     t("allocation:worksheet.accountHoldingSummary", {
                       amount: formatAmount(holding.value, currency),
                       quantity: formatQuantity(holding.quantity),
+                      symbol: position.symbol,
                     })}
                   {holding && !isReduce && " · "}
                   {/* An estimate from the page's own figures; the preview then
@@ -245,90 +325,88 @@ export function AccountAllocation({
                   {!isReduce &&
                     (estimate
                       ? t("allocation:worksheet.accountCanFund", {
-                          amount: format(estimate.capacity),
+                          amount: format(floorToDigits(estimate.capacity, fractionDigits)),
                         })
                       : t("allocation:worksheet.accountFundingPending"))}
+                  {!isReduce && estimate && deployedByAccount?.[account.id] !== undefined && (
+                    <>
+                      {" "}
+                      <InfoTip
+                        text={t("allocation:worksheet.accountCanFundDetail", {
+                          amount: format(deployedByAccount[account.id] ?? 0),
+                        })}
+                      />
+                    </>
+                  )}
                 </p>
-                {!isReduce && estimate && estimate.deficit >= AMOUNT_EPSILON && (
-                  <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200">
-                    {t("allocation:worksheet.accountFundingDeficit", {
-                      amount: format(estimate.deficit),
-                    })}
+                {/* What the account lacks for what is placed in it: the preview's
+                    figure once there is one, the page's own estimate before.
+                    Covering it is one click away, never done for the user. */}
+                {need >= 0.01 ? (
+                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-[11px] font-medium text-amber-800 dark:text-amber-200">
+                    <span>{t("allocation:worksheet.fundingNeeded", { amount: format(need) })}</span>
+                    <AddDepositButton
+                      amount={need}
+                      account={nameOf(account)}
+                      currency={currency}
+                      onAdd={(amount) => onAddDeposit(account.id, amount)}
+                    />
                   </p>
-                )}
-                {funding && funding.remaining < -AMOUNT_EPSILON && (
-                  <p className="mt-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-200">
-                    {t("allocation:worksheet.fundingNeeded", {
-                      amount: formatAmount(-funding.remaining, currency),
-                    })}
-                  </p>
+                ) : (
+                  !isReduce &&
+                  estimate &&
+                  estimate.deficit >= AMOUNT_EPSILON && (
+                    <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200">
+                      {t("allocation:worksheet.accountFundingDeficit", {
+                        amount: format(estimate.deficit),
+                      })}
+                    </p>
+                  )
                 )}
               </div>
               <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-2">
-                  {accounts.length === 1 ? (
-                    <span className="font-mono text-sm font-semibold tabular-nums">
-                      {formatAmount(requested, currency)}
-                    </span>
-                  ) : (
-                    <>
-                      {/* The row's field and steps, at the row's width. */}
-                      <StepperField
-                        className="w-full flex-none sm:w-[13.5rem]"
-                        prefix={currency}
-                        unitSteps={
-                          canStep
-                            ? {
-                                downLabel: t("allocation:worksheet.removeOneUnitIn", {
-                                  account: account.name,
-                                }),
-                                upLabel: t("allocation:worksheet.addOneUnitIn", {
-                                  account: account.name,
-                                }),
-                                onDown:
-                                  currentAmount > AMOUNT_EPSILON
-                                    ? () => stepAccount(account.id, currentAmount, -1)
-                                    : undefined,
-                                onUp: () => stepAccount(account.id, currentAmount, 1),
-                              }
-                            : undefined
-                        }
-                        aria-label={t("allocation:worksheet.accountAmountLabel", {
-                          account: account.name,
-                        })}
-                        value={atRest(
-                          account.id,
-                          impliedHolder === account.id
-                            ? formatDecimalInput(requested, 6)
-                            : (adjustment.accountAmounts[account.id] ?? ""),
-                        )}
-                        onFocus={() => setTypingAccountId(account.id)}
-                        onBlur={() => setTypingAccountId(null)}
-                        onChange={(event) => onAmountChange(account.id, event.target.value)}
-                        inputMode="decimal"
-                        placeholder="0"
-                      />
-                      {/* Offered only while it would add to this account: it says the
-                          amount, so nothing about it has to be guessed. */}
-                      {!isFullyAllocated && amountToUse > currentAmount + AMOUNT_EPSILON && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 font-mono text-[11px] tabular-nums"
-                          aria-label={t("allocation:worksheet.useAmountIn", {
-                            amount: format(amountToUse),
-                            account: account.name,
-                          })}
-                          onClick={() =>
-                            onAmountChange(account.id, formatDecimalInput(amountToUse, 6))
+                {accounts.length === 1 ? (
+                  <span className="font-mono text-sm font-semibold tabular-nums">
+                    {formatAmount(requested, currency)}
+                  </span>
+                ) : (
+                  // The row's field and steps, at the row's width.
+                  <StepperField
+                    className="w-full flex-none sm:w-[13.5rem]"
+                    prefix={currency}
+                    unitSteps={
+                      canStep
+                        ? {
+                            downLabel: t("allocation:worksheet.removeOneUnitIn", {
+                              account: nameOf(account),
+                            }),
+                            upLabel: t("allocation:worksheet.addOneUnitIn", {
+                              account: nameOf(account),
+                            }),
+                            onDown:
+                              currentAmount > AMOUNT_EPSILON
+                                ? () => stepAccount(account.id, currentAmount, -1)
+                                : undefined,
+                            onUp: () => stepAccount(account.id, currentAmount, 1),
                           }
-                        >
-                          {t("allocation:worksheet.useAmount", { amount: format(amountToUse) })}
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
+                        : undefined
+                    }
+                    aria-label={t("allocation:worksheet.accountAmountLabel", {
+                      account: nameOf(account),
+                    })}
+                    value={atRest(
+                      account.id,
+                      impliedHolder === account.id
+                        ? formatDecimalInput(requested, 6)
+                        : (adjustment.accountAmounts[account.id] ?? ""),
+                    )}
+                    onFocus={() => setTypingAccountId(account.id)}
+                    onBlur={() => setTypingAccountId(null)}
+                    onChange={(event) => onAmountChange(account.id, event.target.value)}
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                )}
                 {currentUnits !== undefined && currentAmount > AMOUNT_EPSILON && (
                   <span className="text-muted-foreground font-mono text-[10px] tabular-nums">
                     {t("allocation:worksheet.accountUnitsSummary", {
@@ -339,6 +417,22 @@ export function AccountAllocation({
                   </span>
                 )}
               </div>
+              {offersAmount && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 justify-self-end px-2 font-mono text-[11px] tabular-nums sm:ml-2 sm:h-9"
+                  aria-label={t("allocation:worksheet.useAmountIn", {
+                    amount: format(amountToUse),
+                    account: nameOf(account),
+                  })}
+                  onClick={() =>
+                    onAmountChange(account.id, formatDecimalInput(amountToUse, fractionDigits))
+                  }
+                >
+                  {t("allocation:worksheet.useAmount", { amount: format(amountToUse) })}
+                </Button>
+              )}
             </div>
           );
         })}
@@ -355,5 +449,34 @@ export function AccountAllocation({
         </button>
       )}
     </div>
+  );
+}
+
+/** One click to cover an account's shortfall with a deposit it states. */
+export function AddDepositButton({
+  amount,
+  account,
+  currency,
+  onAdd,
+}: {
+  amount: number;
+  account: string;
+  currency: string;
+  onAdd: (amount: number) => void;
+}) {
+  const { t } = useTranslation();
+  const { formatAmount } = useAmountFormatting();
+  return (
+    <button
+      type="button"
+      onClick={() => onAdd(amount)}
+      aria-label={t("allocation:worksheet.addAsDepositTo", {
+        amount: formatAmount(amount, currency),
+        account,
+      })}
+      className="text-foreground font-medium underline underline-offset-2"
+    >
+      {t("allocation:worksheet.addAsDeposit", { amount: formatAmount(amount, currency) })}
+    </button>
   );
 }

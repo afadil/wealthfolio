@@ -34,7 +34,14 @@ const labels: WorksheetExportLabels = {
   price: "Unit price",
   priceDate: "Price date",
   warnings: "Warnings",
+  status: "Status",
   statusUnresolved: "Unresolved",
+  statusCalculated: "Calculated",
+  statusEdited: "Edited",
+  direction: "Direction",
+  increase: "Increase",
+  reduce: "Reduce",
+  deposit: "Deposit",
   unknownAccount: "Unknown account",
   total: "Total",
   cashLeft: "Cash remaining",
@@ -135,6 +142,9 @@ function csvLines(overrides: Partial<WorksheetExportLabels> = {}) {
       accountIds: ["acc-1", "acc-2"],
       trackedCashToUse: 900,
       externalCash: 300.5,
+      depositsByAccount: { "acc-2": 300.5 },
+      // BND was changed by hand after the calculation.
+      editedAssetIds: new Set(["bnd"]),
       describeWarning: (warning) => warning.message,
     },
     { ...labels, ...overrides },
@@ -148,28 +158,56 @@ describe("worksheet export", () => {
     const lines = csvLines();
 
     expect(lines.slice(0, 4)).toEqual([
-      `"Account","Symbol","Security","Amount (USD)","Estimated quantity","Unit price (USD)","Category","Price date","Note"`,
-      `"Brokerage","AAPL","Apple","200.00","1","200","US equity","2026-09-20",""`,
+      `"Account","Symbol","Security","Status","Direction","Amount (USD)","Estimated quantity","Unit price (USD)","Category","Price date","Note"`,
+      `"Brokerage","AAPL","Apple","Calculated","Increase","200.00","1","200","US equity","2026-09-20",""`,
       // A mixed fund carries both its classes; the stored price loses its float residue.
-      `"Brokerage","VBIAX","Balanced Index","1200.00","12","100","US equity 60% · Bonds 40%","2026-09-20",""`,
+      `"Brokerage","VBIAX","Balanced Index","Calculated","Increase","1200.00","12","100","US equity 60% · Bonds 40%","2026-09-20",""`,
       // A name a spreadsheet would run stays text.
-      `"Retirement","BND","'=HYPERLINK(evil)","-300.00","-4","75","Bonds","2026-09-20","BND quote is dated."`,
+      `"Retirement","BND","'=HYPERLINK(evil)","Edited","Reduce","-300.00","-4","75","Bonds","2026-09-20","BND quote is dated."`,
     ]);
   });
 
   it("keeps unresolved amounts in the table, with no account or security", () => {
-    expect(csvLines()[4]).toBe(`"","","","50.00","","","Gold","","Unresolved"`);
+    expect(csvLines()[4]).toBe(`"","","","Unresolved","","50.00","","","Gold","",""`);
   });
 
-  it("totals each account apart from the lines, with the cash it has left", () => {
+  it("totals each account apart from the lines, with its deposit and the cash it has left", () => {
     const lines = csvLines();
-    const header = lines.indexOf(`"Account","Total (USD)","Cash remaining (USD)"`);
+    const header = lines.indexOf(`"Account","Deposit (USD)","Total (USD)","Cash remaining (USD)"`);
 
     expect(header).toBe(6);
     expect(lines.slice(header + 1, header + 3)).toEqual([
-      `"Brokerage","1400.00","-100.00"`,
-      `"Retirement","-300.00","300.00"`,
+      `"Brokerage","0.00","1400.00","-100.00"`,
+      `"Retirement","300.50","-300.00","300.00"`,
     ]);
+  });
+
+  it("rounds estimated quantities as the screens show them", () => {
+    const rows = worksheetExportRows(
+      {
+        result: {
+          ...result,
+          lines: [
+            line({ lineId: "a", symbol: "BND", quantity: 25.944175, estimatedAmount: 1821.8 }),
+            line({ lineId: "b", symbol: "BTC", quantity: 0.000193, estimatedAmount: 16 }),
+          ],
+          warnings: [],
+        } as unknown as AllocationWorksheetResult,
+        calculated: null,
+        accountNames: new Map([["acc-1", "Brokerage"]]),
+        accountIds: ["acc-1"],
+        trackedCashToUse: 0,
+        externalCash: 0,
+        depositsByAccount: {},
+        editedAssetIds: undefined,
+        describeWarning: (warning) => warning.message,
+      },
+      labels,
+    );
+
+    expect(rows.slice(1, 3).map((row) => row[6])).toEqual([25.94, 0.000193]);
+    // Without a calculation there is nothing to call a line calculated or edited.
+    expect(rows[1][3]).toBe("");
   });
 
   it("ends with what it was calculated from, the warnings and the limitations, label then value", () => {

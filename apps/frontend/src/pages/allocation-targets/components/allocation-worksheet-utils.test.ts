@@ -1,18 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import type { CalculatedAdjustments } from "@/lib/types";
+import type {
+  Account,
+  AllocationTargetConstraint,
+  CalculatedAdjustments,
+  DriftReport,
+} from "@/lib/types";
+
+import { buildAllocationTargetColorMap } from "./allocation-target-colors";
 import {
   estimatedFunding,
+  accountLabels,
   adjustmentsFromCalculated,
+  amountAccountCanTake,
   allocationProgress,
   amountAtRest,
   eligibleAccountIdsForChange,
   externalContributionFor,
+  floorToDigits,
   formatDecimalInput,
   generationInputsKey,
+  impactClasses,
+  isShortOfFunding,
   parseDecimalInput,
   placementAccountIds,
+  placementSlack,
   planningTotal,
+  standingRules,
   unitPriceMoved,
   type WorksheetGenerationInputs,
 } from "./allocation-worksheet-utils";
@@ -298,5 +312,178 @@ describe("estimatedFunding", () => {
     );
     expect(estimates.get("brokerage")).toEqual({ capacity: 0, deficit: 1000 });
     expect(estimates.get("roth")).toEqual({ capacity: 1500, deficit: 0 });
+  });
+});
+
+describe("account labels", () => {
+  const account = (id: string, name: string, extra: Partial<Account> = {}) =>
+    ({ id, name, currency: "USD", ...extra }) as Account;
+
+  it("leaves a name alone when no other account shares it", () => {
+    const labels = accountLabels([account("a", "Brokerage"), account("b", "Retirement")]);
+    expect(labels.get("a")).toBe("Brokerage");
+    expect(labels.get("b")).toBe("Retirement");
+  });
+
+  it("tells apart accounts that share a name by the end of their number", () => {
+    const labels = accountLabels([
+      account("a", "Individual", { accountNumber: "U1234001" }),
+      account("b", "INDIVIDUAL", { accountNumber: "U5678002" }),
+    ]);
+    expect(labels.get("a")).toBe("Individual ··4001");
+    expect(labels.get("b")).toBe("INDIVIDUAL ··8002");
+  });
+
+  it("falls back on the currency when there is no number to tell them apart", () => {
+    const labels = accountLabels([
+      account("a", "Individual"),
+      account("b", "Individual", { currency: "CAD" }),
+    ]);
+    expect(labels.get("a")).toBe("Individual (USD)");
+    expect(labels.get("b")).toBe("Individual (CAD)");
+  });
+});
+
+describe("what an account can take of a change", () => {
+  it("takes what is left when the account can fund all of it", () => {
+    expect(amountAccountCanTake(1200, 2000, undefined, false, 2)).toBe(1200);
+  });
+
+  it("never offers more than the account can fund, down to the cent", () => {
+    // What a division leaves past the cent would put the account over by it.
+    expect(amountAccountCanTake(83523.37, 18413.135072, undefined, false, 2)).toBe(18413.13);
+  });
+
+  it("takes whole units under a whole-unit policy", () => {
+    expect(amountAccountCanTake(1000, 450, 100, true, 2)).toBe(400);
+  });
+
+  it("offers nothing while the account's funding is not known", () => {
+    expect(amountAccountCanTake(1200, undefined, undefined, false, 2)).toBe(0);
+  });
+
+  it("leaves a fraction of a cent behind rather than going past what is left", () => {
+    expect(amountAccountCanTake(1200.004, 2000, undefined, false, 2)).toBe(1200);
+  });
+
+  it("offers what is left as the row shows it, so placing it completes the row", () => {
+    // The calculation leaves fractions of a cent; the row reads $4,351.02.
+    expect(amountAccountCanTake(4351.0199, 12250.95, undefined, false, 2)).toBe(4351.02);
+  });
+});
+
+describe("an amount cut to the currency's smallest unit", () => {
+  it("never rounds up past what it was", () => {
+    // Shown as "about $27,915.07" before, beside "Use $27,915.06".
+    expect(floorToDigits(27915.065, 2)).toBe(27915.06);
+    expect(floorToDigits(18413.14, 2)).toBe(18413.14);
+    expect(floorToDigits(5000.9, 0)).toBe(5000);
+  });
+});
+
+describe("a funding shortfall", () => {
+  it("counts from a cent, as the amounts are shown", () => {
+    expect(isShortOfFunding(-3e-12)).toBe(false);
+    expect(isShortOfFunding(-0.004)).toBe(false);
+    expect(isShortOfFunding(-0.006)).toBe(true);
+    expect(isShortOfFunding(-300)).toBe(true);
+    expect(isShortOfFunding(200)).toBe(false);
+  });
+});
+
+describe("standingRules", () => {
+  const rule = (
+    subjectType: AllocationTargetConstraint["subjectType"],
+    subjectId: string,
+    action: AllocationTargetConstraint["action"],
+    effect: AllocationTargetConstraint["effect"] = "block",
+  ): AllocationTargetConstraint => ({
+    id: `${subjectType}-${subjectId}-${action}`,
+    targetId: "target-1",
+    subjectType,
+    subjectId,
+    action,
+    effect,
+    createdAt: "",
+    updatedAt: "",
+  });
+
+  it("reads the target's never-reduced assets and accounts as the calculation does", () => {
+    const rules = standingRules([rule("asset", "vti", "sell"), rule("account", "acc-2", "sell")]);
+
+    expect(rules.blocksReduce("vti", "acc-1", [])).toBe(true);
+    expect(rules.blocksReduce("bnd", "acc-1", [])).toBe(false);
+    expect(rules.blocksReduce("bnd", "acc-2", [])).toBe(true);
+    expect(rules.protectedAccountIds).toEqual(new Set(["acc-2"]));
+    // Selling rules leave increases alone.
+    expect(rules.blocksIncrease("vti", [])).toBe(false);
+  });
+
+  it("lets trade rules bind both ways, and category rules only through classified categories", () => {
+    const rules = standingRules([
+      rule("category", "bonds", "trade"),
+      rule("category", "__UNKNOWN__", "sell"),
+    ]);
+
+    expect(rules.blocksReduce("bnd", "acc-1", ["bonds"])).toBe(true);
+    expect(rules.blocksIncrease("bnd", ["bonds"])).toBe(true);
+    expect(rules.blocksReduce("btc", "acc-1", ["__UNKNOWN__"])).toBe(false);
+  });
+
+  it("leaves avoid rules to the preview", () => {
+    const rules = standingRules([rule("asset", "vti", "sell", "avoid")]);
+
+    expect(rules.blocksReduce("vti", "acc-1", [])).toBe(false);
+  });
+});
+
+describe("impactClasses", () => {
+  it("colours each class as the allocation page does, even past an empty one", () => {
+    const row = (categoryId: string, categoryName: string, currentBps: number, targetBps: number) =>
+      ({
+        categoryId,
+        categoryName,
+        color: "",
+        currentBps,
+        targetBps,
+        driftBps: currentBps - targetBps,
+        currentValue: currentBps,
+        targetValue: targetBps,
+        valueDelta: 0,
+        effectiveBandBps: 500,
+        status: "in_band",
+        isRequired: false,
+        isZeroCurrent: currentBps === 0,
+        isCash: false,
+      }) as DriftReport["rows"][number];
+    // An empty class first: the rail leaves it out, the allocation page keeps it.
+    const report = {
+      rows: [
+        row("R00", "Antarctica", 0, 0),
+        row("R10", "Europe", 4000, 5000),
+        row("R20", "Asia", 6000, 5000),
+      ],
+    } as DriftReport;
+    const pageColors = buildAllocationTargetColorMap(report.rows);
+
+    const classes = impactClasses(report, null, 500);
+
+    expect(classes.map((item) => item.categoryId)).toEqual(["R10", "R20"]);
+    expect(classes.map((item) => item.color)).toEqual([
+      pageColors.get("R10"),
+      pageColors.get("R20"),
+    ]);
+  });
+});
+
+describe("placementSlack", () => {
+  it("accepts 1% of the change, or the minimum line size when that is larger", () => {
+    expect(placementSlack(58964.43, 0, undefined)).toEqual({ short: 589.6443, over: 589.6443 });
+    expect(placementSlack(919.29, 50, undefined)).toEqual({ short: 50, over: 50 });
+  });
+
+  it("never asks for less than two cents, and leaves a part unit under whole units", () => {
+    expect(placementSlack(1, 0, undefined)).toEqual({ short: 0.02, over: 0.02 });
+    expect(placementSlack(1000, 0, 336.64)).toEqual({ short: 336.64, over: 10 });
   });
 });

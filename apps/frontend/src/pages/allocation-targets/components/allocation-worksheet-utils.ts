@@ -1,7 +1,9 @@
 import type { useAmountFormatting } from "@wealthfolio/ui";
 
 import type {
+  Account,
   AllocationRule,
+  AllocationTargetConstraint,
   AllocationWorksheetResult,
   CalculatedAdjustments,
   DriftReport,
@@ -69,6 +71,14 @@ export interface PositionAdjustment {
   inputValue: string;
   /** Amount placed in each account, as entered. */
   accountAmounts: Record<string, string>;
+  /**
+   * Which way the change went when `accountAmounts` were placed: 1 for an
+   * increase, -1 for a reduction. Typing a new total passes through an empty
+   * field or a bare sign, so the previous keystroke cannot say.
+   */
+  placedDirection?: 1 | -1;
+  /** What was placed while the change went the other way, until it turns back. */
+  setAsideAccountAmounts?: Record<string, string>;
 }
 
 export type PositionAdjustments = Record<string, PositionAdjustment>;
@@ -248,36 +258,66 @@ export function adjustmentsFromCalculated(calculated: CalculatedAdjustments): Po
 }
 
 /**
- * The worksheet still holds the calculated amounts, so recalculating would
- * replace nothing the user entered (§5). Compared as numbers: a value only
- * reformatted is not an edit.
+ * The securities whose amounts or account placements the user changed since
+ * the calculation, or added. Compared as numbers: a value only reformatted is
+ * not an edit.
  */
-export function isAsCalculated(
+export function editedAssetIds(
   adjustments: PositionAdjustments,
   calculated: CalculatedAdjustments,
-): boolean {
+): Set<string> {
   const expected = adjustmentsFromCalculated(calculated);
   const same = (left: string | undefined, right: string | undefined) =>
     left !== undefined &&
     right !== undefined &&
     Math.abs(decimalInputOrZero(left) - decimalInputOrZero(right)) < AMOUNT_EPSILON;
-  const assetIds = new Set([...Object.keys(adjustments), ...Object.keys(expected)]);
-  for (const assetId of assetIds) {
+  const isEdited = (assetId: string) => {
     const actual = adjustments[assetId];
     const wanted = expected[assetId];
-    if (!actual || !wanted) return false;
+    if (!actual || !wanted) return true;
     if (actual.inputMode !== wanted.inputMode || !same(actual.inputValue, wanted.inputValue)) {
-      return false;
+      return true;
     }
     const accountIds = new Set([
       ...Object.keys(actual.accountAmounts),
       ...Object.keys(wanted.accountAmounts),
     ]);
-    for (const accountId of accountIds) {
-      if (!same(actual.accountAmounts[accountId], wanted.accountAmounts[accountId])) return false;
-    }
-  }
-  return true;
+    return [...accountIds].some(
+      (accountId) => !same(actual.accountAmounts[accountId], wanted.accountAmounts[accountId]),
+    );
+  };
+  return new Set(
+    [...new Set([...Object.keys(adjustments), ...Object.keys(expected)])].filter(isEdited),
+  );
+}
+
+/**
+ * The worksheet still holds the calculated amounts, so recalculating would
+ * replace nothing the user entered (§5).
+ */
+export function isAsCalculated(
+  adjustments: PositionAdjustments,
+  calculated: CalculatedAdjustments,
+): boolean {
+  return editedAssetIds(adjustments, calculated).size === 0;
+}
+
+/**
+ * How far a change split across accounts may be from the change, either way,
+ * and still be accepted: the larger of 1% of the change and the target's
+ * minimum line size, never under two cents. A remainder that small moves no
+ * category in a way that matters and would be flagged as too small to trade
+ * on its own, so it is stated rather than demanded. Under a whole-unit policy
+ * the last fraction of a unit buys nothing, so up to a unit's price may be
+ * left unplaced too.
+ */
+export function placementSlack(
+  requested: number,
+  minLineSize: number,
+  wholeUnitPrice: number | undefined,
+): { short: number; over: number } {
+  const over = Math.max(0.02, requested * 0.01, minLineSize);
+  return { short: wholeUnitPrice ? Math.max(over, wholeUnitPrice) : over, over };
 }
 
 /**
@@ -344,6 +384,89 @@ export function estimatedFunding(
   return estimates;
 }
 
+/**
+ * What one account can take of a change: what is left of it, capped by what
+ * the account can fund or holds, in whole units under a whole-unit policy.
+ * What is left is offered to the cent as the row shows it, so taking it
+ * completes the row; the cap is cut down to the cent, so the offer is never
+ * more than the account can fund. Nothing while the cap is not known:
+ * offering the whole change could place it where it cannot be funded.
+ */
+export function amountAccountCanTake(
+  remaining: number,
+  cap: number | undefined,
+  unitPrice: number | undefined,
+  wholeSharesOnly: boolean,
+  fractionDigits: number,
+): number {
+  if (cap === undefined) return 0;
+  const scale = 10 ** fractionDigits;
+  const capped = Math.min(
+    Math.round(remaining * scale) / scale,
+    floorToDigits(cap, fractionDigits),
+  );
+  // The unit price is derived from the recorded holding rather than the quote
+  // the core resolves against, so the floor gets a tolerance and never drops a
+  // unit over the last decimal. An amount that buys nothing is still offered:
+  // the core reports such a line, and withholding it only forces the same
+  // amount in by hand.
+  const wholeUnits =
+    wholeSharesOnly && unitPrice ? Math.floor(capped / unitPrice + 1e-9) * unitPrice : capped;
+  return floorToDigits(wholeUnits > AMOUNT_EPSILON ? wholeUnits : capped, fractionDigits);
+}
+
+/**
+ * An amount cut down to the currency's smallest unit, never rounded up past
+ * what it was: how much an account can fund is stated, and offered, this way.
+ */
+export function floorToDigits(amount: number, fractionDigits: number): number {
+  const scale = 10 ** fractionDigits;
+  return Math.floor(amount * scale + 1e-6) / scale;
+}
+
+/**
+ * Whether what an account has left is a shortfall, counted to the cent as the
+ * core counts it: dividing by a price leaves residue far past the cent, and an
+ * account spent to the cent is not short.
+ */
+export function isShortOfFunding(remaining: number): boolean {
+  return Math.round(remaining * 100) < 0;
+}
+
+/**
+ * Each account's name, told apart from another account of the same name by the
+ * end of its number, or else by its currency. Setup shows both beside the
+ * name; everywhere else the name stands alone and has to carry the difference.
+ */
+export function accountLabels(
+  accounts: readonly Pick<Account, "id" | "name" | "currency" | "accountNumber">[],
+): Map<string, string> {
+  const key = (name: string) => name.trim().toLowerCase();
+  const byName = new Map<string, number>();
+  for (const account of accounts) {
+    byName.set(key(account.name), (byName.get(key(account.name)) ?? 0) + 1);
+  }
+  return new Map(
+    accounts.map((account) => {
+      if ((byName.get(key(account.name)) ?? 0) < 2) return [account.id, account.name];
+      const number = account.accountNumber?.trim();
+      if (number) return [account.id, `${account.name} ··${number.slice(-4)}`];
+      const sharesCurrency = accounts.some(
+        (other) =>
+          other.id !== account.id &&
+          key(other.name) === key(account.name) &&
+          other.currency === account.currency,
+      );
+      return [
+        account.id,
+        account.currency && !sharesCurrency
+          ? `${account.name} (${account.currency})`
+          : account.name,
+      ];
+    }),
+  );
+}
+
 export function externalContributionFor(
   accountIds: readonly string[],
   entered: Readonly<Record<string, string>>,
@@ -368,6 +491,8 @@ export interface WorksheetGenerationInputs {
   externalContribution: Readonly<Record<string, number>>;
   /** Omitted means every recorded security; an empty list is a different, valid selection. */
   eligibleAssetIds?: readonly string[];
+  /** The securities that may be sold; omitted means every recorded security. */
+  sellableAssetIds?: readonly string[];
 }
 
 /**
@@ -397,6 +522,11 @@ export function generationInputsKey(inputs: WorksheetGenerationInputs): string {
           ),
         ]
       : []),
+    // Only when something is kept from the sales, so a worksheet calculated
+    // before it existed still matches.
+    ...(inputs.sellableAssetIds === undefined
+      ? []
+      : [{ sellable: [...inputs.sellableAssetIds].sort() }]),
   ]);
 }
 
@@ -438,7 +568,9 @@ export function impactClasses(
   const visibleRows = sourceRows.filter(
     (row) => row.currentBps > 0 || row.projectedBps > 0 || row.targetBps > 0,
   );
-  const colorMap = buildAllocationTargetColorMap(visibleRows);
+  // Colours come from the drift report's own list, as on the allocation page,
+  // so a class keeps its colour whichever classes the rail leaves out.
+  const colorMap = buildAllocationTargetColorMap([...report.rows, ...visibleRows]);
   return visibleRows.map((row, index) => ({
     categoryId: row.categoryId,
     categoryName: row.categoryName,
@@ -451,4 +583,67 @@ export function impactClasses(
     color: allocationTargetColorForRow(row, colorMap, index),
     effectiveBandBps: driftByCategory.get(row.categoryId)?.effectiveBandBps ?? defaultBandBps,
   }));
+}
+
+/** The target's blocking rules, as the calculation applies them (§4.1, #1177). */
+export interface StandingRules {
+  /** Whether a reduction of the security in this account is blocked. */
+  blocksReduce: (assetId: string, accountId: string, categoryIds: readonly string[]) => boolean;
+  /** Whether any increase of the security is blocked. */
+  blocksIncrease: (assetId: string, categoryIds: readonly string[]) => boolean;
+  /** Accounts whose holdings are never reduced. */
+  protectedAccountIds: ReadonlySet<string>;
+}
+
+/**
+ * Reads the target's constraints the way the core does: only `block` rules
+ * bind, `trade` covers both directions, and a category rule matches the
+ * classified categories a security counts towards, never Unknown. `avoid`
+ * only warns in the preview, so it stays out.
+ */
+export function standingRules(constraints: readonly AllocationTargetConstraint[]): StandingRules {
+  const blocks = constraints.filter((constraint) => constraint.effect === "block");
+  const covers = (constraint: AllocationTargetConstraint, action: "buy" | "sell") =>
+    constraint.action === "trade" || constraint.action === action;
+  const matches = (
+    constraint: AllocationTargetConstraint,
+    assetId: string,
+    accountId: string | null,
+    categoryIds: readonly string[],
+  ) => {
+    switch (constraint.subjectType) {
+      case "asset":
+        return constraint.subjectId === assetId;
+      case "account":
+        return accountId !== null && constraint.subjectId === accountId;
+      case "category":
+        return (
+          constraint.subjectId !== UNCLASSIFIED_CATEGORY_ID &&
+          categoryIds.includes(constraint.subjectId)
+        );
+    }
+  };
+  return {
+    blocksReduce: (assetId, accountId, categoryIds) =>
+      blocks.some(
+        (constraint) =>
+          covers(constraint, "sell") && matches(constraint, assetId, accountId, categoryIds),
+      ),
+    blocksIncrease: (assetId, categoryIds) =>
+      blocks.some(
+        (constraint) =>
+          covers(constraint, "buy") && matches(constraint, assetId, null, categoryIds),
+      ),
+    protectedAccountIds: new Set(
+      blocks
+        .filter((constraint) => constraint.subjectType === "account" && covers(constraint, "sell"))
+        .map((constraint) => constraint.subjectId),
+    ),
+  };
+}
+
+/** Up to three symbols, then how many more. */
+export function symbolList(symbols: readonly string[], more: (count: number) => string): string {
+  const shown = symbols.slice(0, 3).join(", ");
+  return symbols.length > 3 ? `${shown} ${more(symbols.length - 3)}` : shown;
 }

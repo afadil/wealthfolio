@@ -5,6 +5,8 @@ import type {
   WorksheetWarning,
 } from "@/lib/types";
 
+import { displayUnits } from "./allocation-worksheet-amounts";
+
 /** A number written with a fixed count of decimals, the way sums are read. */
 export interface DecimalCell {
   decimal: number;
@@ -46,7 +48,15 @@ export interface WorksheetExportLabels {
   price: string;
   priceDate: string;
   warnings: string;
+  status: string;
   statusUnresolved: string;
+  /** A line as calculated, and one the user changed or added. */
+  statusCalculated: string;
+  statusEdited: string;
+  direction: string;
+  increase: string;
+  reduce: string;
+  deposit: string;
   unknownAccount: string;
   total: string;
   cashLeft: string;
@@ -62,6 +72,10 @@ export interface WorksheetExportInput {
   accountIds: readonly string[];
   trackedCashToUse: number;
   externalCash: number;
+  /** What each account takes as a deposit not recorded yet. */
+  depositsByAccount: Readonly<Record<string, number>>;
+  /** Securities changed by hand since the calculation; absent when there is none. */
+  editedAssetIds: ReadonlySet<string> | undefined;
   /** A warning in the user's language and number format. */
   describeWarning: (warning: WorksheetWarning) => string;
 }
@@ -74,10 +88,6 @@ function lineCategory(line: AllocationWorksheetLineResult): string {
   return exposures
     .map((exposure) => `${exposure.categoryName} ${Math.round(exposure.weightBps / 100)}%`)
     .join(" · ");
-}
-
-function round(value: number, digits: number): number {
-  return Number(value.toFixed(digits));
 }
 
 /**
@@ -160,11 +170,20 @@ export function worksheetExportRows(
       left.symbol.localeCompare(right.symbol),
   );
 
+  // Calculated or edited, when there is a calculation to compare with.
+  const statusOf = (line: AllocationWorksheetLineResult) =>
+    input.editedAssetIds === undefined
+      ? ""
+      : input.editedAssetIds.has(line.assetId)
+        ? labels.statusEdited
+        : labels.statusCalculated;
   const rows: ExportCell[][] = [
     [
       labels.account,
       labels.symbol,
       labels.security,
+      labels.status,
+      labels.direction,
       `${labels.amount} (${currency})`,
       labels.quantity,
       `${labels.price} (${currency})`,
@@ -179,8 +198,11 @@ export function worksheetExportRows(
       accountName(line.accountId),
       line.symbol,
       line.name,
+      statusOf(line),
+      line.direction === "increase" ? labels.increase : labels.reduce,
       decimal(signedAmount(line)),
-      round(line.direction === "increase" ? line.quantity : -line.quantity, 6),
+      // An estimate, rounded as the screens show it; the amount is primary.
+      displayUnits(line.direction === "increase" ? line.quantity : -line.quantity),
       storedPrice(line.unitPrice),
       lineCategory(line),
       line.quoteSource.timestamp.slice(0, 10),
@@ -193,32 +215,51 @@ export function worksheetExportRows(
       "",
       "",
       "",
+      labels.statusUnresolved,
+      "",
       decimal(item.amount),
       "",
       "",
       item.categoryName,
       "",
-      labels.statusUnresolved,
+      "",
     ]);
   }
 
   // A table of its own rather than total rows among the lines, so a sum or a
   // filter over the amounts column counts each line once.
-  const accountIds = [...new Set(lines.map((line) => line.accountId))];
+  // Every account with a line or a deposit: a deposit is part of what the
+  // account's figures count on.
+  const accountIds = [
+    ...new Set([
+      ...lines.map((line) => line.accountId),
+      ...input.accountIds.filter((accountId) => (input.depositsByAccount[accountId] ?? 0) > 0),
+    ]),
+  ];
   const fundingByAccount = new Map(
     result.accountFunding.map((funding) => [funding.accountId, funding]),
   );
   if (accountIds.length > 0) {
     rows.push(
       [],
-      [labels.account, `${labels.total} (${currency})`, `${labels.cashLeft} (${currency})`],
+      [
+        labels.account,
+        `${labels.deposit} (${currency})`,
+        `${labels.total} (${currency})`,
+        `${labels.cashLeft} (${currency})`,
+      ],
     );
     for (const accountId of accountIds) {
       const net = lines
         .filter((line) => line.accountId === accountId)
         .reduce((sum, line) => sum + signedAmount(line), 0);
       const funding = fundingByAccount.get(accountId);
-      rows.push([accountName(accountId), decimal(net), funding ? decimal(funding.remaining) : ""]);
+      rows.push([
+        accountName(accountId),
+        decimal(input.depositsByAccount[accountId] ?? 0),
+        decimal(net),
+        funding ? decimal(funding.remaining) : "",
+      ]);
     }
   }
 

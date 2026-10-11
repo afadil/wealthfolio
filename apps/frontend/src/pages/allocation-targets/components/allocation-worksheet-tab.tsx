@@ -25,7 +25,7 @@ import {
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -62,6 +62,8 @@ import { useExchangeRates } from "@/pages/settings/general/exchange-rates/use-ex
 import { useAllocationWorksheet } from "../hooks/use-allocation-worksheet";
 import { useCalculatedAdjustments } from "../hooks/use-calculated-adjustments";
 import { useEligibleHoldingsSelection } from "../hooks/use-eligible-holdings";
+import { useTargetConstraints } from "../hooks/use-target-constraints";
+import { AddDepositButton } from "./allocation-worksheet-account-allocation";
 import { AmountsList, type AmountsRowModel } from "./allocation-worksheet-amounts-list";
 import { cashToUse, editableAmounts } from "./allocation-worksheet-cash";
 import { createHighlightStore, HighlightStoreContext } from "./allocation-worksheet-highlight";
@@ -69,12 +71,20 @@ import { rowStatus, type PlacementProblem } from "./allocation-worksheet-amounts
 import { ImpactRail } from "./allocation-worksheet-impact-rail";
 import { csvFile, toCsv, toTsv, worksheetExportRows } from "./allocation-worksheet-export";
 import { ReviewPanel } from "./allocation-worksheet-review";
-import { WorksheetSetup } from "./allocation-worksheet-setup";
+import {
+  allocationTargetColorForRow,
+  buildAllocationTargetColorMap,
+} from "./allocation-target-colors";
+import { SecuritiesCard } from "./allocation-worksheet-securities";
+import { categoriesByAsset, type TargetCategories } from "./eligible-holdings";
+import { WorksheetSetup, type CategoryReach } from "./allocation-worksheet-setup";
 import { describeWarning, type WarningFormatting } from "./allocation-worksheet-warnings";
 import {
+  accountLabels,
   adjustmentsFromCalculated,
   AMOUNT_EPSILON,
   decimalInputOrZero,
+  editedAssetIds,
   eligibleAccountIdsForChange,
   estimatedFunding,
   externalContributionFor,
@@ -83,10 +93,13 @@ import {
   generationInputsKey,
   impactClasses,
   isAsCalculated,
+  isShortOfFunding,
   parseDecimalInput,
   planningTotal,
   PRICE_MOVE_THRESHOLD,
+  placementSlack,
   soleHoldingAccountId,
+  standingRules,
   UNCLASSIFIED_CATEGORY_ID,
   UNRESOLVED_REASON_KEYS,
   unitPriceMoved,
@@ -98,7 +111,6 @@ import {
   type WorksheetGenerationInputs,
   type WorksheetPosition,
 } from "./allocation-worksheet-utils";
-import { EligibleHoldingsSelector, type TargetCategories } from "./eligible-holdings-selector";
 import { accountScopeKey } from "./target-scope";
 
 const DISCLOSURE_STORAGE_KEY = "wealthfolio:rebalancing-worksheet-disclosure:v2";
@@ -409,7 +421,15 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 interface FundingSummaryProps {
   result: AllocationWorksheetResult | null;
+  /**
+   * What each selected account has left by the page's own figures, until a
+   * preview reports it: placing a change needs it most before every change is
+   * placed, which is when the preview cannot run.
+   */
+  estimate: readonly { accountId: string; remaining: number }[] | undefined;
   accountNames: Map<string, string>;
+  /** Covers an account's shortfall with a deposit, when the user asks. */
+  onAddDeposit: (accountId: string, amount: number) => void;
   currency: string;
 }
 
@@ -418,31 +438,42 @@ interface FundingSummaryProps {
  * is reported, never corrected: after prefill the worksheet is the source of
  * truth (§5).
  */
-function FundingSummary({ result, accountNames, currency }: FundingSummaryProps) {
+function FundingSummary({
+  result,
+  estimate,
+  accountNames,
+  onAddDeposit,
+  currency,
+}: FundingSummaryProps) {
   const { t } = useTranslation();
   const { formatAmount } = useAmountFormatting();
+  const rows = result ? result.accountFunding : estimate;
+  const isEstimate = !result && estimate !== undefined;
+  // What the accounts have left between them. A shortfall is stated on its own
+  // account and never offset by another's surplus (§6).
+  const left = (rows ?? []).reduce((sum, funding) => sum + Math.max(0, funding.remaining), 0);
+  const amountOf = (amount: number) =>
+    isEstimate ? `≈ ${formatAmount(amount, currency)}` : formatAmount(amount, currency);
 
   return (
     <div className="min-w-0 p-5 sm:p-6">
       <Eyebrow>{t("allocation:worksheet.fundingLabel")}</Eyebrow>
-      {!result ? (
+      {!rows ? (
         <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
           {t("allocation:worksheet.fundingPending")}
         </p>
       ) : (
         <>
-          <p className="mt-2 font-mono text-xl font-semibold leading-tight">
-            {formatAmount(result.cashRemaining, currency)}
-          </p>
+          <p className="mt-2 font-mono text-xl font-semibold leading-tight">{amountOf(left)}</p>
           <p className="text-muted-foreground mt-1 text-xs">
             {t(
-              result.cashRemaining < 0
-                ? "allocation:worksheet.fundingShort"
+              isEstimate
+                ? "allocation:worksheet.fundingLeftEstimate"
                 : "allocation:worksheet.fundingLeft",
             )}
           </p>
           <ul className="mt-4 divide-y">
-            {result.accountFunding.map((funding) => (
+            {rows.map((funding) => (
               <li key={funding.accountId} className="py-2 text-xs">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 truncate font-medium">
@@ -452,17 +483,25 @@ function FundingSummary({ result, accountNames, currency }: FundingSummaryProps)
                   <span
                     className={cn(
                       "shrink-0 font-mono tabular-nums",
-                      funding.remaining < 0 && "text-amber-800 dark:text-amber-200",
+                      isShortOfFunding(funding.remaining) && "text-amber-800 dark:text-amber-200",
                     )}
                   >
-                    {formatAmount(funding.remaining, currency)}
+                    {amountOf(funding.remaining)}
                   </span>
                 </div>
-                {funding.remaining < 0 && (
-                  <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-200">
-                    {t("allocation:worksheet.fundingNeeded", {
-                      amount: formatAmount(-funding.remaining, currency),
-                    })}
+                {isShortOfFunding(funding.remaining) && (
+                  <p className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-2 text-[11px] text-amber-800 dark:text-amber-200">
+                    <span>
+                      {t("allocation:worksheet.fundingNeeded", {
+                        amount: formatAmount(-funding.remaining, currency),
+                      })}
+                    </span>
+                    <AddDepositButton
+                      amount={-funding.remaining}
+                      account={accountNames.get(funding.accountId) ?? ""}
+                      currency={currency}
+                      onAdd={(amount) => onAddDeposit(funding.accountId, amount)}
+                    />
                   </p>
                 )}
               </li>
@@ -671,6 +710,19 @@ export function AllocationWorksheetTab({
   const { data: portfolios = [] } = usePortfolios();
 
   const [panel, setPanel] = useState<WorksheetPanel>("setup");
+  const worksheetRef = useRef<HTMLDivElement>(null);
+  const shownPanelRef = useRef(panel);
+  // A step opens at its top, wherever the last one was left: at once, since
+  // the content was replaced rather than moved. Before paint, and before an
+  // issue's own scroll to its row, which waits for the next frame.
+  useLayoutEffect(() => {
+    if (shownPanelRef.current === panel) return;
+    shownPanelRef.current = panel;
+    const worksheet = worksheetRef.current;
+    if (worksheet && worksheet.getBoundingClientRect().top < 0) {
+      worksheet.scrollIntoView({ behavior: "instant", block: "start" });
+    }
+  }, [panel]);
   const [editMode, setEditMode] = useState<WorksheetEditMode>("amount");
   const [mode, setMode] = useState<WorksheetMode>("invest_cash");
   // `null` follows the cash the chosen accounts record; a string is the
@@ -795,10 +847,15 @@ export function AllocationWorksheetTab({
   const changeHoldings = scopedHoldings.filter((holding) =>
     changeAccountIds.includes(holding.accountId),
   );
-  const eligibility = useEligibleHoldingsSelection(
-    changeHoldings,
-    `${draftStorageKey ?? ""}:${[...changeAccountIds].sort().join(",")}`,
-  );
+  const holdingsKey = `${draftStorageKey ?? ""}:${[...changeAccountIds].sort().join(",")}`;
+  // What the calculation may increase, and apart from it what it may reduce:
+  // the user knows which positions they would rather not sell this time.
+  const eligibility = useEligibleHoldingsSelection(changeHoldings, holdingsKey);
+  const sellability = useEligibleHoldingsSelection(changeHoldings, holdingsKey);
+  // The target's never-reduced rules, which the calculation applies whatever
+  // Setup says; Setup shows them rather than offering a choice it ignores.
+  const { constraints } = useTargetConstraints(profile?.id);
+  const rules = useMemo(() => standingRules(constraints), [constraints]);
 
   const cryptoAssetIds = useMemo(
     () =>
@@ -834,10 +891,7 @@ export function AllocationWorksheetTab({
     () => new Map(scopedAccounts.map((account) => [account.id, account])),
     [scopedAccounts],
   );
-  const accountNames = useMemo(
-    () => new Map(scopedAccounts.map((account) => [account.id, account.name])),
-    [scopedAccounts],
-  );
+  const accountNames = useMemo(() => accountLabels(scopedAccounts), [scopedAccounts]);
   const assetSourceVersion = useMemo(
     () => eligibleAssets.map((asset) => `${asset.id}:${asset.updatedAt}`).join("|"),
     [eligibleAssets],
@@ -1086,6 +1140,8 @@ export function AllocationWorksheetTab({
     trackedCashByAccount,
     externalContribution,
     eligibleAssetIds: eligibility.eligibleAssetIds,
+    // Invest cash never reduces, so what it may reduce is no input there.
+    sellableAssetIds: mode === "rebalance" ? sellability.eligibleAssetIds : undefined,
   };
   // The cash the accounts record comes back with the first preview, after the
   // worksheet opens. Until then what each account spends is unknown rather
@@ -1151,6 +1207,10 @@ export function AllocationWorksheetTab({
     });
   }
 
+  // Reductions follow Rebalance, which the target's own setting may withhold:
+  // Invest cash only adds, in the calculation and by hand alike.
+  const allowsReductions = profile.allowSells && mode === "rebalance";
+  const minLineSize = decimalInputOrZero(profile.minTradeAmount ?? "");
   const prepared: PreparedWorksheet = (() => {
     const lines: AllocationWorksheetLineInput[] = [];
     let increaseTotal = 0;
@@ -1178,9 +1238,14 @@ export function AllocationWorksheetTab({
       const changeAmount = positionChangeAmount(adjustment, position, basis);
       if (!adjustment || Math.abs(changeAmount) < AMOUNT_EPSILON) continue;
 
-      if (changeAmount < 0 && !profile.allowSells) {
+      if (changeAmount < 0 && !allowsReductions) {
         flag({
-          message: t("allocation:worksheet.reductionsDisabledIssue", { symbol: position.symbol }),
+          message: t(
+            profile.allowSells
+              ? "allocation:worksheet.reductionsNeedRebalanceIssue"
+              : "allocation:worksheet.reductionsDisabledIssue",
+            { symbol: position.symbol },
+          ),
           kind: "position",
           assetId: position.assetId,
         });
@@ -1259,16 +1324,20 @@ export function AllocationWorksheetTab({
       }
 
       const allocatedAmount = allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
-      // Under a whole-unit policy the last fraction of a unit buys nothing, so
-      // no account can take it. Demanding it be placed would leave the
-      // worksheet permanently unreviewable; anything from a whole unit up still
-      // has to be placed.
+      // A split a little off the change, either way, is accepted and stated
+      // rather than demanded (placementSlack): the calculation sizes changes to
+      // fractions of a cent while each account takes whole cents, and a few
+      // dollars on a large change move nothing that matters. More than that
+      // still blocks, so a change left half placed is not missed.
       const positionUnitPrice = unitPriceFor(position);
-      const unplaceable =
-        profile.wholeSharesOnly && positionUnitPrice ? Math.max(0.02, positionUnitPrice) : 0.02;
+      const slack = placementSlack(
+        requestedAmount,
+        minLineSize,
+        profile.wholeSharesOnly ? positionUnitPrice : undefined,
+      );
       const shortfall = requestedAmount - allocatedAmount;
       const excess = allocatedAmount - requestedAmount;
-      if (eligibleAccounts.length > 1 && (shortfall > unplaceable || excess > 0.02)) {
+      if (eligibleAccounts.length > 1 && (shortfall > slack.short || excess > slack.over)) {
         flag({
           message: t("allocation:worksheet.allocateAccountsIssue", {
             symbol: position.symbol,
@@ -1277,7 +1346,7 @@ export function AllocationWorksheetTab({
           kind: "allocation",
           assetId: position.assetId,
           placement:
-            excess > 0.02
+            excess > slack.over
               ? { reason: "over", amount: excess }
               : allocatedAmount < AMOUNT_EPSILON
                 ? { reason: "not_placed" }
@@ -1286,12 +1355,10 @@ export function AllocationWorksheetTab({
         continue;
       }
       ledger.isValid = true;
-      if (eligibleAccounts.length > 1) {
-        placedAccountIds.set(
-          position.assetId,
-          allocations.map((allocation) => allocation.accountId),
-        );
-      }
+      placedAccountIds.set(
+        position.assetId,
+        allocations.map((allocation) => allocation.accountId),
+      );
 
       for (const allocation of allocations) {
         const accountHolding = position.accountHoldings.find(
@@ -1370,6 +1437,20 @@ export function AllocationWorksheetTab({
         ]),
       )
     : undefined;
+  // Each selected account's funding after everything placed so far, the
+  // page's own estimate for Funding left until a preview reports it.
+  const fundingEstimate = fundingBase
+    ? [...estimatedFunding(fundingBase, prepared.placements, "", changeAccountIds)]
+        .map(([accountId, estimate]) => ({
+          accountId,
+          remaining: estimate.capacity - estimate.deficit,
+        }))
+        .sort((left, right) =>
+          (accountNames.get(left.accountId) ?? "").localeCompare(
+            accountNames.get(right.accountId) ?? "",
+          ),
+        )
+    : undefined;
   const amountsRows: AmountsRowModel[] = positions.map((position) => {
     const unitPrice = resolvedPriceByAsset.get(position.assetId) ?? unitPriceFor(position);
     const adjustment = adjustments[position.assetId];
@@ -1410,7 +1491,9 @@ export function AllocationWorksheetTab({
             : undefined,
         stalePriceDate:
           quote?.quote && quote.isStale ? (quote.quoteDate ?? quote.quote.timestamp) : undefined,
-        isExcluded: eligibility.excludedAssetIds.has(position.assetId),
+        isExcluded: (changeAmount < 0 ? sellability : eligibility).excludedAssetIds.has(
+          position.assetId,
+        ),
         placedAccountIds: prepared.placedAccountIds.get(position.assetId) ?? [],
       }),
       asset: eligibleAssets.find((item) => item.id === position.assetId),
@@ -1432,6 +1515,7 @@ export function AllocationWorksheetTab({
                   accounts.map((account) => account.id),
                 )
               : undefined,
+          deployedByAccount: fundingBase,
           problem: prepared.rowIssues.get(position.assetId)?.placement,
         };
       })(),
@@ -1460,11 +1544,31 @@ export function AllocationWorksheetTab({
   }
 
   function updatePositionInput(position: WorksheetPosition, value: string) {
-    updateAdjustment(position.assetId, {
+    const current = adjustments[position.assetId];
+    const directionOf = (adjustment: PositionAdjustment | undefined) => {
+      const amount = positionChangeAmount(adjustment, position, basis);
+      if (!Number.isFinite(amount) || Math.abs(amount) < AMOUNT_EPSILON) return undefined;
+      return amount > 0 ? 1 : -1;
+    };
+    // The amounts already placed stay while the total is edited; the status
+    // says how far apart they are.
+    const next: PositionAdjustment = {
+      ...current,
       inputMode: editMode,
       inputValue: value,
-      accountAmounts: {},
-    });
+      accountAmounts: current?.accountAmounts ?? {},
+    };
+    const placedFor = current?.placedDirection ?? directionOf(current);
+    const direction = directionOf(next) ?? placedFor;
+    // A change that turns around draws on other accounts' holdings, so its
+    // split is set aside rather than carried over, and comes back if it turns
+    // back again.
+    if (placedFor && direction && direction !== placedFor) {
+      next.accountAmounts = current?.setAsideAccountAmounts ?? {};
+      next.setAsideAccountAmounts = current?.accountAmounts;
+    }
+    next.placedDirection = direction;
+    updateAdjustment(position.assetId, next);
   }
 
   function reducePositionToZero(position: WorksheetPosition) {
@@ -1511,6 +1615,22 @@ export function AllocationWorksheetTab({
     });
   }
 
+  /**
+   * Covers an account's shortfall with a deposit, the same cash not recorded
+   * yet that Setup takes, rounded up to the cent. The user asks for it; the
+   * app never adds one on its own, since placing the change elsewhere may be
+   * the better answer.
+   */
+  function addDeposit(accountId: string, amount: number) {
+    const scale = 10 ** fractionDigits;
+    const rounded = Math.ceil(amount * scale - 1e-6) / scale;
+    if (rounded <= 0) return;
+    setExternalCash((current) => {
+      const now = Math.max(0, decimalInputOrZero(current[accountId] ?? ""));
+      return { ...current, [accountId]: formatDecimalInput(now + rounded, fractionDigits) };
+    });
+  }
+
   function removeAddedPosition(assetId: string) {
     setAddedAssetIds((current) => current.filter((id) => id !== assetId));
     updateAdjustment(assetId, null);
@@ -1522,12 +1642,16 @@ export function AllocationWorksheetTab({
     });
   }
 
-  /** Replaces the worksheet with a calculated set. Only the two explicit actions call this. */
+  /**
+   * Replaces the worksheet's amounts with a calculated set. Only the two
+   * explicit actions call this. Added securities stay: the user chose them as
+   * part of the scope, and the calculation gives what is not held nothing, so
+   * their amounts start empty.
+   */
   function applyCalculated(calculated: CalculatedAdjustments) {
     const prefilled = adjustmentsFromCalculated(calculated);
     setEditMode("amount");
     setAdjustments(prefilled);
-    setAddedAssetIds([]);
     setExpandedAssetIds(new Set());
     setResult(null);
     setCalculationError(null);
@@ -1546,6 +1670,7 @@ export function AllocationWorksheetTab({
         cash: cashInput,
         selectedAccountIds: changeAccountIds,
         eligibleAssetIds: generationInputs.eligibleAssetIds,
+        sellableAssetIds: generationInputs.sellableAssetIds,
       });
       setGenerated({ calculated, inputsKey: generationInputsKey(generationInputs) });
       applyCalculated(calculated);
@@ -1692,6 +1817,8 @@ export function AllocationWorksheetTab({
         accountIds: changeAccountIds,
         trackedCashToUse,
         externalCash: externalTotal,
+        depositsByAccount: externalContribution,
+        editedAssetIds: calculated ? editedAssetIds(adjustments, calculated) : undefined,
         describeWarning: wordWarning,
       },
       {
@@ -1735,7 +1862,14 @@ export function AllocationWorksheetTab({
         price: t("allocation:worksheet.unitPrice"),
         priceDate: t("allocation:worksheet.exportPriceDate"),
         warnings: t("allocation:worksheet.exportWarnings"),
+        status: t("allocation:worksheet.exportStatus"),
         statusUnresolved: t("allocation:worksheet.exportStatusUnresolved"),
+        statusCalculated: t("allocation:worksheet.exportStatusCalculated"),
+        statusEdited: t("allocation:worksheet.exportStatusEdited"),
+        direction: t("allocation:worksheet.exportDirection"),
+        increase: t("allocation:worksheet.allowIncrease"),
+        reduce: t("allocation:worksheet.allowReduce"),
+        deposit: t("allocation:worksheet.depositAdd"),
         unknownAccount: t("allocation:worksheet.unknownAccount"),
         total: t("allocation:worksheet.accountTotal"),
         cashLeft: t("allocation:result.cashRemaining"),
@@ -1792,9 +1926,9 @@ export function AllocationWorksheetTab({
     </div>
   );
 
-  // The picker groups securities by the target's categories, the ones below
-  // target first since they receive the increases, so the user sees which of
-  // them would be left with nothing eligible.
+  // The securities card groups securities by the target's categories, the
+  // ones below target first since they receive the increases.
+  const colorByCategory = buildAllocationTargetColorMap(driftReport.rows);
   const targetCategories: TargetCategories | undefined = driftReport.holdings
     ? {
         order: driftReport.rows
@@ -1802,21 +1936,70 @@ export function AllocationWorksheetTab({
           .map((row) => ({
             id: row.categoryId,
             name: row.categoryName,
+            // The allocation page's colours, so a category reads the same everywhere.
+            color: allocationTargetColorForRow(row, colorByCategory),
             isBelowTarget: row.valueDelta < 0,
           }))
           .sort((left, right) => Number(right.isBelowTarget) - Number(left.isBelowTarget)),
-        byAsset: driftReport.holdings.rows.reduce((byAsset, row) => {
-          if (row.isCash || row.isUnknownCategory) return byAsset;
-          const current = byAsset.get(row.assetId) ?? [];
-          if (!current.includes(row.categoryId))
-            byAsset.set(row.assetId, [...current, row.categoryId]);
-          return byAsset;
-        }, new Map<string, string[]>()),
+        byAsset: categoriesByAsset(driftReport.holdings.rows),
       }
     : undefined;
 
+  // What the target's rules take out of the calculation's hands in the
+  // selected accounts: a reduction where every account holding the security
+  // is covered, an increase wherever it is covered.
+  const categoriesOf = (assetId: string) => targetCategories?.byAsset.get(assetId) ?? [];
+  const reduceProtected = new Set(
+    eligibility.eligibleHoldings
+      .filter((holding) =>
+        holding.accountIds.every((accountId) =>
+          rules.blocksReduce(holding.assetId, accountId, categoriesOf(holding.assetId)),
+        ),
+      )
+      .map((holding) => holding.assetId),
+  );
+  const increaseProtected = new Set(
+    eligibility.eligibleHoldings
+      .filter((holding) => rules.blocksIncrease(holding.assetId, categoriesOf(holding.assetId)))
+      .map((holding) => holding.assetId),
+  );
+
+  // What each category's gap can reach in the selected accounts, with the
+  // securities as they are set: the gap card says it beside the amount.
+  const reach = new Map<string, CategoryReach>(
+    (targetCategories?.order ?? []).map((category) => {
+      const held = eligibility.eligibleHoldings.filter((holding) =>
+        (targetCategories?.byAsset.get(holding.assetId) ?? []).includes(category.id),
+      );
+      // Two assets can share a symbol; the note names each symbol once.
+      const symbols = (holdings: typeof held) => [
+        ...new Set(holdings.map((holding) => holding.symbol)),
+      ];
+      return [
+        category.id,
+        {
+          held: symbols(held),
+          increase: symbols(
+            held.filter(
+              (holding) =>
+                !eligibility.excludedAssetIds.has(holding.assetId) &&
+                !increaseProtected.has(holding.assetId),
+            ),
+          ),
+          reduce: symbols(
+            held.filter(
+              (holding) =>
+                !sellability.excludedAssetIds.has(holding.assetId) &&
+                !reduceProtected.has(holding.assetId),
+            ),
+          ),
+        },
+      ];
+    }),
+  );
+
   // The target's limits, said once with the securities they shape.
-  const minLine = decimalInputOrZero(profile.minTradeAmount ?? "");
+  const minLine = minLineSize;
   const targetLimits = [
     profile.wholeSharesOnly ? t("allocation:worksheet.limitWholeUnits") : null,
     minLine > 0
@@ -1879,9 +2062,8 @@ export function AllocationWorksheetTab({
    * calculation are replaced only once the user says so (§5).
    */
   function goToAdjust() {
-    const hasEdits =
-      generated !== null &&
-      (addedAssetIds.length > 0 || !isAsCalculated(adjustments, generated.calculated));
+    // An added security is scope, not an edit; an amount typed for it is.
+    const hasEdits = generated !== null && !isAsCalculated(adjustments, generated.calculated);
     if (!nextNeedsCalculation) {
       setPanel("amounts");
     } else if (hasEdits) {
@@ -1941,7 +2123,7 @@ export function AllocationWorksheetTab({
   );
 
   return (
-    <div className="space-y-4">
+    <div ref={worksheetRef} className="space-y-4">
       <AlertDialog open={firstUseOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2032,18 +2214,27 @@ export function AllocationWorksheetTab({
           onExternalCashChange={(accountId, value) =>
             setExternalCash((current) => ({ ...current, [accountId]: value }))
           }
+          reach={reach}
+          protectedAccountIds={rules.protectedAccountIds}
           eligibleSecurities={
-            <EligibleHoldingsSelector
-              variant="card"
-              holdings={scopedHoldings}
-              excludedAssetIds={eligibility.excludedAssetIds}
-              onToggle={eligibility.toggle}
-              onSelectAll={eligibility.selectAll}
-              onClear={eligibility.clear}
-              accountNames={accountNames}
+            <SecuritiesCard
+              holdings={changeHoldings}
               categories={targetCategories}
-              rule={t("allocation:worksheet.ruleCurrentHoldingProportionsHint")}
+              increaseExcluded={eligibility.excludedAssetIds}
+              reduceExcluded={sellability.excludedAssetIds}
+              increaseProtected={increaseProtected}
+              reduceProtected={reduceProtected}
+              onToggleIncrease={eligibility.toggle}
+              onToggleReduce={sellability.toggle}
+              onSetIncrease={eligibility.setIncluded}
+              onSetReduce={sellability.setIncluded}
+              isRebalance={mode === "rebalance"}
+              assets={eligibleAssets}
+              addedAssetIds={addedAssetIds}
+              onAdd={(assetId) => setAddedAssetIds((current) => [...current, assetId])}
+              onRemove={removeAddedPosition}
               limits={targetLimits}
+              currency={currency}
             />
           }
           blockingIssues={[
@@ -2123,7 +2314,7 @@ export function AllocationWorksheetTab({
                         }
                         editMode={editMode}
                         currency={currency}
-                        allowSells={profile.allowSells}
+                        allowSells={allowsReductions}
                         wholeSharesOnly={profile.wholeSharesOnly}
                         fundingByAccount={fundingByAccount}
                         isPriceSyncing={syncPrice.isPending}
@@ -2139,6 +2330,7 @@ export function AllocationWorksheetTab({
                               return next;
                             }),
                           onAccountAmountChange: updateAccountAmount,
+                          onAddDeposit: addDeposit,
                           onPriceAction: (assetId, asset) => {
                             if (asset?.quoteMode === "MARKET") syncPrice.mutate([asset.id]);
                             else navigate(`/holdings/${assetId}`);
@@ -2178,6 +2370,8 @@ export function AllocationWorksheetTab({
                     })}
                     calculationError={calculationError}
                     accountNames={accountNames}
+                    depositsByAccount={externalContribution}
+                    onAddDeposit={addDeposit}
                     currency={currency}
                     onOpenRow={(assetId) => {
                       const issue = prepared.rowIssues.get(assetId);
@@ -2238,18 +2432,18 @@ export function AllocationWorksheetTab({
                     >
                       {exportMessage}
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-2">
+                      <Button disabled={!canExport} onClick={() => void exportWorksheet("csv")}>
+                        <Icons.Download className="mr-1.5 h-4 w-4" />
+                        {t("allocation:worksheet.exportCsv")}
+                      </Button>
                       <Button
                         variant="outline"
                         disabled={!canExport}
                         onClick={() => void exportWorksheet("copy")}
                       >
                         <Icons.Copy className="mr-1.5 h-4 w-4" />
-                        {t("allocation:worksheet.copyTable")}
-                      </Button>
-                      <Button disabled={!canExport} onClick={() => void exportWorksheet("csv")}>
-                        <Icons.Download className="mr-1.5 h-4 w-4" />
-                        {t("allocation:worksheet.exportCsv")}
+                        {t("allocation:worksheet.copyForSpreadsheet")}
                       </Button>
                     </div>
                   </>
@@ -2274,6 +2468,8 @@ export function AllocationWorksheetTab({
                   <CardContent className="p-0">
                     <FundingSummary
                       result={isResultStale ? null : result}
+                      estimate={fundingEstimate}
+                      onAddDeposit={addDeposit}
                       accountNames={accountNames}
                       currency={currency}
                     />

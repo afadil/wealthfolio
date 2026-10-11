@@ -17,10 +17,12 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { AddDepositButton } from "./allocation-worksheet-account-allocation";
+import { displayUnits } from "./allocation-worksheet-amounts";
 import {
-  AMOUNT_EPSILON,
   formatDecimalInput,
   formatSignedAmount,
+  isShortOfFunding,
 } from "./allocation-worksheet-utils";
 
 /** A change the review cannot include yet, and why. */
@@ -40,6 +42,10 @@ interface ReviewPanelProps {
   heldLines: readonly HeldLine[];
   calculationError: { title: string; description?: string } | null;
   accountNames: ReadonlyMap<string, string>;
+  /** What each account takes as a deposit not recorded yet. */
+  depositsByAccount: Readonly<Record<string, number>>;
+  /** Covers an account's shortfall with a deposit, when the user asks. */
+  onAddDeposit: (accountId: string, amount: number) => void;
   currency: string;
   onOpenRow: (assetId: string) => void;
   /** A warning in the user's language and number format. */
@@ -64,6 +70,8 @@ export function ReviewPanel({
   heldLines,
   calculationError,
   accountNames,
+  depositsByAccount,
+  onAddDeposit,
   currency,
   onOpenRow,
   describeWarning,
@@ -182,7 +190,7 @@ export function ReviewPanel({
         {[...groups].map(([accountId, lines]) => {
           const funding = fundingByAccount.get(accountId);
           const net = lines.reduce((sum, line) => sum + signedLineAmount(line), 0);
-          const isShort = funding !== undefined && funding.remaining < -AMOUNT_EPSILON;
+          const isShort = funding !== undefined && isShortOfFunding(funding.remaining);
           return (
             <section key={accountId} data-review-account={accountId} className="border-b">
               <div className="bg-muted/15 px-4 py-2.5 sm:px-5">
@@ -218,7 +226,11 @@ export function ReviewPanel({
                               type="button"
                               className="text-muted-foreground border-muted-foreground/40 w-fit cursor-help border-b border-dotted font-mono text-[11px] tabular-nums sm:justify-self-end"
                             >
-                              ≈ {formatQuantity(line.quantity)}
+                              {/* Rounded as Adjust positions shows it; the tooltip
+                                  says where the price comes from. */}
+                              {t("allocation:worksheet.accountUnitsSummary", {
+                                quantity: formatQuantity(displayUnits(Math.abs(line.quantity))),
+                              })}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="left" className="max-w-80 space-y-1 text-xs">
@@ -288,6 +300,27 @@ export function ReviewPanel({
                       : t("allocation:worksheet.accountCashLeft", {
                           amount: formatAmount(funding.remaining, currency),
                         })}
+                  </p>
+                )}
+                {/* The deposit the account's figures count on, said with them, and
+                    a shortfall's way out: a deposit the user adds. */}
+                {((depositsByAccount[accountId] ?? 0) > 0 || (funding && isShort)) && (
+                  <p className="text-muted-foreground col-span-full flex flex-wrap justify-end gap-x-3 text-right text-[11px]">
+                    {(depositsByAccount[accountId] ?? 0) > 0 && (
+                      <span>
+                        {t("allocation:worksheet.depositIncluded", {
+                          amount: formatAmount(depositsByAccount[accountId] ?? 0, currency),
+                        })}
+                      </span>
+                    )}
+                    {funding && isShort && (
+                      <AddDepositButton
+                        amount={-funding.remaining}
+                        account={accountNames.get(accountId) ?? ""}
+                        currency={currency}
+                        onAdd={(amount) => onAddDeposit(accountId, amount)}
+                      />
+                    )}
                   </p>
                 )}
               </div>

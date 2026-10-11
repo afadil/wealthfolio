@@ -1,4 +1,4 @@
-import type { Holding } from "@/lib/types";
+import type { DriftReport, Holding } from "@/lib/types";
 
 export interface EligibleHolding {
   assetId: string;
@@ -9,9 +9,9 @@ export interface EligibleHolding {
   instrumentType?: string | null;
   /** Accounts that hold this security. */
   accountIds: string[];
+  /** What it is worth across those accounts, in the base currency. */
+  value: number;
 }
-
-const GROUP_ORDER = ["EQUITY", "BOND", "CRYPTO", "OPTION", "METAL", "FX"];
 
 function compareText(a: string, b: string): number {
   const left = a.toLowerCase();
@@ -34,6 +34,7 @@ export function getEligibleHoldings(holdings: Holding[]): EligibleHolding[] {
           exchangeMic: instrument.exchangeMic,
           instrumentType: instrument.instrumentType,
           accountIds: [holding.accountId],
+          value: holding.marketValue?.base ?? 0,
         },
       ];
     })
@@ -56,34 +57,35 @@ export function getEligibleHoldings(holdings: Holding[]): EligibleHolding[] {
     for (const accountId of row.accountIds) {
       if (!existing.accountIds.includes(accountId)) existing.accountIds.push(accountId);
     }
+    existing.value += row.value;
   }
   return [...unique.values()];
 }
 
-function groupKey(row: EligibleHolding): string {
-  const key = row.instrumentType?.trim().toUpperCase();
-  return key && GROUP_ORDER.includes(key) ? key : "OTHER";
+export interface TargetCategories {
+  /** The target's categories, below target first. */
+  order: readonly { id: string; name: string; color?: string; isBelowTarget: boolean }[];
+  /** The categories each security counts towards, keyed by asset, its largest share first. */
+  byAsset: ReadonlyMap<string, readonly string[]>;
 }
 
-function groupSortKey(key: string): [number, string] {
-  const index = GROUP_ORDER.indexOf(key);
-  return [index === -1 ? GROUP_ORDER.length : index, key];
-}
-
-export function groupEligibleHoldings(
-  holdings: EligibleHolding[],
-): { key: string; holdings: EligibleHolding[] }[] {
-  const grouped = new Map<string, EligibleHolding[]>();
-  for (const holding of holdings) {
-    const key = groupKey(holding);
-    grouped.set(key, [...(grouped.get(key) ?? []), holding]);
+/** The categories each security counts towards, its largest share first. */
+export function categoriesByAsset(
+  rows: NonNullable<DriftReport["holdings"]>["rows"],
+): Map<string, string[]> {
+  const values = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    // Unknown is a category like any other here: the calculation reduces what
+    // it holds when it sits above its target of nothing.
+    if (row.isCash) continue;
+    const byCategory = values.get(row.assetId) ?? new Map<string, number>();
+    byCategory.set(row.categoryId, (byCategory.get(row.categoryId) ?? 0) + row.value);
+    values.set(row.assetId, byCategory);
   }
-
-  return [...grouped.entries()]
-    .sort(([a], [b]) => {
-      const [aOrder, aName] = groupSortKey(a);
-      const [bOrder, bName] = groupSortKey(b);
-      return aOrder - bOrder || compareText(aName, bName);
-    })
-    .map(([key, rows]) => ({ key, holdings: rows }));
+  return new Map(
+    [...values].map(([assetId, byCategory]) => [
+      assetId,
+      [...byCategory].sort((left, right) => right[1] - left[1]).map(([categoryId]) => categoryId),
+    ]),
+  );
 }
