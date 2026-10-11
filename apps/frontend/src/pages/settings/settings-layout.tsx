@@ -159,43 +159,38 @@ export default function SettingsLayout() {
             </div>
           </div>
           <div className="space-y-6 p-3 pb-[var(--mobile-nav-total-offset)]">
-            {sections.map((section) => {
-              const mobileItems = section.items.filter((item) => item.href !== "agent-access");
-              if (mobileItems.length === 0) return null;
-
-              return (
-                <div key={section.title} className="space-y-3">
-                  <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
-                    {section.title}
-                  </div>
-                  <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
-                    {mobileItems.map((item) => (
-                      <button
-                        key={item.href}
-                        onClick={() => navigate(item.href)}
-                        className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
-                        aria-label={item.title}
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <div className="text-muted-foreground shrink-0">{item.icon}</div>
-                          <div className="min-w-0">
-                            <div className="text-foreground truncate text-base font-medium">
-                              {item.title}
-                            </div>
-                            {item?.subtitle && (
-                              <div className="text-muted-foreground truncate text-sm">
-                                {item.subtitle}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
+            {sections.map((section) => (
+              <div key={section.title} className="space-y-3">
+                <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
+                  {section.title}
                 </div>
-              );
-            })}
+                <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
+                  {section.items.map((item) => (
+                    <button
+                      key={item.href}
+                      onClick={() => navigate(item.href)}
+                      className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
+                      aria-label={item.title}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="text-muted-foreground shrink-0">{item.icon}</div>
+                        <div className="min-w-0">
+                          <div className="text-foreground truncate text-base font-medium">
+                            {item.title}
+                          </div>
+                          {item?.subtitle && (
+                            <div className="text-muted-foreground truncate text-sm">
+                              {item.subtitle}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </ApplicationShell>
