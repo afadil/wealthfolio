@@ -10,7 +10,7 @@ use super::models::{
 use crate::broker_ingest::BrokerSyncState;
 use crate::broker_ingest::{ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary};
 use crate::platform::Platform;
-use wealthfolio_core::accounts::Account;
+use wealthfolio_core::accounts::{account_types, Account};
 use wealthfolio_core::errors::Result;
 
 /// Account tracking modes accepted by Wealthfolio Connect account-scoped endpoints.
@@ -38,23 +38,23 @@ pub struct BrokerAccountContext {
 
 impl BrokerAccountContext {
     pub fn from_account(account: &Account) -> Self {
-        let metadata = account
+        // Broker sync has always stored the provider label under `raw_type`.
+        let raw_type = account
             .meta
             .as_deref()
-            .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok());
-        let raw_type = metadata.as_ref().and_then(|meta| {
-            ["broker_raw_type", "raw_type"].iter().find_map(|key| {
-                meta.get(key)
+            .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+            .and_then(|meta| {
+                meta.get("raw_type")
                     .and_then(serde_json::Value::as_str)
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
                     .map(String::from)
-            })
-        });
+            });
         let account_type = match account.account_type.as_str() {
-            "SECURITIES" | "CASH" | "CREDIT_CARD" | "CRYPTOCURRENCY" => {
-                Some(account.account_type.clone())
-            }
+            account_types::SECURITIES
+            | account_types::CASH
+            | account_types::CREDIT_CARD
+            | account_types::CRYPTOCURRENCY => Some(account.account_type.clone()),
             _ => None,
         };
         Self {
@@ -88,38 +88,17 @@ pub trait BrokerApiClient: Send + Sync {
     /// * `end_date` - Optional end date filter (YYYY-MM-DD)
     /// * `offset` - Pagination offset
     /// * `limit` - Maximum number of results per page
+    #[allow(clippy::too_many_arguments)]
     async fn get_account_activities(
         &self,
         account_id: &str,
         tracking_mode: BrokerTrackingMode,
+        account_context: &BrokerAccountContext,
         start_date: Option<&str>,
         end_date: Option<&str>,
         offset: Option<i64>,
         limit: Option<i64>,
     ) -> Result<PaginatedUniversalActivity>;
-
-    /// Backward-compatible extension: clients without diagnostic headers keep the same behavior.
-    #[allow(clippy::too_many_arguments)]
-    async fn get_account_activities_with_context(
-        &self,
-        account_id: &str,
-        tracking_mode: BrokerTrackingMode,
-        _context: &BrokerAccountContext,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        offset: Option<i64>,
-        limit: Option<i64>,
-    ) -> Result<PaginatedUniversalActivity> {
-        self.get_account_activities(
-            account_id,
-            tracking_mode,
-            start_date,
-            end_date,
-            offset,
-            limit,
-        )
-        .await
-    }
 
     /// Fetch current holdings for a broker account.
     ///
@@ -247,27 +226,34 @@ mod account_context_tests {
     use super::*;
 
     #[test]
-    fn account_context_uses_local_type_and_original_broker_label() {
-        let account = Account { account_type: "CASH".into(),
-            meta: Some(r#"{"broker_account_type":"SECURITIES","broker_raw_type":"TFSA","raw_type":"RRSP"}"#.into()),
-            ..Account::default() };
+    fn account_context_uses_local_type_and_provider_label() {
+        // Metadata as broker sync writes it: the API's canonical type plus the provider label.
+        let account = Account {
+            account_type: "CASH".into(),
+            meta: BrokerAccount {
+                account_type: Some("SECURITIES".into()),
+                raw_type: Some("TFSA".into()),
+                ..BrokerAccount::default()
+            }
+            .to_meta_json(),
+            ..Account::default()
+        };
         let context = BrokerAccountContext::from_account(&account);
         assert_eq!(context.account_type.as_deref(), Some("CASH"));
         assert_eq!(context.raw_type.as_deref(), Some("TFSA"));
     }
 
     #[test]
-    fn account_context_falls_back_only_to_raw_type_and_tolerates_old_metadata() {
+    fn account_context_trims_raw_type_and_omits_missing_or_malformed_metadata() {
         for (meta, expected) in [
+            (Some(r#"{"raw_type":" RRSP "}"#), Some("RRSP")),
+            (Some(r#"{"raw_type":"  "}"#), None),
+            (Some(r#"{"raw_type":4}"#), None),
+            // The API's canonical type is not a provider label.
             (
-                Some(r#"{"broker_raw_type":"  ","raw_type":" RRSP "}"#),
-                Some("RRSP"),
+                Some(r#"{"broker_account_type":"SECURITIES","raw_type":null}"#),
+                None,
             ),
-            (
-                Some(r#"{"broker_raw_type":4,"raw_type":"IRA"}"#),
-                Some("IRA"),
-            ),
-            (Some(r#"{"broker_account_type":"SECURITIES"}"#), None),
             (Some("invalid json"), None),
             (None, None),
         ] {

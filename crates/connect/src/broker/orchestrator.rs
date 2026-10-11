@@ -17,7 +17,9 @@ use super::models::{
     SyncResult,
 };
 use super::progress::SyncProgressReporter;
-use super::traits::{BrokerApiClient, BrokerSyncServiceTrait, BrokerTrackingMode};
+use super::traits::{
+    BrokerAccountContext, BrokerApiClient, BrokerSyncServiceTrait, BrokerTrackingMode,
+};
 use wealthfolio_core::accounts::{Account, TrackingMode};
 
 /// Configuration for sync operations.
@@ -44,7 +46,7 @@ pub(super) struct AccountSyncJob {
     account_name: String,
     broker_account_id: String,
     tracking_mode: BrokerTrackingMode,
-    account_context: super::traits::BrokerAccountContext,
+    account_context: BrokerAccountContext,
 }
 
 impl AccountSyncJob {
@@ -61,7 +63,7 @@ impl AccountSyncJob {
             }
         };
         Some(Self {
-            account_context: super::traits::BrokerAccountContext::from_account(&account),
+            account_context: BrokerAccountContext::from_account(&account),
             account_id: account.id,
             account_name: account.name,
             broker_account_id: account.provider_account_id?,
@@ -505,7 +507,7 @@ mod tests {
         broker_accounts: Vec<BrokerAccount>,
         activity_pages: Mutex<Vec<PaginatedUniversalActivity>>,
         activity_calls: Mutex<Vec<BrokerTrackingMode>>,
-        activity_contexts: Mutex<Vec<super::super::traits::BrokerAccountContext>>,
+        activity_contexts: Mutex<Vec<BrokerAccountContext>>,
         holdings_calls: Mutex<Vec<BrokerTrackingMode>>,
     }
 
@@ -530,33 +532,19 @@ mod tests {
             &self,
             _account_id: &str,
             tracking_mode: BrokerTrackingMode,
+            context: &BrokerAccountContext,
             _start_date: Option<&str>,
             _end_date: Option<&str>,
             _offset: Option<i64>,
             _limit: Option<i64>,
         ) -> Result<PaginatedUniversalActivity> {
             self.activity_calls.lock().unwrap().push(tracking_mode);
+            self.activity_contexts.lock().unwrap().push(context.clone());
             let mut pages = self.activity_pages.lock().unwrap();
             if pages.is_empty() {
                 return Ok(PaginatedUniversalActivity::default());
             }
             Ok(pages.remove(0))
-        }
-
-        #[allow(clippy::too_many_arguments)]
-        async fn get_account_activities_with_context(
-            &self,
-            account_id: &str,
-            mode: BrokerTrackingMode,
-            context: &super::super::traits::BrokerAccountContext,
-            start: Option<&str>,
-            end: Option<&str>,
-            offset: Option<i64>,
-            limit: Option<i64>,
-        ) -> Result<PaginatedUniversalActivity> {
-            self.activity_contexts.lock().unwrap().push(context.clone());
-            self.get_account_activities(account_id, mode, start, end, offset, limit)
-                .await
         }
 
         async fn get_account_holdings(
@@ -859,14 +847,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn every_activity_page_receives_the_accounts_original_context() {
-        let context = super::super::traits::BrokerAccountContext {
+    async fn every_activity_page_receives_the_account_context() {
+        let context = BrokerAccountContext {
             account_type: Some("SECURITIES".into()),
             raw_type: Some("TFSA".into()),
         };
         let account = Account {
             account_type: "SECURITIES".into(),
-            meta: Some(r#"{"broker_raw_type":"TFSA","raw_type":"RRSP"}"#.into()),
+            meta: Some(r#"{"raw_type":"TFSA"}"#.into()),
             ..synced_account("account-1", "broker-1", TrackingMode::Transactions)
         };
         let service = Arc::new(MockSyncService {

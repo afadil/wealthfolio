@@ -63,7 +63,8 @@ pub struct BrokerAccount {
     #[serde(alias = "number")]
     pub account_number: Option<String>,
 
-    /// Account type from the API (e.g., "TFSA", "RRSP", "MARGIN")
+    /// Canonical account type normalized by the API from `raw_type`
+    /// ("SECURITIES", "CASH", "CRYPTOCURRENCY" or "CREDIT_CARD")
     #[serde(rename = "type")]
     pub account_type: Option<String>,
 
@@ -103,7 +104,7 @@ pub struct BrokerAccount {
     #[serde(default)]
     pub status: Option<String>,
 
-    /// The account type as provided by the brokerage (legacy, use account_type)
+    /// The account type as provided by the brokerage (e.g., "TFSA", "RRSP", "MARGIN")
     #[serde(default)]
     pub raw_type: Option<String>,
 
