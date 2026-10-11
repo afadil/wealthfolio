@@ -1,6 +1,6 @@
 // useGlobalEventListener.ts
 import {
-  isDesktop,
+  isTauri,
   listenAssetClassificationsChanged,
   listenBrokerSyncComplete,
   listenBrokerSyncError,
@@ -60,7 +60,7 @@ const useGlobalEventListener = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [areListenersReady, setAreListenersReady] = useState(false);
-  const isDesktopEnv = isDesktop;
+  const isTauriEnv = isTauri;
   const isMobileViewport = useIsMobileViewport();
   const syncContext = usePortfolioSyncOptional();
 
@@ -451,7 +451,7 @@ const useGlobalEventListener = () => {
       setAreListenersReady(false);
       cleanupFn?.();
     };
-  }, [isDesktopEnv]); // Only re-run if isDesktopEnv changes (which it won't)
+  }, [isTauriEnv]); // Only re-run if isTauriEnv changes (which it won't)
 
   return areListenersReady;
 };

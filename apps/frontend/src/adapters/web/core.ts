@@ -6,8 +6,8 @@ import { notifyUnauthorized } from "@/lib/auth-token";
 import type { Logger } from "../types";
 import { invokeTimeoutMs } from "../invoke-timeout";
 
-/** True when running in the desktop (Tauri) environment */
-export const isDesktop = false;
+/** True in every Tauri build (desktop and mobile); use getPlatform() for the OS */
+export const isTauri = false;
 
 /** True when running in the web environment */
 export const isWeb = true;

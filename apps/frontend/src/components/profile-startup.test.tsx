@@ -31,7 +31,7 @@ vi.mock("@/features/profiles/auth-bridge", () => ({ isNativeAuthPending: () => f
 vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 vi.mock("@/adapters", () => ({
   isWeb: false,
-  isDesktop: false,
+  isTauri: false,
   getSettings: () => mocks.settings(),
   logger: { error: vi.fn() },
 }));

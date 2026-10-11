@@ -77,5 +77,5 @@ export async function tauriInvoke<T>(
 }
 
 // Platform detection flags for shared modules
-export const isDesktop = true;
+export const isTauri = true;
 export const isWeb = false;

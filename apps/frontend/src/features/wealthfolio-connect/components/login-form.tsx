@@ -1,5 +1,5 @@
 import { profileAwareErrorMessage } from "@/features/profiles/error-messages";
-import { isDesktop } from "@/adapters";
+import { isTauri } from "@/adapters";
 import { ExternalLink } from "@/components/external-link";
 import { getPreferredProvider, savePreferredProvider } from "@/lib/cookie-utils";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
@@ -52,7 +52,7 @@ export function LoginForm() {
 
   // Keep both native sign-in methods visible, with the last-used method first.
   // Self-hosted web continues to offer email only.
-  const providers: Provider[] = isDesktop
+  const providers: Provider[] = isTauri
     ? preferredProvider === "email"
       ? ["email", "google"]
       : ["google", "email"]

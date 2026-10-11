@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   windowTheme: vi.fn(),
 }));
 vi.mock("@/adapters", () => ({
-  isDesktop: true,
+  isTauri: true,
   logger: { error: vi.fn() },
 }));
 vi.mock("@/hooks/use-platform", () => ({ getPlatform: () => mocks.platform() }));

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "./login-form";
 
 const fixture = vi.hoisted(() => ({
-  desktop: true,
+  tauri: true,
   preferredProvider: null as "email" | "google" | null,
   signInWithOAuth: vi.fn(),
   signInWithMagicLink: vi.fn(),
@@ -13,8 +13,8 @@ const fixture = vi.hoisted(() => ({
 }));
 
 vi.mock("@/adapters", () => ({
-  get isDesktop() {
-    return fixture.desktop;
+  get isTauri() {
+    return fixture.tauri;
   },
   openUrlInBrowser: vi.fn(),
 }));
@@ -40,7 +40,7 @@ beforeEach(() => {
       disconnect = vi.fn();
     },
   );
-  fixture.desktop = true;
+  fixture.tauri = true;
   fixture.preferredProvider = null;
   fixture.signInWithOAuth.mockResolvedValue(undefined);
   fixture.signInWithMagicLink.mockResolvedValue(undefined);
@@ -70,7 +70,7 @@ describe("Connect sign-in choices", () => {
   );
 
   it("keeps self-hosted web email-only, even with a saved Google preference", () => {
-    fixture.desktop = false;
+    fixture.tauri = false;
     fixture.preferredProvider = "google";
     render(<LoginForm />);
     expect(screen.getByRole("button", { name: emailLabel })).toBeTruthy();
