@@ -8980,7 +8980,6 @@ dependencies = [
  "futures",
  "hkdf 0.12.4",
  "hostname",
- "jni 0.21.1",
  "keyring",
  "keyring-core",
  "local-ip-address",

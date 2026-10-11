@@ -117,8 +117,6 @@ zbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rus
 
 [target.'cfg(target_os = "android")'.dependencies]
 android-native-keyring-store = "1.0.0"
-# The Android store's initialization API uses jni 0.21 types.
-jni = "0.21"
 
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
 # Compatibility fixture only: verify credentials written by our previous backend.
