@@ -66,9 +66,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Third-party Rust dependencies exported by cache-warm.yml. Read before
           # any registry login, so PRs (including forks') import it anonymously.
+          # Release tags skip it: every ref shares that cache tag, so published
+          # images compile their dependencies here.
           cache-from:
-            type=registry,ref=ghcr.io/${{ github.repository_owner
-            }}/wealthfolio-build-cache:deps-${{ matrix.arch }}
+            ${{ !startsWith(github.ref, 'refs/tags/') &&
+            format('type=registry,ref=ghcr.io/{0}/wealthfolio-build-cache:deps-{1}',
+            github.repository_owner, matrix.arch) || '' }}
           # Secret values do not invalidate Docker's cache; compile current destinations.
           no-cache-filters: backend
           secrets: |

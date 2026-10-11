@@ -17,9 +17,9 @@ name: Warm Rust Cache
 #
 # warm-docker-deps exports the Dockerfile's dependency layers to the
 # wealthfolio-build-cache GHCR package, outside the Actions cache budget.
-# docker-publish.yml imports it without logging in, so the package must stay
-# public, or Docker builds compile every dependency. Dockerfile changes also
-# rewarm it.
+# docker-publish.yml imports it without logging in, except on release tags, so
+# the package must stay public, or Docker builds compile every dependency.
+# Dockerfile changes also rewarm it.
 
 on:
   push:
