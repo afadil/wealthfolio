@@ -6,6 +6,7 @@ import { isDesktop, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
+import { getPlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
 import i18n, { LANGUAGE_STORAGE_KEY } from "@/i18n/i18n";
@@ -276,10 +277,12 @@ const applySettingsToDocument = async (newSettings: Settings) => {
       }
     }
 
-    // On desktop, also sync with Tauri window theme + listen to OS changes
+    // On desktop, also sync with Tauri window theme + listen to OS changes.
+    // Mobile windows always report light, so mobile relies on the media query.
     if (isDesktop) {
       (async () => {
         try {
+          if (!(await getPlatform()).is_desktop) return;
           const { getCurrentWindow } = await import("@tauri-apps/api/window");
           if (application !== appearanceGeneration) return;
           const currentWindow = getCurrentWindow();
