@@ -13,7 +13,7 @@ use super::net_worth_model::{
 };
 use super::net_worth_traits::NetWorthServiceTrait;
 use crate::accounts::{account_types, is_liability_account_type, AccountRepositoryTrait};
-use crate::assets::loan::LoanPayment;
+use crate::assets::loan::{manual_loan_principal, LoanPayment};
 use crate::assets::{AlternativeAssetRepositoryTrait, Asset, AssetKind, AssetRepositoryTrait};
 use crate::constants::DECIMAL_PRECISION;
 use crate::errors::Result;
@@ -22,7 +22,7 @@ use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 use crate::quotes::QuoteServiceTrait;
-use crate::utils::time_utils::parse_user_timezone_or_default;
+use crate::utils::time_utils::{parse_user_timezone_or_default, user_today, valuation_date_today};
 
 /// Number of days after which a valuation is considered stale.
 const STALENESS_THRESHOLD_DAYS: i64 = 90;
@@ -82,6 +82,19 @@ impl NetWorthService {
             timezone,
         });
         self
+    }
+
+    fn today(&self) -> NaiveDate {
+        self.loan_payments
+            .as_ref()
+            .map_or_else(valuation_date_today, |source| {
+                user_today(parse_user_timezone_or_default(
+                    &source
+                        .timezone
+                        .read()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()),
+                ))
+            })
     }
 
     fn loan_payments(&self, assets: &[&Asset]) -> Result<HashMap<String, Vec<LoanPayment>>> {
@@ -697,8 +710,14 @@ impl NetWorthServiceTrait for NetWorthService {
             } else {
                 None
             };
-            let Some((price, quote_currency, valuation_date)) =
-                calculated.or_else(|| self.get_latest_quote_as_of(&asset.id, date))
+            let Some((price, quote_currency, valuation_date)) = calculated
+                .or_else(|| self.get_latest_quote_as_of(&asset.id, date))
+                .or_else(|| {
+                    (asset.kind == AssetKind::Liability)
+                        .then(|| manual_loan_principal(asset.metadata.as_ref(), date, self.today()))
+                        .flatten()
+                        .map(|(date, value)| (value, asset.quote_ccy.clone(), date))
+                })
             else {
                 continue;
             };
@@ -921,6 +940,17 @@ impl NetWorthServiceTrait for NetWorthService {
                 .insert(quote.asset_id.clone(), value_base);
         }
 
+        // Keep unconfirmed principals in local currency. Like scheduled balances,
+        // they are converted on each emitted date until a recorded quote takes over.
+        let manual_principals: Vec<_> = alternative_assets
+            .iter()
+            .filter(|asset| asset.kind == AssetKind::Liability)
+            .filter_map(|asset| {
+                manual_loan_principal(asset.metadata.as_ref(), end_date, self.today())
+                    .map(|(date, value)| (*asset, date, value))
+            })
+            .collect();
+
         // =====================================================================
         // 4. Get initial values for forward-fill (quotes before the first emitted point)
         // =====================================================================
@@ -1059,6 +1089,11 @@ impl NetWorthServiceTrait for NetWorthService {
             all_dates.push(end_date);
         }
 
+        for (_, date, _) in &manual_principals {
+            all_dates.push((*date).max(history_seed_date));
+            all_dates.push(end_date);
+        }
+
         all_dates.sort();
         all_dates.dedup();
 
@@ -1080,6 +1115,7 @@ impl NetWorthServiceTrait for NetWorthService {
         };
         let mut portfolio_initialized = false;
 
+        let mut confirmed_assets: HashSet<String> = initial_asset_values.keys().cloned().collect();
         let mut current_asset_values = initial_asset_values.clone();
         let mut current_credit_card_assets = initial_credit_card_assets.clone();
         let mut current_credit_card_liabilities = initial_credit_card_liabilities.clone();
@@ -1096,6 +1132,7 @@ impl NetWorthServiceTrait for NetWorthService {
             // Update alternative asset values if we have quotes for this date
             if let Some(quotes_on_date) = quotes_by_date.get(&date) {
                 for (symbol, value) in quotes_on_date {
+                    confirmed_assets.insert(symbol.clone());
                     current_asset_values.insert(symbol.clone(), *value);
                 }
             }
@@ -1128,6 +1165,20 @@ impl NetWorthServiceTrait for NetWorthService {
                     .map(|v| v.round_dp(2))
                 {
                     let (value, currency) = normalize_amount(value, &asset.quote_ccy);
+                    let converted = if currency == base_currency {
+                        value
+                    } else {
+                        self.fx_service
+                            .convert_currency_for_date(value, currency, &base_currency, date)
+                            .unwrap_or(value)
+                    };
+                    current_asset_values.insert(asset.id.clone(), converted);
+                }
+            }
+
+            for (asset, origin, principal) in &manual_principals {
+                if date >= *origin && !confirmed_assets.contains(&asset.id) {
+                    let (value, currency) = normalize_amount(*principal, &asset.quote_ccy);
                     let converted = if currency == base_currency {
                         value
                     } else {

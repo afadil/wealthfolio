@@ -185,7 +185,10 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
   // Calculate net equity for linkable assets
   const netEquity = useMemo(() => {
-    if (linkedLiabilities.length === 0) {
+    if (
+      linkedLiabilities.length === 0 ||
+      linkedLiabilities.some((loan) => loan.loan?.balanceSource === null)
+    ) {
       return null;
     }
     const liabilityTotal = linkedLiabilities.reduce((sum, liability) => {
@@ -265,7 +268,9 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
             {/* Right: Detail card */}
             <AlternativeAssetDetailCard
               holding={holding}
-              netEquity={isLinkableAsset ? (netEquity ?? marketValue) : null}
+              netEquity={
+                isLinkableAsset ? (linkedLiabilities.length ? netEquity : marketValue) : null
+              }
               hasLinkedLiabilities={linkedLiabilities.length > 0}
               linkedLiabilities={isLinkableAsset ? linkedLiabilities : []}
               className="col-span-1"

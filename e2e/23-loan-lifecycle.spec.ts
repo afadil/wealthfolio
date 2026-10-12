@@ -667,6 +667,7 @@ test("loan terms are previewed and checked by the backend", async ({ page }) => 
   });
   // Holdings carries what the card shows, from the calculation that values the loan.
   expect((await named("Setup loan")).loan).toEqual({
+    balanceSource: "schedule",
     scheduled: true,
     originalAmount: 1200,
     annualRate: 0,
@@ -685,7 +686,7 @@ test("loan terms are previewed and checked by the backend", async ({ page }) => 
   const sheet = page.getByRole("dialog");
   await page.goto(`${BASE_URL}/holdings?tab=assets`);
   await page.locator('button.h-9.w-9[aria-haspopup="dialog"]').click();
-  await page.getByRole("button", { name: "Add Asset", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add Asset", exact: true }).click();
   await sheet.getByRole("button", { name: /Liability.*Loans/ }).click();
   await sheet.getByRole("button", { name: "Continue", exact: true }).click();
   await sheet.getByPlaceholder("Home Mortgage, Car Loan...").fill("Previewed loan");
