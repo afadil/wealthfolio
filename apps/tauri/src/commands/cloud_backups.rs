@@ -50,13 +50,11 @@ pub async fn cloud_backup_capture(
     runtime: ProfileAccess,
     manual: Option<bool>,
 ) -> Result<Option<BackupPoint>, String> {
-    let manual = manual.unwrap_or(false);
-    let result = check_and_capture(&runtime.0, manual).await;
-    // A manual attempt may have held the export slot when the due timer fired.
-    if manual || matches!(result, Ok((Some(_), _))) {
+    let result = check_and_capture(&runtime.0, manual.unwrap_or(false)).await?;
+    if result.0.is_some() {
         runtime.backup_scheduler.request_check();
     }
-    Ok(result?.0)
+    Ok(result.0)
 }
 
 // Account admission is held by each API phase; shared logic gates the refresh result.
@@ -83,10 +81,14 @@ async fn check_and_capture(
     // Single-flight admission is distinct from lifecycle locks. A competing
     // automatic/manual check observes the active capture instead of failing it.
     let Ok(_permit) = runtime.backup_export_slot.clone().try_acquire_owned() else {
-        return Ok((None, Some(std::time::Duration::from_secs(30 * 60))));
+        // A busy slot is a local check; retry soon rather than after the failure fallback.
+        return Ok((None, Some(std::time::Duration::from_secs(60))));
     };
     let generation = runtime.backup_scheduler.generation();
     runtime.backup_scheduler.checking(generation);
+    if manual {
+        runtime.backup_scheduler.early(generation);
+    }
     let result = runtime
         .backup_scheduler
         .until_changed(generation, capture_in_phases(runtime, generation, manual))
@@ -134,11 +136,11 @@ async fn capture_in_phases(
     };
     let trigger = match policy.capture_plan(manual).map_err(|e| e.to_string())? {
         CapturePlan::Wait(delay) => return Ok((None, Some(delay))),
-        CapturePlan::Due(trigger) => trigger,
-        CapturePlan::Early => {
-            runtime.backup_scheduler.early(generation);
-            "manual"
+        CapturePlan::Due(trigger) => {
+            runtime.backup_scheduler.due(generation);
+            trigger
         }
+        CapturePlan::Early => "manual",
     };
     if runtime.backup_scheduler.is_paused() {
         return Ok((None, None));
