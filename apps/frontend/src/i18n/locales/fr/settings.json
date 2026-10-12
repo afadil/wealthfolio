@@ -1649,7 +1649,7 @@
   "cloud_backup_enable": "Activer les sauvegardes",
   "cloud_backup_failed": "Impossible de terminer. Vérifiez votre connexion et réessayez.",
   "cloud_backup_manual_limit": "Vous avez atteint la limite de sauvegardes manuelles pour aujourd’hui. Les sauvegardes automatiques continuent comme prévu.",
-  "cloud_backup_busy": "Une sauvegarde ou une exportation est déjà en cours. Réessayez dans un instant.",
+  "cloud_backup_not_started": "Impossible de lancer une sauvegarde pour le moment. Réessayez dans un instant.",
   "cloud_backup_last": "Dernière sauvegarde réussie : {{date}}",
   "cloud_backup_none": "Aucune sauvegarde pour le moment",
   "cloud_backup_offline": "Une sauvegarde serveur doit être restaurée sur la machine qui exécute Wealthfolio. La restauration depuis ce navigateur n’est pas disponible.",

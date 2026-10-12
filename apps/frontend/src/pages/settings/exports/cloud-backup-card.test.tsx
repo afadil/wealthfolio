@@ -707,7 +707,7 @@ it("offers a manual backup in the menu and sends it as manual", async () => {
     expect(mocks.toast).toHaveBeenCalledWith({ title: copy.backup_saved, variant: "success" }),
   );
 });
-it("says so when another backup or export holds the slot", async () => {
+it("says so when no backup was started", async () => {
   mocks.action.mockImplementation((op) =>
     Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
   );
@@ -715,7 +715,9 @@ it("says so when another backup or export holds the slot", async () => {
   mount();
   await openBackupMenu();
   fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
-  await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ title: copy.cloud_backup_busy }));
+  await waitFor(() =>
+    expect(mocks.toast).toHaveBeenCalledWith({ title: copy.cloud_backup_not_started }),
+  );
 });
 it("explains the daily manual limit instead of a generic failure", async () => {
   mocks.action.mockImplementation((op) =>

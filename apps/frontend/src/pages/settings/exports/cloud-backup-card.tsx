@@ -572,11 +572,12 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
                               void perform("manual", async () => {
                                 const point = await captureCloudBackup(true);
                                 if (!active.current) return;
-                                // No point: another backup or export holds the single slot.
+                                // No point: the slot was busy, eligibility changed, or the
+                                // attempt was cancelled. The status refresh shows which.
                                 toast(
                                   point
                                     ? { title: t("settings:backup_saved"), variant: "success" }
-                                    : { title: t("settings:cloud_backup_busy") },
+                                    : { title: t("settings:cloud_backup_not_started") },
                                 );
                               }),
                           },
