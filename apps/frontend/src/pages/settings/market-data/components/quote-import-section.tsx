@@ -80,10 +80,12 @@ export function ImportQuotesSection({
   const renderStep = () => {
     switch (currentStep) {
       case 1:
+        // The form stays mounted and clickable while it animates out to the
+        // preview, so keep it locked once a preview exists.
         return (
           <QuoteImportForm
             file={file}
-            isValidating={isValidating}
+            isValidating={isValidating || preview !== null}
             error={error}
             onFileSelect={setFile}
             onValidate={validateFile}

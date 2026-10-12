@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@/test/render";
+import { act, fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,5 +112,27 @@ describe("MarketDataImportPage", () => {
 
     expect(await screen.findByText("Import completed")).toBeInTheDocument();
     expect(startOverButton()).toBeEnabled();
+  });
+
+  it("locks the upload form while it animates out to the preview", async () => {
+    let finishValidation!: (quotes: QuoteImport[]) => void;
+    adapterMocks.checkQuotesImport.mockReturnValueOnce(
+      new Promise<QuoteImport[]>((resolve) => (finishValidation = resolve)),
+    );
+    const { container } = renderPage();
+
+    await validateFile(container);
+    const validateButton = screen.getByRole("button", { name: /Validating/ });
+    await act(async () => finishValidation([quote]));
+
+    // The outgoing form is still mounted until its exit animation ends.
+    expect(validateButton).toBeInTheDocument();
+    expect(validateButton).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Remove File/ })).not.toBeInTheDocument();
+    fireEvent.click(validateButton);
+    fireEvent.click(validateButton);
+    expect(adapterMocks.checkQuotesImport).toHaveBeenCalledTimes(1);
+
+    expect(await screen.findByRole("button", { name: /Import 1 Quote/ })).toBeEnabled();
   });
 });
