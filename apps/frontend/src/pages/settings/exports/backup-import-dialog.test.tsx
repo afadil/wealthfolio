@@ -44,7 +44,7 @@ beforeEach(() => {
   mocks.discard.mockResolvedValue(undefined);
   mocks.confirm.mockResolvedValue(undefined);
 });
-function mount(filename?: string, cloud = false) {
+function mount(filename?: string, cloud = false, reactStrictMode = false) {
   const close = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
@@ -63,6 +63,7 @@ function mount(filename?: string, cloud = false) {
         }
       />
     </QueryClientProvider>,
+    { reactStrictMode },
   );
   return { ...view, close, client };
 }
@@ -81,6 +82,15 @@ it("keeps cloud previews immutable with no local file picker or back-to-file ste
   expect(mocks.discard).toHaveBeenCalledWith("cloud-immutable-id");
   expect(mocks.choose).not.toHaveBeenCalled();
   expect(mocks.inspect).not.toHaveBeenCalled();
+});
+it("keeps a cloud preview through the development StrictMode remount", async () => {
+  mount(undefined, true, true);
+  const restore = screen.getByRole("button", { name: copy.backup_restore_title });
+  await waitFor(() => expect(restore).toBeEnabled());
+  expect(mocks.discard).not.toHaveBeenCalled();
+  fireEvent.click(restore);
+  await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith("cloud-immutable-id"));
+  expect(mocks.discard).not.toHaveBeenCalled();
 });
 it("does not reuse a consumed cloud preview after restore failure", async () => {
   mocks.confirm.mockRejectedValueOnce(new Error("Expired backup preview"));
