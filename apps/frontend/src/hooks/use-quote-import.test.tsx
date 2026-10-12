@@ -79,6 +79,23 @@ describe("useQuoteImport", () => {
     });
 
     expect(result.current.error).toBe("Failed to import CSV quotes: Database error");
-    vi.clearAllTimers();
+  });
+
+  it("stops the progress timer when the import fails", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    adapterMocks.checkQuotesImport.mockResolvedValue([quote]);
+    adapterMocks.importManualQuotes.mockRejectedValue("Database is locked");
+    const { result } = renderQuoteImport();
+
+    await act(async () => {
+      await result.current.validateFile();
+    });
+    await act(async () => {
+      expect(await result.current.importQuotes()).toBe(false);
+    });
+
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current.importProgress).toBe(0);
   });
 });
