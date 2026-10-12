@@ -144,23 +144,21 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
     setImportProgress(0);
     setError(null);
 
+    // Simulate progress during import since Tauri command doesn't provide updates
+    const progressInterval = setInterval(() => {
+      setImportProgress((prev) => {
+        const newProgress = prev + Math.random() * 10;
+        return Math.min(newProgress, 90);
+      });
+    }, 200);
+
     try {
       setImportProgress(25);
-
-      // Simulate progress during import since Tauri command doesn't provide updates
-      const progressInterval = setInterval(() => {
-        setImportProgress((prev) => {
-          const newProgress = prev + Math.random() * 10;
-          return Math.min(newProgress, 90);
-        });
-      }, 200);
 
       const importResult = await importManualQuotes(prepareQuotesForImport(validQuotes));
       const normalizedResult = importResult.map(normalizeQuoteImport);
       queryClient.invalidateQueries({ queryKey: [QueryKeys.LATEST_QUOTES] });
       invalidatePerformanceCaches(queryClient);
-
-      clearInterval(progressInterval);
 
       setImportProgress(100);
 
@@ -179,6 +177,7 @@ export function useQuoteImport(): QuoteImportState & QuoteImportActions {
       setError(errorMessage(err, "Failed to import quotes"));
       return false;
     } finally {
+      clearInterval(progressInterval);
       setIsImporting(false);
       setImportProgress(0);
     }
