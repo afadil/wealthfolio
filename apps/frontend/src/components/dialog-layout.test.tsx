@@ -15,6 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ProgressIndicator,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -105,5 +106,11 @@ describe("dialog overflow containment", () => {
     );
 
     expect(screen.getByRole("dialog")).toHaveAttribute("data-side", "bottom");
+  });
+
+  it("marks the progress dialog for the max-width opt-out", () => {
+    render(<ProgressIndicator open title="Importing" />);
+
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-slot", "dialog-content");
   });
 });
