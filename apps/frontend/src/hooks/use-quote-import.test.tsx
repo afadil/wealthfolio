@@ -64,7 +64,6 @@ describe("useQuoteImport", () => {
   });
 
   it("shows the backend import error", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     adapterMocks.checkQuotesImport.mockResolvedValue([quote]);
     adapterMocks.importManualQuotes.mockRejectedValue(
       "Failed to import CSV quotes: Database error",
@@ -79,6 +78,26 @@ describe("useQuoteImport", () => {
     });
 
     expect(result.current.error).toBe("Failed to import CSV quotes: Database error");
-    vi.clearAllTimers();
+  });
+
+  it.each([
+    ["fails", () => adapterMocks.importManualQuotes.mockRejectedValue("Database error")],
+    ["succeeds", () => adapterMocks.importManualQuotes.mockResolvedValue([quote])],
+  ])("stops the simulated progress when the import %s", async (_outcome, mockImport) => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    adapterMocks.checkQuotesImport.mockResolvedValue([quote]);
+    mockImport();
+    const { result } = renderQuoteImport();
+
+    await act(async () => {
+      await result.current.validateFile();
+    });
+    await act(async () => {
+      await result.current.importQuotes();
+    });
+
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(result.current.importProgress).toBe(0);
   });
 });
