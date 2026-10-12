@@ -304,6 +304,7 @@
     "import_from_csv": "Importa da CSV",
     "transfer_holdings": "Trasferisci posizioni",
     "add_personal_asset": "Aggiungi asset personale",
+    "connect_account": "Collega conto",
     "add_activities": "Aggiungi movimenti",
     "ask_ai_categorize": "Chiedi all'IA di categorizzare",
     "investments": "Investimenti",
@@ -1164,7 +1165,8 @@
       "total": "Totale",
       "importAnother": "Importa un altro",
       "viewHoldings": "Visualizza posizioni",
-      "viewActivities": "Visualizza movimenti"
+      "viewActivities": "Visualizza movimenti",
+      "syncAutomatically": "Preferisci la sincronizzazione automatica?"
     },
     "assets": {
       "noAssetsTitle": "Nessun asset richiede revisione",

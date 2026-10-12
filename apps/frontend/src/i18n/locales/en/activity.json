@@ -303,6 +303,7 @@
     "import_from_csv": "Import from CSV",
     "transfer_holdings": "Transfer Holdings",
     "add_personal_asset": "Add Personal Asset",
+    "connect_account": "Connect Account",
     "add_activities": "Add Activities",
     "ask_ai_categorize": "Ask AI to categorize",
     "investments": "Investments",
@@ -1130,7 +1131,8 @@
       "total": "Total",
       "importAnother": "Import Another",
       "viewHoldings": "View Holdings",
-      "viewActivities": "View Activities"
+      "viewActivities": "View Activities",
+      "syncAutomatically": "Want this to sync automatically?"
     },
     "assets": {
       "noAssetsTitle": "No assets require review",

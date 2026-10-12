@@ -56,6 +56,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
@@ -83,6 +84,8 @@ interface ActivityTableProps {
   onUnlinkTransfer?: (activity: ActivityDetails) => void;
   filtersActive?: boolean;
   onAdd?: () => void;
+  /** Show a "Connect Account" button next to the add button when there are no activities. */
+  showConnectAccountLink?: boolean;
   onClearFilters?: () => void;
   onLoadMore?: () => void;
   hasNextPage?: boolean;
@@ -102,6 +105,7 @@ export const ActivityTable = ({
   onUnlinkTransfer,
   filtersActive = false,
   onAdd,
+  showConnectAccountLink = false,
   onClearFilters,
   onLoadMore,
   hasNextPage = false,
@@ -749,10 +753,20 @@ export const ActivityTable = ({
               </Button>
             ) : null
           ) : onAdd ? (
-            <Button onClick={onAdd}>
-              <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("activity:add_activity")}
-            </Button>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Button onClick={onAdd}>
+                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t("activity:add_activity")}
+              </Button>
+              {showConnectAccountLink && (
+                <Button variant="outline" asChild>
+                  <Link to={connectPagePath("activities_empty")}>
+                    <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {t("activity:page.connect_account")}
+                  </Link>
+                </Button>
+              )}
+            </div>
           ) : null}
         </EmptyPlaceholder>
       </div>

@@ -303,6 +303,7 @@
     "import_from_csv": "從 CSV 匯入",
     "transfer_holdings": "移轉持有部位",
     "add_personal_asset": "新增個人資產",
+    "connect_account": "連結帳戶",
     "add_activities": "新增交易紀錄",
     "ask_ai_categorize": "請 AI 分類",
     "investments": "投資",
@@ -1130,7 +1131,8 @@
       "total": "總計",
       "importAnother": "再次匯入",
       "viewHoldings": "檢視持有部位",
-      "viewActivities": "檢視交易紀錄"
+      "viewActivities": "檢視交易紀錄",
+      "syncAutomatically": "想要自動同步嗎？"
     },
     "assets": {
       "noAssetsTitle": "沒有需要檢查的資產",

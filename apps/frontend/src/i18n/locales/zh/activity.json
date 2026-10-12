@@ -302,6 +302,7 @@
     "import_from_csv": "从 CSV 导入",
     "transfer_holdings": "转移持仓",
     "add_personal_asset": "添加个人资产",
+    "connect_account": "连接账户",
     "add_activities": "添加活动",
     "ask_ai_categorize": "让 AI 分类",
     "investments": "投资",
@@ -1115,7 +1116,8 @@
       "total": "总计",
       "importAnother": "导入另一个",
       "viewHoldings": "查看持仓",
-      "viewActivities": "查看活动"
+      "viewActivities": "查看活动",
+      "syncAutomatically": "想要自动同步吗？"
     },
     "assets": {
       "noAssetsTitle": "没有需要审核的资产",

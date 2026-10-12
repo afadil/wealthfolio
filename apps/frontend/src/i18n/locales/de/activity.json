@@ -200,6 +200,7 @@
     "import_from_csv": "Aus CSV importieren",
     "transfer_holdings": "Bestände übertragen",
     "add_personal_asset": "Persönlichen Vermögenswert hinzufügen",
+    "connect_account": "Konto verbinden",
     "add_activities": "Aktivitäten hinzufügen",
     "ask_ai_categorize": "KI um Kategorisierung bitten",
     "investments": "Investitionen",
@@ -1130,7 +1131,8 @@
       "total": "Gesamt",
       "importAnother": "Weiteren importieren",
       "viewHoldings": "Bestände anzeigen",
-      "viewActivities": "Aktivitäten anzeigen"
+      "viewActivities": "Aktivitäten anzeigen",
+      "syncAutomatically": "Lieber automatisch synchronisieren?"
     },
     "assets": {
       "noAssetsTitle": "Keine Vermögenswerte zu prüfen",
