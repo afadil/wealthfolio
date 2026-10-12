@@ -1512,6 +1512,14 @@
       "bulgaria": "保加利亚"
     }
   },
+  "currencyFormats": {
+    "title": "货币格式",
+    "description": "按其他地区的惯例显示特定货币的金额。其他货币沿用“地区与格式”。",
+    "currencyPlaceholder": "选择货币",
+    "regionPlaceholder": "选择地区",
+    "regionFor": "{{currency}} 的地区",
+    "remove": "移除 {{currency}} 的格式"
+  },
   "appearance_navigation_title": "导航",
   "appearance_navigation_description": "选择在大屏幕上的导航方式。",
   "addons_pin_to_navigation": "将 {{name}} 固定到导航栏",

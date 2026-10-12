@@ -1512,6 +1512,14 @@
       "bulgaria": "불가리아"
     }
   },
+  "currencyFormats": {
+    "title": "통화별 표시 형식",
+    "description": "특정 통화의 금액을 다른 지역의 표기 방식으로 표시합니다. 다른 통화는 '지역 및 표시 형식'을 따릅니다.",
+    "currencyPlaceholder": "통화 선택",
+    "regionPlaceholder": "지역 선택",
+    "regionFor": "{{currency}} 지역",
+    "remove": "{{currency}} 표시 형식 삭제"
+  },
   "appearance_navigation_title": "탐색",
   "appearance_navigation_description": "큰 화면에서 탐색하는 방식을 선택하세요.",
   "addons_pin_to_navigation": "{{name}}을(를) 탐색에 고정",

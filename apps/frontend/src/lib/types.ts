@@ -923,6 +923,8 @@ export interface Settings {
   font: string;
   language: string;
   formattingRegion: string;
+  /** Formatting regions for amounts in specific currencies, keyed by currency code. */
+  currencyFormattingRegions?: Record<string, string>;
   baseCurrency: string;
   defaultReturnMetric: "twr" | "irr" | "valueReturn";
   timezone: string;

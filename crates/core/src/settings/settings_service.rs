@@ -1,10 +1,12 @@
 use super::SettingsRepositoryTrait;
 use crate::errors::{DatabaseError, Error, Result};
+use crate::fx::currency::get_normalization_rule;
 use crate::fx::FxServiceTrait;
 use crate::settings::{Settings, SettingsUpdate};
 use crate::utils::time_utils::canonicalize_timezone;
 use async_trait::async_trait;
 use log::{debug, error};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 const SUPPORTED_FORMATTING_REGIONS: &[&str] = &[
@@ -101,6 +103,42 @@ fn validate_formatting_region(region: &str) -> Result<()> {
     }
 }
 
+/// Quote units such as GBX follow their major currency's override, so they
+/// cannot have one of their own.
+fn is_currency_code(code: &str) -> bool {
+    code.len() == 3
+        && code.bytes().all(|byte| byte.is_ascii_uppercase())
+        && get_normalization_rule(code).is_none()
+}
+
+/// A currency override names a concrete region; following the system locale is
+/// what `formatting_region` is for.
+fn is_currency_formatting_region(region: &str) -> bool {
+    region != "system" && SUPPORTED_FORMATTING_REGIONS.contains(&region)
+}
+
+fn normalize_currency_formatting_regions(regions: &mut BTreeMap<String, String>) {
+    regions.retain(|currency, region| {
+        is_currency_code(currency) && is_currency_formatting_region(region)
+    });
+}
+
+fn validate_currency_formatting_regions(regions: &BTreeMap<String, String>) -> Result<()> {
+    for (currency, region) in regions {
+        if !is_currency_code(currency) {
+            return Err(Error::InvalidConfigValue(format!(
+                "Unsupported currency code: {currency}"
+            )));
+        }
+        if !is_currency_formatting_region(region) {
+            return Err(Error::InvalidConfigValue(format!(
+                "Unsupported formatting region for {currency}: {region}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 // Define the trait for SettingsService
 #[async_trait]
 pub trait SettingsServiceTrait: Send + Sync {
@@ -143,6 +181,7 @@ impl SettingsServiceTrait for SettingsService {
         let mut settings = self.settings_repository.get_settings()?;
         settings.formatting_region =
             normalize_formatting_region(&settings.language, &settings.formatting_region);
+        normalize_currency_formatting_regions(&mut settings.currency_formatting_regions);
         settings.language = normalize_ui_language(&settings.language);
         Ok(settings)
     }
@@ -164,6 +203,9 @@ impl SettingsServiceTrait for SettingsService {
 
         if let Some(ref region) = normalized_settings.formatting_region {
             validate_formatting_region(region)?;
+        }
+        if let Some(ref regions) = normalized_settings.currency_formatting_regions {
+            validate_currency_formatting_regions(regions)?;
         }
         if let Some(ref language) = normalized_settings.language {
             normalized_settings.language = Some(validate_ui_language(language)?);
@@ -260,9 +302,17 @@ impl SettingsService {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_formatting_region, normalize_ui_language, validate_formatting_region,
-        validate_ui_language,
+        normalize_currency_formatting_regions, normalize_formatting_region, normalize_ui_language,
+        validate_currency_formatting_regions, validate_formatting_region, validate_ui_language,
     };
+    use std::collections::BTreeMap;
+
+    fn regions(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
+        entries
+            .iter()
+            .map(|(currency, region)| (currency.to_string(), region.to_string()))
+            .collect()
+    }
 
     #[test]
     fn preserves_explicit_system_formatting_preference() {
@@ -366,5 +416,46 @@ mod tests {
         assert!(validate_formatting_region("RO").is_ok());
         assert!(validate_formatting_region("BG").is_ok());
         assert!(validate_formatting_region("de-DE").is_err());
+    }
+
+    #[test]
+    fn accepts_currency_formatting_regions_for_supported_regions() {
+        assert!(validate_currency_formatting_regions(&regions(&[])).is_ok());
+        assert!(
+            validate_currency_formatting_regions(&regions(&[("INR", "IN"), ("USD", "US")])).is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_currency_formatting_region_updates() {
+        for entries in [
+            [("inr", "IN")],
+            [("GBp", "GB")],
+            [("RUPEE", "IN")],
+            [("GBX", "DE")],
+            [("ZAC", "GB")],
+            [("INR", "system")],
+            [("INR", "en-IN")],
+            [("INR", "ZZ")],
+        ] {
+            assert!(
+                validate_currency_formatting_regions(&regions(&entries)).is_err(),
+                "{entries:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn drops_invalid_persisted_currency_formatting_regions() {
+        let mut persisted = regions(&[
+            ("INR", "IN"),
+            ("USD", "US"),
+            ("usd", "US"),
+            ("GBX", "DE"),
+            ("EUR", "system"),
+            ("JPY", "unknown"),
+        ]);
+        normalize_currency_formatting_regions(&mut persisted);
+        assert_eq!(persisted, regions(&[("INR", "IN"), ("USD", "US")]));
     }
 }

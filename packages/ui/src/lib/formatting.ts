@@ -192,6 +192,8 @@ export interface FormattingApi {
   formatRoundedAmount: (value: number | string | null | undefined, currency: string) => string;
   formatCurrencySymbol: (currency: string) => string;
   currencyFractionDigits: (currency: string) => number;
+  /** The locale amounts in `currency` are formatted with. */
+  currencyLocale: (currency: string) => string;
   formatPercent: (value: number | null | undefined, options?: PercentFormatOptions) => string;
   formatQuantity: (value: number | string | null | undefined) => string;
   formatDecimal: (value: number | string, options?: NumberDisplayOptions) => string;
@@ -218,7 +220,11 @@ export type AmountFormatting = Pick<
   | "formatRoundedAmount"
   | "formatCurrencySymbol"
   | "currencyFractionDigits"
+  | "currencyLocale"
 >;
+
+/** Formatting regions for amounts in specific currencies, keyed by currency code. */
+export type CurrencyFormattingRegions = Readonly<Record<string, string>>;
 
 export type NumberFormatting = Pick<
   FormattingApi,
@@ -721,7 +727,7 @@ function numeric(value: number | string | null | undefined) {
   return Number.isFinite(result) ? result : null;
 }
 
-export function createAmountFormatting(
+function createLocaleAmountFormatting(
   locale: string,
   prepared?: PreparedAmountFormatters,
 ): AmountFormatting {
@@ -879,6 +885,9 @@ export function createAmountFormatting(
     currencyFractionDigits(currency) {
       return getCurrencyFractionDigits(currency);
     },
+    currencyLocale() {
+      return resolvedLocale;
+    },
     formatCompactAmount(value, currency, displayCurrency = true, currencyDisplay = "symbol") {
       const amount = numeric(value);
       if (amount == null) return "-";
@@ -944,6 +953,48 @@ export function createAmountFormatting(
         return priceDecimalFormatter(maximumFractionDigits).format(displayed);
       }
     },
+  };
+}
+
+/** Quote units such as GBp follow the region of their major currency. */
+function currencyFormattingKey(currency: string): string {
+  return getQuoteUnitCurrency(currency)?.major ?? currency?.toUpperCase?.() ?? "";
+}
+
+export function createAmountFormatting(
+  locale: string,
+  prepared?: PreparedAmountFormatters,
+  currencyRegions?: CurrencyFormattingRegions,
+): AmountFormatting {
+  const base = createLocaleAmountFormatting(locale, prepared);
+  const overrides = Object.entries(currencyRegions ?? {});
+  if (overrides.length === 0) return base;
+
+  const byLocale = new Map<string, AmountFormatting>([[base.currencyLocale(""), base]]);
+  const byCurrency = new Map<string, AmountFormatting>();
+  for (const [currency, region] of overrides) {
+    const regionLocale = resolveFormattingLocale(region);
+    let formatting = byLocale.get(regionLocale);
+    if (!formatting) {
+      formatting = createLocaleAmountFormatting(regionLocale);
+      byLocale.set(regionLocale, formatting);
+    }
+    byCurrency.set(currency.toUpperCase(), formatting);
+  }
+  const forCurrency = (currency: string) => byCurrency.get(currencyFormattingKey(currency)) ?? base;
+
+  return {
+    formatAmount: (value, currency, displayCurrency) =>
+      forCurrency(currency).formatAmount(value, currency, displayCurrency),
+    formatCompactAmount: (value, currency, displayCurrency, currencyDisplay) =>
+      forCurrency(currency).formatCompactAmount(value, currency, displayCurrency, currencyDisplay),
+    formatPrice: (value, currency, displayCurrency) =>
+      forCurrency(currency).formatPrice(value, currency, displayCurrency),
+    formatRoundedAmount: (value, currency) =>
+      forCurrency(currency).formatRoundedAmount(value, currency),
+    formatCurrencySymbol: (currency) => forCurrency(currency).formatCurrencySymbol(currency),
+    currencyFractionDigits: (currency) => forCurrency(currency).currencyFractionDigits(currency),
+    currencyLocale: (currency) => forCurrency(currency).currencyLocale(currency),
   };
 }
 

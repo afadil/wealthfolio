@@ -23,6 +23,7 @@ interface ExtendedSettingsContextType extends SettingsContextType {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -64,6 +65,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -177,6 +179,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         locale={formattingRegion}
         uiLocale={uiLocale}
         timezone={formattingTimezone}
+        currencyFormattingRegions={settings?.currencyFormattingRegions}
       >
         {children}
       </FormattingProvider>
