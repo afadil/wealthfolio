@@ -222,5 +222,11 @@ describe("QuoteHistoryDataGrid mobile editing", () => {
     expect(screen.queryByRole("textbox", { name: "Close" })).toBeNull();
     expect(screen.getAllByText(/^\d+\/\d+\/26$/)).toHaveLength(20);
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
+
+    // Turning manual tracking back on must not bring the old draft back.
+    view.rerender(grid({ data, isManualDataSource: true }));
+    expect(screen.queryByRole("textbox", { name: "Close" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
 });

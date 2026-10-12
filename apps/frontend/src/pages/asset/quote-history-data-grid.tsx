@@ -397,6 +397,13 @@ export function QuoteHistoryDataGrid({
   const [mobileDraft, setMobileDraft] = useState<QuoteEntry | null>(null);
   const [mobileDeleteEntry, setMobileDeleteEntry] = useState<QuoteEntry | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
+  // Leaving manual mode (toolbar switch or asset editor) drops the open quote.
+  const [draftIsManual, setDraftIsManual] = useState(isManualDataSource);
+  if (draftIsManual !== isManualDataSource) {
+    setDraftIsManual(isManualDataSource);
+    setMobileDraft(null);
+    setMobileDeleteEntry(null);
+  }
   const sortedEntries = useMemo(
     () => [...localEntries].sort((a, b) => b.date.getTime() - a.date.getTime()),
     [localEntries],
@@ -471,10 +478,8 @@ export function QuoteHistoryDataGrid({
   }, [isPersisting, mobileDeleteEntry, onDeleteQuote]);
 
   if (isMobile) {
-    // Switching to automatic prices hides the editor, so an open draft no longer applies.
-    const activeDraft = isManualDataSource ? mobileDraft : null;
-    const mobileEntries = activeDraft?.isNew
-      ? [activeDraft, ...mobilePageEntries]
+    const mobileEntries = mobileDraft?.isNew
+      ? [mobileDraft, ...mobilePageEntries]
       : mobilePageEntries;
     const priceFields = [
       { field: "close", label: t("asset:quoteGrid.close") },
@@ -491,7 +496,7 @@ export function QuoteHistoryDataGrid({
           dirtyCount={dirtyIds.size}
           deletedCount={deletedIds.size}
           isManualDataSource={isManualDataSource}
-          isAddDisabled={activeDraft !== null || isPersisting}
+          isAddDisabled={mobileDraft !== null || isPersisting}
           onAddRow={handleMobileAdd}
           onDeleteSelected={handleDeleteSelected}
           onSave={handleSave}
@@ -506,8 +511,8 @@ export function QuoteHistoryDataGrid({
             </p>
           ) : (
             mobileEntries.map((entry) => {
-              if (activeDraft?.id === entry.id) {
-                const draft = activeDraft;
+              if (mobileDraft?.id === entry.id) {
+                const draft = mobileDraft;
 
                 return (
                   <div key={draft.id} className="bg-muted/30 space-y-3 p-3">
@@ -677,7 +682,7 @@ export function QuoteHistoryDataGrid({
                 variant="outline"
                 size="sm"
                 onClick={() => setMobilePage(currentMobilePage - 1)}
-                disabled={currentMobilePage === 0 || activeDraft !== null || isPersisting}
+                disabled={currentMobilePage === 0 || mobileDraft !== null || isPersisting}
               >
                 {t("asset:quoteGrid.previous")}
               </Button>
@@ -686,7 +691,7 @@ export function QuoteHistoryDataGrid({
                 size="sm"
                 onClick={() => setMobilePage(currentMobilePage + 1)}
                 disabled={
-                  currentMobilePage >= mobilePageCount - 1 || activeDraft !== null || isPersisting
+                  currentMobilePage >= mobilePageCount - 1 || mobileDraft !== null || isPersisting
                 }
               >
                 {t("asset:quoteGrid.next")}
