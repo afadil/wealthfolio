@@ -302,6 +302,7 @@
     "import_from_csv": "CSV에서 가져오기",
     "transfer_holdings": "보유 종목 이체",
     "add_personal_asset": "개인 자산 추가",
+    "connect_account": "계좌 연결",
     "add_activities": "활동 추가",
     "ask_ai_categorize": "AI에게 분류 요청",
     "investments": "투자",
@@ -1115,7 +1116,8 @@
       "total": "합계",
       "importAnother": "다른 파일 가져오기",
       "viewHoldings": "보유 종목 보기",
-      "viewActivities": "활동 보기"
+      "viewActivities": "활동 보기",
+      "syncAutomatically": "자동으로 동기화하시겠습니까?"
     },
     "assets": {
       "noAssetsTitle": "검토가 필요한 자산이 없습니다",

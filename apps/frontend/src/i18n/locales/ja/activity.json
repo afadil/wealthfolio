@@ -302,6 +302,7 @@
     "import_from_csv": "CSVからインポート",
     "transfer_holdings": "保有銘柄を振替",
     "add_personal_asset": "個人資産を追加",
+    "connect_account": "口座を連携",
     "add_activities": "取引を追加",
     "ask_ai_categorize": "AIに分類を依頼",
     "investments": "投資",
@@ -1115,7 +1116,8 @@
       "total": "合計",
       "importAnother": "別のファイルをインポート",
       "viewHoldings": "保有銘柄を表示",
-      "viewActivities": "取引を表示"
+      "viewActivities": "取引を表示",
+      "syncAutomatically": "自動で同期しますか?"
     },
     "assets": {
       "noAssetsTitle": "確認が必要な資産はありません",

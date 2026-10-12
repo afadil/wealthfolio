@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildConnectUrl } from "./connect-url";
+import { buildConnectUrl, connectPagePath, parseConnectPagePlacement } from "./connect-url";
 
 describe("Connect signup URLs", () => {
   it.each([
@@ -23,5 +23,23 @@ describe("Connect signup URLs", () => {
     const url = new URL(buildConnectUrl({ isWeb: false, isMobile: false }, "app_onboarding"));
     expect(url.pathname).toBe("/");
     expect(url.searchParams.has("plan")).toBe(false);
+  });
+});
+
+describe("Connect page placements", () => {
+  it.each([
+    "settings_accounts",
+    "activities_menu",
+    "activities_empty",
+    "account_empty",
+    "import_result",
+  ] as const)("round-trips %s through the Connect page URL", (placement) => {
+    const url = new URL(connectPagePath(placement), "http://app.local");
+    expect(url.pathname).toBe("/connect");
+    expect(parseConnectPagePlacement(url.searchParams.get("placement"))).toBe(placement);
+  });
+
+  it.each([null, "", "subscription_plans", "evil"])("ignores %j", (value) => {
+    expect(parseConnectPagePlacement(value)).toBeUndefined();
   });
 });

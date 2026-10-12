@@ -1,10 +1,13 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useQuery } from "@tanstack/react-query";
 import { getAccounts } from "@/adapters";
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
+import { AccountType, isLiabilityAccountType } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
 import { useImportContext, reset, setStep } from "../context";
@@ -105,7 +108,18 @@ export function ContextResultStep() {
     queryFn: () => getAccounts(),
   });
 
-  const isHoldingsMode = accounts?.find((a) => a.id === accountId)?.trackingMode === "HOLDINGS";
+  const account = accounts?.find((a) => a.id === accountId);
+  const isHoldingsMode = account?.trackingMode === "HOLDINGS";
+
+  // Broker sync is pitched for investment accounts and creates its own, so bank,
+  // credit-card and already-synced imports get no link.
+  const canShowConnectAccountLink = useShowConnectAccountLink();
+  const showConnectAccountLink =
+    canShowConnectAccountLink &&
+    !!account &&
+    !account.providerAccountId &&
+    account.accountType !== AccountType.CASH &&
+    !isLiabilityAccountType(account.accountType);
 
   const handleViewResult = () => {
     if (isHoldingsMode) {
@@ -241,6 +255,18 @@ export function ContextResultStep() {
           <Icons.ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </motion.div>
+
+      {showConnectAccountLink && (
+        <motion.p className="text-muted-foreground mt-6 text-sm" variants={itemVariants}>
+          {t("activity:import.result.syncAutomatically")}{" "}
+          <Link
+            to={connectPagePath("import_result")}
+            className="text-primary font-medium underline-offset-4 hover:underline"
+          >
+            {t("settings:accounts_connect_account")}
+          </Link>
+        </motion.p>
+      )}
     </motion.div>
   );
 }

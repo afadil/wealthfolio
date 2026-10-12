@@ -30,6 +30,7 @@ import {
 } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Link } from "react-router-dom";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { useTranslation } from "react-i18next";
 import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
@@ -61,6 +62,8 @@ interface ActivityTableMobileProps {
   onUnlinkTransfer?: (activity: ActivityDetails) => void;
   filtersActive?: boolean;
   onAdd?: () => void;
+  /** Show a "Connect Account" button next to the add button when there are no activities. */
+  showConnectAccountLink?: boolean;
   onClearFilters?: () => void;
   onLoadMore?: () => void;
   hasNextPage?: boolean;
@@ -80,6 +83,7 @@ export const ActivityTableMobile = ({
   onUnlinkTransfer,
   filtersActive = false,
   onAdd,
+  showConnectAccountLink = false,
   onClearFilters,
   onLoadMore,
   hasNextPage = false,
@@ -153,10 +157,20 @@ export const ActivityTableMobile = ({
             </Button>
           ) : null
         ) : onAdd ? (
-          <Button onClick={onAdd}>
-            <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t("activity:add_activity")}
-          </Button>
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <Button onClick={onAdd}>
+              <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t("activity:add_activity")}
+            </Button>
+            {showConnectAccountLink && (
+              <Button variant="outline" asChild>
+                <Link to={connectPagePath("activities_empty")}>
+                  <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("activity:page.connect_account")}
+                </Link>
+              </Button>
+            )}
+          </div>
         ) : null}
       </EmptyPlaceholder>
     );
