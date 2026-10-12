@@ -1,9 +1,10 @@
-import { BackupError, type BackupFailure } from "@/pages/settings/exports/backup-error";
+import type { BackupFailure } from "@/pages/settings/exports/backup-error";
 import { reloadApplication } from "@/lib/reload-application";
 import { useEffect, useId, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import { useDateFormatting } from "@wealthfolio/ui";
 import {
   discardDatabaseBackupImport,
   getDatabaseEncryptionStatus,
@@ -26,19 +27,24 @@ import {
 import { PasswordInput } from "@wealthfolio/ui/components/ui/password-input";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Label } from "@wealthfolio/ui/components/ui/label";
+import { BackupAlert, PendingIcon } from "./backup-ui";
 
 export function BackupImportDialog({
   filename,
   displayName,
   onClose,
+  onRetry,
   initialPreview,
 }: {
   initialPreview?: BackupImportPreview;
   filename?: string;
   displayName?: string;
   onClose: () => void;
+  /** Fetches a new caller preview after this one was used; the caller remounts the dialog. */
+  onRetry?: () => Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
+  const formatting = useDateFormatting();
   const id = useId();
   const reduceMotion = useReducedMotion();
   const [restored, setRestored] = useState(false);
@@ -129,6 +135,18 @@ export function BackupImportDialog({
       setPending(null);
     }
   };
+  const retry = async () => {
+    if (pending || !onRetry) return;
+    setPending("inspect");
+    setError(null);
+    try {
+      await onRetry();
+    } catch (cause) {
+      setError({ cause });
+    } finally {
+      setPending(null);
+    }
+  };
   const choose = async () => {
     try {
       const path = await openDatabaseFileDialog();
@@ -148,6 +166,9 @@ export function BackupImportDialog({
     : filename
       ? (displayName ?? filename)
       : selected?.split(/[\\/]/).pop();
+  // A failed restore consumes its preview; a caller preview can only be checked again.
+  const consumed = preview !== null && previewId.current !== preview.id;
+  const canRetry = consumed && pending !== "restore" && !!initialPreview && !!onRetry;
   return (
     <Dialog
       open
@@ -166,18 +187,8 @@ export function BackupImportDialog({
           if (pending === "restore") event.preventDefault();
         }}
       >
-        <DialogHeader className={restored ? "sr-only" : "shrink-0 gap-3 px-6 pb-5 pt-7 text-left"}>
-          <div className="flex gap-1.5 pr-12" aria-hidden>
-            <span className="bg-primary h-1 w-8 rounded-full" />
-            <span
-              className={`h-1 w-8 rounded-full transition-colors ${preview ? "bg-primary" : "bg-muted"}`}
-            />
-          </div>
-          <DialogTitle
-            ref={stepHeading}
-            tabIndex={-1}
-            className="pr-10 text-xl leading-snug outline-none"
-          >
+        <DialogHeader className={restored ? "sr-only" : "shrink-0 px-6 pb-4 pt-6 text-left"}>
+          <DialogTitle ref={stepHeading} tabIndex={-1} className="pr-8 outline-none">
             {t(
               restored
                 ? "settings:backup_restored_title"
@@ -186,10 +197,8 @@ export function BackupImportDialog({
                   : "settings:backup_open_title",
             )}
           </DialogTitle>
-          <DialogDescription
-            className={restored || preview ? "sr-only" : "text-xs leading-relaxed"}
-          >
-            {t("settings:backup_import_description")}
+          <DialogDescription className="truncate">
+            {preview && selectedName ? selectedName : t("settings:backup_import_description")}
           </DialogDescription>
         </DialogHeader>
         {restored ? (
@@ -216,7 +225,7 @@ export function BackupImportDialog({
               preview
                 ? (event) => {
                     event.preventDefault();
-                    void confirm();
+                    void (canRetry ? retry() : confirm());
                   }
                 : inspect
             }
@@ -224,78 +233,26 @@ export function BackupImportDialog({
           >
             <div
               ref={scrollBody}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 sm:max-h-[55dvh]"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 sm:max-h-[60dvh]"
             >
               <motion.div
                 key={preview ? "review" : "open"}
                 initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-5"
+                className="space-y-4"
               >
-                {selectedName ? (
-                  <div
-                    className={
-                      preview
-                        ? "text-muted-foreground flex min-w-0 items-center gap-3"
-                        : "bg-muted/50 flex min-w-0 items-center gap-3 rounded-xl border p-3"
-                    }
-                  >
-                    <div
-                      className={
-                        preview
-                          ? "shrink-0"
-                          : "bg-background text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg"
-                      }
-                    >
-                      <Icons.FileArchive className="size-5" aria-hidden />
-                    </div>
-                    <p
-                      className="min-w-0 flex-1 truncate text-xs font-medium"
-                      title={filename ?? selectedName}
-                    >
-                      {selectedName}
-                    </p>
-                    {!filename && !preview && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-11 shrink-0"
-                        disabled={pending !== null}
-                        onClick={() => void choose()}
-                        aria-label={t("settings:recovery_change_file")}
-                      >
-                        <Icons.FolderOpen className="size-4" aria-hidden />
-                      </Button>
-                    )}
-                  </div>
-                ) : !preview ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-24 w-full gap-3 rounded-xl border-dashed"
-                    disabled={pending !== null}
-                    onClick={() => void choose()}
-                  >
-                    <Icons.FolderOpen className="size-5" aria-hidden />
-                    {t("settings:recovery_choose_file")}
-                  </Button>
-                ) : null}
                 {preview ? (
                   <>
-                    <section className="space-y-3" aria-label={t("settings:recovery_preview")}>
-                      <h3 className="text-muted-foreground text-xs font-medium">
-                        {t("settings:recovery_preview")}
-                      </h3>
-                      <dl className="bg-muted/50 grid grid-cols-2 divide-x rounded-xl py-4">
+                    <section className="space-y-2" aria-label={t("settings:recovery_preview")}>
+                      <dl className="bg-muted/50 grid grid-cols-2 divide-x rounded-lg py-3">
                         {[
                           { label: t("common:accounts"), value: preview.summary.accountCount },
                           { label: t("common:activities"), value: preview.summary.activityCount },
                         ].map(({ label, value }) => (
-                          <div key={label} className="flex flex-col gap-1 px-4">
+                          <div key={label} className="flex flex-col gap-0.5 px-4">
                             <dt className="text-muted-foreground text-xs">{label}</dt>
-                            <dd className="order-first text-2xl font-semibold tabular-nums tracking-tight">
+                            <dd className="order-first text-xl font-semibold tabular-nums tracking-tight">
                               {value.toLocaleString(i18n.resolvedLanguage)}
                             </dd>
                           </div>
@@ -304,18 +261,21 @@ export function BackupImportDialog({
                       {created && !Number.isNaN(created.getTime()) && (
                         <p className="text-muted-foreground text-xs">
                           {t("settings:recovery_created", {
-                            date: created.toLocaleString(i18n.resolvedLanguage),
+                            date: formatting.formatDateTime(created, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }),
                           })}
                         </p>
                       )}
                     </section>
-                    <div className="border-destructive/20 bg-destructive/5 flex gap-3 rounded-xl border p-4">
+                    <div className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3">
                       <Icons.AlertTriangle
-                        className="text-destructive mt-0.5 size-4 shrink-0"
+                        className="text-warning mt-0.5 size-4 shrink-0"
                         aria-hidden
                       />
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium leading-relaxed">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">
                           {t("settings:backup_replace_warning")}
                         </p>
                         <p className="text-muted-foreground text-xs leading-relaxed">
@@ -323,30 +283,66 @@ export function BackupImportDialog({
                         </p>
                       </div>
                     </div>
-                    <div className="text-muted-foreground space-y-3 text-xs leading-relaxed">
+                    <ul className="text-muted-foreground space-y-2 text-xs leading-relaxed">
                       {encryption.data && (
-                        <div className="flex gap-3">
-                          <EncryptionIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-                          <p>
-                            {t(
-                              encryption.data.enabled
-                                ? "settings:backup_destination_encrypted"
-                                : "settings:backup_destination_plain",
-                            )}
-                          </p>
-                        </div>
+                        <li className="flex gap-2.5">
+                          <EncryptionIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                          {t(
+                            encryption.data.enabled
+                              ? "settings:backup_destination_encrypted"
+                              : "settings:backup_destination_plain",
+                          )}
+                        </li>
                       )}
-                      <div className="flex gap-3">
-                        <Icons.RefreshCw className="mt-0.5 size-4 shrink-0" aria-hidden />
-                        <p>{t("settings:backup_import_reconnect")}</p>
-                      </div>
-                    </div>
+                      <li className="flex gap-2.5">
+                        <Icons.RefreshCw className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                        {t("settings:backup_import_reconnect")}
+                      </li>
+                    </ul>
                   </>
                 ) : (
-                  !filename && (
-                    <div className="space-y-3">
+                  <>
+                    {selectedName ? (
+                      <div className="bg-muted/50 flex min-w-0 items-center gap-3 rounded-lg border p-3">
+                        <Icons.FileArchive
+                          className="text-muted-foreground size-5 shrink-0"
+                          aria-hidden
+                        />
+                        <p
+                          className="min-w-0 flex-1 truncate text-sm font-medium"
+                          title={filename ?? selectedName}
+                        >
+                          {selectedName}
+                        </p>
+                        {!filename && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="pointer-coarse:size-11 shrink-0"
+                            disabled={pending !== null}
+                            onClick={() => void choose()}
+                            aria-label={t("settings:recovery_change_file")}
+                          >
+                            <Icons.FolderOpen className="size-4" aria-hidden />
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-24 w-full gap-3 rounded-lg border-dashed"
+                        disabled={pending !== null}
+                        onClick={() => void choose()}
+                      >
+                        <Icons.FolderOpen className="size-5" aria-hidden />
+                        {t("settings:recovery_choose_file")}
+                      </Button>
+                    )}
+                    {!filename && (
                       <div className="space-y-2">
-                        <Label htmlFor={`${id}-password`} className="text-sm">
+                        <Label htmlFor={`${id}-password`}>
                           {t(
                             selectedName?.endsWith(".wfrec")
                               ? "settings:cloud_backup_code"
@@ -368,32 +364,30 @@ export function BackupImportDialog({
                         <p id={`${id}-password-help`} className="text-muted-foreground text-xs">
                           {t("settings:backup_password_optional")}
                         </p>
+                        <details className="text-muted-foreground group text-xs leading-relaxed">
+                          <summary className="inline-flex cursor-pointer list-none items-center gap-1 py-1 [&::-webkit-details-marker]:hidden">
+                            <Icons.ChevronRight
+                              className="size-3.5 transition-transform group-open:rotate-90"
+                              aria-hidden
+                            />
+                            {t("settings:backup_password_help_title")}
+                          </summary>
+                          <p className="pt-1">
+                            {t(
+                              selectedName?.endsWith(".wfrec")
+                                ? "settings:cloud_backup_save_code"
+                                : "settings:recovery_password_help",
+                            )}
+                          </p>
+                        </details>
                       </div>
-                      <details className="text-muted-foreground text-xs leading-relaxed">
-                        <summary className="cursor-pointer py-2">
-                          {t("settings:backup_password_help_title")}
-                        </summary>
-                        <p className="pt-1">
-                          {t(
-                            selectedName?.endsWith(".wfrec")
-                              ? "settings:cloud_backup_save_code"
-                              : "settings:recovery_password_help",
-                          )}
-                        </p>
-                      </details>
-                    </div>
-                  )
+                    )}
+                  </>
                 )}
                 {encryption.isError && (
-                  <p role="alert" className="text-destructive text-sm">
-                    {t("settings:backup_encryption_status_failed")}
-                  </p>
+                  <BackupAlert error={t("settings:backup_encryption_status_failed")} />
                 )}
-                {error && (
-                  <div role="alert" className="text-destructive break-words text-sm">
-                    <BackupError error={error} />
-                  </div>
-                )}
+                {error && <BackupAlert error={error} />}
               </motion.div>
             </div>
             <DialogFooter className="bg-background shrink-0 border-t px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:pb-6">
@@ -403,32 +397,34 @@ export function BackupImportDialog({
                 disabled={pending === "restore"}
                 onClick={preview && !initialPreview ? back : close}
               >
-                {preview && !initialPreview && (
-                  <Icons.ArrowLeft className="mr-2 size-4" aria-hidden />
-                )}
+                {preview && !initialPreview && <Icons.ArrowLeft aria-hidden />}
                 {t(preview && !initialPreview ? "common:back" : "common:cancel")}
               </Button>
               <Button
                 type="submit"
-                className="gap-2 sm:flex-1"
                 disabled={
                   pending !== null ||
-                  (preview
-                    ? !encryption.data || previewId.current !== preview.id
-                    : !filename && !selected)
+                  (preview ? !canRetry && (!encryption.data || consumed) : !filename && !selected)
                 }
               >
-                {pending && <Icons.Spinner className="size-4 animate-spin" aria-hidden />}
+                <PendingIcon
+                  pending={pending !== null}
+                  icon={canRetry ? <Icons.RotateCcw aria-hidden /> : undefined}
+                />
                 {t(
-                  preview
-                    ? pending === "restore"
-                      ? "settings:recovery_restoring"
-                      : "settings:backup_restore_title"
-                    : pending === "inspect"
+                  canRetry
+                    ? pending === "inspect"
                       ? "settings:recovery_inspecting"
-                      : "settings:recovery_inspect",
+                      : "common:retry"
+                    : preview
+                      ? pending === "restore"
+                        ? "settings:recovery_restoring"
+                        : "settings:backup_restore_title"
+                      : pending === "inspect"
+                        ? "settings:recovery_inspecting"
+                        : "settings:recovery_inspect",
                 )}
-                {!pending && !preview && <Icons.ArrowRight className="size-4" aria-hidden />}
+                {!pending && !preview && <Icons.ArrowRight aria-hidden />}
               </Button>
             </DialogFooter>
           </form>

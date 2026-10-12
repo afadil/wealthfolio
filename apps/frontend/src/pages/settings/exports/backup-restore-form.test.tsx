@@ -32,6 +32,7 @@ vi.mock("@/adapters", () => ({
 }));
 vi.mock("@/hooks/use-platform", () => ({
   usePlatform: () => ({ platform: { is_desktop: false } }),
+  useIsMobileViewport: () => false,
 }));
 vi.mock("./use-backup-restore", () => ({
   useBackupRestore: () => ({
@@ -69,6 +70,9 @@ beforeEach(() => {
     },
   ];
 });
+function openRowMenu(name: RegExp | string) {
+  fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
+}
 it("shows actual snapshot protection and exports the selected snapshot", () => {
   render(<BackupRestoreForm />);
   expect(screen.getByText(new RegExp(copy.backup_protection_encrypted))).toBeVisible();
@@ -85,8 +89,10 @@ it("native opens review for saved snapshots and disables unavailable snapshots",
   });
   render(<BackupRestoreForm />);
   expect(screen.getByRole("button", { name: /^Restore Backup from Sep 2, 2026/ })).toBeDisabled();
-  expect(screen.getByRole("button", { name: /^Export Backup from Sep 2, 2026/ })).toBeDisabled();
-  expect(screen.getByRole("button", { name: /^Delete Backup from Sep 2, 2026/ })).toBeEnabled();
+  openRowMenu(/^Options for backup from Sep 2, 2026/);
+  expect(screen.getByRole("menuitem", { name: "Export" })).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("menuitem", { name: "Delete" })).not.toHaveAttribute("aria-disabled");
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: /^Restore Backup from Sep 1, 2026/ }));
   expect(screen.getByText("Inspecting old.db")).toBeVisible();
 });
@@ -95,7 +101,8 @@ it("native offers file restore alongside managed creation", () => {
   render(<BackupRestoreForm />);
   fireEvent.click(screen.getByRole("button", { name: copy.backup_now }));
   expect(mocks.create).toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: copy.backup_restore_from_file }));
+  openRowMenu("More options");
+  fireEvent.click(screen.getByRole("menuitem", { name: copy.backup_restore_from_file }));
   expect(screen.getByText("Inspecting picked file")).toBeVisible();
 });
 it("shows list failure and retry instead of an empty success state", () => {
@@ -109,8 +116,9 @@ it("shows list failure and retry instead of an empty success state", () => {
 it("keeps original server snapshots behind an explicit key warning, including unavailable keys", () => {
   mocks.data[0].protection = "unavailable";
   render(<BackupRestoreForm />);
-  expect(screen.getByRole("link", { name: copy.backup_original_save })).not.toBeVisible();
-  fireEvent.click(screen.getByText(copy.backup_original_advanced));
+  expect(screen.queryByText(copy.backup_original_warning)).not.toBeInTheDocument();
+  openRowMenu(/^Options for backup from Sep 1, 2026/);
+  fireEvent.click(screen.getByRole("menuitem", { name: copy.backup_original_advanced }));
   expect(screen.getByText(copy.backup_original_warning)).toBeVisible();
   expect(screen.getByRole("link", { name: copy.backup_original_save })).toHaveAttribute(
     "href",
@@ -121,6 +129,8 @@ it("keeps original server snapshots behind an explicit key warning, including un
 it("does not offer a server snapshot URL on native", () => {
   mocks.web = false;
   render(<BackupRestoreForm />);
+  openRowMenu(/^Options for backup from Sep 1, 2026/);
+  expect(screen.getByRole("menuitem", { name: "Export" })).toBeInTheDocument();
   expect(screen.queryByText(copy.backup_original_advanced)).not.toBeInTheDocument();
 });
 
@@ -133,7 +143,9 @@ it("web offers backup management without any restore controls", () => {
     screen.queryByRole("button", { name: /^Restore Backup from Sep 1, 2026/ }),
   ).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /^Export Backup from Sep 1, 2026/ })).toBeEnabled();
-  expect(screen.getByRole("button", { name: /^Delete Backup from Sep 1, 2026/ })).toBeEnabled();
+  openRowMenu(/^Options for backup from Sep 1, 2026/);
+  expect(screen.getByRole("menuitem", { name: "Delete" })).not.toHaveAttribute("aria-disabled");
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: copy.backup_now }));
   expect(mocks.create).toHaveBeenCalled();
 });
@@ -164,10 +176,12 @@ it.each(SUPPORTED_LOCALE_CODES)(
       </I18nextProvider>
     );
     const { rerender } = render(view());
-    fireEvent.click(screen.getByTitle(common.delete));
+    const menu = document.querySelector<HTMLElement>('[aria-haspopup="menu"]')!;
+    fireEvent.pointerDown(menu, { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("menuitem", { name: common.delete }));
     expect(screen.getByRole("button", { name: common.cancel })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: common.delete }));
-    expect(mocks.remove).toHaveBeenCalledWith("old.db");
+    expect(mocks.remove).toHaveBeenCalledWith("old.db", expect.anything());
     mocks.removing = true;
     rerender(view());
     expect(screen.getByRole("button", { name: settings.backup_deleting })).toBeDisabled();

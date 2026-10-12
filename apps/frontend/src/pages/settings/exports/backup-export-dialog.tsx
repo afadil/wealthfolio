@@ -1,4 +1,4 @@
-import { BackupError, type BackupFailure } from "@/pages/settings/exports/backup-error";
+import type { BackupFailure } from "@/pages/settings/exports/backup-error";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { exportDatabaseBackup } from "@/adapters";
@@ -17,6 +17,7 @@ import { Label } from "@wealthfolio/ui/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { generateBackupPassword, isValidBackupPassword } from "./backup-password";
+import { BackupAlert, PendingIcon } from "./backup-ui";
 
 interface BackupExportDialogProps {
   filename: string;
@@ -85,12 +86,12 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
         if (!open) close();
       }}
     >
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md" mobileClassName="h-auto max-h-[85dvh] overflow-y-auto">
+        <DialogHeader className="text-left">
           <DialogTitle>{t("settings:backup_export_dialog_title")}</DialogTitle>
           <DialogDescription>{t("settings:backup_export_description")}</DialogDescription>
         </DialogHeader>
-        <div className="bg-muted/50 flex min-w-0 items-center gap-3 rounded-lg p-3">
+        <div className="bg-muted/50 flex min-w-0 items-center gap-3 rounded-lg border p-3">
           <Icons.FileArchive className="text-muted-foreground size-5 shrink-0" aria-hidden />
           <p className="min-w-0 break-words text-sm font-medium" title={filename}>
             {displayName ?? filename}
@@ -121,7 +122,11 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
             </div>
           </RadioGroup>
           {unencrypted ? (
-            <p className="bg-muted/50 rounded-lg p-3 text-sm leading-relaxed" role="note">
+            <p
+              className="border-warning/30 bg-warning/10 flex gap-3 rounded-lg border p-3 text-sm leading-relaxed"
+              role="note"
+            >
+              <Icons.AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" aria-hidden />
               {t("settings:backup_export_plain_warning")}
             </p>
           ) : (
@@ -201,16 +206,13 @@ export function BackupExportDialog({ filename, displayName, onClose }: BackupExp
               </p>
             </>
           )}
-          {error && (
-            <div role="alert" className="text-destructive text-sm">
-              <BackupError error={error} />
-            </div>
-          )}
-          <DialogFooter className="border-t pt-4">
-            <Button type="button" variant="outline" onClick={close}>
+          {error && <BackupAlert error={error} />}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={close}>
               {t("common:cancel")}
             </Button>
             <Button type="submit" disabled={pending}>
+              <PendingIcon pending={pending} />
               {t(
                 pending
                   ? "settings:backup_export_busy"
