@@ -1530,6 +1530,14 @@
       "bulgaria": "Bulgarien"
     }
   },
+  "currencyFormats": {
+    "title": "Währungsformate",
+    "description": "Beträge in bestimmten Währungen nach den Konventionen einer anderen Region formatieren. Andere Währungen folgen „Region und Formate“.",
+    "currencyPlaceholder": "Währung auswählen",
+    "regionPlaceholder": "Region auswählen",
+    "regionFor": "Region für {{currency}}",
+    "remove": "Format für {{currency}} entfernen"
+  },
   "appearance_navigation_title": "Navigation",
   "appearance_navigation_description": "Wählen Sie die Navigation auf großen Bildschirmen.",
   "addons_pin_to_navigation": "{{name}} an Navigation anheften",

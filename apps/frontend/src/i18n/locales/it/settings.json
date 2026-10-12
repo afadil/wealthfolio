@@ -1571,6 +1571,14 @@
       "taiwan": "Taiwan"
     }
   },
+  "currencyFormats": {
+    "title": "Formati delle valute",
+    "description": "Formatta gli importi in valute specifiche con le convenzioni di un'altra regione. Le altre valute seguono «Regione e formati».",
+    "currencyPlaceholder": "Seleziona valuta",
+    "regionPlaceholder": "Seleziona regione",
+    "regionFor": "Regione per {{currency}}",
+    "remove": "Rimuovi il formato per {{currency}}"
+  },
   "appearance_navigation_title": "Navigazione",
   "appearance_navigation_description": "Scegli come navigare su schermi grandi.",
   "addons_pin_to_navigation": "Fissa {{name}} nella navigazione",

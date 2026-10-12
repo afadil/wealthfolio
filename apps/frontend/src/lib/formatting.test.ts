@@ -1,4 +1,5 @@
 import {
+  createAmountFormatting,
   createFormatter,
   dateFnsLocaleFor,
   formatAmount,
@@ -573,5 +574,54 @@ describe("en-IN formatting", () => {
 
     expect(locale.localize.month(0)).toBe("January");
     expect(locale.options?.weekStartsOn).toBe(0);
+  });
+});
+
+describe("per-currency formatting regions", () => {
+  it("formats each overridden currency in its own region", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN" });
+
+    expect(formatting.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatting.formatAmount(1234567.89, "USD")).toBe("$1,234,567.89");
+    expect(formatting.formatCompactAmount(123456789, "INR")).toBe("₹12.35Cr");
+    expect(formatting.formatCompactAmount(123456789, "USD")).toBe("$123.46M");
+    expect(formatting.formatRoundedAmount(1234567.89, "INR")).toBe("₹12,34,568");
+    expect(formatting.formatPrice(1234567.5, "INR")).toBe("₹12,34,567.50");
+    expect(formatting.formatAmount(1234567.89, "INR", false)).toBe("12,34,567.89");
+    expect(formatting.currencyLocale("inr")).toBe("en-IN");
+    expect(formatting.currencyLocale("USD")).toBe("en-US");
+  });
+
+  it("keeps US grouping for USD when the global region is India", () => {
+    const formatting = createAmountFormatting("IN", undefined, { USD: "US" });
+
+    expect(formatting.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatting.formatAmount(1234567.89, "USD")).toBe("$1,234,567.89");
+    expect(formatting.formatCompactAmount(1234567.89, "USD")).toBe("$1.23M");
+  });
+
+  it("formats quote units in the region of their major currency", () => {
+    const formatting = createAmountFormatting("US", undefined, { GBP: "DE" });
+
+    expect(formatting.formatAmount(1234.5, "GBp")).toBe("1.234,50p");
+    expect(formatting.currencyLocale("GBX")).toBe("de-DE");
+  });
+
+  it("matches the global formatter when there are no overrides", () => {
+    const global = createAmountFormatting("DE");
+
+    for (const formatting of [
+      createAmountFormatting("DE", undefined, {}),
+      createAmountFormatting("DE", undefined, { INR: "IN" }),
+    ]) {
+      expect(formatting.formatAmount(1234567.89, "EUR")).toBe(
+        global.formatAmount(1234567.89, "EUR"),
+      );
+      expect(formatting.formatCompactAmount(1234567.89, "USD")).toBe(
+        global.formatCompactAmount(1234567.89, "USD"),
+      );
+      expect(formatting.formatCurrencySymbol("USD")).toBe(global.formatCurrencySymbol("USD"));
+      expect(formatting.currencyLocale("EUR")).toBe("de-DE");
+    }
   });
 });

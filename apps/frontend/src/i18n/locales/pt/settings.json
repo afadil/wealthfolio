@@ -1571,6 +1571,14 @@
       "taiwan": "Taiwan"
     }
   },
+  "currencyFormats": {
+    "title": "Formatos de moeda",
+    "description": "Formate valores em moedas específicas com as convenções de outra região. As outras moedas seguem \"Região e formatos\".",
+    "currencyPlaceholder": "Selecionar moeda",
+    "regionPlaceholder": "Selecionar região",
+    "regionFor": "Região para {{currency}}",
+    "remove": "Remover formato de {{currency}}"
+  },
   "appearance_navigation_title": "Navegação",
   "appearance_navigation_description": "Escolha como navegar em telas grandes.",
   "addons_pin_to_navigation": "Fixar {{name}} na navegação",

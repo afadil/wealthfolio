@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useAmountFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
 import type { TFunction } from "i18next";
@@ -202,6 +203,7 @@ type IncomeContentProps = ToolCallMessagePartProps<GetIncomeArgs, GetIncomeOutpu
 const IncomeContent = memo(IncomeContentImpl);
 
 function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
+  const amountFormatting = useAmountFormatting();
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
@@ -211,15 +213,9 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
 
   const formatter = useMemo(
     () => ({
-      format: (value: number) =>
-        formatting.formatDecimal(value, {
-          style: "currency",
-          currency,
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        }),
+      format: (value: number) => amountFormatting.formatRoundedAmount(value, currency),
     }),
-    [currency, formatting],
+    [currency, amountFormatting],
   );
 
   // Calculate type percentages

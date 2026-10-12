@@ -1571,6 +1571,14 @@
       "bulgaria": "Bulgarie"
     }
   },
+  "currencyFormats": {
+    "title": "Formats des devises",
+    "description": "Formatez les montants de certaines devises selon les conventions d’une autre région. Les autres devises suivent « Région et formats ».",
+    "currencyPlaceholder": "Choisir une devise",
+    "regionPlaceholder": "Choisir une région",
+    "regionFor": "Région pour {{currency}}",
+    "remove": "Supprimer le format pour {{currency}}"
+  },
   "appearance_navigation_title": "Navigation",
   "appearance_navigation_description": "Choisissez votre mode de navigation sur grand écran.",
   "addons_pin_to_navigation": "Épingler {{name}} à la navigation",

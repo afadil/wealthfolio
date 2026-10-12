@@ -1,6 +1,6 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import NumberFlow from "@number-flow/react";
-import { useAmountFormatting, useLocalizationSettings, useNumberFormatting } from "@wealthfolio/ui";
+import { useAmountFormatting } from "@wealthfolio/ui";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo } from "react";
 
@@ -27,8 +27,7 @@ const Balance: React.FC<BalanceProps> = ({
   isUnavailable = false,
 }) => {
   const amountFormatting = useAmountFormatting();
-  const numberFormatting = useNumberFormatting();
-  const { locale } = useLocalizationSettings();
+  const locale = amountFormatting.currencyLocale(currency);
 
   const { isBalanceHidden } = useBalancePrivacy();
   const validCurrency = isValidCurrencyCode(currency);
@@ -42,17 +41,17 @@ const Balance: React.FC<BalanceProps> = ({
     const useCurrencyStyle = displayCurrency && validCurrency;
     if (compact && useCurrencyStyle)
       return amountFormatting.formatCompactAmount(targetValue, currency);
-    return numberFormatting.formatDecimal(targetValue, {
+    return new Intl.NumberFormat(locale, {
       ...(useCurrencyStyle ? { currency, currencyDisplay: "narrowSymbol" as const } : {}),
       style: useCurrencyStyle ? "currency" : "decimal",
       notation: compact ? "compact" : "standard",
       minimumFractionDigits: compact ? 0 : displayDecimal ? 2 : 0,
       maximumFractionDigits: compact ? 1 : displayDecimal ? 2 : 0,
-    });
+    }).format(targetValue);
   }, [
     currency,
     amountFormatting,
-    numberFormatting,
+    locale,
     validCurrency,
     displayCurrency,
     displayDecimal,

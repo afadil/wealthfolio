@@ -1490,6 +1490,14 @@
       "bulgaria": "Bulgaria"
     }
   },
+  "currencyFormats": {
+    "title": "Currency formats",
+    "description": "Format amounts in specific currencies with another region's conventions. Other currencies follow Region & formats.",
+    "currencyPlaceholder": "Select currency",
+    "regionPlaceholder": "Select region",
+    "regionFor": "Region for {{currency}}",
+    "remove": "Remove format for {{currency}}"
+  },
   "appearance_navigation_title": "Navigation",
   "appearance_navigation_description": "Choose how you navigate on large screens.",
   "addons_pin_to_navigation": "Pin {{name}} to navigation",
