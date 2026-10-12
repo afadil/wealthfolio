@@ -80,6 +80,7 @@ const formattingRegions = [
   ["CA", "canada"],
   ["US", "unitedStates"],
   ["GB", "unitedKingdom"],
+  ["IN", "india"],
   ["FR", "france"],
   ["DE", "germany"],
   ["CH", "switzerland"],
