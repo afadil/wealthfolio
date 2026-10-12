@@ -5681,6 +5681,320 @@ pub(crate) mod tests {
         assert_eq!(updated.asset_id, None);
     }
 
+    fn cash_symbol_update_service(
+        existing: Activity,
+    ) -> (
+        ActivityService,
+        Arc<MockActivityRepository>,
+        Arc<MockAssetService>,
+    ) {
+        let accounts = Arc::new(MockAccountService::new());
+        accounts.add_account(create_test_account("acc-1", "USD"));
+        let repository = Arc::new(MockActivityRepository::new());
+        repository.add_activity(existing);
+        let assets = Arc::new(MockAssetService::new());
+        let service = ActivityService::new(
+            repository.clone(),
+            accounts,
+            assets.clone(),
+            Arc::new(MockFxService::new()),
+            Arc::new(MockQuoteService),
+        );
+        (service, repository, assets)
+    }
+
+    async fn save_cash_symbol_update(
+        service: &ActivityService,
+        update: ActivityUpdate,
+        bulk: bool,
+    ) -> Activity {
+        if bulk {
+            let result = service
+                .bulk_mutate_activities(ActivityBulkMutationRequest {
+                    creates: vec![],
+                    updates: vec![update],
+                    delete_ids: vec![],
+                })
+                .await
+                .expect("bulk update should succeed");
+            assert!(result.errors.is_empty(), "{:?}", result.errors);
+            result.updated.into_iter().next().expect("updated row")
+        } else {
+            service
+                .update_activity(update)
+                .await
+                .expect("single update")
+        }
+    }
+
+    #[tokio::test]
+    async fn cash_symbol_updates_preserve_currency_and_final_amount() {
+        for bulk in [false, true] {
+            for (symbol, currency, expected_currency) in [
+                ("$CASH-EUR", "", "EUR"),
+                (" cash:eur ", " ", "EUR"),
+                ("$CASH-EUR", "USD", "USD"),
+            ] {
+                let mut existing =
+                    create_stored_activity("transfer-1", "acc-1", Some("minted-cash"));
+                existing.activity_type = "TRANSFER_OUT".to_string();
+                // The stored amount is a user-entered total, not quantity x price.
+                existing.amount = Some(dec!(75));
+                let (service, _, assets) = cash_symbol_update_service(existing);
+                let events = MockDomainEventSink::new();
+                let service = service.with_event_sink(Arc::new(events.clone()));
+                let mut update = create_test_activity_update(
+                    "transfer-1",
+                    "acc-1",
+                    Some(AssetResolutionInput {
+                        symbol: Some(symbol.to_string()),
+                        ..Default::default()
+                    }),
+                    currency,
+                );
+                update.activity_type = "TRANSFER_OUT".to_string();
+                update.quantity = Some(Some(dec!(2)));
+                update.unit_price = None;
+                update.amount = None;
+
+                let saved = save_cash_symbol_update(&service, update, bulk).await;
+                assert_eq!(saved.asset_id, None);
+                assert_eq!(saved.currency, expected_currency);
+                assert_eq!(saved.amount, Some(dec!(75)));
+                assert!(assets.get_assets().unwrap().is_empty());
+                assert_eq!(assets.resolve_import_asset_call_count(), 0);
+                let emitted = events.events();
+                assert_eq!(emitted.len(), 1);
+                match &emitted[0] {
+                    DomainEvent::ActivitiesChanged {
+                        account_ids,
+                        asset_ids,
+                        currencies,
+                        ..
+                    } => {
+                        assert_eq!(account_ids, &["acc-1".to_string()]);
+                        assert_eq!(asset_ids, &["minted-cash".to_string()]);
+                        assert!(currencies.contains(&"USD".to_string()));
+                        assert!(currencies.contains(&expected_currency.to_string()));
+                    }
+                    event => panic!("unexpected event: {event:?}"),
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cash_symbol_creates_infer_currency_without_live_asset_resolution() {
+        for mode in ["single", "save", "import", "sync"] {
+            for (symbol, currency, expected_currency) in [
+                ("$cash-eur", "", "EUR"),
+                (" CASH_EUR ", "", "EUR"),
+                ("CASH:EUR", "USD", "USD"),
+                // is_cash_symbol uppercases before checking the currency.
+                // Such UTF-8 input must not panic during extraction.
+                ("CASH-ııı", "USD", "USD"),
+            ] {
+                let accounts = Arc::new(MockAccountService::new());
+                let account = create_test_account("acc-1", "USD");
+                accounts.add_account(account.clone());
+                let assets = Arc::new(MockAssetService::new());
+                let service = ActivityService::new(
+                    Arc::new(MockActivityRepository::new()),
+                    accounts,
+                    assets.clone(),
+                    Arc::new(MockFxService::new()),
+                    Arc::new(MockQuoteService),
+                );
+                let activity = NewActivity {
+                    asset: Some(AssetResolutionInput {
+                        symbol: Some(symbol.to_string()),
+                        ..Default::default()
+                    }),
+                    ..create_test_cash_create("cash-1", "acc-1", "DEPOSIT", currency)
+                };
+                if mode == "single" {
+                    let saved = service.create_activity(activity).await.unwrap();
+                    assert_eq!(saved.asset_id, None);
+                    assert_eq!(saved.currency, expected_currency);
+                } else {
+                    let result = match mode {
+                        "save" => {
+                            service
+                                .prepare_activities_for_save(vec![activity], &account)
+                                .await
+                        }
+                        "import" => {
+                            service
+                                .prepare_activities_for_import(vec![activity], &account)
+                                .await
+                        }
+                        _ => {
+                            service
+                                .prepare_activities_for_sync(vec![activity], &account)
+                                .await
+                        }
+                    }
+                    .unwrap();
+                    assert!(result.errors.is_empty(), "{:?}", result.errors);
+                    assert_eq!(result.prepared.len(), 1);
+                    let saved = &result.prepared[0].activity;
+                    assert_eq!(saved.get_symbol_id(), None);
+                    assert_eq!(saved.currency, expected_currency);
+                }
+                assert!(assets.get_assets().unwrap().is_empty());
+                assert_eq!(assets.resolve_import_asset_call_count(), 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cash_symbol_updates_respect_preserved_asset_backed_subtypes() {
+        for bulk in [false, true] {
+            for (activity_type, subtype) in [
+                ("INTEREST", "STAKING_REWARD"),
+                ("ADJUSTMENT", "OPTION_EXPIRY"),
+                ("ADJUSTMENT", "RETURN_OF_CAPITAL"),
+                ("ADJUSTMENT", "NOTIONAL_DISTRIBUTION"),
+            ] {
+                let mut existing = create_stored_activity("income-1", "acc-1", Some("asset-1"));
+                existing.activity_type = activity_type.to_string();
+                existing.subtype = Some(subtype.to_string());
+                let (service, _, _) = cash_symbol_update_service(existing);
+                let mut update = create_test_activity_update(
+                    "income-1",
+                    "acc-1",
+                    Some(AssetResolutionInput {
+                        symbol: Some("$CASH-USD".to_string()),
+                        ..Default::default()
+                    }),
+                    "USD",
+                );
+                update.activity_type = activity_type.to_string();
+                update.subtype = None;
+                update.quantity = None;
+                update.unit_price = None;
+                update.amount = None;
+
+                let saved = save_cash_symbol_update(&service, update, bulk).await;
+                assert_eq!(saved.subtype.as_deref(), Some(subtype));
+                assert!(
+                    saved.asset_id.is_some(),
+                    "{subtype} must remain asset-backed"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cash_symbol_updates_allow_explicit_subtype_clear() {
+        for bulk in [false, true] {
+            let mut existing = create_stored_activity("income-1", "acc-1", Some("asset-1"));
+            existing.activity_type = "INTEREST".to_string();
+            existing.subtype = Some("STAKING_REWARD".to_string());
+            let (service, _, assets) = cash_symbol_update_service(existing);
+            let mut update = create_test_activity_update(
+                "income-1",
+                "acc-1",
+                Some(AssetResolutionInput {
+                    symbol: Some("$CASH-USD".to_string()),
+                    ..Default::default()
+                }),
+                "USD",
+            );
+            update.activity_type = "INTEREST".to_string();
+            update.subtype = Some(String::new());
+            update.quantity = Some(None);
+            update.unit_price = Some(None);
+            update.amount = None;
+
+            let saved = save_cash_symbol_update(&service, update, bulk).await;
+            assert_eq!(saved.subtype, None);
+            assert_eq!(saved.asset_id, None);
+            assert_eq!(saved.amount, Some(dec!(100)));
+            assert!(assets.get_assets().unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn cash_symbol_updates_reject_missing_final_cash_before_writing() {
+        for bulk in [false, true] {
+            let mut existing = create_stored_activity("transfer-1", "acc-1", Some("minted-cash"));
+            existing.activity_type = "TRANSFER_OUT".to_string();
+            existing.quantity = None;
+            existing.unit_price = None;
+            existing.amount = None;
+            let (service, repository, assets) = cash_symbol_update_service(existing);
+            let mut update = create_test_activity_update(
+                "transfer-1",
+                "acc-1",
+                Some(AssetResolutionInput {
+                    symbol: Some("$CASH-USD".to_string()),
+                    ..Default::default()
+                }),
+                "USD",
+            );
+            update.activity_type = "TRANSFER_OUT".to_string();
+            update.quantity = None;
+            update.unit_price = None;
+            update.amount = None;
+
+            let error = if bulk {
+                let result = service
+                    .bulk_mutate_activities(ActivityBulkMutationRequest {
+                        creates: vec![],
+                        updates: vec![update],
+                        delete_ids: vec![],
+                    })
+                    .await
+                    .unwrap();
+                assert!(result.updated.is_empty());
+                assert_eq!(result.errors.len(), 1);
+                result.errors[0].message.clone()
+            } else {
+                service
+                    .update_activity(update)
+                    .await
+                    .expect_err("missing amount")
+                    .to_string()
+            };
+            assert!(error.contains("require a final cash amount"), "{error}");
+            assert_eq!(
+                repository
+                    .get_activity("transfer-1")
+                    .unwrap()
+                    .asset_id
+                    .as_deref(),
+                Some("minted-cash")
+            );
+            assert!(assets.get_assets().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn cash_symbol_update_preview_still_rejects_symbols_without_writes() {
+        let mut existing = create_stored_activity("cash-1", "acc-1", None);
+        existing.activity_type = "WITHDRAWAL".to_string();
+        let (service, repository, assets) = cash_symbol_update_service(existing);
+        let before = stored_snapshot(&repository);
+        let mut update = create_test_activity_update(
+            "cash-1",
+            "acc-1",
+            Some(AssetResolutionInput {
+                symbol: Some("$CASH-EUR".to_string()),
+                ..Default::default()
+            }),
+            "",
+        );
+        update.activity_type = "WITHDRAWAL".to_string();
+        let error = service
+            .preview_activity_update(update)
+            .expect_err("symbols are not previewable");
+        assert!(error.to_string().contains("not by symbol"));
+        assert_eq!(stored_snapshot(&repository), before);
+        assert!(assets.get_assets().unwrap().is_empty());
+        assert_eq!(assets.resolve_import_asset_call_count(), 0);
+    }
+
     #[tokio::test]
     async fn test_bulk_update_clears_existing_subtype_when_explicitly_cleared() {
         let account_service = Arc::new(MockAccountService::new());
