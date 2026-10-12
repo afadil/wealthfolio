@@ -31,7 +31,7 @@ import {
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
@@ -94,8 +94,7 @@ export const ActivityTableMobile = ({
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
 
-  // The list scrolls inside its own box, so it sits at the top of it and the
-  // margin resolves to zero; the hook still supplies the element itself.
+  // Embedded lists can share an already-scrolled page rather than their own box.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
 
   /**
@@ -115,6 +114,12 @@ export const ActivityTableMobile = ({
   const virtualizer = useVirtualizer({
     count: activities.length,
     getScrollElement: () => scrollElement,
+    // Seed the offset before the virtualizer's initial scrollTo. Swipeable views
+    // mount neighboring lists while the shared page may already be scrolled.
+    observeElementOffset: (instance, onChange) => {
+      onChange(instance.scrollElement?.scrollTop ?? 0, false);
+      return observeElementOffset(instance, onChange);
+    },
     estimateSize: () => (isCompactView ? COMPACT_CARD_HEIGHT : DETAILED_CARD_HEIGHT),
     getItemKey,
     overscan: OVERSCAN,

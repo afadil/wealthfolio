@@ -28,7 +28,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import {
   AmountDisplay,
   Button,
@@ -678,9 +678,8 @@ export const ActivityTable = ({
 
   const tableRows = table.getRowModel().rows;
 
-  // The body scrolls inside this table's own box, but it starts below a sticky
-  // header, so the origin the virtualizer measures from is the body's top
-  // rather than the scroll box's.
+  // Embedded tables may scroll with the page; the body can start below both
+  // page content and the table header, so account for that offset.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
 
   // Keyed by activity, so a row keeps its measured height when a page loads
@@ -694,6 +693,12 @@ export const ActivityTable = ({
   const virtualizer = useVirtualizer({
     count: tableRows.length,
     getScrollElement: () => scrollElement,
+    // A tab can mount this table inside an already-scrolled page. Read the
+    // current offset before the virtualizer performs its initial scrollTo.
+    observeElementOffset: (instance, onChange) => {
+      onChange(instance.scrollElement?.scrollTop ?? 0, false);
+      return observeElementOffset(instance, onChange);
+    },
     estimateSize: () => ROW_HEIGHT,
     getItemKey,
     overscan: OVERSCAN,
