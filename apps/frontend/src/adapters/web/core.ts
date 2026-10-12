@@ -459,7 +459,8 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   };
 
   switch (command) {
-    case "cloud_backup_action": {
+    case "cloud_backup_action":
+    case "cloud_backup_capture": {
       body = JSON.stringify(payload);
       break;
     }

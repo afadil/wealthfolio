@@ -35,5 +35,6 @@ export type CloudBackupOperation =
   | { action: "delete"; backupId: string | null };
 export const cloudBackupAction = <T = unknown>(operation: CloudBackupOperation): Promise<T> =>
   invoke<T>("cloud_backup_action", { operation });
-export const captureCloudBackup = (): Promise<CloudBackupPoint | null> =>
-  invoke<CloudBackupPoint | null>("cloud_backup_capture");
+/** `manual` backs up before the next scheduled time; the cloud allows a few a day. */
+export const captureCloudBackup = (manual = false): Promise<CloudBackupPoint | null> =>
+  invoke<CloudBackupPoint | null>("cloud_backup_capture", { manual });
