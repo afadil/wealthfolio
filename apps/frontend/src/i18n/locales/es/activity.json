@@ -1303,6 +1303,8 @@
       "activitiesRequiredFields": "date, activityType, symbol, quantity, unitPrice",
       "optionalFields": "Campos opcionales:",
       "activitiesOptionalFields": "amount, account, currency, fee, tax, comment, fxRate, subtype, instrumentType, isin",
+      "transactionsRequiredFields": "date, activityType, amount",
+      "transactionsOptionalFields": "account, currency, fee, tax, comment, fxRate, subtype",
       "tipBold": "💡 Consejo:",
       "activitiesTip": " Los nombres de las columnas y los tipos de actividad no necesitan coincidir exactamente: puedes asignarlos durante la importación. Las asignaciones se pueden guardar como plantillas personalizadas para futuras importaciones.",
       "amountBold": "💰 Campo de importe:",

@@ -1239,6 +1239,8 @@
       "activitiesRequiredFields": "date、activityType、symbol、quantity、unitPrice",
       "optionalFields": "选填字段：",
       "activitiesOptionalFields": "amount、account、currency、fee、tax、comment、fxRate、subtype、instrumentType、isin",
+      "transactionsRequiredFields": "date、activityType、amount",
+      "transactionsOptionalFields": "account、currency、fee、tax、comment、fxRate、subtype",
       "tipBold": "💡 提示：",
       "activitiesTip": " 列名和活动类型无需完全匹配——您可以在导入过程中进行映射。映射可保存为自定义模板以供将来导入使用。",
       "amountBold": "💰 金额字段：",

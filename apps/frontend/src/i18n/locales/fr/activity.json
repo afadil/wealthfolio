@@ -1303,6 +1303,8 @@
       "activitiesRequiredFields": "date, activityType, symbol, quantity, unitPrice",
       "optionalFields": "Champs facultatifs :",
       "activitiesOptionalFields": "amount, account, currency, fee, tax, comment, fxRate, subtype, instrumentType, isin",
+      "transactionsRequiredFields": "date, activityType, amount",
+      "transactionsOptionalFields": "account, currency, fee, tax, comment, fxRate, subtype",
       "tipBold": "💡 Astuce :",
       "activitiesTip": " Les noms de colonnes et les types d'activité n'ont pas besoin de correspondre exactement — vous pouvez les associer lors de l'import. Les correspondances peuvent être enregistrées comme modèles personnalisés pour les imports futurs.",
       "amountBold": "💰 Champ Montant :",

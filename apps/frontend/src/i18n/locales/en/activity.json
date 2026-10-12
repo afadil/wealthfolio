@@ -1257,6 +1257,8 @@
       "activitiesRequiredFields": "date, activityType, symbol, quantity, unitPrice",
       "optionalFields": "Optional fields:",
       "activitiesOptionalFields": "amount, account, currency, fee, tax, comment, fxRate, subtype, instrumentType, isin",
+      "transactionsRequiredFields": "date, activityType, amount",
+      "transactionsOptionalFields": "account, currency, fee, tax, comment, fxRate, subtype",
       "tipBold": "💡 Tip:",
       "activitiesTip": " Column names and activity types don't need to match exactly — you can map them during import. Mappings can be saved as custom templates for future imports.",
       "amountBold": "💰 Amount field:",
