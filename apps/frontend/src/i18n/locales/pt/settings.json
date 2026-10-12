@@ -1648,6 +1648,8 @@
   "cloud_backup_download": "Baixar",
   "cloud_backup_enable": "Ativar backups",
   "cloud_backup_failed": "Não foi possível concluir. Verifique a conexão e tente novamente.",
+  "cloud_backup_manual_limit": "Você atingiu o limite de backups manuais de hoje. Os backups automáticos continuam conforme programado.",
+  "cloud_backup_busy": "Já há um backup ou exportação em andamento. Tente novamente em instantes.",
   "cloud_backup_last": "Última cópia concluída: {{date}}",
   "cloud_backup_none": "Nenhum backup ainda",
   "cloud_backup_offline": "Um backup de servidor deve ser restaurado na máquina que executa o Wealthfolio. A restauração por este navegador não está disponível.",

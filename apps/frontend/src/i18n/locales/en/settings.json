@@ -1601,6 +1601,8 @@
   "cloud_backup_download": "Download",
   "cloud_backup_enable": "Turn on backups",
   "cloud_backup_failed": "We couldn’t complete this. Check your connection and try again.",
+  "cloud_backup_manual_limit": "You’ve reached today’s limit for manual backups. Automatic backups continue as scheduled.",
+  "cloud_backup_busy": "A backup or export is already running. Try again in a moment.",
   "cloud_backup_last": "Last successful backup: {{date}}",
   "cloud_backup_none": "No backup yet",
   "cloud_backup_offline": "A server backup must be restored on the machine running Wealthfolio. Restoring from this browser is not available.",

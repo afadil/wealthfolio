@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   download: vi.fn(),
   preview: vi.fn(),
+  toast: vi.fn(),
   profile: "profile-a",
   user: "user-a",
   connected: true,
@@ -40,6 +41,7 @@ vi.mock("@/hooks/use-platform", () => ({
   usePlatform: () => ({ isMobile: mocks.mobile, loading: false }),
   useIsMobileViewport: () => mocks.compact,
 }));
+vi.mock("@wealthfolio/ui/components/ui/use-toast", () => ({ toast: mocks.toast }));
 vi.mock("./backup-import-dialog", () => ({
   BackupImportDialog: () => <div>Immutable restore preview</div>,
 }));
@@ -671,4 +673,92 @@ it("puts every row action in the titled action palette on phone widths", async (
   expect(screen.getByRole("button", { name: copy.cloud_backup_delete })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: copy.cloud_backup_restore }));
   await waitFor(() => expect(mocks.preview).toHaveBeenCalledWith("point"));
+});
+
+const running = {
+  ...status,
+  hasKey: true,
+  keyReady: true,
+  isSource: true,
+  sourceConsented: true,
+  policy: {
+    ...status.policy,
+    enabled: true,
+    lastBackupAt: "2026-10-01T00:00:00Z",
+    nextDueAt: "2999-10-02T00:00:00Z",
+  },
+};
+async function openBackupMenu() {
+  fireEvent.pointerDown(await screen.findByRole("button", { name: copy.cloud_backup_options }), {
+    button: 0,
+    ctrlKey: false,
+  });
+}
+it("offers a manual backup in the menu and sends it as manual", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockResolvedValue({ backupId: "now", publishedAt: "2026-10-01T01:00:00Z" });
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  await waitFor(() => expect(mocks.capture).toHaveBeenCalledWith(true));
+  await waitFor(() =>
+    expect(mocks.toast).toHaveBeenCalledWith({ title: copy.backup_saved, variant: "success" }),
+  );
+});
+it("says so when another backup or export holds the slot", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockResolvedValue(null);
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ title: copy.cloud_backup_busy }));
+});
+it("explains the daily manual limit instead of a generic failure", async () => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(op.action === "runtimeStatus" ? { state: "idle", retryAt: null } : running),
+  );
+  mocks.capture.mockRejectedValue(
+    new Error("API error (409): BACKUP_MANUAL_LIMIT: Manual backup limit reached"),
+  );
+  mount();
+  await openBackupMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: copy.backup_now }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(copy.cloud_backup_manual_limit);
+});
+it.each([
+  {
+    when: "before the first backup",
+    runtime: { state: "idle", retryAt: null },
+    policy: { lastBackupAt: null },
+    badge: copy.cloud_backup_state_waiting,
+  },
+  {
+    when: "after a failure",
+    runtime: { state: "failed", retryAt: null },
+    policy: {},
+    badge: copy.cloud_backup_state_failed,
+  },
+  {
+    when: "while a backup runs",
+    runtime: { state: "running", retryAt: null },
+    policy: {},
+    badge: copy.cloud_backup_state_running,
+  },
+])("keeps the manual backup out of the menu $when", async ({ runtime, policy, badge }) => {
+  mocks.action.mockImplementation((op) =>
+    Promise.resolve(
+      op.action === "runtimeStatus"
+        ? runtime
+        : { ...running, policy: { ...running.policy, ...policy } },
+    ),
+  );
+  mount();
+  await screen.findAllByText(badge);
+  await openBackupMenu();
+  await screen.findByRole("menuitem", { name: copy.cloud_backup_disable });
+  expect(screen.queryByRole("menuitem", { name: copy.backup_now })).not.toBeInTheDocument();
 });
