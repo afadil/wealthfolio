@@ -68,6 +68,27 @@ describe("MarketDataImportPage", () => {
     expect(startOverButton()).toBeEnabled();
   });
 
+  it("ignores a CSV dropped while a file is validating", async () => {
+    let failValidation!: (reason: unknown) => void;
+    adapterMocks.checkQuotesImport.mockReturnValue(
+      new Promise<QuoteImport[]>((_, reject) => (failValidation = reject)),
+    );
+    const { container } = renderPage();
+
+    await validateFile(container);
+    fireEvent.drop(await screen.findByText("Processing file..."), {
+      dataTransfer: {
+        files: [new File(["symbol,date,close\n"], "other.csv", { type: "text/csv" })],
+      },
+    });
+
+    failValidation("Invalid CSV");
+
+    // The error belongs to the file that was validated, not the dropped one.
+    expect(await screen.findByText("quotes.csv")).toBeInTheDocument();
+    expect(screen.queryByText("other.csv")).not.toBeInTheDocument();
+  });
+
   it("disables Start Over and Back until the import finishes", async () => {
     let finishImport!: (quotes: QuoteImport[]) => void;
     adapterMocks.checkQuotesImport.mockResolvedValue([quote]);
