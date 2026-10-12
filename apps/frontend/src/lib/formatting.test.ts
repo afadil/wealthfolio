@@ -489,3 +489,39 @@ describe("de-CH formatting", () => {
     expect(locale.options?.weekStartsOn).toBe(1);
   });
 });
+
+describe("en-IN formatting", () => {
+  it("resolves India to Indian English", () => {
+    expect(resolveFormattingLocale("IN")).toBe("en-IN");
+    expect(resolveFormattingLocale("en-IN")).toBe("en-IN");
+  });
+
+  it("groups in lakhs and crores", () => {
+    const formatter = createFormatter(resolveFormattingLocale("IN"), "UTC");
+
+    expect(formatter.formatDecimal(1234567.89)).toBe("12,34,567.89");
+    expect(formatter.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatter.formatCompactAmount(1234567.89, "INR")).toBe("₹12.35L");
+    expect(formatter.formatCompactAmount(12345678, "INR")).toBe("₹1.23Cr");
+    expect(formatter.formatPercent(0.125, { digits: 1 })).toBe("12.5%");
+    // The United States shares the language and groups in thousands.
+    expect(createFormatter("en-US", "UTC").formatDecimal(1234567.89)).toBe("1,234,567.89");
+  });
+
+  it("writes dates day-first and round-trips Indian grouping", () => {
+    const formatter = createFormatter(resolveFormattingLocale("IN"), "UTC");
+    const date = new Date(Date.UTC(2026, 6, 10, 14, 30));
+
+    expect(formatter.formatDate(date, { dateStyle: "short" })).toBe("10/07/26");
+    expect(parseLocalizedDate("10/07/2026", "en-IN")).toEqual(new Date(2026, 6, 10));
+    expect(formatter.parseNumber(formatter.formatDecimal(1234567.89))).toBe(1234567.89);
+    expect(parseLocalizedDecimalString("12,34,567.89", "en-IN")).toBe("1234567.89");
+  });
+
+  it("uses English calendar text with a Sunday week start", () => {
+    const locale = dateFnsLocaleFor(resolveFormattingLocale("IN"));
+
+    expect(locale.localize.month(0)).toBe("January");
+    expect(locale.options?.weekStartsOn).toBe(0);
+  });
+});

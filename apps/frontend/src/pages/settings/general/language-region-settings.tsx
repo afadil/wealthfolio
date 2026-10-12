@@ -26,6 +26,7 @@ const FORMATTING_REGION_OPTIONS = [
   ["CA", "canada"],
   ["US", "unitedStates"],
   ["GB", "unitedKingdom"],
+  ["IN", "india"],
   ["FR", "france"],
   ["DE", "germany"],
   ["CH", "switzerland"],
