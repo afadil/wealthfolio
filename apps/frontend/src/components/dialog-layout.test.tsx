@@ -15,6 +15,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
 } from "@wealthfolio/ui";
 import { describe, expect, it } from "vitest";
 
@@ -74,5 +78,32 @@ describe("dialog overflow containment", () => {
       "max-sm:[&_button]:shrink",
       "sm:flex-wrap",
     );
+  });
+
+  // globals.css restores max-w-* below 1024 px for these attributes only.
+  it("marks side sheets for the max-width opt-out and leaves bottom sheets out", () => {
+    const sideSheet = render(
+      <Sheet open>
+        <SheetContent>
+          <SheetTitle>Side sheet</SheetTitle>
+          <SheetDescription>Opens from the right by default</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    );
+
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-slot", "sheet-content");
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-side", "right");
+    sideSheet.unmount();
+
+    render(
+      <Dialog open useIsMobile={() => true}>
+        <DialogContent>
+          <DialogTitle>Mobile dialog</DialogTitle>
+          <DialogDescription>Renders as a bottom sheet</DialogDescription>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-side", "bottom");
   });
 });
