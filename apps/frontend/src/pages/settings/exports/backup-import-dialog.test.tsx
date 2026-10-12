@@ -44,7 +44,12 @@ beforeEach(() => {
   mocks.discard.mockResolvedValue(undefined);
   mocks.confirm.mockResolvedValue(undefined);
 });
-function mount(filename?: string, cloud = false, reactStrictMode = false) {
+function mount(
+  filename?: string,
+  cloud = false,
+  reactStrictMode = false,
+  onRetry?: () => Promise<void>,
+) {
   const close = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
@@ -52,6 +57,7 @@ function mount(filename?: string, cloud = false, reactStrictMode = false) {
       <BackupImportDialog
         filename={filename}
         onClose={close}
+        onRetry={onRetry}
         displayName={cloud ? "Selected cloud backup" : undefined}
         initialPreview={
           cloud
@@ -107,6 +113,22 @@ it("does not reuse a consumed cloud preview after restore failure", async () => 
   expect(mocks.confirm).toHaveBeenCalledWith("cloud-immutable-id");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   expect(view.close).toHaveBeenCalledTimes(1);
+});
+it("offers to check a used cloud preview again instead of a disabled restore", async () => {
+  mocks.confirm.mockRejectedValueOnce(
+    new Error("This backup preview has expired or is unavailable"),
+  );
+  const retry = vi.fn().mockResolvedValue(undefined);
+  mount(undefined, true, false, retry);
+  const restore = screen.getByRole("button", { name: copy.backup_restore_title });
+  await waitFor(() => expect(restore).toBeEnabled());
+  fireEvent.click(restore);
+  await screen.findByRole("alert");
+  const again = screen.getByRole("button", { name: "Retry" });
+  expect(again).toBeEnabled();
+  fireEvent.click(again);
+  await waitFor(() => expect(retry).toHaveBeenCalledOnce());
+  expect(mocks.confirm).toHaveBeenCalledTimes(1);
 });
 it("validates the selected snapshot before confirming its immutable ID once", async () => {
   mount("old.db");

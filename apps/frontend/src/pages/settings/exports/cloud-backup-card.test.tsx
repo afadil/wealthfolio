@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { fireEvent, render, screen, waitFor, within } from "@/test/render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   connected: true,
   tauri: true,
   mobile: false,
+  compact: false,
 }));
 vi.mock("@/adapters", () => ({
   cloudBackupAction: mocks.action,
@@ -37,6 +38,7 @@ vi.mock("@/features/profiles/profile-context", () => ({
 }));
 vi.mock("@/hooks/use-platform", () => ({
   usePlatform: () => ({ isMobile: mocks.mobile, loading: false }),
+  useIsMobileViewport: () => mocks.compact,
 }));
 vi.mock("./backup-import-dialog", () => ({
   BackupImportDialog: () => <div>Immutable restore preview</div>,
@@ -55,6 +57,7 @@ beforeEach(() => {
   mocks.connected = true;
   mocks.tauri = true;
   mocks.mobile = false;
+  mocks.compact = false;
   mocks.action.mockResolvedValue(status);
 });
 function mount(summary = false) {
@@ -372,7 +375,7 @@ it("shows a subscription promotion instead of setup controls to non-subscribers"
   });
   mount();
   await screen.findByText(copy.cloud_backup_promotion_title);
-  expect(screen.queryByText(copy.cloud_backup_history)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(copy.cloud_backup_title)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: copy.cloud_backup_setup })).not.toBeInTheDocument();
   expect(mocks.capture).not.toHaveBeenCalled();
 });
@@ -611,4 +614,61 @@ it.each([
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(mocks.action.mock.calls.some(([op]) => op.action === "enable")).toBe(false);
   expect(mocks.capture).not.toHaveBeenCalled();
+});
+
+it("shows progress only on the restore point being checked and lists the latest five", async () => {
+  const history = Array.from({ length: 7 }, (_, index) => ({
+    backupId: `point-${index}`,
+    publishedAt: `2026-10-0${index + 1}T00:00:00Z`,
+    sizeBytes: 123,
+  }));
+  mocks.action.mockResolvedValue({ ...status, hasKey: true, keyReady: true, history });
+  let finish!: (value: unknown) => void;
+  mocks.preview.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  mount();
+  const list = await screen.findByRole("list", { name: copy.cloud_backup_history });
+  expect(within(list).getAllByRole("listitem")).toHaveLength(5);
+  const restores = within(list).getAllByRole("button", { name: copy.cloud_backup_restore });
+  fireEvent.click(restores[0]);
+  expect(mocks.preview).toHaveBeenCalledWith("point-6");
+  expect(restores[0]).toHaveAttribute("aria-busy", "true");
+  expect(restores[1]).not.toHaveAttribute("aria-busy", "true");
+  expect(restores[1]).toBeDisabled();
+  finish({ id: "preview", summary: { accountCount: 1, activityCount: 1, createdAt: null } });
+  await screen.findByText("Immutable restore preview");
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: copy.backup_show_older_other.replace("{{count}}", "2"),
+    }),
+  );
+  expect(within(list).getAllByRole("listitem")).toHaveLength(7);
+  expect(screen.getByRole("button", { name: copy.backup_show_fewer })).toBeInTheDocument();
+});
+
+it("puts every row action in the titled action palette on phone widths", async () => {
+  mocks.compact = true;
+  mocks.action.mockResolvedValue({
+    ...status,
+    hasKey: true,
+    keyReady: true,
+    history: [{ backupId: "point", publishedAt: "2026-10-01T00:00:00Z", sizeBytes: 123 }],
+  });
+  mocks.preview.mockResolvedValue({
+    id: "preview",
+    summary: { accountCount: 1, activityCount: 1, createdAt: null },
+  });
+  mount();
+  const list = await screen.findByRole("list", { name: copy.cloud_backup_history });
+  expect(within(list).queryByRole("button", { name: copy.cloud_backup_restore })).toBeNull();
+  fireEvent.click(within(list).getByRole("button", { name: /^Options for backup from/ }));
+  expect(await screen.findByRole("heading", { name: /2026/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: copy.cloud_backup_download })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: copy.cloud_backup_delete })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: copy.cloud_backup_restore }));
+  await waitFor(() => expect(mocks.preview).toHaveBeenCalledWith("point"));
 });
