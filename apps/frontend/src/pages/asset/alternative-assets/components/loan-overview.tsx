@@ -50,6 +50,7 @@ export function LoanOverview({
         calculation={calculation}
         metadata={metadata}
         balance={balance}
+        balanceAvailable={holding.loan?.balanceSource !== null}
         originalAmount={originalAmount}
         currency={holding.currency}
       />
@@ -60,6 +61,8 @@ export function LoanOverview({
         metadata={metadata}
         currency={holding.currency}
         balance={balance}
+        balanceAvailable={holding.loan?.balanceSource !== null}
+        originalBalance={holding.loan?.balanceSource === "original"}
         originalAmount={originalAmount}
         lastConfirmed={lastConfirmed}
         mortgage={mortgage}

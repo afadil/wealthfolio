@@ -780,6 +780,7 @@
     "balance_correction_description": "Ersetzt den offenen Saldo ab einem bestimmten Datum, ohne frühere Daten zu ändern.",
     "extra_repayment": "Sondertilgung",
     "extra_repayment_description": "Erfasst eine zusätzliche Tilgung und aktualisiert die zukünftige Prognose.",
+    "balance_replaces_confirmation": "Dies ersetzt Ihren erfassten Saldo von {{amount}} am {{date}}. Eine spätere Löschung stellt den vorherigen Saldo nicht wieder her.",
     "repayment_before_confirmation": "Ihr erfasster Saldo von {{amount}} am {{date}} hat ab diesem Datum Vorrang, daher senkt diese Rückzahlung den Saldo danach nicht. Wenn dieser Auszug die Rückzahlung nicht enthält, bearbeiten oder löschen Sie ihn im Tab „Zahlungsplan“.",
     "confirm_extra_repayment": "Tilgung erfassen",
     "close_loan": "Darlehen abschließen",

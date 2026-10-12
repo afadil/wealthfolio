@@ -20,19 +20,21 @@ export function LoanSummaryStrip({
   balance,
   originalAmount,
   currency,
+  balanceAvailable = true,
 }: {
   calculation: LoanCalculation | null;
   metadata: Record<string, unknown>;
   balance: number;
   originalAmount: number | null;
   currency: string;
+  balanceAvailable?: boolean;
 }) {
   const { t, isBalanceHidden, numbers, money, moneyText, shortDate, month, rate } =
     useLoanFormat(currency);
   const today = useLoanToday();
   const milestones = loanMilestones(calculation, metadata, today);
   const progress =
-    originalAmount != null
+    originalAmount != null && balanceAvailable
       ? Math.max(0, Math.min(1, (originalAmount - balance) / originalAmount))
       : null;
   const currentRenewal = readLoanEvents(metadata)
@@ -80,7 +82,9 @@ export function LoanSummaryStrip({
               {t("asset:loanOverview.principal_repaid")}
             </p>
             <p className="mt-1 font-semibold tabular-nums">
-              {originalAmount == null ? "—" : money(Math.max(0, originalAmount - balance))}
+              {originalAmount == null || !balanceAvailable
+                ? "—"
+                : money(Math.max(0, originalAmount - balance))}
             </p>
             {originalAmount != null && (
               <p className="text-muted-foreground mt-0.5 text-xs">

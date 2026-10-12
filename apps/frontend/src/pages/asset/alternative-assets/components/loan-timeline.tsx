@@ -57,6 +57,8 @@ interface LoanTimelineProps {
   metadata: Record<string, unknown>;
   currency: string;
   balance: number;
+  balanceAvailable?: boolean;
+  originalBalance?: boolean;
   originalAmount: number | null;
   lastConfirmed?: string;
   mortgage?: boolean;
@@ -73,6 +75,8 @@ export function LoanTimeline({
   metadata,
   currency,
   balance,
+  balanceAvailable = true,
+  originalBalance = false,
   originalAmount,
   lastConfirmed,
   mortgage = false,
@@ -104,7 +108,7 @@ export function LoanTimeline({
   const period = loanPeriod(points, from, today);
   const visible = range === "ALL" ? points : period.points;
   const paidDown =
-    range === "ALL" && originalAmount
+    range === "ALL" && originalAmount && balanceAvailable
       ? { amount: originalAmount - balance, percent: (originalAmount - balance) / originalAmount }
       : { amount: period.reduction, percent: period.percent };
   const estimated = !!calculation && lastConfirmed !== today;
@@ -229,7 +233,16 @@ export function LoanTimeline({
             <HoverCardTrigger asChild className="cursor-pointer">
               <div>
                 <p className="flex items-center gap-2 pt-3 text-xl font-bold">
-                  <AmountDisplay value={balance} currency={currency} isHidden={isBalanceHidden} />
+                  {balanceAvailable ? (
+                    <AmountDisplay value={balance} currency={currency} isHidden={isBalanceHidden} />
+                  ) : (
+                    t("asset:loanOverview.unavailable")
+                  )}
+                  {originalBalance && (
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {t("asset:quickAdd.original_amount")}
+                    </Badge>
+                  )}
                   {estimated && (
                     <Badge variant="secondary" className="text-xs font-normal">
                       {t("asset:loanOverview.projected")}

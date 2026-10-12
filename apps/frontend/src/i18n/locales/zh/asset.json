@@ -780,6 +780,7 @@
     "balance_correction_description": "从指定日期起更正未偿余额，而不修改此前记录。",
     "extra_repayment": "额外还款",
     "extra_repayment_description": "记录额外本金还款并更新未来预测。",
+    "balance_replaces_confirmation": "这将替换 {{date}} 记录的余额 {{amount}}。之后删除此记录不会恢复之前的余额。",
     "repayment_before_confirmation": "您在 {{date}} 记录的余额 {{amount}} 自该日起优先，因此这笔额外还款不会降低之后的余额。如果该对账单未包含此还款，请在“还款计划”标签页中编辑或删除它。",
     "confirm_extra_repayment": "记录还款",
     "close_loan": "结清贷款",
