@@ -10,6 +10,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { PasswordInput } from "@wealthfolio/ui/components/ui/password-input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +49,28 @@ import { backupDate, backupState, useCloudBackups } from "./use-cloud-backups";
 
 type Flow = "setup" | "resume" | "unlock" | "replace" | "pause" | "help";
 /** The one operation in progress: `restore:<id>` and `download:<id>` name their row. */
-type Pending = "capture" | "flow" | "delete" | `restore:${string}` | `download:${string}`;
+type Pending =
+  | "capture"
+  | "manual"
+  | "flow"
+  | "delete"
+  | `restore:${string}`
+  | `download:${string}`;
+
+/** An extra backup now, offered while automatic backups run here and have run at least once. */
+function canBackUpNow(data: CloudBackupStatus) {
+  const state = backupState(data);
+  return (
+    data.policy.uploadEntitled &&
+    data.policy.enabled &&
+    data.isSource &&
+    data.sourceConsented !== false &&
+    data.keyReady &&
+    !!data.policy.lastBackupAt &&
+    state !== "failed" &&
+    state !== "running"
+  );
+}
 
 function ProtectionStatus({ data }: { data: CloudBackupStatus }) {
   const { t } = useTranslation();
@@ -330,7 +352,13 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
     setReauth(recentLogin);
     setError({
       cause,
-      message: t(recentLogin ? "settings:cloud_backup_reauth" : "settings:cloud_backup_failed"),
+      message: t(
+        recentLogin
+          ? "settings:cloud_backup_reauth"
+          : String(cause).includes("BACKUP_MANUAL_LIMIT")
+            ? "settings:cloud_backup_manual_limit"
+            : "settings:cloud_backup_failed",
+      ),
     });
   }
   async function run(operation: CloudBackupOperation) {
@@ -532,8 +560,28 @@ function CloudBackupPanel({ backup }: { backup: ReturnType<typeof useCloudBackup
                 title={t("settings:cloud_backup_title")}
                 label={t("settings:cloud_backup_options")}
                 disabled={busy}
+                pending={pending === "manual"}
                 groups={[
                   [
+                    ...(canBackUpNow(data)
+                      ? [
+                          {
+                            icon: Icons.Upload,
+                            label: t("settings:backup_now"),
+                            onSelect: () =>
+                              void perform("manual", async () => {
+                                const point = await captureCloudBackup(true);
+                                if (!active.current) return;
+                                // No point: another backup or export holds the single slot.
+                                toast(
+                                  point
+                                    ? { title: t("settings:backup_saved"), variant: "success" }
+                                    : { title: t("settings:cloud_backup_busy") },
+                                );
+                              }),
+                          },
+                        ]
+                      : []),
                     ...(data.keyReady
                       ? [
                           {

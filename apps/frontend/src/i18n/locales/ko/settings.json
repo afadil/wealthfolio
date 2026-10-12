@@ -1576,6 +1576,8 @@
   "cloud_backup_download": "다운로드",
   "cloud_backup_enable": "백업 켜기",
   "cloud_backup_failed": "완료하지 못했습니다. 연결을 확인하고 다시 시도하세요.",
+  "cloud_backup_manual_limit": "오늘의 수동 백업 한도에 도달했습니다. 자동 백업은 예정대로 계속됩니다.",
+  "cloud_backup_busy": "백업 또는 내보내기가 이미 진행 중입니다. 잠시 후 다시 시도하세요.",
   "cloud_backup_last": "마지막 성공한 백업: {{date}}",
   "cloud_backup_none": "아직 백업이 없습니다",
   "cloud_backup_offline": "서버 백업은 Wealthfolio를 실행하는 컴퓨터에서 복원해야 합니다. 이 브라우저에서는 복원할 수 없습니다.",
