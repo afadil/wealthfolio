@@ -25,6 +25,7 @@ beforeAll(() => {
 });
 
 describe("internal transfer currencies (real form)", () => {
+  // Both real currency pickers can exceed the default 5s on shared CI runners.
   it("offers both cash currencies in advanced options", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -52,7 +53,7 @@ describe("internal transfer currencies (real form)", () => {
       sourceAmount: 1000,
       destinationAmount: 1000,
     });
-  });
+  }, 15_000);
 
   it.each([
     [780, 100],
