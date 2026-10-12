@@ -1601,7 +1601,7 @@
   "cloud_backup_enable": "開啟備份",
   "cloud_backup_failed": "無法完成操作。請檢查網路連線後再試。",
   "cloud_backup_manual_limit": "今天的手動備份次數已達上限。自動備份將照常進行。",
-  "cloud_backup_busy": "已有備份或匯出正在進行。請稍後再試。",
+  "cloud_backup_not_started": "暫時無法開始備份。請稍後再試。",
   "cloud_backup_last": "上次成功備份：{{date}}",
   "cloud_backup_none": "尚無備份",
   "cloud_backup_offline": "伺服器備份必須在執行 Wealthfolio 的機器上還原，無法從此瀏覽器還原。",

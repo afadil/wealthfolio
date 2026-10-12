@@ -1577,7 +1577,7 @@
   "cloud_backup_enable": "开启备份",
   "cloud_backup_failed": "未能完成操作。请检查网络连接后重试。",
   "cloud_backup_manual_limit": "今天的手动备份次数已达上限。自动备份将照常进行。",
-  "cloud_backup_busy": "已有备份或导出正在进行。请稍后再试。",
+  "cloud_backup_not_started": "暂时无法开始备份。请稍后再试。",
   "cloud_backup_last": "上次成功备份：{{date}}",
   "cloud_backup_none": "暂无备份",
   "cloud_backup_offline": "服务器备份必须在运行 Wealthfolio 的机器上恢复，无法从此浏览器恢复。",

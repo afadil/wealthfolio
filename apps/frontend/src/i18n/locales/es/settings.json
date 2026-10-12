@@ -1648,7 +1648,7 @@
   "cloud_backup_enable": "Activar copias",
   "cloud_backup_failed": "No hemos podido completar esto. Comprueba tu conexión e inténtalo de nuevo.",
   "cloud_backup_manual_limit": "Has alcanzado el límite de copias manuales de hoy. Las copias automáticas siguen según lo programado.",
-  "cloud_backup_busy": "Ya hay una copia o exportación en curso. Inténtalo de nuevo en un momento.",
+  "cloud_backup_not_started": "No se ha podido iniciar la copia ahora. Inténtalo de nuevo en un momento.",
   "cloud_backup_last": "Última copia correcta: {{date}}",
   "cloud_backup_none": "Todavía no hay copias",
   "cloud_backup_offline": "Una copia de servidor debe restaurarse en el equipo donde se ejecuta Wealthfolio. No se puede restaurar desde este navegador.",

@@ -1601,7 +1601,7 @@
   "cloud_backup_enable": "Backups einschalten",
   "cloud_backup_failed": "Das konnte nicht abgeschlossen werden. Prüfe deine Verbindung und versuche es erneut.",
   "cloud_backup_manual_limit": "Du hast das heutige Limit für manuelle Backups erreicht. Automatische Backups laufen wie geplant weiter.",
-  "cloud_backup_busy": "Ein Backup oder Export läuft bereits. Versuche es gleich noch einmal.",
+  "cloud_backup_not_started": "Das Backup konnte gerade nicht gestartet werden. Versuche es gleich noch einmal.",
   "cloud_backup_last": "Letzte erfolgreiche Sicherung: {{date}}",
   "cloud_backup_none": "Noch kein Backup",
   "cloud_backup_offline": "Ein Server-Backup muss auf dem Computer wiederhergestellt werden, auf dem Wealthfolio läuft. Die Wiederherstellung in diesem Browser ist nicht verfügbar.",

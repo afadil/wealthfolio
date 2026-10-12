@@ -1577,7 +1577,7 @@
   "cloud_backup_enable": "バックアップを有効にする",
   "cloud_backup_failed": "完了できませんでした。接続を確認して再試行してください。",
   "cloud_backup_manual_limit": "本日の手動バックアップの上限に達しました。自動バックアップは予定どおり続行されます。",
-  "cloud_backup_busy": "バックアップまたはエクスポートがすでに実行中です。しばらくしてから再試行してください。",
+  "cloud_backup_not_started": "現在バックアップを開始できませんでした。しばらくしてから再試行してください。",
   "cloud_backup_last": "最後に成功したバックアップ：{{date}}",
   "cloud_backup_none": "バックアップはまだありません",
   "cloud_backup_offline": "サーバーのバックアップはWealthfolioを実行しているマシンで復元します。このブラウザからは復元できません。",
