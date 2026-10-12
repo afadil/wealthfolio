@@ -493,6 +493,53 @@ describe("de-CH formatting", () => {
   });
 });
 
+describe("de-AT formatting", () => {
+  const locale = resolveFormattingLocale("AT");
+  const formatter = createFormatter(locale);
+
+  it.each([
+    ["EUR", 1234.56, "1234.56"],
+    ["USD", 1234.56, "1234.56"],
+    ["CAD", 1234.56, "1234.56"],
+    ["EUR", -1234567.89, "-1234567.89"],
+    ["JPY", 1234, "1234"],
+  ] as const)("round-trips Austrian %s currency amounts (%s)", (currency, value, expected) => {
+    const amount = formatter.formatAmount(value, currency);
+
+    expect(formatter.parseNumber(amount)).toBe(value);
+    expect(parseLocalizedNumber(amount, locale)).toBe(value);
+    expect(parseLocalizedDecimalString(amount, locale)).toBe(expected);
+  });
+
+  it("accepts decimal and currency grouping while preserving precision", () => {
+    expect(formatter.parseNumber(formatter.formatDecimal(1234.56))).toBe(1234.56);
+    expect(parseLocalizedDecimalString("1.234,56", locale)).toBe("1234.56");
+    expect(parseLocalizedDecimalString("€ 123.456.789.012.345.678,12345678", locale)).toBe(
+      "123456789012345678.12345678",
+    );
+  });
+
+  it("uses a currency affix to disambiguate whole amounts", () => {
+    expect(formatter.parseNumber("€ 1.234")).toBe(1234);
+    expect(parseLocalizedDecimalString("€ 1.234", locale)).toBe("1234");
+    expect(formatter.parseNumber("1.234")).toBe(1.234);
+    expect(parseLocalizedDecimalString("1.234", locale)).toBe("1.234");
+  });
+
+  it.each(["1234.56", "1,234.56", "$1,234.56"])("preserves machine-formatted input %s", (value) => {
+    expect(formatter.parseNumber(value)).toBe(1234.56);
+    expect(parseLocalizedDecimalString(value, locale)).toBe("1234.56");
+  });
+
+  it.each(["12.34,56", "1.23.456,78", "1.234,5.6", "1.234,56,78"])(
+    "rejects malformed Austrian currency grouping %s",
+    (value) => {
+      expect(formatter.parseNumber(`€ ${value}`)).toBeUndefined();
+      expect(parseLocalizedDecimalString(`€ ${value}`, locale)).toBeUndefined();
+    },
+  );
+});
+
 describe("en-IN formatting", () => {
   it("resolves India to Indian English", () => {
     expect(resolveFormattingLocale("IN")).toBe("en-IN");
