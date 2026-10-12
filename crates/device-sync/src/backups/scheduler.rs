@@ -48,9 +48,6 @@ impl Drop for CaptureCancellation<'_> {
     fn drop(&mut self) {
         if self.armed {
             self.scheduler.finished(self.generation, true);
-            // A due check may have found this capture's export slot busy and be waiting
-            // on its fallback; recheck now that the slot is released.
-            self.scheduler.request_check();
         }
     }
 }
@@ -115,16 +112,24 @@ impl BackupScheduler {
             status.retry_at = None;
         }
     }
-    /// The attempt is an early backup the user asked for. Its outcome goes to the caller;
-    /// the schedule's health and retry time only reflect backups that were due. The mark
-    /// lasts until this attempt's `finished`, which a competing check never reaches.
+    /// A backup the user asked for is early until the policy shows it is due (`due`).
+    /// An early attempt's outcome goes to its caller; the schedule's health and retry time
+    /// only reflect backups that were due. The mark lasts until this attempt's `finished`,
+    /// which a competing check never reaches.
     pub fn early(&self, generation: u64) {
         if self.is_current(generation) {
             self.early.store(true, Ordering::SeqCst);
         }
     }
+    /// The policy shows the attempt is due: it reports like any scheduled backup.
+    pub fn due(&self, generation: u64) {
+        if self.is_current(generation) {
+            self.early.store(false, Ordering::SeqCst);
+        }
+    }
     pub fn finished(&self, generation: u64, failed: bool) {
-        let failed = failed && !self.early.swap(false, Ordering::SeqCst);
+        let early = self.early.swap(false, Ordering::SeqCst);
+        let failed = failed && !early;
         let mut status = self
             .status
             .lock()
@@ -287,23 +292,35 @@ mod tests {
     async fn an_early_backup_reports_to_its_caller_and_leaves_the_schedule_healthy() {
         let scheduler = BackupScheduler::default();
         let generation = scheduler.generation();
-        // A due backup that fails marks the schedule and sets a retry.
-        scheduler.checking(generation);
-        scheduler.started(generation);
-        scheduler.finished(generation, true);
-        assert_eq!(scheduler.status().state, CaptureState::Failed);
-        assert!(scheduler.status().retry_at.is_some());
-        // An early one that fails, is blocked, or is dropped mid-flight does not.
-        scheduler.checking(generation);
-        scheduler.early(generation);
-        // A due check that wakes now finds the export slot busy; it must not clear the mark.
-        scheduler.checking(generation);
-        scheduler.started(generation);
-        scheduler.blocked(generation);
-        assert_eq!(scheduler.status().state, CaptureState::Running);
-        scheduler.finished(generation, true);
-        assert_eq!(scheduler.status().state, CaptureState::Idle);
-        assert!(scheduler.status().retry_at.is_none());
+        let attempt = |early: bool, due: bool, failed: bool| {
+            scheduler.checking(generation);
+            if early {
+                scheduler.early(generation);
+            }
+            // A due check that wakes now finds the export slot busy; it must not clear the mark.
+            scheduler.checking(generation);
+            if due {
+                scheduler.due(generation);
+            }
+            scheduler.started(generation);
+            if failed {
+                scheduler.blocked(generation);
+            }
+            scheduler.finished(generation, failed);
+            scheduler.status()
+        };
+        // A scheduled failure marks the schedule.
+        assert_eq!(attempt(false, false, true).state, CaptureState::Failed);
+        // An early failure, including one before the policy is read, does not.
+        let status = attempt(true, false, true);
+        assert_eq!(status.state, CaptureState::Idle);
+        assert!(status.retry_at.is_none());
+        // A requested backup that turns out to be due reports like a scheduled one.
+        assert_eq!(attempt(true, true, true).state, CaptureState::Failed);
+        // A successful early backup clears its mark for the next attempt.
+        assert_eq!(attempt(true, false, false).state, CaptureState::Idle);
+        assert_eq!(attempt(false, false, true).state, CaptureState::Failed);
+        // An early attempt dropped mid-flight leaves the schedule healthy too.
         scheduler.checking(generation);
         scheduler.early(generation);
         scheduler.started(generation);
@@ -312,17 +329,6 @@ mod tests {
             .await
             .is_err());
         assert_eq!(scheduler.status().state, CaptureState::Idle);
-        // The dropped capture leaves a recheck for a due timer that found its slot busy.
-        assert!(
-            tokio::time::timeout(Duration::from_millis(10), scheduler.wake.notified())
-                .await
-                .is_ok()
-        );
-        // The next check starts a due attempt again.
-        scheduler.checking(generation);
-        scheduler.started(generation);
-        scheduler.finished(generation, true);
-        assert_eq!(scheduler.status().state, CaptureState::Failed);
     }
 
     #[tokio::test(start_paused = true)]
