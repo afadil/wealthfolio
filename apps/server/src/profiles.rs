@@ -79,6 +79,8 @@ pub struct WebProfiles {
     auth: Option<Arc<crate::auth::AuthManager>>,
     pub(crate) oidc: Option<Arc<crate::oidc::OidcManager>>,
     runtimes: Mutex<HashMap<Uuid, Arc<AppState>>>,
+    // Keep slow startup serialized without blocking cached runtime lookups.
+    initialization: Mutex<()>,
     mcp: Mutex<HashMap<Uuid, Router>>,
     visited: std::sync::Mutex<std::collections::HashSet<String>>,
 }
@@ -143,6 +145,7 @@ impl WebProfiles {
             oidc: auth.oidc,
             deletion: Mutex::new(()),
             runtimes: Mutex::new(HashMap::new()),
+            initialization: Mutex::new(()),
             mcp: Mutex::new(HashMap::new()),
             visited: std::sync::Mutex::new(Default::default()),
         }))
@@ -176,8 +179,12 @@ impl WebProfiles {
         }
         self.visited.lock().map_err(failure)?.insert(owner);
         self.mcp.lock().await.remove(&id);
-        let runtime = self.runtimes.lock().await.remove(&id);
+        let runtime = {
+            let _initialization = self.initialization.lock().await;
+            self.runtimes.lock().await.remove(&id)
+        };
         if let Some(runtime) = runtime {
+            runtime.backup_scheduler.set_paused(true);
             let _lifecycle = runtime.profile_lifecycle.lock().await;
             let workers = std::mem::take(&mut *runtime.workers.lock().map_err(failure)?);
             for worker in workers {
@@ -251,6 +258,7 @@ impl WebProfiles {
             config: config.clone(),
             deletion: Mutex::new(()),
             runtimes: Mutex::new(runtimes),
+            initialization: Mutex::new(()),
             mcp: Mutex::new(HashMap::new()),
             visited: std::sync::Mutex::new(Default::default()),
         }))
@@ -287,9 +295,17 @@ impl WebProfiles {
     }
 
     pub async fn runtime(&self, id: Uuid) -> Result<Arc<AppState>> {
-        let mut runtimes = self.runtimes.lock().await;
+        {
+            let runtimes = self.runtimes.lock().await;
+            self.registry.profile(id).map_err(failure)?;
+            if let Some(runtime) = runtimes.get(&id) {
+                return Ok(runtime.clone());
+            }
+        }
+        let _initialization = self.initialization.lock().await;
+        // A waiting open may have been initialized or marked for deletion.
         let profile = self.registry.profile(id).map_err(failure)?;
-        if let Some(runtime) = runtimes.get(&id) {
+        if let Some(runtime) = self.runtimes.lock().await.get(&id) {
             return Ok(runtime.clone());
         }
         let paths = self.registry.paths(&profile);
@@ -307,7 +323,7 @@ impl WebProfiles {
             .await
             .map_err(|error| startup_failure("runtime_initialization", error))?;
         let _ = runtime.profile_binding.set((self.registry.clone(), id));
-        runtimes.insert(id, runtime.clone());
+        self.runtimes.lock().await.insert(id, runtime.clone());
         crate::scheduler::start_background_workers(runtime.clone());
         Ok(runtime)
     }

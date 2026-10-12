@@ -79,14 +79,20 @@ Keep any existing `WF_SECRET_FILE` and legacy `WF_ADDONS_DIR` overrides when
 upgrading.
 
 For Docker, keep the container directory at `/data` and select host storage
-through its volume mapping. The image and supplied Compose files retain
-`WF_DB_PATH=/data/wealthfolio.db`. To select a different container root,
-explicitly update that path as well, or clear it with `WF_DB_PATH=` when opting
-into `WF_DATA_DIR`. Ensure the new container directory has a persistent writable
-mount. The supplied Compose files hardcode `WF_DB_PATH`; setting it in
-`.env.docker` alone does not override it. Use a Compose override file to
-explicitly change storage settings. No new data-directory default is injected
-during upgrades.
+through its volume mapping. The image retains `WF_DB_PATH=/data/wealthfolio.db`.
+The supplied Compose files forward `WF_DATA_DIR` and `WF_DB_PATH` from
+`.env.docker`, preserving that legacy database default and leaving `WF_DATA_DIR`
+empty unless explicitly set. An explicitly empty `WF_DB_PATH=` is honored when
+opting into `WF_DATA_DIR`; the legacy candidate then becomes `<root>/app.db`.
+Keep the existing legacy database filename when first adopting an installation,
+so `/data/wealthfolio.db` is not missed by switching to `/data/app.db`.
+
+To select a different container root, update `WF_DATA_DIR` and point
+`WF_DB_PATH` into it, or clear the database path intentionally. Ensure that root
+has a persistent writable mount. Review any local Compose override that replaces
+these settings; explicit `-f` commands do not automatically include
+`compose.override.yml`. No new data-directory default is injected during
+upgrades.
 
 Use the same path settings, vault override, and master-key source for the server
 and offline `db encrypt`, `db decrypt`, and `db restore` commands. An existing
@@ -178,6 +184,41 @@ preserved. There is no startup requirement to change vault permissions. A
 writable vault in a non-writable directory remains supported; creating a new
 vault requires a writable parent directory. The database and other application
 files retain their own directory-access requirements.
+
+### Secrets file cannot be opened
+
+The server logs `SECRET_VAULT_UNAVAILABLE` at startup when `secrets.json` (or
+the `WF_SECRET_FILE` path) exists but cannot be opened with the configured
+master key. The server still starts and leaves the file untouched, but saved
+credentials such as provider API keys and the Connect sign-in are unavailable,
+and deleting a profile fails with "The profile credential store could not be
+accessed." The browser shows the same failure as a secrets-file error. This
+vault belongs to the server: it never uses the host's keyring, so mounting a
+D-Bus or keyring socket into the container has no effect.
+
+The `reason` field names the cause:
+
+| `reason`         | Cause                                                                                                                                     | Fix                                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cannot_decrypt` | The configured `WF_SECRET_KEY` or `WF_SECRET_KEY_FILE` differs from the key the vault was created with, or the encrypted data is damaged. | Configure the original key; see [Preserving the master key](#preserving-the-master-key). If the key is right, restore the file from a backup made with it. |
+| `unreadable`     | The runtime user cannot read the file; `io_kind` and `os_code` give the system error.                                                     | Give the runtime user (see [above](#permissions-and-existing-deployments)) read access, and write access for saving credentials.                           |
+| `not_a_file`     | The path is a directory or another non-file, for example one Docker created for a single-file bind mount whose source was missing.        | Remove that mount or point it at the real file.                                                                                                            |
+| `malformed`      | The file is not a valid secrets file.                                                                                                     | Restore it from a backup made with the same master key.                                                                                                    |
+
+Restart after the fix. A profile deletion that failed for this reason stays
+pending and finishes at the next startup.
+
+A read-only vault starts without a log entry, because startup only reads it.
+Deleting a profile also removes that profile's saved credentials, so when it has
+any, deletion fails with the same error until the runtime user can write the
+file. After granting write access, retry the deletion or restart the server.
+
+If the original key is lost, no key can decrypt the vault. Stop the server,
+rename the file (for example to `secrets.json.bak`), and start it again; the
+server creates a new vault the next time it saves a credential. Enter provider
+API keys again and sign in to Connect again. Do not restore the original key if
+you enabled database encryption after changing it: the database now requires the
+new key, so move the vault aside instead.
 
 ## Backups and upgrades
 

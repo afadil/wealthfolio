@@ -14,17 +14,37 @@ pub struct QuoteIdentifiers {
     pub isin: Option<Cow<'static, str>>,
 }
 
-/// Bond metadata needed for yield-curve-based price calculation.
+/// Known bond metadata supplied to quote providers.
+/// Missing pricing fields must not discard a known Treasury type.
 #[derive(Clone, Debug)]
 pub struct BondQuoteMetadata {
+    /// Verified TreasuryDirect type, required by the Treasury calculator.
+    pub treasury_type: Option<String>,
     /// Annual coupon rate as a decimal (0.05 = 5%)
-    pub coupon_rate: Decimal,
+    pub coupon_rate: Option<Decimal>,
     /// Maturity date of the bond
-    pub maturity_date: NaiveDate,
+    pub maturity_date: Option<NaiveDate>,
     /// Face/par value of the bond
     pub face_value: Decimal,
     /// Coupon payment frequency: "SEMI_ANNUAL", "ANNUAL", "QUARTERLY", "ZERO"
-    pub coupon_frequency: String,
+    pub coupon_frequency: Option<String>,
+}
+
+impl BondQuoteMetadata {
+    pub fn has_valid_treasury_terms(&self) -> bool {
+        let valid_coupon = match self.treasury_type.as_deref() {
+            Some("Bill") => {
+                self.coupon_rate == Some(Decimal::ZERO)
+                    && self.coupon_frequency.as_deref() == Some("ZERO")
+            }
+            Some("Note" | "Bond") => {
+                self.coupon_rate.is_some_and(|rate| rate > Decimal::ZERO)
+                    && self.coupon_frequency.as_deref() == Some("SEMI_ANNUAL")
+            }
+            _ => false,
+        };
+        valid_coupon && self.maturity_date.is_some() && self.face_value > Decimal::ZERO
+    }
 }
 
 /// Request context for quote fetching
@@ -50,6 +70,19 @@ pub struct QuoteContext {
 
     /// Custom provider code (e.g., "coingecko") — used by CUSTOM_SCRAPER to find source config
     pub custom_provider_code: Option<String>,
+}
+
+impl QuoteContext {
+    /// The custom provider this security is assigned to. The code counts only while the
+    /// custom scraper is the chosen provider, so a code left behind under another
+    /// provider can't route requests to an assigned-only source.
+    pub fn assigned_custom_provider(&self) -> Option<&str> {
+        if self.preferred_provider.as_deref() == Some(crate::provider::DATA_SOURCE_CUSTOM_SCRAPER) {
+            self.custom_provider_code.as_deref()
+        } else {
+            None
+        }
+    }
 }
 
 /// Market data quote

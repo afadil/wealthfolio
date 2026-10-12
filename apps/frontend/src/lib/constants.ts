@@ -429,6 +429,13 @@ export const ACTIVITY_SUBTYPES = {
   // ADJUSTMENT subtypes
   // OPTION_EXPIRY: removes option lots with no cash effect
   OPTION_EXPIRY: "OPTION_EXPIRY",
+  // RETURN_OF_CAPITAL: capital paid back, not income; lowers the asset's cost basis
+  // (beyond it, a capital gain). On a DIVIDEND the cash is capital; on an ADJUSTMENT
+  // (no cash) it reclassifies dividends already recorded
+  RETURN_OF_CAPITAL: "RETURN_OF_CAPITAL",
+  // NOTIONAL_DISTRIBUTION: taxable distribution reinvested without new units; income
+  // that raises the asset's cost basis, no unit or cash effect
+  NOTIONAL_DISTRIBUTION: "NOTIONAL_DISTRIBUTION",
 
   // BUY/SELL position intent subtypes
   // POSITION_OPEN: opens or extends a long/short position
@@ -496,6 +503,8 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
   [ACTIVITY_SUBTYPES.REFUND]: "Fee Refund",
   [ACTIVITY_SUBTYPES.REIMBURSEMENT]: "Reimbursement",
   [ACTIVITY_SUBTYPES.OPTION_EXPIRY]: "Option Expiry",
+  [ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL]: "Return of Capital",
+  [ACTIVITY_SUBTYPES.NOTIONAL_DISTRIBUTION]: "Notional Distribution",
   [ACTIVITY_SUBTYPES.POSITION_OPEN]: "Open Position",
   [ACTIVITY_SUBTYPES.POSITION_CLOSE]: "Close Position",
 };
@@ -504,7 +513,11 @@ export const SUBTYPE_DISPLAY_NAMES: Record<string, string> = {
 export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
   [ActivityType.BUY]: [ACTIVITY_SUBTYPES.POSITION_OPEN, ACTIVITY_SUBTYPES.POSITION_CLOSE],
   [ActivityType.SELL]: [ACTIVITY_SUBTYPES.POSITION_OPEN, ACTIVITY_SUBTYPES.POSITION_CLOSE],
-  [ActivityType.DIVIDEND]: [ACTIVITY_SUBTYPES.DRIP, ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND],
+  [ActivityType.DIVIDEND]: [
+    ACTIVITY_SUBTYPES.DRIP,
+    ACTIVITY_SUBTYPES.DIVIDEND_IN_KIND,
+    ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL,
+  ],
   [ActivityType.INTEREST]: [ACTIVITY_SUBTYPES.STAKING_REWARD],
   [ActivityType.CREDIT]: [
     ACTIVITY_SUBTYPES.BONUS,
@@ -512,7 +525,11 @@ export const SUBTYPES_BY_ACTIVITY_TYPE: Record<string, string[]> = {
     ACTIVITY_SUBTYPES.REFUND,
     ACTIVITY_SUBTYPES.REIMBURSEMENT,
   ],
-  [ActivityType.ADJUSTMENT]: [ACTIVITY_SUBTYPES.OPTION_EXPIRY],
+  [ActivityType.ADJUSTMENT]: [
+    ACTIVITY_SUBTYPES.OPTION_EXPIRY,
+    ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL,
+    ACTIVITY_SUBTYPES.NOTIONAL_DISTRIBUTION,
+  ],
 };
 
 // Asset kinds for behavior classification

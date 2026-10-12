@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt, fs, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashMap,
+    fmt, fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chacha20poly1305::{
@@ -41,6 +46,21 @@ struct EncryptedSecrets {
     version: u32,
     nonce: String,
     ciphertext: String,
+}
+
+impl EncryptedSecrets {
+    /// Errors here mean a damaged file; only decryption itself depends on the key.
+    fn decode(self) -> Result<([u8; 12], Vec<u8>)> {
+        let nonce = BASE64
+            .decode(self.nonce)
+            .map_err(|e| Error::Secret(format!("Failed to decode nonce: {e}")))?
+            .try_into()
+            .map_err(|_| Error::Secret("Invalid nonce length in secrets file".into()))?;
+        let ciphertext = BASE64
+            .decode(self.ciphertext)
+            .map_err(|e| Error::Secret(format!("Failed to decode ciphertext: {e}")))?;
+        Ok((nonce, ciphertext))
+    }
 }
 
 impl FileSecretStore {
@@ -113,14 +133,7 @@ impl FileSecretStore {
                 Error::Secret("WF_SECRET_KEY must be set to decrypt the secrets file".into())
             })?;
             let enc: EncryptedSecrets = serde_json::from_value(value)?;
-            let nonce_bytes: [u8; 12] = BASE64
-                .decode(enc.nonce)
-                .map_err(|e| Error::Secret(format!("Failed to decode nonce: {e}")))?
-                .try_into()
-                .map_err(|_| Error::Secret("Invalid nonce length in secrets file".into()))?;
-            let cipher_bytes = BASE64
-                .decode(enc.ciphertext)
-                .map_err(|e| Error::Secret(format!("Failed to decode ciphertext: {e}")))?;
+            let (nonce_bytes, cipher_bytes) = enc.decode()?;
 
             let cipher = ChaCha20Poly1305::new((&key).into());
             let nonce = Nonce::from(nonce_bytes);
@@ -222,6 +235,7 @@ pub fn build_secret_store(
                         old_key.copy_from_slice(old_raw);
                     } else {
                         // Can't migrate, just return the new store (will fail on decrypt)
+                        report_unusable_vault(&path);
                         return Ok(store);
                     }
                     let old_store = FileSecretStore::new_from_bytes(path.clone(), Some(old_key))?;
@@ -235,6 +249,7 @@ pub fn build_secret_store(
                         }
                         Err(_) => {
                             // Neither key works — return the new store
+                            report_unusable_vault(&path);
                             return Ok(store);
                         }
                     }
@@ -245,6 +260,75 @@ pub fn build_secret_store(
     } else {
         FileSecretStore::new_from_bytes(path, derived_key)
     }
+}
+
+/// Why an existing vault could not be loaded with any configured key.
+enum UnusableVault {
+    NotAFile,
+    Unreadable(std::io::ErrorKind, Option<i32>),
+    CannotDecrypt,
+    Malformed,
+}
+
+fn diagnose_unusable_vault(path: &Path) -> UnusableVault {
+    let raw = match fs::metadata(path) {
+        Ok(metadata) if !metadata.is_file() => return UnusableVault::NotAFile,
+        Ok(_) => fs::read(path),
+        Err(error) => Err(error),
+    };
+    match raw {
+        Err(error) => UnusableVault::Unreadable(error.kind(), error.raw_os_error()),
+        // A well-formed envelope that still fails to open was sealed with another key,
+        // or its ciphertext is damaged; the two are indistinguishable without the key.
+        Ok(raw)
+            if serde_json::from_slice::<EncryptedSecrets>(&raw)
+                .is_ok_and(|envelope| envelope.decode().is_ok()) =>
+        {
+            UnusableVault::CannotDecrypt
+        }
+        Ok(_) => UnusableVault::Malformed,
+    }
+}
+
+/// Startup continues and the file is left untouched so the original key can still
+/// recover it. Only the cause is logged, never vault contents or key material.
+fn report_unusable_vault(path: &Path) {
+    let (reason, io_kind, os_code, guidance) = match diagnose_unusable_vault(path) {
+        UnusableVault::NotAFile => (
+            "not_a_file",
+            None,
+            None,
+            "It is not a regular file; check the volume mounts.",
+        ),
+        UnusableVault::Unreadable(kind, code) => (
+            "unreadable",
+            Some(kind),
+            code,
+            "The server cannot read it; check its owner and permissions.",
+        ),
+        UnusableVault::CannotDecrypt => (
+            "cannot_decrypt",
+            None,
+            None,
+            "WF_SECRET_KEY or WF_SECRET_KEY_FILE does not decrypt it; configure the key it was created with, or restore the file from a backup if the key is right.",
+        ),
+        UnusableVault::Malformed => (
+            "malformed",
+            None,
+            None,
+            "It is not a valid secrets file; restore it from a backup.",
+        ),
+    };
+    tracing::error!(
+        code = "SECRET_VAULT_UNAVAILABLE",
+        reason,
+        ?io_kind,
+        ?os_code,
+        path = %path.display(),
+        "The secrets file cannot be opened. {guidance} Saved credentials stay unavailable and \
+         profile deletion fails until this is fixed. See \
+         docs/self-host/README.md#secrets-file-cannot-be-opened"
+    );
 }
 
 #[cfg(test)]

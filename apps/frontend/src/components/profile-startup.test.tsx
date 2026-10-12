@@ -23,6 +23,7 @@ vi.mock("@/features/profiles/api", () => ({
 }));
 vi.mock("@/features/profiles/session", () => ({
   installProfileSession: () => true,
+  hasProfileSession: () => false,
   profileScope: () => "test-scope",
   revokeProfileSession: vi.fn(),
 }));
@@ -30,7 +31,7 @@ vi.mock("@/features/profiles/auth-bridge", () => ({ isNativeAuthPending: () => f
 vi.mock("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
 vi.mock("@/adapters", () => ({
   isWeb: false,
-  isDesktop: false,
+  isTauri: false,
   getSettings: () => mocks.settings(),
   logger: { error: vi.fn() },
 }));
@@ -45,7 +46,10 @@ vi.mock("@/context/auth-context", () => ({
 vi.mock("@/hooks/use-settings-mutation", () => ({
   useSettingsMutation: () => ({ mutateAsync: vi.fn() }),
 }));
-vi.mock("@/lib/connect-config", () => ({ CONNECT_ENABLED: false }));
+vi.mock(import("@/lib/connect-config"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  CONNECT_ENABLED: false,
+}));
 vi.mock("@/i18n/i18n", () => ({
   LANGUAGE_STORAGE_KEY: "test-language",
   default: {

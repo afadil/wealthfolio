@@ -22,6 +22,7 @@ import type {
 } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 export function useGoalDetail(goalId: string | undefined) {
@@ -55,6 +56,7 @@ export function useGoalDetail(goalId: string | undefined) {
 }
 
 export function useGoalPlanMutations(goalId: string) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const invalidateGoal = () => {
@@ -69,9 +71,9 @@ export function useGoalPlanMutations(goalId: string) {
     mutationFn: (plan: SaveGoalPlan) => saveGoalPlan(plan),
     onSuccess: () => {
       invalidateGoal();
-      toast.success("Plan saved successfully.");
+      toast.success(t("goals:plan_saved"));
     },
-    onError: () => toast.error("Failed to save plan."),
+    onError: () => toast.error(t("goals:plan_error")),
   });
 
   const saveFundingMutation = useMutation({
@@ -79,9 +81,9 @@ export function useGoalPlanMutations(goalId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QueryKeys.goalFunding(goalId) });
       invalidateGoal();
-      toast.success("Funding saved successfully.");
+      toast.success(t("goals:funding_saved"));
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to save funding."),
+    onError: (e) => toast.error(e instanceof Error ? e.message : t("goals:funding_error")),
   });
 
   const refreshSummaryMutation = useMutation({

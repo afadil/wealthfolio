@@ -28,14 +28,14 @@
     "test:e2e:net-worth": "playwright test --config playwright.net-worth.config.ts",
     "test:e2e:addon-sandbox": "node scripts/run-addon-sandbox-e2e.mjs",
     "test:e2e:ui": "node scripts/run-e2e.mjs --ui",
-    "lint": "pnpm --filter frontend lint && pnpm -r lint",
-    "lint:fix": "pnpm --filter frontend lint:fix && pnpm -r lint:fix",
-    "lint:quiet": "pnpm --filter frontend lint:quiet && pnpm -r lint:quiet",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "lint:quiet": "pnpm -r lint:quiet",
     "lint:root": "pnpm --filter frontend lint",
     "format": "prettier --write . && pnpm -r format",
     "format:check": "prettier --check . && pnpm -r format:check",
     "tsc": "tsc -b",
-    "type-check": "pnpm run build:types && pnpm --filter frontend type-check && pnpm -r type-check",
+    "type-check": "pnpm run build:types && pnpm -r type-check",
     "type-check:root": "pnpm --filter frontend type-check",
     "check": "pnpm format:check && pnpm lint:quiet && pnpm type-check",
     "publish:sdk": "cd packages/addon-sdk && npm publish --access public",
@@ -68,11 +68,11 @@
       "baseline-browser-mapping@>=2 <2.11.0": "2.11.22",
       "js-yaml@>=4 <4.3.2": "4.3.2",
       "@humanfs/node@>=0.16 <0.16.8": "0.16.8",
-      "fast-uri@>=3 <3.1.6": "3.1.7",
-      "hono@<4.13.5": "4.13.7",
-      "postcss-selector-parser@>=7.1 <7.1.3": "7.1.6",
       "@babel/core@<=7.29.0": "^7.29.6",
-      "esbuild@>=0.27.3 <0.28.1": "^0.28.1"
+      "esbuild@>=0.27.3 <0.28.1": "^0.28.1",
+      "undici@>=7 <7.29.1": "7.29.1",
+      "brace-expansion@<1.1.21": "1.1.21",
+      "brace-expansion@>=4 <5.0.12": "5.0.12"
     }
   }
 }

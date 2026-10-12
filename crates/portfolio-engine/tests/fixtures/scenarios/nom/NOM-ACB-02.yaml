@@ -1,0 +1,49 @@
+id: NOM-ACB-02
+title: The CRA's negative ACB example, returns of capital beyond cost realize a capital gain
+intent: >
+  Rule R7.4. The CRA's "Tax treatment of mutual funds" example (RST Mutual
+  Fund Trust): units bought for $1,000, a $200 return of capital in each of
+  five years takes the ACB to zero, and a further $100 return of capital is
+  a capital gain, because the ACB is already zero and a negative ACB is
+  deemed a capital gain (the ACB stays zero). The returns of capital are
+  cash distributions of capital (DIVIDEND, subtype RETURN_OF_CAPITAL), no
+  income. The CRA's years are kept in order on consecutive days.
+policy:
+  base_currency: CAD
+  timezone: UTC
+  as_of: 2025-01-13
+accounts:
+  - id: acc-1
+    name: Non-registered
+    currency: CAD
+    cost_basis_method: WAC
+assets:
+  - id: rst
+    quote_ccy: CAD
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 1000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-02T11:00:00Z, asset: rst, quantity: 100, unit_price: 10, amount: 1000, fee: 0 }
+  - { id: roc-2016, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-03T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 200 }
+  - { id: roc-2017, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-06T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 200 }
+  - { id: roc-2018, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 200 }
+  - { id: roc-2019, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-08T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 200 }
+  - { id: roc-2020, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-09T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 200 }
+  - { id: roc-may, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-10T10:00:00Z, asset: rst, quantity: 0, unit_price: 0, amount: 100 }
+quotes:
+  - { asset: rst, day: 2025-01-02, close: 10 }
+  - { asset: rst, day: 2025-01-03, close: 8 }
+  - { asset: rst, day: 2025-01-06, close: 6 }
+  - { asset: rst, day: 2025-01-07, close: 4 }
+  - { asset: rst, day: 2025-01-08, close: 2 }
+  - { asset: rst, day: 2025-01-09, close: 1 }
+  - { asset: rst, day: 2025-01-10, close: 1 }
+  - { asset: rst, day: 2025-01-13, close: 1 }
+expected_notes: >
+  buy-1: 100 units, ACB 1,000. Each of the five 200 returns of capital
+  books 200 of cash, is no income, and reduces the ACB by 200: 800, 600,
+  400, 200, 0, realizing nothing (the ACB covers each) and writing no
+  disposal row. roc-may's 100 finds the ACB at zero: it is a capital gain,
+  one disposal row with no units (proceeds 100, cost 0, P&L 100), and the
+  ACB stays zero. The 100 units remain, at their purchase price of 10. Cash
+  1,000 - 1,000 + 5 x 200 + 100 = 1,100. Value 1,100 + 100 x 1 = 1,200, a
+  gain of 200: realized 100, unrealized 100 - 0 = 100, income 0.

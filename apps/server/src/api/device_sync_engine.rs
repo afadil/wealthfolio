@@ -581,7 +581,67 @@ pub async fn run_sync_cycle(
     Ok(result)
 }
 
+pub(crate) async fn share_backup_access(state: &Arc<AppState>) -> Result<(), String> {
+    if !get_sync_identity_from_store(state).is_some_and(|i| sync_identity_can_run_background(&i)) {
+        return Ok(());
+    }
+    if let (Some(url), Ok(token)) = (
+        crate::features::cloud_api_base_url(),
+        crate::api::connect::mint_access_token(state).await,
+    ) {
+        if let Ok(client) = wealthfolio_device_sync::backups::client::BackupClient::new(&url) {
+            let result = async {
+                let policy = client.policy(&token).await?;
+                let material = {
+                    let _guard = state.profile_lifecycle.lock().await;
+                    if !get_sync_identity_from_store(state)
+                        .is_some_and(|i| sync_identity_can_run_background(&i))
+                    {
+                        return Ok(());
+                    }
+                    wealthfolio_device_sync::backups::client::BackupClient::access_material(
+                        state.secret_store.as_ref(),
+                        &policy,
+                    )?
+                };
+                let resolved = client.resolve_access(&token, material).await?;
+                let gained_access = resolved.restores_local_access();
+                let _guard = state.profile_lifecycle.lock().await;
+                if let Some((registry, id)) = state.profile_binding.get() {
+                    if registry.profile(*id).is_err() {
+                        return Ok(());
+                    }
+                }
+                resolved.apply(state.secret_store.as_ref())?;
+                if gained_access {
+                    state.backup_scheduler.request_check();
+                }
+                Ok::<(), wealthfolio_device_sync::DeviceSyncError>(())
+            }
+            .await;
+            if result.is_err() {
+                if let Err(error) = result {
+                    if wealthfolio_device_sync::backups::client::BackupClient::is_key_conflict(
+                        &error,
+                    ) {
+                        return Err(error.to_string());
+                    }
+                }
+                tracing::warn!("Backup access sharing unavailable; retry on a linked device");
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn ensure_background_engine_started(state: Arc<AppState>) -> Result<(), String> {
+    if start_background_engine_if_ready(Arc::clone(&state)).await? {
+        let _ = share_backup_access(&state).await;
+    }
+    Ok(())
+}
+
+async fn start_background_engine_if_ready(state: Arc<AppState>) -> Result<bool, String> {
     let _lifecycle = state.profile_lifecycle.lock().await;
     if let Some((registry, id)) = state.profile_binding.get() {
         registry.profile(*id).map_err(|e| e.to_string())?;
@@ -592,27 +652,29 @@ pub async fn ensure_background_engine_started(state: Arc<AppState>) -> Result<()
         .requires_cloud_reconnect()
         .map_err(|e| e.to_string())?
     {
-        return Ok(());
+        return Ok(false);
     }
     let has_session = state
         .token_lifecycle
         .is_session_configured(state.secret_store.as_ref())
         .map_err(|err| err.to_string())?;
     if !has_session {
-        return Ok(());
+        return Ok(false);
     }
     let Some(identity) = get_sync_identity_from_store(&state) else {
-        return Ok(());
+        return Ok(false);
     };
     if !sync_identity_can_run_background(&identity) {
-        return Ok(());
+        return Ok(false);
     }
+    let starting = !state.device_sync_runtime.is_background_running().await;
     let ports = Arc::new(ServerEnginePorts::new(Arc::clone(&state)));
     state
         .device_sync_runtime
         .ensure_background_started(ports)
         .await;
-    Ok(())
+    drop(_lifecycle);
+    Ok(starting)
 }
 
 pub async fn ensure_background_engine_stopped(state: Arc<AppState>) -> Result<(), String> {
@@ -679,7 +741,12 @@ pub async fn generate_snapshot_now(
         ));
     }
 
-    let local_cursor = state.app_sync_repository.get_cursor().ok();
+    let local_cursor = Some(
+        state
+            .app_sync_repository
+            .get_cursor()
+            .map_err(|e| format!("Snapshot cursor unavailable: {e}"))?,
+    );
     let server_cursor = create_client()
         .get_events_cursor(&token, &device_id)
         .await
@@ -746,7 +813,6 @@ pub async fn generate_snapshot_now(
     let upload_headers = wealthfolio_device_sync::SnapshotUploadHeaders {
         event_id: Some(Uuid::now_v7().to_string()),
         schema_version: SNAPSHOT_SCHEMA_VERSION,
-        covers_tables: APP_SYNC_TABLES.iter().map(|v| v.to_string()).collect(),
         size_bytes: payload.len() as i64,
         checksum,
         metadata_payload,
@@ -756,7 +822,12 @@ pub async fn generate_snapshot_now(
 
     let upload_result = create_client()
         .upload_snapshot_with_cancel_flag(
-            &token,
+            || async {
+                crate::api::connect::mint_access_token(&state)
+                    .await
+                    .map_err(|e| e.to_string())
+                    .map_err(wealthfolio_device_sync::DeviceSyncError::Auth)
+            },
             &device_id,
             upload_headers,
             payload,
@@ -846,14 +917,17 @@ pub async fn complete_pairing_with_transfer(
         return Err(format!("Snapshot upload failed: {}", snapshot.message));
     }
 
-    // 4. Complete pairing (send encrypted key bundle)
-    let token = crate::api::connect::mint_access_token(&state)
-        .await
-        .map_err(|e| e.to_string())?;
+    let _ = share_backup_access(&state).await;
+
+    // 4. Complete pairing (send encrypted key bundle with current credentials)
     tracing::info!("[DeviceSync] complete_pairing_with_transfer: completing pairing");
     client
         .complete_pairing(
-            &token,
+            || async {
+                crate::api::connect::mint_access_token(&state)
+                    .await
+                    .map_err(|e| wealthfolio_device_sync::DeviceSyncError::Auth(e.to_string()))
+            },
             &device_id,
             &pairing_id,
             wealthfolio_device_sync::CompletePairingRequest {
@@ -954,6 +1028,16 @@ impl RestorePorts for ServerEnginePorts {
         }
     }
 
+    async fn snapshot_is_empty(&self, image: Vec<u8>) -> Result<bool, String> {
+        tokio::task::spawn_blocking(move || {
+            let image = zeroize::Zeroizing::new(image);
+            wealthfolio_storage_sqlite::db::cloud_backups::snapshot_is_empty(&image)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+
     fn local_rows(&self) -> Result<i64, String> {
         self.state
             .app_sync_repository
@@ -1016,7 +1100,9 @@ impl RestorePorts for ServerEnginePorts {
                 tracing::warn!("[DeviceSync] Post-restore sync cycle failed: {}", error);
             }
         }
-        ensure_background_engine_started(Arc::clone(&self.state)).await
+        start_background_engine_if_ready(Arc::clone(&self.state)).await?;
+        let _ = share_backup_access(&self.state).await;
+        Ok(())
     }
 
     fn refresh_portfolio(&self) {

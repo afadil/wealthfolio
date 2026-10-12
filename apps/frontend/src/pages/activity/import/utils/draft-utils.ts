@@ -212,6 +212,12 @@ export function reconcileExpenseReversalBoundary(
 }
 
 /**
+ * Schwab dates some rows "09/16/2026 as of 09/15/2026": the date the row
+ * posted, then the date it took effect. The posting date is the one read.
+ */
+const AS_OF_SUFFIX_RE = /\s+as\s+of\b.*$/i;
+
+/**
  * Parse a date value using the configured format (priority) then auto-detection fallback.
  * Returns a full ISO datetime string preserving any time component from the source.
  */
@@ -223,12 +229,13 @@ export function parseDateValue(
   if (!value || value.trim() === "") return "";
 
   const trimmed = value.trim();
+  const dateText = trimmed.replace(AS_OF_SUFFIX_RE, "");
 
   // 1. If user specified a format, try it first
   const pattern = getDateFnsPattern(dateFormat);
   if (pattern) {
     try {
-      const parsed = parse(trimmed, pattern, new Date());
+      const parsed = parse(dateText, pattern, new Date());
       if (isValid(parsed)) return parsed.toISOString();
     } catch {
       // fall through to auto-detection
@@ -238,7 +245,7 @@ export function parseDateValue(
   // 2. For ISO8601 preset, try parseISO directly
   if (dateFormat === "ISO8601") {
     try {
-      const parsed = parseISO(trimmed);
+      const parsed = parseISO(dateText);
       if (isValid(parsed)) return parsed.toISOString();
     } catch {
       // fall through
@@ -246,7 +253,7 @@ export function parseDateValue(
   }
 
   // 3. Auto-detection fallback (handles 80+ formats)
-  const autoDetected = tryParseDate(trimmed, order);
+  const autoDetected = tryParseDate(dateText, order);
   if (autoDetected) return autoDetected.toISOString();
 
   // 4. Return as-is if nothing works (will surface as validation error)
@@ -483,6 +490,12 @@ export function validateDraft(
   // Required field validation
   if (!draft.activityDate) {
     errors.activityDate = ["Date is required"];
+  } else {
+    // A cell no format could read stays raw text; a grid edit stores a Date.
+    const date = draft.activityDate as string | Date;
+    if (!isValid(typeof date === "string" ? parseISO(date) : date)) {
+      errors.activityDate = ["Date not recognized"];
+    }
   }
 
   if (!draft.activityType) {
@@ -509,7 +522,7 @@ export function validateDraft(
   ) {
     errors.activityType = [
       ...(errors.activityType ?? []),
-      "Credit card imports only support charges, payments, refunds, fees, and interest",
+      "Credit card imports only support charges, payments, transfers out, refunds, fees, and interest",
     ];
   }
 

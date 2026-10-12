@@ -70,7 +70,11 @@ impl std::error::Error for IsinError {}
 /// Validates format (length, country code, alphanumeric NSIN) and
 /// verifies the Luhn check digit.
 pub fn parse_isin(s: &str) -> Result<ParsedIsin, IsinError> {
-    let s = s.trim().to_uppercase();
+    let s = s.trim();
+    if !s.is_ascii() {
+        return Err(IsinError::InvalidNsin);
+    }
+    let s = s.to_uppercase();
     let len = s.len();
 
     if len != 12 {
@@ -87,11 +91,10 @@ pub fn parse_isin(s: &str) -> Result<ParsedIsin, IsinError> {
         return Err(IsinError::InvalidNsin);
     }
 
-    let check_char = s.chars().nth(11).unwrap();
-    if !check_char.is_ascii_digit() {
+    let Some(actual_check) = s.chars().nth(11).and_then(|c| c.to_digit(10)) else {
         return Err(IsinError::InvalidCheckDigitFormat);
-    }
-    let actual_check = check_char.to_digit(10).unwrap() as u8;
+    };
+    let actual_check = actual_check as u8;
 
     // Compute expected check digit using Luhn on the first 11 characters
     let expected_check = compute_isin_check_digit(&s[0..11]);
@@ -148,8 +151,8 @@ pub fn compute_isin_check_digit(first_11: &str) -> u8 {
     // Step 1: Convert characters to digit string
     let mut digits = Vec::new();
     for c in first_11.chars() {
-        if c.is_ascii_digit() {
-            digits.push(c.to_digit(10).unwrap() as u8);
+        if let Some(digit) = c.to_digit(10) {
+            digits.push(digit as u8);
         } else if c.is_ascii_alphabetic() {
             let val = c.to_ascii_uppercase() as u8 - b'A' + 10;
             digits.push(val / 10);
@@ -240,6 +243,14 @@ mod tests {
     fn test_invalid_country_code() {
         let result = parse_isin("120378331005");
         assert!(matches!(result, Err(IsinError::InvalidCountryCode(_))));
+    }
+
+    #[test]
+    fn test_non_ascii_isin_is_rejected_without_panicking() {
+        assert!(matches!(
+            parse_isin("USé12345678"),
+            Err(IsinError::InvalidNsin)
+        ));
     }
 
     #[test]

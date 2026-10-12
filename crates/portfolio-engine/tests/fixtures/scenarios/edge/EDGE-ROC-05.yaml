@@ -1,0 +1,49 @@
+id: EDGE-ROC-05
+title: Foreign adjustments move FIFO lots' book cost at the day's rate and leave the purchases as bought
+intent: >
+  Rules R7.4, R3.3. A CAD account holds a USD asset bought in two FIFO lots
+  at two USD/CAD rates. A notional distribution adds cost in USD and, at the
+  day's rate, in CAD, as a purchase is booked; a return of capital takes it
+  off the same way (the CRA converts the ACB at the rate in effect when a
+  return of capital is received), realizing nothing while the lots cover
+  it. Each purchase keeps its price, charges and acquisition rate, so its
+  cost and charges in CAD are what it paid. A sale relieves the adjusted
+  book cost. The gain is the value change.
+policy: { base_currency: CAD, timezone: UTC, as_of: 2025-01-10 }
+accounts:
+  - { id: acc-1, currency: CAD }
+assets:
+  - { id: etf, quote_ccy: USD }
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 3000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-03T10:00:00Z, asset: etf, quantity: 10, unit_price: 100, amount: 1010, fee: 10, currency: USD, fx_rate: 1.30 }
+  - { id: buy-2, account: acc-1, type: BUY, date: 2025-01-06T10:00:00Z, asset: etf, quantity: 10, unit_price: 110, amount: 1100, fee: 0, currency: USD, fx_rate: 1.35 }
+  - { id: nd-1, account: acc-1, type: ADJUSTMENT, subtype: NOTIONAL_DISTRIBUTION, date: 2025-01-07T10:00:00Z, asset: etf, quantity: 0, unit_price: 0, amount: 20, currency: USD }
+  - { id: roc-1, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-08T10:00:00Z, asset: etf, quantity: 0, unit_price: 0, amount: 40, currency: USD }
+  - { id: sell-1, account: acc-1, type: SELL, date: 2025-01-09T10:00:00Z, asset: etf, quantity: 10, unit_price: 120, amount: 1200, fee: 0, currency: USD, fx_rate: 1.50 }
+quotes:
+  - { asset: etf, day: 2025-01-03, close: 100, currency: USD }
+  - { asset: etf, day: 2025-01-06, close: 110, currency: USD }
+  - { asset: etf, day: 2025-01-09, close: 120, currency: USD }
+  - { asset: etf, day: 2025-01-10, close: 120, currency: USD }
+fx_rates:
+  - { from: USD, to: CAD, day: 2025-01-02, rate: 1.30 }
+  - { from: USD, to: CAD, day: 2025-01-03, rate: 1.30 }
+  - { from: USD, to: CAD, day: 2025-01-06, rate: 1.35 }
+  - { from: USD, to: CAD, day: 2025-01-07, rate: 1.40 }
+  - { from: USD, to: CAD, day: 2025-01-08, rate: 1.45 }
+  - { from: USD, to: CAD, day: 2025-01-09, rate: 1.50 }
+  - { from: USD, to: CAD, day: 2025-01-10, rate: 1.50 }
+expected_notes: >
+  buy-1: 10 etf, 1010 USD (price 100, fee 10) at 1.30 = 1313 CAD, the fee
+  13 CAD. buy-2: 10 etf, 1100 USD at 1.35 = 1485 CAD. nd-1 adds 20 USD, 1
+  per unit, and 10 x 1.40 = 14 CAD to each lot: buy-1 1020 USD / 1327 CAD,
+  buy-2 1110 USD / 1499 CAD. roc-1 recovers 40 USD, 2 per unit, and 20 x
+  1.45 = 29 CAD from each lot: buy-1 1000 USD / 1298 CAD, buy-2 1090 USD /
+  1470 CAD; the lots cover it, so nothing is realized and no disposal row
+  is written. The purchases stay as bought: buy-1 1010 USD at 1.30, 1313
+  CAD with its 13 CAD fee, buy-2 1100 USD at 1.35, 1485 CAD. sell-1 (FIFO)
+  sells buy-1's 10 at 120 USD x 1.50 = 1800 CAD: cost 1000 USD / 1298 CAD,
+  P&L 200 USD / 502 CAD. Left: buy-2, 10 units, 1090 USD / 1470 CAD. Cash
+  3000 - 1313 - 1485 + 1800 = 2002 CAD. Value 2002 + 10 x 120 x 1.50 =
+  3802, a gain of 802 CAD.

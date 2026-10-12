@@ -63,9 +63,10 @@ pub mod resolver;
 
 // Re-export all public types from models
 pub use models::{
-    to_iso_alpha2, AssetKind, AssetProfile, BondQuoteMetadata, Coverage, Currency, DividendEvent,
-    InstrumentId, InstrumentKind, Mic, ProviderId, ProviderInstrument, ProviderOverrides,
-    ProviderSymbol, Quote, QuoteContext, QuoteIdentifiers, SearchResult, SplitEvent,
+    to_iso_alpha2, AssetKind, AssetProfile, BondProfile, BondQuoteMetadata, Coverage, Currency,
+    DividendEvent, InstrumentId, InstrumentKind, Mic, ProviderId, ProviderInstrument,
+    ProviderOverrides, ProviderSymbol, Quote, QuoteContext, QuoteIdentifiers, SearchResult,
+    SplitEvent,
 };
 
 // Re-export resolver types
@@ -87,7 +88,7 @@ pub use provider::fixture::FixtureProvider;
 pub use provider::marketdata_app::MarketDataAppProvider;
 pub use provider::metal_price_api::MetalPriceApiProvider;
 pub use provider::openfigi::OpenFigiProvider;
-pub use provider::us_treasury_calc::{TreasuryBondDetails, UsTreasuryCalcProvider};
+pub use provider::us_treasury_calc::UsTreasuryCalcProvider;
 pub use provider::yahoo::YahooProvider;
 pub use provider::{MarketDataProvider, ProviderCapabilities, RateLimit};
 

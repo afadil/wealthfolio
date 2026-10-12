@@ -202,7 +202,7 @@ impl ManualSnapshotService {
                 average_cost: holding.average_cost,
                 total_cost_basis,
                 currency: holding.currency,
-                inception_date: Utc::now(),
+                inception_date: crate::utils::clock::now(),
                 lots: std::collections::VecDeque::new(),
                 created_at: Utc::now(),
                 last_updated: Utc::now(),
@@ -328,7 +328,11 @@ impl ManualSnapshotService {
         date: NaiveDate,
         data_source: String,
     ) {
-        let timestamp = Utc.from_utc_datetime(&date.and_hms_opt(12, 0, 0).unwrap());
+        let timestamp = Utc.from_utc_datetime(
+            &date
+                .and_hms_opt(12, 0, 0)
+                .expect("12:00:00 is a valid time"),
+        );
 
         let quote_id = if data_source == DATA_SOURCE_MANUAL {
             let date_part = timestamp.format("%Y%m%d").to_string();

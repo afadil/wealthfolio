@@ -221,6 +221,7 @@ pub struct DatabaseRuntime {
     startup_error: Mutex<Option<String>>,
     pub backup_imports: db::imports::PendingImports,
     pub backup_export_slot: Arc<tokio::sync::Semaphore>,
+    pub backup_scheduler: Arc<wealthfolio_device_sync::backups::scheduler::BackupScheduler>,
     app_data_dir: String,
     key_provider: Arc<dyn KeyProvider>,
     live: Mutex<Option<Live>>,
@@ -266,6 +267,7 @@ impl DatabaseRuntime {
             startup_error: Mutex::new(None),
             backup_imports: db::imports::PendingImports::default(),
             backup_export_slot: Arc::new(tokio::sync::Semaphore::new(1)),
+            backup_scheduler: Arc::default(),
             app_data_dir: paths.root.to_string_lossy().into_owned(),
             key_provider: Arc::new(KeychainKeyProvider::new(secret_store)),
             live: Mutex::new(None),
@@ -293,6 +295,7 @@ impl DatabaseRuntime {
     }
 
     pub fn suspend(&self) {
+        self.backup_scheduler.wake();
         self.suspended.store(true, Ordering::SeqCst);
         if let Ok(live) = self.live.lock() {
             if let Some(live) = live.as_ref() {
@@ -301,7 +304,11 @@ impl DatabaseRuntime {
         }
     }
 
-    pub async fn shutdown(&self, handle: &AppHandle) -> std::result::Result<(), String> {
+    pub async fn shutdown<R: tauri::Runtime>(
+        &self,
+        handle: &AppHandle<R>,
+    ) -> std::result::Result<(), String> {
+        self.backup_scheduler.wake();
         self.suspended.store(true, Ordering::SeqCst);
         if let Some(live) = self.lock(&self.live)?.as_ref() {
             live.context.active.store(false, Ordering::SeqCst);
@@ -605,7 +612,7 @@ impl DatabaseRuntime {
             .lock(&self.owner)?
             .clone()
             .ok_or_else(|| "Database ownership is not available.".to_string())?;
-        let init = initialize_context(
+        let mut init = initialize_context(
             &self.app_data_dir,
             &access,
             owner,
@@ -616,6 +623,7 @@ impl DatabaseRuntime {
         .await
         .map_err(|e| e.to_string())?;
 
+        init.context.backup_scheduler = self.backup_scheduler.clone();
         let context = Arc::new(init.context);
         if let Some(registry) = &self.profile_registry {
             context
@@ -645,6 +653,12 @@ impl DatabaseRuntime {
                         init.event_receiver,
                         init.sync_outbox_wake_receiver,
                     );
+                    #[cfg(any(feature = "device-sync", feature = "connect-sync"))]
+                    workers.push(crate::commands::cloud_backups::start_scheduler(
+                        handle.clone(),
+                        self.profile_id,
+                        self.backup_scheduler.clone(),
+                    ));
                     if let Some(rebuild) = init.final_cash_rebuild {
                         workers.push(tauri::async_runtime::spawn(rebuild));
                     }
@@ -669,11 +683,11 @@ impl DatabaseRuntime {
 
     /// Real services for IPC tests, without starting native windows or background workers.
     #[cfg(test)]
-    pub(crate) async fn initialize_for_test(&self) {
+    pub(crate) async fn initialize_for_test(&self, key: Option<Arc<DbEncryptionKey>>) {
         std::fs::create_dir_all(&self.app_data_dir).unwrap();
         let owner = Arc::new(DatabaseOwner::acquire(&self.db_path).unwrap());
-        let access = DbAccess::plaintext(&self.db_path);
-        let init = initialize_context(
+        let access = DbAccess::new(&self.db_path, key);
+        let mut init = initialize_context(
             &self.app_data_dir,
             &access,
             owner.clone(),
@@ -683,6 +697,7 @@ impl DatabaseRuntime {
         )
         .await
         .unwrap();
+        init.context.backup_scheduler = self.backup_scheduler.clone();
         *self.owner.lock().unwrap() = Some(owner);
         *self.live.lock().unwrap() = Some(Live {
             generation: uuid::Uuid::new_v4(),
@@ -903,7 +918,10 @@ impl DatabaseRuntime {
 
     /// Releases every handle on the database, in the order that makes the
     /// ownership proof meaningful.
-    async fn teardown(&self, handle: &AppHandle) -> std::result::Result<(), String> {
+    async fn teardown<R: tauri::Runtime>(
+        &self,
+        handle: &AppHandle<R>,
+    ) -> std::result::Result<(), String> {
         let live = self.lock(&self.live)?.take();
         let Some(live) = live else {
             // Nothing was installed, so no worker can be starting a server right
@@ -1213,16 +1231,11 @@ fn start_workers(
             crate::mcp::start_if_enabled(&mcp_handle, &mcp_context).await;
         }));
 
-        // Periodic market data sync (6h interval, 2min initial delay).
-        let periodic_quote_service = Arc::clone(&context.quote_service);
-        workers.push(tauri::async_runtime::spawn(async move {
-            wealthfolio_core::quotes::scheduler::run_periodic_sync(
-                periodic_quote_service,
-                std::time::Duration::from_secs(120),
-                std::time::Duration::from_secs(6 * 3600),
-            )
-            .await;
-        }));
+        // Periodic market data sync plus portfolio update (6h, 2min delay).
+        workers.push(crate::portfolio_jobs::spawn_periodic_update(
+            handle.clone(),
+            Arc::clone(context),
+        ));
     }
 
     // Background device sync engine (self-skips when the device is not READY).

@@ -108,6 +108,8 @@ fn native_store() -> Result<&'static Arc<CredentialStore>> {
     let store = apple_native_keyring_store::keychain::Store::new();
     #[cfg(target_os = "ios")]
     let store = apple_native_keyring_store::protected::Store::new();
+    // tao initializes ndk-context with the application context in the
+    // activity's onCreate, before the app starts. Initializing it again aborts.
     #[cfg(target_os = "android")]
     let store = android_native_keyring_store::Store::new();
     #[cfg(target_os = "windows")]
@@ -124,20 +126,6 @@ fn native_store() -> Result<&'static Arc<CredentialStore>> {
 
 pub fn shared_secret_store(identifier: &str) -> Arc<dyn SecretStore> {
     Arc::new(KeyringSecretStore::new(identifier))
-}
-
-// MainActivity supplies the application context before Tauri starts using secrets.
-#[cfg(target_os = "android")]
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "system" fn Java_com_teymz_wealthfolio_MainActivity_initializeSecretStoreContext(
-    env: jni::JNIEnv,
-    activity: jni::objects::JObject,
-    context: jni::objects::JObject,
-) {
-    android_native_keyring_store::Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext(
-        env, activity, context,
-    );
 }
 
 #[cfg(test)]

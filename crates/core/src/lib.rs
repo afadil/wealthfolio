@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod activities;
 pub mod addons;
 pub mod assets;
+pub mod connect_config;
 pub mod constants;
 pub mod custom_provider;
 pub mod errors;
@@ -28,6 +29,9 @@ pub mod settings;
 pub mod sync;
 pub mod taxonomies;
 pub mod utils;
+
+#[cfg(test)]
+pub mod test_support;
 
 // Re-export common types from asset and portfolio modules
 pub use assets::*;

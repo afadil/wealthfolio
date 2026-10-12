@@ -1,7 +1,14 @@
+import { createInstance } from "i18next";
+
+import enActivity from "@/i18n/locales/en/activity.json";
+import enSpending from "@/i18n/locales/en/spending.json";
+import frActivity from "@/i18n/locales/fr/activity.json";
+import frSpending from "@/i18n/locales/fr/spending.json";
 import { AccountType } from "@/lib/constants";
 
 import {
   getActivitySpendingAmount,
+  getCashActivityLabel,
   getActivityTypesForAccount,
   getEffectiveCashActivityType,
   getVisibleSpendingAmount,
@@ -27,6 +34,7 @@ describe("spending constants", () => {
         "FEE",
         "INTEREST",
         "TRANSFER_IN",
+        "TRANSFER_OUT",
         "CREDIT",
       ]);
     });
@@ -171,5 +179,50 @@ describe("spending constants", () => {
     it("falls back to the unfiltered spending amount for rows without it", () => {
       expect(getVisibleSpendingAmount(withdrawal, AccountType.CASH)).toBe(100);
     });
+  });
+});
+
+describe("getCashActivityLabel", () => {
+  const i18n = createInstance();
+  beforeAll(async () => {
+    await i18n.init({
+      lng: "en",
+      fallbackLng: "en",
+      resources: {
+        en: { activity: enActivity, spending: enSpending },
+        fr: { activity: frActivity, spending: frSpending },
+      },
+    });
+  });
+
+  it("keeps the English labels the table, filter and form showed before", () => {
+    const t = i18n.getFixedT("en");
+
+    expect(getCashActivityLabel(t, "WITHDRAWAL", AccountType.CASH)).toBe("Withdrawal");
+    expect(getCashActivityLabel(t, "TRANSFER_IN", AccountType.CASH)).toBe("Transfer In");
+    expect(getCashActivityLabel(t, "CREDIT", AccountType.CASH, "REIMBURSEMENT")).toBe(
+      "Reimbursement / refund",
+    );
+    expect(getCashActivityLabel(t, "WITHDRAWAL", AccountType.CREDIT_CARD)).toBe("Charge");
+    expect(getCashActivityLabel(t, "FEE", AccountType.CREDIT_CARD)).toBe("Fee");
+    expect(getCashActivityLabel(t, "INTEREST", AccountType.CREDIT_CARD)).toBe("Interest Charge");
+    expect(getCashActivityLabel(t, "TRANSFER_IN", AccountType.CREDIT_CARD)).toBe("Payment");
+    expect(getCashActivityLabel(t, "TRANSFER_OUT", AccountType.CREDIT_CARD)).toBe(
+      "Balance Transfer / Cash Advance",
+    );
+    expect(getCashActivityLabel(t, "CREDIT", AccountType.CREDIT_CARD, "REIMBURSEMENT")).toBe(
+      "Refund / Credit",
+    );
+  });
+
+  it("translates both the base and the card wording", () => {
+    const t = i18n.getFixedT("fr");
+
+    expect(getCashActivityLabel(t, "WITHDRAWAL", AccountType.CASH)).toBe("Retrait");
+    expect(getCashActivityLabel(t, "WITHDRAWAL", AccountType.CREDIT_CARD)).toBe("Dépense");
+    expect(getCashActivityLabel(t, "TRANSFER_IN", AccountType.CREDIT_CARD)).toBe("Paiement");
+    expect(getCashActivityLabel(t, "TRANSFER_OUT", AccountType.CREDIT_CARD)).toBe(
+      "Transfert de solde / Avance de fonds",
+    );
   });
 });

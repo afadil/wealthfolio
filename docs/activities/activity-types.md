@@ -268,7 +268,7 @@ described above.
 | -------------------- | --------------------------------------------------- |
 | **Cash**             | Increases by `amount` in activity currency          |
 | **Holdings**         | No change (unless DRIP or DIVIDEND_IN_KIND subtype) |
-| **Cost Basis**       | No change                                           |
+| **Cost Basis**       | No change (unless RETURN_OF_CAPITAL subtype)        |
 | **Net Contribution** | No change (income, not new capital)                 |
 
 **Required Fields**: `asset`, `amount`, `currency` **Optional Fields**: `fee`,
@@ -413,13 +413,13 @@ The compiler expands these into canonical activity postings.
 
 ### Dividend Subtypes
 
-| Subtype             | Description                                                    | Expansion                   |
-| ------------------- | -------------------------------------------------------------- | --------------------------- |
-| `DRIP`              | Dividend Reinvestment Plan - dividend automatically reinvested | DIVIDEND + BUY              |
-| `QUALIFIED`         | Qualified dividend (tax classification)                        | DIVIDEND (pass-through)     |
-| `ORDINARY`          | Ordinary dividend (tax classification)                         | DIVIDEND (pass-through)     |
-| `RETURN_OF_CAPITAL` | Return of capital (reduces cost basis)                         | DIVIDEND (special handling) |
-| `DIVIDEND_IN_KIND`  | Dividend paid as additional units of the same asset            | DIVIDEND + BUY              |
+| Subtype             | Description                                                          | Expansion                   |
+| ------------------- | -------------------------------------------------------------------- | --------------------------- |
+| `DRIP`              | Dividend Reinvestment Plan - dividend automatically reinvested       | DIVIDEND + BUY              |
+| `QUALIFIED`         | Qualified dividend (tax classification)                              | DIVIDEND (pass-through)     |
+| `ORDINARY`          | Ordinary dividend (tax classification)                               | DIVIDEND (pass-through)     |
+| `RETURN_OF_CAPITAL` | Return of capital: capital paid back, not income; reduces cost basis | DIVIDEND (special handling) |
+| `DIVIDEND_IN_KIND`  | Dividend paid as additional units of the same asset                  | DIVIDEND + BUY              |
 
 #### DRIP Expansion
 
@@ -511,6 +511,61 @@ currency).
 | `BONUS`  | Sign-up/referral/promotional bonus           | External flow (+)         |
 | `REBATE` | Trading rebate (maker rebate, volume rebate) | Internal flow (no change) |
 | `REFUND` | Fee correction/reversal                      | Internal flow (no change) |
+
+---
+
+### Return of Capital and Notional Distributions
+
+These activities track book cost and investment performance within an account,
+using its selected cost basis method. Enter the classification supplied by your
+broker or fund. They do not calculate country-specific taxes or establish that
+the selected method is valid for your tax return.
+
+A **return of capital** pays back part of your investment and reduces book cost.
+Any amount beyond the remaining basis is recorded as realized P&L. A **notional
+distribution** records income reinvested without additional units, increasing
+both income and book cost by the entered amount. It is sometimes called a
+phantom or reinvested distribution. This subtype is not a general basis
+correction and does not cover every non-cash tax event.
+
+For Canadian funds, T3 box 42 reports cost-base adjustments: positive amounts
+reduce ACB and negative amounts increase it. The table below shows how to record
+a ROC reclassification or a reinvested distribution matching those effects.
+
+| Record as                               | When                                                                    | Cash   | Cost basis               | Income           |
+| --------------------------------------- | ----------------------------------------------------------------------- | ------ | ------------------------ | ---------------- |
+| DIVIDEND with `RETURN_OF_CAPITAL`       | A distribution paid in cash that is capital                             | Booked | Down by the gross amount | None             |
+| ADJUSTMENT with `RETURN_OF_CAPITAL`     | Part of dividends already recorded turns out to be capital (box 42 > 0) | None   | Down by `amount`         | Down by `amount` |
+| ADJUSTMENT with `NOTIONAL_DISTRIBUTION` | A distribution reinvested without new units (box 42 < 0)                | None   | Up by `amount`           | Up by `amount`   |
+
+- The amount moves the cost basis your account's cost basis method keeps. With
+  weighted average cost, a return of capital reduces the pool, as a sale does,
+  so nothing is realized while the combined basis covers the amount, even when
+  transfer history keeps some lots separate. With FIFO, LIFO or HIFO, the amount
+  is spread over the lots by units, so every unit's cost moves alike. Each lot's
+  purchase price and fees stay as bought: what moves is its remaining cost
+  basis.
+- Beyond the remaining cost basis, a return of capital is realized P&L, shown as
+  a disposal with no units. One paid after you sold every unit is realized in
+  full, on the lot the sale closed, and its cash is booked.
+- In another currency, the cost basis in your account and base currency moves by
+  the amount at the day's rate, as the CRA converts the adjusted cost base when
+  a return of capital is received; the purchase keeps the rate it was bought at.
+- No units move, and net contribution does not change. A reclassification
+  changes the breakdown of income and gains without creating or removing
+  investment profit. A non-cash distribution creates no cash or contribution.
+- A return of capital on an asset the account has never held, or a notional
+  distribution on one it holds no units of, is rejected, and is left out of
+  performance and holdings income.
+- Rules: `docs/architecture/portfolio-engine-rules.md` R7.4.
+
+### Adjustment Subtypes
+
+| Subtype                 | Description                                                 | Effect                                          |
+| ----------------------- | ----------------------------------------------------------- | ----------------------------------------------- |
+| `OPTION_EXPIRY`         | Option contract expired worthless                           | Removes `quantity` lots, no cash                |
+| `RETURN_OF_CAPITAL`     | Dividends already recorded that were a return of capital    | Cost basis and income down by `amount`, no cash |
+| `NOTIONAL_DISTRIBUTION` | Taxable distribution reinvested without new units (phantom) | Cost basis and income up by `amount`, no cash   |
 
 ---
 

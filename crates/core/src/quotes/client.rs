@@ -39,8 +39,8 @@ use crate::secrets::SecretStore;
 use wealthfolio_market_data::{
     mic_to_currency, mic_to_exchange_name, yahoo_equity_provider_symbol_to_canonical,
     yahoo_exchange_to_mic, yahoo_suffix_to_mic, AlphaVantageProvider,
-    AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider, BondQuoteMetadata, DividendEvent,
-    ExchangeMap, FinnhubProvider, FixtureProvider, MarketDataAppProvider, MetalPriceApiProvider,
+    AssetProfile as MarketAssetProfile, BoerseFrankfurtProvider, DividendEvent, ExchangeMap,
+    FinnhubProvider, FixtureProvider, MarketDataAppProvider, MetalPriceApiProvider,
     OpenFigiProvider, ProviderId, ProviderRegistry, Quote as MarketQuote, QuoteContext,
     QuoteIdentifiers, ResolverChain, SearchResult as MarketSearchResult, SplitEvent,
     UsTreasuryCalcProvider, YahooProvider,
@@ -132,6 +132,10 @@ impl MarketDataClient {
         let mut custom_priorities: HashMap<String, i32> = HashMap::new();
 
         for config in &enabled_providers {
+            // Extra providers arrive pre-built; only their priority comes from settings.
+            if extra_providers.iter().any(|ep| ep.id() == config.id) {
+                continue;
+            }
             match Self::create_provider(&config.id, &secret_store).await {
                 Ok(Some(provider)) => {
                     info!("Initialized market data provider: {}", config.id);
@@ -163,6 +167,9 @@ impl MarketDataClient {
             // Append extra providers (e.g., CustomScraperProvider)
             for ep in extra_providers {
                 info!("Registered extra provider: {}", ep.id());
+                if let Some(config) = enabled_providers.iter().find(|c| c.id == ep.id()) {
+                    custom_priorities.insert(config.id.clone(), config.priority);
+                }
                 providers.push(ep);
             }
         }
@@ -226,12 +233,15 @@ impl MarketDataClient {
                 fixture_dir,
                 DATA_SOURCE_BOERSE_FRANKFURT,
             )))),
+            DATA_SOURCE_US_TREASURY_CALC => Ok(Some(Arc::new(
+                UsTreasuryCalcProvider::with_fixtures(fixture_dir)
+                    .map_err(MarketDataClientError::from)?,
+            ))),
             DATA_SOURCE_MARKET_DATA_APP
             | DATA_SOURCE_ALPHA_VANTAGE
             | DATA_SOURCE_METAL_PRICE_API
             | DATA_SOURCE_FINNHUB
             | DATA_SOURCE_OPENFIGI
-            | DATA_SOURCE_US_TREASURY_CALC
             | DATA_SOURCE_CUSTOM_SCRAPER => {
                 warn!(
                     "Provider {} is disabled because WEALTHFOLIO_E2E=1; add fixture support before using it in e2e",
@@ -370,11 +380,7 @@ impl MarketDataClient {
         let market_quotes = match market_result {
             Ok(quotes) => quotes,
             Err(error) => {
-                let provider_id = diagnostics
-                    .errors()
-                    .into_iter()
-                    .last()
-                    .map(|(provider_id, _)| provider_id.to_string());
+                let provider_id = diagnostics.error_provider.map(|id| id.to_string());
                 return Err(HistoricalQuoteFetchError {
                     error: MarketDataClientError::MarketData(error).into(),
                     provider_id,
@@ -465,20 +471,8 @@ impl MarketDataClient {
         // Preferred provider from asset
         let preferred_provider: Option<ProviderId> = asset.preferred_provider().map(Cow::Owned);
 
-        // Convert bond spec to market-data BondQuoteMetadata when available.
-        // coupon_rate defaults to 0 for zero-coupon instruments (T-bills).
-        // maturity_date is still required — without it we can't price.
-        let bond_metadata = match asset.bond_spec() {
-            Some(spec) if spec.maturity_date.is_some() => Some(BondQuoteMetadata {
-                coupon_rate: spec.coupon_rate.unwrap_or(rust_decimal::Decimal::ZERO),
-                maturity_date: spec.maturity_date.unwrap(),
-                face_value: spec.face_value.unwrap_or(rust_decimal::Decimal::from(1000)),
-                coupon_frequency: spec
-                    .coupon_frequency
-                    .unwrap_or_else(|| "SEMI_ANNUAL".to_string()),
-            }),
-            _ => None,
-        };
+        // Preserve partial metadata so providers can reject known unsupported types.
+        let bond_metadata = asset.bond_spec().map(|spec| spec.to_quote_metadata());
 
         // Extract custom_provider_code from provider_config if present
         let custom_provider_code = asset
@@ -883,6 +877,14 @@ impl MarketDataClient {
         });
 
         ProviderProfile {
+            bond: profile.bond.map(|bond| crate::assets::BondSpec {
+                isin: bond.isin,
+                treasury_type: bond.treasury_type,
+                coupon_rate: bond.coupon_rate,
+                maturity_date: bond.maturity_date,
+                face_value: bond.face_value,
+                coupon_frequency: bond.coupon_frequency,
+            }),
             id: Some(symbol.to_string()),
             isin: profile.isin,
             name: profile.name,
@@ -1206,6 +1208,180 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn disabled_treasury_provider_is_not_used_even_when_preferred() {
+        // The registry contains only enabled providers. A preference must not
+        // instantiate a disabled provider for either profiles or quotes.
+        let client = create_test_client();
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TH14", "USD");
+        asset.instrument_type = Some(InstrumentType::Bond);
+        asset.provider_config = Some(serde_json::json!({"preferred_provider": "US_TREASURY_CALC"}));
+        assert_eq!(
+            asset.preferred_provider().as_deref(),
+            Some("US_TREASURY_CALC")
+        );
+        assert!(client.get_profile(&asset).await.is_err());
+        assert!(client.fetch_latest_quote(&asset).await.is_err());
+    }
+
+    struct FailingProvider {
+        id: &'static str,
+        priority: u8,
+    }
+
+    impl FailingProvider {
+        fn error(&self) -> wealthfolio_market_data::errors::MarketDataError {
+            wealthfolio_market_data::errors::MarketDataError::ProviderError {
+                provider: self.id.to_string(),
+                message: "unavailable".to_string(),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl wealthfolio_market_data::MarketDataProvider for FailingProvider {
+        fn id(&self) -> &'static str {
+            self.id
+        }
+
+        fn priority(&self) -> u8 {
+            self.priority
+        }
+
+        fn capabilities(&self) -> wealthfolio_market_data::ProviderCapabilities {
+            wealthfolio_market_data::ProviderCapabilities {
+                instrument_kinds: &[wealthfolio_market_data::InstrumentKind::Equity],
+                coverage: wealthfolio_market_data::Coverage::global_best_effort(),
+                supports_latest: true,
+                supports_historical: true,
+                supports_search: false,
+                supports_profile: false,
+                supports_dividends: false,
+            }
+        }
+
+        fn rate_limit(&self) -> wealthfolio_market_data::RateLimit {
+            wealthfolio_market_data::RateLimit::default()
+        }
+
+        async fn get_latest_quote(
+            &self,
+            _context: &QuoteContext,
+            _instrument: wealthfolio_market_data::ProviderInstrument,
+        ) -> std::result::Result<MarketQuote, wealthfolio_market_data::errors::MarketDataError>
+        {
+            Err(self.error())
+        }
+
+        async fn get_historical_quotes(
+            &self,
+            _context: &QuoteContext,
+            _instrument: wealthfolio_market_data::ProviderInstrument,
+            _start: DateTime<Utc>,
+            _end: DateTime<Utc>,
+        ) -> std::result::Result<Vec<MarketQuote>, wealthfolio_market_data::errors::MarketDataError>
+        {
+            Err(self.error())
+        }
+    }
+
+    struct NoSecrets;
+
+    impl SecretStore for NoSecrets {
+        fn set_secret(&self, _service: &str, _secret: &str) -> Result<()> {
+            Ok(())
+        }
+
+        fn get_secret(&self, _service: &str) -> Result<Option<String>> {
+            Ok(None)
+        }
+
+        fn delete_secret(&self, _service: &str) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn custom_scraper_uses_its_stored_priority_and_errors_name_the_first_provider() {
+        // The custom scraper arrives pre-built with the trait's default priority (10).
+        // Its stored priority (50) must still order it after a provider ranked 20.
+        let client = MarketDataClient::new_with_extra(
+            Arc::new(NoSecrets),
+            vec![ProviderConfig {
+                id: DATA_SOURCE_CUSTOM_SCRAPER.to_string(),
+                priority: 50,
+            }],
+            vec![
+                Arc::new(FailingProvider {
+                    id: DATA_SOURCE_CUSTOM_SCRAPER,
+                    priority: 10,
+                }),
+                Arc::new(FailingProvider {
+                    id: "ALPHA_VANTAGE",
+                    priority: 20,
+                }),
+            ],
+        )
+        .await
+        .unwrap();
+        let asset = create_test_asset(AssetKind::Investment, "AAPL", "USD");
+
+        let error = client
+            .fetch_historical_quotes_with_context(&asset, Utc::now(), Utc::now())
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.provider_id.as_deref(), Some("ALPHA_VANTAGE"));
+    }
+
+    #[test]
+    fn bond_profile_terms_survive_client_conversion() {
+        let profile = MarketAssetProfile {
+            source: Some("US_TREASURY_CALC".into()),
+            bond: Some(wealthfolio_market_data::BondProfile {
+                isin: Some("US912810TH14".into()),
+                treasury_type: Some("Bond".into()),
+                coupon_rate: Some(dec!(0.05)),
+                maturity_date: chrono::NaiveDate::from_ymd_opt(2043, 5, 15),
+                face_value: Some(dec!(1000)),
+                coupon_frequency: Some("SEMI_ANNUAL".into()),
+            }),
+            ..Default::default()
+        };
+        let converted = MarketDataClient::convert_profile(profile, "US912810TH14");
+        assert_eq!(converted.data_source, "US_TREASURY_CALC");
+        assert!(converted
+            .bond
+            .unwrap()
+            .to_quote_metadata()
+            .has_valid_treasury_terms());
+    }
+
+    #[test]
+    fn incomplete_treasury_profile_preserves_type_in_quote_context() {
+        let client = create_test_client();
+        for kind in ["TIPS", "FRN"] {
+            let profile = MarketAssetProfile {
+                bond: Some(wealthfolio_market_data::BondProfile {
+                    isin: Some("US912810TH14".into()),
+                    treasury_type: Some(kind.into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            let converted = MarketDataClient::convert_profile(profile, "US912810TH14");
+            let mut asset = create_test_asset(AssetKind::Investment, "US912810TH14", "USD");
+            asset.instrument_type = Some(InstrumentType::Bond);
+            asset.metadata = Some(serde_json::json!({"bond": converted.bond.unwrap()}));
+            let context = client.build_quote_context(&asset).unwrap();
+            let metadata = context
+                .bond_metadata
+                .expect("partial metadata must survive");
+            assert_eq!(metadata.treasury_type.as_deref(), Some(kind));
+            assert!(!metadata.has_valid_treasury_terms());
+        }
+    }
+
     #[test]
     fn test_build_quote_context_equity() {
         let asset = create_test_asset(AssetKind::Investment, "AAPL", "USD");
@@ -1326,6 +1502,25 @@ mod tests {
     }
 
     #[test]
+    fn unknown_bond_coupon_or_frequency_does_not_create_calculated_terms() {
+        let mut asset = create_test_asset(AssetKind::Investment, "US912810TH14", "USD");
+        asset.instrument_type = Some(crate::assets::InstrumentType::Bond);
+        asset.instrument_symbol = Some("US912810TH14".into());
+        let client = create_test_client();
+        for bond in [
+            serde_json::json!({"maturityDate": "2043-05-15", "couponFrequency": "SEMI_ANNUAL"}),
+            serde_json::json!({"maturityDate": "2043-05-15", "couponRate": 0.04}),
+        ] {
+            asset.metadata = Some(serde_json::json!({"bond": bond}));
+            assert!(client
+                .build_quote_context(&asset)
+                .unwrap()
+                .bond_metadata
+                .is_some_and(|metadata| !metadata.has_valid_treasury_terms()));
+        }
+    }
+
+    #[test]
     fn test_build_quote_context_bond_metadata_populated() {
         use crate::assets::InstrumentType;
         use chrono::NaiveDate;
@@ -1349,13 +1544,13 @@ mod tests {
         let bond_meta = context
             .bond_metadata
             .expect("bond_metadata should be populated");
-        assert_eq!(bond_meta.coupon_rate, dec!(0.04375));
+        assert_eq!(bond_meta.coupon_rate, Some(dec!(0.04375)));
         assert_eq!(
             bond_meta.maturity_date,
-            NaiveDate::from_ymd_opt(2040, 11, 15).unwrap()
+            NaiveDate::from_ymd_opt(2040, 11, 15)
         );
         assert_eq!(bond_meta.face_value, dec!(1000));
-        assert_eq!(bond_meta.coupon_frequency, "SEMI_ANNUAL");
+        assert_eq!(bond_meta.coupon_frequency.as_deref(), Some("SEMI_ANNUAL"));
     }
 
     #[test]
@@ -1489,12 +1684,12 @@ mod tests {
         let bond_meta = context
             .bond_metadata
             .expect("bond_metadata should be Some for zero-coupon bond");
-        assert_eq!(bond_meta.coupon_rate, dec!(0));
+        assert_eq!(bond_meta.coupon_rate, Some(dec!(0)));
         assert_eq!(
             bond_meta.maturity_date,
-            NaiveDate::from_ymd_opt(2025, 12, 18).unwrap()
+            NaiveDate::from_ymd_opt(2025, 12, 18)
         );
         assert_eq!(bond_meta.face_value, dec!(1000));
-        assert_eq!(bond_meta.coupon_frequency, "ZERO");
+        assert_eq!(bond_meta.coupon_frequency.as_deref(), Some("ZERO"));
     }
 }

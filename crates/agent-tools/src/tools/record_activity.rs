@@ -8,11 +8,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use wealthfolio_core::activities::{
     ACTIVITY_SUBTYPE_BONUS, ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND, ACTIVITY_SUBTYPE_DRIP,
-    ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_ADJUSTMENT, ACTIVITY_TYPE_BUY,
-    ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_FEE,
-    ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TAX,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_UNKNOWN,
-    ACTIVITY_TYPE_WITHDRAWAL,
+    ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_ADJUSTMENT,
+    ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND,
+    ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT,
+    ACTIVITY_TYPE_TAX, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    ACTIVITY_TYPE_UNKNOWN, ACTIVITY_TYPE_WITHDRAWAL,
 };
 
 use crate::env::AgentEnvironment;
@@ -278,6 +278,11 @@ pub(crate) fn get_subtypes_for_activity_type(activity_type: &str) -> Vec<Subtype
                 value: ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND.to_string(),
                 label: "Dividend in Kind".to_string(),
             },
+            // Capital paid back: reduces cost basis instead of counting as income
+            SubtypeOption {
+                value: ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL.to_string(),
+                label: "Return of Capital".to_string(),
+            },
         ],
         // STAKING_REWARD expands to INTEREST + BUY
         s if s == ACTIVITY_TYPE_INTEREST => vec![SubtypeOption {
@@ -337,7 +342,7 @@ pub(crate) fn record_activity_schema() -> serde_json::Value {
             },
             "subtype": {
                 "type": "string",
-                "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), DIVIDEND_IN_KIND (dividend paid as additional units of the same asset), STAKING_REWARD (staking income received as more units of the same asset), BONUS (promotional credit)"
+                "description": "Activity subtype for semantic variations: DRIP (dividend reinvested), DIVIDEND_IN_KIND (dividend paid as additional units of the same asset), STAKING_REWARD (staking income received as more units of the same asset), BONUS (promotional credit), RETURN_OF_CAPITAL (a dividend that pays back capital: it reduces cost basis and is not income)"
             },
             "notes": {
                 "type": "string",
@@ -807,7 +812,8 @@ mod tests {
         let subtypes = get_subtypes_for_activity_type("DIVIDEND");
         assert!(subtypes.iter().any(|s| s.value == "DRIP"));
         assert!(subtypes.iter().any(|s| s.value == "DIVIDEND_IN_KIND"));
-        assert_eq!(subtypes.len(), 2); // DRIP and DIVIDEND_IN_KIND
+        assert!(subtypes.iter().any(|s| s.value == "RETURN_OF_CAPITAL"));
+        assert_eq!(subtypes.len(), 3); // DRIP, DIVIDEND_IN_KIND and RETURN_OF_CAPITAL
 
         let subtypes = get_subtypes_for_activity_type("INTEREST");
         assert!(subtypes.iter().any(|s| s.value == "STAKING_REWARD"));

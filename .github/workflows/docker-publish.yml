@@ -11,6 +11,10 @@ on:
       - "crates/storage-sqlite/**"
       - "crates/core/src/profiles/**"
       - "crates/core/src/secrets/**"
+      - "crates/device-sync/**"
+      - "crates/connect/**"
+      - "crates/core/src/connect_config.rs"
+      - "config/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -40,6 +44,12 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Check Connect build configuration
+        env:
+          CONNECT_AUTH_URL: ${{ vars.CONNECT_AUTH_URL }}
+          CONNECT_AUTH_PUBLISHABLE_KEY: ${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}
+          CONNECT_STORAGE_ALLOWED_HOSTS: ${{ secrets.CONNECT_STORAGE_ALLOWED_HOSTS }}
+        run: python3 .github/scripts/check_connect_build.py --github-env
       - uses: docker/setup-buildx-action@v3
       - name: Image metadata
         id: meta
@@ -54,8 +64,18 @@ jobs:
           load: true
           tags: wealthfolio-smoke:ci
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=docker-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=docker-${{ matrix.arch }}
+          # Third-party Rust dependencies exported by cache-warm.yml. Read before
+          # any registry login, so PRs (including forks') import it anonymously.
+          # Release tags skip it: every ref shares that cache tag, so published
+          # images compile their dependencies here.
+          cache-from:
+            ${{ !startsWith(github.ref, 'refs/tags/') &&
+            format('type=registry,ref=ghcr.io/{0}/wealthfolio-build-cache:deps-{1}',
+            github.repository_owner, matrix.arch) || '' }}
+          # Secret values do not invalidate Docker's cache; compile current destinations.
+          no-cache-filters: backend
+          secrets: |
+            connect-storage-hosts=${{ env.CONNECT_STORAGE_ALLOWED_HOSTS }}
           build-args: |
             CONNECT_AUTH_URL=${{ vars.CONNECT_AUTH_URL }}
             CONNECT_AUTH_PUBLISHABLE_KEY=${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}

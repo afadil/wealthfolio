@@ -19,6 +19,7 @@ use super::assets_traits::{AssetRepositoryTrait, AssetServiceTrait};
 use super::auto_classification::{
     AutoClassificationService, ClassificationInput, ProviderProfileClassification,
 };
+use super::bond_identity::{resolve_bond_aliases, BondAliasResolution, BondIdentityClaims};
 use super::{
     asset_provider_alias_symbols, parse_crypto_pair_symbol, parse_symbol_with_known_exchange,
     AssetResolutionInput, AssetResolutionOutput,
@@ -86,6 +87,68 @@ fn asset_metadata_isin(asset: &Asset) -> Option<String> {
         .and_then(|identifiers| identifiers.get("isin"))
         .and_then(|value| value.as_str())
         .and_then(normalized_lookup_key)
+}
+
+/// Fill missing bond fields without overwriting saved terms. A conflicting set
+/// must not acquire a Treasury type that would certify it for calculated pricing.
+fn merge_bond_profile(
+    symbol: Option<&str>,
+    metadata: &mut Option<serde_json::Value>,
+    profile: &super::assets_model::BondSpec,
+) -> Result<()> {
+    let saved_claims = BondIdentityClaims::new(symbol, metadata.as_ref());
+    let profile_claims = BondIdentityClaims::new(profile.isin.as_deref(), None);
+    if profile_claims.isins.is_empty()
+        || saved_claims.unique_group().is_none()
+        || saved_claims.unique_group() != profile_claims.unique_group()
+        || (!saved_claims.isins.is_empty() && saved_claims.isins != profile_claims.isins)
+    {
+        return Err(Error::Asset(
+            "Bond profile identity does not match the asset".into(),
+        ));
+    }
+    let root = metadata.get_or_insert_with(|| serde_json::json!({}));
+    if root.is_null() {
+        *root = serde_json::json!({});
+    }
+    let root = root
+        .as_object_mut()
+        .ok_or_else(|| Error::Asset("Invalid asset metadata object".into()))?;
+    let bond = root.entry("bond").or_insert_with(|| serde_json::json!({}));
+    if bond.is_null() {
+        *bond = serde_json::json!({});
+    }
+    let saved: super::assets_model::BondSpec = serde_json::from_value(bond.clone())
+        .map_err(|_| Error::Asset("Invalid bond metadata object".into()))?;
+    let compatible = saved
+        .coupon_rate
+        .is_none_or(|v| Some(v) == profile.coupon_rate)
+        && saved
+            .maturity_date
+            .is_none_or(|v| Some(v) == profile.maturity_date)
+        && saved
+            .face_value
+            .is_none_or(|v| Some(v) == profile.face_value)
+        && saved
+            .coupon_frequency
+            .as_ref()
+            .is_none_or(|v| Some(v) == profile.coupon_frequency.as_ref());
+    let values = serde_json::to_value(profile).map_err(|e| Error::Asset(e.to_string()))?;
+    let bond = bond
+        .as_object_mut()
+        .ok_or_else(|| Error::Asset("Invalid bond metadata object".into()))?;
+    let values = values
+        .as_object()
+        .ok_or_else(|| Error::Asset("Invalid bond profile object".into()))?;
+    for (key, value) in values {
+        if key == "treasuryType" && !compatible {
+            continue;
+        }
+        if !value.is_null() && bond.get(key).is_none_or(|v| v.is_null()) {
+            bond.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(())
 }
 
 struct AssetResolutionLocalIndex {
@@ -1188,10 +1251,47 @@ impl AssetService {
 }
 
 impl AssetService {
+    async fn retain_bond_isin(&self, asset_id: &str, isin: &str) -> Result<Asset> {
+        let asset = self.asset_repository.get_by_id(asset_id)?;
+        let stored =
+            BondIdentityClaims::new(asset.instrument_symbol.as_deref(), asset.metadata.as_ref());
+        let incoming = BondIdentityClaims::new(Some(isin), None);
+        if !asset.is_bond()
+            || stored.unique_group().is_none()
+            || stored.unique_group() != incoming.unique_group()
+            || stored.isins.iter().any(|old| old != isin)
+            || Self::metadata_identifier(asset.metadata.as_ref(), "isin")
+                .is_some_and(|stored_isin| crate::utils::isin::parse_isin(stored_isin).is_ok())
+        {
+            return Ok(asset);
+        }
+        let mut metadata = asset
+            .metadata
+            .clone()
+            .unwrap_or_else(|| serde_json::json!({}));
+        let Some(root) = metadata.as_object_mut() else {
+            return Ok(asset);
+        };
+        let identifiers = root
+            .entry("identifiers")
+            .or_insert_with(|| serde_json::json!({}));
+        if identifiers.is_null() {
+            *identifiers = serde_json::json!({});
+        }
+        let Some(identifiers) = identifiers.as_object_mut() else {
+            return Ok(asset);
+        };
+        identifiers.insert("isin".into(), serde_json::json!(isin));
+        self.update_asset_profile(
+            asset_id,
+            UpdateAssetProfile::metadata_only(&asset, metadata),
+        )
+        .await
+    }
+
     async fn enrich_asset_profile_silent(&self, asset_id: &str) -> Result<AssetEnrichmentOutcome> {
         // Get the existing asset
         let existing_asset = self.asset_repository.get_by_id(asset_id)?;
-        let old_multiplier = existing_asset.contract_multiplier();
 
         // Skip enrichment for assets that don't need market data
         if existing_asset.quote_mode != QuoteMode::Market {
@@ -1211,17 +1311,25 @@ impl AssetService {
             asset_id, existing_asset.display_code, existing_asset.instrument_exchange_mic
         );
 
-        let provider_profile = match self.quote_service.get_asset_profile(&existing_asset).await {
-            Ok(profile) => profile,
-            Err(e) => {
-                return Err(Error::MarketData(
-                    crate::quotes::MarketDataError::ProviderError(format!(
-                        "Could not fetch profile for asset {} (display_code: {:?}): {}",
-                        asset_id, existing_asset.display_code, e
-                    )),
-                ));
-            }
-        };
+        let provider_profile = self
+            .quote_service
+            .get_asset_profile(&existing_asset)
+            .await?;
+        // User edits can happen during the network request. Merge missing terms into
+        // the latest asset, and discard results if its identity or mode changed.
+        let latest_asset = self.asset_repository.get_by_id(asset_id)?;
+        if latest_asset.instrument_type != existing_asset.instrument_type
+            || latest_asset.instrument_symbol != existing_asset.instrument_symbol
+            || latest_asset.quote_mode != existing_asset.quote_mode
+            || latest_asset.to_instrument_id() != existing_asset.to_instrument_id()
+            || latest_asset.provider_config != existing_asset.provider_config
+        {
+            return Err(Error::Asset(
+                "Asset changed during enrichment; retry with its current identity".into(),
+            ));
+        }
+        let existing_asset = latest_asset;
+        let old_multiplier = existing_asset.contract_multiplier();
 
         // Derive instrument_type from provider's asset_type if not already set
         let updated_instrument_type = if existing_asset.instrument_type.is_none() {
@@ -1302,38 +1410,13 @@ impl AssetService {
             Some(serde_json::Value::Object(merged))
         };
 
-        // Enrich US Treasury bonds with maturity/coupon data from TreasuryDirect
-        // when the bond spec is missing this data (needed for yield-curve pricing).
         if existing_asset.is_bond() {
-            let needs_bond_enrichment = existing_asset
-                .bond_spec()
-                .is_none_or(|s| s.maturity_date.is_none());
-
-            if needs_bond_enrichment {
-                if let Some(isin) = existing_asset.instrument_symbol.as_deref() {
-                    if isin.starts_with("US912") {
-                        let http = wealthfolio_http::client();
-                        match wealthfolio_market_data::provider::us_treasury_calc::UsTreasuryCalcProvider::fetch_bond_details(&http, isin).await {
-                            Some(details) => {
-                                let spec = super::assets_model::BondSpec {
-                                    isin: Some(isin.to_string()),
-                                    coupon_rate: Some(details.coupon_rate),
-                                    maturity_date: Some(details.maturity_date),
-                                    face_value: Some(details.face_value),
-                                    coupon_frequency: Some(details.coupon_frequency),
-                                };
-                                let meta = updated_metadata.get_or_insert_with(|| serde_json::json!({}));
-                                if let Some(obj) = meta.as_object_mut() {
-                                    obj.insert("bond".to_string(), serde_json::json!(spec));
-                                }
-                                info!("Enriched bond {} with Treasury details: maturity={}, coupon={}", asset_id, details.maturity_date, details.coupon_rate);
-                            }
-                            None => {
-                                debug!("Could not fetch Treasury bond details for {}", isin);
-                            }
-                        }
-                    }
-                }
+            if let Some(bond) = &provider_profile.bond {
+                merge_bond_profile(
+                    existing_asset.instrument_symbol.as_deref(),
+                    &mut updated_metadata,
+                    bond,
+                )?;
             }
         }
 
@@ -1435,6 +1518,42 @@ impl AssetServiceTrait for AssetService {
         }
 
         let local_index = AssetResolutionLocalIndex::new(self.get_assets()?);
+        let bond_specs: Vec<_> = inputs
+            .iter()
+            .filter(|input| input.instrument_type == Some(InstrumentType::Bond))
+            .map(|input| {
+                let symbol = if input.source_symbol.trim().is_empty() {
+                    input.isin.clone().unwrap_or_default()
+                } else {
+                    input.source_symbol.clone()
+                };
+                let mut spec = AssetSpec::market_instrument(
+                    symbol.clone(),
+                    symbol,
+                    None,
+                    InstrumentType::Bond,
+                    input.account_currency.clone(),
+                );
+                spec.id = input.asset_id.clone();
+                spec.metadata = input
+                    .isin
+                    .as_ref()
+                    .map(|isin| serde_json::json!({"identifiers": {"isin": isin}}));
+                spec
+            })
+            .collect();
+        let bond_resolutions = resolve_bond_aliases(&bond_specs, &local_index.assets);
+        let matched_bond_isins: HashMap<_, _> = bond_resolutions
+            .iter()
+            .filter_map(BondAliasResolution::matched_isin)
+            .map(|(id, isin)| (id.to_string(), isin.to_string()))
+            .collect();
+        let bond_ids: HashMap<_, _> = inputs
+            .iter()
+            .filter(|input| input.instrument_type == Some(InstrumentType::Bond))
+            .zip(bond_resolutions)
+            .map(|(input, resolution)| (input.key.clone(), resolution.asset_id))
+            .collect();
         let mut outputs = Vec::with_capacity(inputs.len());
 
         for input in inputs {
@@ -1531,19 +1650,38 @@ impl AssetServiceTrait for AssetService {
                     (!account_currency.is_empty()).then_some(account_currency)
                 });
 
-            let local_existing_asset = local_index.find_for_import_input(
-                input.asset_id.as_deref(),
-                input.isin.as_deref(),
-                &resolution_symbol,
-                &local_canonical_symbol,
-                local_exchange_mic.as_deref(),
-                local_instrument_type.as_ref(),
-                local_match_quote_ccy,
-            );
+            let bond_match = if input.instrument_type == Some(InstrumentType::Bond) {
+                local_index.find_by_id(bond_ids.get(&input.key).and_then(|id| id.as_deref()))
+            } else {
+                None
+            };
+            let has_bond_identifier = input.instrument_type == Some(InstrumentType::Bond)
+                && [Some(resolution_symbol.as_str()), input.isin.as_deref()]
+                    .into_iter()
+                    .flatten()
+                    .any(|symbol| {
+                        !BondIdentityClaims::new(Some(symbol), None)
+                            .groups
+                            .is_empty()
+                    });
+            let local_existing_asset = if has_bond_identifier {
+                bond_match
+            } else {
+                local_index.find_for_import_input(
+                    input.asset_id.as_deref(),
+                    input.isin.as_deref(),
+                    &resolution_symbol,
+                    &local_canonical_symbol,
+                    local_exchange_mic.as_deref(),
+                    local_instrument_type.as_ref(),
+                    local_match_quote_ccy,
+                )
+            };
             if let Some(asset) = local_existing_asset {
-                let canonical_symbol = asset
-                    .instrument_symbol
-                    .clone()
+                let canonical_symbol = matched_bond_isins
+                    .get(&asset.id)
+                    .cloned()
+                    .or_else(|| asset.instrument_symbol.clone())
                     .or_else(|| asset.display_code.clone())
                     .unwrap_or_else(|| local_canonical_symbol.clone());
                 let exchange_mic = asset
@@ -2184,6 +2322,33 @@ impl AssetServiceTrait for AssetService {
                     existing_asset.is_active = true;
                 }
 
+                if inferred_instrument_type == Some(InstrumentType::Bond) {
+                    if let Some(meta) = metadata.as_ref() {
+                        if let Some(symbol) = meta
+                            .instrument_symbol
+                            .as_ref()
+                            .or(meta.display_code.as_ref())
+                        {
+                            let mut spec = AssetSpec::market_instrument(
+                                symbol.clone(),
+                                symbol.clone(),
+                                None,
+                                InstrumentType::Bond,
+                                existing_asset.quote_ccy.clone(),
+                            );
+                            spec.metadata = meta.asset_metadata.clone();
+                            let resolutions = resolve_bond_aliases(
+                                std::slice::from_ref(&spec),
+                                &self.get_assets()?,
+                            );
+                            if let Some((matched_id, isin)) = resolutions[0].matched_isin() {
+                                if matched_id == asset_id {
+                                    return self.retain_bond_isin(asset_id, isin).await;
+                                }
+                            }
+                        }
+                    }
+                }
                 return Ok(existing_asset);
             }
             Err(Error::Database(DatabaseError::NotFound(_))) => {
@@ -2579,17 +2744,44 @@ impl AssetServiceTrait for AssetService {
 
     async fn ensure_assets(
         &self,
-        specs: Vec<AssetSpec>,
+        mut specs: Vec<AssetSpec>,
         _activity_repository: &dyn crate::activities::ActivityRepositoryTrait,
     ) -> Result<EnsureAssetsResult> {
         if specs.is_empty() {
             return Ok(EnsureAssetsResult::default());
         }
 
+        let input_keys: Vec<Option<String>> = specs
+            .iter()
+            .map(|spec| spec.id.clone().or_else(|| spec.instrument_key()))
+            .collect();
+        let bond_resolutions = if specs
+            .iter()
+            .any(|spec| spec.instrument_type == Some(InstrumentType::Bond))
+        {
+            resolve_bond_aliases(&specs, &self.get_assets()?)
+        } else {
+            vec![BondAliasResolution::default(); specs.len()]
+        };
+        let matched_bond_isins: HashMap<_, _> = bond_resolutions
+            .iter()
+            .filter_map(BondAliasResolution::matched_isin)
+            .map(|(id, isin)| (id.to_string(), isin.to_string()))
+            .collect();
+        for (spec, resolution) in specs.iter_mut().zip(&bond_resolutions) {
+            resolution.apply_to_spec(spec);
+        }
+        let input_to_resolved_key: Vec<(Option<String>, Option<String>)> = input_keys
+            .into_iter()
+            .zip(&specs)
+            .map(|(input, spec)| (input, spec.id.clone().or_else(|| spec.instrument_key())))
+            .collect();
+
         // Deduplicate specs by ID (if present) or by instrument_key
         let unique_specs: Vec<AssetSpec> = specs
             .into_iter()
-            .fold(HashMap::new(), |mut map, spec| {
+            .zip(&input_to_resolved_key)
+            .fold(HashMap::new(), |mut map, (spec, (input_key, _))| {
                 let key = spec.id.clone().unwrap_or_else(|| {
                     spec.instrument_key().unwrap_or_else(|| {
                         format!(
@@ -2603,10 +2795,22 @@ impl AssetServiceTrait for AssetService {
                         )
                     })
                 });
-                map.entry(key).or_insert(spec);
+                let is_original_identity = spec.instrument_key().as_ref() == input_key.as_ref();
+                match map.entry(key) {
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert((spec, is_original_identity));
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut entry)
+                        if is_original_identity && !entry.get().1 =>
+                    {
+                        entry.insert((spec, true));
+                    }
+                    _ => {}
+                }
                 map
             })
             .into_values()
+            .map(|(spec, _)| spec)
             .collect();
 
         // Pre-resolve specs without IDs by looking up via instrument_key
@@ -2838,13 +3042,29 @@ impl AssetServiceTrait for AssetService {
             }
         }
 
+        for (asset_id, isin) in matched_bond_isins {
+            let asset = self.retain_bond_isin(&asset_id, &isin).await?;
+            assets_map.insert(asset_id, asset);
+        }
+
         // 5. Emit batch event for created assets
         if !created_ids.is_empty() {
             self.event_sink
                 .emit(DomainEvent::assets_created(created_ids.clone()));
         }
+        let key_to_id: HashMap<String, String> = assets_map
+            .values()
+            .filter_map(|asset| Some((asset.instrument_key.clone()?, asset.id.clone())))
+            .chain(assets_map.keys().map(|id| (id.clone(), id.clone())))
+            .collect();
+        let input_to_asset_id = input_to_resolved_key
+            .into_iter()
+            .filter_map(|(input, resolved)| Some((input?, key_to_id.get(&resolved?)?.clone())))
+            .collect();
+
         Ok(EnsureAssetsResult {
             assets: assets_map,
+            input_to_asset_id,
             created_ids,
             merge_candidates: Vec::new(),
         })
@@ -2857,7 +3077,9 @@ mod tests {
         Asset, AssetKind, AssetSpec, InstrumentType, NewAsset, ProviderProfile,
         QuoteCcyResolutionSource, UpdateAssetProfile,
     };
-    use super::{AssetRepositoryTrait, AssetService, AssetServiceTrait, QuoteMode};
+    use super::{
+        merge_bond_profile, AssetRepositoryTrait, AssetService, AssetServiceTrait, QuoteMode,
+    };
     use crate::assets::AssetResolutionInput;
     use crate::errors::{DatabaseError, Error, Result};
     use crate::events::{DomainEvent, MockDomainEventSink};
@@ -2869,6 +3091,390 @@ mod tests {
     use rust_decimal::Decimal;
     use std::collections::{HashMap, HashSet};
     use std::sync::{Arc, Mutex};
+
+    #[tokio::test]
+    async fn bond_import_reuses_legacy_metadata_without_changing_currency() {
+        let mut stored = treasury_test_asset();
+        stored.instrument_symbol = Some("BROKER-ID".into());
+        stored.instrument_key = Some("BOND:BROKER-ID".into());
+        stored.quote_ccy = "CAD".into();
+        stored.metadata = Some(serde_json::json!({"bond": {"isin": "US912810TH14"}}));
+        let service = test_asset_service(vec![stored], TestQuoteService::default());
+        let mut input = import_input("912810TH1", "USD");
+        input.instrument_type = Some(InstrumentType::Bond);
+        let result = service
+            .resolve_import_asset_inputs(vec![input])
+            .await
+            .unwrap();
+        assert_eq!(result[0].existing_asset_id.as_deref(), Some("treasury"));
+        assert_eq!(result[0].quote_ccy.as_deref(), Some("CAD"));
+    }
+
+    #[tokio::test]
+    async fn bond_import_rejects_competing_batch_isins() {
+        let cusip = "135087D27";
+        let stored = Asset {
+            id: "stored".into(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some(cusip.into()),
+            instrument_key: Some(format!("BOND:{cusip}")),
+            ..Default::default()
+        };
+        let service = test_asset_service(vec![stored], TestQuoteService::default());
+        let inputs = ["CA", "US"].map(|country| {
+            let mut input =
+                import_input(&crate::utils::cusip::cusip_to_isin(cusip, country), "USD");
+            input.instrument_type = Some(InstrumentType::Bond);
+            input
+        });
+        let result = service
+            .resolve_import_asset_inputs(inputs.into())
+            .await
+            .unwrap();
+        assert!(result
+            .iter()
+            .all(|output| output.existing_asset_id.is_none()));
+    }
+
+    #[tokio::test]
+    async fn bond_import_reuses_mic_qualified_broker_symbol() {
+        let unqualified = Asset {
+            id: "unqualified-bond".into(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some("ABC".into()),
+            instrument_key: Some("BOND:ABC".into()),
+            quote_ccy: "USD".into(),
+            ..Default::default()
+        };
+        let stored = Asset {
+            id: "broker-bond".into(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some("ABC".into()),
+            instrument_exchange_mic: Some("XTSE".into()),
+            instrument_key: Some("BOND:ABC@XTSE".into()),
+            quote_ccy: "CAD".into(),
+            ..Default::default()
+        };
+        let service = test_asset_service(vec![unqualified, stored], TestQuoteService::default());
+        let mut input = import_input("ABC", "CAD");
+        input.instrument_type = Some(InstrumentType::Bond);
+        input.exchange_mic = Some("XTSE".into());
+        let result = service
+            .resolve_import_asset_inputs(vec![input])
+            .await
+            .unwrap();
+        assert_eq!(result[0].existing_asset_id.as_deref(), Some("broker-bond"));
+        assert_eq!(result[0].exchange_mic.as_deref(), Some("XTSE"));
+        assert_eq!(result[0].quote_ccy.as_deref(), Some("CAD"));
+    }
+
+    #[tokio::test]
+    async fn existing_cusip_asset_retains_incoming_isin_for_quotes() {
+        let asset = Asset {
+            id: "apple-bond".into(),
+            is_active: true,
+            instrument_symbol: Some("037833EZ9".into()),
+            instrument_key: Some("BOND:037833EZ9".into()),
+            instrument_type: Some(InstrumentType::Bond),
+            quote_ccy: "USD".into(),
+            metadata: Some(
+                serde_json::json!({"custom": true, "identifiers": {"isin": "INVALID"}, "bond": {"couponRate": 0.05}}),
+            ),
+            ..Default::default()
+        };
+        let service = test_asset_service(vec![asset], TestQuoteService::default());
+        let mut input = import_input("US037833EZ91", "USD");
+        input.instrument_type = Some(InstrumentType::Bond);
+        let preview = service
+            .resolve_import_asset_inputs(vec![input])
+            .await
+            .unwrap();
+        assert_eq!(preview[0].existing_asset_id.as_deref(), Some("apple-bond"));
+        assert_eq!(preview[0].canonical_symbol.as_deref(), Some("US037833EZ91"));
+        assert_eq!(
+            service
+                .get_asset_by_id("apple-bond")
+                .unwrap()
+                .metadata
+                .unwrap()["identifiers"]["isin"],
+            "INVALID"
+        );
+        let metadata = super::super::AssetMetadata {
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some("US037833EZ91".into()),
+            ..Default::default()
+        };
+        for _ in 0..2 {
+            let asset = service
+                .get_or_create_minimal_asset(
+                    "apple-bond",
+                    Some("USD".into()),
+                    Some(metadata.clone()),
+                    None,
+                )
+                .await
+                .unwrap();
+            assert_eq!(asset.id, "apple-bond");
+            assert_eq!(asset.instrument_symbol.as_deref(), Some("037833EZ9"));
+            assert_eq!(
+                asset.metadata.as_ref().unwrap()["identifiers"]["isin"],
+                "US037833EZ91"
+            );
+            assert_eq!(asset.metadata.as_ref().unwrap()["custom"], true);
+            assert_eq!(
+                asset.bond_spec().unwrap().coupon_rate,
+                Some(Decimal::new(5, 2))
+            );
+            assert!(
+                matches!(asset.to_instrument_id(), Some(super::super::InstrumentId::Bond { isin }) if isin.as_ref() == "US037833EZ91")
+            );
+        }
+    }
+
+    fn treasury_test_asset() -> Asset {
+        Asset {
+            id: "treasury".into(),
+            instrument_type: Some(InstrumentType::Bond),
+            instrument_symbol: Some("US912810TH14".into()),
+            instrument_key: Some("BOND:US912810TH14".into()),
+            quote_mode: QuoteMode::Market,
+            quote_ccy: "USD".into(),
+            metadata: Some(serde_json::json!({"custom": true, "bond": {"couponRate": 0.04}})),
+            ..Default::default()
+        }
+    }
+
+    fn bond_profile() -> ProviderProfile {
+        ProviderProfile {
+            bond: Some(super::super::BondSpec {
+                isin: Some("US912810TH14".into()),
+                treasury_type: Some("Bond".into()),
+                coupon_rate: Some(Decimal::new(5, 2)),
+                maturity_date: Some(NaiveDate::from_ymd_opt(2043, 5, 15).unwrap()),
+                coupon_frequency: Some("SEMI_ANNUAL".into()),
+                face_value: Some(Decimal::from(1000)),
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn ensure_bond_broker_symbols_preserve_venues() {
+        use crate::activities::activities_service_tests::tests::MockActivityRepository;
+        for existing in [false, true] {
+            let mut assets = vec![Asset {
+                id: "unqualified-bond".into(),
+                is_active: true,
+                instrument_type: Some(InstrumentType::Bond),
+                instrument_symbol: Some("ABC".into()),
+                instrument_key: Some("BOND:ABC".into()),
+                quote_ccy: "USD".into(),
+                ..Default::default()
+            }];
+            let venues = [("XTSE", "CAD"), ("XNYS", "USD")];
+            if existing {
+                for (mic, currency) in venues {
+                    assets.push(Asset {
+                        id: format!("bond-{mic}"),
+                        is_active: true,
+                        instrument_type: Some(InstrumentType::Bond),
+                        instrument_symbol: Some("ABC".into()),
+                        instrument_exchange_mic: Some(mic.into()),
+                        instrument_key: Some(format!("BOND:ABC@{mic}")),
+                        quote_ccy: currency.into(),
+                        ..Default::default()
+                    });
+                }
+            }
+            let quotes = Arc::new(TestQuoteService {
+                reject_provider_calls: true,
+                ..Default::default()
+            });
+            let service = AssetService::new(
+                Arc::new(TestAssetRepository::with_assets(assets)),
+                quotes.clone(),
+            )
+            .unwrap();
+            let specs = venues
+                .into_iter()
+                .map(|(mic, currency)| {
+                    AssetSpec::market_instrument(
+                        "ABC".into(),
+                        "ABC".into(),
+                        Some(mic.into()),
+                        InstrumentType::Bond,
+                        currency.into(),
+                    )
+                })
+                .collect();
+            let result = service
+                .ensure_assets(specs, &MockActivityRepository::default())
+                .await
+                .unwrap();
+
+            assert_eq!(result.assets.len(), 2);
+            assert_eq!(result.created_ids.len(), if existing { 0 } else { 2 });
+            assert_eq!(service.get_assets().unwrap().len(), 3);
+            for (mic, currency) in venues {
+                let key = format!("BOND:ABC@{mic}");
+                let id = result.input_to_asset_id.get(&key).unwrap();
+                let asset = &result.assets[id];
+                assert_ne!(id, "unqualified-bond");
+                if existing {
+                    assert_eq!(id, &format!("bond-{mic}"));
+                }
+                assert_eq!(asset.instrument_key.as_deref(), Some(key.as_str()));
+                assert_eq!(asset.instrument_exchange_mic.as_deref(), Some(mic));
+                assert_eq!(asset.quote_ccy, currency);
+            }
+            assert!(quotes.search_calls.lock().unwrap().is_empty());
+            assert!(quotes.profile_calls.lock().unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn ensure_bonds_uses_local_resolution_and_creation_events() {
+        use crate::activities::activities_service_tests::tests::MockActivityRepository;
+        for existing in [false, true] {
+            let mut asset = treasury_test_asset();
+            asset.is_active = true;
+            let repo = Arc::new(TestAssetRepository::with_assets(if existing {
+                vec![asset]
+            } else {
+                vec![]
+            }));
+            let quotes = Arc::new(TestQuoteService {
+                reject_provider_calls: true,
+                ..Default::default()
+            });
+            let events = Arc::new(MockDomainEventSink::new());
+            let service = AssetService::new(repo, quotes.clone())
+                .unwrap()
+                .with_event_sink(events.clone());
+            let spec = AssetSpec::market_instrument(
+                "US912810TH14".into(),
+                "US912810TH14".into(),
+                None,
+                InstrumentType::Bond,
+                "USD".into(),
+            );
+            let result = service
+                .ensure_assets(vec![spec], &MockActivityRepository::default())
+                .await
+                .unwrap();
+            assert_eq!(result.assets.len(), 1);
+            assert_eq!(result.input_to_asset_id.len(), 1);
+            assert!(quotes.profile_calls.lock().unwrap().is_empty());
+            let emitted = events.events();
+            if existing {
+                assert!(result.created_ids.is_empty());
+                assert!(emitted
+                    .iter()
+                    .all(|event| matches!(event, DomainEvent::AssetsUpdated { .. })));
+            } else {
+                assert_eq!(result.created_ids.len(), 1);
+                assert!(
+                    matches!(&emitted[..], [DomainEvent::AssetsCreated { asset_ids }] if asset_ids == &result.created_ids)
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn bond_profile_failure_is_retryable_and_preserves_saved_metadata() {
+        let asset = treasury_test_asset();
+        let before = asset.metadata.clone();
+        let repo = Arc::new(TestAssetRepository::with_assets(vec![asset]));
+        let quotes = Arc::new(TestQuoteService::default());
+        let service = AssetService::new(repo.clone(), quotes.clone()).unwrap();
+        assert_eq!(
+            service
+                .enrich_assets(vec!["treasury".into()])
+                .await
+                .unwrap(),
+            (0, 0, 1)
+        );
+        assert!(quotes.enriched.lock().unwrap().is_empty());
+        assert_eq!(repo.get_by_id("treasury").unwrap().metadata, before);
+        quotes
+            .profiles
+            .lock()
+            .unwrap()
+            .insert("US912810TH14".into(), bond_profile());
+        assert_eq!(
+            service
+                .enrich_assets(vec!["treasury".into()])
+                .await
+                .unwrap(),
+            (1, 0, 0)
+        );
+        let bond = repo.get_by_id("treasury").unwrap().bond_spec().unwrap();
+        assert_eq!(bond.coupon_rate, Some(Decimal::new(4, 2)));
+        // Conflicting saved coupon must not be certified by attaching the provider's type.
+        assert_eq!(bond.treasury_type, None);
+        assert!(bond.maturity_date.is_some());
+        assert_eq!(
+            service
+                .enrich_assets(vec!["treasury".into()])
+                .await
+                .unwrap(),
+            (0, 1, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn bond_profile_preserves_edits_made_during_fetch() {
+        let repo = Arc::new(TestAssetRepository::with_assets(
+            vec![treasury_test_asset()],
+        ));
+        let quotes = Arc::new(TestQuoteService::default());
+        quotes
+            .profiles
+            .lock()
+            .unwrap()
+            .insert("US912810TH14".into(), bond_profile());
+        *quotes.edit_during_fetch.lock().unwrap() = Some(repo.clone());
+        let service = AssetService::new(repo.clone(), quotes).unwrap();
+        service.enrich_asset_profile("treasury").await.unwrap();
+        let asset = repo.get_by_id("treasury").unwrap();
+        assert_eq!(
+            asset.bond_spec().unwrap().coupon_rate,
+            Some(Decimal::new(7, 2))
+        );
+        assert_eq!(asset.bond_spec().unwrap().treasury_type, None);
+        assert_eq!(asset.notes.as_deref(), Some("User edit during fetch"));
+        assert_eq!(asset.metadata.unwrap()["custom"], true);
+    }
+
+    #[test]
+    fn bond_profile_fills_missing_fields_and_preserves_unknown_fields() {
+        let mut metadata = Some(serde_json::json!({"custom": true, "bond": {"customBond": true}}));
+        merge_bond_profile(
+            Some("US912810TH14"),
+            &mut metadata,
+            &bond_profile().bond.unwrap(),
+        )
+        .unwrap();
+        let value = metadata.unwrap();
+        assert_eq!(value["custom"], true);
+        assert_eq!(value["bond"]["customBond"], true);
+        assert_eq!(value["bond"]["treasuryType"], "Bond");
+        let bond: super::super::BondSpec = serde_json::from_value(value["bond"].clone()).unwrap();
+        assert!(bond.to_quote_metadata().has_valid_treasury_terms());
+    }
+
+    #[test]
+    fn bond_profile_rejects_conflicting_identifiers_without_mutation() {
+        for symbol in ["US037833EZ91", "US912810TH14"] {
+            let mut metadata = Some(serde_json::json!({"bond": {"isin": "US037833EZ91"}}));
+            let before = metadata.clone();
+            assert!(
+                merge_bond_profile(Some(symbol), &mut metadata, &bond_profile().bond.unwrap())
+                    .is_err()
+            );
+            assert_eq!(metadata, before);
+        }
+    }
 
     #[derive(Default)]
     struct TestAssetRepository {
@@ -2906,7 +3512,7 @@ mod tests {
             let asset = Asset {
                 id: new_asset
                     .id
-                    .unwrap_or_else(|| "test-created-asset".to_string()),
+                    .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
                 kind: new_asset.kind,
                 name: new_asset.name,
                 display_code: new_asset.display_code,
@@ -2928,8 +3534,12 @@ mod tests {
             Ok(asset)
         }
 
-        async fn create_batch(&self, _new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
-            unimplemented!()
+        async fn create_batch(&self, new_assets: Vec<NewAsset>) -> Result<Vec<Asset>> {
+            let mut created = Vec::new();
+            for asset in new_assets {
+                created.push(self.create(asset).await?);
+            }
+            Ok(created)
         }
 
         async fn update_profile(
@@ -3062,6 +3672,10 @@ mod tests {
         profiles: Arc<Mutex<HashMap<String, ProviderProfile>>>,
         latest_quotes: Arc<Mutex<HashMap<String, Quote>>>,
         search_calls: Arc<Mutex<Vec<String>>>,
+        profile_calls: Mutex<Vec<String>>,
+        reject_provider_calls: bool,
+        enriched: Mutex<HashSet<String>>,
+        edit_during_fetch: Mutex<Option<Arc<TestAssetRepository>>>,
     }
 
     impl TestQuoteService {
@@ -3198,10 +3812,37 @@ mod tests {
                 .unwrap_or_default())
         }
 
+        async fn resolve_symbol_quote(
+            &self,
+            _symbol: &str,
+            _mic: Option<&str>,
+            _kind: Option<&InstrumentType>,
+            _ccy: Option<&str>,
+            _provider: Option<&str>,
+            _provider_symbol: Option<&str>,
+        ) -> Result<crate::quotes::ResolvedQuote> {
+            assert!(
+                !self.reject_provider_calls,
+                "asset resolution must not fetch a quote"
+            );
+            Ok(crate::quotes::ResolvedQuote::default())
+        }
+
         async fn get_asset_profile(
             &self,
             asset: &Asset,
         ) -> Result<super::super::assets_model::ProviderProfile> {
+            assert!(
+                !self.reject_provider_calls,
+                "asset resolution must not fetch a profile"
+            );
+            self.profile_calls.lock().unwrap().push(asset.id.clone());
+            if let Some(repo) = self.edit_during_fetch.lock().unwrap().take() {
+                let mut assets = repo.assets.lock().unwrap();
+                assets[0].metadata.as_mut().unwrap()["bond"]["couponRate"] =
+                    serde_json::json!(0.07);
+                assets[0].notes = Some("User edit during fetch".into());
+            }
             let symbol = asset
                 .instrument_symbol
                 .as_deref()
@@ -3275,11 +3916,16 @@ mod tests {
             Ok(Vec::new())
         }
 
-        fn get_sync_state(&self, _symbol: &str) -> Result<Option<QuoteSyncState>> {
-            Ok(None)
+        fn get_sync_state(&self, symbol: &str) -> Result<Option<QuoteSyncState>> {
+            let mut state = QuoteSyncState::new(symbol.into(), "TEST".into());
+            if self.enriched.lock().unwrap().contains(symbol) {
+                state.mark_profile_enriched();
+            }
+            Ok(Some(state))
         }
 
-        async fn mark_profile_enriched(&self, _symbol: &str) -> Result<()> {
+        async fn mark_profile_enriched(&self, symbol: &str) -> Result<()> {
+            self.enriched.lock().unwrap().insert(symbol.into());
             Ok(())
         }
 

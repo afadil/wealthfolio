@@ -1,6 +1,7 @@
 //! Test/eval-only mock implementations of the AiEnvironment trait and
 //! every service it returns. Gated behind the `test-utils` feature so the
 //! eval binary (`cargo run --bin eval --features eval`) can construct one.
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test fixture")]
 
 use super::*;
 use async_trait::async_trait;
@@ -13,10 +14,11 @@ use wealthfolio_core::{
     activities::{
         Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityDetails,
         ActivityImport, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityServiceTrait,
-        ActivityUpdate, BrokerSyncProfileData, ImportAssetCandidate, ImportAssetPreviewItem,
-        ImportMappingData, ImportTemplateData, ImportTemplateScope, InternalTransferPairRequest,
-        InternalTransferPairResponse, NewActivity, SaveBrokerSyncProfileRulesRequest, Sort,
-        TransferMatchCandidate, TransferMatchCandidateRequest,
+        ActivityUpdate, ActivityUpdatePreview, BrokerSyncProfileData, ImportAssetCandidate,
+        ImportAssetPreviewItem, ImportMappingData, ImportTemplateData, ImportTemplateScope,
+        InternalTransferPairRequest, InternalTransferPairResponse, NewActivity,
+        SaveBrokerSyncProfileRulesRequest, Sort, TransferMatchCandidate,
+        TransferMatchCandidateRequest, UnlinkedTransfers, UnlinkedTransfersRequest,
     },
     assets::{
         Asset, AssetMetadata, AssetResolutionInput, AssetResolutionOutput, AssetServiceTrait,
@@ -29,9 +31,9 @@ use wealthfolio_core::{
     },
     health::{
         checks::{
-            AssetHoldingInfo, ConsistencyIssueInfo, FxPairInfo, InvalidTransferGroupInfo,
-            LegacyMigrationInfo, QuoteSyncErrorInfo, UnclassifiedAssetInfo,
-            UnconfiguredAccountInfo,
+            AssetHoldingInfo, ConsistencyIssueInfo, FxConflictInfo, FxPairInfo,
+            InvalidTransferGroupInfo, LegacyMigrationInfo, QuoteSyncErrorInfo,
+            UnclassifiedAssetInfo, UnconfiguredAccountInfo,
         },
         FixAction, HealthConfig, HealthServiceTrait, HealthStatus,
     },
@@ -60,9 +62,7 @@ use wealthfolio_core::{
         AssetTaxonomyAssignment, Category, NewAssetTaxonomyAssignment, NewCategory, NewTaxonomy,
         Taxonomy, TaxonomyServiceTrait, TaxonomyWithCategories,
     },
-    valuation::{
-        DailyAccountValuation, NegativeBalanceInfo, ValuationRecalcMode, ValuationServiceTrait,
-    },
+    valuation::{DailyAccountValuation, NegativeBalanceInfo, ValuationServiceTrait},
     Error as CoreError, Result as CoreResult,
 };
 use wealthfolio_spending::cash_activities::CashActivityServiceTrait;
@@ -404,6 +404,10 @@ impl ActivityServiceTrait for MockActivityService {
         unimplemented!("MockActivityService::get_activities")
     }
 
+    fn get_activities_including_archived_accounts(&self) -> CoreResult<Vec<Activity>> {
+        unimplemented!("MockActivityService::get_activities_including_archived_accounts")
+    }
+
     fn get_activities_by_account_id(&self, _account_id: &str) -> CoreResult<Vec<Activity>> {
         unimplemented!("MockActivityService::get_activities_by_account_id")
     }
@@ -449,6 +453,13 @@ impl ActivityServiceTrait for MockActivityService {
         Ok(Vec::new())
     }
 
+    async fn find_unlinked_transfers(
+        &self,
+        _request: UnlinkedTransfersRequest,
+    ) -> CoreResult<UnlinkedTransfers> {
+        Ok(UnlinkedTransfers::default())
+    }
+
     fn get_first_activity_date(
         &self,
         _account_ids: Option<&[String]>,
@@ -474,6 +485,13 @@ impl ActivityServiceTrait for MockActivityService {
 
     async fn update_activity(&self, _activity: ActivityUpdate) -> CoreResult<Activity> {
         unimplemented!("MockActivityService::update_activity")
+    }
+
+    fn preview_activity_update(
+        &self,
+        _activity: ActivityUpdate,
+    ) -> CoreResult<ActivityUpdatePreview> {
+        unimplemented!("MockActivityService::preview_activity_update")
     }
 
     async fn delete_activity(&self, _activity_id: String) -> CoreResult<Activity> {
@@ -660,6 +678,14 @@ pub struct MockHoldingsService {
 
 #[async_trait]
 impl HoldingsServiceTrait for MockHoldingsService {
+    async fn get_asset_lot_view(
+        &self,
+        _asset_id: &str,
+        _include_snapshot_positions: bool,
+    ) -> CoreResult<Vec<wealthfolio_core::lots::AssetLotView>> {
+        Ok(Vec::new())
+    }
+
     async fn get_holdings(
         &self,
         _account_id: &str,
@@ -719,7 +745,18 @@ impl ValuationServiceTrait for MockValuationService {
         Ok(self.valuations.clone())
     }
 
-    fn get_historical_valuations_for_accounts(
+    async fn get_historical_valuations_for_accounts(
+        &self,
+        _scope_id: &str,
+        _account_ids: &[String],
+        _base_currency: &str,
+        _start_date: Option<NaiveDate>,
+        _end_date: Option<NaiveDate>,
+    ) -> CoreResult<Vec<DailyAccountValuation>> {
+        Ok(self.valuations.clone())
+    }
+
+    async fn get_historical_valuation_totals_for_accounts(
         &self,
         _scope_id: &str,
         _account_ids: &[String],
@@ -743,14 +780,6 @@ impl ValuationServiceTrait for MockValuationService {
         _account_ids: &[String],
     ) -> CoreResult<Vec<NegativeBalanceInfo>> {
         Ok(Vec::new())
-    }
-
-    async fn calculate_valuation_history(
-        &self,
-        _account_id: &str,
-        _mode: ValuationRecalcMode,
-    ) -> CoreResult<()> {
-        Ok(())
     }
 }
 
@@ -1444,7 +1473,6 @@ fn mock_performance_result(id: &str) -> PerformanceResult {
         series: Vec::new(),
         is_holdings_mode: false,
         is_mixed_tracking_mode: false,
-        holdings_flows_unavailable: false,
     }
 }
 
@@ -1755,6 +1783,7 @@ impl HealthServiceTrait for MockHealthService {
         _latest_quote_times: &std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
         _quote_sync_errors: &[QuoteSyncErrorInfo],
         _fx_pairs: &[FxPairInfo],
+        _fx_conflicts: &[FxConflictInfo],
         _unclassified_assets: &[UnclassifiedAssetInfo],
         _consistency_issues: &[ConsistencyIssueInfo],
         _legacy_migration_info: &Option<LegacyMigrationInfo>,

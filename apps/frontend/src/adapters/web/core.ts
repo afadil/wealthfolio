@@ -4,9 +4,10 @@ import { profileFetch } from "@/features/profiles/session";
 
 import { notifyUnauthorized } from "@/lib/auth-token";
 import type { Logger } from "../types";
+import { invokeTimeoutMs } from "../invoke-timeout";
 
-/** True when running in the desktop (Tauri) environment */
-export const isDesktop = false;
+/** True in every Tauri build (desktop and mobile); use getPlatform() for the OS */
+export const isTauri = false;
 
 /** True when running in the web environment */
 export const isWeb = true;
@@ -15,19 +16,11 @@ export const API_PREFIX = "/api/v1";
 export const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
 export const AI_CHAT_STREAM_ENDPOINT = `${API_PREFIX}/ai/chat/stream`;
 
-const DEFAULT_INVOKE_TIMEOUT_MS = 300_000;
-
-// Commands that legitimately do batched network I/O over many symbols (Yahoo
-// Finance lookups during CSV import). Larger imports — especially Options —
-// can exceed the default 5-minute safety net. See issue #884.
-const INVOKE_TIMEOUT_OVERRIDES_MS: Record<string, number> = {
-  preview_import_assets: 600_000,
-  check_activities_import: 600_000,
-};
-
 type CommandMap = Record<string, { method: string; path: string }>;
 
 export const COMMANDS: CommandMap = {
+  cloud_backup_action: { method: "POST", path: "/cloud-backups/action" },
+  cloud_backup_capture: { method: "POST", path: "/cloud-backups/capture" },
   get_accounts: { method: "GET", path: "/accounts" },
   create_account: { method: "POST", path: "/accounts" },
   update_account: { method: "PUT", path: "/accounts" },
@@ -406,6 +399,12 @@ export const COMMANDS: CommandMap = {
   link_liability: { method: "POST", path: "/alternative-assets" },
   unlink_liability: { method: "DELETE", path: "/alternative-assets" },
   update_alternative_asset_metadata: { method: "PUT", path: "/alternative-assets" },
+  calculate_loan: { method: "POST", path: "/loans/calculate" },
+  recalculate_loan: { method: "POST", path: "/loans/recalculate" },
+  preview_loan_terms: { method: "POST", path: "/loans/preview" },
+  apply_loan_action: { method: "POST", path: "/loans" },
+  get_loan_payments: { method: "GET", path: "/loans" },
+  link_loan_payment: { method: "POST", path: "/loans/payments" },
   get_alternative_holdings: { method: "GET", path: "/alternative-holdings" },
   // Agent Access (PATs + audit log)
   get_agent_access_status: { method: "GET", path: "/agent-access/status" },
@@ -460,6 +459,10 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   };
 
   switch (command) {
+    case "cloud_backup_action": {
+      body = JSON.stringify(payload);
+      break;
+    }
     case "update_account": {
       const data = payload as { accountUpdate: { id: string } & Record<string, unknown> };
       url += `/${data.accountUpdate.id}`;
@@ -1860,6 +1863,28 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     // Alternative Assets commands
+    case "get_loan_payments": {
+      const { assetId } = payload as { assetId: string };
+      url += `/${encodeURIComponent(assetId)}/payments`;
+      break;
+    }
+    case "link_loan_payment": {
+      const { activityId, link } = payload as { activityId: string; link: Record<string, unknown> };
+      url += `/${encodeURIComponent(activityId)}`;
+      body = JSON.stringify(link);
+      break;
+    }
+    case "apply_loan_action": {
+      const { assetId, action } = payload as { assetId: string; action: Record<string, unknown> };
+      url += `/${encodeURIComponent(assetId)}/actions`;
+      body = JSON.stringify(action);
+      break;
+    }
+    case "preview_loan_terms":
+      body = JSON.stringify(payload);
+      break;
+    case "recalculate_loan":
+    case "calculate_loan":
     case "create_alternative_asset": {
       const { request } = payload as { request: Record<string, unknown> };
       body = JSON.stringify(request);
@@ -1891,14 +1916,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "update_alternative_asset_metadata": {
-      const { assetId, metadata, name, notes } = payload as {
+      const { assetId, metadata, name, notes, loan } = payload as {
         assetId: string;
         metadata: Record<string, string>;
         name?: string;
         notes?: string | null;
+        loan?: unknown;
       };
       url += `/${encodeURIComponent(assetId)}/metadata`;
-      body = JSON.stringify({ metadata, name, notes });
+      body = JSON.stringify({ metadata, name, notes, loan });
       break;
     }
     case "get_alternative_holdings":
@@ -2132,7 +2158,7 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     headers,
     body,
     credentials: "same-origin",
-    signal: AbortSignal.timeout(INVOKE_TIMEOUT_OVERRIDES_MS[command] ?? DEFAULT_INVOKE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(invokeTimeoutMs(command)),
   });
 
   // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.

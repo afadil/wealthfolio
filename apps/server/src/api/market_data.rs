@@ -13,7 +13,6 @@ use axum::{
     Json, Router,
 };
 use wealthfolio_core::assets::InstrumentType;
-use wealthfolio_core::portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode};
 use wealthfolio_core::quotes::{
     FetchDividendsParams, LatestQuoteSnapshot, MarketSyncMode, ProviderInfo, Quote, QuoteImport,
     SymbolSearchResult,
@@ -176,9 +175,7 @@ async fn update_quote(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::Full,
-            valuation_mode: ValuationRecalcMode::Full,
-            since_date: None,
+            force_full: false,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -196,9 +193,7 @@ async fn delete_quote(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::Full,
-            valuation_mode: ValuationRecalcMode::Full,
-            since_date: None,
+            force_full: false,
         },
     );
     Ok(StatusCode::NO_CONTENT)
@@ -255,24 +250,11 @@ async fn import_quotes_csv(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<ImportQuotesBody>,
 ) -> ApiResult<Json<Vec<QuoteImport>>> {
+    // The quote service emits PriceHistoryChanged when the batch saves quotes.
     let result = state
         .quote_service
         .import_quotes(body.quotes, body.overwrite_existing)
         .await?;
-
-    // Quote import - no market sync needed, but force full recalculation
-    // so historical valuations are recomputed with the imported quotes
-    enqueue_portfolio_job(
-        state,
-        PortfolioJobConfig {
-            account_ids: None,
-            market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::Full,
-            valuation_mode: ValuationRecalcMode::Full,
-            since_date: None,
-        },
-    );
-
     Ok(Json(result))
 }
 
@@ -312,9 +294,7 @@ async fn sync_market_data(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode,
-            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
-            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
-            since_date: None,
+            ..PortfolioJobConfig::default()
         },
     );
     Ok(StatusCode::NO_CONTENT)

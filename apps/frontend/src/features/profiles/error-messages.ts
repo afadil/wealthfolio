@@ -1,4 +1,11 @@
 import type { TFunction } from "i18next";
+import { isWeb } from "@/adapters";
+
+/** Normalize codes once for both native string errors and HTTP error messages. */
+export function profileErrorCode(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /\b(?:PROFILE_[A-Z_]+|CONNECT_[A-Z_]+)\b/.exec(message)?.[0];
+}
 
 /** Keep diagnostic codes in state; render only curated, translated copy. */
 export function profileErrorMessage(error: unknown, t: TFunction<"common">): string {
@@ -6,7 +13,7 @@ export function profileErrorMessage(error: unknown, t: TFunction<"common">): str
   if (!(error instanceof Error) && typeof error !== "string") return t("profiles.errors.generic");
   const raw = error instanceof Error ? error.message : error;
   if (!raw) return "";
-  const code = /\b(?:PROFILE_[A-Z_]+|CONNECT_[A-Z_]+)\b/.exec(raw)?.[0];
+  const code = profileErrorCode(error);
   switch (code) {
     case "PROFILE_COOLDOWN": {
       const seconds = /PROFILE_COOLDOWN:\s*Try again in (\d+) seconds?\b/.exec(raw)?.[1];
@@ -14,6 +21,10 @@ export function profileErrorMessage(error: unknown, t: TFunction<"common">): str
         ? t("profiles.errors.cooldown", { count: Number(seconds) })
         : t("profiles.errors.cooldownUnknown");
     }
+    case "PROFILE_CONNECTION_FAILED":
+      return t("profiles.errors.connectionFailed");
+    case "PROFILE_AUTH_REQUIRED":
+      return t("profiles.errors.authRequired");
     case "PROFILE_ORIGIN_REJECTED":
       return t("profiles.errors.originRejected");
     case "PROFILE_LOCKED":
@@ -41,7 +52,9 @@ export function profileErrorMessage(error: unknown, t: TFunction<"common">): str
       return t("profiles.errors.invalid");
     case "PROFILE_UNAVAILABLE":
       if (raw.includes("Another Wealthfolio process")) return t("profiles.errors.inUse");
-      if (raw.includes("credential store")) return t("profiles.errors.credentials");
+      // The web server keeps credentials in its own secrets file, not the device keychain.
+      if (raw.includes("credential store"))
+        return t(isWeb ? "profiles.errors.serverCredentials" : "profiles.errors.credentials");
       return t("profiles.errors.unavailable");
     case "CONNECT_PROFILE_EXISTS":
       return t("profiles.errors.duplicateAccount");

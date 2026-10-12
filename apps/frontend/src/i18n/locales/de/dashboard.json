@@ -102,8 +102,16 @@
     "values_without_returns": "Kontowerte werden ohne Periodenrenditen angezeigt.",
     "failed_to_load": "Konten konnten nicht geladen werden",
     "failed_to_load_performance": "Wertentwicklungskennzahlen konnten nicht geladen werden",
-    "try_restarting": "Versuchen Sie, die App neu zu starten. Falls das Problem weiterhin besteht, muss Ihre Datenbank möglicherweise zurückgesetzt werden."
+    "try_restarting": "Versuchen Sie es erneut. Wenn das Problem weiterhin besteht, starten Sie Wealthfolio neu oder wenden Sie sich an den Support."
   },
   "accounts_count_one": "{{count}} Konto",
-  "accounts_count_other": "{{count}} Konten"
+  "accounts_count_other": "{{count}} Konten",
+  "portfolio_filter": {
+    "choose": "Portfolio auswählen",
+    "search": "Portfolios suchen…",
+    "manage": "Portfolios verwalten",
+    "unavailable": "Das ausgewählte Portfolio ist nicht mehr verfügbar. Alle Konten werden angezeigt.",
+    "load_error": "Das ausgewählte Portfolio konnte nicht geladen werden.",
+    "empty": "In diesem Portfolio gibt es keine Konten zum Anzeigen."
+  }
 }

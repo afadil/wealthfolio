@@ -1,0 +1,39 @@
+id: EDGE-ROC-03
+title: A dividend of capital books its cash as no income and recovers its gross amount of cost
+intent: >
+  Rule R7.4, issue 1799. A DIVIDEND with subtype RETURN_OF_CAPITAL books its
+  cash, counts no income (what was withheld is still a charge), and recovers
+  its gross amount of the asset's cost; beyond the cost, the excess is a
+  capital gain. A plain dividend on the same asset is income. One on an asset
+  the account has never held is rejected, its cash with it.
+policy: { base_currency: USD, timezone: UTC, as_of: 2025-01-10 }
+accounts:
+  - { id: acc-1, currency: USD }
+assets:
+  - { id: mlp, quote_ccy: USD }
+  - { id: other, quote_ccy: USD }
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 1000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-03T10:00:00Z, asset: mlp, quantity: 10, unit_price: 50, amount: 500, fee: 0 }
+  - { id: div-1, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-06T10:00:00Z, asset: mlp, quantity: 0, unit_price: 0, amount: 30 }
+  - { id: div-2, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T10:00:00Z, asset: mlp, quantity: 0, unit_price: 0, amount: 450, tax: 50 }
+  - { id: div-3, account: acc-1, type: DIVIDEND, date: 2025-01-08T10:00:00Z, asset: mlp, quantity: 0, unit_price: 0, amount: 10 }
+  - { id: div-4, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-08T11:00:00Z, asset: other, quantity: 0, unit_price: 0, amount: 7 }
+quotes:
+  - { asset: mlp, day: 2025-01-03, close: 50 }
+  - { asset: mlp, day: 2025-01-06, close: 50 }
+  - { asset: mlp, day: 2025-01-07, close: 49 }
+  - { asset: mlp, day: 2025-01-08, close: 48 }
+  - { asset: mlp, day: 2025-01-09, close: 48 }
+  - { asset: mlp, day: 2025-01-10, close: 48 }
+  - { asset: other, day: 2025-01-03, close: 1 }
+expected_notes: >
+  buy-1: 10 mlp, cost 500. div-1 pays 30 of capital: cash +30, no income, the
+  lot's cost 470, nothing realized. div-2 pays 450 after 50 withheld: cash
+  +450, tax 50, no income; its gross 500 recovers the lot's 470 and the 30
+  beyond it is a capital gain, one disposal row with no units (proceeds 500,
+  cost 470, P&L 30). The lot keeps its 10 units at cost 0 and price 50. div-3
+  is a plain dividend: cash +10, income 10. div-4 names an asset the account
+  has never held: rejected, and its 7 is not booked. Cash 1000 - 500 + 30 +
+  450 + 10 = 990. Value 990 + 10 x 48 = 1470, a gain of 470: realized 30,
+  unrealized 480, income 10, tax -50.

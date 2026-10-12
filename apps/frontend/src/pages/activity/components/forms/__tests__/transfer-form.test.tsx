@@ -72,6 +72,11 @@ vi.mock("../fields", () => ({
   createValidatedSubmit: vi.fn((_form, handler) => handler),
 }));
 
+// The unmocked currency controls are covered by transfer-currencies.test.tsx.
+vi.mock("../fields/internal-transfer-currency-fields", () => ({
+  InternalTransferCurrencyFields: () => null,
+}));
+
 // Mock UI components
 vi.mock("@wealthfolio/ui/components/ui/button", () => ({
   Button: ({
@@ -384,6 +389,39 @@ describe("TransferForm", () => {
       render(<TransferForm accounts={mockAccounts} onSubmit={mockOnSubmit} isEditing={false} />);
 
       expect(screen.getByTestId("plus-icon")).toBeInTheDocument();
+    });
+  });
+
+  describe("Credit card as the source (#1227)", () => {
+    const withCard: AccountSelectOption[] = [
+      ...mockAccounts,
+      { value: "card-1", label: "Rewards Card", currency: "USD", accountType: "CREDIT_CARD" },
+    ];
+    const optionValues = (testId: string) =>
+      Array.from(screen.getByTestId(testId).querySelectorAll("option")).map((o) => o.value);
+
+    it("offers a credit card as the source of a cash transfer", () => {
+      render(<TransferForm accounts={withCard} onSubmit={mockOnSubmit} />);
+      expect(optionValues("select-fromAccountId")).toContain("card-1");
+    });
+
+    it("still keeps credit cards out of securities transfers", async () => {
+      const user = userEvent.setup();
+      render(<TransferForm accounts={withCard} onSubmit={mockOnSubmit} />);
+      await user.click(screen.getByTestId("toggle-securities"));
+      expect(optionValues("select-fromAccountId")).not.toContain("card-1");
+      expect(optionValues("select-toAccountId")).not.toContain("card-1");
+    });
+
+    it("offers a credit card for an external cash transfer out", () => {
+      render(
+        <TransferForm
+          accounts={withCard}
+          onSubmit={mockOnSubmit}
+          defaultValues={{ isExternal: true, direction: "out" }}
+        />,
+      );
+      expect(optionValues("select-accountId")).toContain("card-1");
     });
   });
 

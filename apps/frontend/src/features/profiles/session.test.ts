@@ -115,3 +115,35 @@ it("enables legacy preference fallback only with backend legacy metadata", async
   session.installProfileSession(grant, true);
   expect(session.usesLegacyPreferences()).toBe(true);
 });
+
+it("routes a proxy sign-in page to auth recovery without revoking the profile, but preserves 524 responses", async () => {
+  vi.resetModules();
+  const session = await import("./session");
+  const { setUnauthorizedHandler } = await import("@/lib/auth-token");
+  const unauthorized = vi.fn();
+  setUnauthorizedHandler(unauthorized);
+  session.installProfileSession({ profileId: "a", scopeId: "scope-a" });
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(
+      new Response("<html>Sign in</html>", { headers: { "Content-Type": "text/html" } }),
+    );
+  vi.stubGlobal("fetch", fetch);
+  try {
+    await expect(session.profileFetch("/api/v1/accounts")).rejects.toThrow("PROFILE_AUTH_REQUIRED");
+    expect(unauthorized).toHaveBeenCalledExactlyOnceWith("signIn");
+    expect(session.profileScope()).toBe("scope-a");
+    fetch.mockResolvedValue(
+      new Response("<html>Timeout</html>", {
+        status: 524,
+        headers: { "Content-Type": "text/html" },
+      }),
+    );
+    expect((await session.profileFetch("/api/v1/accounts")).status).toBe(524);
+    expect(unauthorized).toHaveBeenCalledExactlyOnceWith("signIn");
+    expect(session.profileScope()).toBe("scope-a");
+  } finally {
+    setUnauthorizedHandler(null);
+    vi.unstubAllGlobals();
+  }
+});

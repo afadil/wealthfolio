@@ -1,7 +1,27 @@
-use std::{path::Path, process::Command, sync::Arc};
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+use std::{
+    path::Path,
+    process::Command,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use wealthfolio_server::{config::Config, profiles::WebProfiles};
-use wealthfolio_storage_sqlite::db::{DbAccess, DbEncryptionKey};
+use wealthfolio_storage_sqlite::db::{maintenance, DatabaseOwner, DbAccess, DbEncryptionKey};
+
+/// env_clear() drops SYSTEMROOT on Windows; SQLCipher needs it to seed OpenSSL's RNG.
+trait KeepSystemRoot {
+    fn keep_systemroot(&mut self) -> &mut Self;
+}
+
+impl KeepSystemRoot for std::process::Command {
+    fn keep_systemroot(&mut self) -> &mut Self {
+        if let Some(root) = std::env::var_os("SYSTEMROOT") {
+            self.env("SYSTEMROOT", root);
+        }
+        self
+    }
+}
 
 const KEY: &str = "--------------------------------";
 
@@ -11,6 +31,7 @@ fn worker(directory: &Path, mode: &str) -> Command {
         .args(["--exact", "storage_worker", "--nocapture"])
         .current_dir(directory)
         .env_clear()
+        .keep_systemroot()
         .env("WF_STORAGE_TEST_MODE", mode)
         .env("WF_LISTEN_ADDR", "127.0.0.1:0")
         .env("WF_SECRET_KEY", KEY)
@@ -88,7 +109,11 @@ fn conflicting_paths_fail_in_startup_and_offline_commands_without_writes() {
         vec!["db", "restore", "missing.wfbackup", "--yes"],
     ] {
         let mut command = Command::new(env!("CARGO_BIN_EXE_wealthfolio-server"));
-        command.args(args).current_dir(temp.path()).env_clear();
+        command
+            .args(args)
+            .current_dir(temp.path())
+            .env_clear()
+            .keep_systemroot();
         commands.push(command);
     }
     for command in &mut commands {
@@ -127,18 +152,39 @@ fn empty_web_override_masks_desktop_dotenv() {
     assert!(!temp.path().join("desktop-data").exists());
 }
 
-#[tokio::test]
-async fn storage_worker() {
+#[test]
+fn storage_worker() {
     let Ok(mode) = std::env::var("WF_STORAGE_TEST_MODE") else {
         return;
     };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let databases = runtime.block_on(run_storage_worker(&mode));
+    // Profile runtimes stay alive in their tasks until the runtime drops them.
+    drop(runtime);
+    // An r2d2 worker may still be opening or closing pooled connections.
+    // Exiting first races SQLCipher's exit-time cleanup and can crash; a pool
+    // releases ownership only once all of its connections are closed.
+    for database in databases {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while DatabaseOwner::acquire(database.path()).is_err() {
+            assert!(Instant::now() < deadline, "{database:?} is still owned");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        maintenance::check_sqlite_locks(&database).unwrap();
+    }
+}
+
+async fn run_storage_worker(mode: &str) -> Vec<DbAccess> {
     if mode == "conflict" {
         let error = Config::from_env()
             .err()
             .expect("conflicting paths must fail");
         assert!(error.to_string().contains("must select the same directory"));
         println!("{error}");
-        return;
+        return Vec::new();
     }
     let config = Config::from_env().unwrap();
     if mode == "seed-legacy" {
@@ -155,8 +201,10 @@ async fn storage_worker() {
     }
     let all = profiles.registry.list().unwrap();
     assert_eq!(all.len(), 2);
+    let mut databases = Vec::new();
     for profile in all {
         let state = profiles.runtime(profile.id).await.unwrap();
+        databases.push(state.db_access.clone());
         if mode.starts_with("seed") {
             state.db_access.connect_rusqlite().unwrap().execute(
                 "INSERT INTO app_settings(setting_key,setting_value) VALUES('storage_probe',?1)",
@@ -183,4 +231,5 @@ async fn storage_worker() {
             Some(profile.id.to_string())
         );
     }
+    databases
 }

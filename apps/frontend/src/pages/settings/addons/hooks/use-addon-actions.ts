@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import {
-  isDesktop,
+  isTauri,
   logger as envLogger,
   installAddon,
   getInstalledAddons,
@@ -78,7 +78,7 @@ export function useAddonActions() {
   const handleLoadAddon = async () => {
     try {
       setIsLoading(true);
-      if (isDesktop) {
+      if (isTauri) {
         // Dynamically import Tauri APIs in desktop to avoid bundling in web
         const { open } = await import("@tauri-apps/plugin-dialog");
         const { readFile } = await import("@tauri-apps/plugin-fs");

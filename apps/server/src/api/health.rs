@@ -16,7 +16,6 @@ use axum::{
 use serde_json::json;
 use wealthfolio_core::{
     health::{FixAction, HealthConfig, HealthStatus},
-    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
 };
 
@@ -33,7 +32,11 @@ async fn get_health_status(
     }
 
     // Run fresh checks
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     let client_timezone = extract_client_timezone(&headers);
     let status =
         run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
@@ -45,7 +48,11 @@ async fn run_health_checks(
     axum::Extension(state): axum::Extension<Arc<AppState>>,
     headers: HeaderMap,
 ) -> ApiResult<Json<HealthStatus>> {
-    let base_currency = state.base_currency.read().unwrap().clone();
+    let base_currency = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     let client_timezone = extract_client_timezone(&headers);
     let status =
         run_health_checks_internal(&state, &base_currency, client_timezone.as_deref()).await?;
@@ -58,7 +65,11 @@ async fn run_health_checks_internal(
     base_currency: &str,
     client_timezone: Option<&str>,
 ) -> Result<HealthStatus, anyhow::Error> {
-    let configured_timezone = state.timezone.read().unwrap().clone();
+    let configured_timezone = state
+        .timezone
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     state
         .health_service
         .run_full_checks(
@@ -208,9 +219,7 @@ async fn execute_health_fix(
             account_ids: Some(account_ids),
             // Prices/valuations were already fixed by the user; just rebuild.
             market_sync_mode: MarketSyncMode::Incremental { asset_ids: None },
-            snapshot_mode: SnapshotRecalcMode::Full,
-            valuation_mode: ValuationRecalcMode::Full,
-            since_date: None,
+            force_full: true,
         };
 
         process_portfolio_job(state.clone(), job_config)

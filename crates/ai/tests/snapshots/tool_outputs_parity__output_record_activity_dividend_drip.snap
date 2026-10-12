@@ -20,6 +20,10 @@ expression: result
       {
         "label": "Dividend in Kind",
         "value": "DIVIDEND_IN_KIND"
+      },
+      {
+        "label": "Return of Capital",
+        "value": "RETURN_OF_CAPITAL"
       }
     ],
     "draft": {

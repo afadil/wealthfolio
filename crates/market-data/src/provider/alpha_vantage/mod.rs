@@ -424,6 +424,7 @@ impl EtfProfileResponse {
     /// Convert to AssetProfile
     fn to_asset_profile(&self, _symbol: &str) -> AssetProfile {
         AssetProfile {
+            bond: None,
             source: Some(PROVIDER_ID.to_string()),
             name: None, // ETF_PROFILE doesn't include name
             quote_type: Some("ETF".to_string()),
@@ -482,6 +483,7 @@ impl CompanyOverviewResponse {
             });
 
         AssetProfile {
+            bond: None,
             source: Some(PROVIDER_ID.to_string()),
             name: self.name.clone(),
             quote_type,
@@ -716,10 +718,9 @@ impl AlphaVantageProvider {
         // OCC format: UNDERLYING + YYMMDD + C/P + STRIKE(8) = 15 non-underlying chars
         let s = occ_symbol.trim();
         let underlying_len = s.len().saturating_sub(15);
-        if underlying_len == 0 {
-            s.to_string()
-        } else {
-            s[..underlying_len].trim().to_string()
+        match s.get(..underlying_len) {
+            Some(underlying) if underlying_len > 0 => underlying.trim().to_string(),
+            _ => s.to_string(),
         }
     }
 
@@ -1163,7 +1164,7 @@ impl MarketDataProvider for AlphaVantageProvider {
             } => self.fetch_crypto_quotes(symbol, market).await?,
             ProviderInstrument::FxSymbol { ref symbol } => {
                 // Try to parse FX symbol format (e.g., "EURUSD" -> EUR/USD)
-                if symbol.len() == 6 {
+                if symbol.len() == 6 && symbol.is_char_boundary(3) {
                     let from = &symbol[..3];
                     let to = &symbol[3..];
                     self.fetch_fx_quotes(from, to).await?
@@ -1232,7 +1233,7 @@ impl MarketDataProvider for AlphaVantageProvider {
             } => self.fetch_crypto_quotes(symbol, market).await?,
             ProviderInstrument::FxSymbol { ref symbol } => {
                 // Try to parse FX symbol format (e.g., "EURUSD" -> EUR/USD)
-                if symbol.len() == 6 {
+                if symbol.len() == 6 && symbol.is_char_boundary(3) {
                     let from = &symbol[..3];
                     let to = &symbol[3..];
                     self.fetch_fx_quotes(from, to).await?
@@ -1631,6 +1632,10 @@ mod tests {
         // Test decimal format
         assert!((EtfProfileResponse::parse_weight("0.511").unwrap() - 0.511).abs() < 0.001);
 
+        // Unit conversion is explicit, even when the resulting fraction exceeds 1.0.
+        assert!((EtfProfileResponse::parse_weight("115.7%").unwrap() - 1.157).abs() < 0.0001);
+        assert!((EtfProfileResponse::parse_weight("1.157").unwrap() - 1.157).abs() < 0.0001);
+
         // Test edge cases
         assert!(EtfProfileResponse::parse_weight("invalid").is_none());
     }
@@ -1715,6 +1720,44 @@ mod tests {
             AlphaVantageProvider::extract_underlying_from_occ("TSLA  250321C00250000"),
             "TSLA"
         );
+    }
+
+    #[test]
+    fn test_extract_underlying_from_non_ascii_symbol() {
+        // 20 bytes, with byte 5 inside the first 'é'
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("Société Générale"),
+            "Société Générale"
+        );
+        // A cut on a character boundary still extracts the underlying
+        assert_eq!(
+            AlphaVantageProvider::extract_underlying_from_occ("ÉDF240119C00195000"),
+            "ÉDF"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_non_ascii_fx_symbol_is_unsupported() {
+        // 6 bytes, with byte 3 inside the '€'
+        let provider = AlphaVantageProvider::new("test_key".to_string());
+        let context = create_test_fx_context(None, "USD");
+        let instrument = || ProviderInstrument::FxSymbol {
+            symbol: "US€D".into(),
+        };
+
+        let latest = provider.get_latest_quote(&context, instrument()).await;
+        assert!(matches!(
+            latest,
+            Err(MarketDataError::UnsupportedAssetType(_))
+        ));
+
+        let history = provider
+            .get_historical_quotes(&context, instrument(), Utc::now(), Utc::now())
+            .await;
+        assert!(matches!(
+            history,
+            Err(MarketDataError::UnsupportedAssetType(_))
+        ));
     }
 
     #[test]

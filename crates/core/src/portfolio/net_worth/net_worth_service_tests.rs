@@ -9,6 +9,7 @@ use crate::assets::{
 use crate::errors::Result;
 use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
 use crate::portfolio::economic_events::BasisStatus;
+use crate::portfolio::snapshot::SnapshotService;
 use crate::portfolio::snapshot::{
     AccountStateSnapshot, Position, SnapshotRepositoryTrait, SnapshotSource,
 };
@@ -20,6 +21,7 @@ use crate::quotes::{
     LatestQuotePair, LatestQuoteSnapshot, ProviderInfo, Quote, QuoteImport, QuoteServiceTrait,
     QuoteSyncState, SymbolSearchResult, SymbolSyncPlan, SyncResult,
 };
+use crate::test_support::in_memory::InMemoryActivityRepository;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
@@ -239,32 +241,6 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
         unimplemented!()
     }
 
-    async fn delete_snapshots_for_account_in_range(
-        &self,
-        _account_id: &str,
-        _start_date: NaiveDate,
-        _end_date: NaiveDate,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    async fn overwrite_snapshots_for_account_in_range(
-        &self,
-        _account_id: &str,
-        _start_date: NaiveDate,
-        _end_date: NaiveDate,
-        _snapshots_to_save: &[AccountStateSnapshot],
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    async fn overwrite_multiple_account_snapshot_ranges(
-        &self,
-        _new_snapshots: &[AccountStateSnapshot],
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
     fn get_all_non_archived_account_snapshots(
         &self,
         _start_date: Option<NaiveDate>,
@@ -282,10 +258,6 @@ impl SnapshotRepositoryTrait for MockSnapshotRepository {
         _account_id: &str,
         _snapshots_to_save: &[AccountStateSnapshot],
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    async fn update_snapshots_source(&self, _account_id: &str, _new_source: &str) -> Result<usize> {
         unimplemented!()
     }
 
@@ -744,10 +716,6 @@ impl MockValuationRepository {
 
 #[async_trait]
 impl ValuationRepositoryTrait for MockValuationRepository {
-    async fn save_valuations(&self, _valuation_records: &[DailyAccountValuation]) -> Result<()> {
-        Ok(())
-    }
-
     async fn replace_valuations_for_account(
         &self,
         _account_id: &str,
@@ -789,16 +757,6 @@ impl ValuationRepositoryTrait for MockValuationRepository {
             .cloned()
             .collect();
         Ok(filtered)
-    }
-
-    fn load_latest_valuation_date(&self, account_id: &str) -> Result<Option<NaiveDate>> {
-        let latest = self
-            .valuations
-            .iter()
-            .filter(|v| v.account_id == account_id)
-            .max_by_key(|v| v.valuation_date)
-            .map(|v| v.valuation_date);
-        Ok(latest)
     }
 
     async fn delete_valuations_for_account(
@@ -1005,11 +963,18 @@ fn create_net_worth_service_with_valuations(
     let valuation_repo = Arc::new(MockValuationRepository::new(valuations));
     let fx_service = Arc::new(MockFxService::new("USD"));
 
+    let snapshot_service = Arc::new(SnapshotService::new(
+        Arc::new(RwLock::new("UTC".to_string())),
+        account_repo.clone(),
+        snapshot_repo,
+        Arc::new(InMemoryActivityRepository::new(Vec::new(), HashSet::new())),
+    ));
+
     NetWorthService::new(
         base_currency,
         account_repo,
         asset_repo,
-        snapshot_repo,
+        snapshot_service,
         market_data_repo,
         valuation_repo,
         fx_service,
@@ -1114,6 +1079,25 @@ async fn test_empty_accounts_returns_zero_net_worth() {
     assert_eq!(result.assets.total, Decimal::ZERO);
     assert_eq!(result.liabilities.total, Decimal::ZERO);
     assert_eq!(result.currency, "USD");
+}
+
+#[tokio::test]
+async fn test_alternative_assets_count_without_accounts() {
+    // A household that only tracks a home and its mortgage has no accounts.
+    let property = create_test_asset("PROP-home", AssetKind::Property, "USD");
+    let mortgage = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+    let date = NaiveDate::from_ymd_opt(2024, 1, 15).unwrap();
+    let quotes = vec![
+        create_test_quote("PROP-home", dec!(450000), date, "USD"),
+        create_test_quote("LIAB-mortgage", dec!(300000), date, "USD"),
+    ];
+    let service = create_net_worth_service(vec![], vec![property, mortgage], vec![], quotes);
+
+    let result = service.get_net_worth(date).await.unwrap();
+
+    assert_eq!(get_category_value(&result, "properties"), dec!(450000));
+    assert_eq!(result.liabilities.total, dec!(300000));
+    assert_eq!(result.net_worth, dec!(150000));
 }
 
 #[tokio::test]
@@ -2683,4 +2667,168 @@ async fn test_liability_with_future_zero_quote_is_included_at_past_balance() {
     );
     // Net worth = assets (0) - liabilities (180_000) = -180_000
     assert_eq!(result.net_worth, dec!(-180000));
+}
+
+#[tokio::test]
+async fn automated_loan_net_worth_and_history_use_the_same_as_of_balance() {
+    let start = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let end = NaiveDate::from_ymd_opt(2026, 4, 15).unwrap();
+    let mut asset = create_test_asset("LIAB-automatic", AssetKind::Liability, "USD");
+    asset.metadata = Some(serde_json::json!({
+        "loan_projection": {"version": 1,"annualRate":0,"paymentAmount":100,"frequency":"monthly","firstPaymentDate":"2026-02-01","amortizationEndDate":"2027-01-01"},
+        "loan_events": [{"type":"extra_repayment","effectiveDate":"2026-04-10","amount":200}]
+    }));
+    let service = create_net_worth_service(
+        vec![],
+        vec![asset],
+        vec![],
+        vec![create_test_quote(
+            "LIAB-automatic",
+            dec!(1200),
+            start,
+            "USD",
+        )],
+    );
+    let current = service.get_net_worth(end).await.unwrap();
+    let history = service.get_net_worth_history(start, end).unwrap();
+    assert_eq!(current.liabilities.total, dec!(700));
+    assert_eq!(history.last().unwrap().total_liabilities, dec!(700));
+    assert_eq!(
+        history
+            .iter()
+            .find(|p| p.date == NaiveDate::from_ymd_opt(2026, 3, 1).unwrap())
+            .unwrap()
+            .total_liabilities,
+        dec!(1000)
+    );
+}
+
+#[tokio::test]
+async fn loan_history_before_first_confirmation_matches_point_in_time() {
+    let start = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let as_of = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+    let confirmation = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
+    let mut asset = create_test_asset("LIAB-history", AssetKind::Liability, "USD");
+    asset.metadata = Some(serde_json::json!({
+        "original_amount":"1200", "origination_date":"2026-01-01",
+        "loan_projection":{"version": 1,"annualRate":0,"paymentAmount":100,"frequency":"monthly","firstPaymentDate":"2026-02-01","amortizationEndDate":"2027-01-01"}
+    }));
+    let service = create_net_worth_service(
+        vec![],
+        vec![asset],
+        vec![],
+        vec![create_test_quote(
+            "LIAB-history",
+            dec!(950),
+            confirmation,
+            "USD",
+        )],
+    );
+    assert_eq!(
+        service
+            .get_net_worth(as_of)
+            .await
+            .unwrap()
+            .liabilities
+            .total,
+        dec!(1100)
+    );
+    assert_eq!(
+        service
+            .get_net_worth_history(start, as_of)
+            .unwrap()
+            .last()
+            .unwrap()
+            .total_liabilities,
+        dec!(1100)
+    );
+}
+
+/// Loan payments for net worth, as the account repository would read them.
+struct TaggedPayments(HashMap<String, Vec<crate::assets::loan::StoredPayment>>);
+
+#[async_trait]
+impl crate::assets::AlternativeAssetRepositoryTrait for TaggedPayments {
+    async fn delete_alternative_asset(&self, _: &str) -> Result<()> {
+        unimplemented!("not used by net worth")
+    }
+    async fn update_asset_metadata(&self, _: &str, _: Option<serde_json::Value>) -> Result<()> {
+        unimplemented!("not used by net worth")
+    }
+    fn find_liabilities_linked_to(&self, _: &str) -> Result<Vec<String>> {
+        unimplemented!("not used by net worth")
+    }
+    async fn update_asset_details(
+        &self,
+        _: &str,
+        _: Option<&str>,
+        _: Option<&str>,
+        _: Option<serde_json::Value>,
+        _: Option<&str>,
+    ) -> Result<()> {
+        unimplemented!("not used by net worth")
+    }
+    fn loan_payments(
+        &self,
+        loan_ids: &[String],
+    ) -> Result<HashMap<String, Vec<crate::assets::loan::StoredPayment>>> {
+        Ok(self
+            .0
+            .iter()
+            .filter(|(id, _)| loan_ids.contains(id))
+            .map(|(id, payments)| (id.clone(), payments.clone()))
+            .collect())
+    }
+    async fn update_loan(
+        &self,
+        _: &str,
+        _: crate::assets::LoanChange,
+    ) -> Result<crate::assets::loan::LoanUpdate> {
+        unimplemented!("not used by net worth")
+    }
+    async fn update_payment_tag(
+        &self,
+        _: &str,
+        _: Option<&str>,
+        _: crate::assets::PaymentTagChange,
+    ) -> Result<Option<crate::activities::Activity>> {
+        unimplemented!("not used by net worth")
+    }
+}
+
+#[tokio::test]
+async fn tagged_loan_payments_count_in_net_worth_and_its_history() {
+    let start = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let end = NaiveDate::from_ymd_opt(2026, 4, 15).unwrap();
+    let mut asset = create_test_asset("LIAB-paid", AssetKind::Liability, "USD");
+    asset.metadata = Some(serde_json::json!({
+        "loan_projection": {"version": 1,"annualRate":0,"paymentAmount":100,"frequency":"monthly","firstPaymentDate":"2026-02-01","amortizationEndDate":"2027-01-01"}
+    }));
+    // 10 pm on April 15 in Toronto, already April 16 in UTC.
+    let payment = crate::assets::loan::StoredPayment {
+        activity_id: "extra".into(),
+        account_id: "chequing".into(),
+        paid_at: "2026-04-16T02:00:00Z".parse().unwrap(),
+        amount: 200.0,
+        escrow: 0.0,
+        applies_to: Some(crate::assets::loan::PaymentTarget::Extra),
+    };
+    let service = create_net_worth_service(
+        vec![],
+        vec![asset],
+        vec![],
+        vec![create_test_quote("LIAB-paid", dec!(1200), start, "USD")],
+    )
+    .with_loan_payments(
+        Arc::new(TaggedPayments(HashMap::from([(
+            "LIAB-paid".to_string(),
+            vec![payment],
+        )]))),
+        Arc::new(RwLock::new("America/Toronto".to_string())),
+    );
+    // The same figures as a recorded extra repayment of 200 on April 15.
+    let current = service.get_net_worth(end).await.unwrap();
+    let history = service.get_net_worth_history(start, end).unwrap();
+    assert_eq!(current.liabilities.total, dec!(700));
+    assert_eq!(history.last().unwrap().total_liabilities, dec!(700));
 }

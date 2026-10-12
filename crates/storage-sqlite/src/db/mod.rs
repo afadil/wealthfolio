@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use diesel::connection::{Connection, SimpleConnection};
+use diesel::connection::{Connection, Instrumentation, InstrumentationEvent, SimpleConnection};
 use diesel::r2d2;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 use diesel::sqlite::SqliteConnection;
@@ -37,6 +37,7 @@ const SQLITE_MAGIC: &[u8; 16] = b"SQLite format 3\0";
 pub type DbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<SqliteConnection>>;
 
+pub mod cloud_backups;
 pub mod encryption;
 pub mod imports;
 pub mod maintenance;
@@ -170,7 +171,7 @@ impl DbAccess {
             .connection_timeout(Duration::from_secs(30))
             .connection_customizer(Box::new(ConnectionCustomizer {
                 key: self.key.clone(),
-                _owner: owner,
+                owner,
             }))
             .build(manager)
             .map_err(|e| DatabaseError::PoolCreationFailed(e.to_string()))?;
@@ -1482,6 +1483,27 @@ mod migration_tests {
             "the VACUUM migration must be recorded as applied exactly once"
         );
     }
+
+    /// Diesel keys pending migrations by version (the directory name before
+    /// the first `_`), so two directories sharing a version silently skip one
+    /// of them on every database that has not applied it yet.
+    #[test]
+    fn embedded_migration_versions_are_unique() {
+        use diesel::migration::MigrationSource;
+        let migrations =
+            <EmbeddedMigrations as MigrationSource<diesel::sqlite::Sqlite>>::migrations(
+                &MIGRATIONS,
+            )
+            .unwrap();
+        let mut seen = std::collections::HashMap::new();
+        for migration in &migrations {
+            let name = migration.name().to_string();
+            let version = migration.name().version().to_string();
+            if let Some(previous) = seen.insert(version.clone(), name.clone()) {
+                panic!("migrations {previous} and {name} share version {version}");
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1714,7 +1736,23 @@ pub fn get_connection(pool: &Pool<ConnectionManager<SqliteConnection>>) -> Resul
 #[derive(Debug)]
 struct ConnectionCustomizer {
     key: Option<Arc<DbEncryptionKey>>,
-    _owner: Option<Arc<DatabaseOwner>>,
+    owner: Option<Arc<DatabaseOwner>>,
+}
+
+/// Database ownership held by one pooled connection until it is closed.
+///
+/// r2d2 drops the customizer, and its ownership, before the pool's idle
+/// connections, and can do so on one of its own workers. diesel drops a
+/// connection's instrumentation only after closing its SQLite handle, so this
+/// releases ownership after the close, on whichever thread performs it.
+/// Without it, deletion, maintenance or process exit could proceed while a
+/// connection is still closing; at exit that races SQLCipher's cleanup.
+struct ConnectionOwnership {
+    _owner: Arc<DatabaseOwner>,
+}
+
+impl Instrumentation for ConnectionOwnership {
+    fn on_connection_event(&mut self, _event: InstrumentationEvent<'_>) {}
 }
 
 impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for ConnectionCustomizer {
@@ -1722,6 +1760,11 @@ impl r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for Connec
         &self,
         conn: &mut SqliteConnection,
     ) -> std::result::Result<(), diesel::r2d2::Error> {
+        if let Some(owner) = &self.owner {
+            conn.set_instrumentation(ConnectionOwnership {
+                _owner: Arc::clone(owner),
+            });
+        }
         // SQLCipher requires `PRAGMA key` before any other statement, so it
         // cannot join the batch below. This covers the write actor too: its
         // dedicated connection is drawn from this pool.

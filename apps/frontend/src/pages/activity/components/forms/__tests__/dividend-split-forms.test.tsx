@@ -180,6 +180,18 @@ describe("DividendForm", () => {
       expect(screen.getByTestId("textarea-comment")).toBeInTheDocument();
     });
 
+    it("offers a return of capital as a cash dividend type", async () => {
+      const user = userEvent.setup();
+      render(<DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
+
+      const option = screen.getByRole("radio", { name: /return of capital/i });
+      await user.click(option);
+
+      expect(option).toBeChecked();
+      expect(screen.getByTestId("input-amount")).toBeInTheDocument();
+      expect(screen.queryByTestId("received-quantity-input")).not.toBeInTheDocument();
+    });
+
     it("renders submit button with correct text for new dividend", () => {
       render(<DividendForm accounts={mockAccounts} onSubmit={mockOnSubmit} />);
 

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 use axum::{
     body::{to_bytes, Body},
     http::{Request, StatusCode},
@@ -906,4 +907,273 @@ async fn runtime_startup_failure_is_retryable_without_revoking_the_profile() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::LOCKED);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn cold_profile_startup_does_not_block_cached_runtime_or_initialize_twice() {
+    use wealthfolio_storage_sqlite::db::DbAccess;
+    let dir = tempfile::tempdir().unwrap();
+    let config = test_config(dir.path());
+    let state = build_state(&config).await.unwrap();
+    let root = WebProfiles::new(state.clone(), &config).unwrap();
+    let warm_id = root.registry.default_id().unwrap();
+    let cold = root.registry.create("Cold", "clay-fluff-animated").unwrap();
+    let path = root
+        .registry
+        .paths(&root.registry.profile(cold.id).unwrap())
+        .database;
+    let database = DbAccess::plaintext(path.to_str().unwrap());
+    database.prepare().unwrap();
+    database.run_migrations().unwrap();
+    let connection = database.connect_rusqlite().unwrap();
+    connection
+        .execute_batch("PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE;")
+        .unwrap();
+
+    let first = tokio::spawn({
+        let root = root.clone();
+        async move { root.runtime(cold.id).await }
+    });
+    // Ownership is acquired inside initialization, before the blocked SQLite read.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let owner_path = path.with_file_name("app.db.lock");
+        while !owner_path.exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let second = root.runtime(cold.id);
+    tokio::pin!(second);
+    let second_waiting = tokio::time::timeout(Duration::from_millis(50), &mut second).await;
+    let warm = tokio::time::timeout(Duration::from_millis(500), root.runtime(warm_id)).await;
+    connection.execute_batch("ROLLBACK;").unwrap();
+    let first = tokio::time::timeout(Duration::from_secs(5), first)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let second = tokio::time::timeout(Duration::from_secs(5), second)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        second_waiting.is_err(),
+        "The second open must wait for startup"
+    );
+    assert!(
+        Arc::ptr_eq(&first, &second),
+        "Concurrent opens must share one runtime"
+    );
+    assert!(Arc::ptr_eq(
+        &state,
+        &warm
+            .expect("Cached profile waited for cold initialization")
+            .unwrap()
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn deleting_a_starting_profile_waits_for_startup_and_rejects_queued_opens() {
+    use wealthfolio_storage_sqlite::db::DbAccess;
+    let dir = tempfile::tempdir().unwrap();
+    let config = test_config(dir.path());
+    let state = build_state(&config).await.unwrap();
+    let root = WebProfiles::new(state.clone(), &config).unwrap();
+    let cold = root.registry.create("Cold", "clay-fluff-animated").unwrap();
+    let path = root
+        .registry
+        .paths(&root.registry.profile(cold.id).unwrap())
+        .database;
+    let database = DbAccess::plaintext(path.to_str().unwrap());
+    database.prepare().unwrap();
+    database.run_migrations().unwrap();
+    let connection = database.connect_rusqlite().unwrap();
+    connection
+        .execute_batch("PRAGMA journal_mode = DELETE; BEGIN EXCLUSIVE;")
+        .unwrap();
+    let startup = tokio::spawn({
+        let root = root.clone();
+        async move { root.runtime(cold.id).await }
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !path.with_file_name("app.db.lock").exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let waiting = root.runtime(cold.id);
+    tokio::pin!(waiting);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(50), &mut waiting)
+            .await
+            .is_err()
+    );
+
+    let owner = uuid::Uuid::new_v4().to_string();
+    let session = root
+        .registry
+        .sessions
+        .issue(&owner, cold.id, false, None)
+        .unwrap();
+    let router = profiles::router(root.clone())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            wealthfolio_server::auth::require_jwt,
+        ))
+        .with_state(state);
+    let deletion = tokio::spawn(async move {
+        send(
+            &router,
+            "/profiles/delete_profile",
+            json!({"profileId": cold.id, "confirmation": "Cold"}),
+            Some(&format!("wf_browser={owner}")),
+            Some(&session.scope_id.to_string()),
+        )
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !root.registry.is_deleting(cold.id) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(!deletion.is_finished());
+    connection.execute_batch("ROLLBACK;").unwrap();
+    drop(connection);
+    drop(
+        tokio::time::timeout(Duration::from_secs(5), startup)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    );
+    assert!(tokio::time::timeout(Duration::from_secs(5), waiting)
+        .await
+        .unwrap()
+        .is_err());
+    let (status, body, _) = tokio::time::timeout(Duration::from_secs(5), deletion)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(!path.exists());
+    assert!(root.runtime(cold.id).await.is_err());
+    assert!(
+        !path.exists(),
+        "A queued open recreated the deleted database"
+    );
+}
+
+/// Each phase owns its runtime; shutting it down stands in for a server restart.
+fn phase<F: std::future::Future>(future: F) -> F::Output {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let output = runtime.block_on(future);
+    runtime.shutdown_timeout(Duration::from_secs(5));
+    output
+}
+
+#[test]
+fn deletion_blocked_by_unusable_vault_finishes_after_repair_and_restart() {
+    for move_vault_aside in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let config = test_config(dir.path());
+        let vault = dir.path().join("secrets.json");
+        phase(async {
+            let root = WebProfiles::open(&config).await.unwrap();
+            let profile = root
+                .registry
+                .profile(root.registry.default_id().unwrap())
+                .unwrap();
+            root.registry
+                .secret_store(&profile)
+                .set_secret("provider", "saved")
+                .unwrap();
+        });
+        // A changed master key leaves the existing vault undecryptable.
+        let mut changed = config.clone();
+        changed.raw_secret_key = vec![8; 32];
+        changed.secrets_encryption_key = [8; 32];
+        let id = phase(async {
+            let router = wealthfolio_server::api::app_router_from_config(&changed)
+                .await
+                .unwrap();
+            let (status, _, cookie) = send(
+                &router,
+                "/api/v1/profiles/get_profile_state",
+                json!({}),
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let (status, created, _) = send(
+                &router,
+                "/api/v1/profiles/create_profile",
+                json!({"name":"Second","avatarId":wealthfolio_core::profiles::PROFILE_AVATARS[0]}),
+                cookie.as_deref(),
+                None,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{created}");
+            let id = created["id"].as_str().unwrap().to_string();
+            let (status, session, _) = send(
+                &router,
+                "/api/v1/profiles/unlock_profile",
+                json!({"profileId":id}),
+                cookie.as_deref(),
+                None,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{session}");
+            let (status, body, _) = send(
+                &router,
+                "/api/v1/profiles/delete_profile",
+                json!({"profileId":id,"confirmation":"Second"}),
+                cookie.as_deref(),
+                session["scopeId"].as_str(),
+            )
+            .await;
+            assert_eq!(status, StatusCode::LOCKED);
+            assert!(
+                body.as_str().unwrap().contains("credential store"),
+                "{body}"
+            );
+            let (_, state, _) = send(
+                &router,
+                "/api/v1/profiles/get_profile_state",
+                json!({}),
+                cookie.as_deref(),
+                None,
+            )
+            .await;
+            assert_eq!(state["pendingDeletions"][0]["id"], json!(id));
+            id
+        });
+        let profile_dir = dir.path().join("profiles").join(&id);
+        assert!(
+            profile_dir.exists(),
+            "data is kept until credentials are cleaned"
+        );
+        let restarted = if move_vault_aside {
+            std::fs::rename(&vault, dir.path().join("secrets.json.bak")).unwrap();
+            changed
+        } else {
+            config
+        };
+        phase(async {
+            // Startup retries journaled deletions.
+            let root = WebProfiles::open(&restarted).await.unwrap();
+            assert!(root.registry.pending_profiles().unwrap().is_empty());
+            assert!(root
+                .registry
+                .list()
+                .unwrap()
+                .iter()
+                .all(|profile| profile.id.to_string() != id));
+        });
+        assert!(!profile_dir.exists());
+    }
 }

@@ -270,7 +270,7 @@ export function DividendForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    if (value === INCOME_MODE_CASH) {
+    if (value === INCOME_MODE_CASH || value === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL) {
       setValue("quantity", undefined, { shouldDirty: true, shouldValidate: false });
       setValue("unitPrice", undefined, { shouldDirty: true, shouldValidate: false });
     }
@@ -343,6 +343,18 @@ export function DividendForm({
                   className="cursor-pointer text-sm font-normal"
                 >
                   {t("activity:form.type_in_kind")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value={ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL}
+                  id="dividend-type-return-of-capital"
+                />
+                <Label
+                  htmlFor="dividend-type-return-of-capital"
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  {t("activity:form.type_return_of_capital")}
                 </Label>
               </div>
             </RadioGroup>

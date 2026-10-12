@@ -1,5 +1,6 @@
 import { importActivitySchema, importMappingSchema, parseConfigSchema } from "@/lib/schemas";
 import * as z from "zod";
+import type { LoanSetup } from "@/adapters/shared/alternative-assets";
 import {
   AccountType,
   ACTIVITY_TYPE_DISPLAY_NAMES,
@@ -173,18 +174,39 @@ export interface Activity {
   updatedAt: string;
 }
 
+interface TypedActivity {
+  activityType: string;
+  activityTypeOverride?: string | null;
+}
+
+/**
+ * What Rust's `str::trim` strips (Unicode White_Space), at either end. The
+ * backend reads a blank override with that set; JavaScript's `trim()`
+ * differs (it strips U+FEFF and keeps U+0085).
+ */
+const OVERRIDE_PADDING =
+  /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+|[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/g;
+
+/**
+ * The user's type override, when it is not blank: a blank override is none,
+ * as the backend and the portfolio engine read it.
+ */
+function typeOverride(activity: TypedActivity): string | undefined {
+  return activity.activityTypeOverride?.replace(OVERRIDE_PADDING, "") || undefined;
+}
+
 /**
  * Helper to get effective type (respects user override)
  */
-export function getEffectiveType(activity: Activity): string {
-  return activity.activityTypeOverride ?? activity.activityType;
+export function getEffectiveType(activity: TypedActivity): string {
+  return typeOverride(activity) ?? activity.activityType;
 }
 
 /**
  * Check if activity has user override
  */
-export function hasUserOverride(activity: Activity): boolean {
-  return activity.activityTypeOverride !== undefined && activity.activityTypeOverride !== null;
+export function hasUserOverride(activity: TypedActivity): boolean {
+  return typeOverride(activity) !== undefined;
 }
 
 /**
@@ -359,6 +381,10 @@ export interface InternalTransferPairRequest {
   destinationAmount: string | number;
   sourceCurrency: string;
   destinationCurrency: string;
+  /** @deprecated Execution-rate hint accepted for compatibility; cash amounts are authoritative.
+   * Never stored in Activity.fxRate (the activity-to-account valuation override).
+   * Derive the transfer rate from destinationAmount / sourceAmount instead.
+   */
   fxRate?: string | number | null;
   notes?: string | null;
   transferMode?: "cash";
@@ -1512,6 +1538,8 @@ export interface CreateAlternativeAssetRequest {
   metadata?: Record<string, string>;
   /** For liabilities: optional ID of the financed asset (UI-only linking) */
   linkedAssetId?: string;
+  /** For liabilities: the loan as entered; loan fields are not accepted in `metadata`. */
+  loan?: LoanSetup;
 }
 
 /**
@@ -1697,6 +1725,21 @@ export interface AlternativeAssetHolding {
   linkedAssetId?: string;
   /** Asset notes */
   notes?: string | null;
+  /** For liabilities: what the card shows, from the calculation that values it */
+  loan?: LoanSummary | null;
+}
+
+/** A liability's terms in effect and its milestones, as Holdings values it. */
+export interface LoanSummary {
+  /** The balance follows a payment schedule rather than manual updates. */
+  scheduled: boolean;
+  originalAmount: number | null;
+  annualRate: number | null;
+  paymentAmount: number | null;
+  frequency: "monthly" | "biweekly" | "accelerated_biweekly" | null;
+  /** When principal and accrued interest are settled; null while a residual remains. */
+  payoffDate: string | null;
+  renewalMaturity: string | null;
 }
 
 /**

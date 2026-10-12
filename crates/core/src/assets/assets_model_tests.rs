@@ -11,6 +11,27 @@ mod tests {
     use rust_decimal_macros::dec;
     use serde_json::json;
 
+    #[test]
+    fn bond_specs_use_the_stored_isin_key_before_lookup() {
+        // Holdings deduplicate and resolve by this key before asset creation, which
+        // stores bonds under their ISIN and without an exchange MIC.
+        for symbol in ["912810TH1", "US912810TH14"] {
+            for mic in [None, Some("XNAS".to_string())] {
+                let spec = AssetSpec::market_instrument(
+                    symbol.to_string(),
+                    symbol.to_string(),
+                    mic,
+                    InstrumentType::Bond,
+                    "USD".to_string(),
+                );
+                assert_eq!(spec.instrument_key().as_deref(), Some("BOND:US912810TH14"));
+                assert_eq!(spec.instrument_symbol.as_deref(), Some("US912810TH14"));
+                assert_eq!(spec.instrument_exchange_mic, None);
+                assert_eq!(spec.quote_ccy, "USD");
+            }
+        }
+    }
+
     // Test AssetKind enum
     #[test]
     fn test_asset_kind_serialization() {

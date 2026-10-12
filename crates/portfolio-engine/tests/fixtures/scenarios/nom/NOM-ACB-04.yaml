@@ -1,0 +1,41 @@
+id: NOM-ACB-04
+title: The ACB is the pool's, so a return of capital reduces the average rather than each purchase
+intent: >
+  Rules R7.4, R7.2. Canada's ACB is the average cost of all identical units
+  (the CRA: the average cost per unit of all units held). Under WAC a return
+  of capital pools the purchases first, as a redemption does, and reduces
+  the pool: one unit bought at 1 and one at 10, then a 4 return of capital,
+  leave an ACB of 7 and realize nothing. Spreading it over each purchase
+  would take the unit bought at 1 to zero and realize 1 while the ACB still
+  covers the 4. A later return of capital beyond the ACB takes it to zero
+  and the excess is a capital gain (a negative ACB is deemed one).
+policy:
+  base_currency: CAD
+  timezone: UTC
+  as_of: 2025-01-08
+accounts:
+  - id: acc-1
+    name: Non-registered
+    currency: CAD
+    cost_basis_method: WAC
+assets:
+  - id: fund
+    quote_ccy: CAD
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 100 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-02T11:00:00Z, asset: fund, quantity: 1, unit_price: 1, amount: 1, fee: 0 }
+  - { id: buy-2, account: acc-1, type: BUY, date: 2025-01-03T10:00:00Z, asset: fund, quantity: 1, unit_price: 10, amount: 10, fee: 0 }
+  - { id: roc-1, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-06T10:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 4 }
+  - { id: roc-2, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T10:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 10 }
+quotes:
+  - { asset: fund, day: 2025-01-02, close: 1 }
+  - { asset: fund, day: 2025-01-03, close: 10 }
+  - { asset: fund, day: 2025-01-08, close: 10 }
+expected_notes: >
+  buy-1: 1 unit, 1. buy-2: 1 unit, 10: ACB 11, average 5.50. roc-1 pays 4 of
+  capital: cash +4, no income; it pools the purchases and reduces the ACB to
+  7, average 3.50, realizing nothing and writing no disposal row. roc-2 pays
+  10: it takes the 7 left and the 3 beyond it is a capital gain, one
+  disposal row with no units (proceeds 10, cost 7, P&L 3); the ACB is 0.
+  Cash 100 - 11 + 4 + 10 = 103. Value 103 + 2 x 10 = 123, a gain of 23:
+  realized 3, unrealized 20, income 0.

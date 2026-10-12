@@ -9,6 +9,7 @@ mod domain_events;
 mod events;
 mod listeners;
 mod mcp;
+mod portfolio_jobs;
 mod profile_lifecycle;
 mod profile_startup;
 mod profiles;
@@ -432,6 +433,10 @@ pub fn run() {
             commands::limits::update_contribution_limit,
             commands::limits::delete_contribution_limit,
             commands::limits::calculate_deposits_for_contribution_limit,
+            commands::cloud_backups::cloud_backup_action,
+            commands::cloud_backups::cloud_backup_capture,
+            commands::cloud_backups::cloud_backup_download,
+            commands::cloud_backups::cloud_backup_restore_preview,
             // Utility commands
             commands::utilities::save_text_file_with_dialog,
             commands::utilities::save_file_with_dialog,
@@ -480,6 +485,12 @@ pub fn run() {
             commands::alternative_assets::get_net_worth,
             commands::alternative_assets::get_net_worth_history,
             commands::alternative_assets::get_alternative_holdings,
+            commands::alternative_assets::calculate_loan,
+            commands::alternative_assets::recalculate_loan,
+            commands::alternative_assets::apply_loan_action,
+            commands::alternative_assets::get_loan_payments,
+            commands::alternative_assets::preview_loan_terms,
+            commands::alternative_assets::link_loan_payment,
             // Market data commands
             commands::market_data::search_symbol,
             commands::market_data::resolve_symbol_quote,
@@ -529,6 +540,8 @@ pub fn run() {
             commands::secrets::get_addon_secret,
             commands::secrets::delete_addon_secret,
             commands::addon_network::addon_network_request,
+            commands::addon_network::register_dev_addon_manifest,
+            commands::addon_network::unregister_dev_addon_manifest,
             // Provider settings commands
             commands::providers_settings::get_market_data_providers_settings,
             commands::providers_settings::update_market_data_provider_settings,
@@ -760,6 +773,30 @@ pub fn run() {
         .expect("Failed to build Wealthfolio application")
         .run(|_handle, event| {
             #[cfg(mobile)]
+            if let tauri::RunEvent::WindowEvent {
+                event: window_event,
+                ..
+            } = &event
+            {
+                let suspended = match window_event {
+                    tauri::WindowEvent::Suspended => Some(true),
+                    tauri::WindowEvent::Resumed => Some(false),
+                    _ => None,
+                };
+                if let Some(suspended) = suspended {
+                    if let Some(startup) = _handle.try_state::<profile_startup::ProfileStartup>() {
+                        startup
+                            .backup_suspended
+                            .store(suspended, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    if let Some(profiles) = _handle.try_state::<profiles::NativeProfiles>() {
+                        if let Ok(Some(runtime)) = profiles.active() {
+                            runtime.backup_scheduler.set_paused(suspended);
+                        }
+                    }
+                }
+            }
+            #[cfg(mobile)]
             if matches!(
                 &event,
                 tauri::RunEvent::WindowEvent {
@@ -771,37 +808,23 @@ pub fn run() {
                     .try_state::<profiles::NativeProfiles>()
                     .and_then(|profiles| profiles.try_context())
                 {
-                    listeners::refresh_portfolio_on_resume(_handle.clone(), context);
-                }
-            }
-
-            #[cfg(desktop)]
-            if matches!(
-                event,
-                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
-            ) {
-                // Stop the embedded MCP server and delete mcp.lock.
-                if _handle.try_state::<mcp::McpServerState>().is_some() {
-                    let mcp_handle = _handle.clone();
-                    tauri::async_runtime::block_on(async move {
-                        mcp::stop_server(&mcp_handle).await;
-                    });
-                }
-
-                #[cfg(feature = "device-sync")]
-                if let Some(context) = _handle
-                    .try_state::<profiles::NativeProfiles>()
-                    .and_then(|runtime| runtime.try_context())
-                {
-                    tauri::async_runtime::block_on(async move {
-                        if let Err(err) =
-                            crate::commands::device_sync::ensure_background_engine_stopped(context)
-                                .await
-                        {
-                            warn!("Failed to stop background device sync engine: {}", err);
+                    listeners::refresh_portfolio_on_resume(_handle.clone(), context.clone());
+                    #[cfg(feature = "device-sync")]
+                    tauri::async_runtime::spawn(async move {
+                        if context.is_active() {
+                            let _ = commands::device_sync::share_backup_access(&context).await;
                         }
                     });
                 }
+            }
+
+            // Desktop quits and restarts end here, including macOS Quit, which
+            // skips ExitRequested. The Windows updater does not: its installer
+            // step exits the process itself. Releasing the database also stops
+            // the MCP server (deleting mcp.lock) and the device sync engine.
+            #[cfg(desktop)]
+            if matches!(event, tauri::RunEvent::Exit) {
+                profiles::release_for_exit(_handle);
             }
         });
 }

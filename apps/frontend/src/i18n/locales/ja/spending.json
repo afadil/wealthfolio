@@ -50,6 +50,13 @@
     "noCategoriesFound": "カテゴリが見つかりません。",
     "clearCategory": "カテゴリをクリア"
   },
+  "activityTypes": {
+    "balanceTransferCashAdvance": "残高移行 / キャッシング",
+    "charge": "カード利用",
+    "interestCharge": "支払利息",
+    "refundCredit": "返金 / クレジット",
+    "reimbursementRefund": "払い戻し / 返金"
+  },
   "rules": {
     "editTitle": "ルールを編集",
     "addTitle": "ルールを追加",
@@ -704,12 +711,7 @@
     "noIncome": "この期間、選択中の口座に収入はありません。",
     "spent": "支出",
     "saved": "貯蓄",
-    "incomeSaving": "収入と貯蓄",
-    "nonSpendingCashflow": "{{period}}の支出以外のキャッシュフロー。",
-    "moneyIn": "入金",
-    "incomeSources": "収入源",
     "setAside": "積立",
-    "savingDestinations": "貯蓄先",
     "sortSpent": "支出額",
     "sortChange": "変化",
     "sortName": "名前",
@@ -728,6 +730,35 @@
     "openTransactions": "取引一覧を開く →",
     "moreCount_other": "他{{count}}件",
     "vsRange": "{{from}} – {{to}} と比較"
+  },
+  "moneyFlow": {
+    "title": "お金の流れ",
+    "subtitle": "{{period}}のお金の出どころと行き先。",
+    "focusSubtitle": "{{period}}のすべてのカテゴリ。",
+    "back": "すべての流れ",
+    "chartLabel": "お金の流れの図。矢印キーで項目を移動できます。",
+    "nodeAria": "{{name}}、{{amount}}",
+    "shareOfIncome": "収入の{{pct}}",
+    "shareOfTotal": "合計の{{pct}}",
+    "clickTransactions": "クリックして取引を表示",
+    "clickCategories": "クリックしてすべてのカテゴリを表示",
+    "node": {
+      "total": "合計",
+      "shortfall": "不足",
+      "refunds": "純返金",
+      "surplus": "残り",
+      "uncategorizedIncome": "未分類の収入"
+    },
+    "hint": {
+      "total": "入金に純返金と不足分を加えた合計。常に出金と一致します。",
+      "totalOut": "返金前の、支出と積立の合計です。",
+      "shortfall": "入金を超えた支出と貯蓄。",
+      "refunds": "返金が支出を上回ったカテゴリ。",
+      "saved": "貯蓄口座や投資口座へ移したお金。",
+      "surplus": "入金のうち、支出も積立もしていない分。",
+      "uncategorized": "まだカテゴリがない支出。"
+    },
+    "groupRefunds": "純返金{{amount}}を差し引く前の金額です。"
   },
   "budgetChart": {
     "overBudget": "予算超過",

@@ -1,7 +1,6 @@
 import { calculatePerformanceSummaries } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCurrentAccountValuations } from "@/hooks/use-current-account-valuations";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type {
   Account,
@@ -28,10 +27,6 @@ vi.mock("@/adapters", () => ({
 
 vi.mock("@/hooks/use-accounts", () => ({
   useAccounts: vi.fn(),
-}));
-
-vi.mock("@/hooks/use-latest-valuations", () => ({
-  useLatestValuations: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-current-account-valuations", () => ({
@@ -98,7 +93,6 @@ vi.mock("@wealthfolio/ui/components/ui/tooltip", () => ({
 
 const mockCalculatePerformanceSummaries = vi.mocked(calculatePerformanceSummaries);
 const mockUseAccounts = vi.mocked(useAccounts);
-const mockUseLatestValuations = vi.mocked(useLatestValuations);
 const mockUseCurrentAccountValuations = vi.mocked(useCurrentAccountValuations);
 const mockUseSettingsContext = vi.mocked(useSettingsContext);
 const mockUseQuery = vi.mocked(useQuery);
@@ -264,6 +258,7 @@ function createPerformanceResult(
 }
 
 function renderAccountsSummary({
+  accountIds,
   accounts,
   valuations,
   currentValuations,
@@ -271,6 +266,7 @@ function renderAccountsSummary({
   performanceByScopeKey = {},
   isPerformanceLoading = false,
 }: {
+  accountIds?: string[];
   accounts: Account[];
   valuations: AccountValuation[];
   currentValuations?: CurrentAccountValuation[];
@@ -295,12 +291,6 @@ function renderAccountsSummary({
     isError: false,
     error: null,
     refetch: vi.fn(),
-  });
-
-  mockUseLatestValuations.mockReturnValue({
-    latestValuations: valuations,
-    isLoading: false,
-    error: null,
   });
 
   const defaultCurrentValuations = valuations.map((valuation) =>
@@ -372,7 +362,7 @@ function renderAccountsSummary({
 
   return render(
     <MemoryRouter>
-      <AccountsSummary />
+      <AccountsSummary accountIds={accountIds} />
     </MemoryRouter>,
   );
 }
@@ -818,5 +808,47 @@ describe("AccountsSummary", () => {
     expect(screen.getByText("Business Investment")).toBeInTheDocument();
     expect(screen.getByText("gain-percent:-0.1923")).toBeInTheDocument();
     expect(screen.queryByText(/backend performance warning/i)).not.toBeInTheDocument();
+  });
+  it("filters both displayed accounts and performance scopes by portfolio membership", () => {
+    renderAccountsSummary({
+      accountIds: ["included"],
+      accounts: [
+        createAccount({ id: "included", name: "Included account" }),
+        createAccount({ id: "excluded", name: "Excluded account" }),
+      ],
+      valuations: [
+        createValuation({ accountId: "included", totalValue: 10 }),
+        createValuation({ accountId: "excluded", totalValue: 20 }),
+      ],
+    });
+    expect(screen.getByText("Included account")).toBeInTheDocument();
+    expect(screen.queryByText("Excluded account")).not.toBeInTheDocument();
+    expect(mockUseCurrentAccountValuations).toHaveBeenCalledWith(["included"], expect.anything());
+    const options = mockUseQuery.mock.calls.at(-1)?.[0];
+    expect(options?.queryKey).toContainEqual([{ accountIds: ["included"] }]);
+  });
+
+  it("offers portfolio management when none of its members are eligible for reporting", () => {
+    renderAccountsSummary({
+      accountIds: ["archived"],
+      accounts: [createAccount({ id: "active", name: "Active account" })],
+      valuations: [createValuation({ accountId: "active", totalValue: 10 })],
+    });
+    expect(screen.queryByText("Active account")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Add your first account/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Manage portfolios/ })).toHaveAttribute(
+      "href",
+      "/settings/portfolios",
+    );
+  });
+
+  it("does not treat an empty selected membership as all accounts", () => {
+    renderAccountsSummary({
+      accountIds: [],
+      accounts: [createAccount({ name: "Excluded account" })],
+      valuations: [],
+    });
+    expect(screen.queryByText("Excluded account")).not.toBeInTheDocument();
+    expect(mockUseCurrentAccountValuations).toHaveBeenCalledWith([], expect.anything());
   });
 });

@@ -69,6 +69,7 @@ impl CustomProviderService {
             name: payload.name,
             description: payload.description,
             priority: payload.priority,
+            use_as_fallback: payload.use_as_fallback,
             sources: payload.sources,
         };
 
@@ -112,8 +113,9 @@ impl CustomProviderService {
         let asset_count = self.repo.get_asset_count_for_provider(provider_id)?;
         if asset_count > 0 {
             return Err(ValidationError::InvalidInput(format!(
-                "Cannot delete '{}': {} asset(s) still use it as preferred provider. \
-                 Change their preferred provider first, then try again.",
+                "Cannot delete '{}': {} asset(s) still use it as their market data provider \
+                 or in a symbol mapping. Change their provider or remove the mapping first, \
+                 then try again.",
                 provider_id, asset_count
             ))
             .into());
@@ -253,7 +255,11 @@ impl CustomProviderService {
                 price: None,
                 currency: None,
                 date: None,
-                error: Some(format!("HTTP {}: {}", status, &body[..body.len().min(500)])),
+                error: Some(format!(
+                    "HTTP {}: {}",
+                    status,
+                    &body[..body.floor_char_boundary(500)]
+                )),
                 raw_response: Some(body),
                 detected_elements: None,
                 detected_tables: None,
@@ -625,7 +631,6 @@ fn detect_html_elements(body: &str, locale: Option<&str>) -> Vec<DetectedHtmlEle
 
     let document = scraper::Html::parse_document(body);
     let mut results = Vec::new();
-    let mut seen_selectors = std::collections::HashSet::new();
 
     let skip_tags: &[&str] = &[
         "script", "style", "meta", "link", "noscript", "head", "title",
@@ -664,11 +669,9 @@ fn detect_html_elements(body: &str, locale: Option<&str>) -> Vec<DetectedHtmlEle
             None => continue,
         };
 
-        let selector = build_css_selector(element_ref);
-        if seen_selectors.contains(&selector) {
+        let Some(selector) = build_unique_css_selector(&document, element_ref) else {
             continue;
-        }
-        seen_selectors.insert(selector.clone());
+        };
 
         let label = find_context_label(element_ref);
         let html_context = extract_html_context(element_ref);
@@ -747,6 +750,48 @@ fn build_css_selector(el: scraper::ElementRef) -> String {
     }
 
     self_part
+}
+
+/// Keep compact selectors when unique, otherwise qualify the detected element
+/// with ancestor context and sibling positions so extraction selects that element.
+fn build_unique_css_selector(document: &scraper::Html, el: scraper::ElementRef) -> Option<String> {
+    let selects_target = |candidate: &str| {
+        scraper::Selector::parse(candidate)
+            .ok()
+            .is_some_and(|selector| document.select(&selector).eq(std::iter::once(el)))
+    };
+    let mut path = String::new();
+
+    for node in std::iter::once(el).chain(el.ancestors().filter_map(scraper::ElementRef::wrap)) {
+        let compact = build_css_selector(node);
+        let candidate = if path.is_empty() {
+            compact
+        } else {
+            format!("{compact} > {path}")
+        };
+        if selects_target(&candidate) {
+            return Some(candidate);
+        }
+
+        let tag = node.value().name();
+        let position = node
+            .prev_siblings()
+            .filter_map(scraper::ElementRef::wrap)
+            .filter(|sibling| sibling.value().name() == tag)
+            .count()
+            + 1;
+        let part = format!("{tag}:nth-of-type({position})");
+        path = if path.is_empty() {
+            part
+        } else {
+            format!("{part} > {path}")
+        };
+        if selects_target(&path) {
+            return Some(path);
+        }
+    }
+
+    None
 }
 
 /// Find nearby text that describes what a numeric element represents.
@@ -960,9 +1005,9 @@ pub fn parse_number_string(s: &str, locale: Option<&str>) -> Option<f64> {
 
             if has_european_comma && !has_trailing_dot {
                 stripped.replace('.', "").replace(',', ".")
-            } else if stripped.contains(',') && !stripped.contains('.') {
+            } else if let Some(last_comma) = stripped.rfind(',').filter(|_| !stripped.contains('.'))
+            {
                 // Check if comma is a thousands separator (exactly 3 digits after last comma)
-                let last_comma = stripped.rfind(',').unwrap();
                 let digits_after = stripped.len() - last_comma - 1;
                 if digits_after == 3
                     && stripped[last_comma + 1..]
@@ -1045,9 +1090,9 @@ fn detect_html_tables(body: &str) -> Vec<DetectedHtmlTable> {
         Ok(s) => s,
         Err(_) => return Vec::new(),
     };
-    let tr_sel = scraper::Selector::parse("tr").unwrap();
-    let th_sel = scraper::Selector::parse("th").unwrap();
-    let td_sel = scraper::Selector::parse("td").unwrap();
+    let tr_sel = scraper::Selector::parse("tr").expect("valid CSS selector 'tr'");
+    let th_sel = scraper::Selector::parse("th").expect("valid CSS selector 'th'");
+    let td_sel = scraper::Selector::parse("td").expect("valid CSS selector 'td'");
 
     let mut tables = Vec::new();
     for (table_idx, table_el) in document.select(&table_sel).take(10).enumerate() {
@@ -1268,12 +1313,76 @@ pub fn detect_html_locale(body: &str) -> Option<String> {
     let sel = scraper::Selector::parse("html").ok()?;
     let el = document.select(&sel).next()?;
     let lang = el.value().attr("lang")?;
-    Some(lang[..2.min(lang.len())].to_lowercase())
+    Some(lang.get(..2.min(lang.len()))?.to_lowercase())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detected_html_selectors_extract_the_detected_element() {
+        let body = r#"<html><body>
+            <table class="prices"><tr><td><span class="t-text -right"></span></td></tr>
+                <tr><td>Reference price</td><td><span class="t-text -right">98,21</span></td></tr>
+                <tr><td>High</td><td><span class="t-text -right">101,50</span></td></tr>
+            </table>
+            <table class="prices"><tr><td>Another price</td><td><span class="t-text -right">97,67</span></td></tr></table>
+        </body></html>"#;
+        let document = scraper::Html::parse_document(body);
+        let detected = detect_html_elements(body, Some("it"));
+
+        // Authored selectors still use their first match; detection must avoid
+        // generating this ambiguous selector for the later numeric elements.
+        assert_eq!(
+            extract_html_value(body, "td > span.t-text.-right", Some("it")),
+            None
+        );
+        assert_eq!(detected.len(), 3);
+        for element in detected {
+            let selector = scraper::Selector::parse(&element.selector).unwrap();
+            assert_eq!(
+                document.select(&selector).count(),
+                1,
+                "{}",
+                element.selector
+            );
+            assert_eq!(
+                extract_html_value(body, &element.selector, Some("it")),
+                Some(element.value),
+                "{}",
+                element.selector
+            );
+        }
+    }
+
+    #[test]
+    fn detected_html_selectors_preserve_unique_ids_and_parent_context() {
+        let body = r#"<html><body>
+            <div><span id="reference-price">98.21</span></div>
+            <div id="high"><span>101.50</span></div>
+        </body></html>"#;
+        let detected = detect_html_elements(body, None);
+
+        assert_eq!(detected.len(), 2);
+        assert_eq!(detected[0].selector, "#reference-price");
+        assert_eq!(detected[1].selector, "#high > span");
+    }
+
+    #[test]
+    fn detected_html_selectors_disambiguate_duplicate_ids() {
+        let body = r#"<html><body>
+            <div><span id="price"></span></div>
+            <div><span id="price">98.21</span></div>
+        </body></html>"#;
+        let detected = detect_html_elements(body, None);
+
+        assert_eq!(detected.len(), 1);
+        assert_eq!(
+            extract_html_value(body, &detected[0].selector, None),
+            Some(98.21)
+        );
+    }
 
     #[test]
     fn extracts_json_values_from_unicode_keys() {
@@ -1370,5 +1479,15 @@ mod tests {
             Some(1234.56)
         );
         assert_eq!(parse_number_string("0,5", Some("pt-BR")), Some(0.5));
+    }
+
+    #[test]
+    fn detect_html_locale_skips_lang_cut_inside_a_character() {
+        assert_eq!(
+            detect_html_locale(r#"<html lang="fr-FR"></html>"#),
+            Some("fr".to_string())
+        );
+        // Byte 2 falls inside '中'
+        assert_eq!(detect_html_locale(r#"<html lang="中文"></html>"#), None);
     }
 }

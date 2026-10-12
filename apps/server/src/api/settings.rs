@@ -16,7 +16,6 @@ use reqwest::StatusCode as HttpStatusCode;
 use semver::Version;
 use serde::Deserialize;
 use wealthfolio_core::{
-    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
@@ -37,18 +36,33 @@ async fn update_settings(
         .map(|_| crate::profiles::connect_guard(&state))
         .transpose()
         .map_err(crate::error::ApiError::Forbidden)?;
-    let previous_base_currency = state.base_currency.read().unwrap().clone();
-    let previous_timezone = state.timezone.read().unwrap().clone();
+    let previous_base_currency = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
+    let previous_timezone = state
+        .timezone
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     state.settings_service.update_settings(&payload).await?;
     let updated_settings = state.settings_service.get_settings()?;
-    *state.timezone.write().unwrap() = updated_settings.timezone.clone();
+    *state
+        .timezone
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = updated_settings.timezone.clone();
     state.health_service.clear_cache().await;
 
     let base_currency_changed = updated_settings.base_currency != previous_base_currency;
     let timezone_changed = updated_settings.timezone != previous_timezone;
 
     if base_currency_changed {
-        *state.base_currency.write().unwrap() = updated_settings.base_currency.clone();
+        *state
+            .base_currency
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+            updated_settings.base_currency.clone();
 
         let state_for_job = state.clone();
         tokio::spawn(async move {
@@ -60,9 +74,7 @@ async fn update_settings(
                     asset_ids: None,
                     days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
                 },
-                snapshot_mode: SnapshotRecalcMode::Full,
-                valuation_mode: ValuationRecalcMode::Full,
-                since_date: None,
+                ..PortfolioJobConfig::default()
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
@@ -75,9 +87,7 @@ async fn update_settings(
             let job_config = PortfolioJobConfig {
                 account_ids: None,
                 market_sync_mode: MarketSyncMode::None,
-                snapshot_mode: SnapshotRecalcMode::Full,
-                valuation_mode: ValuationRecalcMode::Full,
-                since_date: None,
+                force_full: false,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {

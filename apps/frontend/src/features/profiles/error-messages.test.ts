@@ -1,7 +1,14 @@
 import { createInstance } from "i18next";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import en from "@/i18n/locales/en/common.json";
 import { profileErrorMessage, profileAwareErrorMessage } from "./error-messages";
+
+const platform = vi.hoisted(() => ({ isWeb: false }));
+vi.mock("@/adapters", () => ({
+  get isWeb() {
+    return platform.isWeb;
+  },
+}));
 
 const i18n = createInstance();
 beforeAll(async () => {
@@ -13,6 +20,8 @@ it.each([
     "PROFILE_ORIGIN_REJECTED: /private/secret/internal-details",
     "We couldn’t connect to this Wealthfolio server. Check the address you’re using or contact the server administrator.",
   ],
+  ["PROFILE_CONNECTION_FAILED", "Unable to verify your profile. Check your connection and retry."],
+  ["PROFILE_AUTH_REQUIRED", "Your sign-in session could not be verified. Reload to sign in again."],
   ["PROFILE_LOCKED", "Enter your profile password to continue."],
   ["PROFILE_STALE", "Your session has ended. Unlock your profile again."],
   ["PROFILE_NOT_FOUND", "This profile is no longer available. Choose another profile."],
@@ -40,6 +49,25 @@ it.each([
   ["database /private/secret/database", "Something went wrong. Please try again."],
 ])("renders safe copy for %s", (diagnostic, message) => {
   expect(profileErrorMessage(new Error(diagnostic), i18n.getFixedT("en", "common"))).toBe(message);
+});
+
+describe("credential store failures", () => {
+  afterEach(() => {
+    platform.isWeb = false;
+  });
+  it.each([
+    [false, "We couldn’t access your saved sign-in details. Unlock your device and try again."],
+    [
+      true,
+      "The server couldn’t access its secrets file (secrets.json). Ask the server administrator to check that WF_SECRET_KEY matches the key the file was created with and that the server can read and write the file.",
+    ],
+  ])("name the platform's credential store (web: %s)", (web, message) => {
+    platform.isWeb = web;
+    const error = new Error(
+      "PROFILE_UNAVAILABLE: The profile credential store could not be accessed.",
+    );
+    expect(profileErrorMessage(error, i18n.getFixedT("en", "common"))).toBe(message);
+  });
 });
 
 const catalogs = import.meta.glob<{ default: typeof en }>("../../i18n/locales/*/common.json", {
