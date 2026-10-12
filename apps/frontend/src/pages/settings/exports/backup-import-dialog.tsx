@@ -55,10 +55,12 @@ export function BackupImportDialog({
   const [error, setError] = useState<BackupFailure | null>(null);
   const operation = useRef<AbortController | null>(null);
   const previewId = useRef<string | null>(initialPreview?.id ?? null);
+  // StrictMode remounts once in development, so a caller's preview is discarded on close only.
+  const callerPreviewId = useRef(initialPreview?.id);
   useEffect(
     () => () => {
       operation.current?.abort();
-      if (previewId.current)
+      if (previewId.current && previewId.current !== callerPreviewId.current)
         void discardDatabaseBackupImport(previewId.current).catch(() => undefined);
     },
     [],
@@ -85,6 +87,10 @@ export function BackupImportDialog({
     if (pending === "restore") return;
     operation.current?.abort();
     setPassword("");
+    if (previewId.current) {
+      void discardDatabaseBackupImport(previewId.current).catch(() => undefined);
+      previewId.current = null;
+    }
     onClose();
   };
   const inspect = async (event: React.FormEvent) => {
