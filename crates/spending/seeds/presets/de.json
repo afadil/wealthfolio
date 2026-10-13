@@ -75,7 +75,7 @@
       "pattern": "(?i)\\baral\\b|\\bjet\\b tankstelle|\\bstar tankstelle\\b|\\besso\\b|\\bshell\\b|totalenergies|\\bavia\\b|\\bhem tankstelle\\b|\\bagip\\b|\\bionity\\b|\\benbw mobility\\b",
       "matchType": "regex",
       "categoryKey": "transport_gas",
-      "priority": 78
+      "priority": 83
     },
     {
       "key": "de.parking",
@@ -96,7 +96,7 @@
     {
       "key": "de.travel",
       "name": "Travel",
-      "pattern": "(?i)\\blufthansa\\b|\\beurowings\\b|\\bcondor\\b|\\btui\\b|\\bholidaycheck\\b|\\bfewo-direkt\\b|\\bflughafen\\b",
+      "pattern": "(?i)\\blufthansa\\b|\\beurowings\\b|\\bcondor\\b|\\btui\\b|\\bholidaycheck\\b|\\bfewo-direkt\\b",
       "matchType": "regex",
       "categoryKey": "travel",
       "priority": 72
@@ -163,7 +163,7 @@
       "pattern": "(?i)vodafone kabel|\\bp[ÿy]ur\\b|\\bnetcologne\\b|\\bm-net\\b|\\bdeutsche glasfaser\\b",
       "matchType": "regex",
       "categoryKey": "bills_internet",
-      "priority": 82
+      "priority": 83
     },
     {
       "key": "de.streaming",
@@ -272,7 +272,7 @@
     {
       "key": "de.bank_fees",
       "name": "Bank fees",
-      "pattern": "(?i)kontof(?:ü|ue|u)hrung|\\bkontoentgelt\\b|\\bentgelt f(?:ü|ue|u)r\\b|\\bkartengeb(?:ü|ue|u)hr\\b",
+      "pattern": "(?i)kontof(?:ü|ue|u)hrung|\\bkontoentgelt\\b|\\bentgelt f(?:ü|ue|u)r (?:konto|karte|girocard|kreditkarte|debitkarte)|\\bkartengeb(?:ü|ue|u)hr\\b",
       "matchType": "regex",
       "categoryKey": "fees_bank",
       "priority": 85
