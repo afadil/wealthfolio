@@ -304,6 +304,8 @@
     "screenshot_alt": "スクリーンショット{{number}}",
     "downloading_update": "アップデートをダウンロード中...",
     "installing_update": "アップデートをインストール中...",
+    "update_external_flatpak": "このWealthfolioはFlatpakでインストールされています。Flatpakまたはソフトウェアセンターからアップデートしてください。",
+    "update_external_package_manager": "このインストールはWealthfolio内からアップデートできません。インストールしたときと同じ方法でアップデートしてください。",
     "update_failed": "アップデートに失敗しました。もう一度お試しください。",
     "remind_me_later": "後で通知",
     "view_changelog": "変更履歴を表示",
