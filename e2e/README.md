@@ -181,8 +181,8 @@ npx playwright test e2e/<spec>.spec.ts --debug
 # Show the last HTML report
 npx playwright show-report
 
-# Record a trace for a failing test (trace is saved on retry)
-# Already configured in playwright.config.ts: trace: "on-first-retry"
+# Open the trace kept for a failed test (playwright.config.ts: trace: "retain-on-failure")
+npx playwright show-trace test-results/<test-folder>/trace.zip
 ```
 
 ## Profile startup and switching
