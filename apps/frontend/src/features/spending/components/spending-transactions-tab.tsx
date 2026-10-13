@@ -15,13 +15,13 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { createActivity, deleteActivity, updateActivity } from "@/adapters";
-import { localizeActivityTypeName } from "@/lib/activity-utils";
-import { generateId } from "@/lib/id";
+import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
+import { localizeActivityTypeName } from "@/lib/activity-utils";
 import { generateId } from "@/lib/id";
 import { QueryKeys } from "@/lib/query-keys";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -49,18 +49,7 @@ import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mob
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
 import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
 import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
-import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
-import { ActivityType } from "@/lib/constants";
-import type { AmountRange } from "./amount-range-filter";
-import { DeleteTransactionsDialog, type DeletePreview } from "./delete-transactions-dialog";
-import { TransactionCard } from "./transaction-card";
-import { SelectionToolbar } from "./selection-toolbar";
-import { TransactionDayHeader, TransactionDayHeading } from "./transaction-day-header";
-import { TransactionRow } from "./transaction-row";
-import { SplitTransactionSheet } from "./split-transaction-sheet";
-import { TransactionsBulkBar } from "./transactions-bulk-bar";
-import { TransactionsFilterBar, type FilterOption } from "./transactions-filter-bar";
-import type { QuickCategorizeScope } from "./quick-categorize-popover";
+import { useSpendingSettings } from "../hooks/use-spending-settings";
 import {
   CASH_ACTIVITY_TYPES,
   getEffectiveCashActivityType,
