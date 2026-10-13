@@ -325,6 +325,11 @@ mod tests {
             ("Entgelt fuer Kontofuehrung", "fees_bank"),
             ("dm-drogerie markt", "health_pharmacy"),
             ("Baeckerei Mueller", "food_coffee"),
+            ("Vodafone Kabel Deutschland GmbH", "bills_internet"),
+            ("EnBW mobility+ AG", "transport_gas"),
+            ("Burger King Flughafen Muenchen", "food_restaurants"),
+            ("H&M Flughafen Frankfurt", "shopping_clothing"),
+            ("Entgelt fuer Girocard", "fees_bank"),
         ] {
             assert_eq!(
                 match_preset("de", notes).as_deref(),
@@ -344,6 +349,8 @@ mod tests {
             "DEPOT WERTPAPIERE",
             "ROLLER LEIHE",
             "REWEB DESIGN",
+            "Kiosk Flughafen Hamburg",
+            "Entgelt fuer Stellplatz",
         ] {
             assert_eq!(match_preset("de", notes), None, "{notes}");
         }
