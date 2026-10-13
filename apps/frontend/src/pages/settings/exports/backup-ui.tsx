@@ -1,4 +1,5 @@
 import { Fragment, useState, type ComponentType, type ReactNode } from "react";
+import { FileArchiveIcon } from "@phosphor-icons/react/dist/csr/FileArchive";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -172,6 +173,17 @@ export function BackupList<T>({
   );
 }
 
+/** Muted tile with a duotone file icon; each backup is one saved snapshot file. */
+export function BackupFileTile({ className = "flex" }: { className?: string }) {
+  return (
+    <span
+      className={`bg-muted text-muted-foreground size-9 shrink-0 items-center justify-center rounded-lg ${className}`}
+    >
+      <FileArchiveIcon weight="duotone" className="size-5" aria-hidden />
+    </span>
+  );
+}
+
 export function BackupRow({
   title,
   meta,
@@ -190,9 +202,7 @@ export function BackupRow({
   ];
   return (
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <div className="text-muted-foreground hidden size-9 shrink-0 items-center justify-center rounded-lg border md:flex">
-        <Icons.FileArchive className="size-4" aria-hidden />
-      </div>
+      <BackupFileTile className="hidden md:flex" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium leading-5">{title}</p>
         <p className="text-muted-foreground mt-0.5 truncate text-xs leading-5">

@@ -4,6 +4,11 @@
 // ==================================================================
 
 import { PortalLink } from "@/features/wealthfolio-connect/components/portal-link";
+import { DesktopIcon } from "@phosphor-icons/react/dist/csr/Desktop";
+import { DeviceMobileIcon } from "@phosphor-icons/react/dist/csr/DeviceMobile";
+import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
+import { GlobeIcon } from "@phosphor-icons/react/dist/csr/Globe";
+import { HardDrivesIcon } from "@phosphor-icons/react/dist/csr/HardDrives";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icons, isKeyboardEventComposing, Skeleton } from "@wealthfolio/ui";
 import {
@@ -87,15 +92,15 @@ function wantsRestoreDialog(operation: RestoreOperation): boolean {
   return operation.phase === "awaiting_consent" || wanted === true;
 }
 
-const platformIcons: Record<string, typeof Icons.Monitor> = {
-  macos: Icons.Monitor,
-  mac: Icons.Monitor,
-  windows: Icons.Monitor,
-  linux: Icons.Monitor,
-  ios: Icons.Smartphone,
-  android: Icons.Smartphone,
-  server: Icons.Cloud,
-  web: Icons.Cloud,
+const platformIcons: Record<string, typeof DesktopIcon> = {
+  macos: DesktopIcon,
+  mac: DesktopIcon,
+  windows: DesktopIcon,
+  linux: DesktopIcon,
+  ios: DeviceMobileIcon,
+  android: DeviceMobileIcon,
+  server: HardDrivesIcon,
+  web: GlobeIcon,
 };
 
 export function DeviceSyncSection() {
@@ -460,7 +465,7 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.deviceSync")}</h3>
             </div>
@@ -482,7 +487,7 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.connectedDevices")}</h3>
             </div>
@@ -508,7 +513,7 @@ export function DeviceSyncSection() {
             {/* Header row - matches other cards pattern */}
             <div className="flex items-center gap-2">
               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
               </div>
               <h3 className="text-base font-semibold">{t("sync:section.deviceSync")}</h3>
             </div>
@@ -551,7 +556,7 @@ export function DeviceSyncSection() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                  <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+                  <DevicesIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
                 </div>
                 <h3 className="text-base font-semibold">{t("sync:section.connectedDevices")}</h3>
                 <SyncStatusDot engineStatus={status.engineStatus} />
@@ -1024,7 +1029,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar className="h-9 w-9 shrink-0 rounded-lg">
             <AvatarFallback className="rounded-lg">
-              <Icons.Smartphone className="text-muted-foreground h-4 w-4" />
+              <DevicesIcon weight="duotone" className="text-muted-foreground size-5" />
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
@@ -1163,7 +1168,7 @@ function DeviceCard({
   const [isUnpairing, setIsUnpairing] = useState(false);
 
   const platform = device.platform?.toLowerCase() || "unknown";
-  const Icon = platformIcons[platform] || Icons.Monitor;
+  const Icon = platformIcons[platform] || DesktopIcon;
   const isTrusted = device.trustState === "trusted";
   const isUntrusted = device.trustState === "untrusted";
   const isRevoked = device.trustState === "revoked";
@@ -1215,8 +1220,8 @@ function DeviceCard({
       <div className="hover:bg-muted/40 group flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors">
         {/* Device icon with online indicator */}
         <div className="relative shrink-0">
-          <div className="bg-muted/60 flex h-10 w-10 items-center justify-center rounded-full">
-            <Icon className="text-foreground/70 h-[18px] w-[18px]" />
+          <div className="bg-muted flex size-9 items-center justify-center rounded-lg">
+            <Icon weight="duotone" className="text-muted-foreground size-5" />
           </div>
           {isOnline && (
             <span className="border-background absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 bg-green-500" />
