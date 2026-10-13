@@ -1384,6 +1384,44 @@ async fn failures_keep_the_markers_and_are_retried() {
 }
 
 #[tokio::test]
+async fn a_new_profile_without_a_base_currency_has_nothing_to_run() {
+    let mut facts = scenario("NOM-TRADE-01").facts();
+    facts.accounts.clear();
+    facts.activities.clear();
+    facts.base_currency = String::new();
+    let h = harness(facts).await;
+    h.store.mark(MarkerScope::All, GENESIS);
+
+    let report = h
+        .coordinator
+        .run_job(request(), &SilentObserver)
+        .await
+        .unwrap();
+
+    assert!(report.failures.is_empty(), "{:?}", report.failures);
+    assert!(
+        !h.projections.pending_markers().unwrap().is_empty(),
+        "the markers wait for the first run with accounts"
+    );
+}
+
+#[tokio::test]
+async fn accounts_without_a_base_currency_still_fail() {
+    let mut facts = scenario("NOM-TRADE-01").facts();
+    facts.base_currency = String::new();
+    let h = harness(facts).await;
+    h.store.mark(MarkerScope::All, GENESIS);
+
+    let report = h
+        .coordinator
+        .run_job(request(), &SilentObserver)
+        .await
+        .unwrap();
+
+    assert!(report.failures.iter().any(|f| f.code == "JOB_FAILED"));
+}
+
+#[tokio::test]
 async fn concurrent_requests_run_one_after_another() {
     let scenario = scenario("NOM-TRADE-01");
     let harness = harness(scenario.facts()).await;
