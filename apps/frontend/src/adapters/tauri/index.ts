@@ -173,6 +173,7 @@ export {
   checkForUpdates,
   installUpdate,
   getPlatform,
+  getSystemTheme,
 } from "./settings";
 export type { BackupImportPreview, DatabaseBackup, DatabaseEncryptionStatus } from "./settings";
 

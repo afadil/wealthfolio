@@ -528,6 +528,7 @@ pub fn run() {
             commands::taxonomy::migrate_legacy_classifications,
             // Platform commands
             commands::platform::get_platform,
+            commands::platform::get_system_theme,
             commands::platform::is_mobile,
             commands::platform::is_desktop,
             // Secrets commands

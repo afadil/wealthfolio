@@ -324,6 +324,7 @@
   "recovery_opening": "正在開啟投資組合…",
   "recovery_title": "無法開啟您的投資組合",
   "recovery_description": "還原備份以復原投資組合。Wealthfolio 會將現有資料檔案保留在另一個資料夾中。",
+  "recovery_encrypted_description": "如果裝置的安全儲存空間已鎖定，請先解鎖並重試，再考慮還原備份。如果重試後仍無法開啟，您可以還原備份；現有資料檔案將另行保留。",
   "recovery_unavailable": "請嘗試重新開啟投資組合。如果問題持續發生，請查看錯誤詳細資料。",
   "recovery_retry": "重試",
   "recovery_encrypted": "還原後的資料會在此裝置上加密。",

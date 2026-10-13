@@ -328,6 +328,7 @@
   "recovery_opening": "Ouverture de votre portefeuille…",
   "recovery_title": "Impossible d’ouvrir votre portefeuille",
   "recovery_description": "Restaurez une sauvegarde pour récupérer votre portefeuille. Wealthfolio conservera vos fichiers de données existants dans un dossier séparé.",
+  "recovery_encrypted_description": "Si le stockage sécurisé de votre appareil est verrouillé, déverrouillez-le et réessayez avant de restaurer une sauvegarde. Si le problème persiste, vous pouvez restaurer une sauvegarde ; vos fichiers de données existants seront conservés séparément.",
   "recovery_unavailable": "Essayez à nouveau d’ouvrir votre portefeuille. Si le problème persiste, consultez les détails de l’erreur.",
   "recovery_retry": "Réessayer",
   "recovery_encrypted": "Vos données restaurées seront chiffrées sur cet appareil.",

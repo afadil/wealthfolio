@@ -18,6 +18,7 @@ vi.mock("./core", () => ({
 import {
   exportDatabaseBackup,
   getSettings,
+  getSystemTheme,
   inspectDatabaseBackup,
   inspectSavedDatabaseBackup,
   restoreDatabaseBackupImport,
@@ -26,6 +27,14 @@ import {
 
 beforeEach(() => {
   installProfileSession({ profileId: "test", scopeId: "scope-test" });
+});
+
+it("leaves browser system-theme resolution local without a server request", async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  await expect(getSystemTheme()).resolves.toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(mocks.invoke).not.toHaveBeenCalled();
 });
 
 afterEach(() => {

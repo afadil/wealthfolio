@@ -164,6 +164,8 @@ export const getPlatform = async (): Promise<PlatformInfo> => {
   return invoke<PlatformInfo>("get_platform");
 };
 
+export const getSystemTheme = (): Promise<"light" | "dark" | null> => invoke("get_system_theme");
+
 export interface DatabaseStartupStatus {
   generation: string | null;
   ready: boolean;

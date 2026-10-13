@@ -324,6 +324,7 @@
   "recovery_opening": "포트폴리오 여는 중…",
   "recovery_title": "포트폴리오를 열지 못했습니다",
   "recovery_description": "백업을 복원해 포트폴리오를 되찾으세요. Wealthfolio는 기존 데이터 파일을 별도의 폴더에 보관합니다.",
+  "recovery_encrypted_description": "기기의 보안 저장소가 잠겨 있다면 백업을 복원하기 전에 잠금을 해제하고 다시 시도하세요. 그래도 문제가 해결되지 않으면 백업을 복원할 수 있습니다. 기존 데이터 파일은 별도로 보관됩니다.",
   "recovery_unavailable": "포트폴리오를 다시 열어 보세요. 문제가 계속되면 오류 세부 정보를 확인하세요.",
   "recovery_retry": "다시 시도",
   "recovery_encrypted": "복원된 데이터는 이 기기에서 암호화됩니다.",

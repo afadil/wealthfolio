@@ -326,6 +326,7 @@
   "recovery_opening": "Abriendo tu cartera…",
   "recovery_title": "No hemos podido abrir tu cartera",
   "recovery_description": "Restaura una copia de seguridad para recuperar tu cartera. Wealthfolio conservará tus archivos de datos actuales en una carpeta aparte.",
+  "recovery_encrypted_description": "Si el almacenamiento seguro de tu dispositivo está bloqueado, desbloquéalo y vuelve a intentarlo antes de restaurar una copia de seguridad. Si el problema persiste, puedes restaurar una copia de seguridad; tus archivos de datos actuales se conservarán por separado.",
   "recovery_unavailable": "Intenta abrir tu cartera de nuevo. Si el problema continúa, consulta los detalles del error.",
   "recovery_retry": "Volver a intentar",
   "recovery_encrypted": "Tus datos restaurados se cifrarán en este dispositivo.",

@@ -472,6 +472,7 @@ export {
   getAppInfo,
   getDatabaseBackupDownloadUrl,
   getPlatform,
+  getSystemTheme,
   getSettings,
   installUpdate,
   isAutoUpdateCheckEnabled,
