@@ -278,6 +278,10 @@ mod tests {
             ("Kosten OranjePakket", "fees_bank"),
             ("Coolblue BV", "shopping_electronics"),
             ("Basic-Fit Nederland", "health_fitness"),
+            ("NS-Utrecht Centraal 123 UTRECHT NLD", "transport_public"),
+            ("Rabobank Hypotheken", "housing_rent"),
+            ("BENU Apotheken", "health_pharmacy"),
+            ("AH to go Schiphol", "groceries"),
         ] {
             assert_eq!(
                 match_preset("nl", notes).as_deref(),
@@ -296,6 +300,7 @@ mod tests {
             "PICNICTAFEL",
             "HUUR FIETS",
             "GAMMASTRALING",
+            "Example BV SCHIPHOL RIJK",
         ] {
             assert_eq!(match_preset("nl", notes), None, "{notes}");
         }

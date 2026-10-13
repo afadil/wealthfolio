@@ -24,7 +24,7 @@
     {
       "key": "nl.drugstores",
       "name": "Drugstores",
-      "pattern": "(?i)\\bkruidvat\\b|\\betos\\b|\\bda drogist\\b|\\btrekpleister\\b|holland ?& ?barrett|\\bapotheek\\b",
+      "pattern": "(?i)\\bkruidvat\\b|\\betos\\b|\\bda drogist\\b|\\btrekpleister\\b|holland ?& ?barrett|\\bapothe(ek|ken)\\b",
       "matchType": "regex",
       "categoryKey": "health_pharmacy",
       "priority": 76
@@ -56,7 +56,7 @@
     {
       "key": "nl.public_transit",
       "name": "Public transport",
-      "pattern": "(?i)\\bns (groep|reizigers|international)\\b|ov-?chipkaart|\\btranslink\\b|\\bgvb\\b|\\bret rotterdam\\b|\\bhtm\\b|\\barriva\\b|\\bconnexxion\\b|\\bqbuzz\\b|\\bebs\\b|\\bkeolis\\b",
+      "pattern": "(?i)\\bns (groep|reizigers|international)\\b|\\bns-|ov-?chipkaart|\\btranslink\\b|\\bgvb\\b|\\bret rotterdam\\b|\\bhtm\\b|\\barriva\\b|\\bconnexxion\\b|\\bqbuzz\\b|\\bebs\\b|\\bkeolis\\b",
       "matchType": "regex",
       "categoryKey": "transport_public",
       "priority": 80
@@ -96,7 +96,7 @@
     {
       "key": "nl.travel",
       "name": "Travel",
-      "pattern": "(?i)\\bklm\\b|\\btransavia\\b|\\bcorendon\\b|\\bsunweb\\b|\\bschiphol\\b|\\bcheaptickets\\b",
+      "pattern": "(?i)\\bklm\\b|\\btransavia\\b|\\bcorendon\\b|\\bsunweb\\b|\\bcheaptickets\\b",
       "matchType": "regex",
       "categoryKey": "travel",
       "priority": 72
@@ -112,7 +112,7 @@
     {
       "key": "nl.mortgage",
       "name": "Mortgage",
-      "pattern": "(?i)\\bhypotheek\\b",
+      "pattern": "(?i)\\bhypothe(ek|ken)\\b",
       "matchType": "regex",
       "categoryKey": "housing_rent",
       "priority": 84
