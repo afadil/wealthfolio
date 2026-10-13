@@ -525,7 +525,7 @@ pub fn loan_value(
     loan_balance(&loan_calculation(metadata?, quotes, payments, date)?)
 }
 
-/// A manual loan's unconfirmed principal when no dated quote is available.
+/// A manual loan's unconfirmed principal, used only when it has no recorded balances.
 /// Undated legacy loans start on their stored creation date, never before it.
 /// A dormant schedule on a manually tracked loan does not drive this value.
 pub fn manual_loan_principal(

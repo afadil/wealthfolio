@@ -686,6 +686,12 @@ impl NetWorthServiceTrait for NetWorthService {
             .collect();
 
         let mut loan_payments = self.loan_payments(&alternative_assets)?;
+        let loan_ids: Vec<_> = alternative_assets
+            .iter()
+            .filter(|asset| asset.kind == AssetKind::Liability)
+            .map(|asset| asset.id.clone())
+            .collect();
+        let recorded_loan_dates = self.quote_service.get_quote_bounds_for_assets(&loan_ids)?;
         for asset in alternative_assets {
             // Skip if this asset was already processed via a snapshot position
             // (in case there's overlap)
@@ -715,16 +721,17 @@ impl NetWorthServiceTrait for NetWorthService {
             let Some((price, quote_currency, valuation_date)) = calculated
                 .or_else(|| self.get_latest_quote_as_of(&asset.id, date))
                 .or_else(|| {
-                    (asset.kind == AssetKind::Liability)
-                        .then(|| {
-                            manual_loan_principal(
-                                asset.metadata.as_ref(),
-                                date,
-                                user_date_from_utc(asset.created_at.and_utc(), self.timezone()),
-                            )
-                        })
-                        .flatten()
-                        .map(|(date, value)| (value, asset.quote_ccy.clone(), date))
+                    (asset.kind == AssetKind::Liability
+                        && !recorded_loan_dates.contains_key(&asset.id))
+                    .then(|| {
+                        manual_loan_principal(
+                            asset.metadata.as_ref(),
+                            date,
+                            user_date_from_utc(asset.created_at.and_utc(), self.timezone()),
+                        )
+                    })
+                    .flatten()
+                    .map(|(date, value)| (value, asset.quote_ccy.clone(), date))
                 })
             else {
                 continue;
@@ -899,6 +906,8 @@ impl NetWorthServiceTrait for NetWorthService {
         )?;
 
         let mut loan_payments = self.loan_payments(&alternative_assets)?;
+        let loan_ids: Vec<_> = liability_symbols.iter().cloned().collect();
+        let recorded_loan_dates = self.quote_service.get_quote_bounds_for_assets(&loan_ids)?;
         let mut loan_histories = Vec::new();
         for asset in &alternative_assets {
             if asset.kind == AssetKind::Liability
@@ -948,11 +957,14 @@ impl NetWorthServiceTrait for NetWorthService {
                 .insert(quote.asset_id.clone(), value_base);
         }
 
-        // Keep unconfirmed principals in local currency. Like scheduled balances,
-        // they are converted on each emitted date until a recorded quote takes over.
+        // Only loans without any recorded balances use an unconfirmed principal.
+        // A later balance does not establish the debt on earlier dates. Keep
+        // principals in local currency and convert them on each emitted date.
         let manual_principals: Vec<_> = alternative_assets
             .iter()
-            .filter(|asset| asset.kind == AssetKind::Liability)
+            .filter(|asset| {
+                asset.kind == AssetKind::Liability && !recorded_loan_dates.contains_key(&asset.id)
+            })
             .filter_map(|asset| {
                 manual_loan_principal(
                     asset.metadata.as_ref(),
@@ -1127,7 +1139,6 @@ impl NetWorthServiceTrait for NetWorthService {
         };
         let mut portfolio_initialized = false;
 
-        let mut confirmed_assets: HashSet<String> = initial_asset_values.keys().cloned().collect();
         let mut current_asset_values = initial_asset_values.clone();
         let mut current_credit_card_assets = initial_credit_card_assets.clone();
         let mut current_credit_card_liabilities = initial_credit_card_liabilities.clone();
@@ -1144,7 +1155,6 @@ impl NetWorthServiceTrait for NetWorthService {
             // Update alternative asset values if we have quotes for this date
             if let Some(quotes_on_date) = quotes_by_date.get(&date) {
                 for (symbol, value) in quotes_on_date {
-                    confirmed_assets.insert(symbol.clone());
                     current_asset_values.insert(symbol.clone(), *value);
                 }
             }
@@ -1189,7 +1199,7 @@ impl NetWorthServiceTrait for NetWorthService {
             }
 
             for (asset, origin, principal) in &manual_principals {
-                if date >= *origin && !confirmed_assets.contains(&asset.id) {
+                if date >= *origin {
                     let (value, currency) = normalize_amount(*principal, &asset.quote_ccy);
                     let converted = if currency == base_currency {
                         value
