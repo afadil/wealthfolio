@@ -59,6 +59,7 @@ import { Link } from "react-router-dom";
 import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
@@ -72,6 +73,7 @@ import { ActivityTypeBadge } from "../activity-type-badge";
 const ROW_HEIGHT = 89;
 /** Rows kept mounted past the viewport edge, so a fast scroll stays painted. */
 const OVERSCAN = 8;
+const ACTIVITY_TABLE_COLUMN_VISIBILITY_KEY = "activity-table-column-visibility";
 
 interface ActivityTableProps {
   activities: ActivityDetails[];
@@ -128,12 +130,15 @@ export const ActivityTable = ({
     [duplicateActivity],
   );
 
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    accountId: false,
-    accountCurrency: false,
-    assetName: false,
-    currency: false,
-  });
+  const [columnVisibility, setColumnVisibility] = usePersistentState<VisibilityState>(
+    ACTIVITY_TABLE_COLUMN_VISIBILITY_KEY,
+    {
+      accountId: false,
+      accountCurrency: false,
+      assetName: false,
+      currency: false,
+    },
+  );
   const symbolExchangeCountMap = React.useMemo(() => {
     const exchangesBySymbol = new Map<string, Set<string>>();
 
