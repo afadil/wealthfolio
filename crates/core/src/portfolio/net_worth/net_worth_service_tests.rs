@@ -2852,6 +2852,64 @@ async fn tagged_loan_payments_count_in_net_worth_and_its_history() {
 }
 
 #[tokio::test]
+async fn manual_mortgage_with_a_recorded_balance_does_not_backfill_original_principal() {
+    let origin = NaiveDate::from_ymd_opt(2016, 1, 1).unwrap();
+    let confirmation = NaiveDate::from_ymd_opt(2026, 10, 13).unwrap();
+    let before_confirmation = confirmation.pred_opt().unwrap();
+    for balance in [dec!(150000), Decimal::ZERO] {
+        let mut mortgage = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+        mortgage.metadata = Some(json!({
+            "original_amount":"300000", "origination_date":origin.to_string(),
+            "tracking_mode":"manual"
+        }));
+        let property = create_test_asset("PROP-home", AssetKind::Property, "USD");
+        let service = create_net_worth_service(
+            vec![],
+            vec![mortgage, property],
+            vec![],
+            vec![
+                create_test_quote("PROP-home", dec!(500000), origin, "USD"),
+                create_test_quote("LIAB-mortgage", balance, confirmation, "USD"),
+            ],
+        );
+        for date in [origin, before_confirmation] {
+            assert_eq!(
+                service.get_net_worth(date).await.unwrap().liabilities.total,
+                Decimal::ZERO,
+                "a later recorded balance must not invent debt before it"
+            );
+        }
+        let earlier = service
+            .get_net_worth_history(origin, before_confirmation)
+            .unwrap();
+        assert!(!earlier.is_empty());
+        assert!(earlier
+            .iter()
+            .all(|point| point.total_liabilities.is_zero()));
+        let history = service.get_net_worth_history(origin, confirmation).unwrap();
+        assert_eq!(history.first().unwrap().net_worth, dec!(500000));
+        assert_eq!(history.last().unwrap().net_worth, dec!(500000) - balance);
+        for point in history {
+            let expected = if point.date < confirmation {
+                Decimal::ZERO
+            } else {
+                balance
+            };
+            assert_eq!(point.total_liabilities, expected);
+            assert_eq!(
+                service
+                    .get_net_worth(point.date)
+                    .await
+                    .unwrap()
+                    .liabilities
+                    .total,
+                expected
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
     let origin = NaiveDate::from_ymd_opt(2022, 6, 5).unwrap();
     let confirmation = origin + chrono::Days::new(10);
@@ -2875,9 +2933,26 @@ async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
             dec!(0)
         );
         let history = service.get_net_worth_history(origin, end).unwrap();
-        assert_eq!(history.first().unwrap().date, origin);
-        assert_eq!(history.first().unwrap().total_liabilities, dec!(100));
-        assert_eq!(history.last().unwrap().date, end);
+        assert_eq!(
+            history.first().unwrap().date,
+            if recorded.is_some() {
+                confirmation
+            } else {
+                origin
+            }
+        );
+        assert_eq!(
+            history.first().unwrap().total_liabilities,
+            recorded.unwrap_or(dec!(100))
+        );
+        assert_eq!(
+            history.last().unwrap().date,
+            if recorded.is_some() {
+                confirmation
+            } else {
+                end
+            }
+        );
         assert_eq!(
             history.last().unwrap().total_liabilities,
             recorded.unwrap_or(dec!(100))
@@ -2894,14 +2969,29 @@ async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
             );
         }
         let after_origin = origin + chrono::Days::new(2);
+        let before_confirmation = service
+            .get_net_worth_history(after_origin, after_origin)
+            .unwrap();
+        if recorded.is_some() {
+            assert!(before_confirmation.is_empty());
+        } else {
+            assert_eq!(
+                before_confirmation.last().unwrap().total_liabilities,
+                dec!(100)
+            );
+        }
         assert_eq!(
             service
-                .get_net_worth_history(after_origin, after_origin)
+                .get_net_worth(after_origin)
+                .await
                 .unwrap()
-                .last()
-                .unwrap()
-                .total_liabilities,
-            dec!(100)
+                .liabilities
+                .total,
+            if recorded.is_some() {
+                Decimal::ZERO
+            } else {
+                dec!(100)
+            }
         );
     }
 }

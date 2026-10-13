@@ -828,6 +828,7 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             .filter(|asset| asset.kind == AssetKind::Liability)
             .map(|asset| asset.id.clone())
             .collect();
+        let recorded_loan_dates = self.quote_service.get_quote_bounds_for_assets(&loan_ids)?;
         let mut payments = self.alternative_asset_repository.loan_payments(&loan_ids)?;
         let timezone = self.timezone();
         // One calculation per scheduled loan gives both its value and its card summary.
@@ -864,15 +865,16 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             .into_iter()
             .filter_map(|asset| {
                 let quote = quotes.get(&asset.id);
-                let principal = (asset.kind == AssetKind::Liability)
-                    .then(|| {
-                        manual_loan_principal(
-                            asset.metadata.as_ref(),
-                            as_of,
-                            user_date_from_utc(asset.created_at.and_utc(), timezone),
-                        )
-                    })
-                    .flatten();
+                let principal = (asset.kind == AssetKind::Liability
+                    && !recorded_loan_dates.contains_key(&asset.id))
+                .then(|| {
+                    manual_loan_principal(
+                        asset.metadata.as_ref(),
+                        as_of,
+                        user_date_from_utc(asset.created_at.and_utc(), timezone),
+                    )
+                })
+                .flatten();
                 let value = loan_values
                     .get(&asset.id)
                     .copied()
@@ -985,7 +987,7 @@ mod tests {
 
     // ---------------------------------------------------------------------------
     // Minimal mock: QuoteService
-    // Only the two methods called by get_alternative_holdings are meaningful;
+    // Only the methods called by get_alternative_holdings are meaningful;
     // everything else panics so accidental calls are caught immediately.
     //
     // Crucially, get_latest_quotes returns the "bad" future-zero quote for the
@@ -1013,6 +1015,30 @@ mod tests {
                 .iter()
                 .filter_map(|s| self.latest_quotes.get(s).cloned().map(|q| (s.clone(), q)))
                 .collect())
+        }
+
+        fn get_quote_bounds_for_assets(
+            &self,
+            asset_ids: &[String],
+        ) -> Result<HashMap<String, (NaiveDate, NaiveDate)>> {
+            let mut bounds: HashMap<String, (NaiveDate, NaiveDate)> = HashMap::new();
+            for quote in self
+                .as_of_quotes
+                .values()
+                .chain(self.latest_quotes.values())
+            {
+                if asset_ids.contains(&quote.asset_id) {
+                    let day = quote.timestamp.date_naive();
+                    bounds
+                        .entry(quote.asset_id.clone())
+                        .and_modify(|(first, last)| {
+                            *first = (*first).min(day);
+                            *last = (*last).max(day);
+                        })
+                        .or_insert((day, day));
+                }
+            }
+            Ok(bounds)
         }
 
         fn get_latest_quotes_as_of(
@@ -1827,6 +1853,42 @@ mod tests {
             if source.is_none() {
                 assert!(holding.unrealized_gain.is_none());
             }
+        }
+    }
+
+    #[test]
+    fn manual_liability_with_only_a_future_balance_does_not_use_original_principal() {
+        let _clock = crate::utils::clock::freeze("2026-10-13T12:00:00Z".parse().unwrap());
+        let future = chrono::NaiveDate::from_ymd_opt(2026, 10, 14).unwrap();
+        for balance in [Decimal::new(150000, 0), Decimal::ZERO] {
+            let asset = Asset {
+                id: "loan".into(),
+                kind: AssetKind::Liability,
+                quote_ccy: "USD".into(),
+                metadata: Some(json!({
+                    "original_amount":"300000", "origination_date":"2016-01-01",
+                    "tracking_mode":"manual"
+                })),
+                ..Default::default()
+            };
+            let service = AlternativeAssetService::new(
+                Arc::new(MockAltAssetRepository::default()),
+                Arc::new(MockAssetRepository {
+                    assets: vec![asset],
+                }),
+                Arc::new(MockQuoteService {
+                    cutoff: Arc::new(std::sync::Mutex::new(None)),
+                    as_of_quotes: HashMap::new(),
+                    latest_quotes: [("loan".into(), make_quote("loan", balance, future))]
+                        .into_iter()
+                        .collect(),
+                }),
+            )
+            .with_timezone(Arc::new(RwLock::new("UTC".into())));
+            let holdings = service.get_alternative_holdings().unwrap();
+            assert_eq!(holdings.len(), 1);
+            assert_eq!(holdings[0].market_value, Decimal::ZERO);
+            assert_eq!(holdings[0].loan.as_ref().unwrap().balance_source, None);
         }
     }
 
