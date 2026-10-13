@@ -36,6 +36,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   type AssetDetailsSheetAsset,
+  toLinkedLiability,
   UpdateValuationModal,
   ValueHistoryDataGrid,
 } from "./alternative-assets";
@@ -821,16 +822,8 @@ export function useAlternativeAssetActions({
         onSave={handleEditSave}
         linkedAssetName={linkedAssetName}
         linkableAssets={linkableAssets.map((a) => ({ id: a.id, name: a.name }))}
-        linkedLiabilities={linkedLiabilities.map((l) => ({
-          id: l.id,
-          name: l.name,
-          balance: l.marketValue,
-        }))}
-        availableMortgages={availableMortgages.map((m) => ({
-          id: m.id,
-          name: m.name,
-          balance: m.marketValue,
-        }))}
+        linkedLiabilities={linkedLiabilities.map(toLinkedLiability)}
+        availableMortgages={availableMortgages.map(toLinkedLiability)}
         onLinkMortgage={handleLinkMortgage}
         onUnlinkMortgage={handleUnlinkMortgage}
         isSaving={updateMetadataMutation.isPending}
