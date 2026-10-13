@@ -181,10 +181,10 @@ fn manual_principal_is_dated_validated_and_does_not_enable_a_schedule() {
     }
     let undated = json!({"original_amount":"100"});
     assert_eq!(
-        manual_loan_principal(Some(&undated), today, today),
-        Some((today, Decimal::new(100, 0)))
+        manual_loan_principal(Some(&undated), today, origin),
+        Some((origin, Decimal::new(100, 0)))
     );
-    assert!(manual_loan_principal(Some(&undated), today.pred_opt().unwrap(), today).is_none());
+    assert!(manual_loan_principal(Some(&undated), origin.pred_opt().unwrap(), origin).is_none());
     for metadata in [
         json!({}),
         json!({"original_amount":"NaN"}),

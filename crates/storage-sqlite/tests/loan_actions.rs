@@ -957,12 +957,19 @@ async fn manual_liability_correction_deletion_keeps_the_loan_and_its_principal()
         assert_eq!(holding.market_value, Decimal::new(100, 0));
         assert_eq!(
             holding.valuation_date.date_naive(),
-            if dated { origin } else { today }
+            if dated {
+                origin
+            } else {
+                asset.created_at.date()
+            }
         );
         assert_eq!(
             holding.loan.unwrap().balance_source,
             Some(wealthfolio_core::assets::loan::LoanBalanceSource::Original)
         );
-        assert!(loan.assets.get_by_id(&id).is_ok());
+        assert_eq!(
+            loan.assets.get_by_id(&id).unwrap().created_at,
+            asset.created_at
+        );
     }
 }
