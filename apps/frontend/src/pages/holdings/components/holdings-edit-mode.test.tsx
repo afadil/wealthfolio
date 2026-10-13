@@ -50,17 +50,20 @@ const makeHolding = (overrides: Partial<Holding> = {}): Holding => ({
   ...overrides,
 });
 
-const renderEditMode = (holding: Holding = makeHolding()) =>
+const holdingFor = (symbol: string): Holding =>
+  makeHolding({
+    id: symbol,
+    instrument: { id: symbol, symbol, currency: "USD", quoteMode: QuoteMode.MARKET },
+  });
+
+const renderHoldings = (holdings: Holding[]) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <HoldingsEditMode
-        holdings={[holding]}
-        account={account}
-        isLoading={false}
-        onClose={vi.fn()}
-      />
+      <HoldingsEditMode holdings={holdings} account={account} isLoading={false} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
+
+const renderEditMode = (holding: Holding = makeHolding()) => renderHoldings([holding]);
 
 describe("HoldingsEditMode cost fields", () => {
   it("recomputes cost per share when total cost is edited", () => {
@@ -131,5 +134,38 @@ describe("HoldingsEditMode cost fields", () => {
 
     expect(totalCost).toHaveValue("500");
     expect(averageCost).toHaveValue("25");
+  });
+
+  it("keeps each row's cost fields independent", () => {
+    renderHoldings([holdingFor("AAPL"), holdingFor("MSFT")]);
+
+    const aaplAverage = screen.getByTestId("holding-average-cost-AAPL");
+    const aaplTotal = screen.getByTestId("holding-total-cost-AAPL");
+    const aaplShares = screen.getByTestId("holding-shares-AAPL");
+    const msftAverage = screen.getByTestId("holding-average-cost-MSFT");
+    const msftTotal = screen.getByTestId("holding-total-cost-MSFT");
+    const msftShares = screen.getByTestId("holding-shares-MSFT");
+
+    // Edit only the first row.
+    fireEvent.change(aaplTotal, { target: { value: "500" } });
+    fireEvent.change(aaplShares, { target: { value: "20" } });
+
+    // The first row honours its own last-touched field (Total kept).
+    expect(aaplTotal).toHaveValue("500");
+    expect(aaplAverage).toHaveValue("25");
+
+    // The second row kept its own values and its own default, so a shares edit
+    // still re-derives Total from Avg Cost: the first row's intent did not leak.
+    expect(msftTotal).toHaveValue("250");
+    expect(msftAverage).toHaveValue("25");
+
+    fireEvent.change(msftShares, { target: { value: "20" } });
+
+    expect(msftTotal).toHaveValue("500");
+    expect(msftAverage).toHaveValue("25");
+
+    // Editing the second row left the first row alone.
+    expect(aaplTotal).toHaveValue("500");
+    expect(aaplAverage).toHaveValue("25");
   });
 });
