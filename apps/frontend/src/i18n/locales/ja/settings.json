@@ -1513,7 +1513,9 @@
     }
   },
   "currencyFormats": {
-    "title": "通貨ごとの表示形式",
+    "title": "通貨ごとの表示形式をカスタマイズ",
+    "customCount_one": "カスタム形式 {{count}} 件",
+    "customCount_other": "カスタム形式 {{count}} 件",
     "description": "特定の通貨の金額を別の地域の表記規則で表示します。その他の通貨は「地域と表示形式」に従います。",
     "currencyPlaceholder": "通貨を選択",
     "regionPlaceholder": "地域を選択",

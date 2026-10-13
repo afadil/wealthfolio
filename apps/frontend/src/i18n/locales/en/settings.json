@@ -1491,7 +1491,9 @@
     }
   },
   "currencyFormats": {
-    "title": "Currency formats",
+    "title": "Customize currency formats",
+    "customCount_one": "{{count}} custom format",
+    "customCount_other": "{{count}} custom formats",
     "description": "Format amounts in specific currencies with another region's conventions. Other currencies follow Region & formats.",
     "currencyPlaceholder": "Select currency",
     "regionPlaceholder": "Select region",

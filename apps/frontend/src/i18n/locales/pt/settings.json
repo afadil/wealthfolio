@@ -1572,7 +1572,10 @@
     }
   },
   "currencyFormats": {
-    "title": "Formatos de moeda",
+    "title": "Personalizar formatos de moeda",
+    "customCount_one": "{{count}} formato personalizado",
+    "customCount_many": "{{count}} formatos personalizados",
+    "customCount_other": "{{count}} formatos personalizados",
     "description": "Formate valores em moedas específicas com as convenções de outra região. As outras moedas seguem \"Região e formatos\".",
     "currencyPlaceholder": "Selecionar moeda",
     "regionPlaceholder": "Selecionar região",

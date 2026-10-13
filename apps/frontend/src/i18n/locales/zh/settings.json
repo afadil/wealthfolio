@@ -1513,7 +1513,9 @@
     }
   },
   "currencyFormats": {
-    "title": "货币格式",
+    "title": "自定义货币格式",
+    "customCount_one": "{{count}} 个自定义格式",
+    "customCount_other": "{{count}} 个自定义格式",
     "description": "按其他地区的惯例显示特定货币的金额。其他货币沿用“地区与格式”。",
     "currencyPlaceholder": "选择货币",
     "regionPlaceholder": "选择地区",

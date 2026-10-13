@@ -3,6 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageRegionSettings } from "./language-region-settings";
 
+async function renderSettings() {
+  const view = render(<LanguageRegionSettings />);
+  await userEvent.click(screen.getByRole("button", { name: /Customize currency formats/ }));
+  return view;
+}
+
 const updateSettings = vi.fn();
 let currencyFormattingRegions: Record<string, string> = {};
 
@@ -49,14 +55,35 @@ describe("LanguageRegionSettings currency formats", () => {
     Element.prototype.releasePointerCapture = vi.fn();
   });
 
-  it("previews each currency in its own region", () => {
+  it("keeps currency formats collapsed and shows how many are set", async () => {
+    currencyFormattingRegions = { INR: "IN", USD: "US" };
     render(<LanguageRegionSettings />);
+
+    const toggle = screen.getByRole("button", { name: /Customize currency formats/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("2 custom formats");
+    expect(screen.queryByTestId("currency-format-INR")).not.toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("currency-format-INR")).toBeInTheDocument();
+  });
+
+  it("shows no count when no currency has its own format", () => {
+    currencyFormattingRegions = {};
+    render(<LanguageRegionSettings />);
+
+    expect(screen.getByRole("button", { name: "Customize currency formats" })).toBeInTheDocument();
+  });
+
+  it("previews each currency in its own region", async () => {
+    await renderSettings();
 
     expect(screen.getByTestId("currency-format-INR")).toHaveTextContent("₹12,34,567.89 · ₹12.35Cr");
   });
 
   it("removes a currency format", async () => {
-    render(<LanguageRegionSettings />);
+    await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: "Remove format for INR" }));
 
@@ -64,7 +91,7 @@ describe("LanguageRegionSettings currency formats", () => {
   });
 
   it("adds a currency format", async () => {
-    render(<LanguageRegionSettings />);
+    await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: "Select currency" }));
     await userEvent.click(screen.getByRole("combobox", { name: "Select region" }));
@@ -76,9 +103,9 @@ describe("LanguageRegionSettings currency formats", () => {
     });
   });
 
-  it("names each region control after its currency", () => {
+  it("names each region control after its currency", async () => {
     currencyFormattingRegions = { INR: "IN", USD: "US" };
-    render(<LanguageRegionSettings />);
+    await renderSettings();
 
     expect(screen.getByRole("combobox", { name: "Region for INR" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Region for USD" })).toBeInTheDocument();
@@ -96,7 +123,7 @@ describe("LanguageRegionSettings currency formats", () => {
           };
         }),
     );
-    const view = render(<LanguageRegionSettings />);
+    const view = await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: "Remove format for INR" }));
     expect(screen.getByRole("button", { name: "Remove format for USD" })).toBeDisabled();
@@ -111,7 +138,7 @@ describe("LanguageRegionSettings currency formats", () => {
 
   it("keeps the edit available when a save fails", async () => {
     updateSettings.mockRejectedValue(new Error("save failed"));
-    render(<LanguageRegionSettings />);
+    await renderSettings();
 
     await userEvent.click(screen.getByRole("button", { name: "Remove format for INR" }));
     expect(screen.getByRole("button", { name: "Remove format for INR" })).toBeEnabled();
@@ -142,7 +169,7 @@ describe("LanguageRegionSettings currency formats", () => {
             };
           }),
       );
-      const view = render(<LanguageRegionSettings />);
+      const view = await renderSettings();
       const region = screen.getByRole("combobox", { name: "Region for INR" });
 
       region.focus();
@@ -167,7 +194,7 @@ describe("LanguageRegionSettings currency formats", () => {
           finishSave = resolve;
         }),
     );
-    const view = render(<LanguageRegionSettings />);
+    const view = await renderSettings();
 
     screen.getByRole("button", { name: "Remove format for INR" }).focus();
     await userEvent.keyboard("{Enter}");
