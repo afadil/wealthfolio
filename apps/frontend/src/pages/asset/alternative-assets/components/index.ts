@@ -31,6 +31,7 @@ export {
   assetDetailsSchema,
   formValuesToMetadata,
   getDefaultDetailsFormValues,
+  toLinkedLiability,
   type AssetDetailsFormValues,
 } from "./asset-details-sheet-schema";
 

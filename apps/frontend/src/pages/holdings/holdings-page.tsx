@@ -57,6 +57,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   UpdateValuationModal,
+  toLinkedLiability,
   type AssetDetailsSheetAsset,
   type LinkableAsset,
   type LinkedLiability,
@@ -307,11 +308,7 @@ export const HoldingsPage = () => {
           const linkedAssetId = metadata?.linked_asset_id;
           return linkedAssetId === propertyId;
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
@@ -329,11 +326,7 @@ export const HoldingsPage = () => {
             liabilityType === "mortgage" && (!linkedAssetId || linkedAssetId === excludePropertyId)
           );
         })
-        .map((h) => ({
-          id: h.id,
-          name: h.name,
-          balance: h.marketValue,
-        }));
+        .map(toLinkedLiability);
     },
     [liabilitiesHoldings],
   );
