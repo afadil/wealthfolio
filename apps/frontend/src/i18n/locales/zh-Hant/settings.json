@@ -1531,7 +1531,9 @@
     }
   },
   "currencyFormats": {
-    "title": "貨幣格式",
+    "title": "自訂貨幣格式",
+    "customCount_one": "{{count}} 個自訂格式",
+    "customCount_other": "{{count}} 個自訂格式",
     "description": "依其他地區的慣例顯示特定貨幣的金額。其他貨幣沿用「地區與格式」。",
     "currencyPlaceholder": "選擇貨幣",
     "regionPlaceholder": "選擇地區",

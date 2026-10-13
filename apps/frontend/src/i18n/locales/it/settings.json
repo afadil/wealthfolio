@@ -1572,7 +1572,10 @@
     }
   },
   "currencyFormats": {
-    "title": "Formati delle valute",
+    "title": "Personalizza i formati delle valute",
+    "customCount_one": "{{count}} formato personalizzato",
+    "customCount_many": "{{count}} formati personalizzati",
+    "customCount_other": "{{count}} formati personalizzati",
     "description": "Formatta gli importi in valute specifiche con le convenzioni di un'altra regione. Le altre valute seguono «Regione e formati».",
     "currencyPlaceholder": "Seleziona valuta",
     "regionPlaceholder": "Seleziona regione",

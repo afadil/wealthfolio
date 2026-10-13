@@ -1531,7 +1531,9 @@
     }
   },
   "currencyFormats": {
-    "title": "Währungsformate",
+    "title": "Währungsformate anpassen",
+    "customCount_one": "{{count}} angepasstes Format",
+    "customCount_other": "{{count}} angepasste Formate",
     "description": "Beträge in bestimmten Währungen nach den Konventionen einer anderen Region formatieren. Andere Währungen folgen „Region und Formate“.",
     "currencyPlaceholder": "Währung auswählen",
     "regionPlaceholder": "Region auswählen",

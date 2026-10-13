@@ -10,8 +10,14 @@ import {
   CurrencyInput,
   resolveFormattingLocale,
 } from "@wealthfolio/ui";
+import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@wealthfolio/ui/components/ui/collapsible";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Select,
@@ -21,6 +27,7 @@ import {
   SelectValue,
 } from "@wealthfolio/ui/components/ui/select";
 import { Separator } from "@wealthfolio/ui/components/ui/separator";
+import { cn } from "@wealthfolio/ui/lib/utils";
 import { TimezoneInput } from "./timezone-input";
 import {
   detectBrowserTimezone,
@@ -62,6 +69,7 @@ function CurrencyRegionSelect({
   label,
   placeholder,
   disabled,
+  className,
   testId,
 }: {
   id: string;
@@ -70,12 +78,13 @@ function CurrencyRegionSelect({
   label: string;
   placeholder?: string;
   disabled: boolean;
+  className: string;
   testId: string;
 }) {
   const { t } = useTranslation();
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger id={id} className="w-[200px]" aria-label={label} data-testid={testId}>
+      <SelectTrigger id={id} className={className} aria-label={label} data-testid={testId}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -96,6 +105,8 @@ function CurrencyFormatSettings() {
   const [newCurrency, setNewCurrency] = useState("");
   const [newRegion, setNewRegion] = useState("");
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const overrideCount = Object.keys(overrides).length;
   const idPrefix = useId();
   const controlId = (control: string) => `${idPrefix}${control}`;
   const focusAfterSave = useRef<string | null>(null);
@@ -154,76 +165,100 @@ function CurrencyFormatSettings() {
   };
 
   return (
-    <section className="space-y-3">
-      <div>
-        <h3 className="text-sm font-medium">{t("settings:currencyFormats.title")}</h3>
-        <p className="text-muted-foreground text-sm">{t("settings:currencyFormats.description")}</p>
-      </div>
-      {Object.entries(overrides).map(([currency, region]) => (
-        <div
-          key={currency}
-          className="flex flex-wrap items-center gap-2"
-          data-testid={`currency-format-${currency}`}
-        >
-          <span className="w-12 text-sm font-medium">{currency}</span>
-          <CurrencyRegionSelect
-            id={controlId(`region-${currency}`)}
-            value={region}
-            onValueChange={(value) =>
-              void saveOverrides({ ...overrides, [currency]: value }, `region-${currency}`)
-            }
-            label={t("settings:currencyFormats.regionFor", { currency })}
-            disabled={saving}
-            testId={`currency-format-region-${currency}`}
-          />
-          <span className="text-muted-foreground text-sm tabular-nums">
-            {preview(currency, region)}
-          </span>
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
+      <section className="space-y-3">
+        <CollapsibleTrigger asChild>
           <Button
-            id={controlId(`remove-${currency}`)}
             variant="ghost"
-            size="icon"
-            aria-label={t("settings:currencyFormats.remove", { currency })}
-            disabled={saving}
-            onClick={() => removeOverride(currency)}
+            className="h-auto w-full justify-between whitespace-normal px-0 py-1 text-left hover:bg-transparent has-[>svg]:px-0"
+            data-testid="currency-formats-toggle"
           >
-            <Icons.Close className="h-4 w-4" />
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{t("settings:currencyFormats.title")}</span>
+              {overrideCount > 0 && (
+                <Badge variant="secondary">
+                  {t("settings:currencyFormats.customCount", { count: overrideCount })}
+                </Badge>
+              )}
+            </span>
+            <Icons.ChevronDown
+              className={cn("h-4 w-4 shrink-0 transition-transform", open && "rotate-180")}
+            />
           </Button>
-        </div>
-      ))}
-      <div className="flex flex-wrap items-center gap-2">
-        <CurrencyInput
-          id={controlId("new-currency")}
-          value={newCurrency}
-          onChange={setNewCurrency}
-          placeholder={t("settings:currencyFormats.currencyPlaceholder")}
-          valueDisplay="code-label"
-          allowCustom={false}
-          className="w-[200px]"
-          aria-label={t("settings:currencyFormats.currencyPlaceholder")}
-          disabled={saving}
-          data-testid="currency-format-new-currency"
-        />
-        <CurrencyRegionSelect
-          id={controlId("new-region")}
-          value={newRegion}
-          onValueChange={setNewRegion}
-          label={t("settings:currencyFormats.regionPlaceholder")}
-          placeholder={t("settings:currencyFormats.regionPlaceholder")}
-          disabled={saving}
-          testId="currency-format-new-region"
-        />
-        <Button
-          id={controlId("add")}
-          variant="outline"
-          disabled={saving || !newCurrency || !newRegion}
-          onClick={addOverride}
-          data-testid="currency-format-add"
-        >
-          {t("common:add")}
-        </Button>
-      </div>
-    </section>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3">
+          <p className="text-muted-foreground text-sm">
+            {t("settings:currencyFormats.description")}
+          </p>
+          {Object.entries(overrides).map(([currency, region]) => (
+            <div
+              key={currency}
+              className="flex flex-wrap items-center gap-2"
+              data-testid={`currency-format-${currency}`}
+            >
+              <span className="w-12 text-sm font-medium">{currency}</span>
+              <CurrencyRegionSelect
+                id={controlId(`region-${currency}`)}
+                value={region}
+                onValueChange={(value) =>
+                  void saveOverrides({ ...overrides, [currency]: value }, `region-${currency}`)
+                }
+                label={t("settings:currencyFormats.regionFor", { currency })}
+                disabled={saving}
+                className="min-w-0 flex-1 sm:w-[240px] sm:flex-none"
+                testId={`currency-format-region-${currency}`}
+              />
+              <span className="text-muted-foreground order-last basis-full text-sm tabular-nums sm:order-none sm:basis-auto">
+                {preview(currency, region)}
+              </span>
+              <Button
+                id={controlId(`remove-${currency}`)}
+                variant="ghost"
+                size="icon"
+                aria-label={t("settings:currencyFormats.remove", { currency })}
+                disabled={saving}
+                onClick={() => removeOverride(currency)}
+              >
+                <Icons.Close className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <CurrencyInput
+              id={controlId("new-currency")}
+              value={newCurrency}
+              onChange={setNewCurrency}
+              placeholder={t("settings:currencyFormats.currencyPlaceholder")}
+              valueDisplay="code-label"
+              allowCustom={false}
+              className="w-full sm:w-[240px]"
+              aria-label={t("settings:currencyFormats.currencyPlaceholder")}
+              disabled={saving}
+              data-testid="currency-format-new-currency"
+            />
+            <CurrencyRegionSelect
+              id={controlId("new-region")}
+              value={newRegion}
+              onValueChange={setNewRegion}
+              label={t("settings:currencyFormats.regionPlaceholder")}
+              placeholder={t("settings:currencyFormats.regionPlaceholder")}
+              disabled={saving}
+              className="w-full sm:w-[240px]"
+              testId="currency-format-new-region"
+            />
+            <Button
+              id={controlId("add")}
+              variant="outline"
+              disabled={saving || !newCurrency || !newRegion}
+              onClick={addOverride}
+              data-testid="currency-format-add"
+            >
+              {t("common:add")}
+            </Button>
+          </div>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
   );
 }
 

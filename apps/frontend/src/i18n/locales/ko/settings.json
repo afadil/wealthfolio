@@ -1513,7 +1513,9 @@
     }
   },
   "currencyFormats": {
-    "title": "통화별 표시 형식",
+    "title": "통화별 표시 형식 사용자 지정",
+    "customCount_one": "사용자 지정 형식 {{count}}개",
+    "customCount_other": "사용자 지정 형식 {{count}}개",
     "description": "특정 통화의 금액을 다른 지역의 표기 방식으로 표시합니다. 다른 통화는 '지역 및 표시 형식'을 따릅니다.",
     "currencyPlaceholder": "통화 선택",
     "regionPlaceholder": "지역 선택",

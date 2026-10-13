@@ -1572,7 +1572,10 @@
     }
   },
   "currencyFormats": {
-    "title": "Formats des devises",
+    "title": "Personnaliser les formats des devises",
+    "customCount_one": "{{count}} format personnalisé",
+    "customCount_many": "{{count}} formats personnalisés",
+    "customCount_other": "{{count}} formats personnalisés",
     "description": "Formatez les montants de certaines devises selon les conventions d’une autre région. Les autres devises suivent « Région et formats ».",
     "currencyPlaceholder": "Choisir une devise",
     "regionPlaceholder": "Choisir une région",
