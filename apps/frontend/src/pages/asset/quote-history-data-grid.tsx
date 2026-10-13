@@ -56,6 +56,9 @@ interface QuoteHistoryDataGridProps {
 // Generate a temporary ID for new entries
 const generateTempId = () => `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+// A price left at 0 was not entered. Like quote imports and providers, fall back to close.
+const priceOrClose = (price: number, close: number) => (price === 0 ? close : price);
+
 // Convert QuoteEntry back to Quote for saving
 const toQuote = (entry: QuoteEntry, assetId: string): Quote => {
   const datePart = format(entry.date, "yyyy-MM-dd").replace(/-/g, "");
@@ -65,9 +68,9 @@ const toQuote = (entry: QuoteEntry, assetId: string): Quote => {
     dataSource: "MANUAL",
     timestamp: format(entry.date, "yyyy-MM-dd'T'00:00:00'Z'"),
     assetId: assetId,
-    open: entry.open,
-    high: entry.high,
-    low: entry.low,
+    open: priceOrClose(entry.open, entry.close),
+    high: priceOrClose(entry.high, entry.close),
+    low: priceOrClose(entry.low, entry.close),
     close: entry.close,
     volume: entry.volume,
     adjclose: entry.close,

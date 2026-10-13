@@ -89,7 +89,16 @@ describe("QuoteHistoryDataGrid mobile editing", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Save" })).toBeNull());
     expect(onSaveQuote).toHaveBeenCalledTimes(1);
     expect(onSaveQuote).toHaveBeenCalledWith(
-      expect.objectContaining({ assetId, close: 11.678, volume: 1200, dataSource: "MANUAL" }),
+      expect.objectContaining({
+        assetId,
+        // Open, high and low were left empty, so they take the close.
+        open: 11.678,
+        high: 11.678,
+        low: 11.678,
+        close: 11.678,
+        volume: 1200,
+        dataSource: "MANUAL",
+      }),
     );
     expect(editButton()).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add" })).toBeEnabled();
