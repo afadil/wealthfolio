@@ -1452,7 +1452,15 @@ export interface UpdateInfo {
   storeUrl?: string;
   changelogUrl?: string;
   screenshots?: string[];
+  /** Set when something other than the app installs updates. */
+  externalUpdateSource?: ExternalUpdateSource | null;
 }
+
+/** How updates arrive when the in-app updater must leave them to something else. */
+export type ExternalUpdateSource =
+  | { kind: "packager"; explanation: string }
+  | { kind: "flatpak" }
+  | { kind: "packageManager" };
 
 // Platform/Broker type
 export interface Platform {

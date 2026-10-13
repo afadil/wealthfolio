@@ -228,6 +228,8 @@
     "type_at_least_2": "اكتب حرفين على الأقل للبحث.",
     "unable_to_open_changelog": "تعذر فتح سجل التغييرات",
     "unable_to_open_link": "تعذر فتح الرابط",
+    "update_external_flatpak": "تم تثبيت هذه النسخة من Wealthfolio باستخدام Flatpak. حدّثها باستخدام Flatpak أو مركز البرامج لديك.",
+    "update_external_package_manager": "لا يمكن تحديث هذا التثبيت من داخل Wealthfolio. حدّثه بالطريقة نفسها التي ثبّته بها.",
     "update_failed": "فشل التحديث. يرجى المحاولة مرة أخرى.",
     "update_now": "حدّث الآن",
     "update_quotes": "تحديث الأسعار",

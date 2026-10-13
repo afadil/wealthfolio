@@ -304,6 +304,8 @@
     "screenshot_alt": "截图 {{number}}",
     "downloading_update": "正在下载更新...",
     "installing_update": "正在安装更新...",
+    "update_external_flatpak": "此 Wealthfolio 通过 Flatpak 安装。请使用 Flatpak 或软件中心更新。",
+    "update_external_package_manager": "此安装无法在 Wealthfolio 内更新。请使用安装时的相同方式更新。",
     "update_failed": "更新失败。请重试。",
     "remind_me_later": "稍后提醒我",
     "view_changelog": "查看更新日志",

@@ -304,6 +304,8 @@
     "screenshot_alt": "Screenshot {{number}}",
     "downloading_update": "Downloading update...",
     "installing_update": "Installing update...",
+    "update_external_flatpak": "This copy of Wealthfolio was installed with Flatpak. Update it with Flatpak or your software center.",
+    "update_external_package_manager": "This installation can't be updated from within Wealthfolio. Update it the same way you installed it.",
     "update_failed": "Update failed. Please try again.",
     "remind_me_later": "Remind me later",
     "view_changelog": "View Changelog",
