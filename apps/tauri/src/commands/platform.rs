@@ -41,34 +41,7 @@ pub fn get_platform() -> PlatformInfo {
 /// the desktop portal, so the frontend applies the resolved preference directly.
 #[tauri::command]
 pub async fn get_system_theme() -> Result<Option<tauri::Theme>, String> {
-    #[cfg(target_os = "linux")]
-    {
-        let connection = zbus::Connection::session()
-            .await
-            .map_err(|error| format!("Could not connect to the desktop portal: {error}"))?;
-        let proxy = zbus::Proxy::new(
-            &connection,
-            "org.freedesktop.portal.Desktop",
-            "/org/freedesktop/portal/desktop",
-            "org.freedesktop.portal.Settings",
-        )
-        .await
-        .map_err(|error| format!("Could not access desktop appearance settings: {error}"))?;
-        let value: zbus::zvariant::OwnedValue = proxy
-            .call("Read", &("org.freedesktop.appearance", "color-scheme"))
-            .await
-            .map_err(|error| format!("Could not read the system theme: {error}"))?;
-        let scheme = value
-            .downcast_ref::<u32>()
-            .map_err(|error| format!("Invalid system color scheme: {error}"))?;
-        Ok(Some(if scheme == 1 {
-            tauri::Theme::Dark
-        } else {
-            tauri::Theme::Light
-        }))
-    }
-    #[cfg(not(target_os = "linux"))]
-    Ok(None)
+    crate::system_theme::read().await
 }
 
 // Alternative: Use compile-time constants for even better performance

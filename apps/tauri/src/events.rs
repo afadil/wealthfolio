@@ -5,6 +5,8 @@ use wealthfolio_core::quotes::MarketSyncMode;
 /// Event emitted when core context/services are ready to use.
 pub const APP_READY: &str = "app:ready";
 pub const DATABASE_STATE_CHANGED: &str = "database-state-changed";
+#[cfg(target_os = "linux")]
+pub const SYSTEM_THEME_CHANGED: &str = "system-theme-changed";
 
 /// Event emitted when the background portfolio recalculation process starts.
 pub const PORTFOLIO_UPDATE_START: &str = "portfolio:update-start";

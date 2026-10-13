@@ -434,6 +434,7 @@ export {
   listenBrokerSyncStart,
   listenDatabaseRestored,
   listenDeepLink,
+  listenSystemThemeChanged,
   listenDeviceSyncRestore,
   getCurrentDeepLinks,
   listenFileDrop,

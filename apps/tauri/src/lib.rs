@@ -16,6 +16,7 @@ mod profiles;
 mod scheduler;
 mod secret_store;
 mod services;
+mod system_theme;
 
 #[cfg(desktop)]
 mod menu;
@@ -255,6 +256,7 @@ pub fn run() {
             // Setup event listeners (platform-agnostic)
             profiles::start_lock_monitor(handle.clone());
             profile_lifecycle::install(&handle);
+            system_theme::install(&handle);
 
             // Setup deep link handler
             let deep_link_handle = handle.clone();

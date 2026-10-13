@@ -11,6 +11,15 @@ beforeEach(() => {
   vi.resetModules();
   listeners.clear();
 });
+it("delivers system appearance events while the portfolio is locked", async () => {
+  const session = await import("@/features/profiles/session");
+  session.revokeProfileSession();
+  const { listenSystemThemeChanged } = await import("./events");
+  const handler = vi.fn();
+  await listenSystemThemeChanged(handler);
+  listeners.get("system-theme-changed")!({ event: "system-theme-changed", payload: "dark", id: 1 });
+  expect(handler).toHaveBeenCalledWith({ event: "system-theme-changed", payload: "dark", id: 1 });
+});
 it("drops queued data from an older scope, including after a local lock", async () => {
   const session = await import("@/features/profiles/session");
   session.installProfileSession({ profileId: "B", scopeId: "scope-b" });

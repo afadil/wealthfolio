@@ -248,6 +248,7 @@ export {
   listenBrokerSyncError,
   listenNavigateToRoute,
   listenDeepLink,
+  listenSystemThemeChanged,
   getCurrentDeepLinks,
 } from "./events";
 

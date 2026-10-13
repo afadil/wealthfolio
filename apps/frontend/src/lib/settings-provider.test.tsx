@@ -11,11 +11,16 @@ const mocks = vi.hoisted(() => ({
   mediaListener: vi.fn<(type: string, handler: (event: MediaQueryListEvent) => void) => void>(),
   themeListener:
     vi.fn<(handler: (event: { payload: "light" | "dark" }) => void) => Promise<() => void>>(),
+  systemListener:
+    vi.fn<(handler: (event: { payload: "light" | "dark" }) => void) => Promise<() => void>>(),
+  systemUnlisten: vi.fn(),
 }));
 vi.mock("@/adapters", () => ({
   isTauri: true,
   logger: { error: vi.fn() },
   getSystemTheme: () => mocks.systemTheme(),
+  listenSystemThemeChanged: (handler: (event: { payload: "light" | "dark" }) => void) =>
+    mocks.systemListener(handler),
 }));
 vi.mock("@/hooks/use-platform", () => ({ getPlatform: () => mocks.platform() }));
 vi.mock("@tauri-apps/api/window", () => ({
@@ -73,6 +78,8 @@ beforeEach(() => {
   mocks.windowTheme.mockResolvedValue("light");
   mocks.systemTheme.mockResolvedValue("dark");
   mocks.themeListener.mockResolvedValue(() => {});
+  mocks.systemListener.mockResolvedValue(mocks.systemUnlisten);
+  mocks.setTheme.mockResolvedValue(undefined);
 });
 
 it("keeps the system media query theme on mobile instead of the native window theme", async () => {
@@ -97,6 +104,7 @@ it.each(["macos", "windows"])(
     expect(mocks.windowTheme).toHaveBeenCalled();
     expect(mocks.setTheme).toHaveBeenCalledWith(null);
     expect(mocks.systemTheme).not.toHaveBeenCalled();
+    expect(mocks.systemListener).not.toHaveBeenCalled();
   },
 );
 
@@ -137,15 +145,34 @@ it("keeps following Linux system changes through the media query", async () => {
   expect(document.documentElement).toHaveClass("dark");
 });
 
-it("keeps following native Linux theme notifications", async () => {
+it("follows Linux portal changes in both the document and window", async () => {
   mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
   render(<SettingsProvider>content</SettingsProvider>);
-  await waitFor(() => expect(mocks.themeListener).toHaveBeenCalledOnce());
-  const change = mocks.themeListener.mock.calls[0]![0];
+  await waitFor(() => expect(mocks.systemListener).toHaveBeenCalledOnce());
+  expect(mocks.themeListener).not.toHaveBeenCalled();
+  const change = mocks.systemListener.mock.calls[0]![0];
   act(() => change({ payload: "light" }));
   expect(document.documentElement).toHaveClass("light");
+  expect(mocks.setTheme).toHaveBeenLastCalledWith("light");
   act(() => change({ payload: "dark" }));
   expect(document.documentElement).toHaveClass("dark");
+  expect(mocks.setTheme).toHaveBeenLastCalledWith("dark");
+});
+
+it("stops Linux portal updates when switching to an explicit theme", async () => {
+  mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
+  const view = render(<SettingsProvider>content</SettingsProvider>);
+  await waitFor(() => expect(mocks.systemListener).toHaveBeenCalledOnce());
+  const change = mocks.systemListener.mock.calls[0]![0];
+
+  settings = { ...settings, theme: "light" };
+  view.rerender(<SettingsProvider>content</SettingsProvider>);
+  await waitFor(() => expect(mocks.setTheme).toHaveBeenLastCalledWith("light"));
+  expect(mocks.systemUnlisten).toHaveBeenCalledOnce();
+  const calls = mocks.setTheme.mock.calls.length;
+  act(() => change({ payload: "dark" }));
+  expect(document.documentElement).toHaveClass("light");
+  expect(mocks.setTheme).toHaveBeenCalledTimes(calls);
 });
 
 it("keeps the media-query fallback when the Linux portal is unavailable", async () => {

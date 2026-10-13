@@ -2,7 +2,7 @@ import { StartupScreen } from "@/components/startup-screen";
 import { useProfile } from "@/features/profiles/profile-context";
 import { Button } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { getSystemTheme, isTauri, logger } from "@/adapters";
+import { getSystemTheme, isTauri, listenSystemThemeChanged, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
@@ -308,11 +308,20 @@ const applySettingsToDocument = async (newSettings: Settings) => {
         if (current === "dark" || current === "light") {
           applyResolvedTheme(current);
         }
-        const unlisten = await currentWindow.onThemeChanged(({ payload }) => {
+        const handleThemeChange = ({ payload }: { payload: "light" | "dark" }) => {
           if (application !== appearanceGeneration) return;
           const next = payload === "dark" ? "dark" : "light";
           applyResolvedTheme(next);
-        });
+          if (desktop.os === "linux") {
+            void currentWindow
+              .setTheme(next)
+              .catch(() => logger.error("Error setting window theme."));
+          }
+        };
+        const unlisten =
+          desktop.os === "linux"
+            ? await listenSystemThemeChanged<"light" | "dark">(handleThemeChange)
+            : await currentWindow.onThemeChanged(handleThemeChange);
         if (application !== appearanceGeneration) unlisten();
         else tauriThemeUnlisten = unlisten;
       } catch {
