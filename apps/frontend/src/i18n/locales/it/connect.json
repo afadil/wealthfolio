@@ -14,7 +14,11 @@
     "noDevicesSyncing": "Ancora nessun dispositivo in sincronizzazione",
     "noDevicesDescription": "Configura la sincronizzazione tra dispositivi nelle impostazioni per mantenere i tuoi dati sincronizzati su più dispositivi.",
     "noActivity": "Ancora nessuna attività",
-    "noActivityDescription": "Gli aggiornamenti appariranno qui non appena i tuoi dati inizieranno a sincronizzarsi."
+    "noActivityDescription": "Gli aggiornamenti appariranno qui non appena i tuoi dati inizieranno a sincronizzarsi.",
+    "showMore_one": "Mostra altri {{count}}",
+    "showMore_many": "Mostra altri {{count}}",
+    "showMore_other": "Mostra altri {{count}}",
+    "showLess": "Mostra meno"
   },
   "emptyState": {
     "optional": "Facoltativo",
@@ -71,7 +75,8 @@
     "noDataYet": "Ancora nessun dato",
     "dataAsOf": "Dati aggiornati al {{date}}",
     "emptyTitle": "Ancora nessun conto sincronizzato",
-    "emptyDescription": "Collega un broker per iniziare a sincronizzare i tuoi conti."
+    "emptyDescription": "Collega un broker per iniziare a sincronizzare i tuoi conti.",
+    "needsSetup": "Richiede configurazione"
   },
   "connections": {
     "title": "Connessioni broker",
@@ -90,7 +95,13 @@
     "accountsSyncing_other": "{{count}} conti in sincronizzazione",
     "partialSyncing_one": "{{syncing}} di {{total}} conti in sincronizzazione · {{excluded}} conto escluso",
     "partialSyncing_many": "{{syncing}} di {{total}} conti in sincronizzazione · {{excluded}} conti esclusi",
-    "partialSyncing_other": "{{syncing}} di {{total}} conti in sincronizzazione · {{excluded}} conti esclusi"
+    "partialSyncing_other": "{{syncing}} di {{total}} conti in sincronizzazione · {{excluded}} conti esclusi",
+    "accountCount_one": "{{count}} conto",
+    "accountCount_many": "{{count}} conti",
+    "accountCount_other": "{{count}} conti",
+    "excludedCount_one": "{{count}} escluso",
+    "excludedCount_many": "{{count}} esclusi",
+    "excludedCount_other": "{{count}} esclusi"
   },
   "sync": {
     "syncNow": "Sincronizza ora",
@@ -198,21 +209,36 @@
     "title": "La sincronizzazione del broker richiede attenzione",
     "description_one": "{{count}} conto necessita di un nuovo tentativo o di una revisione da parte del broker.",
     "description_many": "{{count}} conti necessitano di un nuovo tentativo o di una revisione da parte del broker.",
-    "description_other": "{{count}} conti necessitano di un nuovo tentativo o di una revisione da parte del broker."
+    "description_other": "{{count}} conti necessitano di un nuovo tentativo o di una revisione da parte del broker.",
+    "heading": "Richiede attenzione",
+    "connectionLost": "Connessione persa",
+    "accountsNotSyncing_one": "{{count}} conto non sincronizzato",
+    "accountsNotSyncing_many": "{{count}} conti non sincronizzati",
+    "accountsNotSyncing_other": "{{count}} conti non sincronizzati",
+    "syncFailed": "Ultima sincronizzazione non riuscita"
   },
   "setup": {
     "newAccountsTitle": "I nuovi conti richiedono configurazione",
     "newAccountsDescription_one": "{{count}} conto richiede una configurazione rapida prima di poter iniziare la sincronizzazione.",
     "newAccountsDescription_many": "{{count}} conti richiedono una configurazione rapida prima di poter iniziare la sincronizzazione.",
     "newAccountsDescription_other": "{{count}} conti richiedono una configurazione rapida prima di poter iniziare la sincronizzazione.",
-    "reviewAccounts": "Rivedi conti"
+    "reviewAccounts": "Rivedi conti",
+    "setUp": "Configura"
   },
   "devices": {
     "thisDevice": "Questo dispositivo",
     "activeNow": "Attivo ora",
     "lastSeen": "Ultimo accesso {{time}}",
     "online": "Online",
-    "never": "Mai"
+    "never": "Mai",
+    "showInactive_one": "Mostra {{count}} dispositivo inattivo",
+    "showInactive_many": "Mostra {{count}} dispositivi inattivi",
+    "showInactive_other": "Mostra {{count}} dispositivi inattivi",
+    "hideInactive": "Nascondi dispositivi inattivi",
+    "platforms": {
+      "server": "Server",
+      "web": "Web"
+    }
   },
   "deviceStatus": {
     "syncError": "Errore di sincronizzazione",
