@@ -785,19 +785,29 @@
     "title": "Flujo de dinero",
     "subtitle": "De dónde vino tu dinero y a dónde fue para {{period}}.",
     "focusSubtitle": "Todas las categorías para {{period}}.",
+    "focusSubcategoriesSubtitle": "Todas las subcategorías para {{period}}.",
     "back": "Todos los flujos",
+    "backTo": "Volver a {{name}}",
     "chartLabel": "Diagrama del flujo de dinero. Usa las flechas para moverte entre los flujos.",
     "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
     "shareOfIncome": "{{pct}} de los ingresos",
     "shareOfTotal": "{{pct}} del total",
     "clickTransactions": "Haz clic para ver las transacciones",
     "clickCategories": "Haz clic para ver todas las categorías",
+    "clickSubcategories": "Haz clic para ver las subcategorías",
+    "action": {
+      "categories": "Ver todas las categorías",
+      "subcategories": "Ver subcategorías",
+      "transactions": "Ver transacciones"
+    },
     "node": {
       "total": "Total",
       "shortfall": "Déficit",
       "refunds": "Reembolsos netos",
       "surplus": "Sobrante",
-      "uncategorizedIncome": "Ingresos sin categorizar"
+      "uncategorizedIncome": "Ingresos sin categorizar",
+      "netSpending": "Gasto neto"
     },
     "hint": {
       "total": "Dinero entrante más reembolsos netos y cualquier déficit. Siempre igual al dinero saliente.",
@@ -806,9 +816,12 @@
       "refunds": "Categorías donde los reembolsos superaron el gasto.",
       "saved": "Transferido a cuentas de ahorro e inversión.",
       "surplus": "Entró, pero no se gastó ni se reservó.",
-      "uncategorized": "Gastos que aún no tienen categoría."
+      "uncategorized": "Gastos que aún no tienen categoría.",
+      "net": "Lo que costó esta categoría después de los reembolsos.",
+      "direct": "Asignado a la propia categoría, no a una subcategoría."
     },
-    "groupRefunds": "Antes de restar {{amount}} en reembolsos netos."
+    "groupRefunds": "Antes de restar {{amount}} en reembolsos netos.",
+    "categoryRefunds": "Antes de restar {{refunds}} en reembolsos netos. Gasto neto: {{net}}."
   },
   "budgetChart": {
     "overBudget": "Presupuesto excedido",

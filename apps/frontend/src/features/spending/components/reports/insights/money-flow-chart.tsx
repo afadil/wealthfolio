@@ -42,6 +42,8 @@ const TOOLTIP_WIDTH = 240;
 const TOOLTIP_EDGE = 8;
 /** How far the tooltip's near edge sits past its node's centre. */
 const TOOLTIP_ANCHOR_OFFSET = 24;
+/** Follows the name of a node that zooms into more detail. */
+const EXPAND_MARK = "\u00a0›";
 
 const HINT_KEYS: Partial<Record<MoneyFlowNodeKind, string>> = {
   total: "spending:moneyFlow.hint.total",
@@ -50,6 +52,8 @@ const HINT_KEYS: Partial<Record<MoneyFlowNodeKind, string>> = {
   saved: "spending:moneyFlow.hint.saved",
   surplus: "spending:moneyFlow.hint.surplus",
   uncategorized: "spending:moneyFlow.hint.uncategorized",
+  net: "spending:moneyFlow.hint.net",
+  direct: "spending:moneyFlow.hint.direct",
 };
 
 type PositionedNode = MoneyFlowNode & { x: number; y: number; dx: number; dy: number };
@@ -72,7 +76,7 @@ interface MoneyFlowChartProps {
   currency: string;
   isMobile: boolean;
   onCategoryClick?: (categoryId: string) => void;
-  /** Zoom into a destination (a group, Set aside, or a group's folded remainder). */
+  /** Zoom into a destination (a group or Set aside) or a category with subcategories. */
   onFocusNode?: (nodeId: string) => void;
   /** Node to take keyboard focus once rendered — where a zoom was left from. */
   autoFocusNodeId?: string | null;
@@ -84,7 +88,8 @@ interface MoneyFlowChartProps {
  * categories, as built by `buildMoneyFlowGraph`. Columns keep the builder's
  * order (`sort={false}`) so ribbons never cross and the layout stays stable
  * between periods. Hovering or focusing a node lights its path and shows a
- * tooltip; categories open their transactions and destinations zoom in.
+ * tooltip; destinations and categories with subcategories zoom in, other
+ * categories open their transactions.
  */
 export function MoneyFlowChart({
   graph,
@@ -151,18 +156,34 @@ export function MoneyFlowChart({
   const formatValue = (value: number) =>
     isBalanceHidden ? "••••" : formatRoundedAmount(value, currency);
 
+  // A zoomed view's own subject has nothing more to show.
+  const canFocus = (node: MoneyFlowNode) =>
+    !!onFocusNode && node.id !== graph.rootId && isFocusable(node);
+  /** What activating a node does, as its accessible action; `null` when nothing. */
+  const actionOf = (node: MoneyFlowNode) => {
+    if (canFocus(node)) {
+      return node.subcategories
+        ? "spending:moneyFlow.action.subcategories"
+        : "spending:moneyFlow.action.categories";
+    }
+    return node.categoryId ? "spending:moneyFlow.action.transactions" : null;
+  };
+  const markOf = (node: MoneyFlowNode) => (canFocus(node) ? EXPAND_MARK : "");
+
   const device = isMobile ? "mobile" : "desktop";
   const gutterMax = isMobile && lastColumn <= 1 ? MOBILE_ZOOMED_GUTTER_MAX : GUTTER[device].max;
   const outerLabelMax = gutterMax - LABEL_GAP * 2;
   const fitName = (node: MoneyFlowNode, maxWidth: number) =>
-    fitText(node.name, maxWidth, (text) => measure(text, NAME_FONT));
+    fitText(node.name, maxWidth - measure(markOf(node), NAME_FONT), (text) =>
+      measure(text, NAME_FONT),
+    );
   const gutterFor = (column: number) => {
     let widest = 0;
     for (const node of graph.nodes) {
       if (node.column !== column) continue;
       widest = Math.max(
         widest,
-        measure(fitName(node, outerLabelMax), NAME_FONT),
+        measure(fitName(node, outerLabelMax) + markOf(node), NAME_FONT),
         measure(formatValue(node.value), AMOUNT_FONT),
       );
     }
@@ -187,19 +208,22 @@ export function MoneyFlowChart({
   };
 
   const select = (node: MoneyFlowNode) => {
-    if (node.categoryId) onCategoryClick?.(node.categoryId);
-    else if (isFocusable(node)) onFocusNode?.(node.parentId ?? node.id);
+    // A folded remainder zooms into the destination it was folded from.
+    if (canFocus(node)) onFocusNode?.((node.kind === "more" && node.parentId) || node.id);
+    else if (node.categoryId) onCategoryClick?.(node.categoryId);
   };
 
   const renderNode = (props: SankeyNodeProps) => {
     const node = props.payload as unknown as PositionedNode;
-    const interactive = !!node.categoryId || (isFocusable(node) && !!onFocusNode);
+    const action = actionOf(node);
+    const interactive = action !== null;
     const dimmed = lineage != null && !lineage.has(node.id);
     const labelLeft = node.column === 0 && lastColumn > 0;
     const isOuter = node.column === 0 || node.column === lastColumn;
+    const mark = markOf(node);
     const name = fitName(node, isOuter ? outerLabelMax : middleLabelMax);
     const amount = formatValue(node.value);
-    const labelWidth = Math.max(measure(name, NAME_FONT), measure(amount, AMOUNT_FONT));
+    const labelWidth = Math.max(measure(name + mark, NAME_FONT), measure(amount, AMOUNT_FONT));
     const textX = labelLeft ? props.x - LABEL_GAP : props.x + props.width + LABEL_GAP;
     const labelX = labelLeft ? textX - labelWidth : textX;
     const centerY = props.y + props.height / 2;
@@ -232,7 +256,7 @@ export function MoneyFlowChart({
     };
 
     // Every node is reachable by keyboard so its tooltip (hints, folded
-    // members) is too; only categories and destinations act on Enter.
+    // members) is too; only nodes with an action act on Enter.
     return (
       <g
         key={node.id}
@@ -240,7 +264,11 @@ export function MoneyFlowChart({
         data-node-id={node.id}
         role={interactive ? "button" : "img"}
         tabIndex={node.id === tabStopId ? 0 : -1}
-        aria-label={t("spending:moneyFlow.nodeAria", { name: node.name, amount })}
+        aria-label={
+          action
+            ? t("spending:moneyFlow.nodeActionAria", { name: node.name, amount, action: t(action) })
+            : t("spending:moneyFlow.nodeAria", { name: node.name, amount })
+        }
         aria-describedby={active?.node.id === node.id ? tooltipId : undefined}
         className="group outline-none"
         style={{
@@ -323,6 +351,7 @@ export function MoneyFlowChart({
           style={{ fill: "var(--foreground)" }}
         >
           {name}
+          {mark && <tspan style={{ fill: "var(--muted-foreground)" }}>{mark}</tspan>}
         </text>
         <text
           x={textX}
@@ -458,7 +487,7 @@ export function MoneyFlowChart({
           chartHeight={height}
           totals={graph.totals}
           currency={currency}
-          canFocus={!!onFocusNode && isFocusable(active.node)}
+          canFocus={canFocus(active.node)}
         />
       )}
     </div>
@@ -514,6 +543,8 @@ function MoneyFlowTooltip({
       : HINT_KEYS[node.kind];
   const members = node.members ?? [];
   const hiddenMembers = Math.max(0, members.length - MAX_TOOLTIP_MEMBERS);
+  const formatTooltipAmount = (value: number) =>
+    isBalanceHidden ? "••••" : formatAmount(value, currency);
 
   return (
     <div
@@ -544,9 +575,14 @@ function MoneyFlowTooltip({
       {hintKey && <p className="text-muted-foreground mt-1.5 leading-snug">{t(hintKey)}</p>}
       {node.netRefunds && (
         <p className="text-muted-foreground mt-1.5 leading-snug">
-          {t("spending:moneyFlow.groupRefunds", {
-            amount: isBalanceHidden ? "••••" : formatAmount(node.netRefunds, currency),
-          })}
+          {node.kind === "category"
+            ? t("spending:moneyFlow.categoryRefunds", {
+                refunds: formatTooltipAmount(node.netRefunds),
+                net: formatTooltipAmount(node.value - node.netRefunds),
+              })
+            : t("spending:moneyFlow.groupRefunds", {
+                amount: formatTooltipAmount(node.netRefunds),
+              })}
         </p>
       )}
       {members.length > 0 && (
@@ -569,9 +605,11 @@ function MoneyFlowTooltip({
       {(node.categoryId || canFocus) && (
         <p className="text-muted-foreground/80 mt-2 text-[11px]">
           {t(
-            node.categoryId
-              ? "spending:moneyFlow.clickTransactions"
-              : "spending:moneyFlow.clickCategories",
+            canFocus
+              ? node.subcategories
+                ? "spending:moneyFlow.clickSubcategories"
+                : "spending:moneyFlow.clickCategories"
+              : "spending:moneyFlow.clickTransactions",
           )}
         </p>
       )}
