@@ -197,7 +197,8 @@ export function BackupImportDialog({
                   : "settings:backup_open_title",
             )}
           </DialogTitle>
-          <DialogDescription className="truncate">
+          {/* Truncate a long file name; let the explanation wrap. */}
+          <DialogDescription className={preview && selectedName ? "truncate" : undefined}>
             {preview && selectedName ? selectedName : t("settings:backup_import_description")}
           </DialogDescription>
         </DialogHeader>
