@@ -89,6 +89,7 @@ const PRESET_JSONS: &[(&str, &str)] = &[
     ("ca", include_str!("../../seeds/presets/ca.json")),
     ("gb", include_str!("../../seeds/presets/gb.json")),
     ("es", include_str!("../../seeds/presets/es.json")),
+    ("de", include_str!("../../seeds/presets/de.json")),
     ("fr", include_str!("../../seeds/presets/fr.json")),
     ("nl", include_str!("../../seeds/presets/nl.json")),
     ("au", include_str!("../../seeds/presets/au.json")),
@@ -307,8 +308,50 @@ mod tests {
     }
 
     #[test]
+    fn german_merchants_match_specific_categories() {
+        for (notes, category) in [
+            ("VISA REWE Markt GmbH", "groceries"),
+            ("NETTO MARKEN-DISCOUNT", "groceries"),
+            ("PENNY.Markt GmbH", "groceries"),
+            ("DB Vertrieb GmbH", "transport_public"),
+            ("Stadtwerke Muenster GmbH", "housing_utilities"),
+            (
+                "ARD ZDF Deutschlandradio Beitragsservice",
+                "housing_utilities",
+            ),
+            ("Techniker Krankenkasse", "health_insurance"),
+            ("Telekom Deutschland GmbH", "bills_phone"),
+            ("Lieferando.de", "food_delivery"),
+            ("Entgelt fuer Kontofuehrung", "fees_bank"),
+            ("dm-drogerie markt", "health_pharmacy"),
+            ("Baeckerei Mueller", "food_coffee"),
+        ] {
+            assert_eq!(
+                match_preset("de", notes).as_deref(),
+                Some(category),
+                "{notes}"
+            );
+        }
+    }
+
+    #[test]
+    fn german_merchants_require_complete_names() {
+        for notes in [
+            "NETTOBETRAG",
+            "Netto 123,45 EUR",
+            "PENNYWISE",
+            "OTTO MUELLER",
+            "DEPOT WERTPAPIERE",
+            "ROLLER LEIHE",
+            "REWEB DESIGN",
+        ] {
+            assert_eq!(match_preset("de", notes), None, "{notes}");
+        }
+    }
+
+    #[test]
     fn bundled_presets_have_unique_keys_and_valid_regexes() {
-        for preset_id in ["us", "ca", "gb", "es", "fr", "nl", "au", "nz", "se"] {
+        for preset_id in ["us", "ca", "gb", "es", "de", "fr", "nl", "au", "nz", "se"] {
             let preset = load_preset(preset_id).expect("preset should load");
             assert_eq!(preset.preset_id, preset_id);
             assert!(!preset.rules.is_empty(), "preset {preset_id} has no rules");
