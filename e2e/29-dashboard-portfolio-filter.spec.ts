@@ -36,6 +36,32 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
     });
     expect(deposit.ok()).toBe(true);
   }
+  // Other specs share this profile, so All Accounts shows whatever the whole
+  // profile is worth: compare it with the valuation the dashboard reads. The
+  // portfolio totals below stay exact.
+  const allAccountsTotal = async () => {
+    const response = await page.request.post(`${BASE_URL}/api/v1/valuations/current/query`, {
+      data: { filter: { type: "all" } },
+    });
+    expect(response.ok()).toBe(true);
+    const { summary } = (await response.json()) as { summary: { totalValueBase: number } };
+    return summary.totalValueBase;
+  };
+  const expectAllAccountsTotal = async () => {
+    await expect
+      .poll(
+        async () => {
+          const total = await allAccountsTotal();
+          const text = total.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+          return total >= 1_000_200 && ((await balanceValue.textContent()) ?? "").includes(text);
+        },
+        { timeout: 30000 },
+      )
+      .toBe(true);
+  };
   await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded" });
   const filter = page.getByRole("combobox", { name: /^Choose portfolio:/ });
   // Mobile keeps neighbouring views mounted; scope assertions to the investment headline.
@@ -47,9 +73,7 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
   await expect(
     headlineContainer.locator("..").getByText("All Accounts", { exact: true }),
   ).toHaveCount(0);
-  await expect(balanceValue).toContainText("1,000,200.00", {
-    timeout: 30000,
-  });
+  await expectAllAccountsTotal();
   const privacy = page.getByRole("button", { name: /^(Hide|Show) Balance$/ });
   expect(await privacy.evaluate((element) => element.closest("a"))).toBeNull();
   await privacy.focus();
@@ -60,7 +84,7 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
   await privacy.press("Enter");
   await expect(headlineContainer.getByTestId("portfolio-balance")).toContainText("•••");
   await privacy.press("Enter");
-  await expect(balanceValue).toContainText("1,000,200.00");
+  await expectAllAccountsTotal();
   await headlineContainer.getByTestId("portfolio-balance").hover();
   await expect(page.getByRole("button", { name: "Update prices", exact: true })).toBeVisible();
   await page.mouse.move(0, 0);
@@ -155,9 +179,7 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
   await expect(filter).toHaveAccessibleName("Choose portfolio: Dashboard savings");
   await filter.click();
   await page.getByRole("option", { name: "All Accounts" }).click();
-  await expect(balanceValue).toContainText("1,000,200.00", {
-    timeout: 30000,
-  });
+  await expectAllAccountsTotal();
   await filter.click();
   await page.getByRole("option", { name: "Dashboard savings" }).click();
 
@@ -231,9 +253,7 @@ test("dashboard portfolio selection, creation, persistence, deletion and mobile 
   expect(deleted.ok()).toBe(true);
   await page.reload();
   await expect(filter).toHaveAccessibleName("Choose portfolio: All Accounts");
-  await expect(balanceValue).toContainText("1,000,200.00", {
-    timeout: 30000,
-  });
+  await expectAllAccountsTotal();
   const longName = "Long-term savings and fixed income — retirement investment portfolio";
   const longPortfolio = await page.request.post(`${BASE_URL}/api/v1/portfolios`, {
     data: { name: longName, accountIds: [accountIds[0]] },
