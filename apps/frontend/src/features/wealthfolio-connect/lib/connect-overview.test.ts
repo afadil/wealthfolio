@@ -19,13 +19,16 @@ const brokerAccount = (id: string, connectionId: string, syncEnabled = true) =>
 const localAccount = (id: string, providerAccountId: string, trackingMode = "TRANSACTIONS") =>
   ({ id, name: `Local ${id}`, providerAccountId, trackingMode }) as Account;
 
+// `at` is when the state was last written; the attempt it records started then too.
 const syncState = (accountId: string, syncStatus: BrokerSyncState["syncStatus"], at?: string) =>
   ({
     accountId,
     provider: "SNAPTRADE",
     syncStatus,
     lastAttemptedAt: at ?? null,
-  }) as BrokerSyncState;
+    updatedAt: at,
+    lastRunId: null,
+  }) as unknown as BrokerSyncState;
 
 const run = (
   accountId: string,
@@ -104,7 +107,10 @@ describe("buildAttentionItems", () => {
 
   it("names the brokerage, not the provider, and counts reviewable warnings", () => {
     const accounts = [localAccount("l1", "a1"), localAccount("l2", "a2")];
-    const states = [syncState("l1", "FAILED"), syncState("l2", "NEEDS_REVIEW")];
+    const states = [
+      syncState("l1", "FAILED"),
+      { ...syncState("l2", "NEEDS_REVIEW"), lastRunId: "l2-2026-10-13T10:00:00Z" },
+    ];
     const rows = buildBrokerageRows(
       [connection("c", "Schwab")],
       [brokerAccount("a1", "c"), brokerAccount("a2", "c")],
@@ -112,7 +118,7 @@ describe("buildAttentionItems", () => {
       states,
       "Unknown",
     );
-    // The newest run is a holdings run without warnings.
+    // The state's run has the warnings; a newer holdings run has none.
     const runs = [run("l2", 0, "2026-10-13T10:05:00Z"), run("l2", 3)];
 
     expect(buildAttentionItems(rows, states, accounts, runs)).toEqual([
@@ -133,6 +139,26 @@ describe("buildAttentionItems", () => {
         issueMessage: null,
         reviewCount: 3,
       },
+    ]);
+  });
+
+  it("doesn't explain a review with warnings from a run the state doesn't point to", () => {
+    const accounts = [localAccount("l1", "a1")];
+    // Deferred activity sync: NEEDS_REVIEW with no run of its own.
+    const states = [
+      { ...syncState("l1", "NEEDS_REVIEW"), lastError: "Holdings sync deferred: provider busy" },
+    ];
+    const rows = buildBrokerageRows(
+      [connection("c", "Schwab")],
+      [brokerAccount("a1", "c")],
+      accounts,
+      states,
+      "Unknown",
+    );
+    const olderRunWithWarnings = run("l1", 4, "2026-10-01T10:00:00Z");
+
+    expect(buildAttentionItems(rows, states, accounts, [olderRunWithWarnings])).toEqual([
+      expect.objectContaining({ kind: "needsReview", reviewCount: 0 }),
     ]);
   });
 
@@ -198,6 +224,17 @@ describe("getLastBrokerSyncAt", () => {
 
     expect(getLastBrokerSyncAt(states, runs)?.toISOString()).toBe("2026-10-13T10:01:00.000Z");
     expect(getLastBrokerSyncAt([], [])).toBeNull();
+  });
+
+  it("uses when a completed sync finished, not when it started", () => {
+    const states = [
+      {
+        ...syncState("l1", "IDLE", "2026-10-13T09:20:00Z"),
+        lastAttemptedAt: "2026-10-13T09:00:00Z",
+      },
+    ];
+
+    expect(getLastBrokerSyncAt(states, [])?.toISOString()).toBe("2026-10-13T09:20:00.000Z");
   });
 
   it("ignores attempts and runs that failed or are still running", () => {

@@ -169,10 +169,12 @@ export function buildAttentionItems(
         issueMessage,
       });
     } else if (state.syncStatus === "NEEDS_REVIEW") {
-      // Holdings runs carry no warnings; use the latest run that raised any.
-      const warnings =
-        recentRuns.find((run) => run.accountId === state.accountId && run.summary?.warnings)
-          ?.summary?.warnings ?? 0;
+      // Only the state's own run explains it. Deferred or failed reference syncs have
+      // no run, and an older run's warnings would show a stale count and Review link.
+      const ownRun = state.lastRunId
+        ? recentRuns.find((run) => run.id === state.lastRunId)
+        : undefined;
+      const warnings = ownRun?.summary?.warnings ?? 0;
       items.push({
         kind: "needsReview",
         key: `account:${state.accountId}`,
@@ -198,18 +200,16 @@ const COMPLETED_RUN_STATUSES = new Set<ImportRun["status"]>(["APPLIED", "NEEDS_R
 
 /**
  * Wall-clock time of the latest completed broker sync. The backend stores no such time:
- * lastSuccessfulAt is the provider's data date, and lastAttemptedAt is rewritten when an
- * attempt starts. So an attempt counts only while its account's latest sync completed,
- * and runs count only once they completed.
+ * lastSuccessfulAt is the provider's data date. A state written on completion (IDLE or
+ * NEEDS_REVIEW) has updatedAt set to when that sync finished; failed and running states
+ * are skipped. Runs count once they completed.
  */
 export function getLastBrokerSyncAt(
   syncStates: BrokerSyncState[],
   recentRuns: ImportRun[],
 ): Date | null {
   const times = [
-    ...syncStates
-      .filter((s) => COMPLETED_SYNC_STATUSES.has(s.syncStatus))
-      .map((s) => s.lastAttemptedAt),
+    ...syncStates.filter((s) => COMPLETED_SYNC_STATUSES.has(s.syncStatus)).map((s) => s.updatedAt),
     ...recentRuns
       .filter((r) => COMPLETED_RUN_STATUSES.has(r.status))
       .map((r) => r.finishedAt ?? r.startedAt),
