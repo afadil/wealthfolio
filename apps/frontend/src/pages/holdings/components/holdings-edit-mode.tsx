@@ -75,8 +75,19 @@ const totalCostFrom: CostMath = (shares, averageCost) => shares * averageCost;
 /** total cost ÷ shares = cost-per-share. */
 const averageCostFrom: CostMath = (shares, totalCost) => totalCost / shares;
 
-/** Format a computed cost, trimming trailing zeros. */
-const formatCost = (value: number): string => value.toFixed(8).replace(/\.?0+$/, "");
+/**
+ * Canonical, locale-independent decimal for state and persistence: up to 15
+ * significant digits, trailing zeros trimmed, no grouping, "." separator. This
+ * is the machine form the backend parses and Number() reads; the display is
+ * localized separately by the inputs via useNumberFormatting. Significant digits
+ * (not a fixed number of decimals) keep the error relative to the value, so
+ * shares × cost-per-share reproduces the entered total whatever the share count.
+ */
+const CANONICAL_DECIMAL = new Intl.NumberFormat("en-US", {
+  useGrouping: false,
+  maximumSignificantDigits: 15,
+});
+const formatCost = (value: number): string => CANONICAL_DECIMAL.format(value);
 
 /**
  * Run `derive` over the share count and a cost text, formatting the result the

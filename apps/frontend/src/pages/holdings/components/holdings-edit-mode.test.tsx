@@ -1,7 +1,9 @@
+import { saveManualHoldings } from "@/adapters";
 import { HoldingType, QuoteMode } from "@/lib/constants";
 import type { Account, Holding } from "@/lib/types";
-import { fireEvent, render, screen } from "@/test/render";
+import { fireEvent, render, screen, waitFor } from "@/test/render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { FormattingProvider } from "@wealthfolio/ui";
 import { describe, expect, it, vi } from "vitest";
 
 import { HoldingsEditMode } from "./holdings-edit-mode";
@@ -56,11 +58,16 @@ const holdingFor = (symbol: string): Holding =>
     instrument: { id: symbol, symbol, currency: "USD", quoteMode: QuoteMode.MARKET },
   });
 
-const renderHoldings = (holdings: Holding[]) =>
+const renderHoldings = (holdings: Holding[], locale = "en-US") =>
   render(
     <QueryClientProvider client={new QueryClient()}>
       <HoldingsEditMode holdings={holdings} account={account} isLoading={false} onClose={vi.fn()} />
     </QueryClientProvider>,
+    {
+      wrapper: ({ children }) => (
+        <FormattingProvider locale={locale}>{children}</FormattingProvider>
+      ),
+    },
   );
 
 const renderEditMode = (holding: Holding = makeHolding()) => renderHoldings([holding]);
@@ -167,5 +174,83 @@ describe("HoldingsEditMode cost fields", () => {
     // Editing the second row left the first row alone.
     expect(aaplTotal).toHaveValue("500");
     expect(aaplAverage).toHaveValue("25");
+  });
+
+  it("persists the derived cost per share at full precision", async () => {
+    const saveMock = vi.mocked(saveManualHoldings);
+    saveMock.mockClear();
+    renderEditMode();
+
+    // Total 25 over 1e9 units needs 9 decimals per share (0.000000025); the
+    // persisted value must reproduce the entered total when multiplied back.
+    fireEvent.change(screen.getByTestId("holding-shares-AAPL"), {
+      target: { value: "1000000000" },
+    });
+    fireEvent.change(screen.getByTestId("holding-total-cost-AAPL"), {
+      target: { value: "25" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() =>
+      expect(saveMock).toHaveBeenCalledWith(
+        "account-1",
+        [expect.objectContaining({ quantity: "1000000000", averageCost: "0.000000025" })],
+        {},
+        expect.any(String),
+      ),
+    );
+  });
+
+  it("keeps the persisted cost accurate regardless of share count", async () => {
+    const saveMock = vi.mocked(saveManualHoldings);
+    saveMock.mockClear();
+    renderEditMode();
+
+    // 25 ÷ 1000000001 is non-terminating, so a fixed 15-decimal average drifts
+    // by ~3e-8 here; significant-digit precision must still reconstruct 25.
+    fireEvent.change(screen.getByTestId("holding-shares-AAPL"), {
+      target: { value: "1000000001" },
+    });
+    fireEvent.change(screen.getByTestId("holding-total-cost-AAPL"), {
+      target: { value: "25" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const savedAverageCost = Number(saveMock.mock.calls[0]?.[1]?.[0]?.averageCost);
+    expect(savedAverageCost * 1000000001).toBeCloseTo(25, 8);
+  });
+
+  it("localizes the displayed cost but persists a canonical decimal", async () => {
+    const saveMock = vi.mocked(saveManualHoldings);
+    saveMock.mockClear();
+    renderHoldings([holdingFor("AAPL")], "de-DE");
+
+    fireEvent.change(screen.getByTestId("holding-shares-AAPL"), {
+      target: { value: "1000000000" },
+    });
+    fireEvent.change(screen.getByTestId("holding-total-cost-AAPL"), {
+      target: { value: "25" },
+    });
+
+    // Displayed with the user's locale (comma), not the canonical "."…
+    const displayedAverageCost = screen.getByTestId(
+      "holding-average-cost-AAPL",
+    ) as HTMLInputElement;
+    expect(displayedAverageCost.value).toContain(",");
+    expect(displayedAverageCost.value).not.toContain(".");
+
+    // …but saved with the canonical "." the backend parses.
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() =>
+      expect(saveMock).toHaveBeenCalledWith(
+        "account-1",
+        [expect.objectContaining({ averageCost: "0.000000025" })],
+        {},
+        expect.any(String),
+      ),
+    );
   });
 });
