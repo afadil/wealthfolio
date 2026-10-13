@@ -24,16 +24,16 @@
     "learnMore": "了解有关 Connect 的更多信息",
     "features": {
       "brokerageSync": {
-        "title": "券商同步",
-        "description": "每日自动同步账户和交易。"
+        "title": "已连接的账户",
+        "description": "自动同步券商的交易记录。"
       },
       "deviceSync": {
-        "title": "设备同步",
-        "description": "通过端到端加密在各设备间同步。"
+        "title": "设备同步与备份",
+        "description": "端到端加密同步和自动云备份。"
       },
       "householdView": {
-        "title": "家庭视图",
-        "description": "与家庭成员共享账户。"
+        "title": "家庭投资组合",
+        "description": "共同查看家庭成员的投资。"
       }
     }
   },
@@ -286,5 +286,16 @@
   },
   "errors": {
     "unknown": "未知错误"
+  },
+  "session": {
+    "restoring": "正在恢复 Connect…",
+    "unavailable": "Connect 暂时无法使用",
+    "localAvailable": "本地投资组合仍可使用。请重试连接。"
+  },
+  "rebind": {
+    "title": "更改此个人资料的 Connect 连接？",
+    "description": "你正在连接其他账户或家庭。你的本地投资组合数据将被保留，但现有的券商关联和设备同步设置将被移除。新账户可以向此个人资料添加券商数据。你可以在准备好后重新设置设备同步。如果希望分别管理数据，请使用新的个人资料。",
+    "cancel": "取消",
+    "confirm": "更改连接"
   }
 }

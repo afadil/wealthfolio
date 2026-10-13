@@ -14,7 +14,7 @@ use crate::{
     main_lib::AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::Path,
     http::StatusCode,
     routing::{delete, get, post, put},
     Json, Router,
@@ -30,7 +30,6 @@ use wealthfolio_core::{
         UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
         UpdateValuationRequest as CoreValuationRequest,
     },
-    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
 };
 
@@ -74,6 +73,8 @@ pub struct CreateAlternativeAssetRequest {
     pub purchase_date: Option<String>,
     pub metadata: Option<Value>,
     pub linked_asset_id: Option<String>,
+    #[serde(default)]
+    pub loan: Option<wealthfolio_core::assets::loan::LoanSetup>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +123,8 @@ pub struct AlternativeHoldingResponse {
     pub metadata: Option<Value>,
     pub linked_asset_id: Option<String>,
     pub notes: Option<String>,
+    /// For liabilities: what the card shows, from the calculation that values it.
+    pub loan: Option<wealthfolio_core::assets::loan::LoanSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +133,9 @@ pub struct UpdateAssetDetailsRequest {
     pub name: Option<String>,
     pub metadata: std::collections::HashMap<String, String>,
     pub notes: Option<String>,
+    /// A liability's loan section, saved with the other details.
+    #[serde(default)]
+    pub loan: Option<wealthfolio_core::assets::loan::LoanSetup>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,7 +144,7 @@ pub struct UpdateAssetDetailsRequest {
 
 /// POST /alternative-assets - Creates a new alternative asset with initial valuation
 async fn create_alternative_asset(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<CreateAlternativeAssetRequest>,
 ) -> ApiResult<Json<CreateAlternativeAssetResponse>> {
     // Parse string values to typed values
@@ -172,6 +178,7 @@ async fn create_alternative_asset(
         purchase_date,
         metadata: request.metadata,
         linked_asset_id: request.linked_asset_id,
+        loan: request.loan,
     };
 
     // Delegate to core service
@@ -186,9 +193,7 @@ async fn create_alternative_asset(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
-            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
-            since_date: None,
+            force_full: false,
         },
     );
 
@@ -201,7 +206,7 @@ async fn create_alternative_asset(
 /// PUT /alternative-assets/:id/valuation - Updates the valuation of an alternative asset
 async fn update_alternative_asset_valuation(
     Path(asset_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<UpdateValuationRequest>,
 ) -> ApiResult<Json<UpdateValuationResponse>> {
     // Parse string values
@@ -232,9 +237,7 @@ async fn update_alternative_asset_valuation(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
-            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
-            since_date: None,
+            force_full: false,
         },
     );
 
@@ -248,7 +251,7 @@ async fn update_alternative_asset_valuation(
 /// PUT /alternative-assets/:id/metadata - Updates an alternative asset's details (name, notes, and/or metadata)
 async fn update_alternative_asset_metadata(
     Path(asset_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<UpdateAssetDetailsRequest>,
 ) -> ApiResult<StatusCode> {
     // Convert HashMap<String, String> to HashMap<String, Option<String>>
@@ -271,6 +274,7 @@ async fn update_alternative_asset_metadata(
         name: request.name,
         notes: request.notes,
         metadata: Some(metadata_map),
+        loan: request.loan,
     };
 
     // Delegate to core service
@@ -285,7 +289,7 @@ async fn update_alternative_asset_metadata(
 /// DELETE /alternative-assets/:id - Deletes an alternative asset and related data
 async fn delete_alternative_asset(
     Path(asset_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state
         .alternative_asset_service
@@ -298,9 +302,7 @@ async fn delete_alternative_asset(
         PortfolioJobConfig {
             account_ids: None,
             market_sync_mode: MarketSyncMode::None,
-            snapshot_mode: SnapshotRecalcMode::IncrementalFromLast,
-            valuation_mode: ValuationRecalcMode::IncrementalFromLast,
-            since_date: None,
+            force_full: false,
         },
     );
 
@@ -310,7 +312,7 @@ async fn delete_alternative_asset(
 /// POST /alternative-assets/:id/link-liability - Links a liability to a target asset
 async fn link_liability(
     Path(liability_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<LinkLiabilityRequest>,
 ) -> ApiResult<StatusCode> {
     let core_request = CoreLinkRequest {
@@ -329,7 +331,7 @@ async fn link_liability(
 /// DELETE /alternative-assets/:id/link-liability - Unlinks a liability from its linked asset
 async fn unlink_liability(
     Path(liability_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state
         .alternative_asset_service
@@ -341,7 +343,7 @@ async fn unlink_liability(
 
 /// GET /alternative-holdings - Gets all alternative holdings (assets with their latest valuations)
 async fn get_alternative_holdings(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AlternativeHoldingResponse>>> {
     let holdings = state.alternative_asset_service.get_alternative_holdings()?;
 
@@ -374,6 +376,7 @@ async fn get_alternative_holdings(
                 metadata: h.metadata,
                 linked_asset_id: h.linked_asset_id,
                 notes: h.notes,
+                loan: h.loan,
             }
         })
         .collect();
@@ -385,7 +388,7 @@ async fn get_alternative_holdings(
 // Router
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/alternative-assets", post(create_alternative_asset))
         .route(
@@ -406,4 +409,90 @@ pub fn router() -> Router<Arc<AppState>> {
             put(update_alternative_asset_metadata),
         )
         .route("/alternative-holdings", get(get_alternative_holdings))
+        .route("/loans/calculate", post(calculate_loan))
+        .route("/loans/recalculate", post(recalculate_loan))
+        .route("/loans/preview", post(preview_loan_terms))
+        .route("/loans/{id}/actions", post(apply_loan_action))
+        .route("/loans/{id}/payments", get(get_loan_payments))
+        .route("/loans/payments/{activity_id}", post(link_loan_payment))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewLoanTermsRequest {
+    #[serde(default)]
+    asset_id: Option<String>,
+    setup: wealthfolio_core::assets::loan::LoanSetup,
+}
+
+async fn preview_loan_terms(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(request): Json<PreviewLoanTermsRequest>,
+) -> ApiResult<Json<Option<wealthfolio_core::assets::loan::LoanSchedulePreview>>> {
+    Ok(Json(state.alternative_asset_service.preview_loan_terms(
+        request.asset_id.as_deref(),
+        &request.setup,
+    )?))
+}
+
+async fn get_loan_payments(
+    Path(asset_id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<wealthfolio_core::assets::loan::LoanPayment>>> {
+    Ok(Json(
+        state
+            .alternative_asset_service
+            .get_loan_payments(&asset_id)?,
+    ))
+}
+
+async fn link_loan_payment(
+    Path(activity_id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(link): Json<wealthfolio_core::assets::loan::PaymentLink>,
+) -> ApiResult<StatusCode> {
+    state
+        .alternative_asset_service
+        .link_loan_payment(&activity_id, link)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn apply_loan_action(
+    Path(asset_id): Path<String>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+    Json(action): Json<wealthfolio_core::assets::loan::LoanAction>,
+) -> ApiResult<StatusCode> {
+    let result = state
+        .alternative_asset_service
+        .apply_loan_action(&asset_id, action)
+        .await?;
+    // Recorded balances change valuations, as a manual quote save does.
+    if result.balances_changed {
+        enqueue_portfolio_job(
+            state.clone(),
+            PortfolioJobConfig {
+                account_ids: None,
+                market_sync_mode: MarketSyncMode::None,
+                force_full: false,
+            },
+        );
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn calculate_loan(
+    Json(request): Json<wealthfolio_core::assets::loan::LoanCalculationRequest>,
+) -> ApiResult<Json<Option<wealthfolio_core::assets::loan::LoanCalculation>>> {
+    Ok(Json(wealthfolio_core::assets::loan::calculate_loan(
+        &request,
+    )))
+}
+
+async fn recalculate_loan(
+    Json(request): Json<wealthfolio_core::assets::loan::LoanRecalculationRequest>,
+) -> ApiResult<Json<Option<wealthfolio_core::assets::loan::LoanRecalculation>>> {
+    Ok(Json(wealthfolio_core::assets::loan::recalculate_loan(
+        &request,
+    )))
 }

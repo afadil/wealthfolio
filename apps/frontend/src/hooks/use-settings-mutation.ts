@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 
 export function useSettingsMutation(
   setSettings: React.Dispatch<React.SetStateAction<Settings | null>>,
-  applySettingsToDocument: (newSettings: Settings) => void,
+  applySettingsToDocument: (newSettings: Settings) => void | Promise<void>,
 ) {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
@@ -37,9 +37,14 @@ export function useSettingsMutation(
         queryClient.invalidateQueries({ queryKey: [QueryKeys.RETIREMENT_OVERVIEW] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.SAVE_UP_OVERVIEW] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.SAVE_UP_PREVIEW] });
+        // Loan payments are dated by their day in that zone, as are the date
+        // ranges of activity searches, including a loan's payment candidates.
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ALTERNATIVE_HOLDINGS] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ASSET_DATA] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.ACTIVITIES] });
       }
       setSettings(updatedSettings);
-      applySettingsToDocument(updatedSettings);
+      await applySettingsToDocument(updatedSettings);
       // Don't show toast during onboarding
       const isOnboarding =
         "onboardingCompleted" in variables || !updatedSettings.onboardingCompleted;

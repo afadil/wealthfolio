@@ -1,10 +1,9 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
 use log::{debug, info, warn};
 use serde::Deserialize;
-use tauri::State;
 use wealthfolio_core::activities::Activity;
 use wealthfolio_spending::activity_assignments::{
     ActivityTaxonomyAssignment, BulkCategoryAssignment,
@@ -87,9 +86,7 @@ async fn spending_enabled(state: &Arc<ServiceContext>) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn get_spending_settings(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<SpendingSettings, String> {
+pub async fn get_spending_settings(state: ProfileAccess) -> Result<SpendingSettings, String> {
     let context = state.context()?;
     debug!("Fetching spending settings...");
     context
@@ -102,7 +99,7 @@ pub async fn get_spending_settings(
 #[tauri::command]
 pub async fn update_spending_settings(
     update: SpendingSettingsUpdate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<SpendingSettings, String> {
     let context = state.context()?;
     debug!("Updating spending settings...");
@@ -136,7 +133,7 @@ pub async fn update_spending_settings(
 #[tauri::command]
 pub async fn list_cash_activities(
     filter: Option<CashActivityFilter>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<CashActivity>, String> {
     let context = state.context()?;
     debug!("Listing cash activities...");
@@ -153,7 +150,7 @@ pub async fn list_cash_activities(
 #[tauri::command]
 pub async fn search_cash_activities(
     request: Option<CashActivitySearchRequest>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<CashActivitySearchResponse, String> {
     let context = state.context()?;
     debug!("Searching cash activities...");
@@ -182,7 +179,7 @@ pub async fn search_cash_activities(
 pub async fn set_activity_event(
     activity_id: String,
     event_id: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Activity, String> {
     let context = state.context()?;
     context
@@ -195,7 +192,7 @@ pub async fn set_activity_event(
 #[tauri::command]
 pub async fn get_activity_assignments(
     activity_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ActivityTaxonomyAssignment>, String> {
     let context = state.context()?;
     context
@@ -210,7 +207,7 @@ pub async fn assign_activity_category(
     activity_id: String,
     taxonomy_id: String,
     category_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ActivityTaxonomyAssignment, String> {
     let context = state.context()?;
     context
@@ -224,7 +221,7 @@ pub async fn assign_activity_category(
 pub async fn unassign_activity_category(
     activity_id: String,
     taxonomy_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     context
@@ -237,7 +234,7 @@ pub async fn unassign_activity_category(
 #[tauri::command]
 pub async fn get_activity_splits(
     activity_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ActivitySplit>, String> {
     let context = state.context()?;
     context
@@ -251,7 +248,7 @@ pub async fn get_activity_splits(
 pub async fn replace_activity_splits(
     activity_id: String,
     splits: Vec<NewActivitySplit>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ActivitySplit>, String> {
     let context = state.context()?;
     context
@@ -264,7 +261,7 @@ pub async fn replace_activity_splits(
 #[tauri::command]
 pub async fn clear_activity_splits(
     activity_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     context
@@ -280,7 +277,7 @@ pub async fn clear_activity_splits(
 #[tauri::command]
 pub async fn bulk_assign_categories(
     items: Vec<BulkCategoryAssignment>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ActivityTaxonomyAssignment>, String> {
     let context = state.context()?;
     if items.len() > MAX_BULK_CATEGORY_ASSIGNMENTS {
@@ -297,7 +294,7 @@ pub async fn bulk_assign_categories(
 
 #[tauri::command]
 pub async fn list_categorization_rules(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<CategorizationRule>, String> {
     let context = state.context()?;
     context
@@ -310,7 +307,7 @@ pub async fn list_categorization_rules(
 #[tauri::command]
 pub async fn create_categorization_rule(
     rule: NewCategorizationRule,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<CategorizationRule, String> {
     let context = state.context()?;
     let created = context
@@ -326,7 +323,7 @@ pub async fn create_categorization_rule(
 pub async fn update_categorization_rule(
     id: String,
     patch: UpdateCategorizationRule,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<CategorizationRule, String> {
     let context = state.context()?;
     let updated = context
@@ -345,7 +342,7 @@ pub async fn update_categorization_rule(
 #[tauri::command]
 pub async fn upsert_categorization_rule(
     rule: NewCategorizationRule,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<CategorizationRule, String> {
     let context = state.context()?;
     let saved = context
@@ -358,10 +355,7 @@ pub async fn upsert_categorization_rule(
 }
 
 #[tauri::command]
-pub async fn delete_categorization_rule(
-    id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_categorization_rule(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .categorization_rules_service()
@@ -373,7 +367,7 @@ pub async fn delete_categorization_rule(
 #[tauri::command]
 pub async fn rerun_categorization_rules(
     only_uncategorized: bool,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<usize, String> {
     let context = state.context()?;
     let s = context
@@ -392,9 +386,7 @@ pub async fn rerun_categorization_rules(
 }
 
 #[tauri::command]
-pub async fn list_rule_presets(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<RulePresetSummary>, String> {
+pub async fn list_rule_presets(state: ProfileAccess) -> Result<Vec<RulePresetSummary>, String> {
     let context = state.context()?;
     if !spending_enabled(&context).await? {
         return Ok(Vec::new());
@@ -409,7 +401,7 @@ pub async fn list_rule_presets(
 #[tauri::command]
 pub async fn import_rule_preset(
     preset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportPresetResult, String> {
     let context = state.context()?;
     // Build the categoryKey → (taxonomy_id, category_id) resolver from the
@@ -439,7 +431,7 @@ pub async fn import_rule_preset(
 #[tauri::command]
 pub async fn remove_rule_preset(
     preset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<RemovePresetResult, String> {
     let context = state.context()?;
     context
@@ -450,7 +442,7 @@ pub async fn remove_rule_preset(
 }
 
 #[tauri::command]
-pub async fn list_event_types(state: State<'_, DatabaseRuntime>) -> Result<Vec<EventType>, String> {
+pub async fn list_event_types(state: ProfileAccess) -> Result<Vec<EventType>, String> {
     let context = state.context()?;
     if !spending_enabled(&context).await? {
         return Ok(Vec::new());
@@ -465,7 +457,7 @@ pub async fn list_event_types(state: State<'_, DatabaseRuntime>) -> Result<Vec<E
 #[tauri::command]
 pub async fn create_event_type(
     new_type: NewEventType,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<EventType, String> {
     let context = state.context()?;
     context
@@ -495,7 +487,7 @@ where
 pub async fn update_event_type(
     id: String,
     patch: UpdateEventType,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<EventType, String> {
     let context = state.context()?;
     context
@@ -506,10 +498,7 @@ pub async fn update_event_type(
 }
 
 #[tauri::command]
-pub async fn delete_event_type(
-    id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_event_type(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .events_service()
@@ -519,7 +508,7 @@ pub async fn delete_event_type(
 }
 
 #[tauri::command]
-pub async fn list_events(state: State<'_, DatabaseRuntime>) -> Result<Vec<Event>, String> {
+pub async fn list_events(state: ProfileAccess) -> Result<Vec<Event>, String> {
     let context = state.context()?;
     if !spending_enabled(&context).await? {
         return Ok(Vec::new());
@@ -532,10 +521,7 @@ pub async fn list_events(state: State<'_, DatabaseRuntime>) -> Result<Vec<Event>
 }
 
 #[tauri::command]
-pub async fn create_event(
-    event: NewEvent,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Event, String> {
+pub async fn create_event(event: NewEvent, state: ProfileAccess) -> Result<Event, String> {
     let context = state.context()?;
     context
         .events_service()
@@ -548,7 +534,7 @@ pub async fn create_event(
 pub async fn update_event(
     id: String,
     patch: UpdateEvent,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Event, String> {
     let context = state.context()?;
     context
@@ -559,7 +545,7 @@ pub async fn update_event(
 }
 
 #[tauri::command]
-pub async fn delete_event(id: String, state: State<'_, DatabaseRuntime>) -> Result<(), String> {
+pub async fn delete_event(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .events_service()
@@ -571,7 +557,7 @@ pub async fn delete_event(id: String, state: State<'_, DatabaseRuntime>) -> Resu
 #[tauri::command]
 pub async fn get_budget(
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -587,7 +573,7 @@ pub async fn get_budget(
 pub async fn upsert_budget_target(
     target: NewBudgetTarget,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -603,7 +589,7 @@ pub async fn upsert_budget_target(
 pub async fn delete_budget_target(
     id: String,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -619,7 +605,7 @@ pub async fn delete_budget_target(
 pub async fn upsert_budget_rollover_setting(
     setting: NewBudgetRolloverSetting,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -635,7 +621,7 @@ pub async fn upsert_budget_rollover_setting(
 pub async fn delete_budget_rollover_setting(
     id: String,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -651,7 +637,7 @@ pub async fn delete_budget_rollover_setting(
 pub async fn create_budget_group(
     group: NewBudgetGroup,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -668,7 +654,7 @@ pub async fn update_budget_group(
     id: String,
     patch: UpdateBudgetGroup,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -685,7 +671,7 @@ pub async fn delete_budget_group(
     id: String,
     reassign_to_group_id: String,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -708,7 +694,7 @@ pub async fn assign_category_to_group(
     category_id: String,
     group_id: String,
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -723,7 +709,7 @@ pub async fn assign_category_to_group(
 #[tauri::command]
 pub async fn reset_budget_groups(
     period_key: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -740,7 +726,7 @@ pub async fn copy_budget_targets(
     source_period_key: String,
     target_period_key: String,
     overwrite: bool,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<BudgetSnapshot, String> {
     let context = state.context()?;
     let base_currency = context.get_base_currency();
@@ -761,7 +747,7 @@ pub async fn copy_budget_targets(
 #[tauri::command]
 pub async fn get_spending_report(
     request: ReportRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<MonthlyReport, String> {
     let context = state.context()?;
     let timezone = context.get_timezone();
@@ -776,7 +762,7 @@ pub async fn get_spending_report(
 #[tauri::command]
 pub async fn get_spending_insight(
     request: SpendingInsightRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<SpendingInsight, String> {
     let context = state.context()?;
     let currency = context.get_base_currency();
@@ -791,7 +777,7 @@ pub async fn get_spending_insight(
 #[tauri::command]
 pub async fn get_event_spending_summaries(
     request: Option<EventSummariesRequest>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<EventSpendingSummary>, String> {
     let context = state.context()?;
     let mut req = request.unwrap_or(EventSummariesRequest {

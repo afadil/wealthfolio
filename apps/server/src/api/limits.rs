@@ -4,7 +4,7 @@ use crate::{
     api::shared::trigger_lightweight_portfolio_update, error::ApiResult, main_lib::AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::Path,
     http::StatusCode,
     routing::{get, put},
     Json, Router,
@@ -51,14 +51,14 @@ fn validate_contribution_limit_accounts(
 }
 
 async fn get_contribution_limits(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<ContributionLimit>>> {
     let limits = state.limits_service.get_contribution_limits()?;
     Ok(Json(limits))
 }
 
 async fn create_contribution_limit(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(new_limit): Json<NewContributionLimit>,
 ) -> ApiResult<Json<ContributionLimit>> {
     validate_contribution_limit_accounts(&state, &new_limit)?;
@@ -72,7 +72,7 @@ async fn create_contribution_limit(
 
 async fn update_contribution_limit(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(updated): Json<NewContributionLimit>,
 ) -> ApiResult<Json<ContributionLimit>> {
     validate_contribution_limit_accounts(&state, &updated)?;
@@ -86,7 +86,7 @@ async fn update_contribution_limit(
 
 async fn delete_contribution_limit(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.limits_service.delete_contribution_limit(&id).await?;
     trigger_lightweight_portfolio_update(state);
@@ -95,16 +95,20 @@ async fn delete_contribution_limit(
 
 async fn calculate_deposits_for_contribution_limit(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<DepositsCalculation>> {
-    let base = state.base_currency.read().unwrap().clone();
+    let base = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     let calc = state
         .limits_service
         .calculate_deposits_for_contribution_limit(&id, &base)?;
     Ok(Json(calc))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/limits",

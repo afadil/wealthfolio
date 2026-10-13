@@ -48,7 +48,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           title: isMobile ? "!text-sm !font-semibold" : undefined,
           description: isMobile ? "!text-[0.8125rem] !leading-tight" : undefined,
           actionButton: isMobile
-            ? "!bg-transparent !border-none !p-0 !font-semibold !text-[0.8125rem] !underline !underline-offset-2"
+            ? "!bg-transparent !text-inherit !border-none !p-0 !font-semibold !text-[0.8125rem] !underline !underline-offset-2"
             : undefined,
           closeButton:
             "!absolute !top-2 !right-2 !left-auto !transform-none !border-none" +

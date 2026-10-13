@@ -1,8 +1,9 @@
 # E2E Tests
 
 Wealthfolio E2E tests use [Playwright](https://playwright.dev/) and run against
-the **web app** (not the Tauri desktop app). There are **no mocks** — both
-frontend and backend must be running against a fresh database.
+the **web app** (not the Tauri desktop app). The frontend and Rust backend run
+against a fresh SQLite database. The automated runner uses synthetic market-data
+fixtures; application APIs and persistence are not mocked.
 
 ---
 
@@ -26,6 +27,17 @@ Playwright, and shuts everything down.
 pnpm test:e2e
 ```
 
+The runner replaces supported market-data providers with fixtures and disables
+other providers. Treasury fixtures supply security terms and yield curves to the
+real Treasury parser and calculator. See
+[the fixture contract](fixtures/quotes/README.md).
+
+Run the regular bond regression with the same setup:
+
+```bash
+pnpm test:e2e e2e/22-bond-fixtures.spec.ts
+```
+
 To open the Playwright UI instead:
 
 ```bash
@@ -45,17 +57,23 @@ restarting the server on every run.
 node scripts/prep-e2e.mjs
 ```
 
-This creates a new timestamped SQLite database (e.g.
-`db/app-testing-20260411T120000Z.db`) and writes its path to `.env.web`. **Run
-this every time** before starting the server — it ensures test isolation.
+This creates a unique timestamped data directory (e.g.
+`db/app-testing-20260411T120000Z-XXXXXX/`) and writes its database, vault, and
+addon paths to `.env.web`. The profile registry and profile databases stay in
+that directory too. **Run this every time** before starting the server —
+changing only the database filename would reuse the previous installation's
+profiles.
 
 #### Step 2 — Start the web app
 
 **Option A — watch the terminal output directly:**
 
 ```bash
-pnpm run dev:web
+WEALTHFOLIO_E2E=1 WEALTHFOLIO_FIXTURE_DIR="$PWD/e2e/fixtures/quotes" pnpm run dev:web
 ```
+
+Leave those fixture variables unset only when running the opt-in live-provider
+spec.
 
 Wait until you see Vite's "ready in Xms" and the Rust server binding messages,
 then move on to Step 3 in a separate terminal.
@@ -63,7 +81,7 @@ then move on to Step 3 in a separate terminal.
 **Option B — redirect output to a log file and use the wait script:**
 
 ```bash
-pnpm run dev:web > /tmp/wealthfolio-dev2.log 2>&1 &
+WEALTHFOLIO_E2E=1 WEALTHFOLIO_FIXTURE_DIR="$PWD/e2e/fixtures/quotes" pnpm run dev:web > /tmp/wealthfolio-dev2.log 2>&1 &
 ./scripts/wait-for-both-servers-to-be-ready.sh
 ```
 
@@ -125,6 +143,18 @@ npx playwright test && npx playwright show-report
 | `10-symbol-mapping-validation.spec.ts` | Symbol mapping real-time validation (Yahoo Finance, Börse Frankfurt)                                                        |
 | `13-multi-exchange-import.spec.ts`     | Multi-exchange CSV import: XETRA/LSE/TSX/NASDAQ resolution, region & instrument-type classification (issue #855)            |
 | `16-final-cash-policy.spec.ts`         | Final-cash writer policy through CSV import: persisted amounts + review flags per policy row, fixture-computed ledger total |
+| `20-asset-exchange-edit.spec.ts`       | Asset exchange edits: unchanged keys, duplicate-identity errors, and ISO-only venues                                        |
+| `21-bond-live.spec.ts`                 | Opt-in real-provider bond checks; requires `WF_BOND_LIVE_E2E=1` and a server started without fixture mode                   |
+| `22-bond-fixtures.spec.ts`             | UI bond creation/buy, CUSIP/ISIN reuse, provider terms, numerical Treasury prices, holdings valuation, and type filters     |
+| `23-loan-lifecycle.spec.ts`            | Shared loan fixture lifecycle, net-worth consistency, loan creation, and asset-type presentation                            |
+| `24-loan-editing.spec.ts`              | Loan event management, form validation, interest conventions, balance edits, and recalculation                              |
+| `25-loan-payments.spec.ts`             | Loan payments from a cash account: Paid from, linking from Spending and the loan, suggestions, extra repayments, unlinking  |
+| `26-cost-basis-transfer.spec.ts`       | A transfer between accounts on different cost basis methods; switching the sender's method recalculates the receiver        |
+| `27-cost-basis-methods.spec.ts`        | Switching an account between FIFO, LIFO, HIFO and WAC in the account form, and the book cost each leaves                    |
+| `29-asset-mobile-scroll.spec.ts`       | Mobile asset section switching preserves page scroll while neighboring virtualized activity lists mount                     |
+| `30-activity-scroll.spec.ts`           | Desktop asset/account activity tabs preserve page scroll; Spending selection and mobile tab switching preserve scroll       |
+| `31-manual-liability.spec.ts`          | Manual loan origination, balance correction/deletion, principal fallback, and net-worth consistency                         |
+| `31-formatting-regions.spec.ts`        | Austria, Romania, and Bulgaria formatting selections persist after saving and reloading settings                            |
 
 ---
 
@@ -154,3 +184,26 @@ npx playwright show-report
 # Record a trace for a failing test (trace is saved on retry)
 # Already configured in playwright.config.ts: trace: "on-first-retry"
 ```
+
+## Profile startup and switching
+
+The isolated profile suite uses a disposable installation directory, a generated
+server secret, and the production web build. It starts its own server and does
+not run `prep-e2e.mjs` or rewrite `.env.web`.
+
+Run from the repository root:
+
+```bash
+cargo build -p wealthfolio-server
+pnpm build
+pnpm exec playwright test --config playwright.profiles.config.ts
+```
+
+Rebuild for web if the last frontend build targeted Tauri. Chrome must be
+installed and port 18388 available. The suite exercises profile switching,
+appearance, shared-browser tab routing, and mobile navigation. Native privacy
+covers, OS lifecycle events, and native OAuth require device testing.
+
+See the
+[profile architecture](../docs/architecture/multi-profile-and-app-lock.md) for
+access boundaries and additional release verification requirements.

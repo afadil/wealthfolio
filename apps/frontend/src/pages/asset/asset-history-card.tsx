@@ -1,3 +1,4 @@
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { searchActivities } from "@/adapters";
 import HistoryChart, {
   type HistoryChartActivity,
@@ -33,7 +34,7 @@ import {
   useNumberFormatting,
 } from "@wealthfolio/ui";
 import { format, subMonths } from "date-fns";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ASSET_MARKER_ACTIVITY_TYPES,
@@ -74,20 +75,10 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
   const syncMarketDataMutation = useSyncMarketDataMutation(true);
   const { isBalanceHidden } = useBalancePrivacy();
   const [refreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
-  const [showActivityMarkers, setShowActivityMarkers] = useState<boolean>(() => {
-    try {
-      return window.localStorage.getItem(SHOW_ACTIVITY_MARKERS_STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(SHOW_ACTIVITY_MARKERS_STORAGE_KEY, String(showActivityMarkers));
-    } catch {
-      // localStorage unavailable (e.g. private browsing); the toggle just won't persist.
-    }
-  }, [showActivityMarkers]);
+  const [showActivityMarkers, setShowActivityMarkers] = usePersistentState(
+    SHOW_ACTIVITY_MARKERS_STORAGE_KEY,
+    false,
+  );
   const [selectedActivityDate, setSelectedActivityDate] = useState<string | null>(null);
   const [isActivitySheetOpen, setIsActivitySheetOpen] = useState(false);
 

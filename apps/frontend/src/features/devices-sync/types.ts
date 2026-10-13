@@ -224,6 +224,8 @@ export interface PairingSession {
 
 // Claimer session state (for new device being paired)
 export interface ClaimerSession {
+  /** Enrollment that claimed the pairing; prevents writes after an account change. */
+  deviceId: string;
   pairingId: string;
   code: string;
   ephemeralSecretKey: string; // base64

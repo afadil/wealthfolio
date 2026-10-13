@@ -2,10 +2,10 @@
 // Uses the existing Tauri keyring integration via secrets commands
 // =================================================================
 
-import { getSecret, setSecret, logger } from "@/adapters";
+import { logger } from "@/adapters";
 
 // Storage key for sync identity in keychain
-const SYNC_IDENTITY_KEY = "sync_identity";
+import { profileCommand } from "@/features/profiles/api";
 
 /**
  * Device sync identity stored in keychain as a single JSON object
@@ -47,7 +47,7 @@ function migrateIdentity(data: Record<string, unknown>): SyncIdentity | null {
  */
 async function getIdentity(): Promise<SyncIdentity | null> {
   try {
-    const json = await getSecret(SYNC_IDENTITY_KEY);
+    const json = await profileCommand<string | null>("get_profile_sync_identity", {}, true);
     if (!json) return null;
     const data = JSON.parse(json);
     return migrateIdentity(data);
@@ -61,7 +61,11 @@ async function getIdentity(): Promise<SyncIdentity | null> {
  * Save the sync identity to keychain
  */
 async function saveIdentity(identity: SyncIdentity): Promise<void> {
-  await setSecret(SYNC_IDENTITY_KEY, JSON.stringify(identity));
+  await profileCommand(
+    "update_profile_sync_identity",
+    { identity: JSON.stringify(identity) },
+    true,
+  );
 }
 
 /**
@@ -88,9 +92,12 @@ export const syncStorage = {
   /**
    * Clear only the root key (used during key rotation or re-pairing).
    */
-  async clearRootKey(): Promise<void> {
+  async clearRootKey(expectedDeviceId: string | null): Promise<void> {
     const current = await getIdentity();
     if (current) {
+      if (!expectedDeviceId || current.deviceId !== expectedDeviceId) {
+        throw new Error("Device enrollment changed. Start sync setup again.");
+      }
       const { rootKey: _, deviceSecretKey: __, devicePublicKey: ___, ...rest } = current;
       await saveIdentity(rest as SyncIdentity);
     }
@@ -111,11 +118,12 @@ export const syncStorage = {
   async setE2EECredentials(
     rootKey: string,
     keyVersion: number,
+    expectedDeviceId: string,
     keypair?: { secretKey: string; publicKey: string },
   ): Promise<void> {
     const current = await getIdentity();
-    if (!current) {
-      throw new Error("No sync identity exists. Set device nonce first.");
+    if (!current || !expectedDeviceId || current.deviceId !== expectedDeviceId) {
+      throw new Error("Device enrollment changed. Start sync setup again.");
     }
     await saveIdentity({
       ...current,

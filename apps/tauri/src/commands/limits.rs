@@ -1,8 +1,7 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 
 use crate::context::ServiceContext;
 use log::debug;
-use tauri::State;
 use wealthfolio_core::{
     accounts::{account_supports_purpose, AccountPurpose},
     limits::{ContributionLimit, DepositsCalculation, NewContributionLimit},
@@ -49,7 +48,7 @@ fn validate_contribution_limit_accounts(
 
 #[tauri::command]
 pub async fn get_contribution_limits(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ContributionLimit>, String> {
     let context = state.context()?;
     debug!("Fetching contribution limits...");
@@ -62,7 +61,7 @@ pub async fn get_contribution_limits(
 #[tauri::command]
 pub async fn create_contribution_limit(
     new_limit: NewContributionLimit,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ContributionLimit, String> {
     let context = state.context()?;
     debug!("Creating new contribution limit...");
@@ -78,7 +77,7 @@ pub async fn create_contribution_limit(
 pub async fn update_contribution_limit(
     id: String,
     updated_limit: NewContributionLimit,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ContributionLimit, String> {
     let context = state.context()?;
     debug!("Updating contribution limit...");
@@ -91,10 +90,7 @@ pub async fn update_contribution_limit(
 }
 
 #[tauri::command]
-pub async fn delete_contribution_limit(
-    id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_contribution_limit(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     debug!("Deleting contribution limit...");
     context
@@ -107,7 +103,7 @@ pub async fn delete_contribution_limit(
 #[tauri::command]
 pub async fn calculate_deposits_for_contribution_limit(
     limit_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<DepositsCalculation, String> {
     let context = state.context()?;
     debug!("Calculating deposits for contribution limit...");

@@ -30,6 +30,9 @@ describe("locale formatting", () => {
     expect(resolveFormattingLocale("DE", "en")).toBe("de-DE");
     expect(resolveFormattingLocale("DE", "ja")).toBe("de-DE");
     expect(resolveFormattingLocale("TW", "en")).toBe("zh-TW");
+    expect(resolveFormattingLocale("AT", "en")).toBe("de-AT");
+    expect(resolveFormattingLocale("RO", "en")).toBe("ro-RO");
+    expect(resolveFormattingLocale("BG", "en")).toBe("bg-BG");
     expect(resolveFormattingLocale("en-US", "fr")).toBe("en-US");
   });
 
@@ -42,6 +45,35 @@ describe("locale formatting", () => {
       expect(resolveFormattingLocale(locale)).toBe("en");
     } finally {
       languages.mockRestore();
+    }
+  });
+
+  it("skips reported system locales Intl cannot use", () => {
+    const languages = vi
+      .spyOn(window.navigator, "languages", "get")
+      .mockReturnValue(["C", "POSIX", "de-DE"]);
+
+    try {
+      expect(resolveFormattingLocale("system")).toBe("de-DE");
+    } finally {
+      languages.mockRestore();
+    }
+  });
+
+  it("falls back to a usable locale when WebKitGTK reports C for LC_ALL=C.UTF-8", () => {
+    const languages = vi.spyOn(window.navigator, "languages", "get").mockReturnValue(["C"]);
+    const language = vi.spyOn(window.navigator, "language", "get").mockReturnValue("C");
+
+    try {
+      const locale = resolveFormattingLocale("system");
+      expect(Intl.NumberFormat.supportedLocalesOf(locale)).toEqual([locale]);
+      expect(() => dateFnsLocaleFor(locale)).not.toThrow();
+      expect(createFormatter("system", "UTC").formatDecimal(1234.5)).toBe(
+        createFormatter(locale, "UTC").formatDecimal(1234.5),
+      );
+    } finally {
+      languages.mockRestore();
+      language.mockRestore();
     }
   });
 
@@ -297,6 +329,9 @@ describe("locale formatting", () => {
     expect(fr.formatAmount(1234.56, "EUR")).toMatch(/^1[\u00a0\u202f ]234,56\s*€/);
     expect(us.formatCompactAmount(1_250_000, "USD")).toBe("$1.25M");
     expect(fr.formatCompactAmount(1_250_000, "EUR")).toMatch(/^1,25\s*M\s*€/);
+    const ca = createFormatter("en-CA");
+    expect(ca.formatCompactAmount(47_000, "USD")).toBe("US$47K");
+    expect(ca.formatCompactAmount(47_000, "USD", true, "narrowSymbol")).toBe("$47K");
     expect(us.formatPercent(-0.125)).toBe("-12.50%");
     expect(fr.formatPercent(0.125)).toMatch(/^12,50[\u00a0\u202f ]%$/);
     expect(us.formatQuantity(1234.56789)).toBe("1,234.56789");
@@ -407,5 +442,136 @@ describe("pt-PT formatting", () => {
     expect(locale.code).toBe("pt");
     expect(format(date, "p", { locale })).toBe("15:30");
     expect(format(date, "PPPP", { locale })).toBe("segunda-feira, 9 de março de 2026");
+  });
+});
+
+describe("de-CH formatting", () => {
+  // Switzerland keeps German calendar text but neither German nor French
+  // separators: digits group with an apostrophe and the decimal mark is a dot.
+  const swissDecimal = /^1['’]234\.56$/;
+
+  it("resolves Switzerland to Swiss German, not Germany", () => {
+    expect(resolveFormattingLocale("CH")).toBe("de-CH");
+    expect(resolveFormattingLocale("de-CH")).toBe("de-CH");
+  });
+
+  it("groups with an apostrophe and marks decimals with a dot", () => {
+    const formatter = createFormatter(resolveFormattingLocale("CH"), "UTC");
+
+    expect(formatter.formatDecimal(1234.56)).toMatch(swissDecimal);
+    expect(formatter.formatAmount(1234.56, "CHF")).toMatch(
+      /^CHF\s?1['’]234\.56$|^1['’]234\.56\s?CHF$/,
+    );
+    expect(formatter.formatPercent(0.125, { digits: 1 })).toMatch(/^12\.5\s*%$/);
+    // Germany shares the language and differs on both separators.
+    expect(createFormatter("de-DE", "UTC").formatDecimal(1234.56)).toBe("1.234,56");
+  });
+
+  it("writes dates day-first with dot separators", () => {
+    const formatter = createFormatter(resolveFormattingLocale("CH"), "UTC");
+    const date = new Date(Date.UTC(2026, 6, 10, 14, 30));
+
+    expect(formatter.formatDate(date, { dateStyle: "short" })).toMatch(/^10\.07\.(?:20)?26$/);
+    expect(formatter.formatTime(date, { timeStyle: "short" })).toBe("14:30");
+    expect(parseLocalizedDate("10.07.2026", "de-CH")).toEqual(new Date(2026, 6, 10));
+  });
+
+  it("round-trips Swiss numbers through parsing", () => {
+    const formatter = createFormatter(resolveFormattingLocale("CH"), "UTC");
+    const grouped = formatter.formatDecimal(1234.56);
+
+    expect(parseLocalizedNumber(grouped, "de-CH")).toBe(1234.56);
+    expect(parseLocalizedNumber("1234.56", "de-CH")).toBe(1234.56);
+    expect(parseLocalizedDecimalString(grouped, "de-CH")).toBe("1234.56");
+  });
+
+  it("uses German calendar text with a Monday week start", () => {
+    const locale = dateFnsLocaleFor(resolveFormattingLocale("CH"));
+
+    expect(locale.localize.month(0)).toBe("Januar");
+    expect(locale.options?.weekStartsOn).toBe(1);
+  });
+});
+
+describe("de-AT formatting", () => {
+  const locale = resolveFormattingLocale("AT");
+  const formatter = createFormatter(locale);
+
+  it.each([
+    ["EUR", 1234.56, "1234.56"],
+    ["USD", 1234.56, "1234.56"],
+    ["CAD", 1234.56, "1234.56"],
+    ["EUR", -1234567.89, "-1234567.89"],
+    ["JPY", 1234, "1234"],
+  ] as const)("round-trips Austrian %s currency amounts (%s)", (currency, value, expected) => {
+    const amount = formatter.formatAmount(value, currency);
+
+    expect(formatter.parseNumber(amount)).toBe(value);
+    expect(parseLocalizedNumber(amount, locale)).toBe(value);
+    expect(parseLocalizedDecimalString(amount, locale)).toBe(expected);
+  });
+
+  it("accepts decimal and currency grouping while preserving precision", () => {
+    expect(formatter.parseNumber(formatter.formatDecimal(1234.56))).toBe(1234.56);
+    expect(parseLocalizedDecimalString("1.234,56", locale)).toBe("1234.56");
+    expect(parseLocalizedDecimalString("€ 123.456.789.012.345.678,12345678", locale)).toBe(
+      "123456789012345678.12345678",
+    );
+  });
+
+  it("uses a currency affix to disambiguate whole amounts", () => {
+    expect(formatter.parseNumber("€ 1.234")).toBe(1234);
+    expect(parseLocalizedDecimalString("€ 1.234", locale)).toBe("1234");
+    expect(formatter.parseNumber("1.234")).toBe(1.234);
+    expect(parseLocalizedDecimalString("1.234", locale)).toBe("1.234");
+  });
+
+  it.each(["1234.56", "1,234.56", "$1,234.56"])("preserves machine-formatted input %s", (value) => {
+    expect(formatter.parseNumber(value)).toBe(1234.56);
+    expect(parseLocalizedDecimalString(value, locale)).toBe("1234.56");
+  });
+
+  it.each(["12.34,56", "1.23.456,78", "1.234,5.6", "1.234,56,78"])(
+    "rejects malformed Austrian currency grouping %s",
+    (value) => {
+      expect(formatter.parseNumber(`€ ${value}`)).toBeUndefined();
+      expect(parseLocalizedDecimalString(`€ ${value}`, locale)).toBeUndefined();
+    },
+  );
+});
+
+describe("en-IN formatting", () => {
+  it("resolves India to Indian English", () => {
+    expect(resolveFormattingLocale("IN")).toBe("en-IN");
+    expect(resolveFormattingLocale("en-IN")).toBe("en-IN");
+  });
+
+  it("groups in lakhs and crores", () => {
+    const formatter = createFormatter(resolveFormattingLocale("IN"), "UTC");
+
+    expect(formatter.formatDecimal(1234567.89)).toBe("12,34,567.89");
+    expect(formatter.formatAmount(1234567.89, "INR")).toBe("₹12,34,567.89");
+    expect(formatter.formatCompactAmount(1234567.89, "INR")).toBe("₹12.35L");
+    expect(formatter.formatCompactAmount(12345678, "INR")).toBe("₹1.23Cr");
+    expect(formatter.formatPercent(0.125, { digits: 1 })).toBe("12.5%");
+    // The United States shares the language and groups in thousands.
+    expect(createFormatter("en-US", "UTC").formatDecimal(1234567.89)).toBe("1,234,567.89");
+  });
+
+  it("writes dates day-first and round-trips Indian grouping", () => {
+    const formatter = createFormatter(resolveFormattingLocale("IN"), "UTC");
+    const date = new Date(Date.UTC(2026, 6, 10, 14, 30));
+
+    expect(formatter.formatDate(date, { dateStyle: "short" })).toBe("10/07/26");
+    expect(parseLocalizedDate("10/07/2026", "en-IN")).toEqual(new Date(2026, 6, 10));
+    expect(formatter.parseNumber(formatter.formatDecimal(1234567.89))).toBe(1234567.89);
+    expect(parseLocalizedDecimalString("12,34,567.89", "en-IN")).toBe("1234567.89");
+  });
+
+  it("uses English calendar text with a Sunday week start", () => {
+    const locale = dateFnsLocaleFor(resolveFormattingLocale("IN"));
+
+    expect(locale.localize.month(0)).toBe("January");
+    expect(locale.options?.weekStartsOn).toBe(0);
   });
 });

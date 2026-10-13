@@ -1,8 +1,8 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 
 use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
 use log::debug;
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 use wealthfolio_core::fx::{
     ExchangeRate, ExchangeRateDateBatchRequest, ExchangeRateDateResult, NewExchangeRate,
 };
@@ -27,7 +27,7 @@ fn recalculate_mode_for_settings_change(
 }
 
 #[tauri::command]
-pub async fn get_settings(state: State<'_, DatabaseRuntime>) -> Result<Settings, String> {
+pub async fn get_settings(state: ProfileAccess) -> Result<Settings, String> {
     let context = state.context()?;
     debug!("Fetching active settings...");
     context
@@ -37,9 +37,7 @@ pub async fn get_settings(state: State<'_, DatabaseRuntime>) -> Result<Settings,
 }
 
 #[tauri::command]
-pub async fn is_auto_update_check_enabled(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<bool, String> {
+pub async fn is_auto_update_check_enabled(state: ProfileAccess) -> Result<bool, String> {
     let context = state.context()?;
     debug!("Checking if auto-update check is enabled...");
     context
@@ -51,9 +49,14 @@ pub async fn is_auto_update_check_enabled(
 #[tauri::command]
 pub async fn update_settings(
     settings_update: SettingsUpdate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<Settings, String> {
+    // Only sync settings participate in Connect account replacement.
+    let _connect = settings_update
+        .sync_enabled
+        .map(|_| state.connect_guard())
+        .transpose()?;
     let context = state.context()?;
     debug!("Updating settings...");
     let service = context.settings_service();
@@ -106,7 +109,7 @@ pub async fn update_settings(
     if base_currency_changed {
         debug!(
             "Base currency changed from {} to {}, updating state.",
-            previous_base_currency, &updated_settings.base_currency
+            previous_base_currency, updated_settings.base_currency
         );
         context.update_base_currency(updated_settings.base_currency.clone());
     }
@@ -114,7 +117,7 @@ pub async fn update_settings(
     if timezone_changed {
         debug!(
             "Timezone changed from {} to {}, updating state.",
-            previous_timezone, &updated_settings.timezone
+            previous_timezone, updated_settings.timezone
         );
         context.update_timezone(updated_settings.timezone.clone());
         context.health_service().clear_cache().await;
@@ -127,7 +130,7 @@ pub async fn update_settings(
             .account_ids(None)
             .market_sync_mode(market_sync_mode)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     }
 
     Ok(updated_settings)
@@ -136,7 +139,7 @@ pub async fn update_settings(
 #[tauri::command]
 pub async fn update_exchange_rate(
     rate: ExchangeRate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<ExchangeRate, String> {
     let context = state.context()?;
@@ -154,15 +157,13 @@ pub async fn update_exchange_rate(
         let payload = PortfolioRequestPayload::builder()
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     });
     Ok(result)
 }
 
 #[tauri::command]
-pub async fn get_latest_exchange_rates(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<ExchangeRate>, String> {
+pub async fn get_latest_exchange_rates(state: ProfileAccess) -> Result<Vec<ExchangeRate>, String> {
     let context = state.context()?;
     debug!("Fetching exchange rates...");
     context
@@ -174,7 +175,7 @@ pub async fn get_latest_exchange_rates(
 #[tauri::command]
 pub async fn get_exchange_rates_for_dates(
     request: ExchangeRateDateBatchRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ExchangeRateDateResult>, String> {
     let context = state.context()?;
     debug!("Fetching historical exchange rates for dates...");
@@ -186,7 +187,7 @@ pub async fn get_exchange_rates_for_dates(
 #[tauri::command]
 pub async fn add_exchange_rate(
     new_rate: NewExchangeRate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<ExchangeRate, String> {
     let context = state.context()?;
@@ -213,7 +214,7 @@ pub async fn add_exchange_rate(
         let payload = PortfolioRequestPayload::builder()
             .market_sync_mode(market_sync_mode)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     });
     Ok(result)
 }
@@ -221,7 +222,7 @@ pub async fn add_exchange_rate(
 #[tauri::command]
 pub async fn delete_exchange_rate(
     rate_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<(), String> {
     let context = state.context()?;
@@ -239,7 +240,7 @@ pub async fn delete_exchange_rate(
         let payload = PortfolioRequestPayload::builder()
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     });
     Ok(())
 }

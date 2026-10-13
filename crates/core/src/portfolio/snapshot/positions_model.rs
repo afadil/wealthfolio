@@ -8,7 +8,6 @@ use std::default::Default;
 use crate::activities::Activity;
 
 use crate::constants::QUANTITY_THRESHOLD;
-use crate::fx::currency::normalize_currency_code;
 
 use crate::errors::{CalculatorError, Result};
 use crate::portfolio::economic_events::BasisStatus;
@@ -32,71 +31,24 @@ fn checked_lot_cost_basis(
         .checked_add(tax)
 }
 
-/// Sum a position's cost basis in `target_currency` from its materialized
-/// lots, anchoring each lot to its acquisition-date FX (stored lot rate
-/// preferred). `fx_fallback` supplies an acquisition-date market rate for a lot
-/// that has no stored rate to `target_currency`; returning `None` from it
-/// signals the rate is unavailable.
-///
-/// Mirrors `valuation_calculator::calculate_cost_basis_in_currency`'s per-lot
-/// logic **exactly** so the value is byte-identical to valuation's lot walk:
-///   * skip only zero-cost lots (not zero-quantity);
-///   * prefer the lot's stored acquisition FX (`Lot::stored_fx_rate_to`);
-///   * otherwise multiply by the fallback acquisition-date rate.
-///
-/// Returns `None` when the position has no materialized lots (valuation keeps
-/// its valuation-date-FX fallback for those) or when any required
-/// acquisition-date FX rate is unavailable, so a scalar is derived only when it
-/// can be trusted.
-///
-/// Called from the write-time precompute
-/// ([`HoldingsCalculator::precompute_position_cost_basis`]), which passes a
-/// fallback backed by the FX service. `fx_fallback` stays a parameter so a
-/// caller without an FX service can pass one that always returns `None` and get
-/// a scalar derived purely from the per-lot stored FX.
-pub fn compute_position_cost_basis_from_lots<F>(
-    position: &Position,
-    target_currency: &str,
-    mut fx_fallback: F,
-) -> Option<Decimal>
-where
-    F: FnMut(&str, &str, NaiveDate) -> Option<Decimal>,
-{
-    if position.lots.is_empty() {
-        return None;
-    }
-
-    let position_currency = normalize_currency_code(&position.currency);
-    let target = normalize_currency_code(target_currency);
-    let mut total = Decimal::ZERO;
-
-    for lot in &position.lots {
-        if lot.cost_basis.is_zero() {
-            continue;
-        }
-        if let Some(rate) = lot.stored_fx_rate_to(target) {
-            total += lot.cost_basis * rate;
-            continue;
-        }
-
-        let acquisition_date = lot.acquisition_date_key();
-        let rate = fx_fallback(position_currency, target, acquisition_date)?;
-        total += lot.cost_basis * rate;
-    }
-
-    Some(total)
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Position {
     pub id: String,
     pub account_id: String,
     pub asset_id: String,
+    /// Serialized as an exact decimal string (not the crate-wide f64 default) so
+    /// repeated snapshot JSON round-trips don't accumulate float rounding error.
+    /// Only the writer is overridden so legacy numeric JSON remains readable.
+    #[serde(serialize_with = "rust_decimal::serde::str::serialize")]
     pub quantity: Decimal,
-    /// Average cost per unit in the asset's currency.
+    /// Average cost per unit in the asset's currency. See `quantity` for why
+    /// this is string-encoded.
+    #[serde(serialize_with = "rust_decimal::serde::str::serialize")]
     pub average_cost: Decimal,
-    /// Total cost basis of all lots in the asset's currency.
+    /// Total cost basis of all lots in the asset's currency. See `quantity` for
+    /// why this is string-encoded.
+    #[serde(serialize_with = "rust_decimal::serde::str::serialize")]
     pub total_cost_basis: Decimal,
     /// The currency of the asset and the cost basis values (e.g., "USD", "EUR"). Set by the first acquisition activity.
     pub currency: String,
@@ -121,7 +73,10 @@ pub struct Position {
     pub is_alternative: bool,
     /// Contract multiplier for derivatives (e.g., 100 for equity options).
     /// Defaults to 1 for non-derivative positions and for snapshots created before this field existed.
-    #[serde(default = "default_multiplier")]
+    #[serde(
+        default = "default_multiplier",
+        serialize_with = "rust_decimal::serde::str::serialize"
+    )]
     pub contract_multiplier: Decimal,
     /// Precomputed cost basis of all lots in the ACCOUNT currency, converted at
     /// each lot's acquisition-date FX (stored lot rate preferred, else
@@ -129,11 +84,11 @@ pub struct Position {
     /// valuation can read a scalar instead of walking `lots`. `None` for
     /// snapshots serialized before this field existed and for positions with no
     /// materialized lots; consumers fall back to walking `lots` in that case.
-    #[serde(default)]
+    #[serde(default, serialize_with = "rust_decimal::serde::str_option::serialize")]
     pub cost_basis_account: Option<Decimal>,
     /// Precomputed cost basis of all lots in the app BASE currency, converted at
     /// each lot's acquisition-date FX. See [`Position::cost_basis_account`].
-    #[serde(default)]
+    #[serde(default, serialize_with = "rust_decimal::serde::str_option::serialize")]
     pub cost_basis_base: Option<Decimal>,
 }
 
@@ -151,10 +106,10 @@ impl Default for Position {
             average_cost: Decimal::ZERO,
             total_cost_basis: Decimal::ZERO,
             currency: String::new(), // Initialized as empty, set by first lot
-            inception_date: Utc::now(),
+            inception_date: crate::utils::clock::now(),
             lots: VecDeque::new(),
-            created_at: Utc::now(),
-            last_updated: Utc::now(),
+            created_at: crate::utils::clock::now(),
+            last_updated: crate::utils::clock::now(),
             is_alternative: false,
             contract_multiplier: Decimal::ONE,
             cost_basis_account: None,
@@ -533,7 +488,7 @@ impl Position {
             self.inception_date = first_lot.acquisition_date;
         }
         // Update last updated time
-        self.last_updated = Utc::now();
+        self.last_updated = crate::utils::clock::now();
     }
 
     /// Adds a new lot based on an acquisition activity.
@@ -1336,6 +1291,7 @@ mod tests {
     use crate::portfolio::economic_events::BasisStatus;
     use chrono::TimeZone;
     use rust_decimal_macros::dec;
+    use std::str::FromStr;
 
     fn test_position() -> Position {
         Position::new(
@@ -1571,5 +1527,53 @@ mod tests {
         assert_eq!(old.lots[0].id, "buy-1");
         assert_eq!(old.lots[0].quantity, dec!(10));
         assert_eq!(old.lots[0].cost_basis, dec!(1000));
+    }
+
+    #[test]
+    fn json_round_trip_preserves_exact_decimal_precision() {
+        // f64 holds ~15-17 significant decimal digits; these values have more,
+        // so the old crate-wide f64 serde encoding would corrupt them silently.
+        let mut position = test_position();
+        position.quantity = Decimal::from_str("12345678901234.123456789").unwrap();
+        position.average_cost = Decimal::from_str("987654321.987654321").unwrap();
+        position.total_cost_basis = Decimal::from_str("999999999999.999999999").unwrap();
+        position.contract_multiplier = Decimal::from_str("1.000000001").unwrap();
+        position.cost_basis_account = Some(Decimal::from_str("111111111111.111111111").unwrap());
+        position.cost_basis_base = Some(Decimal::from_str("222222222222.222222222").unwrap());
+
+        let json = serde_json::to_string(&position).unwrap();
+        let round_tripped: Position = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(round_tripped.quantity, position.quantity);
+        assert_eq!(round_tripped.average_cost, position.average_cost);
+        assert_eq!(round_tripped.total_cost_basis, position.total_cost_basis);
+        assert_eq!(
+            round_tripped.contract_multiplier,
+            position.contract_multiplier
+        );
+        assert_eq!(
+            round_tripped.cost_basis_account,
+            position.cost_basis_account
+        );
+        assert_eq!(round_tripped.cost_basis_base, position.cost_basis_base);
+
+        // Encoded as JSON strings now, not floats.
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(value["quantity"].is_string());
+        assert!(value["costBasisAccount"].is_string());
+    }
+
+    #[test]
+    fn deserialize_accepts_legacy_numeric_decimal_fields() {
+        // Snapshots persisted before this fix stored these fields as plain JSON
+        // numbers, not strings. Confirm old rows keep loading correctly.
+        let position = test_position();
+        let mut value = serde_json::to_value(&position).unwrap();
+        value["quantity"] = serde_json::json!(10.5);
+        value["averageCost"] = serde_json::json!(100);
+
+        let round_tripped: Position = serde_json::from_value(value).unwrap();
+        assert_eq!(round_tripped.quantity, dec!(10.5));
+        assert_eq!(round_tripped.average_cost, dec!(100));
     }
 }

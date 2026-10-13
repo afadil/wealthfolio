@@ -37,6 +37,8 @@ mod allocation_targets;
 mod alternative_assets;
 mod assets;
 #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+pub(crate) mod cloud_backups;
+#[cfg(any(feature = "connect-sync", feature = "device-sync"))]
 pub mod connect;
 mod custom_providers;
 mod data_exports;
@@ -83,22 +85,48 @@ pub async fn readyz() -> &'static str {
 pub struct ApiDoc;
 
 // Keep the addon bootstrap hash as well as the application's inline theme script.
-const SERVER_CSP: &str = "default-src 'self'; script-src 'self' 'sha256-slMj4GRDTmxgcSqtC7zLnSIFInhTIO1M3Z6Gs7s7D+k=' 'sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw=' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob: https:; font-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://wealthfolio.app https://auth.wealthfolio.app https://connect.wealthfolio.app https://connect-staging.wealthfolio.app; frame-src 'none'; child-src 'self' blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:";
+const SERVER_CSP: &str = "default-src 'self'; script-src 'self' 'sha256-OUUXM+aKkYdqwM38Z84FhgHpIYOk/e5Dz9UaAnwYXk8=' 'sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw=' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob: https:; font-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://wealthfolio.app https://auth.wealthfolio.app https://connect.wealthfolio.app https://connect-staging.wealthfolio.app; frame-src 'none'; child-src 'self' blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:";
 const ADDON_SANDBOX_CSP: &str = "default-src 'none'; script-src 'sha256-s/UhdlprnzFxx+iXOtDj2n/Jk+MSRz1g/1lyBtFatVw=' 'wasm-unsafe-eval' blob:; style-src 'unsafe-inline' blob:; img-src data: blob:; font-src data: blob:; media-src data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+
+// Match the configured Connect issuer without granting access to arbitrary HTTPS hosts.
+fn application_csp(auth_url: Option<&str>) -> HeaderValue {
+    let Some(origin) = auth_url
+        .and_then(|value| reqwest::Url::parse(value).ok())
+        .filter(|url| {
+            url.scheme() == "https"
+                && url.host_str().is_some_and(|host| {
+                    host.bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || b".-:[]".contains(&byte))
+                })
+                && url.username().is_empty()
+                && url.password().is_none()
+        })
+        .map(|url| url.origin().ascii_serialization())
+    else {
+        return HeaderValue::from_static(SERVER_CSP);
+    };
+    let policy = SERVER_CSP.replacen(
+        "connect-src 'self'",
+        &format!("connect-src 'self' {origin}"),
+        1,
+    );
+    HeaderValue::from_str(&policy).unwrap_or_else(|_| HeaderValue::from_static(SERVER_CSP))
+}
 
 pub async fn security_headers(request: Request<Body>, next: Next) -> Response {
     let path = request.uri().path().to_string();
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+    #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+    let auth_url = connect::connect_auth_url();
+    #[cfg(not(any(feature = "connect-sync", feature = "device-sync")))]
+    let auth_url: Option<String> = None;
     let csp = if path.ends_with("/addon-sandbox.html") {
-        ADDON_SANDBOX_CSP
+        HeaderValue::from_static(ADDON_SANDBOX_CSP)
     } else {
-        SERVER_CSP
+        application_csp(auth_url.as_deref())
     };
-    headers.insert(
-        HeaderName::from_static("content-security-policy"),
-        HeaderValue::from_static(csp),
-    );
+    headers.insert(HeaderName::from_static("content-security-policy"), csp);
     if !path.starts_with("/api/") && !path.starts_with("/mcp") {
         headers.insert(
             HeaderName::from_static("access-control-allow-origin"),
@@ -134,7 +162,30 @@ pub(crate) fn cors_layer(config: &Config) -> anyhow::Result<CorsLayer> {
 
 #[allow(deprecated)]
 pub fn app_router(state: Arc<AppState>, config: &Config) -> anyhow::Result<Router> {
+    let profiles = crate::profiles::WebProfiles::new(state.clone(), config)?;
+    app_router_with_profiles(
+        profiles,
+        auth::AuthState {
+            auth: state.auth.clone(),
+            oidc: state.oidc.clone(),
+        },
+        config,
+    )
+}
+
+pub async fn app_router_from_config(config: &Config) -> anyhow::Result<Router> {
+    let profiles = crate::profiles::WebProfiles::open(config).await?;
+    let auth = profiles.auth_state();
+    app_router_with_profiles(profiles, auth, config)
+}
+
+fn app_router_with_profiles(
+    profiles: Arc<crate::profiles::WebProfiles>,
+    auth_state: auth::AuthState,
+    config: &Config,
+) -> anyhow::Result<Router> {
     let cors = cors_layer(config)?;
+    profiles.start_connected_profiles();
 
     let openapi = ApiDoc::openapi();
 
@@ -178,7 +229,9 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> anyhow::Result<Route
 
     #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
     {
-        protected_api = protected_api.merge(connect::router());
+        protected_api = protected_api
+            .merge(connect::router())
+            .merge(cloud_backups::router());
     }
 
     let protected_api = protected_api.route(
@@ -189,37 +242,38 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> anyhow::Result<Route
         }),
     );
 
-    let protected_api = protected_api.layer(middleware::from_fn_with_state(
-        state.clone(),
-        auth::require_jwt,
-    ));
+    let protected_api = protected_api
+        .layer(middleware::from_fn_with_state(
+            profiles.clone(),
+            crate::profiles::admit,
+        ))
+        .merge(crate::profiles::router(profiles.clone()))
+        .layer(middleware::from_fn_with_state(
+            auth_state.auth.clone(),
+            auth::require_backup_session,
+        ));
 
     let api = Router::new()
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
-        .merge(auth::router(auth::AuthState {
-            auth: state.auth.clone(),
-            oidc: state.oidc.clone(),
-        }))
+        .merge(auth::router(auth_state))
         .merge(protected_api)
-        .with_state(state.clone());
+        .with_state(());
 
     // Timeout wraps only the /api/v1 subtree: /mcp serves long-lived SSE
     // streams that a request timeout would sever.
     let mut router = Router::new()
         .nest("/api/v1", api)
-        .with_state(state.clone())
+        .layer(middleware::from_fn_with_state(
+            profiles.clone(),
+            crate::profiles::instance_logout,
+        ))
+        .with_state(())
         .layer(middleware::from_fn({
             let ordinary_timeout = config.request_timeout;
             move |request: axum::extract::Request, next: middleware::Next| async move {
                 use axum::response::IntoResponse;
-                let path = request.uri().path();
-                let timeout =
-                    if path.contains("/utilities/database/backups/") && path.ends_with("/export") {
-                        std::time::Duration::from_secs(30 * 60)
-                    } else {
-                        ordinary_timeout
-                    };
+                let timeout = request_timeout(request.uri().path(), ordinary_timeout);
                 tokio::time::timeout(timeout, next.run(request))
                     .await
                     .unwrap_or_else(|_| axum::http::StatusCode::REQUEST_TIMEOUT.into_response())
@@ -227,7 +281,10 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> anyhow::Result<Route
         }));
 
     if config.mcp_enabled {
-        router = router.merge(crate::mcp::router(state.clone(), config));
+        router = router.route(
+            "/mcp",
+            axum::routing::any(crate::profiles::mcp).with_state(profiles),
+        );
     }
 
     Ok(router
@@ -248,11 +305,101 @@ pub fn app_router(state: Arc<AppState>, config: &Config) -> anyhow::Result<Route
         ))
 }
 
+fn request_timeout(path: &str, ordinary: std::time::Duration) -> std::time::Duration {
+    // Accept either the outer URI or Axum's prefix-stripped nested route URI.
+    let path = path.strip_prefix("/api/v1").unwrap_or(path);
+    if matches!(
+        path,
+        "/cloud-backups/capture"
+            | "/connect/device/generate-snapshot"
+            | "/sync/pairing/complete-with-transfer"
+    ) || (path.starts_with("/cloud-backups/") && path.ends_with("/package"))
+        || (path.starts_with("/utilities/database/backups/") && path.ends_with("/export"))
+    {
+        std::time::Duration::from_secs(
+            wealthfolio_device_sync::limits::BACKUP_CAPTURE_TIMEOUT_SECONDS,
+        )
+    } else {
+        ordinary
+    }
+}
+
+#[cfg(test)]
+mod request_timeout_tests {
+    use super::*;
+    #[test]
+    fn transfer_routes_include_preparation_time_without_changing_ordinary_routes() {
+        let ordinary = std::time::Duration::from_secs(300);
+        let transfer = std::time::Duration::from_secs(
+            wealthfolio_device_sync::limits::BACKUP_TRANSFER_TIMEOUT_SECONDS,
+        );
+        for path in [
+            "/cloud-backups/capture",
+            "/cloud-backups/id/package",
+            "/connect/device/generate-snapshot",
+            "/sync/pairing/complete-with-transfer",
+        ] {
+            assert!(request_timeout(path, ordinary) > transfer);
+            assert_eq!(
+                request_timeout(path, ordinary),
+                request_timeout(&format!("/api/v1{path}"), ordinary)
+            );
+        }
+        for path in [
+            "/api/v1/accounts",
+            "/api/v1/cloud-backups/action",
+            "/api/v1/connect/device/status",
+        ] {
+            assert_eq!(request_timeout(path, ordinary), ordinary);
+        }
+    }
+}
+
 #[cfg(test)]
 mod security_header_tests {
     use super::*;
     use axum::{routing::get, Router};
     use tower::ServiceExt;
+
+    #[test]
+    fn configured_auth_issuer_is_allowed_only_as_an_exact_connect_origin() {
+        let csp = application_csp(Some("https://vvalcadcvxqwligwzxaw.supabase.co/auth/v1/"));
+        let csp = csp.to_str().unwrap();
+        let connect = csp
+            .split(';')
+            .find(|d| d.trim_start().starts_with("connect-src "))
+            .unwrap();
+        assert!(connect
+            .split_whitespace()
+            .any(|s| s == "https://vvalcadcvxqwligwzxaw.supabase.co"));
+        assert!(!connect
+            .split_whitespace()
+            .any(|s| s == "https:" || s == "*"));
+        assert!(!csp.contains("/auth/v1/"));
+        assert!(csp.contains("frame-src 'none'"));
+        assert!(csp.contains("object-src 'none'"));
+        assert!(!csp
+            .split(';')
+            .find(|d| d.trim_start().starts_with("script-src "))
+            .unwrap()
+            .contains("supabase"));
+    }
+
+    #[test]
+    fn invalid_auth_issuers_cannot_inject_or_expand_the_csp() {
+        for value in [
+            None,
+            Some("invalid"),
+            Some("https://user:password@example.com"),
+            Some("http://example.com"),
+            Some("javascript:alert(1)"),
+            Some("https://example.com; script-src *"),
+            Some("https://example.com;object-src"),
+            Some("https://*.example.com"),
+        ] {
+            assert_eq!(application_csp(value), HeaderValue::from_static(SERVER_CSP));
+        }
+    }
 
     #[tokio::test]
     async fn application_csp_allows_inline_theme_initialization() {
@@ -346,3 +493,6 @@ mod security_header_tests {
         assert!(csp.contains("media-src 'self' data: blob:"));
     }
 }
+
+#[cfg(test)]
+mod connect_admission_tests;

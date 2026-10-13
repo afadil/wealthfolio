@@ -1,3 +1,4 @@
+import { ConnectSessionUnavailable } from "@/features/wealthfolio-connect/components/connect-session-unavailable";
 import { ConnectedView, LoginForm, useWealthfolioConnect } from "@/features/wealthfolio-connect";
 import { Card, CardDescription, CardHeader, CardTitle } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -7,7 +8,7 @@ import { SettingsHeader } from "../settings-header";
 
 export default function ConnectSettingsPage() {
   const { t } = useTranslation();
-  const { isEnabled, isConnected, isInitializing } = useWealthfolioConnect();
+  const { isEnabled, isConnected, isInitializing, isSessionUnavailable } = useWealthfolioConnect();
 
   // Show "not configured" state when Connect feature is disabled
   if (!isEnabled) {
@@ -53,7 +54,13 @@ export default function ConnectSettingsPage() {
         text={t("settings:connect_description_full")}
       />
       <Separator />
-      {isConnected ? <ConnectedView /> : <LoginForm />}
+      {isSessionUnavailable ? (
+        <ConnectSessionUnavailable />
+      ) : isConnected ? (
+        <ConnectedView />
+      ) : (
+        <LoginForm />
+      )}
     </div>
   );
 }

@@ -47,6 +47,7 @@ export const transferActivitySchema = baseActivitySchema.extend({
   amount: z.coerce.number().positive().optional().nullable(),
   sourceAmount: z.coerce.number().positive().optional().nullable(),
   destinationAmount: z.coerce.number().positive().optional().nullable(),
+  transferRate: z.coerce.number().positive().optional().nullable(),
   sourceCurrency: z.string().optional(),
   destinationCurrency: z.string().optional(),
   fee: z.coerce.number().min(0).default(0).optional(),
@@ -90,6 +91,8 @@ export const bulkHoldingRowSchema = z
     symbolQuoteCcy: z.string().optional(),
     // Optional symbol-level instrument type hint from search/provider (e.g., "EQUITY")
     symbolInstrumentType: z.string().optional(),
+    providerId: z.string().optional(),
+    providerSymbol: z.string().optional(),
     // Optional asset kind for custom assets (e.g., "INVESTMENT", "OTHER")
     assetKind: z.string().optional(),
   })

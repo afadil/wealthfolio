@@ -9,9 +9,6 @@ use crate::errors::Result;
 /// Repository trait for managing daily account valuations.
 #[async_trait]
 pub trait ValuationRepositoryTrait: Send + Sync {
-    /// Save multiple valuation records to the database.
-    async fn save_valuations(&self, valuation_records: &[DailyAccountValuation]) -> Result<()>;
-
     /// Atomically replace valuation rows for an account/date range.
     /// If `since_date` is `None`, replaces all rows for the account.
     async fn replace_valuations_for_account(
@@ -55,9 +52,6 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         Ok(max_calculated_at)
     }
 
-    /// Get the latest valuation date for a specific account.
-    fn load_latest_valuation_date(&self, account_id: &str) -> Result<Option<NaiveDate>>;
-
     /// Delete valuations for a specific account.
     /// If `since_date` is `Some(date)`, deletes only records on or after that date.
     /// If `since_date` is `None`, deletes all records for the account.
@@ -77,7 +71,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<DailyAccountValuation>>;
 
-    /// Returns info about accounts that have at least one negative total_value in their history.
+    /// Returns, per account, the first day its cash balance or total value was negative.
     fn get_accounts_with_negative_balance(
         &self,
         account_ids: &[String],

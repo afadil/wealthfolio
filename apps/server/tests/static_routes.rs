@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 use axum::{body::to_bytes, body::Body, http::Request};
 use tempfile::tempdir;
 use tower::ServiceExt;
@@ -26,6 +27,7 @@ async fn serves_index_html_for_navigation() {
     let index_path = static_dir.path().join("index.html");
     std::fs::write(&index_path, "<html>SPA</html>").unwrap();
 
+    std::env::set_var("WF_DATA_DIR", "");
     std::env::set_var("WF_DB_PATH", db_dir.path().join("test.db"));
     std::env::set_var("WF_SECRET_KEY", "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     std::env::set_var("WF_STATIC_DIR", static_dir.path());

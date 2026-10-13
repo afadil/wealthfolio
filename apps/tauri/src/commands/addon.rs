@@ -1,6 +1,6 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 
 // Import addon modules
 use crate::context::ServiceContext;
@@ -22,7 +22,7 @@ pub async fn install_addon_zip(
     zip_data: Vec<u8>,
     enable_after_install: Option<bool>,
     approved_network_hosts: Option<Vec<String>>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AddonManifest, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -37,7 +37,7 @@ pub async fn install_addon_zip(
 #[tauri::command]
 pub async fn list_installed_addons(
     app_handle: AppHandle,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<InstalledAddon>, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?.list_installed_addons()
@@ -48,7 +48,7 @@ pub async fn toggle_addon(
     app_handle: AppHandle,
     addon_id: String,
     enabled: bool,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?.toggle_addon(&addon_id, enabled)
@@ -58,7 +58,7 @@ pub async fn toggle_addon(
 pub async fn uninstall_addon(
     app_handle: AppHandle,
     addon_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -70,7 +70,7 @@ pub async fn uninstall_addon(
 pub async fn load_addon_for_runtime(
     app_handle: AppHandle,
     addon_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ExtractedAddon, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?.load_addon_for_runtime(&addon_id)
@@ -81,7 +81,7 @@ pub async fn load_addon_asset(
     app_handle: AppHandle,
     addon_id: String,
     asset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<tauri::ipc::Response, String> {
     let context = state.context()?;
     let addon_service = addon_service(&app_handle, &context)?;
@@ -99,7 +99,7 @@ pub async fn load_addon_asset(
 #[tauri::command]
 pub async fn get_enabled_addons_on_startup(
     app_handle: AppHandle,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ExtractedAddon>, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?.get_enabled_addons_on_startup()
@@ -157,7 +157,7 @@ pub async fn check_addon_update(
 #[tauri::command]
 pub async fn check_all_addon_updates(
     app_handle: AppHandle,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<AddonUpdateCheckResult>, String> {
     let context = state.context()?;
     let mut results = Vec::new();
@@ -203,7 +203,7 @@ pub async fn check_all_addon_updates(
 pub async fn update_addon_from_store_by_id(
     app_handle: AppHandle,
     addon_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AddonManifest, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -214,7 +214,7 @@ pub async fn update_addon_from_store_by_id(
 /// Fetch available addons from the store
 #[tauri::command]
 pub async fn fetch_addon_store_listings(
-    _state: State<'_, DatabaseRuntime>,
+    _state: ProfileAccess,
 ) -> Result<Vec<serde_json::Value>, String> {
     addons::fetch_addon_store_listings().await
 }
@@ -224,7 +224,7 @@ pub async fn fetch_addon_store_listings(
 pub async fn download_addon_to_staging(
     app_handle: AppHandle,
     addon_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ExtractedAddon, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -239,7 +239,7 @@ pub async fn install_addon_from_staging(
     addon_id: String,
     enable_after_install: Option<bool>,
     approved_network_hosts: Option<Vec<String>>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AddonManifest, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -256,7 +256,7 @@ pub async fn update_addon_network_approvals(
     app_handle: AppHandle,
     addon_id: String,
     approved_network_hosts: Vec<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AddonManifest, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -268,7 +268,7 @@ pub async fn update_addon_network_approvals(
 pub async fn clear_addon_staging(
     app_handle: AppHandle,
     addon_id: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?.clear_staging(addon_id.as_deref())
@@ -280,7 +280,7 @@ pub async fn submit_addon_rating(
     addon_id: String,
     rating: u8,
     review: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<serde_json::Value, String> {
     let context = state.context()?;
     let rating_instance_id = context.rating_instance_id.as_str();
@@ -293,7 +293,7 @@ pub async fn get_addon_storage_item(
     app_handle: AppHandle,
     addon_id: String,
     key: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Option<String>, String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -308,7 +308,7 @@ pub async fn set_addon_storage_item(
     addon_id: String,
     key: String,
     value: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?
@@ -322,7 +322,7 @@ pub async fn delete_addon_storage_item(
     app_handle: AppHandle,
     addon_id: String,
     key: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     addon_service(&app_handle, &context)?

@@ -1,10 +1,9 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
 use log::{debug, warn};
 use rust_decimal::prelude::ToPrimitive;
-use tauri::State;
 use wealthfolio_core::goals::{
     Goal, GoalFundingRule, GoalFundingRuleInput, GoalPlan, NewGoal, SaveGoalPlan,
 };
@@ -16,7 +15,7 @@ use wealthfolio_core::portfolio::valuation::CurrentAccountValuationService;
 use wealthfolio_core::utils::time_utils::{parse_user_timezone_or_default, user_today};
 
 #[tauri::command]
-pub async fn get_goals(state: State<'_, DatabaseRuntime>) -> Result<Vec<Goal>, String> {
+pub async fn get_goals(state: ProfileAccess) -> Result<Vec<Goal>, String> {
     let context = state.context()?;
     debug!("Fetching goals...");
     context
@@ -26,7 +25,7 @@ pub async fn get_goals(state: State<'_, DatabaseRuntime>) -> Result<Vec<Goal>, S
 }
 
 #[tauri::command]
-pub async fn get_goal(goal_id: String, state: State<'_, DatabaseRuntime>) -> Result<Goal, String> {
+pub async fn get_goal(goal_id: String, state: ProfileAccess) -> Result<Goal, String> {
     let context = state.context()?;
     debug!("Fetching goal {}...", goal_id);
     context
@@ -36,10 +35,7 @@ pub async fn get_goal(goal_id: String, state: State<'_, DatabaseRuntime>) -> Res
 }
 
 #[tauri::command]
-pub async fn create_goal(
-    mut goal: NewGoal,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Goal, String> {
+pub async fn create_goal(mut goal: NewGoal, state: ProfileAccess) -> Result<Goal, String> {
     let context = state.context()?;
     debug!("Creating new goal...");
     goal.currency = Some(context.get_base_currency());
@@ -51,10 +47,7 @@ pub async fn create_goal(
 }
 
 #[tauri::command]
-pub async fn update_goal(
-    mut goal: Goal,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Goal, String> {
+pub async fn update_goal(mut goal: Goal, state: ProfileAccess) -> Result<Goal, String> {
     let context = state.context()?;
     debug!("Updating goal...");
     goal.currency = Some(context.get_base_currency());
@@ -66,10 +59,7 @@ pub async fn update_goal(
 }
 
 #[tauri::command]
-pub async fn delete_goal(
-    goal_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<usize, String> {
+pub async fn delete_goal(goal_id: String, state: ProfileAccess) -> Result<usize, String> {
     let context = state.context()?;
     debug!("Deleting goal...");
     context
@@ -82,7 +72,7 @@ pub async fn delete_goal(
 #[tauri::command]
 pub async fn get_goal_funding(
     goal_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<GoalFundingRule>, String> {
     let context = state.context()?;
     debug!("Fetching funding rules for goal {}...", goal_id);
@@ -96,7 +86,7 @@ pub async fn get_goal_funding(
 pub async fn save_goal_funding(
     goal_id: String,
     rules: Vec<GoalFundingRuleInput>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<GoalFundingRule>, String> {
     let context = state.context()?;
     debug!("Saving funding rules for goal {}...", goal_id);
@@ -115,7 +105,7 @@ pub async fn save_goal_funding(
 #[tauri::command]
 pub async fn get_goal_plan(
     goal_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Option<GoalPlan>, String> {
     let context = state.context()?;
     debug!("Fetching goal plan for {}...", goal_id);
@@ -128,7 +118,7 @@ pub async fn get_goal_plan(
 #[tauri::command]
 pub async fn save_goal_plan(
     mut plan: SaveGoalPlan,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<GoalPlan, String> {
     let context = state.context()?;
     debug!("Saving goal plan for {}...", plan.goal_id);
@@ -170,10 +160,7 @@ fn normalize_plan_currency_to_base(plan: &mut SaveGoalPlan, base_currency: &str)
 }
 
 #[tauri::command]
-pub async fn delete_goal_plan(
-    goal_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<usize, String> {
+pub async fn delete_goal_plan(goal_id: String, state: ProfileAccess) -> Result<usize, String> {
     let context = state.context()?;
     debug!("Deleting goal plan for {}...", goal_id);
     context
@@ -184,19 +171,14 @@ pub async fn delete_goal_plan(
 }
 
 #[tauri::command]
-pub async fn refresh_goal_summary(
-    goal_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Goal, String> {
+pub async fn refresh_goal_summary(goal_id: String, state: ProfileAccess) -> Result<Goal, String> {
     let context = state.context()?;
     debug!("Refreshing goal summary for {}...", goal_id);
     refresh_summary_internal(&context, &goal_id).await
 }
 
 #[tauri::command]
-pub async fn refresh_all_goal_summaries(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<Goal>, String> {
+pub async fn refresh_all_goal_summaries(state: ProfileAccess) -> Result<Vec<Goal>, String> {
     let context = state.context()?;
     debug!("Refreshing all goal summaries...");
     let goals = context
@@ -226,7 +208,7 @@ pub async fn refresh_all_goal_summaries(
 #[tauri::command]
 pub async fn get_retirement_overview(
     goal_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<RetirementOverview, String> {
     let context = state.context()?;
     debug!("Computing retirement overview for goal {}...", goal_id);
@@ -241,7 +223,7 @@ pub async fn get_retirement_overview(
 #[tauri::command]
 pub async fn get_save_up_overview(
     goal_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<SaveUpOverview, String> {
     let context = state.context()?;
     debug!("Computing save-up overview for goal {}...", goal_id);
@@ -256,7 +238,7 @@ pub async fn get_save_up_overview(
 #[tauri::command]
 pub async fn preview_save_up_overview(
     input: SaveUpInput,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<SaveUpOverview, String> {
     let context = state.context()?;
     let as_of = user_today(parse_user_timezone_or_default(&context.get_timezone()));
@@ -290,13 +272,13 @@ async fn build_valuation_map(
     let timezone = state.get_timezone();
     let latest_snapshot_cutoff = user_today(parse_user_timezone_or_default(&timezone));
     let account_service = state.account_service();
-    let snapshot_repository = state.snapshot_repository();
+    let snapshot_service = state.snapshot_service();
     let asset_service = state.asset_service();
     let quote_service = state.quote_service();
     let fx_service = state.fx_service();
     let service = CurrentAccountValuationService::new(
         account_service.as_ref(),
-        snapshot_repository.as_ref(),
+        snapshot_service.as_ref(),
         asset_service.as_ref(),
         quote_service.as_ref(),
         fx_service.as_ref(),

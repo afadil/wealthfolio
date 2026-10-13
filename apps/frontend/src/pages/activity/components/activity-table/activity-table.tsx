@@ -15,6 +15,7 @@ import {
 } from "@/lib/activity-utils";
 import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
+import { isRowBodyClick } from "@/lib/row-click";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
@@ -28,7 +29,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import {
   AmountDisplay,
   Button,
@@ -55,6 +56,7 @@ import {
 } from "@wealthfolio/ui/components/ui/table";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
@@ -82,6 +84,8 @@ interface ActivityTableProps {
   onUnlinkTransfer?: (activity: ActivityDetails) => void;
   filtersActive?: boolean;
   onAdd?: () => void;
+  /** Show a "Connect Account" button next to the add button when there are no activities. */
+  showConnectAccountLink?: boolean;
   onClearFilters?: () => void;
   onLoadMore?: () => void;
   hasNextPage?: boolean;
@@ -101,6 +105,7 @@ export const ActivityTable = ({
   onUnlinkTransfer,
   filtersActive = false,
   onAdd,
+  showConnectAccountLink = false,
   onClearFilters,
   onLoadMore,
   hasNextPage = false,
@@ -113,12 +118,14 @@ export const ActivityTable = ({
   const { isBalanceHidden } = useBalancePrivacy();
   const { t } = useTranslation();
   const { duplicateActivityMutation } = useActivityMutations();
+  // mutateAsync is stable; the mutation object is not, and `columns` depends on this handler.
+  const { mutateAsync: duplicateActivity } = duplicateActivityMutation;
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
 
   const handleDuplicate = React.useCallback(
-    async (activity: ActivityDetails) => duplicateActivityMutation.mutateAsync(activity),
-    [duplicateActivityMutation],
+    async (activity: ActivityDetails) => duplicateActivity(activity),
+    [duplicateActivity],
   );
 
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
@@ -676,9 +683,8 @@ export const ActivityTable = ({
 
   const tableRows = table.getRowModel().rows;
 
-  // The body scrolls inside this table's own box, but it starts below a sticky
-  // header, so the origin the virtualizer measures from is the body's top
-  // rather than the scroll box's.
+  // Embedded tables may scroll with the page; the body can start below both
+  // page content and the table header, so account for that offset.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
 
   // Keyed by activity, so a row keeps its measured height when a page loads
@@ -692,6 +698,12 @@ export const ActivityTable = ({
   const virtualizer = useVirtualizer({
     count: tableRows.length,
     getScrollElement: () => scrollElement,
+    // A tab can mount this table inside an already-scrolled page. Read the
+    // current offset before the virtualizer performs its initial scrollTo.
+    observeElementOffset: (instance, onChange) => {
+      onChange(instance.scrollElement?.scrollTop ?? 0, false);
+      return observeElementOffset(instance, onChange);
+    },
     estimateSize: () => ROW_HEIGHT,
     getItemKey,
     overscan: OVERSCAN,
@@ -741,10 +753,20 @@ export const ActivityTable = ({
               </Button>
             ) : null
           ) : onAdd ? (
-            <Button onClick={onAdd}>
-              <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {t("activity:add_activity")}
-            </Button>
+            <div className="flex flex-col items-center gap-3 sm:flex-row">
+              <Button onClick={onAdd}>
+                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t("activity:add_activity")}
+              </Button>
+              {showConnectAccountLink && (
+                <Button variant="outline" asChild>
+                  <Link to={connectPagePath("activities_empty")}>
+                    <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {t("activity:page.connect_account")}
+                  </Link>
+                </Button>
+              )}
+            </div>
           ) : null}
         </EmptyPlaceholder>
       </div>
@@ -796,10 +818,14 @@ export const ActivityTable = ({
                   key={virtualItem.key}
                   ref={virtualizer.measureElement}
                   data-index={virtualItem.index}
-                  className="group/row"
+                  className="group/row cursor-pointer"
+                  onClick={(e) => isRowBodyClick(e) && handleEdit(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      data-row-click-ignore={cell.column.id === "actions" || undefined}
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}

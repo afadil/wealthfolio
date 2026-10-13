@@ -30,8 +30,9 @@ import {
 } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Link } from "react-router-dom";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { useTranslation } from "react-i18next";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
@@ -61,6 +62,8 @@ interface ActivityTableMobileProps {
   onUnlinkTransfer?: (activity: ActivityDetails) => void;
   filtersActive?: boolean;
   onAdd?: () => void;
+  /** Show a "Connect Account" button next to the add button when there are no activities. */
+  showConnectAccountLink?: boolean;
   onClearFilters?: () => void;
   onLoadMore?: () => void;
   hasNextPage?: boolean;
@@ -80,6 +83,7 @@ export const ActivityTableMobile = ({
   onUnlinkTransfer,
   filtersActive = false,
   onAdd,
+  showConnectAccountLink = false,
   onClearFilters,
   onLoadMore,
   hasNextPage = false,
@@ -94,8 +98,7 @@ export const ActivityTableMobile = ({
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
 
-  // The list scrolls inside its own box, so it sits at the top of it and the
-  // margin resolves to zero; the hook still supplies the element itself.
+  // Embedded lists can share an already-scrolled page rather than their own box.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
 
   /**
@@ -115,6 +118,12 @@ export const ActivityTableMobile = ({
   const virtualizer = useVirtualizer({
     count: activities.length,
     getScrollElement: () => scrollElement,
+    // Seed the offset before the virtualizer's initial scrollTo. Swipeable views
+    // mount neighboring lists while the shared page may already be scrolled.
+    observeElementOffset: (instance, onChange) => {
+      onChange(instance.scrollElement?.scrollTop ?? 0, false);
+      return observeElementOffset(instance, onChange);
+    },
     estimateSize: () => (isCompactView ? COMPACT_CARD_HEIGHT : DETAILED_CARD_HEIGHT),
     getItemKey,
     overscan: OVERSCAN,
@@ -148,10 +157,20 @@ export const ActivityTableMobile = ({
             </Button>
           ) : null
         ) : onAdd ? (
-          <Button onClick={onAdd}>
-            <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-            {t("activity:add_activity")}
-          </Button>
+          <div className="flex flex-col items-center gap-3 sm:flex-row">
+            <Button onClick={onAdd}>
+              <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t("activity:add_activity")}
+            </Button>
+            {showConnectAccountLink && (
+              <Button variant="outline" asChild>
+                <Link to={connectPagePath("activities_empty")}>
+                  <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("activity:page.connect_account")}
+                </Link>
+              </Button>
+            )}
+          </div>
         ) : null}
       </EmptyPlaceholder>
     );

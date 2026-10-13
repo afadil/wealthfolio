@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
+use wealthfolio_core::activities::stored_type_override;
 use wealthfolio_core::errors::{DatabaseError, Error};
 use wealthfolio_core::sync::{should_apply_lww, SyncEntity, SyncOperation};
 use wealthfolio_core::Result;
@@ -68,9 +69,37 @@ struct PendingBrokerActivityUserPatch {
     op: SyncOperation,
 }
 
-static PENDING_BROKER_ACTIVITY_PATCHES: OnceLock<
-    Mutex<HashMap<String, PendingBrokerActivityUserPatch>>,
-> = OnceLock::new();
+/// Pending edits for one profile/database, retained across writer recreation.
+#[derive(Default)]
+pub(crate) struct BrokerActivityPatchQueue(Mutex<HashMap<String, PendingBrokerActivityUserPatch>>);
+
+impl BrokerActivityPatchQueue {
+    /// Discard edits when the owning profile is deleted or its database is replaced.
+    pub(crate) fn clear(&self) {
+        drop(self.take());
+    }
+
+    /// Temporarily set edits aside while a replacement database is opened.
+    pub(crate) fn take(&self) -> Self {
+        let mut pending = self
+            .0
+            .lock()
+            .expect("pending broker activity patch lock poisoned");
+        Self(Mutex::new(std::mem::take(&mut *pending)))
+    }
+
+    /// Restore the original database's edits after rolling back a replacement.
+    /// Call only while its writer is stopped.
+    pub(crate) fn restore(&self, previous: Self) {
+        *self
+            .0
+            .lock()
+            .expect("pending broker activity patch lock poisoned") = previous
+            .0
+            .into_inner()
+            .expect("pending broker activity patch lock poisoned");
+    }
+}
 
 pub(crate) fn broker_activity_identity(
     source_system: Option<&str>,
@@ -160,13 +189,15 @@ pub(crate) fn parse_broker_activity_user_patch_payload(
     parsed.provider_account_id = identity.provider_account_id;
     parsed.source_record_id = identity.source_record_id;
     parsed.overlay.activity_type_override =
-        normalize_optional(parsed.overlay.activity_type_override.as_deref());
+        stored_type_override(parsed.overlay.activity_type_override.as_deref());
     parsed.overlay.subtype = normalize_optional(parsed.overlay.subtype.as_deref());
     Ok(parsed)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_broker_activity_user_patch_tx(
     conn: &mut SqliteConnection,
+    pending: &BrokerActivityPatchQueue,
     entity_id: &str,
     event_id: &str,
     payload_json: &serde_json::Value,
@@ -182,16 +213,26 @@ pub(crate) fn apply_broker_activity_user_patch_tx(
         client_timestamp,
     )?;
     if outcome == BrokerActivityUserPatchApplyOutcome::MissingTarget {
-        defer_broker_activity_user_patch(entity_id, event_id, payload, client_timestamp, seq, op);
+        defer_broker_activity_user_patch(
+            pending,
+            entity_id,
+            event_id,
+            payload,
+            client_timestamp,
+            seq,
+            op,
+        );
     }
     Ok(outcome)
 }
 
 pub(crate) fn apply_pending_broker_activity_user_patches_tx(
     conn: &mut SqliteConnection,
+    queue: &BrokerActivityPatchQueue,
 ) -> Result<usize> {
     let pending = {
-        let guard = pending_broker_activity_patches()
+        let guard = queue
+            .0
             .lock()
             .expect("pending broker activity patch lock poisoned");
         guard.values().cloned().collect::<Vec<_>>()
@@ -212,7 +253,8 @@ pub(crate) fn apply_pending_broker_activity_user_patches_tx(
     }
 
     if !applied_entity_ids.is_empty() {
-        let mut guard = pending_broker_activity_patches()
+        let mut guard = queue
+            .0
             .lock()
             .expect("pending broker activity patch lock poisoned");
         for entity_id in &applied_entity_ids {
@@ -299,6 +341,7 @@ fn apply_broker_activity_user_patch_payload_tx(
 }
 
 fn defer_broker_activity_user_patch(
+    queue: &BrokerActivityPatchQueue,
     entity_id: &str,
     event_id: &str,
     payload: BrokerActivityUserPatchPayload,
@@ -306,7 +349,8 @@ fn defer_broker_activity_user_patch(
     seq: i64,
     op: SyncOperation,
 ) {
-    let mut guard = pending_broker_activity_patches()
+    let mut guard = queue
+        .0
         .lock()
         .expect("pending broker activity patch lock poisoned");
     let should_replace = guard.get(entity_id).is_none_or(|existing| {
@@ -382,19 +426,6 @@ fn record_applied_broker_activity_patch_tx(
 
 fn sync_enum_to_db<T: serde::Serialize>(value: &T) -> Result<String> {
     Ok(serde_json::to_string(value)?.trim_matches('"').to_string())
-}
-
-fn pending_broker_activity_patches(
-) -> &'static Mutex<HashMap<String, PendingBrokerActivityUserPatch>> {
-    PENDING_BROKER_ACTIVITY_PATCHES.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-#[cfg(test)]
-pub(crate) fn clear_pending_broker_activity_user_patches() {
-    pending_broker_activity_patches()
-        .lock()
-        .expect("pending broker activity patch lock poisoned")
-        .clear();
 }
 
 fn normalize_source_system(value: &str) -> Option<String> {

@@ -24,6 +24,7 @@ import {
   type AccountSelectOption,
 } from "./fields";
 import { calculateIncomeFinalAmount } from "@/lib/activity-final-amount";
+import { assetMetadataSchema } from "./schemas";
 
 // Non-UI sentinel for the "cash" income mode (not a DB value; internal only).
 const INCOME_MODE_CASH = "CASH";
@@ -114,6 +115,7 @@ export const createDividendFormSchema = (t?: TFunction) =>
         .optional(),
       symbolQuoteCcy: z.string().nullable().optional(),
       symbolInstrumentType: z.string().nullable().optional(),
+      assetMetadata: assetMetadataSchema,
     })
     .superRefine((data, ctx) => {
       const isAssetBacked =
@@ -268,7 +270,7 @@ export function DividendForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    if (value === INCOME_MODE_CASH) {
+    if (value === INCOME_MODE_CASH || value === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL) {
       setValue("quantity", undefined, { shouldDirty: true, shouldValidate: false });
       setValue("unitPrice", undefined, { shouldDirty: true, shouldValidate: false });
     }
@@ -299,7 +301,10 @@ export function DividendForm({
             quoteCcyName="symbolQuoteCcy"
             instrumentTypeName="symbolInstrumentType"
             existingAssetIdName="existingAssetId"
+            assetMetadataName="assetMetadata"
           />
+          <input type="hidden" {...form.register("assetMetadata.providerId")} />
+          <input type="hidden" {...form.register("assetMetadata.providerSymbol")} />
           <input type="hidden" {...form.register("symbolQuoteCcy")} />
           <input type="hidden" {...form.register("symbolInstrumentType")} />
           <input type="hidden" {...form.register("existingAssetId")} />
@@ -338,6 +343,18 @@ export function DividendForm({
                   className="cursor-pointer text-sm font-normal"
                 >
                   {t("activity:form.type_in_kind")}
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem
+                  value={ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL}
+                  id="dividend-type-return-of-capital"
+                />
+                <Label
+                  htmlFor="dividend-type-return-of-capital"
+                  className="cursor-pointer text-sm font-normal"
+                >
+                  {t("activity:form.type_return_of_capital")}
                 </Label>
               </div>
             </RadioGroup>

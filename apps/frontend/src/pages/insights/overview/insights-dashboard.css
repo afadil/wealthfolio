@@ -1,3 +1,16 @@
+/* Suppress selection only while a dashboard drag or resize is active. Bundled CSS also
+   works where the native app blocks the drag library's injected stylesheet. */
+body:has(.insights-dashboard .react-grid-item:is(.resizing, .react-draggable-dragging)),
+body:has(.insights-dashboard .react-grid-item:is(.resizing, .react-draggable-dragging)) * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.insights-dashboard .react-resizable-handle,
+.insights-dashboard .insights-drag-handle {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .insights-widget-content > * {
   min-height: inherit;
 }
@@ -18,8 +31,36 @@
 .insights-widget-editing.react-draggable-dragging .insights-widget-content {
   outline-color: var(--primary);
 }
-.insights-dashboard .insights-widget-editing > .react-resizable-handle {
-  opacity: 0.65;
+/* Keep horizontal resizing, but place its grip at the card's bottom-right.
+   The grid item includes 16px of spacing beneath the card. */
+.insights-dashboard .insights-widget-editing > .react-resizable-handle-e {
+  top: auto;
+  bottom: 16px;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 0;
+  transform: none;
+  opacity: 1;
+}
+.insights-dashboard .insights-widget-editing > .react-resizable-handle-e::after {
+  right: 5px;
+  bottom: 5px;
+  width: 12px;
+  height: 12px;
+  border: 0;
+  color: var(--muted-foreground);
+  background: linear-gradient(
+    135deg,
+    transparent 45%,
+    currentColor 45% 55%,
+    transparent 55% 70%,
+    currentColor 70% 80%,
+    transparent 80%
+  );
+}
+.insights-dashboard .insights-widget-editing > .react-resizable-handle-e:hover::after {
+  color: var(--foreground);
 }
 
 /* Adjacent summary widgets retain the original continuous strip. */

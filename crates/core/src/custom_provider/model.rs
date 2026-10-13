@@ -52,8 +52,9 @@ impl PreparedCustomProviderRequest {
 
 /// Cached regex for formatted date templates: `{DATE:...}`, `{FROM:...}`,
 /// `{TO:...}`, `{TODAY:...}`.
-pub static DATE_TEMPLATE_RE: std::sync::LazyLock<regex::Regex> =
-    std::sync::LazyLock::new(|| regex::Regex::new(r"\{(DATE|FROM|TO|TODAY):([^}]+)\}").unwrap());
+pub static DATE_TEMPLATE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(r"\{(DATE|FROM|TO|TODAY):([^}]+)\}").expect("valid date template regex")
+});
 
 /// Maximum HTTP response body size (10 MB).
 pub const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
@@ -90,7 +91,7 @@ fn has_unsupported_date_directive(variable: &str, format: &str) -> bool {
 
     let mut chars = format.chars();
     while let Some(character) = chars.next() {
-        if character == '%' && !matches!(chars.next(), Some('Y' | 'm' | 'd')) {
+        if character == '%' && !matches!(chars.next(), Some('Y' | 'm' | 'd' | 's')) {
             return true;
         }
     }
@@ -108,8 +109,8 @@ pub(crate) enum PrepareRequestError<E> {
 /// Supported variables: `{SYMBOL}`, `{currency}`, `{CURRENCY}`, `{TODAY}`,
 /// `{FROM}`, `{TO}`, `{ISIN}`, `{MIC}`, `{DATE:format}`,
 /// `{FROM:format}`, `{TO:format}`, `{TODAY:format}`. `DATE` accepts any
-/// valid Chrono directive; the date-only variables support `%Y`, `%m`, and
-/// `%d`.
+/// valid Chrono directive; the date-only variables support `%Y`, `%m`, `%d`,
+/// and `%s`.
 pub fn expand_template(
     template: &str,
     ctx: &TemplateContext<'_>,
@@ -166,7 +167,12 @@ pub fn expand_template(
                 };
                 // Parse the ISO date and reformat; fall back to the raw string.
                 match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                    Ok(parsed) => parsed.format(format).to_string(),
+                    Ok(parsed) => parsed
+                        .and_hms_opt(0, 0, 0)
+                        .expect("midnight is always valid")
+                        .and_utc()
+                        .format(format)
+                        .to_string(),
                     Err(_) => date_str.to_string(),
                 }
             })
@@ -355,6 +361,9 @@ pub struct CustomProviderWithSources {
     pub description: String,
     pub enabled: bool,
     pub priority: i32,
+    /// Whether sources with a `{SYMBOL}`/`{ISIN}` placeholder are also tried for
+    /// securities not assigned to this provider. `priority` orders those fallbacks.
+    pub use_as_fallback: bool,
     pub sources: Vec<CustomProviderSource>,
 }
 
@@ -367,6 +376,9 @@ pub struct NewCustomProvider {
     pub name: String,
     pub description: Option<String>,
     pub priority: Option<i32>,
+    /// Defaults to `false`: new providers serve only the securities assigned to them.
+    #[serde(default)]
+    pub use_as_fallback: Option<bool>,
     pub sources: Vec<NewCustomProviderSource>,
 }
 
@@ -378,6 +390,8 @@ pub struct UpdateCustomProvider {
     pub description: Option<String>,
     pub enabled: Option<bool>,
     pub priority: Option<i32>,
+    #[serde(default)]
+    pub use_as_fallback: Option<bool>,
     pub sources: Option<Vec<NewCustomProviderSource>>,
 }
 
@@ -571,6 +585,13 @@ mod tests {
         let c = ctx(Some("2024-01-02"), Some("2024-03-04"));
         let out = expand_template("{FROM:%Y%m%d}-{TO:%d/%m/%Y}", &c).unwrap();
         assert_eq!(out, "20240102-04/03/2024");
+    }
+
+    #[test]
+    fn expands_formatted_from_and_to_unix_timestamp() {
+        let c = ctx(Some("2024-01-02"), Some("2024-03-04"));
+        let out = expand_template("{FROM:%s}-{TO:%s}", &c).unwrap();
+        assert_eq!(out, "1704153600-1709510400");
     }
 
     #[test]

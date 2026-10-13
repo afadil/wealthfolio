@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::StatusCode,
     routing::{delete, get, put},
     Json, Router,
@@ -19,20 +19,22 @@ struct AssetQuery {
 }
 
 async fn get_asset_profile(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<AssetQuery>,
 ) -> ApiResult<Json<AssetProfile>> {
     Ok(Json(state.asset_service.get_asset_profile(&q.asset_id)?))
 }
 
-async fn list_assets(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<CoreAsset>>> {
+async fn list_assets(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<CoreAsset>>> {
     let assets = state.asset_service.get_assets()?;
     Ok(Json(assets))
 }
 
 async fn update_asset_profile(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<UpdateAssetProfile>,
 ) -> ApiResult<Json<CoreAsset>> {
     let asset = state
@@ -51,7 +53,7 @@ struct QuoteModeBody {
 
 async fn update_quote_mode(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<QuoteModeBody>,
 ) -> ApiResult<Json<CoreAsset>> {
     let asset = state
@@ -62,7 +64,7 @@ async fn update_quote_mode(
 }
 
 async fn create_asset(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<NewAsset>,
 ) -> ApiResult<Json<CoreAsset>> {
     let asset = state.asset_service.create_asset(payload).await?;
@@ -70,7 +72,7 @@ async fn create_asset(
 }
 
 async fn delete_asset(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
     state.asset_service.delete_asset(&id).await?;
@@ -78,21 +80,21 @@ async fn delete_asset(
 }
 
 async fn list_asset_logos(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AssetLogoSummary>>> {
     Ok(Json(state.asset_logo_service.list_asset_logos()?))
 }
 
 async fn get_asset_logo(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Option<AssetLogo>>> {
     Ok(Json(state.asset_logo_service.get_asset_logo(&id)?))
 }
 
 async fn upsert_asset_logo(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<UpsertAssetLogo>,
 ) -> ApiResult<Json<AssetLogo>> {
     let logo = state
@@ -104,13 +106,13 @@ async fn upsert_asset_logo(
 
 async fn delete_asset_logo(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.asset_logo_service.delete_asset_logo(&id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/assets", get(list_assets).post(create_asset))
         .route("/assets/{id}", delete(delete_asset))

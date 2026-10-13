@@ -1,4 +1,4 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::sync::Arc;
 
 use crate::context::ServiceContext;
@@ -7,7 +7,7 @@ use crate::events::{
     MARKET_SYNC_COMPLETE, MARKET_SYNC_ERROR, MARKET_SYNC_START,
 };
 use log::{debug, error, info, warn};
-use tauri::{AppHandle, Emitter, State};
+use tauri::AppHandle;
 use wealthfolio_core::health::{FixAction, HealthConfig, HealthServiceTrait, HealthStatus};
 use wealthfolio_core::quotes::{MarketSyncMode, SyncMode};
 
@@ -15,7 +15,7 @@ use wealthfolio_core::quotes::{MarketSyncMode, SyncMode};
 #[tauri::command]
 pub async fn get_health_status(
     client_timezone: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<HealthStatus, String> {
     let context = state.context()?;
     debug!("Getting health status...");
@@ -38,7 +38,7 @@ pub async fn get_health_status(
 #[tauri::command]
 pub async fn run_health_checks(
     client_timezone: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<HealthStatus, String> {
     let context = state.context()?;
     debug!("Running health checks...");
@@ -78,7 +78,7 @@ async fn run_health_checks_internal(
 pub async fn dismiss_health_issue(
     issue_id: String,
     data_hash: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     debug!("Dismissing health issue: {}", issue_id);
@@ -91,10 +91,7 @@ pub async fn dismiss_health_issue(
 
 /// Restore a dismissed health issue.
 #[tauri::command]
-pub async fn restore_health_issue(
-    issue_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn restore_health_issue(issue_id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     debug!("Restoring health issue: {}", issue_id);
     context
@@ -106,9 +103,7 @@ pub async fn restore_health_issue(
 
 /// Get list of dismissed issue IDs.
 #[tauri::command]
-pub async fn get_dismissed_health_issues(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<String>, String> {
+pub async fn get_dismissed_health_issues(state: ProfileAccess) -> Result<Vec<String>, String> {
     let context = state.context()?;
     debug!("Getting dismissed health issues...");
     context
@@ -123,7 +118,7 @@ pub async fn get_dismissed_health_issues(
 pub async fn execute_health_fix(
     action: FixAction,
     app_handle: AppHandle,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     debug!("Executing health fix: {} ({})", action.label, action.id);
@@ -149,7 +144,9 @@ pub async fn execute_health_fix(
             asset_ids
         );
 
-        if let Err(e) = app_handle.emit(MARKET_SYNC_START, &()) {
+        if let Err(e) =
+            crate::events::emit_for_profile(&app_handle, &context, MARKET_SYNC_START, &())
+        {
             error!("Failed to emit market:sync-start event: {}", e);
         }
 
@@ -174,12 +171,22 @@ pub async fn execute_health_fix(
                     skipped_reasons,
                     show_skipped_reasons: true,
                 };
-                if let Err(e) = app_handle.emit(MARKET_SYNC_COMPLETE, &result_payload) {
+                if let Err(e) = crate::events::emit_for_profile(
+                    &app_handle,
+                    &context,
+                    MARKET_SYNC_COMPLETE,
+                    &result_payload,
+                ) {
                     error!("Failed to emit market:sync-complete event: {}", e);
                 }
             }
             Err(e) => {
-                if let Err(e_emit) = app_handle.emit(MARKET_SYNC_ERROR, &e.to_string()) {
+                if let Err(e_emit) = crate::events::emit_for_profile(
+                    &app_handle,
+                    &context,
+                    MARKET_SYNC_ERROR,
+                    &e.to_string(),
+                ) {
                     error!("Failed to emit market:sync-error event: {}", e_emit);
                 }
                 return Err(format!("Failed to sync market data: {}", e));
@@ -192,9 +199,8 @@ pub async fn execute_health_fix(
         return Ok(());
     }
 
-    // Handle rebuild_account_history - trigger an account-scoped full recalculation
-    // by reusing the existing portfolio recalculation pipeline (which maps the
-    // recalculate trigger to SnapshotRecalcMode::Full for the given accounts).
+    // Handle rebuild_account_history: an account-scoped job through the
+    // coordinator, which rebuilds the given accounts from genesis.
     if action.id == "rebuild_account_history" {
         let account_ids: Vec<String> = serde_json::from_value(action.payload.clone())
             .map_err(|e| format!("Failed to parse account IDs: {}", e))?;
@@ -209,12 +215,13 @@ pub async fn execute_health_fix(
         );
 
         // Incremental market sync (prices/valuations were already fixed by the
-        // user); the recalculate trigger performs the full snapshot rebuild.
+        // user); the coordinator performs the full rebuild in the background.
         let payload = PortfolioRequestPayload::builder()
             .account_ids(Some(account_ids))
             .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
+            .force_full(true)
             .build();
-        emit_portfolio_trigger_recalculate(&app_handle, payload);
+        emit_portfolio_trigger_recalculate(&app_handle, payload, &context);
 
         return Ok(());
     }
@@ -228,7 +235,7 @@ pub async fn execute_health_fix(
 
 /// Get health configuration.
 #[tauri::command]
-pub async fn get_health_config(state: State<'_, DatabaseRuntime>) -> Result<HealthConfig, String> {
+pub async fn get_health_config(state: ProfileAccess) -> Result<HealthConfig, String> {
     let context = state.context()?;
     debug!("Getting health config...");
     Ok(context.health_service().get_config().await)
@@ -238,7 +245,7 @@ pub async fn get_health_config(state: State<'_, DatabaseRuntime>) -> Result<Heal
 #[tauri::command]
 pub async fn update_health_config(
     config: HealthConfig,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     debug!("Updating health config...");

@@ -160,7 +160,35 @@ describe("Activity Utilities", () => {
     });
   });
 
+  it.each([
+    "RETURN_OF_CAPITAL",
+    "Return of Capital",
+    "return-of-capital",
+    "NOTIONAL_DISTRIBUTION",
+    "Notional Distribution",
+    "notional-distribution",
+    "option_expiry",
+    "Option Expiry",
+    "option-expiry",
+  ])("requires an asset for %s adjustments, including import placeholders", (subtype) => {
+    expect(isAssetIdentityRequired(ActivityType.ADJUSTMENT, subtype)).toBe(true);
+    expect(shouldResolveImportAsset(ActivityType.ADJUSTMENT, subtype, "")).toBe(true);
+    expect(shouldResolveImportAsset(ActivityType.ADJUSTMENT, subtype, "----")).toBe(true);
+  });
+
   describe("canonicalizeActivitySubtype", () => {
+    it("canonicalizes distribution labels while preserving unknown provider labels", () => {
+      expect(canonicalizeActivitySubtype(ActivityType.DIVIDEND, "Return of Capital")).toBe(
+        "RETURN_OF_CAPITAL",
+      );
+      expect(canonicalizeActivitySubtype(ActivityType.ADJUSTMENT, "notional-distribution")).toBe(
+        "NOTIONAL_DISTRIBUTION",
+      );
+      expect(canonicalizeActivitySubtype(ActivityType.ADJUSTMENT, "Provider Custom-Label")).toBe(
+        "Provider Custom-Label",
+      );
+    });
+
     it("canonicalizes option position intent aliases by activity side", () => {
       expect(canonicalizeActivitySubtype(ActivityType.BUY, "BUY_TO_OPEN")).toBe(
         ACTIVITY_SUBTYPES.POSITION_OPEN,

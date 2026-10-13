@@ -1,16 +1,25 @@
-import { fireEvent, render, screen, waitFor } from "@/test/render";
+import { listen } from "@tauri-apps/api/event";
+import { act, fireEvent, render, screen, waitFor } from "@/test/render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import copy from "@/i18n/locales/en/settings.json";
 import { NativeDatabaseGate } from "./native-database-gate";
 const mocks = vi.hoisted(() => ({
   status: vi.fn(),
+  changed: () => {},
+  stop: vi.fn(),
   choose: vi.fn(),
   inspect: vi.fn(),
   discard: vi.fn(),
   recover: vi.fn(),
   retry: vi.fn(),
   reload: vi.fn(),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (_event: string, callback: () => void) => {
+    mocks.changed = callback;
+    return mocks.stop;
+  }),
 }));
 vi.mock("@/lib/reload-application", () => ({ reloadApplication: mocks.reload }));
 vi.mock("@/adapters", () => ({ isWeb: false }));
@@ -22,6 +31,7 @@ vi.mock("../../adapters/tauri/settings", () => ({
   recoverDatabaseFromImport: mocks.recover,
   retryDatabaseStartup: mocks.retry,
 }));
+afterEach(() => vi.useRealTimers());
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.status.mockResolvedValue({ ready: false, error: "Missing device key", canRecover: true });
@@ -31,7 +41,7 @@ beforeEach(() => {
     summary: { accountCount: 2, activityCount: 15, createdAt: null },
   });
   mocks.discard.mockResolvedValue(undefined);
-  mocks.recover.mockResolvedValue(undefined);
+  mocks.recover.mockImplementation(async () => mocks.changed());
 });
 function mount() {
   return render(
@@ -50,9 +60,10 @@ it("renders the opening screen during migration and mounts providers after readi
     .mockResolvedValue({ ready: true, error: null, canRecover: false });
   mount();
   await waitFor(() => expect(mocks.status).toHaveBeenCalledOnce());
-  expect(screen.getByRole("status")).toHaveTextContent(copy.recovery_opening);
+  expect(screen.getByRole("status")).toHaveTextContent("Opening Wealthfolio");
   expect(screen.queryByText("Portfolio mounted")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: copy.recovery_retry })).not.toBeInTheDocument();
+  await act(async () => mocks.changed());
   await screen.findByText("Portfolio mounted");
 });
 
@@ -68,6 +79,7 @@ it("shows a failed upgrade with its retained backup location", async () => {
 it("keeps portfolio providers unmounted until startup succeeds", async () => {
   mocks.status.mockResolvedValue({ ready: true, error: null, canRecover: false });
   mount();
+  await act(async () => mocks.changed());
   await screen.findByText("Portfolio mounted");
 });
 it("requires validation and explicit confirmation before recovery", async () => {
@@ -129,6 +141,7 @@ it("retries failed startup before allowing the portfolio to mount", async () => 
   await screen.findByText(copy.recovery_title);
   mocks.retry.mockImplementation(async () => {
     mocks.status.mockResolvedValue({ ready: true, error: null, canRecover: false });
+    mocks.changed();
   });
   fireEvent.click(screen.getByRole("button", { name: copy.recovery_retry }));
   await screen.findByText("Portfolio mounted");
@@ -146,8 +159,9 @@ it("observes an owned recovery after the webview reloads", async () => {
     .mockResolvedValue({ ready: true, maintenance: false, error: null, canRecover: false });
   mount();
   await waitFor(() => expect(mocks.status).toHaveBeenCalledOnce());
-  expect(screen.getByRole("status")).toHaveTextContent(copy.recovery_opening);
+  expect(screen.getByRole("status")).toHaveTextContent("Opening Wealthfolio");
   expect(screen.queryByRole("button", { name: copy.recovery_retry })).not.toBeInTheDocument();
+  await act(async () => mocks.changed());
   await screen.findByText("Portfolio mounted");
 });
 
@@ -165,4 +179,74 @@ it("waits for a fresh status and reloads when a cached native generation was rep
   expect(screen.queryByText("Stale providers")).not.toBeInTheDocument();
   await waitFor(() => expect(mocks.reload).toHaveBeenCalledTimes(1));
   expect(screen.queryByText("Stale providers")).not.toBeInTheDocument();
+});
+
+it("makes no periodic or focus reads after readiness and unsubscribes on unmount", async () => {
+  vi.useFakeTimers();
+  mocks.status.mockResolvedValue({ ready: true, maintenance: false, generation: "1" });
+  const view = render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NativeDatabaseGate>
+        <p>Portfolio mounted</p>
+      </NativeDatabaseGate>
+    </QueryClientProvider>,
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(screen.getByText("Portfolio mounted")).toBeInTheDocument();
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  expect(mocks.status).toHaveBeenCalledOnce();
+  view.unmount();
+  expect(mocks.stop).toHaveBeenCalledOnce();
+});
+
+it("observes maintenance failure while financial children are unmounted", async () => {
+  mocks.status.mockResolvedValue({ ready: true, maintenance: false, generation: "1" });
+  mount();
+  await screen.findByText("Portfolio mounted");
+  mocks.status.mockResolvedValue({ ready: false, maintenance: true });
+  await act(async () => mocks.changed());
+  await waitFor(() => expect(screen.queryByText("Portfolio mounted")).not.toBeInTheDocument());
+  mocks.status.mockResolvedValue({
+    ready: false,
+    maintenance: false,
+    error: "Could not reopen",
+    canRecover: true,
+  });
+  await act(async () => mocks.changed());
+  expect(await screen.findByText("Could not reopen")).toBeInTheDocument();
+  expect(mocks.stop).not.toHaveBeenCalled();
+});
+
+it("rereads when a transition arrives during its initial status read", async () => {
+  let resolve!: (value: unknown) => void;
+  mocks.status.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  mocks.status.mockResolvedValue({ ready: true, maintenance: false, generation: "2" });
+  mount();
+  await waitFor(() => expect(mocks.status).toHaveBeenCalledOnce());
+  await act(async () => {
+    mocks.changed();
+    resolve({ ready: false, maintenance: true });
+  });
+  expect(await screen.findByText("Portfolio mounted")).toBeInTheDocument();
+  expect(mocks.status).toHaveBeenCalledTimes(2);
+});
+
+it("reloads instead of retrying the database when event subscription fails", async () => {
+  vi.mocked(listen).mockRejectedValueOnce(new Error("Event registration failed"));
+  mount();
+  expect(await screen.findByText("Reload to try opening your profile again.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(mocks.reload).toHaveBeenCalledOnce();
+  expect(mocks.retry).not.toHaveBeenCalled();
+  expect(mocks.status).not.toHaveBeenCalled();
+  expect(screen.queryByText("Portfolio mounted")).not.toBeInTheDocument();
 });

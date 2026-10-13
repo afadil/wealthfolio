@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use chrono_tz::Tz;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use wealthfolio_core::accounts::{
-    account_supports_purpose, account_types, AccountPurpose, AccountRepositoryTrait,
+    account_supports_purpose, AccountPurpose, AccountRepositoryTrait,
 };
 use wealthfolio_core::activities::{
     Activity, ActivityRepositoryTrait, TransferPairResolution, ACTIVITY_TYPE_TRANSFER_IN,
@@ -1228,18 +1228,13 @@ fn is_visible_cash_activity(activity: &Activity, account_type: &str) -> bool {
 }
 
 fn is_neutral_visible_cash_activity(activity: &Activity, account_type: &str) -> bool {
-    let activity_type = activity.effective_type();
-    // Credit-card payment received (incoming transfer to the card).
-    if account_type == account_types::CREDIT_CARD && activity_type == "TRANSFER_IN" {
-        return true;
-    }
-    // Linked transfers touching a cash account — savings moves to investing
-    // accounts and internal moves between cash accounts. Always shown in the
-    // ledger (we never hide an account's transactions); the totals layer
-    // decides saving vs neutral via classify_activity_for_aggregation.
-    account_type == account_types::CASH
-        && matches!(activity_type, "TRANSFER_IN" | "TRANSFER_OUT")
-        && activity.source_group_id.is_some()
+    // Transfers on a spending account — card payments, balance transfers and
+    // cash advances, savings moves to investing accounts, internal moves.
+    // Always shown in the ledger (we never hide an account's transactions);
+    // the totals layer decides saving vs neutral via
+    // classify_activity_for_aggregation.
+    matches!(activity.effective_type(), "TRANSFER_IN" | "TRANSFER_OUT")
+        && account_supports_purpose(account_type, AccountPurpose::Spending)
 }
 
 fn group_assignments(
@@ -1301,7 +1296,7 @@ mod tests {
     use chrono::{NaiveDate, NaiveDateTime};
     use rust_decimal::Decimal;
     use wealthfolio_core::accounts::{
-        Account, AccountRepositoryTrait, AccountUpdate, NewAccount, TrackingMode,
+        account_types, Account, AccountRepositoryTrait, AccountUpdate, NewAccount, TrackingMode,
     };
     use wealthfolio_core::activities::{
         ActivityBulkMutationResult, ActivitySearchResponse, ActivityStatus, ActivityUpdate,
@@ -1455,14 +1450,6 @@ mod tests {
                         ),
                     )
                 })
-        }
-
-        fn find_transfer_counterpart(
-            &self,
-            _: &str,
-            _: &str,
-        ) -> wealthfolio_core::Result<Option<Activity>> {
-            Ok(None)
         }
 
         fn get_activities(&self) -> wealthfolio_core::Result<Vec<Activity>> {
@@ -1633,10 +1620,6 @@ mod tests {
             _: &str,
             _: &str,
         ) -> wealthfolio_core::Result<()> {
-            unimplemented!()
-        }
-
-        fn calculate_average_cost(&self, _: &str, _: &str) -> wealthfolio_core::Result<Decimal> {
             unimplemented!()
         }
 
@@ -2733,6 +2716,57 @@ mod tests {
         assert!(response.items[0].net_amount_base.is_none());
     }
 
+    // Reuse the cash-read fixtures to check the monetary contract across both APIs.
+    #[tokio::test]
+    async fn spending_reads_label_the_currency_used_for_conversion() {
+        let row = cash_row("a", "WITHDRAWAL", 60, "EUR");
+        let date = row.activity_date.to_rfc3339();
+        let (cash, assignments, _) =
+            make_service_with_fx(vec![row], MockFx::with(&[("EUR", 2, 0)]));
+        let analytics = crate::analytics::AnalyticsService::new(
+            cash.activity_repo.clone(),
+            cash.account_repo.clone(),
+            assignments,
+            cash.splits.clone(),
+            cash.settings.clone(),
+            cash.taxonomy_service.clone(),
+            cash.events.clone(),
+            cash.fx.clone(),
+            cash.activity_events.clone(),
+        );
+        for (account_ids, expected_outflow) in [(None, 120.0), (Some(vec![]), 0.0)] {
+            let report = analytics
+                .monthly_report(
+                    crate::analytics::ReportRequest {
+                        start_date: date.clone(),
+                        end_date: date.clone(),
+                        account_ids,
+                    },
+                    "UTC",
+                    "CAD",
+                )
+                .await
+                .unwrap();
+            assert_eq!(report.current.outflow, expected_outflow);
+            let json = serde_json::to_value(report).unwrap();
+            assert_eq!(json["baseCurrency"], "CAD");
+        }
+        let page = cash
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                Some("CAD"),
+                "UTC",
+            )
+            .await
+            .unwrap();
+        assert_eq!(page.base_currency.as_deref(), Some("CAD"));
+        assert_eq!(page.items[0].net_amount, -60.0);
+        assert_eq!(page.items[0].net_amount_base, Some(-120.0));
+    }
+
     #[tokio::test]
     async fn search_converts_each_row_into_the_base_currency() {
         let (service, _, _) = make_service_with_fx(
@@ -2963,6 +2997,27 @@ mod tests {
         assert!(!is_visible_cash_activity(
             &activity("DEPOSIT"),
             account_types::CREDIT_CARD
+        ));
+    }
+
+    #[test]
+    fn credit_card_transfer_out_is_visible_as_neutral_cash_activity() {
+        // A balance transfer or cash advance moves the card balance, so the
+        // ledger shows it whether or not its other leg is linked (#1227).
+        let mut linked = activity("TRANSFER_OUT");
+        linked.source_group_id = Some("pair-card".to_string());
+
+        assert!(is_visible_cash_activity(
+            &linked,
+            account_types::CREDIT_CARD
+        ));
+        assert!(is_visible_cash_activity(
+            &activity("TRANSFER_OUT"),
+            account_types::CREDIT_CARD
+        ));
+        assert!(!is_visible_cash_activity(
+            &linked,
+            account_types::SECURITIES
         ));
     }
 

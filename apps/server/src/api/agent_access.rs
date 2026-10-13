@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::StatusCode,
     routing::{delete, get, post},
     Json, Router,
@@ -31,7 +31,7 @@ struct AgentAccessStatus {
     endpoint: &'static str,
 }
 
-async fn status(State(state): State<Arc<AppState>>) -> Json<AgentAccessStatus> {
+async fn status(axum::Extension(state): axum::Extension<Arc<AppState>>) -> Json<AgentAccessStatus> {
     Json(AgentAccessStatus {
         mcp_enabled: state.mcp_enabled,
         audit_enabled: state.mcp_audit_enabled,
@@ -73,7 +73,9 @@ impl From<PersonalAccessTokenDB> for TokenInfo {
     }
 }
 
-async fn list_tokens(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<TokenInfo>>> {
+async fn list_tokens(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<TokenInfo>>> {
     let tokens = state.pat_repository.list()?;
     Ok(Json(tokens.into_iter().map(TokenInfo::from).collect()))
 }
@@ -122,7 +124,7 @@ struct CreatedTokenResponse {
 }
 
 async fn create_token(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<CreateTokenRequest>,
 ) -> ApiResult<(StatusCode, Json<CreatedTokenResponse>)> {
     let name = payload.name.trim().to_string();
@@ -167,7 +169,7 @@ async fn create_token(
 }
 
 async fn delete_token(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
     if state.pat_repository.delete(&id).await? {
@@ -249,7 +251,7 @@ struct AuditPage {
 }
 
 async fn list_audit(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(query): Query<AuditQuery>,
 ) -> ApiResult<Json<AuditPage>> {
     let tools = csv(&query.tools);
@@ -279,12 +281,14 @@ struct PurgeResponse {
     purged: u64,
 }
 
-async fn purge_audit(State(state): State<Arc<AppState>>) -> ApiResult<Json<PurgeResponse>> {
+async fn purge_audit(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<PurgeResponse>> {
     let purged = state.mcp_audit_repository.purge_all().await?;
     Ok(Json(PurgeResponse { purged }))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/agent-access/status", get(status))
         .route("/agent-access/tokens", get(list_tokens).post(create_token))

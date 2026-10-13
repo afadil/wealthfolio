@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Context;
 use axum::{
     body::{Body, Bytes},
-    extract::{Path, State},
+    extract::Path,
     http::{header, StatusCode},
     response::Response,
     routing::{delete, get, post},
@@ -24,15 +24,19 @@ struct BackupDatabaseResponse {
 }
 
 async fn backup_database_route(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<BackupDatabaseResponse>> {
     let data_root = state.data_root.clone();
     // Faithful copy: on an encrypted server the backup is encrypted too, and
     // opens on any instance sharing WF_SECRET_KEY.
     let access = state.db_access.clone();
-    let backup_path = task::spawn_blocking(move || db::backup_database(&access, &data_root))
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to execute backup task: {}", e))??;
+    let owner = state._database_owner.clone();
+    let backup_path = task::spawn_blocking(move || {
+        let _owner = owner;
+        db::backup_database(&access, &data_root)
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to execute backup task: {}", e))??;
 
     let filename = StdPath::new(&backup_path)
         .file_name()
@@ -50,18 +54,22 @@ async fn backup_database_route(
 }
 
 async fn list_backup_files_route(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<db::snapshots::Snapshot>>> {
     let root = state.data_root.clone();
     let key = state.database_key.clone();
-    let snapshots = task::spawn_blocking(move || db::snapshots::list(&root, Some(key)))
-        .await
-        .map_err(|error| anyhow::anyhow!(error))??;
+    let owner = state._database_owner.clone();
+    let snapshots = task::spawn_blocking(move || {
+        let _owner = owner;
+        db::snapshots::list(&root, Some(key))
+    })
+    .await
+    .map_err(|error| anyhow::anyhow!(error))??;
     Ok(Json(snapshots))
 }
 
 async fn download_backup_file_route(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(filename): Path<String>,
 ) -> ApiResult<Response> {
     let lease = db::snapshots::acquire(&state.data_root, &filename).map_err(ApiError::backup)?;
@@ -101,14 +109,18 @@ fn stream_file(file: fs::File, lease: db::snapshots::SnapshotLease) -> Body {
 }
 
 async fn delete_backup_file_route(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(filename): Path<String>,
 ) -> ApiResult<StatusCode> {
     let root = state.data_root.clone();
-    task::spawn_blocking(move || db::snapshots::delete(&root, &filename))
-        .await
-        .map_err(|error| anyhow::anyhow!(error))?
-        .map_err(ApiError::backup)?;
+    let owner = state._database_owner.clone();
+    task::spawn_blocking(move || {
+        let _owner = owner;
+        db::snapshots::delete(&root, &filename)
+    })
+    .await
+    .map_err(|error| anyhow::anyhow!(error))?
+    .map_err(ApiError::backup)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -124,7 +136,7 @@ struct DatabaseEncryptionStatus {
 }
 
 async fn database_encryption_status_route(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<DatabaseEncryptionStatus>> {
     Ok(Json(DatabaseEncryptionStatus {
         enabled: state.db_access.is_encrypted(),
@@ -132,7 +144,7 @@ async fn database_encryption_status_route(
     }))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .merge(super::portable_backups::router())
         .route(

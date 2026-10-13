@@ -90,6 +90,8 @@ interface IntervalSelectorProps {
   className?: string;
   isLoading?: boolean;
   defaultValue?: TimePeriod;
+  /** Controlled selection; the parent owns persistence when provided. */
+  value?: TimePeriod;
   /** LocalStorage key to persist selection. When provided, selection is persisted. */
   storageKey?: string;
   /** Optional callback for haptic feedback */
@@ -100,6 +102,7 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   onIntervalSelect,
   className,
   defaultValue = DEFAULT_INTERVAL_CODE,
+  value,
   storageKey,
   onHaptic,
 }) => {
@@ -112,23 +115,25 @@ const IntervalSelector: React.FC<IntervalSelectorProps> = ({
   );
   const [localValue, setLocalValue] = useState<TimePeriod>(defaultValue);
 
-  const currentValue = storageKey ? persistedValue : localValue;
+  const currentValue = value ?? (storageKey ? persistedValue : localValue);
 
   const handleValueChange = useCallback(
-    (value: TimePeriod) => {
+    (nextValue: TimePeriod) => {
       // Update state
-      if (storageKey) {
-        setPersistedValue(value);
-      } else {
-        setLocalValue(value);
+      if (value === undefined) {
+        if (storageKey) {
+          setPersistedValue(nextValue);
+        } else {
+          setLocalValue(nextValue);
+        }
       }
       // Notify parent
-      const data = getIntervalData(value);
+      const data = getIntervalData(nextValue);
       onIntervalSelect(data.code, data.description, data.calculateRange(new Date()));
       // Trigger haptic feedback
       onHaptic?.();
     },
-    [onIntervalSelect, storageKey, setPersistedValue, onHaptic],
+    [onIntervalSelect, storageKey, setPersistedValue, onHaptic, value],
   );
 
   const items = intervals.map((interval) => ({

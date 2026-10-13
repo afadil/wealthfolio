@@ -193,21 +193,56 @@ Ensure you have the following installed on your machine:
    cp .env.example .env
    ```
 
-   Update the `.env` file with your database path and other configuration as
-   needed:
+   For optional Connect setup, see
+   [Wealthfolio Connect in source builds](docs/connect-source-builds.md#desktop).
 
-   ```bash
-   # Database location
-   DATABASE_URL=../db/wealthfolio.db
+   Desktop development uses a separate application identity and profile
+   directory. On macOS, the default layout is:
+
+   ```text
+   ~/Library/Application Support/com.teymz.wealthfolio.dev/
+   ├── profiles.json
+   └── profiles/<uuid>/app.db
    ```
 
-4. **Run in Development Mode**:
+   To select another profile directory during desktop development, set
+   `WF_DATA_DIR` in `.env` to an absolute path as described in `.env.example`.
+   Leave it unset to use the default development app-data directory. Use a
+   dedicated development directory; this setting selects the registry and its
+   profiles, not an individual database file. An existing root-level `app.db` is
+   only adopted on first profile initialization.
 
-Build and run the desktop application using Tauri:
+   If your older `.env` contains `DATABASE_URL`, remove it: `pnpm tauri dev`
+   ignores it, including on first launch. Use `WF_DATA_DIR` for development
+   directory selection. Packaged desktop apps do not ship with an `.env` file.
+
+4. **Run in Development Mode**:
 
 ```bash
 pnpm tauri dev
 ```
+
+The command automatically applies `apps/tauri/tauri.dev.conf.json`, which sets
+`com.teymz.wealthfolio.dev` and `Wealthfolio (Development)`. This identity
+remains in effect when additional `--config` overrides are supplied, including
+when running `pnpm tauri dev --release`. Production builds (`pnpm tauri build`)
+retain the production identity. For an isolated packaged debug build, select the
+same configuration explicitly:
+
+```bash
+pnpm tauri build --debug --config apps/tauri/tauri.dev.conf.json
+```
+
+Credentials follow the selected application identity, not debug/release mode.
+Production Keychain names are unchanged. Development has separate credentials,
+so sign in and enroll it as a separate sync device if needed; later development
+runs reuse those credentials. Profiles and add-ons retain their existing scopes
+within each environment. Mobile commands retain their configured identity.
+
+To populate development with existing data, use the supported backup/export and
+restore flow. A raw copy of an encrypted production database still requires its
+original encryption key; development does not copy or fall back to production
+credentials. Never point development at the live production profile directory.
 
 #### Addon Development Mode
 
@@ -269,8 +304,17 @@ All configuration is done via environment variables in `.env.web`.
 **Server Configuration (WF\_\* variables)**:
 
 - `WF_LISTEN_ADDR` - Server bind address (default: `0.0.0.0:8088`)
-- `WF_DB_PATH` - SQLite database path or directory (default: `./db/app.db`)
-  - If a directory is provided, `app.db` will be used inside it
+- `WF_DATA_DIR` - Optional directory for the profile registry, profile
+  databases, and default encrypted vault. For `pnpm dev:web`, set it in
+  `.env.web` or the shell; the desktop `.env` value is masked. Relative paths
+  use the working directory; `~` is not expanded.
+- `WF_DB_PATH` - Supported legacy database file path (default: `./db/app.db`).
+  Its parent selects the installation when `WF_DATA_DIR` is unset. With only
+  `WF_DATA_DIR`, the legacy candidate is `<WF_DATA_DIR>/app.db`. If both are
+  set, their directories must agree. Existing registries retain their saved
+  database paths; neither setting moves data. See
+  [installation directory configuration](docs/self-host/README.md#installation-directory)
+  for Docker and upgrade behavior.
 - `WF_CORS_ALLOW_ORIGINS` - Comma-separated list of allowed CORS origins
   (default: `*`). **Required when auth is enabled** — wildcard `*` is rejected.
   - Example: `https://wealthfolio.example.com`
@@ -503,6 +547,11 @@ docker compose --env-file .env.docker -f compose.yml -f compose.proxy.yml up -d
 
 Use this when the proxy runs on the same Docker network and forwards traffic to
 `http://wealthfolio:8088`.
+
+Set `WF_CORS_ALLOW_ORIGINS` to the public HTTP(S) origin, including any custom
+port. Profile startup accepts that explicit origin even if the proxy rewrites
+`Host`; wildcard `*` does not authorize this fallback. See
+[reverse proxies and profile startup](docs/self-host/README.md#reverse-proxies-and-profile-startup).
 
 **Using Docker CLI environment file**:
 

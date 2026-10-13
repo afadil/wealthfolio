@@ -1,3 +1,5 @@
+import { profilePreferenceKey } from "@/hooks/use-persistent-state";
+import { usesLegacyPreferences } from "@/features/profiles/session";
 import { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -479,7 +481,8 @@ export function AssetsTable({
       }}
       defaultColumnFilters={[{ id: "holdingStatus", value: ["true"] }]}
       defaultSorting={[{ id: "symbol", desc: false }]}
-      storageKey="securities-table-v5"
+      storageKey={profilePreferenceKey("securities-table-v5")}
+      fallbackStorageKey={usesLegacyPreferences() ? "securities-table-v5" : undefined}
       scrollable
     />
   );

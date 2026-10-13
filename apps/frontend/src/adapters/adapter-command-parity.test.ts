@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 import { calculateRebalancePlan as calculateTauriRebalancePlan } from "./tauri";
 import { COMMANDS, invoke } from "./web/core";
@@ -21,6 +21,12 @@ const TAURI_REGISTERED_COMMAND_RE = /commands::[a-z_]+::([a-zA-Z0-9_]+)/g;
 const RUNTIME_EXPORT_RE =
   /^export\s+(?:const|async\s+function|function|class|enum)\s+([a-zA-Z_$][\w$]*)/gm;
 const NAMED_REEXPORT_RE = /export\s*\{([^{}]*)\}\s*from\s*["']([^"']+)["']/g;
+
+// Adapter tests exercise transport behavior inside an admitted profile.
+beforeEach(async () => {
+  const { installProfileSession } = await import("@/features/profiles/session");
+  installProfileSession({ profileId: "test-profile", scopeId: "test-scope" });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -203,6 +209,23 @@ describe("adapter command parity", () => {
     expect(missing).toEqual([]);
   });
 
+  it("preserves explicit Connect rebind confirmation in the web request", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("null", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await invoke("store_sync_session", { refreshToken: "candidate", confirmRebind: true });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/connect/session");
+    expect(JSON.parse(init.body as string)).toEqual({
+      refreshToken: "candidate",
+      confirmRebind: true,
+    });
+  });
+
   it("routes allocation drilldown requests with all required filters", async () => {
     const response = new Response(JSON.stringify({ holdings: [] }), {
       status: 200,
@@ -263,6 +286,40 @@ function lastCall(mock: ReturnType<typeof stubFetch>) {
   const [url, init] = mock.mock.calls[0] as [string, RequestInit];
   return { url, method: (init as RequestInit & { method: string }).method, body: init.body };
 }
+
+describe("cloud backup action transport", () => {
+  it.each([
+    { action: "status" },
+    { action: "runtimeStatus" },
+    { action: "enable", confirmed: true },
+    { action: "recover", code: "test-recovery-code" },
+  ])("sends the $action operation with profile admission", async (operation) => {
+    const mock = stubFetch();
+    await invoke("cloud_backup_action", { operation });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/cloud-backups/action");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual({ operation });
+    const init = mock.mock.calls[0][1]!;
+    const headers = new Headers(init.headers);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("x-wf-profile-scope")).toBe("test-scope");
+  });
+});
+
+describe("cloud backup capture transport", () => {
+  it("sends the manual flag as a JSON body", async () => {
+    const mock = stubFetch();
+    await invoke("cloud_backup_capture", { manual: true });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/cloud-backups/capture");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual({ manual: true });
+    expect(new Headers(mock.mock.calls[0][1]!.headers).get("Content-Type")).toBe(
+      "application/json",
+    );
+  });
+});
 
 describe("scope-based routing — get_holdings", () => {
   it("all → POST /holdings/query", async () => {

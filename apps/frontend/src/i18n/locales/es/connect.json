@@ -24,16 +24,16 @@
     "learnMore": "Más información sobre Connect",
     "features": {
       "brokerageSync": {
-        "title": "Sincronización de corredores",
-        "description": "Sincroniza cuentas y transacciones automáticamente a diario."
+        "title": "Cuentas conectadas",
+        "description": "Sincroniza automáticamente las transacciones de tus brókeres."
       },
       "deviceSync": {
-        "title": "Sincronización de dispositivos",
-        "description": "Sincroniza entre dispositivos con cifrado de extremo a extremo."
+        "title": "Sincronización y copias",
+        "description": "Sincronización cifrada de extremo a extremo y copias automáticas en la nube."
       },
       "householdView": {
-        "title": "Vista familiar",
-        "description": "Comparte cuentas con miembros de la familia."
+        "title": "Carteras familiares",
+        "description": "Una vista compartida de las inversiones de tu familia."
       }
     }
   },
@@ -305,5 +305,16 @@
   },
   "errors": {
     "unknown": "Error desconocido"
+  },
+  "session": {
+    "restoring": "Restaurando Connect…",
+    "unavailable": "Connect no está disponible temporalmente",
+    "localAvailable": "Tu cartera local está disponible. Reintenta la conexión."
+  },
+  "rebind": {
+    "title": "¿Cambiar la conexión de Connect de este perfil?",
+    "description": "Vas a conectar otra cuenta u otro grupo familiar. Se conservarán los datos locales de tu cartera, pero se eliminarán sus vínculos con brókeres y la configuración de sincronización de dispositivos. La nueva cuenta podrá añadir datos de brókeres a este perfil. Vuelve a configurar la sincronización de dispositivos cuando quieras. Usa un perfil nuevo si prefieres mantener los datos separados.",
+    "cancel": "Cancelar",
+    "confirm": "Cambiar conexión"
   }
 }

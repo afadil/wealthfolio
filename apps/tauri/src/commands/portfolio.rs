@@ -1,4 +1,4 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -14,7 +14,7 @@ use chrono::NaiveDate;
 use log::{debug, info};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 use wealthfolio_core::{
     accounts::{
         account_supports_portfolio_scope, account_supports_purpose, Account, AccountPurpose,
@@ -35,10 +35,9 @@ use wealthfolio_core::{
     },
     portfolio::snapshot::{
         check_holdings_import as validate_holdings_import, holdings_import_data_source,
-        snapshot_date_requires_remediation, snapshot_recalculation_start_after_delete,
-        validate_holdings_import_snapshot, CashBalanceInput, HoldingsImportPositionValidationInput,
-        HoldingsImportSnapshotValidationInput, ManualHoldingInput, ManualSnapshotRequest,
-        ManualSnapshotService, SnapshotSource,
+        snapshot_date_requires_remediation, validate_holdings_import_snapshot, CashBalanceInput,
+        HoldingsImportPositionValidationInput, HoldingsImportSnapshotValidationInput,
+        ManualHoldingInput, ManualSnapshotRequest, ManualSnapshotService, SnapshotSource,
     },
     portfolios::{AccountScope, ResolvedAccountScope},
     quotes::MarketSyncMode,
@@ -160,7 +159,8 @@ pub struct SnapshotInfo {
 }
 
 #[tauri::command]
-pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
+pub async fn recalculate_portfolio(handle: AppHandle, state: ProfileAccess) -> Result<(), String> {
+    let context = state.context()?;
     debug!("Emitting PORTFOLIO_TRIGGER_RECALCULATE event...");
     // Full recalculation uses BackfillHistory to rebuild quote history from activity start.
     // This ensures all historical valuations have proper quote coverage.
@@ -172,20 +172,22 @@ pub async fn recalculate_portfolio(handle: AppHandle) -> Result<(), String> {
             asset_ids: None,
             days: 365 * 5, // 5 years fallback if no activity dates
         })
+        .force_full(true)
         .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload, &context);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn update_portfolio(handle: AppHandle) -> Result<(), String> {
+pub async fn update_portfolio(handle: AppHandle, state: ProfileAccess) -> Result<(), String> {
+    let context = state.context()?;
     debug!("Emitting PORTFOLIO_TRIGGER_UPDATE event...");
     // Manual update uses Incremental sync for all assets
     let payload = PortfolioRequestPayload::builder()
         .account_ids(None) // None signifies all accounts
         .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
         .build();
-    emit_portfolio_trigger_update(&handle, payload);
+    emit_portfolio_trigger_update(&handle, payload, &context);
     Ok(())
 }
 
@@ -231,7 +233,7 @@ async fn resolve_current_valuation_scope(
 
 #[tauri::command]
 pub async fn get_holdings(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: AccountScopeInput,
 ) -> Result<Vec<Holding>, String> {
     let context = state.context()?;
@@ -242,7 +244,7 @@ pub async fn get_holdings(
 
 #[tauri::command]
 pub async fn get_holdings_list(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: AccountScopeInput,
     include_closed: Option<bool>,
 ) -> Result<Vec<HoldingListItem>, String> {
@@ -287,7 +289,7 @@ async fn get_holdings_for_filter(
 
 #[tauri::command]
 pub async fn get_holding(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_id: String,
     asset_id: String,
 ) -> Result<Option<Holding>, String> {
@@ -306,7 +308,7 @@ pub async fn get_holding(
 
 #[tauri::command]
 pub async fn get_asset_holdings(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     asset_id: String,
 ) -> Result<Vec<Holding>, String> {
     let context = state.context()?;
@@ -335,14 +337,14 @@ pub async fn get_asset_holdings(
 
 #[tauri::command]
 pub async fn get_asset_lots(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     asset_id: String,
     include_snapshot_positions: bool,
 ) -> Result<Vec<AssetLotView>, String> {
     let context = state.context()?;
     debug!("Get lot view rows for asset {}", asset_id);
     context
-        .lots_repository
+        .holdings_service()
         .get_asset_lot_view(&asset_id, include_snapshot_positions)
         .await
         .map_err(|e| e.to_string())
@@ -350,7 +352,7 @@ pub async fn get_asset_lots(
 
 #[tauri::command]
 pub async fn get_portfolio_allocations(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: AccountScopeInput,
 ) -> Result<PortfolioAllocations, String> {
     let context = state.context()?;
@@ -379,7 +381,7 @@ pub async fn get_portfolio_allocations(
 
 #[tauri::command]
 pub async fn get_holdings_by_allocation(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: AccountScopeInput,
     taxonomy_id: String,
     category_id: String,
@@ -412,7 +414,7 @@ pub async fn get_holdings_by_allocation(
 
 #[tauri::command]
 pub async fn get_historical_valuations(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_id: Option<String>,
     filter: Option<AccountScopeInput>,
     start_date: Option<String>,
@@ -466,6 +468,7 @@ pub async fn get_historical_valuations(
                     from_date_opt,
                     to_date_opt,
                 )
+                .await
                 .map_err(|e| e.to_string())
         }
     } else if let Some(account_id) = account_id {
@@ -497,6 +500,7 @@ pub async fn get_historical_valuations(
                 from_date_opt,
                 to_date_opt,
             )
+            .await
             .map_err(|e| e.to_string())
     };
 
@@ -514,7 +518,7 @@ pub async fn get_historical_valuations(
 
 #[tauri::command]
 pub async fn get_latest_valuations(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_ids: Vec<String>,
 ) -> Result<Vec<DailyAccountValuation>, String> {
     let context = state.context()?;
@@ -546,7 +550,7 @@ pub async fn get_latest_valuations(
 
 #[tauri::command]
 pub async fn get_current_valuation(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: AccountScopeInput,
     include_accounts: Option<bool>,
 ) -> Result<CurrentValuationResponse, String> {
@@ -559,13 +563,13 @@ pub async fn get_current_valuation(
     let account_filter = filter.into_account_filter()?;
     let resolved = resolve_current_valuation_scope(&account_filter, &context).await?;
     let account_service = context.account_service();
-    let snapshot_repository = context.snapshot_repository();
+    let snapshot_service = context.snapshot_service();
     let asset_service = context.asset_service();
     let quote_service = context.quote_service();
     let fx_service = context.fx_service();
     let service = CurrentAccountValuationService::new(
         account_service.as_ref(),
-        snapshot_repository.as_ref(),
+        snapshot_service.as_ref(),
         asset_service.as_ref(),
         quote_service.as_ref(),
         fx_service.as_ref(),
@@ -585,7 +589,7 @@ pub async fn get_current_valuation(
 
 #[tauri::command]
 pub async fn get_income_summary(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     filter: Option<AccountScopeInput>,
 ) -> Result<Vec<IncomeSummary>, String> {
     let context = state.context()?;
@@ -617,7 +621,7 @@ pub async fn get_income_summary(
 
 #[tauri::command]
 pub async fn calculate_accounts_simple_performance(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_ids: Vec<String>,
 ) -> Result<Vec<SimplePerformanceMetrics>, String> {
     let context = state.context()?;
@@ -657,7 +661,7 @@ pub async fn calculate_accounts_simple_performance(
 /// tracking_mode: Optional tracking mode for the account ("HOLDINGS" or "TRANSACTIONS")
 #[tauri::command]
 pub async fn calculate_performance_history(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     item_type: String,
     item_id: String,
     start_date: Option<String>,
@@ -782,7 +786,7 @@ pub async fn calculate_performance_history(
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn calculate_performance_summary(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     item_type: String,
     item_id: String,
     start_date: Option<String>,
@@ -850,38 +854,20 @@ pub async fn calculate_performance_summary(
             performance_account_tracking_modes_from_map(&accounts_by_id, &account_ids);
         let account_types = performance_account_types_from_map(&accounts_by_id, &account_ids);
         let tracking_composition = performance_tracking_composition(&tracking_modes, &account_ids);
-        let task_context = Arc::clone(&context);
-        let handle = tokio::runtime::Handle::current();
-        let scope_id_for_task = resolved.scope_id.clone();
-        let base_currency_for_task = resolved.base_currency.clone();
-        let account_ids_for_task = account_ids.clone();
-        let tracking_modes_for_task = tracking_modes.clone();
-        let account_types_for_task = account_types.clone();
-        let mut result = tokio::task::spawn_blocking(move || {
-            handle.block_on(async move {
-                task_context
-                    .performance_service()
-                    .calculate_performance_summary_for_accounts(
-                        &scope_id_for_task,
-                        &account_ids_for_task,
-                        &base_currency_for_task,
-                        &tracking_modes_for_task,
-                        &account_types_for_task,
-                        start_date_opt,
-                        end_date_opt,
-                        profile,
-                    )
-                    .await
-            })
-        })
-        .await
-        .map_err(|e| {
-            format!(
-                "Failed to join performance summary calculation for {}: {}",
-                resolved.scope_id, e
+        let mut result = context
+            .performance_service()
+            .calculate_performance_summary_for_accounts(
+                &resolved.scope_id,
+                &account_ids,
+                &resolved.base_currency,
+                &tracking_modes,
+                &account_types,
+                start_date_opt,
+                end_date_opt,
+                profile,
             )
-        })?
-        .map_err(|e| format!("Failed to calculate performance: {}", e))?;
+            .await
+            .map_err(|e| format!("Failed to calculate performance: {}", e))?;
         debug!(
             "Performance summary timing: item_type={}, scope_id={}, profile={:?}, account_count={}, tracking_composition={}, start={:?}, end={:?}, elapsed_ms={:.1}",
             item_type,
@@ -950,7 +936,7 @@ pub async fn calculate_performance_summary(
 
 #[tauri::command]
 pub async fn get_performance_summaries(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     scopes: Vec<PerformanceSummaryScopeInput>,
     start_date: Option<String>,
     end_date: Option<String>,
@@ -1085,7 +1071,7 @@ pub struct HoldingInput {
 /// Ensures assets and FX pairs are created before saving, following the same pattern as activities.
 #[tauri::command]
 pub async fn save_manual_holdings(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     _handle: AppHandle,
     account_id: String,
     holdings: Vec<HoldingInput>,
@@ -1215,7 +1201,7 @@ pub struct CheckHoldingsImportResult {
 
 #[tauri::command]
 pub async fn check_holdings_import(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_id: String,
     snapshots: Vec<HoldingsSnapshotInput>,
 ) -> Result<CheckHoldingsImportResult, String> {
@@ -1369,7 +1355,7 @@ pub struct ImportHoldingsCsvResult {
 /// - Multiple dates create multiple snapshots
 #[tauri::command]
 pub async fn import_holdings_csv(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     _handle: AppHandle,
     account_id: String,
     snapshots: Vec<HoldingsSnapshotInput>,
@@ -1556,7 +1542,7 @@ async fn import_single_snapshot(
 /// Optionally filtered by date range. Returns snapshot metadata without full position details.
 #[tauri::command]
 pub async fn get_snapshots(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_id: String,
     date_from: Option<String>, // YYYY-MM-DD, inclusive
     date_to: Option<String>,   // YYYY-MM-DD, inclusive
@@ -1608,7 +1594,7 @@ pub async fn get_snapshots(
 /// Returns holdings in the same format as get_holdings (without live valuation).
 #[tauri::command]
 pub async fn get_snapshot_by_date(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     account_id: String,
     date: String,
 ) -> Result<Vec<Holding>, String> {
@@ -1645,7 +1631,7 @@ pub async fn get_snapshot_by_date(
 /// Calculated snapshots are only deletable when their date requires remediation.
 #[tauri::command]
 pub async fn delete_snapshot(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
     account_id: String,
     date: String,
@@ -1682,8 +1668,6 @@ pub async fn delete_snapshot(
     let requires_remediation = target_date
         .map(|date| snapshot_date_requires_remediation(date, today))
         .unwrap_or(true);
-    let recalculation_start =
-        target_date.and_then(|date| snapshot_recalculation_start_after_delete(date, today));
     if snapshot.source == SnapshotSource::Calculated.as_str() && !requires_remediation {
         return Err("This entry comes from account activity and can't be deleted here. Update or delete the related activity instead.".to_string());
     }
@@ -1723,9 +1707,8 @@ pub async fn delete_snapshot(
     let payload = PortfolioRequestPayload::builder()
         .account_ids(Some(vec![account_id.clone()]))
         .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
-        .since_date(recalculation_start)
         .build();
-    emit_portfolio_trigger_recalculate(&handle, payload);
+    emit_portfolio_trigger_recalculate(&handle, payload, &context);
 
     Ok(())
 }

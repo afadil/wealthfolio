@@ -4,7 +4,10 @@ fn read_connect_api_url_from_dotenv() -> Option<String> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").ok()?;
     let dotenv_path = PathBuf::from(manifest_dir).join("../../.env");
 
-    println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    // Cargo treats a missing rerun-if-changed path as always stale.
+    if dotenv_path.exists() {
+        println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    }
 
     let content = fs::read_to_string(dotenv_path).ok()?;
     for raw_line in content.lines() {
@@ -38,7 +41,10 @@ fn read_env_value_from_dotenv(key: &str) -> Option<String> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").ok()?;
     let dotenv_path = PathBuf::from(manifest_dir).join("../../.env");
 
-    println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    // Cargo treats a missing rerun-if-changed path as always stale.
+    if dotenv_path.exists() {
+        println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    }
 
     let content = fs::read_to_string(dotenv_path).ok()?;
     for raw_line in content.lines() {
@@ -112,5 +118,26 @@ fn main() {
         println!("cargo:warning=CONNECT_AUTH_PUBLISHABLE_KEY is NOT set");
     }
 
-    tauri_build::build()
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+        && env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+    {
+        // Tauri embeds its default manifest only in application binaries. Link the
+        // same manifest into unit-test executables too, which need Common Controls v6.
+        // See https://github.com/tauri-apps/tauri/issues/13419.
+        let manifest = PathBuf::from(
+            env::var_os("CARGO_MANIFEST_DIR")
+                .expect("Cargo sets CARGO_MANIFEST_DIR for build scripts"),
+        )
+        .join("windows-app-manifest.xml");
+        println!("cargo:rerun-if-changed={}", manifest.display());
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
+        tauri_build::try_build(
+            tauri_build::Attributes::new()
+                .windows_attributes(tauri_build::WindowsAttributes::new_without_app_manifest()),
+        )
+        .expect("failed to run tauri-build");
+    } else {
+        tauri_build::build()
+    }
 }

@@ -22,15 +22,19 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
   const isActive = isPathActive(location.pathname, "/connect");
 
   const tooltipContent =
-    status === "subscription_required"
-      ? t("connect:subscription.syncPausedTooltip")
-      : lastSyncTime
-        ? t("common:layout.connect_last_synced", {
-            time: formatDistanceToNow(new Date(lastSyncTime), localizationSettings, {
-              addSuffix: true,
-            }),
-          })
-        : t("common:connect");
+    status === "restoring"
+      ? t("connect:session.restoring", { defaultValue: "Restoring Connect…" })
+      : status === "unavailable"
+        ? t("connect:session.unavailable", { defaultValue: "Connect is temporarily unavailable" })
+        : status === "subscription_required"
+          ? t("connect:subscription.syncPausedTooltip")
+          : lastSyncTime
+            ? t("common:layout.connect_last_synced", {
+                time: formatDistanceToNow(new Date(lastSyncTime), localizationSettings, {
+                  addSuffix: true,
+                }),
+              })
+            : t("common:connect");
 
   return (
     <Tooltip>
@@ -47,7 +51,9 @@ export function ConnectNavItem({ collapsed }: ConnectNavItemProps) {
             to="/connect"
             title={tooltipContent}
             aria-label={
-              status === "subscription_required"
+              status === "subscription_required" ||
+              status === "restoring" ||
+              status === "unavailable"
                 ? `${t("common:connect")}: ${tooltipContent}`
                 : undefined
             }

@@ -1,5 +1,4 @@
 // Settings Commands
-import { appDataDir, join } from "@tauri-apps/api/path";
 import type { Settings, UpdateInfo } from "@/lib/types";
 import type { AppInfo, PlatformInfo, BackupImportPreview } from "../types";
 export type { BackupImportPreview } from "../types";
@@ -196,7 +195,10 @@ export const inspectDatabaseBackup = async (
     let path = backupFilePath;
     if (platform.is_mobile || platform.os === "ios" || platform.os === "android") {
       staged = await stagePickedDatabaseFileForRestore(backupFilePath, signal);
-      path = await join(await appDataDir(), staged.relativePath);
+      path = await invoke<string>("profile_transfer_file", {
+        relativePath: staged.relativePath,
+        operation: "path",
+      });
     }
     if (signal?.aborted) return null;
     const preview = await tauriInvoke<BackupImportPreview>("inspect_database_backup", {

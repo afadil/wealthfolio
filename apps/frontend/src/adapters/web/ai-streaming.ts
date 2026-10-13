@@ -1,3 +1,4 @@
+import { profileFetch } from "@/features/profiles/session";
 // Web adapter - AI Chat Streaming (platform-specific HTTP implementation)
 
 import { logger, AI_CHAT_STREAM_ENDPOINT } from "./core";
@@ -16,7 +17,7 @@ export async function* streamAiChat(
   request: AiSendMessageRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<AiStreamEvent, void, undefined> {
-  const response = await fetch(AI_CHAT_STREAM_ENDPOINT, {
+  const response = await profileFetch(AI_CHAT_STREAM_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

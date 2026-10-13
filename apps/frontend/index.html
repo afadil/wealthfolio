@@ -40,9 +40,20 @@
           document.documentElement.classList.add(resolved);
           document.documentElement.style.colorScheme = resolved;
         } catch (e) {}
+        // Presentation hint only; profile access is still checked by the app.
+        try {
+          var opening = JSON.parse(sessionStorage.getItem("wealthfolio-profile-opening") || "null");
+          var age = opening && Date.now() - opening.at;
+          if (opening && typeof opening.at === "number" && age >= 0 && age < 300000) {
+            document.documentElement.classList.add("profile-opening");
+          }
+        } catch (e) {}
       })();
     </script>
     <div id="root"></div>
+    <div id="profile-splash" class="profile-lock-screen" role="status" aria-label="Opening profile">
+      <span class="profile-lock-avatar profile-opening-placeholder" aria-hidden="true"></span>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -266,53 +266,6 @@ pub struct CommitInitializeKeysResponse {
     pub key_state: KeyState,
 }
 
-/// Response from starting key rotation (Phase 1).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RotateKeysResponse {
-    /// Base64 encoded challenge
-    pub challenge: String,
-    /// Base64 encoded nonce
-    pub nonce: String,
-    /// New key version
-    #[serde(alias = "new_key_version")]
-    pub new_key_version: i32,
-}
-
-/// Envelope for a device during key rotation.
-/// Note: Uses snake_case for cloud API serialization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceKeyEnvelope {
-    /// Device ID
-    pub device_id: String,
-    /// Base64 encoded device key envelope
-    pub device_key_envelope: String,
-}
-
-/// Request to commit key rotation (Phase 2).
-/// Note: Uses snake_case for cloud API serialization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitRotateKeysRequest {
-    /// New key version
-    pub new_key_version: i32,
-    /// Envelopes for all devices
-    pub envelopes: Vec<DeviceKeyEnvelope>,
-    /// Base64 encoded signature
-    pub signature: String,
-    /// Base64 encoded challenge response (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub challenge_response: Option<String>,
-}
-
-/// Response from committing key rotation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CommitRotateKeysResponse {
-    pub success: bool,
-    #[serde(alias = "key_version")]
-    pub key_version: i32,
-}
-
 /// Response from resetting team sync.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -657,7 +610,8 @@ pub struct SnapshotLatestResponse {
     pub snapshot_id: String,
     #[serde(alias = "schemaVersion")]
     pub schema_version: i32,
-    #[serde(alias = "coversTables")]
+    // Direct downloads omit table metadata; legacy responses may still include it.
+    #[serde(default, alias = "coversTables")]
     pub covers_tables: Vec<String>,
     #[serde(alias = "oplogSeq")]
     pub oplog_seq: i64,
@@ -683,8 +637,6 @@ pub struct SnapshotUploadHeaders {
     pub event_id: Option<String>,
     #[serde(alias = "schemaVersion")]
     pub schema_version: i32,
-    #[serde(alias = "coversTables")]
-    pub covers_tables: Vec<String>,
     #[serde(alias = "sizeBytes")]
     pub size_bytes: i64,
     pub checksum: String,
@@ -724,6 +676,19 @@ pub struct SnapshotUploadResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn snapshot_metadata_accepts_omitted_table_list_and_legacy_alias() {
+        let mut value = serde_json::json!({
+            "snapshot_id": "snapshot", "schema_version": 1, "oplog_seq": 0,
+            "size_bytes": 20, "checksum": "digest", "created_at": "2026-10-04T00:00:00Z"
+        });
+        let direct: SnapshotLatestResponse = serde_json::from_value(value.clone()).unwrap();
+        assert!(direct.covers_tables.is_empty());
+        value["coversTables"] = serde_json::json!(["accounts"]);
+        let legacy: SnapshotLatestResponse = serde_json::from_value(value).unwrap();
+        assert_eq!(legacy.covers_tables, vec!["accounts"]);
+    }
 
     #[test]
     fn app_preference_wire_entity_is_recognized() {

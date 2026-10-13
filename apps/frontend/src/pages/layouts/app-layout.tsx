@@ -1,12 +1,11 @@
 import AppLauncher from "@/components/app-launcher";
 import { MobileLoadingIndicator } from "@/components/mobile-loading-indicator";
-import { StartupError } from "@/components/startup-error";
 import { UpdateDialog } from "@/components/update-dialog";
 import { PortfolioSyncProvider } from "@/context/portfolio-sync-context";
 import { useActiveAppSyncTrigger } from "@/features/devices-sync/hooks/use-active-app-sync-trigger";
 import { usePostLoginConnectSync } from "@/features/wealthfolio-connect/hooks";
 import { useIsMobileViewport, usePlatform } from "@/hooks/use-platform";
-import { useSettings } from "@/hooks/use-settings";
+import { useSettingsContext } from "@/lib/settings-provider";
 import { cn } from "@/lib/utils";
 import { MobileNavigationContainer } from "@/pages/layouts/mobile-navigation-container";
 import useGlobalEventListener from "@/use-global-event-listener";
@@ -17,16 +16,10 @@ import { AppSidebar } from "./navigation/app-sidebar";
 import { FloatingNavigationBar } from "./navigation/floating-navigation-bar";
 import { MobileNavBar } from "./navigation/mobile-navbar";
 import { NavigationModeProvider, useNavigationMode } from "./navigation/navigation-mode-context";
+import { PageErrorBoundary } from "./page-error-boundary";
 
 const AppLayoutContent = () => {
-  const {
-    data: settings,
-    error: settingsError,
-    isError: isSettingsError,
-    isFetching: isSettingsFetching,
-    isSuccess: isSettingsReady,
-    refetch: refetchSettings,
-  } = useSettings();
+  const { settings } = useSettingsContext();
   const location = useLocation();
   const navigation = useNavigation();
   const { isMobile, isMacOS, isTauri } = usePlatform();
@@ -50,7 +43,7 @@ const AppLayoutContent = () => {
       : undefined;
   const launchBarHeight =
     !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
-  const isAppShellReady = isSettingsReady && !!settings?.onboardingCompleted;
+  const isAppShellReady = !!settings?.onboardingCompleted;
   const pageScrollKey =
     location.pathname.startsWith("/addon/") || location.pathname.startsWith("/addons/")
       ? "/addons"
@@ -60,35 +53,16 @@ const AppLayoutContent = () => {
   useActiveAppSyncTrigger({ enabled: isTauri, requireWindowFocusForInterval: !isMobile });
   usePostLoginConnectSync({ enabled: areGlobalEventsReady && isAppShellReady });
 
-  if (isSettingsError) {
-    return (
-      <StartupError
-        error={settingsError}
-        isRetrying={isSettingsFetching}
-        onRetry={() => void refetchSettings()}
-      />
-    );
-  }
-
-  if (!isSettingsReady) {
-    return (
-      <div
-        className="flex h-screen items-center justify-center"
-        style={{ backgroundColor: "#09090b" }}
-      >
-        <img src="/logo-gold.png" alt="Wealthfolio" className="h-[100px] w-auto" />
-      </div>
-    );
-  }
-
   if (!settings?.onboardingCompleted && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" />;
   }
 
   return (
-    <ErrorBoundary>
+    // Catches errors outside a page. Going home reloads at the root, away from a route that keeps failing.
+    <ErrorBoundary onGoHome={() => window.location.assign("/")}>
       <ApplicationShell
         className="app-shell h-screen overflow-x-hidden"
+        data-mobile-navigation={shouldUseMobileNavigation ? "true" : undefined}
         style={{
           ...(launchBarHeight ? { ["--mobile-nav-ui-height" as string]: launchBarHeight } : {}),
           ...(titleBarNudge ? { ["--titlebar-nudge" as string]: titleBarNudge } : {}),
@@ -119,7 +93,9 @@ const AppLayoutContent = () => {
                 key={pageScrollKey}
                 withMobileNavOffset={shouldUseBottomNavigation}
               >
-                <Outlet />
+                <PageErrorBoundary>
+                  <Outlet />
+                </PageErrorBoundary>
               </PageScrollContainer>
             )}
           </main>

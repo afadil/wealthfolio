@@ -5,20 +5,20 @@
 //! - String ↔ typed value conversion
 //! - Error formatting for the frontend
 
-use crate::database::DatabaseRuntime;
-
+use crate::events::{emit_portfolio_trigger_recalculate, PortfolioRequestPayload};
+use crate::profiles::ProfileAccess;
 use chrono::NaiveDate;
 use log::error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::State;
 
 use wealthfolio_core::assets::{
     AssetKind, CreateAlternativeAssetRequest as CoreCreateRequest,
     LinkLiabilityRequest as CoreLinkRequest, UpdateAssetDetailsRequest as CoreUpdateDetailsRequest,
     UpdateValuationRequest as CoreValuationRequest,
 };
+use wealthfolio_core::quotes::MarketSyncMode;
 use wealthfolio_core::utils::time_utils::{parse_user_timezone_or_default, user_today};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +62,8 @@ pub struct CreateAlternativeAssetRequest {
     pub purchase_date: Option<String>,
     pub metadata: Option<Value>,
     pub linked_asset_id: Option<String>,
+    #[serde(default)]
+    pub loan: Option<wealthfolio_core::assets::loan::LoanSetup>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +112,8 @@ pub struct AlternativeHoldingResponse {
     pub metadata: Option<Value>,
     pub linked_asset_id: Option<String>,
     pub notes: Option<String>,
+    /// For liabilities: what the card shows, from the calculation that values it.
+    pub loan: Option<wealthfolio_core::assets::loan::LoanSummary>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,7 +202,7 @@ pub struct NetWorthHistoryPoint {
 #[tauri::command]
 pub async fn create_alternative_asset(
     request: CreateAlternativeAssetRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<CreateAlternativeAssetResponse, String> {
     let context = state.context()?;
     // Parse string values to typed values
@@ -232,6 +236,7 @@ pub async fn create_alternative_asset(
         purchase_date,
         metadata: request.metadata,
         linked_asset_id: request.linked_asset_id,
+        loan: request.loan,
     };
 
     // Delegate to core service
@@ -255,7 +260,7 @@ pub async fn create_alternative_asset(
 pub async fn update_alternative_asset_valuation(
     asset_id: String,
     request: UpdateValuationRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<UpdateValuationResponse, String> {
     let context = state.context()?;
     // Parse string values
@@ -299,7 +304,8 @@ pub async fn update_alternative_asset_metadata(
     name: Option<String>,
     metadata: std::collections::HashMap<String, String>,
     notes: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    loan: Option<wealthfolio_core::assets::loan::LoanSetup>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     // Convert HashMap<String, String> to HashMap<String, Option<String>>
@@ -321,6 +327,7 @@ pub async fn update_alternative_asset_metadata(
         name,
         notes,
         metadata: Some(metadata_map),
+        loan,
     };
 
     // Delegate to core service
@@ -340,7 +347,7 @@ pub async fn update_alternative_asset_metadata(
 #[tauri::command]
 pub async fn delete_alternative_asset(
     asset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     context
@@ -358,7 +365,7 @@ pub async fn delete_alternative_asset(
 pub async fn link_liability(
     liability_id: String,
     request: LinkLiabilityRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     let core_request = CoreLinkRequest {
@@ -380,10 +387,7 @@ pub async fn link_liability(
 
 /// Unlinks a liability from its linked asset.
 #[tauri::command]
-pub async fn unlink_liability(
-    liability_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn unlink_liability(liability_id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .alternative_asset_service()
@@ -400,7 +404,7 @@ pub async fn unlink_liability(
 /// Gets all alternative holdings (assets with their latest valuations).
 #[tauri::command]
 pub async fn get_alternative_holdings(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<AlternativeHoldingResponse>, String> {
     let context = state.context()?;
     let holdings = context
@@ -437,6 +441,7 @@ pub async fn get_alternative_holdings(
                 metadata: h.metadata,
                 linked_asset_id: h.linked_asset_id,
                 notes: h.notes,
+                loan: h.loan,
             }
         })
         .collect();
@@ -448,7 +453,7 @@ pub async fn get_alternative_holdings(
 #[tauri::command]
 pub async fn get_net_worth(
     date: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<NetWorthResponse, String> {
     let context = state.context()?;
     let as_of_date = match date {
@@ -505,7 +510,7 @@ pub async fn get_net_worth(
 pub fn get_net_worth_history(
     start_date: String,
     end_date: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<NetWorthHistoryPoint>, String> {
     let context = state.context()?;
     let start = NaiveDate::parse_from_str(&start_date, "%Y-%m-%d")
@@ -538,4 +543,87 @@ pub fn get_net_worth_history(
         .collect();
 
     Ok(response)
+}
+
+#[tauri::command]
+pub async fn calculate_loan(
+    state: ProfileAccess,
+    request: wealthfolio_core::assets::loan::LoanCalculationRequest,
+) -> Result<Option<wealthfolio_core::assets::loan::LoanCalculation>, String> {
+    let _context = state.context()?;
+    Ok(wealthfolio_core::assets::loan::calculate_loan(&request))
+}
+
+#[tauri::command]
+pub async fn apply_loan_action(
+    asset_id: String,
+    action: wealthfolio_core::assets::loan::LoanAction,
+    state: ProfileAccess,
+    handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let context = state.context()?;
+    let result = context
+        .alternative_asset_service()
+        .apply_loan_action(&asset_id, action)
+        .await
+        .map_err(|e| e.to_string())?;
+    // Recorded balances change valuations, as a manual quote save does.
+    if result.balances_changed {
+        tauri::async_runtime::spawn(async move {
+            let payload = PortfolioRequestPayload::builder()
+                .account_ids(None)
+                .market_sync_mode(MarketSyncMode::None)
+                .build();
+            emit_portfolio_trigger_recalculate(&handle, payload, &context);
+        });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn preview_loan_terms(
+    asset_id: Option<String>,
+    setup: wealthfolio_core::assets::loan::LoanSetup,
+    state: ProfileAccess,
+) -> Result<Option<wealthfolio_core::assets::loan::LoanSchedulePreview>, String> {
+    let context = state.context()?;
+    context
+        .alternative_asset_service()
+        .preview_loan_terms(asset_id.as_deref(), &setup)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_loan_payments(
+    asset_id: String,
+    state: ProfileAccess,
+) -> Result<Vec<wealthfolio_core::assets::loan::LoanPayment>, String> {
+    let context = state.context()?;
+    context
+        .alternative_asset_service()
+        .get_loan_payments(&asset_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn link_loan_payment(
+    activity_id: String,
+    link: wealthfolio_core::assets::loan::PaymentLink,
+    state: ProfileAccess,
+) -> Result<(), String> {
+    let context = state.context()?;
+    context
+        .alternative_asset_service()
+        .link_loan_payment(&activity_id, link)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn recalculate_loan(
+    state: ProfileAccess,
+    request: wealthfolio_core::assets::loan::LoanRecalculationRequest,
+) -> Result<Option<wealthfolio_core::assets::loan::LoanRecalculation>, String> {
+    let _context = state.context()?;
+    Ok(wealthfolio_core::assets::loan::recalculate_loan(&request))
 }

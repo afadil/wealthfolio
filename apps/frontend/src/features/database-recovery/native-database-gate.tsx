@@ -1,3 +1,6 @@
+import { DATABASE_STATE_CHANGED } from "../../adapters/tauri/events";
+import { StartupScreen } from "@/components/startup-screen";
+import { useProfile } from "@/features/profiles/profile-context";
 import { BackupError, type BackupFailure } from "@/pages/settings/exports/backup-error";
 import { reloadApplication } from "@/lib/reload-application";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -24,18 +27,55 @@ export function NativeDatabaseGate({ children }: { children: ReactNode }) {
 
 function NativeStartup({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
+  const profile = useProfile();
+  const [listenerError, setListenerError] = useState<string | null>(null);
   const status = useQuery({
     queryKey: ["database-startup"],
     queryFn: getDatabaseStartupStatus,
     retry: false,
-    staleTime: 0,
-    refetchInterval: (query) =>
-      query.state.data?.maintenance ||
-      (!query.state.data?.ready && !query.state.data?.error && !query.state.error)
-        ? 500
-        : 5000,
-    refetchOnWindowFocus: true,
+    // Reads are driven by the initial subscription and backend transitions.
+    enabled: false,
   });
+  const { refetch } = status;
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+    let pending = false;
+    let unlisten: (() => void) | undefined;
+    const refresh = async () => {
+      if (cancelled) return;
+      if (inFlight) {
+        pending = true;
+        return;
+      }
+      inFlight = true;
+      try {
+        await refetch();
+      } finally {
+        inFlight = false;
+        if (pending && !cancelled) {
+          pending = false;
+          void refresh();
+        }
+      }
+    };
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) => listen(DATABASE_STATE_CHANGED, () => void refresh()))
+      .then((stop) => {
+        if (cancelled) stop();
+        else {
+          unlisten = stop;
+          void refresh();
+        }
+      })
+      .catch((cause) => {
+        if (!cancelled) setListenerError(String(cause));
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [refetch]);
   const generation = useRef<string | null>(null);
   if (status.data?.ready && status.data.generation && generation.current === null) {
     generation.current = status.data.generation;
@@ -111,7 +151,6 @@ function NativeStartup({ children }: { children: ReactNode }) {
     previewId.current = null;
     try {
       await recoverDatabaseFromImport(preview.id);
-      await status.refetch();
     } catch (cause) {
       setError({ cause });
       setPreview(null);
@@ -128,10 +167,19 @@ function NativeStartup({ children }: { children: ReactNode }) {
     } catch (cause) {
       setError({ cause });
     } finally {
-      await status.refetch();
       setBusy(null);
     }
   };
+
+  if (listenerError)
+    return (
+      <StartupScreen
+        message={t("common:profiles.startupFailed")}
+        error={t("common:profiles.reloadHelp")}
+      >
+        <Button onClick={() => reloadApplication()}>{t("common:retry")}</Button>
+      </StartupScreen>
+    );
 
   if (
     status.isFetchedAfterMount &&
@@ -142,16 +190,8 @@ function NativeStartup({ children }: { children: ReactNode }) {
   )
     return children;
   const startupError = status.data?.error || (status.error ? String(status.error) : null);
-  if (!startupError || status.data?.maintenance)
-    return (
-      <main
-        className="text-paper flex min-h-screen flex-col items-center justify-center gap-6 bg-[#09090b] p-6 text-center"
-        role="status"
-      >
-        <img src="/logo-gold.png" alt="Wealthfolio" width={100} height={100} />
-        <p>{t("settings:recovery_opening")}</p>
-      </main>
-    );
+  if (!startupError || status.data?.maintenance || /PROFILE_(LOCKED|STALE)/.test(startupError))
+    return <StartupScreen />;
 
   const createdAt = preview?.summary.createdAt ? new Date(preview.summary.createdAt) : null;
   const formattedDate =
@@ -265,6 +305,17 @@ function NativeStartup({ children }: { children: ReactNode }) {
               </form>
             )}
           </>
+        )}
+        {profile && (
+          <Button
+            variant="ghost"
+            disabled={busy === "restore" || busy === "retry" || !!status.data?.maintenance}
+            onClick={() => {
+              void cancel().then(profile.switchProfile);
+            }}
+          >
+            {t("common:profiles.switch", { defaultValue: "Switch profile" })}
+          </Button>
         )}
         {error && (
           <div role="alert" className="text-destructive break-words text-sm">

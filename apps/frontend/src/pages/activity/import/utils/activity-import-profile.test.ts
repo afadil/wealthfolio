@@ -18,6 +18,7 @@ describe("activity import profiles", () => {
     expect(profile).toBe(DEFAULT_ACTIVITY_IMPORT_PROFILE);
     expect(profile.assetResolutionEnabled).toBe(true);
     expect(profile.requiredMappingFields).toContain(ImportFormat.SYMBOL);
+    expect(profile.requiredMappingFields).not.toContain(ImportFormat.AMOUNT);
   });
 
   it("uses a transaction profile for cash and credit card accounts", () => {
@@ -42,7 +43,9 @@ describe("activity import profiles", () => {
     expect(activityTypeAllowedForImportProfile(ActivityType.WITHDRAWAL, profile)).toBe(true);
     expect(activityTypeAllowedForImportProfile(ActivityType.TRANSFER_IN, profile)).toBe(true);
     expect(activityTypeAllowedForImportProfile(ActivityType.BUY, profile)).toBe(false);
-    expect(activityTypeAllowedForImportProfile(ActivityType.TRANSFER_OUT, profile)).toBe(false);
+    // A balance transfer or cash advance leaves the card as a TRANSFER_OUT (#1227).
+    expect(activityTypeAllowedForImportProfile(ActivityType.TRANSFER_OUT, profile)).toBe(true);
+    expect(activityTypeAllowedForImportProfile(ActivityType.DEPOSIT, profile)).toBe(false);
   });
 
   it("uses credit-card labels for credit card transaction imports", () => {
@@ -54,6 +57,9 @@ describe("activity import profiles", () => {
     );
     expect(getActivityTypeLabelForImportProfile(ActivityType.TRANSFER_IN, creditCard)).toBe(
       "Payment",
+    );
+    expect(getActivityTypeLabelForImportProfile(ActivityType.TRANSFER_OUT, creditCard)).toBe(
+      "Balance Transfer / Cash Advance",
     );
     expect(getActivityTypeLabelForImportProfile(ActivityType.WITHDRAWAL, cash)).toBe("Withdrawal");
   });

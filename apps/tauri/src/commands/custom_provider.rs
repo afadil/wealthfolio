@@ -1,5 +1,4 @@
-use crate::database::DatabaseRuntime;
-use tauri::State;
+use crate::profiles::ProfileAccess;
 use wealthfolio_core::custom_provider::{
     CustomProviderWithSources, NewCustomProvider, TestSourceRequest, TestSourceResult,
     UpdateCustomProvider,
@@ -9,7 +8,7 @@ use super::error::CommandResult;
 
 #[tauri::command]
 pub async fn get_custom_providers(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
 ) -> CommandResult<Vec<CustomProviderWithSources>> {
     let context = context.context()?;
     Ok(context.custom_provider_service.get_all()?)
@@ -17,7 +16,7 @@ pub async fn get_custom_providers(
 
 #[tauri::command]
 pub async fn create_custom_provider(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
     payload: NewCustomProvider,
 ) -> CommandResult<CustomProviderWithSources> {
     let context = context.context()?;
@@ -26,7 +25,7 @@ pub async fn create_custom_provider(
 
 #[tauri::command]
 pub async fn update_custom_provider(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
     provider_id: String,
     payload: UpdateCustomProvider,
 ) -> CommandResult<CustomProviderWithSources> {
@@ -39,7 +38,7 @@ pub async fn update_custom_provider(
 
 #[tauri::command]
 pub async fn delete_custom_provider(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
     provider_id: String,
 ) -> CommandResult<()> {
     let context = context.context()?;
@@ -48,7 +47,7 @@ pub async fn delete_custom_provider(
 
 #[tauri::command]
 pub async fn test_custom_provider_source(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
     payload: TestSourceRequest,
 ) -> CommandResult<TestSourceResult> {
     let context = context.context()?;

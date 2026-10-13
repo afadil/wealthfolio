@@ -13,9 +13,9 @@ import {
   IntervalSelector,
   getInitialIntervalData,
   useNumberFormatting,
-  usePersistentState,
   type TimePeriod,
 } from "@wealthfolio/ui";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import {
@@ -29,11 +29,11 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { BreakdownTable } from "./components/breakdown-table";
 import { CategoryDetailSheet } from "./components/category-detail-sheet";
+import { NetWorthAttention } from "./components/net-worth-attention";
 import { MomentumCard } from "./components/momentum-card";
 import {
   THEME_COLOR,
   THEME_COLOR_LIGHT,
-  averageMonthlyChange,
   computeMomentum,
   computeVelocity,
   deriveChange,
@@ -68,9 +68,10 @@ export function NetWorthContent() {
   });
   const isMobile = useIsMobileViewport();
 
-  const [intervalCode] = usePersistentState<TimePeriod>(INTERVAL_STORAGE_KEY, DEFAULT_INTERVAL);
-
-  const [periodCode, setPeriodCode] = useState<TimePeriod>(intervalCode);
+  const [periodCode, setPeriodCode] = usePersistentState<TimePeriod>(
+    INTERVAL_STORAGE_KEY,
+    DEFAULT_INTERVAL,
+  );
   // A local Date carries the configured calendar day for the date-only interval helper.
   const currentDate = useMemo(() => parseLocalDate(currentDateISO), [currentDateISO]);
   const dateRange = useMemo(
@@ -151,10 +152,16 @@ export function NetWorthContent() {
 
   const velocity = useMemo(() => computeVelocity(parsedHistory), [parsedHistory]);
   const trailingYearMonthly = useMemo(() => {
-    if (periodCode === "ALL") return undefined;
+    if (periodCode === "ALL" || !velocity) return undefined;
     const cutoff = formatDateISO(new Date(currentDate.getTime() - 366 * MS_PER_DAY));
-    return averageMonthlyChange(longHistory.filter((point) => point.date >= cutoff));
-  }, [longHistory, periodCode, currentDate]);
+    const trailing = computeVelocity(longHistory.filter((point) => point.date >= cutoff));
+    const yearAgo = formatDateISO(new Date(currentDate.getTime() - 365 * MS_PER_DAY));
+    // Do not label a partial history as a 12-month average.
+    if (!trailing || trailing.startDate > yearAgo) return undefined;
+    // A range spanning (nearly) the whole trailing year always compares at ~1×.
+    if (trailing.months - velocity.months < 1) return undefined;
+    return trailing.perMonth;
+  }, [longHistory, periodCode, currentDate, velocity]);
   const momentum = useMemo(() => {
     if (!historyDates || periodCode === "ALL") return null;
     return computeMomentum(longHistory, historyDates.startDate, historyDates.endDate);
@@ -170,6 +177,13 @@ export function NetWorthContent() {
       ),
     [parsedHistory],
   );
+
+  // Show percentages and multiples for positive starts and nonnegative ends.
+  // Keep the shared change calculation unchanged for the breakdown rows.
+  const showChangeRatio =
+    parsedHistory.length >= 2 &&
+    parsedHistory[0].netWorth > 0 &&
+    parsedHistory[parsedHistory.length - 1].netWorth >= 0;
 
   const currency = netWorthData?.currency || settings?.baseCurrency || "USD";
   const hasStaleValuations = netWorthData && netWorthData.staleAssets.length > 0;
@@ -263,23 +277,27 @@ export function NetWorthContent() {
                     currency={currency}
                     displayCurrency={false}
                   />
-                  <div className="border-secondary my-1 border-r pr-2" />
-                  {isPlainPercent(netWorthChange.percent) ? (
-                    <GainPercent
-                      className="lg:text-md text-sm font-light"
-                      value={netWorthChange.percent}
-                      animated={true}
-                    />
-                  ) : (
-                    <span
-                      className={`lg:text-md text-sm font-light ${toneClass(netWorthChange.amount)}`}
-                    >
-                      {formatChangePercent(
-                        netWorthChange,
-                        t("insights:networth.breakdown_table.new"),
-                        formatting,
+                  {showChangeRatio && (
+                    <>
+                      <div className="border-secondary my-1 border-r pr-2" />
+                      {isPlainPercent(netWorthChange.percent) ? (
+                        <GainPercent
+                          className="lg:text-md text-sm font-light"
+                          value={netWorthChange.percent}
+                          animated={true}
+                        />
+                      ) : (
+                        <span
+                          className={`lg:text-md text-sm font-light ${toneClass(netWorthChange.amount)}`}
+                        >
+                          {formatChangePercent(
+                            netWorthChange,
+                            t("insights:networth.breakdown_table.new"),
+                            formatting,
+                          )}
+                        </span>
                       )}
-                    </span>
+                    </>
                   )}
                 </>
               )}
@@ -297,10 +315,7 @@ export function NetWorthContent() {
       <div
         className="flex grow flex-col"
         style={{
-          backgroundImage:
-            (parsedData?.netWorth ?? 0) < 0
-              ? `linear-gradient(to top, color-mix(in srgb, var(--destructive) 30%, transparent), color-mix(in srgb, var(--destructive) 15%, transparent) 50%, transparent 100%)`
-              : `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")} 50%, transparent 100%)`,
+          backgroundImage: `linear-gradient(to top, ${THEME_COLOR.replace(")", " / 0.30)")}, ${THEME_COLOR.replace(")", " / 0.15)")} 50%, transparent 100%)`,
         }}
       >
         {/* Chart section */}
@@ -325,8 +340,7 @@ export function NetWorthContent() {
                 className="pointer-events-auto relative z-20 w-full max-w-screen-sm sm:max-w-screen-md md:max-w-2xl lg:max-w-3xl"
                 onIntervalSelect={handleIntervalSelect}
                 isLoading={isHistoryLoading}
-                storageKey={INTERVAL_STORAGE_KEY}
-                defaultValue={DEFAULT_INTERVAL}
+                value={periodCode}
               />
             </div>
           )}
@@ -388,41 +402,7 @@ export function NetWorthContent() {
                 <MomentumCard momentum={momentum} currency={currency} periodLabel={periodLabel} />
               )}
 
-              {/* Stale valuations warning */}
-              {hasStaleValuations && (
-                <div className="border-warning/10 bg-warning/10 rounded-xl border p-4 backdrop-blur-xl md:p-5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Icons.AlertCircle className="text-warning h-4 w-4 shrink-0" />
-                    <h3 className="text-foreground text-sm font-semibold">
-                      {t("insights:networth.update_valuations")}
-                    </h3>
-                    <span className="text-muted-foreground/70 ml-auto text-xs">
-                      {t("insights:networth.assets_count", {
-                        count: netWorthData?.staleAssets.length ?? 0,
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-muted-foreground ml-6 text-xs">
-                    {t("insights:networth.not_updated_over_90_days")}
-                  </p>
-                  <div className="ml-6 mt-3 space-y-1.5">
-                    {netWorthData?.staleAssets.map((asset) => (
-                      <Link
-                        key={asset.assetId}
-                        to={`/holdings/${encodeURIComponent(asset.assetId)}?tab=history`}
-                        className="hover:bg-warning/10 -mx-2 flex items-center justify-between rounded-md px-2 py-1.5 transition-colors"
-                      >
-                        <span className="truncate text-xs font-medium">
-                          {asset.name ?? asset.assetId}
-                        </span>
-                        <span className="text-muted-foreground ml-2 shrink-0 text-xs">
-                          {t("insights:networth.days_ago", { count: asset.daysStale })}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <NetWorthAttention staleAssets={netWorthData?.staleAssets ?? []} />
             </div>
           </div>
         </div>

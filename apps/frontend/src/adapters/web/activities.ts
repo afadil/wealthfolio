@@ -1,3 +1,4 @@
+import { profileFetch } from "@/features/profiles/session";
 // Web-specific activity commands
 import type { ParseConfig, ParsedCsvResult } from "@/lib/types";
 import { API_PREFIX, logger } from "./core";
@@ -40,7 +41,7 @@ export const parseCsv = async (file: File, config: ParseConfig): Promise<ParsedC
     formData.append("file", file);
     formData.append("config", JSON.stringify(config));
 
-    const response = await fetch(`${API_PREFIX}/activities/import/parse`, {
+    const response = await profileFetch(`${API_PREFIX}/activities/import/parse`, {
       method: "POST",
       body: formData,
       credentials: "same-origin",

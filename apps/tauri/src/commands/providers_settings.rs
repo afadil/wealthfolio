@@ -1,12 +1,11 @@
-use crate::database::DatabaseRuntime;
-use tauri::State;
+use crate::profiles::ProfileAccess;
 use wealthfolio_core::quotes::service::ProviderInfo;
 
 use super::error::CommandResult;
 
 #[tauri::command]
 pub async fn get_market_data_providers_settings(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
 ) -> CommandResult<Vec<ProviderInfo>> {
     let context = context.context()?;
     Ok(context.quote_service.get_providers_info().await?)
@@ -14,7 +13,7 @@ pub async fn get_market_data_providers_settings(
 
 #[tauri::command]
 pub async fn update_market_data_provider_settings(
-    context: State<'_, DatabaseRuntime>,
+    context: ProfileAccess,
     provider_id: String,
     priority: i32,
     enabled: bool,

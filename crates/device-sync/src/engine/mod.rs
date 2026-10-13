@@ -9,17 +9,20 @@ use crate::{
 };
 
 pub mod ports;
+mod restore;
+#[cfg(test)]
+mod restore_tests;
 mod runtime;
 
 pub use ports::{
-    CredentialStore, OutboxStore, ReadyReconcileStore, ReplayEvent, ReplayStore,
-    SyncBootstrapResult, SyncCycleResult, SyncIdentity, SyncReadyReconcileResult, SyncTransport,
-    TransportError,
+    CredentialStore, OutboxStore, ReplayEvent, ReplayStore, SyncCycleResult, SyncIdentity,
+    SyncTransport, TransportError,
 };
-pub use runtime::{
-    DeviceSyncRuntimeState, DeviceSyncWakeHandle, OverwriteInfo, OverwriteTableInfo,
-    PairingFlowPhase, PairingFlowResponse, PairingFlowState,
+pub use restore::{
+    RestoreError, RestoreErrorCode, RestoreFile, RestoreOperation, RestorePhase, RestorePorts,
+    RestoreRetry, RestoreSnapshotRef, StartRestore,
 };
+pub use runtime::{DeviceSyncRuntimeState, DeviceSyncWakeHandle};
 
 /// Default periodic sync cadence for the background engine.
 pub const DEVICE_SYNC_PERIODIC_INTERVAL_SECS: u64 = 5 * 60;
@@ -319,7 +322,7 @@ where
     }
 
     ports.persist_device_config(&identity, "trusted").await;
-    let token = match ports.get_access_token() {
+    let token = match ports.get_access_token().await {
         Ok(value) => value,
         Err(err) => {
             return ctx
@@ -1016,167 +1019,6 @@ where
     })
 }
 
-fn reconcile_error(
-    mut result: SyncReadyReconcileResult,
-    message: String,
-) -> SyncReadyReconcileResult {
-    result.status = "error".to_string();
-    result.message = message;
-    result
-}
-
-fn derive_bootstrap_action(bootstrap_status: &str, bootstrap_snapshot_id: Option<&str>) -> String {
-    if bootstrap_status == "applied" {
-        return "PULL_REMOTE_OVERWRITE".to_string();
-    }
-
-    if bootstrap_status == "requested" {
-        return "WAIT_REMOTE_SNAPSHOT".to_string();
-    }
-
-    if bootstrap_snapshot_id
-        .map(|id| !id.trim().is_empty())
-        .unwrap_or(false)
-    {
-        return "PULL_REMOTE_OVERWRITE".to_string();
-    }
-
-    "NO_BOOTSTRAP".to_string()
-}
-
-pub async fn run_ready_reconcile_state<P>(ports: &P) -> SyncReadyReconcileResult
-where
-    P: ReadyReconcileStore + Send + Sync,
-{
-    let mut result = SyncReadyReconcileResult {
-        status: "ok".to_string(),
-        message: "Device sync reconcile completed".to_string(),
-        bootstrap_action: "NO_BOOTSTRAP".to_string(),
-        bootstrap_status: "not_attempted".to_string(),
-        bootstrap_message: None,
-        bootstrap_snapshot_id: None,
-        cycle_status: None,
-        cycle_needs_bootstrap: false,
-        retry_attempted: false,
-        retry_cycle_status: None,
-        background_status: "skipped".to_string(),
-    };
-
-    let sync_state = match ports.get_sync_state().await {
-        Ok(value) => value,
-        Err(err) => {
-            return reconcile_error(result, format!("Failed to read sync state: {}", err));
-        }
-    };
-    if sync_state != SyncState::Ready {
-        result.status = "skipped_not_ready".to_string();
-        result.message = "Device is not in READY state".to_string();
-        return result;
-    }
-
-    let bootstrap_result = match ports.bootstrap_snapshot_if_needed().await {
-        Ok(value) => value,
-        Err(err) => {
-            return reconcile_error(result, format!("Snapshot bootstrap failed: {}", err));
-        }
-    };
-    result.bootstrap_status = bootstrap_result.status.clone();
-    result.bootstrap_message = Some(bootstrap_result.message);
-    result.bootstrap_snapshot_id = bootstrap_result.snapshot_id;
-    result.bootstrap_action = derive_bootstrap_action(
-        &result.bootstrap_status,
-        result.bootstrap_snapshot_id.as_deref(),
-    );
-
-    if result.bootstrap_status == "applied" {
-        let cycle_result = match ports.run_sync_cycle(true).await {
-            Ok(value) => value,
-            Err(err) => {
-                return reconcile_error(result, format!("Initial sync cycle failed: {}", err));
-            }
-        };
-        result.cycle_status = Some(cycle_result.status.clone());
-        result.cycle_needs_bootstrap = cycle_result.needs_bootstrap;
-
-        if cycle_result.needs_bootstrap {
-            result.retry_attempted = true;
-            let retry_bootstrap_result = match ports.bootstrap_snapshot_if_needed().await {
-                Ok(value) => value,
-                Err(err) => {
-                    return reconcile_error(
-                        result,
-                        format!("Retry snapshot bootstrap failed: {}", err),
-                    );
-                }
-            };
-            result.bootstrap_status = retry_bootstrap_result.status.clone();
-            result.bootstrap_message = Some(retry_bootstrap_result.message);
-            result.bootstrap_snapshot_id = retry_bootstrap_result.snapshot_id;
-            result.bootstrap_action = derive_bootstrap_action(
-                &result.bootstrap_status,
-                result.bootstrap_snapshot_id.as_deref(),
-            );
-
-            if result.bootstrap_status != "applied" {
-                let retry_status = result.bootstrap_status.clone();
-                return reconcile_error(
-                    result,
-                    format!(
-                        "Retry bootstrap did not apply a snapshot (status={})",
-                        retry_status
-                    ),
-                );
-            }
-
-            let retry_cycle_result = match ports.run_sync_cycle(true).await {
-                Ok(value) => value,
-                Err(err) => {
-                    return reconcile_error(result, format!("Retry sync cycle failed: {}", err));
-                }
-            };
-            result.retry_cycle_status = Some(retry_cycle_result.status);
-            result.cycle_needs_bootstrap = retry_cycle_result.needs_bootstrap;
-            if result.cycle_needs_bootstrap {
-                return reconcile_error(
-                    result,
-                    "Retry sync cycle still requires bootstrap".to_string(),
-                );
-            }
-        }
-    }
-
-    match ports.ensure_background_started().await {
-        Ok(true) => {
-            result.background_status = "started".to_string();
-        }
-        Ok(false) => {
-            result.background_status = "skipped".to_string();
-        }
-        Err(err) => {
-            result.background_status = "failed".to_string();
-            let bootstrap_status = result.bootstrap_status.clone();
-            let cycle_status = result.cycle_status.as_deref().unwrap_or("none").to_string();
-            let retry_cycle_status = result
-                .retry_cycle_status
-                .as_deref()
-                .unwrap_or("none")
-                .to_string();
-            return reconcile_error(
-                result,
-                format!(
-                    "Background engine start failed: {} (bootstrap_status={}, cycle_status={}, retry_cycle_status={})",
-                    err,
-                    bootstrap_status,
-                    cycle_status,
-                    retry_cycle_status
-                ),
-            );
-        }
-    }
-
-    result
-}
-
 fn compute_jitter_ms() -> u64 {
     let jitter_bound = DEVICE_SYNC_INTERVAL_JITTER_SECS.saturating_mul(1000);
     if jitter_bound > 0 {
@@ -1376,6 +1218,7 @@ mod tests {
         has_cloud_session: bool,
         session_read_results: Arc<std::sync::Mutex<VecDeque<Result<bool, String>>>>,
         sync_allowed: Result<bool, String>,
+        token_lookup_gate: Option<(Arc<Mutex<()>>, Arc<tokio::sync::Notify>)>,
         cursor: i64,
         identity: Option<SyncIdentity>,
         sync_state: Result<SyncState, String>,
@@ -1403,6 +1246,7 @@ mod tests {
                 has_cloud_session: true,
                 session_read_results: Arc::new(std::sync::Mutex::new(VecDeque::new())),
                 sync_allowed: Ok(true),
+                token_lookup_gate: None,
                 cursor: 0,
                 identity,
                 sync_state,
@@ -1664,7 +1508,11 @@ mod tests {
             self.identity.clone()
         }
 
-        fn get_access_token(&self) -> Result<String, String> {
+        async fn get_access_token(&self) -> Result<String, String> {
+            if let Some((mutex, waiting)) = &self.token_lookup_gate {
+                waiting.notify_one();
+                let _guard = mutex.lock().await;
+            }
             Ok("token".to_string())
         }
 
@@ -1853,6 +1701,30 @@ mod tests {
         tokio::time::advance(Duration::from_secs(60)).await;
         wait_for_background_stopped(&runtime, 1_000).await;
         assert!(ports.cycle_outcomes.lock().await.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn background_shutdown_cancels_pending_token_lookup() {
+        let token_mutex = Arc::new(Mutex::new(()));
+        let waiting = Arc::new(tokio::sync::Notify::new());
+        let mut ports = TestPorts::new(Some(ready_identity()), Ok(SyncState::Ready));
+        ports.token_lookup_gate = Some((token_mutex.clone(), waiting.clone()));
+        let ports = Arc::new(ports);
+        let runtime = Arc::new(DeviceSyncRuntimeState::new());
+
+        // Logout retains the token mutex until worker shutdown finishes.
+        let logout_guard = token_mutex.lock().await;
+        runtime.ensure_background_started(ports.clone()).await;
+        tokio::time::timeout(Duration::from_secs(2), waiting.notified())
+            .await
+            .expect("worker must reach token lookup");
+        let stopped =
+            tokio::time::timeout(Duration::from_secs(2), runtime.ensure_background_stopped()).await;
+        drop(logout_guard);
+        stopped.expect("shutdown must cancel lookup without waiting for the token mutex");
+        assert!(!runtime.is_background_running().await);
+        assert_eq!(Arc::strong_count(&ports), 1);
+        assert_eq!(ports.max_active_reconcile_count.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -2576,253 +2448,5 @@ mod tests {
             ports.cycle_outcomes.lock().await.last().map(String::as_str),
             Some("key_version_mismatch")
         );
-    }
-
-    #[derive(Clone)]
-    struct ReconcileTestPorts {
-        sync_state: Result<SyncState, String>,
-        bootstrap_results: Arc<Mutex<Vec<SyncBootstrapResult>>>,
-        cycle_results: Arc<Mutex<Vec<SyncCycleResult>>>,
-        ensure_background_result: Result<bool, String>,
-    }
-
-    impl ReconcileTestPorts {
-        fn new(sync_state: Result<SyncState, String>) -> Self {
-            Self {
-                sync_state,
-                bootstrap_results: Arc::new(Mutex::new(Vec::new())),
-                cycle_results: Arc::new(Mutex::new(Vec::new())),
-                ensure_background_result: Ok(true),
-            }
-        }
-    }
-
-    #[async_trait]
-    impl ReadyReconcileStore for ReconcileTestPorts {
-        async fn get_sync_state(&self) -> Result<SyncState, String> {
-            self.sync_state.clone()
-        }
-
-        async fn bootstrap_snapshot_if_needed(&self) -> Result<SyncBootstrapResult, String> {
-            self.bootstrap_results
-                .lock()
-                .await
-                .pop()
-                .ok_or_else(|| "missing bootstrap result".to_string())
-        }
-
-        async fn run_sync_cycle(&self, _post_bootstrap: bool) -> Result<SyncCycleResult, String> {
-            self.cycle_results
-                .lock()
-                .await
-                .pop()
-                .ok_or_else(|| "missing cycle result".to_string())
-        }
-
-        async fn ensure_background_started(&self) -> Result<bool, String> {
-            self.ensure_background_result.clone()
-        }
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_skips_when_not_ready() {
-        let ports = ReconcileTestPorts::new(Ok(SyncState::Registered));
-        let result = run_ready_reconcile_state(&ports).await;
-
-        assert_eq!(result.status, "skipped_not_ready");
-        assert_eq!(result.bootstrap_status, "not_attempted");
-        assert_eq!(result.background_status, "skipped");
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_applies_bootstrap_and_cycle() {
-        let ports = ReconcileTestPorts::new(Ok(SyncState::Ready));
-        ports
-            .bootstrap_results
-            .lock()
-            .await
-            .push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Snapshot bootstrap completed".to_string(),
-                snapshot_id: Some("snap-1".to_string()),
-            });
-        ports.cycle_results.lock().await.push(SyncCycleResult {
-            status: "ok".to_string(),
-            lock_version: 1,
-            pushed_count: 0,
-            pulled_count: 8,
-            cursor: 25,
-            needs_bootstrap: false,
-            bootstrap_snapshot_id: None,
-            bootstrap_snapshot_seq: None,
-            dead_letter_count: 0,
-        });
-
-        let result = run_ready_reconcile_state(&ports).await;
-        assert_eq!(result.status, "ok");
-        assert_eq!(result.bootstrap_status, "applied");
-        assert_eq!(result.cycle_status.as_deref(), Some("ok"));
-        assert!(!result.retry_attempted);
-        assert_eq!(result.background_status, "started");
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_retries_once_when_cycle_needs_bootstrap() {
-        let ports = ReconcileTestPorts::new(Ok(SyncState::Ready));
-        {
-            let mut bootstrap_results = ports.bootstrap_results.lock().await;
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Retry bootstrap".to_string(),
-                snapshot_id: Some("snap-2".to_string()),
-            });
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Initial bootstrap".to_string(),
-                snapshot_id: Some("snap-1".to_string()),
-            });
-        }
-        {
-            let mut cycle_results = ports.cycle_results.lock().await;
-            cycle_results.push(SyncCycleResult {
-                status: "ok".to_string(),
-                lock_version: 2,
-                pushed_count: 0,
-                pulled_count: 2,
-                cursor: 40,
-                needs_bootstrap: false,
-                bootstrap_snapshot_id: None,
-                bootstrap_snapshot_seq: None,
-                dead_letter_count: 0,
-            });
-            cycle_results.push(SyncCycleResult {
-                status: "stale_cursor".to_string(),
-                lock_version: 1,
-                pushed_count: 0,
-                pulled_count: 0,
-                cursor: 20,
-                needs_bootstrap: true,
-                bootstrap_snapshot_id: None,
-                bootstrap_snapshot_seq: None,
-                dead_letter_count: 0,
-            });
-        }
-
-        let result = run_ready_reconcile_state(&ports).await;
-        assert_eq!(result.status, "ok");
-        assert!(result.retry_attempted);
-        assert_eq!(result.retry_cycle_status.as_deref(), Some("ok"));
-        assert!(!result.cycle_needs_bootstrap);
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_errors_when_retry_bootstrap_not_applied() {
-        let ports = ReconcileTestPorts::new(Ok(SyncState::Ready));
-        {
-            let mut bootstrap_results = ports.bootstrap_results.lock().await;
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "requested".to_string(),
-                message: "requested a new snapshot".to_string(),
-                snapshot_id: None,
-            });
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Initial bootstrap".to_string(),
-                snapshot_id: Some("snap-1".to_string()),
-            });
-        }
-        ports.cycle_results.lock().await.push(SyncCycleResult {
-            status: "stale_cursor".to_string(),
-            lock_version: 1,
-            pushed_count: 0,
-            pulled_count: 0,
-            cursor: 20,
-            needs_bootstrap: true,
-            bootstrap_snapshot_id: None,
-            bootstrap_snapshot_seq: None,
-            dead_letter_count: 0,
-        });
-
-        let result = run_ready_reconcile_state(&ports).await;
-        assert_eq!(result.status, "error");
-        assert!(result.retry_attempted);
-        assert_eq!(result.bootstrap_status, "requested");
-        assert!(result
-            .message
-            .contains("Retry bootstrap did not apply a snapshot"));
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_errors_when_retry_cycle_still_needs_bootstrap() {
-        let ports = ReconcileTestPorts::new(Ok(SyncState::Ready));
-        {
-            let mut bootstrap_results = ports.bootstrap_results.lock().await;
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Retry bootstrap".to_string(),
-                snapshot_id: Some("snap-2".to_string()),
-            });
-            bootstrap_results.push(SyncBootstrapResult {
-                status: "applied".to_string(),
-                message: "Initial bootstrap".to_string(),
-                snapshot_id: Some("snap-1".to_string()),
-            });
-        }
-        {
-            let mut cycle_results = ports.cycle_results.lock().await;
-            cycle_results.push(SyncCycleResult {
-                status: "stale_cursor".to_string(),
-                lock_version: 2,
-                pushed_count: 0,
-                pulled_count: 0,
-                cursor: 40,
-                needs_bootstrap: true,
-                bootstrap_snapshot_id: None,
-                bootstrap_snapshot_seq: None,
-                dead_letter_count: 0,
-            });
-            cycle_results.push(SyncCycleResult {
-                status: "stale_cursor".to_string(),
-                lock_version: 1,
-                pushed_count: 0,
-                pulled_count: 0,
-                cursor: 20,
-                needs_bootstrap: true,
-                bootstrap_snapshot_id: None,
-                bootstrap_snapshot_seq: None,
-                dead_letter_count: 0,
-            });
-        }
-
-        let result = run_ready_reconcile_state(&ports).await;
-        assert_eq!(result.status, "error");
-        assert!(result.retry_attempted);
-        assert!(result.cycle_needs_bootstrap);
-        assert_eq!(result.retry_cycle_status.as_deref(), Some("stale_cursor"));
-        assert!(result
-            .message
-            .contains("Retry sync cycle still requires bootstrap"));
-    }
-
-    #[tokio::test]
-    async fn run_ready_reconcile_state_surfaces_background_start_failure() {
-        let mut ports = ReconcileTestPorts::new(Ok(SyncState::Ready));
-        ports.ensure_background_result = Err("start failed".to_string());
-        ports
-            .bootstrap_results
-            .lock()
-            .await
-            .push(SyncBootstrapResult {
-                status: "skipped".to_string(),
-                message: "Snapshot bootstrap already completed".to_string(),
-                snapshot_id: None,
-            });
-
-        let result = run_ready_reconcile_state(&ports).await;
-        assert_eq!(result.status, "error");
-        assert_eq!(result.background_status, "failed");
-        assert!(result.message.contains("Background engine start failed"));
-        assert!(result.message.contains("bootstrap_status=skipped"));
-        assert_eq!(result.bootstrap_status, "skipped");
     }
 }

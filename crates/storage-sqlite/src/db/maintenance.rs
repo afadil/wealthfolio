@@ -263,6 +263,25 @@ fn build_candidate(
             drop(conn);
 
             copy_database(&source, candidate.path(), candidate.key().map(Arc::as_ref))?;
+            // The installation identifier is device-local (used for addon ratings),
+            // unlike portfolio preferences, which come from the backup.
+            use rusqlite::OptionalExtension;
+            let instance_id: Option<String> = current
+                .connect_rusqlite()?
+                .query_row(
+                    "SELECT setting_value FROM app_settings WHERE setting_key='instance_id'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|e| Error::Database(DatabaseError::RestoreFailed(e.to_string())))?;
+            if let Some(instance_id) = instance_id {
+                candidate.connect_rusqlite()?.execute(
+                    "INSERT INTO app_settings(setting_key,setting_value) VALUES('instance_id',?1)
+                     ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value",
+                    [instance_id],
+                ).map_err(|e| Error::Database(DatabaseError::RestoreFailed(e.to_string())))?;
+            }
             remove_database_files(path_str(&workspace.scratch)?)?;
         }
         MaintenanceRequest::Enable { .. } | MaintenanceRequest::Disable => {
@@ -872,6 +891,50 @@ mod tests {
     ) -> Result<MaintenanceOutcome> {
         let owner = DatabaseOwner::acquire(current.path())?;
         super::run(app_data_dir, current, request, &owner)
+    }
+
+    #[test]
+    fn restore_keeps_destination_installation_identity_and_source_preferences() {
+        for encrypted in [false, true] {
+            let destination_dir = TempDir::new().unwrap();
+            let source_dir = TempDir::new().unwrap();
+            let destination = seeded_database(
+                &destination_dir,
+                encrypted.then(|| Arc::new(DbEncryptionKey::generate())),
+            );
+            let source = seeded_database(&source_dir, None);
+            set_setting(&destination, "instance_id", "destination-installation");
+            set_setting(&source, "instance_id", "source-installation");
+            set_setting(&source, "base_currency", "EUR");
+            let prepared = super::super::portable::prepare_import(
+                Path::new(source.path()),
+                source_dir.path(),
+                None,
+                None,
+            )
+            .unwrap();
+            run(
+                destination_dir.path().to_str().unwrap(),
+                &destination,
+                MaintenanceRequest::Restore {
+                    backup_path: prepared.access.path().into(),
+                    device_key: prepared.access.key().cloned(),
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                read_setting(&destination, "instance_id").as_deref(),
+                Some("destination-installation")
+            );
+            assert_eq!(
+                read_setting(&destination, "base_currency").as_deref(),
+                Some("EUR")
+            );
+            assert_eq!(
+                read_setting(&destination, "restore_reconnect_required").as_deref(),
+                Some("true")
+            );
+        }
     }
 
     /// A migrated database with one recognisable row, in the requested state.

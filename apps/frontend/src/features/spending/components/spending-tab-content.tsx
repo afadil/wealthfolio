@@ -26,11 +26,11 @@ import {
   PrivacyAmount,
   Skeleton,
   useAmountFormatting,
-  usePersistentState,
   type FormattingApi,
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 import { useBudget } from "../hooks/use-budget";
 import { useCashActivities, useUncategorizedCount } from "../hooks/use-cash-activities";

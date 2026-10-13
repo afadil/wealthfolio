@@ -1,3 +1,4 @@
+import { profileFetch } from "@/features/profiles/session";
 // Web adapter - Sync Crypto Commands
 // These call the REST API endpoints for E2EE cryptographic operations.
 
@@ -6,7 +7,7 @@ import { API_PREFIX } from "./core";
 
 // Helper to make authenticated POST requests to crypto endpoints
 async function cryptoPost<T>(endpoint: string, body?: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${API_PREFIX}/sync/crypto/${endpoint}`, {
+  const res = await profileFetch(`${API_PREFIX}/sync/crypto/${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,

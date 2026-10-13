@@ -45,9 +45,7 @@ pub fn router(state: Arc<AppState>, config: &Config) -> Router {
     let handler = builder.build_handler();
     let service = rmcp::transport::streamable_http_server::StreamableHttpService::new(
         move || Ok(handler.clone()),
-        Arc::new(
-            rmcp::transport::streamable_http_server::session::local::LocalSessionManager::default(),
-        ),
+        state.mcp_sessions.clone(),
         http_config,
     );
 

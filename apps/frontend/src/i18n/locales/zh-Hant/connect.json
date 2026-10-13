@@ -24,16 +24,16 @@
     "learnMore": "了解有關 Connect 的更多資訊",
     "features": {
       "brokerageSync": {
-        "title": "券商同步",
-        "description": "每天自動同步帳戶與交易。"
+        "title": "已連接的帳戶",
+        "description": "自動同步券商的交易紀錄。"
       },
       "deviceSync": {
-        "title": "裝置同步",
-        "description": "透過端對端加密在裝置間同步資料。"
+        "title": "裝置同步與備份",
+        "description": "端對端加密同步與自動雲端備份。"
       },
       "householdView": {
-        "title": "家庭檢視",
-        "description": "與家庭成員分享帳戶。"
+        "title": "家庭投資組合",
+        "description": "共同檢視家庭成員的投資。"
       }
     }
   },
@@ -288,5 +288,16 @@
   },
   "errors": {
     "unknown": "未知錯誤"
+  },
+  "session": {
+    "restoring": "正在還原 Connect…",
+    "unavailable": "Connect 暫時無法使用",
+    "localAvailable": "您的本機投資組合仍可使用。請重試連線。"
+  },
+  "rebind": {
+    "title": "變更此個人資料的 Connect 連線？",
+    "description": "你正在連接其他帳戶或家庭。你的本機投資組合資料將會保留，但現有的券商關聯和裝置同步設定將會移除。新帳戶可以在此個人資料中新增券商資料。你可以在準備好後重新設定裝置同步。如果希望分開管理資料，請使用新的個人資料。",
+    "cancel": "取消",
+    "confirm": "變更連線"
   }
 }

@@ -219,18 +219,21 @@ function netWorthAsOf(history: ParsedHistoryPoint[], iso: string): number {
 
 export interface Velocity {
   netChange: number;
-  marketGains: number;
+  portfolioGains: number;
+  otherAssetChanges: number;
   contributions: number;
   equityBuilt: number;
   perMonth: number;
   /** Number of months in the range (for per-month vs total displays). */
   months: number;
+  /** First date of the range, as an ISO calendar date. */
+  startDate: string;
 }
 
 /**
- * Decompose net worth change over the range into market gains (portfolio price +
- * alternative-asset appreciation), contributions, and equity built (liability
- * reduction). These three sum to the net worth change.
+ * Separate contribution-adjusted portfolio gains from other asset balance
+ * changes, contributions, and equity built (liability reduction). Other asset
+ * changes include newly recorded assets as well as appreciation/depreciation.
  */
 export function computeVelocity(history: ParsedHistoryPoint[]): Velocity | null {
   if (history.length < 2) return null;
@@ -249,17 +252,14 @@ export function computeVelocity(history: ParsedHistoryPoint[]): Velocity | null 
 
   return {
     netChange,
-    marketGains: portfolioGain + altGain,
+    portfolioGains: portfolioGain,
+    otherAssetChanges: altGain,
     contributions,
     equityBuilt,
     perMonth,
     months,
+    startDate: first.date,
   };
-}
-
-/** Average monthly net worth change across a history span (for the trailing-year baseline). */
-export function averageMonthlyChange(history: ParsedHistoryPoint[]): number {
-  return computeVelocity(history)?.perMonth ?? 0;
 }
 
 export interface Momentum {

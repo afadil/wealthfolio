@@ -16,18 +16,11 @@
     "fs:allow-copy-file",
     "fs:allow-remove",
     "fs:allow-exists",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        "$APPDATA/pending-exports/**"
-      ]
-    },
     "core:window:allow-start-dragging",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:default",
     "dialog:default",
     "deep-link:default",
     "core:app:allow-set-app-theme",
@@ -35,6 +28,22 @@
     "core:window:allow-theme",
     "updater:default",
     "log:default",
-    "window-state:default"
+    "window-state:default",
+    "fs:deny-default",
+    "fs:allow-open",
+    "fs:allow-read",
+    "fs:allow-write",
+    "fs:allow-fstat",
+    "fs:allow-start-accessing-security-scoped-resource",
+    "fs:allow-stop-accessing-security-scoped-resource",
+    {
+      "identifier": "fs:scope",
+      "deny": [
+        "$APPDATA",
+        "$APPDATA/**",
+        "$APPLOCALDATA",
+        "$APPLOCALDATA/**"
+      ]
+    }
   ]
 }

@@ -4,25 +4,64 @@ use keyring_core::{api::CredentialStore, Entry};
 
 use wealthfolio_core::{
     errors::Error,
-    secrets::{format_service_id, SecretStore},
+    secrets::{SecretStore, SERVICE_PREFIX},
     Result,
 };
 
 const USERNAME: &str = "default";
 
-#[derive(Debug, Default)]
-pub struct KeyringSecretStore;
+#[derive(Debug)]
+pub struct KeyringSecretStore {
+    service_prefix: String,
+}
+
+impl KeyringSecretStore {
+    pub fn new(identifier: &str) -> Self {
+        Self {
+            // Preserve shipped production names. Other application identities must
+            // not start with SERVICE_PREFIX: legacy cleanup inventories that prefix.
+            service_prefix: if identifier == crate::data_dir::PRODUCTION_APP_IDENTIFIER {
+                SERVICE_PREFIX.to_owned()
+            } else {
+                format!("{identifier}:")
+            },
+        }
+    }
+
+    fn service_id(&self, service: &str) -> String {
+        format!("{}{}", self.service_prefix, service.to_lowercase())
+    }
+
+    fn logical_key<'a>(&self, service: &'a str) -> Option<&'a str> {
+        service.strip_prefix(&self.service_prefix)
+    }
+
+    fn entry_for(&self, service: &str) -> Result<Entry> {
+        entry_for(&self.service_id(service))
+    }
+}
 
 impl SecretStore for KeyringSecretStore {
+    fn list_secrets(&self) -> Result<Vec<String>> {
+        let entries = native_store()?
+            .search(&std::collections::HashMap::new())
+            .map_err(|err| Error::Secret(err.to_string()))?;
+        Ok(entries
+            .into_iter()
+            .filter_map(|entry| entry.get_specifiers())
+            .filter(|(_, user)| user == USERNAME)
+            .filter_map(|(service, _)| self.logical_key(&service).map(str::to_owned))
+            .collect())
+    }
     fn set_secret(&self, service: &str, secret: &str) -> Result<()> {
-        let entry = entry_for(service)?;
+        let entry = self.entry_for(service)?;
         entry
             .set_password(secret)
             .map_err(|err| Error::Secret(err.to_string()))
     }
 
     fn get_secret(&self, service: &str) -> Result<Option<String>> {
-        let entry = entry_for(service)?;
+        let entry = self.entry_for(service)?;
         match entry.get_password() {
             Ok(value) => Ok(Some(value)),
             Err(keyring_core::Error::NoEntry) => Ok(None),
@@ -31,7 +70,7 @@ impl SecretStore for KeyringSecretStore {
     }
 
     fn delete_secret(&self, service: &str) -> Result<()> {
-        let entry = entry_for(service)?;
+        let entry = self.entry_for(service)?;
         match entry.delete_credential() {
             Ok(_) | Err(keyring_core::Error::NoEntry) => Ok(()),
             Err(err) => Err(Error::Secret(err.to_string())),
@@ -39,8 +78,7 @@ impl SecretStore for KeyringSecretStore {
     }
 }
 
-fn entry_for(service: &str) -> Result<Entry> {
-    let service_id = format_service_id(service);
+fn entry_for(service_id: &str) -> Result<Entry> {
     // Keep the same Linux collection selector used by keyring 2, so another
     // collection with the same service/user cannot make an existing entry ambiguous.
     #[cfg(all(
@@ -54,7 +92,7 @@ fn entry_for(service: &str) -> Result<Entry> {
     )))]
     let modifiers = None;
     native_store()?
-        .build(&service_id, USERNAME, modifiers.as_ref())
+        .build(service_id, USERNAME, modifiers.as_ref())
         .map_err(|err| Error::Secret(err.to_string()))
 }
 
@@ -70,6 +108,8 @@ fn native_store() -> Result<&'static Arc<CredentialStore>> {
     let store = apple_native_keyring_store::keychain::Store::new();
     #[cfg(target_os = "ios")]
     let store = apple_native_keyring_store::protected::Store::new();
+    // tao initializes ndk-context with the application context in the
+    // activity's onCreate, before the app starts. Initializing it again aborts.
     #[cfg(target_os = "android")]
     let store = android_native_keyring_store::Store::new();
     #[cfg(target_os = "windows")]
@@ -84,22 +124,8 @@ fn native_store() -> Result<&'static Arc<CredentialStore>> {
     Ok(STORE.get_or_init(|| store))
 }
 
-pub fn shared_secret_store() -> Arc<dyn SecretStore> {
-    Arc::new(KeyringSecretStore)
-}
-
-// MainActivity supplies the application context before Tauri starts using secrets.
-#[cfg(target_os = "android")]
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "system" fn Java_com_teymz_wealthfolio_MainActivity_initializeSecretStoreContext(
-    env: jni::JNIEnv,
-    activity: jni::objects::JObject,
-    context: jni::objects::JObject,
-) {
-    android_native_keyring_store::Java_io_crates_keyring_Keyring_00024Companion_initializeNdkContext(
-        env, activity, context,
-    );
+pub fn shared_secret_store(identifier: &str) -> Arc<dyn SecretStore> {
+    Arc::new(KeyringSecretStore::new(identifier))
 }
 
 #[cfg(test)]

@@ -4,6 +4,8 @@ pub mod app_sync;
 pub(crate) mod broker_activity_patch;
 pub mod import_run;
 pub mod platform;
+mod profile_state;
+pub use profile_state::{ProfileSyncState, SavedProfileSyncState};
 pub mod state;
 
 use serde::Serialize;

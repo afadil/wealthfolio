@@ -13,9 +13,9 @@ import {
   GainAmount,
   Icons,
   useNumberFormatting,
-  usePersistentState,
   useDateFormatting,
 } from "@wealthfolio/ui";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useMemo } from "react";

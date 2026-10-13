@@ -152,7 +152,7 @@ pub(crate) struct Claims {
     exp: usize,
     iat: usize,
     #[serde(default)]
-    sid: String,
+    pub(crate) sid: String,
 }
 
 /// Stable across sliding JWT refreshes; scopes transient whole-database jobs.
@@ -350,6 +350,19 @@ pub fn derive_database_key(master: &[u8]) -> [u8; 32] {
     key
 }
 
+/// New profiles have independent database keys; the migrated default keeps
+/// `derive_database_key` unchanged for existing encrypted files and backups.
+pub(crate) fn derive_profile_database_key(master: &[u8], profile_id: uuid::Uuid) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    hkdf::Hkdf::<sha2::Sha256>::new(None, master)
+        .expand(
+            format!("wealthfolio-db-profile-v1:{profile_id}").as_bytes(),
+            &mut key,
+        )
+        .expect("32 bytes is a valid HKDF-SHA256 output length");
+    key
+}
+
 pub fn decode_secret_key(raw: &str) -> anyhow::Result<Vec<u8>> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -458,10 +471,32 @@ pub(crate) async fn require_backup_session(
     next: Next,
 ) -> Result<Response, AuthError> {
     let Some(auth) = auth else {
+        let existing = request
+            .headers()
+            .get(axum::http::header::COOKIE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| {
+                v.split(';').find_map(|c| {
+                    c.trim()
+                        .strip_prefix("wf_browser=")
+                        .and_then(|id| uuid::Uuid::parse_str(id).ok())
+                })
+            });
+        let id = existing.unwrap_or_else(uuid::Uuid::new_v4);
         request
             .extensions_mut()
-            .insert(BackupSession("local-no-auth".into()));
-        return Ok(next.run(request).await);
+            .insert(BackupSession(id.to_string()));
+        let mut response = next.run(request).await;
+        if existing.is_none() {
+            response.headers_mut().append(
+                SET_COOKIE,
+                HeaderValue::from_str(&format!(
+                    "wf_browser={id}; Path=/; HttpOnly; SameSite=Strict"
+                ))
+                .expect("UUID cookie"),
+            );
+        }
+        return Ok(response);
     };
 
     let token = extract_token(&request)?;
@@ -495,7 +530,7 @@ pub(crate) async fn require_backup_session(
     Ok(response)
 }
 
-fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
+pub(crate) fn extract_token(request: &Request<Body>) -> Result<String, AuthError> {
     // 1. Authorization header (Bearer token)
     if let Some(header_value) = request
         .headers()

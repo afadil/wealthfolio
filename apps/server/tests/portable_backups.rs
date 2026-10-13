@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 use axum::{
     body::{to_bytes, Body},
     http::{Request, StatusCode},
@@ -10,6 +11,9 @@ use wealthfolio_core::secrets::SYNC_IDENTITY_KEY;
 use wealthfolio_server::{api::app_router, build_state, config::Config};
 use wealthfolio_storage_sqlite::db;
 
+// Keep a browser identity across requests, as the real client does.
+const BROWSER_COOKIE: &str = "wf_browser=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
 async fn export(
     app: &Router,
     filename: &str,
@@ -18,6 +22,7 @@ async fn export(
     marker: bool,
 ) -> axum::response::Response {
     let mut request = Request::builder()
+        .header("cookie", BROWSER_COOKIE)
         .method("POST")
         .uri(format!(
             "/api/v1/utilities/database/backups/{filename}/export"
@@ -44,7 +49,9 @@ async fn export(
 }
 
 async fn download(app: &Router, id: &str, token: Option<&str>) -> axum::response::Response {
-    let mut request = Request::builder().uri(format!("/api/v1/utilities/database/exports/{id}"));
+    let mut request = Request::builder()
+        .header("cookie", BROWSER_COOKIE)
+        .uri(format!("/api/v1/utilities/database/exports/{id}"));
     if let Some(token) = token {
         request = request.header("authorization", format!("Bearer {token}"));
     }
@@ -66,7 +73,10 @@ async fn export_id(response: axum::response::Response) -> String {
 
 #[tokio::test]
 async fn portable_exports_preserve_selected_data_and_bound_download_lifetimes() {
+    std::env::set_var("WF_DATA_DIR", "");
     std::env::set_var("WF_AUTH_REQUIRED", "false");
+    // An unverified login must fail without contacting the real auth service.
+    std::env::set_var("CONNECT_AUTH_URL", "invalid-auth-url");
     std::env::set_var(
         "WF_SECRET_KEY",
         "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
@@ -129,6 +139,7 @@ async fn portable_exports_preserve_selected_data_and_bound_download_lifetimes() 
                 .clone()
                 .oneshot(
                     Request::builder()
+                        .header("cookie", BROWSER_COOKIE)
                         .method(method)
                         .uri(path)
                         .body(Body::empty())
@@ -251,7 +262,9 @@ async fn portable_exports_preserve_selected_data_and_bound_download_lifetimes() 
             ("status", StatusCode::OK),
             ("restore", StatusCode::FORBIDDEN),
         ] {
-            let mut request = Request::builder().uri(format!("/api/v1/connect/session/{path}"));
+            let mut request = Request::builder()
+                .header("cookie", BROWSER_COOKIE)
+                .uri(format!("/api/v1/connect/session/{path}"));
             if let Some(token) = &token {
                 request = request.header("authorization", format!("Bearer {token}"));
             }
@@ -268,6 +281,7 @@ async fn portable_exports_preserve_selected_data_and_bound_download_lifetimes() 
             }
         }
         let mut request = Request::builder()
+            .header("cookie", BROWSER_COOKIE)
             .method("POST")
             .uri("/api/v1/connect/session")
             .header("content-type", "application/json");
@@ -283,27 +297,20 @@ async fn portable_exports_preserve_selected_data_and_bound_download_lifetimes() 
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        assert!(state
-            .secret_store
-            .get_secret(SYNC_IDENTITY_KEY)
-            .unwrap()
-            .is_none());
-        assert!(state
-            .secret_store
-            .get_secret(CLOUD_ACCESS_TOKEN_KEY)
-            .unwrap()
-            .is_none());
-        assert_eq!(
-            state
-                .secret_store
-                .get_secret(CLOUD_REFRESH_TOKEN_KEY)
-                .unwrap()
-                .as_deref(),
-            Some("new synthetic login")
-        );
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        for key in [
+            SYNC_IDENTITY_KEY,
+            CLOUD_ACCESS_TOKEN_KEY,
+            CLOUD_REFRESH_TOKEN_KEY,
+        ] {
+            assert_eq!(
+                state.secret_store.get_secret(key).unwrap().as_deref(),
+                Some("old synthetic identity"),
+                "a rejected login must preserve existing credentials"
+            );
+        }
         let gate: String = state.db_access.connect_rusqlite().unwrap().query_row(
             "SELECT setting_value FROM app_settings WHERE setting_key='restore_reconnect_required'", [], |r| r.get(0)).unwrap();
-        assert_eq!(gate, "false");
+        assert_eq!(gate, "true");
     }
 }

@@ -1,11 +1,13 @@
+import { profileFetch } from "@/features/profiles/session";
 // Web adapter core - Internal invoke function, COMMANDS map, and helpers
 // This module exports invoke, logger, and platform constants for shared modules
 
 import { notifyUnauthorized } from "@/lib/auth-token";
 import type { Logger } from "../types";
+import { invokeTimeoutMs } from "../invoke-timeout";
 
-/** True when running in the desktop (Tauri) environment */
-export const isDesktop = false;
+/** True in every Tauri build (desktop and mobile); use getPlatform() for the OS */
+export const isTauri = false;
 
 /** True when running in the web environment */
 export const isWeb = true;
@@ -14,19 +16,11 @@ export const API_PREFIX = "/api/v1";
 export const EVENTS_ENDPOINT = `${API_PREFIX}/events/stream`;
 export const AI_CHAT_STREAM_ENDPOINT = `${API_PREFIX}/ai/chat/stream`;
 
-const DEFAULT_INVOKE_TIMEOUT_MS = 300_000;
-
-// Commands that legitimately do batched network I/O over many symbols (Yahoo
-// Finance lookups during CSV import). Larger imports — especially Options —
-// can exceed the default 5-minute safety net. See issue #884.
-const INVOKE_TIMEOUT_OVERRIDES_MS: Record<string, number> = {
-  preview_import_assets: 600_000,
-  check_activities_import: 600_000,
-};
-
 type CommandMap = Record<string, { method: string; path: string }>;
 
 export const COMMANDS: CommandMap = {
+  cloud_backup_action: { method: "POST", path: "/cloud-backups/action" },
+  cloud_backup_capture: { method: "POST", path: "/cloud-backups/capture" },
   get_accounts: { method: "GET", path: "/accounts" },
   create_account: { method: "POST", path: "/accounts" },
   update_account: { method: "PUT", path: "/accounts" },
@@ -304,14 +298,13 @@ export const COMMANDS: CommandMap = {
     method: "POST",
     path: "/sync/pairing/complete-with-transfer",
   },
-  confirm_pairing_with_bootstrap: {
-    method: "POST",
-    path: "/sync/pairing/confirm-with-bootstrap",
-  },
-  begin_pairing_confirm: { method: "POST", path: "/sync/pairing/flow/begin" },
-  get_pairing_flow_state: { method: "POST", path: "/sync/pairing/flow/state" },
-  approve_pairing_overwrite: { method: "POST", path: "/sync/pairing/flow/approve-overwrite" },
-  cancel_pairing_flow: { method: "POST", path: "/sync/pairing/flow/cancel" },
+  // Device Sync - Restore operation (receiving device)
+  device_sync_begin_pairing_restore: { method: "POST", path: "/sync/pairing/begin-restore" },
+  device_sync_get_restore: { method: "GET", path: "/sync/restore" },
+  device_sync_start_restore: { method: "POST", path: "/sync/restore/start" },
+  device_sync_approve_restore: { method: "POST", path: "/sync/restore/approve" },
+  device_sync_retry_restore: { method: "POST", path: "/sync/restore/retry" },
+  device_sync_cancel_restore: { method: "POST", path: "/sync/restore/cancel" },
   // Wealthfolio Connect (Broker Sync)
   store_sync_session: { method: "POST", path: "/connect/session" },
   post_login_bootstrap: { method: "POST", path: "/connect/post-login-bootstrap" },
@@ -346,18 +339,6 @@ export const COMMANDS: CommandMap = {
   device_sync_pairing_source_status: {
     method: "GET",
     path: "/connect/device/pairing-source-status",
-  },
-  device_sync_bootstrap_overwrite_check: {
-    method: "GET",
-    path: "/connect/device/bootstrap-overwrite-check",
-  },
-  device_sync_reconcile_ready_state: {
-    method: "POST",
-    path: "/connect/device/reconcile-ready-state",
-  },
-  device_sync_bootstrap_snapshot_if_needed: {
-    method: "POST",
-    path: "/connect/device/bootstrap-snapshot",
   },
   device_sync_trigger_cycle: { method: "POST", path: "/connect/device/trigger-cycle" },
   device_sync_start_background_engine: {
@@ -418,6 +399,12 @@ export const COMMANDS: CommandMap = {
   link_liability: { method: "POST", path: "/alternative-assets" },
   unlink_liability: { method: "DELETE", path: "/alternative-assets" },
   update_alternative_asset_metadata: { method: "PUT", path: "/alternative-assets" },
+  calculate_loan: { method: "POST", path: "/loans/calculate" },
+  recalculate_loan: { method: "POST", path: "/loans/recalculate" },
+  preview_loan_terms: { method: "POST", path: "/loans/preview" },
+  apply_loan_action: { method: "POST", path: "/loans" },
+  get_loan_payments: { method: "GET", path: "/loans" },
+  link_loan_payment: { method: "POST", path: "/loans/payments" },
   get_alternative_holdings: { method: "GET", path: "/alternative-holdings" },
   // Agent Access (PATs + audit log)
   get_agent_access_status: { method: "GET", path: "/agent-access/status" },
@@ -472,6 +459,11 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
   };
 
   switch (command) {
+    case "cloud_backup_action":
+    case "cloud_backup_capture": {
+      body = JSON.stringify(payload);
+      break;
+    }
     case "update_account": {
       const data = payload as { accountUpdate: { id: string } & Record<string, unknown> };
       url += `/${data.accountUpdate.id}`;
@@ -1060,19 +1052,22 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "resolve_symbol_quote": {
-      const { symbol, exchangeMic, instrumentType, providerId, quoteCcy } = payload as {
-        symbol: string;
-        exchangeMic?: string;
-        instrumentType?: string;
-        providerId?: string;
-        quoteCcy?: string;
-      };
+      const { symbol, exchangeMic, instrumentType, providerId, quoteCcy, providerSymbol } =
+        payload as {
+          symbol: string;
+          exchangeMic?: string;
+          instrumentType?: string;
+          providerId?: string;
+          quoteCcy?: string;
+          providerSymbol?: string;
+        };
       const params = new URLSearchParams();
       params.set("symbol", symbol);
       if (exchangeMic) params.set("exchangeMic", exchangeMic);
       if (instrumentType) params.set("instrumentType", instrumentType);
       if (providerId) params.set("providerId", providerId);
       if (quoteCcy) params.set("quoteCcy", quoteCcy);
+      if (providerSymbol) params.set("providerSymbol", providerSymbol);
       url += `?${params.toString()}`;
       break;
     }
@@ -1779,27 +1774,21 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       body = JSON.stringify(payload);
       break;
     }
-    case "confirm_pairing_with_bootstrap": {
+    case "device_sync_begin_pairing_restore":
+    case "device_sync_start_restore":
+    case "device_sync_approve_restore":
+    case "device_sync_retry_restore":
+    case "device_sync_cancel_restore": {
       body = JSON.stringify(payload);
-      break;
-    }
-    case "begin_pairing_confirm":
-    case "get_pairing_flow_state":
-    case "approve_pairing_overwrite":
-    case "cancel_pairing_flow": {
-      body = JSON.stringify(payload);
-      break;
-    }
-    case "device_sync_reconcile_ready_state": {
-      body = JSON.stringify(payload ?? {});
       break;
     }
     // Wealthfolio Connect commands
     case "store_sync_session": {
-      const { refreshToken } = payload as {
+      const { refreshToken, confirmRebind } = payload as {
         refreshToken: string;
+        confirmRebind?: boolean;
       };
-      body = JSON.stringify({ refreshToken });
+      body = JSON.stringify({ refreshToken, confirmRebind });
       break;
     }
     case "list_devices":
@@ -1875,6 +1864,28 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     // Alternative Assets commands
+    case "get_loan_payments": {
+      const { assetId } = payload as { assetId: string };
+      url += `/${encodeURIComponent(assetId)}/payments`;
+      break;
+    }
+    case "link_loan_payment": {
+      const { activityId, link } = payload as { activityId: string; link: Record<string, unknown> };
+      url += `/${encodeURIComponent(activityId)}`;
+      body = JSON.stringify(link);
+      break;
+    }
+    case "apply_loan_action": {
+      const { assetId, action } = payload as { assetId: string; action: Record<string, unknown> };
+      url += `/${encodeURIComponent(assetId)}/actions`;
+      body = JSON.stringify(action);
+      break;
+    }
+    case "preview_loan_terms":
+      body = JSON.stringify(payload);
+      break;
+    case "recalculate_loan":
+    case "calculate_loan":
     case "create_alternative_asset": {
       const { request } = payload as { request: Record<string, unknown> };
       body = JSON.stringify(request);
@@ -1906,14 +1917,15 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
       break;
     }
     case "update_alternative_asset_metadata": {
-      const { assetId, metadata, name, notes } = payload as {
+      const { assetId, metadata, name, notes, loan } = payload as {
         assetId: string;
         metadata: Record<string, string>;
         name?: string;
         notes?: string | null;
+        loan?: unknown;
       };
       url += `/${encodeURIComponent(assetId)}/metadata`;
-      body = JSON.stringify({ metadata, name, notes });
+      body = JSON.stringify({ metadata, name, notes, loan });
       break;
     }
     case "get_alternative_holdings":
@@ -2142,12 +2154,12 @@ export const invoke = async <T>(command: string, payload?: Record<string, unknow
     }
   }
 
-  const res = await fetch(url, {
+  const res = await profileFetch(url, {
     method,
     headers,
     body,
     credentials: "same-origin",
-    signal: AbortSignal.timeout(INVOKE_TIMEOUT_OVERRIDES_MS[command] ?? DEFAULT_INVOKE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(invokeTimeoutMs(command)),
   });
 
   // 401 = app auth failure (JWT expired/invalid). Cloud auth failures return 403.

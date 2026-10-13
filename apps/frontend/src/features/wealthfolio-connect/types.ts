@@ -238,6 +238,8 @@ export interface ImportRun {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type AggregatedSyncStatus =
+  | "restoring"
+  | "unavailable"
   | "not_connected"
   | "subscription_required"
   | "idle"

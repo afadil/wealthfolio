@@ -1,5 +1,10 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { installProfileSession } from "@/features/profiles/session";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { invoke } from "./core";
+
+beforeEach(() => {
+  installProfileSession({ profileId: "test", scopeId: "scope-test" });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -26,6 +31,7 @@ it("sends reset as an explicit POST for exactly one asset and returns committed 
   const [url, options] = fetchMock.mock.calls[0];
   expect(url).toBe("/api/v1/market-data/quotes/FX%3AUSD%2FEUR/reset");
   expect(options?.method).toBe("POST");
+  expect(new Headers(options?.headers).get("x-wf-profile-scope")).toBe("scope-test");
   expect(options?.body).toBeUndefined();
 });
 
@@ -43,6 +49,7 @@ it("posts the global reset exactly once without a selected asset", async () => {
   const [url, options] = fetchMock.mock.calls[0];
   expect(url).toBe("/api/v1/market-data/quotes/reset");
   expect(options?.method).toBe("POST");
+  expect(new Headers(options?.headers).get("x-wf-profile-scope")).toBe("scope-test");
   expect(options?.body ?? "").not.toContain("assetId");
 });
 

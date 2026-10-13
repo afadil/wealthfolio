@@ -1,13 +1,18 @@
+import { profileAwareErrorMessage } from "@/features/profiles/error-messages";
+import { Button } from "@wealthfolio/ui";
 import {
-  getCurrentDeepLinks,
-  isDesktop,
-  listenDeepLink,
-  logger,
-  openUrlInBrowser,
-} from "@/adapters";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@wealthfolio/ui/components/ui/dialog";
+import { StartupScreen } from "@/components/startup-screen";
+import { getCurrentDeepLinks, isTauri, listenDeepLink, logger, openUrlInBrowser } from "@/adapters";
 import { useAuth } from "@/context/auth-context";
 import { getPlatform } from "@/hooks/use-platform";
-import { CONNECT_ENABLED } from "@/lib/connect-config";
+import { CONNECT_ENABLED, CONNECT_OAUTH_CALLBACK_URL } from "@/lib/connect-config";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient, Session, SupabaseClient, User } from "@supabase/supabase-js";
@@ -22,7 +27,13 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { authenticate as authenticateWithNativeWebAuth } from "tauri-plugin-web-auth-api";
+import {
+  createProfilePkceStorage,
+  launchProfileOAuth,
+  beginProfileLogin,
+  ownsProfileCallback,
+} from "@/features/profiles/auth-bridge";
+import { profileCommand } from "@/features/profiles/api";
 import {
   clearSyncSession,
   getSyncSessionStatus,
@@ -52,9 +63,7 @@ const getWebRedirectUrl = () => {
 // For OAuth on desktop, we use a hosted callback page that redirects to the deep link
 // This is necessary because browsers block direct navigation to custom URL schemes
 // Uses env variable in dev, falls back to production URL for bundled builds
-const HOSTED_OAUTH_CALLBACK_URL =
-  (import.meta.env.CONNECT_OAUTH_CALLBACK_URL as string) ||
-  "https://connect.wealthfolio.app/deeplink";
+const HOSTED_OAUTH_CALLBACK_URL = CONNECT_OAUTH_CALLBACK_URL;
 
 const parseConfiguredAuthCallbackUrl = (url: string) =>
   parseAuthCallbackUrl(url, { hostedCallbackUrl: HOSTED_OAUTH_CALLBACK_URL });
@@ -80,6 +89,8 @@ interface WealthfolioConnectContextValue {
   isEnabled: boolean;
   isConnected: boolean;
   isInitializing: boolean;
+  isSessionUnavailable: boolean;
+  retrySession: () => Promise<void>;
   isLoading: boolean;
   isLoadingUserInfo: boolean;
   user: User | null;
@@ -109,6 +120,8 @@ const disabledContextValue: WealthfolioConnectContextValue = {
   isEnabled: false,
   isConnected: false,
   isInitializing: false,
+  isSessionUnavailable: false,
+  retrySession: async () => {},
   isLoading: false,
   isLoadingUserInfo: false,
   user: null,
@@ -138,63 +151,13 @@ function getAuthStorageKey(supabaseUrl: string): string {
   }
 }
 
-function createHybridPkceStorage(storageKey: string) {
-  const inMemory = new Map<string, string>();
-  const pkceKey = `${storageKey}-code-verifier`;
-
-  const safeLocalStorageGet = (key: string) => {
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  };
-
-  const safeLocalStorageSet = (key: string, value: string) => {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      // ignore - PKCE exchange will fail after a full redirect without persistence
-    }
-  };
-
-  const safeLocalStorageRemove = (key: string) => {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // ignore
-    }
-  };
-
-  return {
-    getItem: (key: string) => {
-      if (key === pkceKey) return safeLocalStorageGet(key);
-      return inMemory.get(key) ?? null;
-    },
-    setItem: (key: string, value: string) => {
-      if (key === pkceKey) {
-        safeLocalStorageSet(key, value);
-        return;
-      }
-      inMemory.set(key, value);
-    },
-    removeItem: (key: string) => {
-      if (key === pkceKey) {
-        safeLocalStorageRemove(key);
-        return;
-      }
-      inMemory.delete(key);
-    },
-  };
-}
-
 // Create a Supabase client with custom storage for persistent auth
 const createSupabaseClient = () => {
   const storageKey = getAuthStorageKey(AUTH_URL);
   return createClient(AUTH_URL, AUTH_PUBLISHABLE_KEY, {
     auth: {
       storageKey,
-      storage: createHybridPkceStorage(storageKey),
+      storage: createProfilePkceStorage(storageKey),
       flowType: "pkce",
       autoRefreshToken: false,
       // Must be true for auth-js to use the provided `storage` (PKCE code_verifier lives there).
@@ -212,6 +175,9 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isSessionUnavailable, setIsSessionUnavailable] = useState(false);
+  const restoreRef = useRef<() => Promise<void>>(async () => {});
+  const retrySession = useCallback(() => restoreRef.current(), []);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUserInfo, setIsLoadingUserInfo] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -224,6 +190,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
   const setSession = useCallback((next: Session | null) => {
     sessionRef.current = next;
+    setIsSessionUnavailable(false);
     syncAccessRef.current = null;
     sessionGenerationRef.current += 1;
     userInfoRequestRef.current += 1;
@@ -244,6 +211,22 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRebind, setConfirmingRebind] = useState(false);
+  const rebindDecisionRef = useRef<((accepted: boolean) => void) | null>(null);
+  const decideRebind = useCallback((accepted: boolean) => {
+    const resolve = rebindDecisionRef.current;
+    rebindDecisionRef.current = null;
+    setConfirmingRebind(false);
+    resolve?.(accepted);
+  }, []);
+  useEffect(
+    () => () => {
+      // Leaving/locking the profile must never accept a pending account change.
+      rebindDecisionRef.current?.(false);
+      rebindDecisionRef.current = null;
+    },
+    [],
+  );
 
   const supabaseRef = useRef<SupabaseClient | null>(null);
   const processedAuthCodesRef = useRef<Map<string, number>>(new Map());
@@ -309,12 +292,29 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
   const storeTokens = useCallback(
     async (next: Session | null) => {
       if (next?.refresh_token) {
-        await storeSyncSession(next.refresh_token);
+        try {
+          await storeSyncSession(next.refresh_token);
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : String(cause);
+          if (!message.includes("CONNECT_REBIND_REQUIRED")) throw cause;
+          const accepted = await new Promise<boolean>((resolve) => {
+            rebindDecisionRef.current = resolve;
+            setConfirmingRebind(true);
+          });
+          if (!accepted) return false;
+          await storeSyncSession(next.refresh_token, true);
+          // Broker links and sync state changed; discard responses from the old connection.
+          await queryClient.cancelQueries();
+          queryClient.removeQueries();
+          setUserInfo(null);
+          setPostLoginSyncRequest(null);
+        }
         // Reconnect clears the backend's read-only restore flag.
         void queryClient.invalidateQueries({ queryKey: [QueryKeys.SETTINGS] });
       } else {
         await clearSyncSession();
       }
+      return true;
     },
     [queryClient],
   );
@@ -322,6 +322,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
   // Handle auth callback from URL (deep link or web redirect)
   const handleAuthCallback = useCallback(
     async (url: string) => {
+      if (!(await ownsProfileCallback(url).catch(() => false))) return;
       const payload = parseConfiguredAuthCallbackUrl(url);
 
       if (!payload) {
@@ -364,7 +365,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
           didExchangeSession = true;
           // Store tokens BEFORE setting session to avoid race condition
-          await storeTokens(data.session);
+          if (!(await storeTokens(data.session))) return;
           setSession(data.session);
           setUser(data.session.user);
           requestPostLoginSync("auth-callback", data.session);
@@ -375,7 +376,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           processedAuthCodesRef.current.delete(payload.code);
         }
         logger.error(`Error in handleAuthCallback: ${err instanceof Error ? err.message : err}`);
-        setError(err instanceof Error ? err.message : t("connect:authErrors.completeSignInFailed"));
+        const message = err instanceof Error ? err.message : typeof err === "string" ? err : "";
+        setError(message || t("connect:authErrors.completeSignInFailed"));
       }
     },
     [
@@ -389,44 +391,51 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     ],
   );
 
-  // Restore session from stored tokens on mount
+  // Cloud restoration never gates local portfolio rendering.
   useEffect(() => {
     let cancelled = false;
-
+    let restoring = false;
     const restoreSession = async () => {
+      if (restoring || cancelled) return;
+      restoring = true;
+      setIsInitializing(true);
       try {
         await runAuthTransition(async () => {
           if (cancelled) return;
-          // Ask the backend for fresh tokens. The backend is the single owner of
-          // the refresh token and will rotate it via Supabase when needed, avoiding
-          // the race condition where both the JS client and backend independently
-          // rotate the same refresh token.
+          const generation = sessionGenerationRef.current;
+          const current = () => !cancelled && generation === sessionGenerationRef.current;
           try {
             const { accessToken, refreshToken } = await restoreSyncSession();
+            if (!current()) return;
             const { data, error: setErr } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
-            if (setErr) {
-              logger.debug("Failed to set session from backend tokens.");
-            } else if (data.session && !cancelled) {
-              setSession(data.session);
-              setUser(data.session.user);
+            if (!current()) return;
+            if (setErr || !data.session) throw setErr ?? new Error("No restored session");
+            setSession(data.session);
+            setUser(data.session.user);
+          } catch (cause) {
+            if (!current()) return;
+            const message = cause instanceof Error ? cause.message : String(cause);
+            if (message.includes("CONNECT_REBIND_REQUIRED")) {
+              // Explicit login presents the account-change confirmation; retain saved credentials.
+              setIsSessionUnavailable(false);
+              return;
             }
-          } catch (_err) {
-            // No backend session (not logged in or backend unreachable) — that's fine
-            logger.debug("No backend session to restore.");
+            // Only authoritative absence/invalidated credentials means signed out.
+            const configured = await getSyncSessionStatus()
+              .then((s) => s.isConfigured)
+              .catch(() => true);
+            if (current()) setIsSessionUnavailable(configured);
           }
         });
-      } catch (_err) {
-        logger.error("Error restoring session.");
       } finally {
-        if (!cancelled) {
-          setIsInitializing(false);
-        }
+        restoring = false;
+        if (!cancelled) setIsInitializing(false);
       }
     };
-
+    restoreRef.current = restoreSession;
     void restoreSession();
 
     // Listen for auth state changes
@@ -452,9 +461,22 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     };
   }, [supabase, runAuthTransition, setSession, clearProcessedAuthCodes, isAuthenticated]);
 
+  useEffect(() => {
+    if (!isSessionUnavailable) return;
+    const retry = () => {
+      void retrySession();
+    };
+    window.addEventListener("online", retry);
+    window.addEventListener("focus", retry);
+    return () => {
+      window.removeEventListener("online", retry);
+      window.removeEventListener("focus", retry);
+    };
+  }, [isSessionUnavailable, retrySession]);
+
   // Listen for deep link events on desktop
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!isTauri) return;
 
     let unlistenFn: (() => Promise<void>) | undefined;
     let cancelled = false;
@@ -496,6 +518,14 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     };
   }, [handleAuthCallback]);
 
+  useEffect(() => {
+    void profileCommand<string | null>("profile_auth_storage", { operation: "callback" }, true)
+      .then((url) => {
+        if (url) return handleAuthCallback(url);
+      })
+      .catch(() => undefined);
+  }, [handleAuthCallback]);
+
   // Handle auth callback on mount (webview redirect callback)
   // This works for both web and desktop (when OAuth happens in webview)
   useEffect(() => {
@@ -525,7 +555,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
           if (data.session) {
             // Store tokens BEFORE setting session to avoid race condition
-            await storeTokens(data.session);
+            if (!(await storeTokens(data.session))) return;
             setSession(data.session);
             setUser(data.session.user);
             requestPostLoginSync("email-sign-in", data.session);
@@ -552,6 +582,11 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           const { data, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+              emailRedirectTo: beginProfileLogin(
+                isTauri ? DESKTOP_DEEP_LINK_URL : getWebRedirectUrl(),
+              ),
+            },
           });
 
           if (signUpError) {
@@ -561,7 +596,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           // If email confirmation is not required, user will be signed in
           if (data.session) {
             // Store tokens BEFORE setting session to avoid race condition
-            await storeTokens(data.session);
+            if (!(await storeTokens(data.session))) return;
             setSession(data.session);
             setUser(data.session.user);
             requestPostLoginSync("email-sign-up", data.session);
@@ -587,7 +622,6 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       setError(null);
 
       try {
-        const isTauri = isDesktop;
         const platform = isTauri ? await getPlatform() : null;
         const isMobile = platform?.is_mobile ?? false;
 
@@ -602,7 +636,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         const redirectUrl = useNativeMobileWebAuth
           ? DESKTOP_DEEP_LINK_URL // Mobile: direct custom scheme, captured by native web auth
           : isTauri && import.meta.env.PROD
-            ? HOSTED_OAUTH_CALLBACK_URL // Desktop: bounce page → wealthfolio://
+            ? HOSTED_OAUTH_CALLBACK_URL // Hosted bounce preserves the profile flow fragment
             : getWebRedirectUrl(); // Web or dev mode
 
         const useSystemBrowser = isTauri && import.meta.env.PROD && !useNativeMobileWebAuth;
@@ -618,7 +652,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           provider,
           options: {
             skipBrowserRedirect: useSystemBrowser || useNativeMobileWebAuth,
-            redirectTo: redirectUrl,
+            redirectTo: beginProfileLogin(redirectUrl),
             queryParams,
           },
         });
@@ -630,17 +664,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
         // Mobile: use the native web-auth plugin instead of the embedded webview.
         if (useNativeMobileWebAuth && data.url) {
           try {
-            const result = await authenticateWithNativeWebAuth({
-              url: data.url,
-              callbackScheme: "wealthfolio",
-            });
-
-            // The plugin returns the full callback URL with the auth code
-            if (result?.callbackUrl) {
-              await handleAuthCallback(result.callbackUrl);
-            } else {
-              logger.error("No callbackUrl in native web auth result");
-            }
+            await launchProfileOAuth(data.url);
           } catch (authErr) {
             // User cancelled or auth failed
             const message =
@@ -676,14 +700,13 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       setError(null);
 
       try {
-        const isTauri = isDesktop;
         const platform = isTauri ? await getPlatform() : null;
         const isMobile = platform?.is_mobile ?? false;
 
         const redirectUrl =
           isTauri && import.meta.env.PROD
             ? isMobile
-              ? HOSTED_OAUTH_CALLBACK_URL // Mobile: bounce page → wealthfolio://
+              ? HOSTED_OAUTH_CALLBACK_URL // Hosted bounce preserves the profile flow fragment
               : DESKTOP_DEEP_LINK_URL // Desktop: direct wealthfolio:// from email client
             : getWebRedirectUrl();
 
@@ -691,7 +714,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
           email,
           options: {
             // Redirect URL for when user clicks the magic link
-            emailRedirectTo: redirectUrl,
+            emailRedirectTo: beginProfileLogin(redirectUrl),
           },
         });
 
@@ -732,7 +755,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
 
           if (data.session) {
             // Store tokens BEFORE setting session to avoid race condition
-            await storeTokens(data.session);
+            if (!(await storeTokens(data.session))) return;
             setSession(data.session);
             setUser(data.session.user);
             requestPostLoginSync("otp", data.session);
@@ -862,6 +885,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       isEnabled: true,
       isConnected: !!session,
       isInitializing,
+      isSessionUnavailable,
+      retrySession,
       isLoading,
       isLoadingUserInfo,
       user,
@@ -869,7 +894,7 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       teamId,
       userInfo,
       postLoginSyncRequest,
-      error,
+      error: error ? profileAwareErrorMessage(error, t) : error,
       signInWithEmail,
       signUpWithEmail,
       signInWithOAuth,
@@ -883,6 +908,8 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
     [
       session,
       isInitializing,
+      isSessionUnavailable,
+      retrySession,
       isLoading,
       isLoadingUserInfo,
       user,
@@ -899,12 +926,32 @@ function EnabledWealthfolioConnectProvider({ children }: { children: ReactNode }
       clearError,
       refetchUserInfo,
       consumePostLoginSyncRequest,
+      t,
     ],
   );
 
   return (
     <WealthfolioConnectContext.Provider value={value}>
       {children}
+      <Dialog
+        open={confirmingRebind}
+        onOpenChange={(open) => {
+          if (!open) decideRebind(false);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("connect:rebind.title")}</DialogTitle>
+            <DialogDescription>{t("connect:rebind.description")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => decideRebind(false)}>
+              {t("connect:rebind.cancel")}
+            </Button>
+            <Button onClick={() => decideRebind(true)}>{t("connect:rebind.confirm")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </WealthfolioConnectContext.Provider>
   );
 }
@@ -941,19 +988,7 @@ export function WealthfolioConnectProvider({ children }: { children: ReactNode }
     };
   }, []);
 
-  if (!isCapabilityCheckComplete) {
-    return (
-      <WealthfolioConnectContext.Provider
-        value={{
-          ...disabledContextValue,
-          isEnabled: true,
-          isInitializing: true,
-        }}
-      >
-        {children}
-      </WealthfolioConnectContext.Provider>
-    );
-  }
+  if (!isCapabilityCheckComplete) return <StartupScreen />;
 
   if (!CONNECT_ENABLED || !isCloudSyncAvailable) {
     return (

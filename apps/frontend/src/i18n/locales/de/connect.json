@@ -24,16 +24,16 @@
     "learnMore": "Mehr über Connect erfahren",
     "features": {
       "brokerageSync": {
-        "title": "Broker-Synchronisierung",
-        "description": "Konten und Transaktionen täglich automatisch synchronisieren."
+        "title": "Verbundene Konten",
+        "description": "Transaktionen deiner Broker automatisch synchronisieren."
       },
       "deviceSync": {
-        "title": "Gerätesynchronisierung",
-        "description": "Geräteübergreifend mit Ende-zu-Ende-Verschlüsselung synchronisieren."
+        "title": "Gerätesync und Backup",
+        "description": "Ende-zu-Ende-verschlüsselte Synchronisierung und automatische Cloud-Backups."
       },
       "householdView": {
-        "title": "Haushaltsansicht",
-        "description": "Konten mit Familienmitgliedern teilen."
+        "title": "Familienportfolios",
+        "description": "Eine gemeinsame Übersicht über die Anlagen deiner Familie."
       }
     }
   },
@@ -288,5 +288,16 @@
   },
   "errors": {
     "unknown": "Unbekannter Fehler"
+  },
+  "session": {
+    "restoring": "Connect wird wiederhergestellt…",
+    "unavailable": "Connect ist vorübergehend nicht verfügbar",
+    "localAvailable": "Ihr lokales Portfolio ist verfügbar. Versuchen Sie erneut, eine Verbindung herzustellen."
+  },
+  "rebind": {
+    "title": "Connect-Verbindung dieses Profils ändern?",
+    "description": "Du verbindest ein anderes Konto oder einen anderen Haushalt. Deine lokalen Portfoliodaten bleiben erhalten, aber bestehende Broker-Verknüpfungen und die Einrichtung der Gerätesynchronisierung werden entfernt. Das neue Konto kann diesem Profil Broker-Daten hinzufügen. Richte die Gerätesynchronisierung erneut ein, sobald du bereit bist. Verwende ein neues Profil, wenn du die Daten getrennt halten möchtest.",
+    "cancel": "Abbrechen",
+    "confirm": "Verbindung ändern"
   }
 }

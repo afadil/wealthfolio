@@ -5,7 +5,7 @@ import type { RunEnv } from "../types";
 import { RunEnvs } from "../types";
 
 // Platform constants from core
-export { isDesktop, isWeb, logger } from "./core";
+export { isTauri, isWeb, logger } from "./core";
 
 /**
  * Runtime environment identifier - always "desktop" for Tauri builds
@@ -42,9 +42,10 @@ export type {
   BackendSyncStateResult,
   BackendEnableSyncResult,
   BackendSyncEngineStatusResult,
-  BackendSyncBootstrapOverwriteCheckResult,
-  BackendSyncReconcileReadyResult,
-  BackendSyncBootstrapResult,
+  BackendRestoreErrorCode,
+  BackendRestoreOperation,
+  BackendRestorePhase,
+  BackendRestoreRetry,
   BackendSyncCycleResult,
   BackendSyncBackgroundEngineResult,
   BackendSyncSnapshotUploadResult,
@@ -197,6 +198,8 @@ export {
   downloadAddonForReview,
   installFromStaging,
   updateAddonNetworkApprovals,
+  registerDevAddonManifest,
+  unregisterDevAddonManifest,
   clearAddonStaging,
   getAddonRatings,
   submitAddonRating,
@@ -233,6 +236,7 @@ export {
   listenPortfolioUpdateStart,
   listenPortfolioUpdateComplete,
   listenDatabaseRestored,
+  listenDeviceSyncRestore,
   listenPortfolioUpdateError,
   listenAssetClassificationsChanged,
   listenMarketSyncComplete,
@@ -282,3 +286,13 @@ export {
   runRetirementSorr,
   runRetirementStressTests,
 } from "./fire-planner";
+
+export {
+  cloudBackupAction,
+  captureCloudBackup,
+  type CloudBackupStatus,
+  type CloudBackupCaptureStatus,
+  type CloudBackupPoint,
+  type CloudBackupOperation,
+} from "../shared/cloud-backups";
+export { downloadCloudBackup, previewCloudBackupRestore } from "./cloud-backups";

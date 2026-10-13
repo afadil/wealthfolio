@@ -8,6 +8,7 @@
 //!
 //! Kept in its own file on purpose: each integration-test file is a separate
 //! process, which isolates the process-global env vars from `tests/oidc.rs`.
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -140,6 +141,7 @@ async fn spawn_mock_idp() -> MockIdp {
 }
 
 fn set_oidc_env(issuer: &str, db_path: std::path::PathBuf) {
+    std::env::set_var("WF_DATA_DIR", "");
     std::env::set_var("WF_DB_PATH", db_path);
     std::env::remove_var("WF_AUTH_PASSWORD_HASH");
 

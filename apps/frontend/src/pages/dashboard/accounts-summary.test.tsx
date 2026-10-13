@@ -1,7 +1,6 @@
 import { calculatePerformanceSummaries } from "@/adapters";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useCurrentAccountValuations } from "@/hooks/use-current-account-valuations";
-import { useLatestValuations } from "@/hooks/use-latest-valuations";
 import { useSettingsContext } from "@/lib/settings-provider";
 import type {
   Account,
@@ -28,10 +27,6 @@ vi.mock("@/adapters", () => ({
 
 vi.mock("@/hooks/use-accounts", () => ({
   useAccounts: vi.fn(),
-}));
-
-vi.mock("@/hooks/use-latest-valuations", () => ({
-  useLatestValuations: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-current-account-valuations", () => ({
@@ -98,7 +93,6 @@ vi.mock("@wealthfolio/ui/components/ui/tooltip", () => ({
 
 const mockCalculatePerformanceSummaries = vi.mocked(calculatePerformanceSummaries);
 const mockUseAccounts = vi.mocked(useAccounts);
-const mockUseLatestValuations = vi.mocked(useLatestValuations);
 const mockUseCurrentAccountValuations = vi.mocked(useCurrentAccountValuations);
 const mockUseSettingsContext = vi.mocked(useSettingsContext);
 const mockUseQuery = vi.mocked(useQuery);
@@ -264,6 +258,7 @@ function createPerformanceResult(
 }
 
 function renderAccountsSummary({
+  accountIds,
   accounts,
   valuations,
   currentValuations,
@@ -271,6 +266,7 @@ function renderAccountsSummary({
   performanceByScopeKey = {},
   isPerformanceLoading = false,
 }: {
+  accountIds?: string[];
   accounts: Account[];
   valuations: AccountValuation[];
   currentValuations?: CurrentAccountValuation[];
@@ -295,12 +291,6 @@ function renderAccountsSummary({
     isError: false,
     error: null,
     refetch: vi.fn(),
-  });
-
-  mockUseLatestValuations.mockReturnValue({
-    latestValuations: valuations,
-    isLoading: false,
-    error: null,
   });
 
   const defaultCurrentValuations = valuations.map((valuation) =>
@@ -372,7 +362,7 @@ function renderAccountsSummary({
 
   return render(
     <MemoryRouter>
-      <AccountsSummary />
+      <AccountsSummary accountIds={accountIds} />
     </MemoryRouter>,
   );
 }
@@ -412,10 +402,12 @@ describe("AccountsSummary", () => {
       ],
     });
 
+    // "Single Group" is a group of one, so it gets a group scope rather than being
+    // flattened into a standalone row.
     expect(getLastPerformanceScopes()).toEqual([
       { accountIds: ["group-a-1", "group-a-2"] },
-      { accountIds: ["standalone"] },
       { accountIds: ["single-group"] },
+      { accountIds: ["standalone"] },
     ]);
 
     await user.click(screen.getByText("Group A"));
@@ -424,9 +416,76 @@ describe("AccountsSummary", () => {
       { accountIds: ["group-a-1", "group-a-2"] },
       { accountIds: ["group-a-1"] },
       { accountIds: ["group-a-2"] },
-      { accountIds: ["standalone"] },
       { accountIds: ["single-group"] },
+      { accountIds: ["standalone"] },
     ]);
+  });
+
+  it("renders a group row for a group with a single account", () => {
+    renderAccountsSummary({
+      accounts: [createAccount({ id: "solo", name: "Solo Account", group: "Solo Group" })],
+      valuations: [createValuation({ accountId: "solo", totalValue: 400 })],
+    });
+
+    // The group header renders instead of a bare account link, so group-wide stats stay visible.
+    expect(screen.getByText("Solo Group")).toBeInTheDocument();
+    expect(screen.queryByText("Solo Account")).not.toBeInTheDocument();
+  });
+
+  it("counts hidden accounts in group totals without rendering them", async () => {
+    const user = userEvent.setup();
+
+    renderAccountsSummary({
+      accounts: [
+        createAccount({ id: "visible", name: "Visible Account", group: "Brokerage" }),
+        createAccount({
+          id: "hidden",
+          name: "Hidden Account",
+          group: "Brokerage",
+          isActive: false,
+        }),
+      ],
+      valuations: [
+        createValuation({ accountId: "visible", totalValue: 100, totalValueBase: 100 }),
+        createValuation({ accountId: "hidden", totalValue: 25, totalValueBase: 25 }),
+      ],
+      performanceByScopeKey: {
+        "accounts:hidden,visible": { pnl: 40, returnValue: 0.4 },
+      },
+    });
+
+    // The component must opt out of the hook's default active-only filtering, or hidden
+    // accounts never reach the grouping logic at all.
+    expect(mockUseAccounts).toHaveBeenCalledWith(expect.objectContaining({ filterActive: false }));
+
+    // Hidden accounts stay in the group's scope, so their gain history is not dropped.
+    expect(getLastPerformanceScopes()).toContainEqual({ accountIds: ["visible", "hidden"] });
+
+    // Group value spans both members: 100 visible + 25 hidden. Only the group row can show
+    // this total, since the sole visible account is worth 100.
+    expect(screen.getByText("Brokerage")).toBeInTheDocument();
+    expect(screen.getByText("value:USD:125")).toBeInTheDocument();
+
+    // But the hidden account never appears as a row, expanded or not.
+    expect(screen.queryByText("Hidden Account")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Brokerage"));
+    expect(screen.queryByText("Hidden Account")).not.toBeInTheDocument();
+    expect(screen.getByText("Visible Account")).toBeInTheDocument();
+  });
+
+  it("keeps a group visible when all but one member is hidden", () => {
+    renderAccountsSummary({
+      accounts: [
+        createAccount({ id: "left", name: "Still Visible", group: "Brokerage" }),
+        createAccount({ id: "gone", name: "Now Hidden", group: "Brokerage", isActive: false }),
+      ],
+      valuations: [
+        createValuation({ accountId: "left", totalValue: 100 }),
+        createValuation({ accountId: "gone", totalValue: 0 }),
+      ],
+    });
+
+    expect(screen.getByText("Brokerage")).toBeInTheDocument();
   });
 
   it("keeps standalone account values visible while performance is loading", () => {
@@ -818,5 +877,47 @@ describe("AccountsSummary", () => {
     expect(screen.getByText("Business Investment")).toBeInTheDocument();
     expect(screen.getByText("gain-percent:-0.1923")).toBeInTheDocument();
     expect(screen.queryByText(/backend performance warning/i)).not.toBeInTheDocument();
+  });
+  it("filters both displayed accounts and performance scopes by portfolio membership", () => {
+    renderAccountsSummary({
+      accountIds: ["included"],
+      accounts: [
+        createAccount({ id: "included", name: "Included account" }),
+        createAccount({ id: "excluded", name: "Excluded account" }),
+      ],
+      valuations: [
+        createValuation({ accountId: "included", totalValue: 10 }),
+        createValuation({ accountId: "excluded", totalValue: 20 }),
+      ],
+    });
+    expect(screen.getByText("Included account")).toBeInTheDocument();
+    expect(screen.queryByText("Excluded account")).not.toBeInTheDocument();
+    expect(mockUseCurrentAccountValuations).toHaveBeenCalledWith(["included"], expect.anything());
+    const options = mockUseQuery.mock.calls.at(-1)?.[0];
+    expect(options?.queryKey).toContainEqual([{ accountIds: ["included"] }]);
+  });
+
+  it("offers portfolio management when none of its members are eligible for reporting", () => {
+    renderAccountsSummary({
+      accountIds: ["archived"],
+      accounts: [createAccount({ id: "active", name: "Active account" })],
+      valuations: [createValuation({ accountId: "active", totalValue: 10 })],
+    });
+    expect(screen.queryByText("Active account")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Add your first account/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Manage portfolios/ })).toHaveAttribute(
+      "href",
+      "/settings/portfolios",
+    );
+  });
+
+  it("does not treat an empty selected membership as all accounts", () => {
+    renderAccountsSummary({
+      accountIds: [],
+      accounts: [createAccount({ name: "Excluded account" })],
+      valuations: [],
+    });
+    expect(screen.queryByText("Excluded account")).not.toBeInTheDocument();
+    expect(mockUseCurrentAccountValuations).toHaveBeenCalledWith([], expect.anything());
   });
 });

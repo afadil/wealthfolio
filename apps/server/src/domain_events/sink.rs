@@ -73,13 +73,8 @@ impl WebDomainEventSink {
         snapshot_service: Arc<
             dyn wealthfolio_core::portfolio::snapshot::SnapshotServiceTrait + Send + Sync,
         >,
-        snapshot_repository: Arc<
-            dyn wealthfolio_core::portfolio::snapshot::SnapshotRepositoryTrait + Send + Sync,
-        >,
         quote_service: Arc<dyn wealthfolio_core::quotes::QuoteServiceTrait + Send + Sync>,
-        valuation_service: Arc<
-            dyn wealthfolio_core::portfolio::valuation::ValuationServiceTrait + Send + Sync,
-        >,
+        portfolio_coordinator: Arc<wealthfolio_core::portfolio::coordinator::PortfolioCoordinator>,
         account_service: Arc<wealthfolio_core::accounts::AccountService>,
         goal_service: Arc<dyn GoalServiceTrait + Send + Sync>,
         fx_service: Arc<dyn wealthfolio_core::fx::FxServiceTrait + Send + Sync>,
@@ -87,11 +82,14 @@ impl WebDomainEventSink {
         timezone: Arc<RwLock<String>>,
         secret_store: Arc<dyn SecretStore>,
         token_lifecycle: Arc<TokenLifecycleState>,
+        profile_binding: Arc<
+            std::sync::OnceLock<(Arc<wealthfolio_core::profiles::ProfileRegistry>, uuid::Uuid)>,
+        >,
         spending_settings_service: Arc<wealthfolio_spending::settings::SpendingSettingsService>,
         categorization_rules_service: Arc<
             wealthfolio_spending::categorization_rules::CategorizationRulesService,
         >,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<tokio::task::JoinHandle<()>> {
         let rx = self.take_receiver()?;
 
         let deps = Arc::new(QueueWorkerDeps {
@@ -102,9 +100,8 @@ impl WebDomainEventSink {
             broker_sync_running,
             health_service,
             snapshot_service,
-            snapshot_repository,
             quote_service,
-            valuation_service,
+            portfolio_coordinator,
             account_service,
             goal_service,
             fx_service,
@@ -112,13 +109,13 @@ impl WebDomainEventSink {
             timezone,
             secret_store,
             token_lifecycle,
+            profile_binding,
             spending_settings_service,
             categorization_rules_service,
         });
 
         // Spawn the background worker
-        tokio::spawn(event_queue_worker(rx, deps));
-        Ok(())
+        Ok(tokio::spawn(event_queue_worker(rx, deps)))
     }
 
     /// Creates a WebDomainEventSink with just the sender.

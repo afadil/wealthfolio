@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -77,7 +77,7 @@ pub struct UpdateToolResultRequest {
 ///
 /// The stream always starts with a `system` event and ends with a `done` event.
 async fn stream_chat(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<SendMessageRequest>,
 ) -> Result<Response, AiChatError> {
     let event_stream = state
@@ -107,7 +107,7 @@ async fn stream_chat(
         .header(header::CACHE_CONTROL, "no-cache")
         .header(header::CONNECTION, "keep-alive")
         .body(body)
-        .unwrap())
+        .expect("constant status and headers are valid"))
 }
 
 // ============================================================================
@@ -125,7 +125,7 @@ async fn stream_chat(
 ///
 /// Returns a `ThreadPage` with threads, next_cursor, and has_more flag.
 async fn list_threads(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(query): Query<ListThreadsQuery>,
 ) -> Result<Json<ThreadPage>, AiChatError> {
     let request = ListThreadsRequest {
@@ -144,7 +144,7 @@ async fn list_threads(
 ///
 /// Get a single chat thread by ID.
 async fn get_thread(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<Json<Option<ChatThread>>, AiChatError> {
     let thread = state
@@ -158,7 +158,7 @@ async fn get_thread(
 ///
 /// Get all messages for a chat thread.
 async fn get_thread_messages(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<Json<Vec<ChatMessage>>, AiChatError> {
     let messages = state
@@ -172,7 +172,7 @@ async fn get_thread_messages(
 ///
 /// Update a chat thread's title and/or pinned status.
 async fn update_thread(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(thread_id): Path<String>,
     Json(request): Json<UpdateThreadRequest>,
 ) -> Result<Json<ChatThread>, AiChatError> {
@@ -207,7 +207,7 @@ async fn update_thread(
 ///
 /// Delete a chat thread and all its messages.
 async fn delete_thread(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<StatusCode, AiChatError> {
     state
@@ -226,7 +226,7 @@ async fn delete_thread(
 ///
 /// Add a tag to a thread.
 async fn add_tag(
-    State(_state): State<Arc<AppState>>,
+    axum::Extension(_state): axum::Extension<Arc<AppState>>,
     Path(_thread_id): Path<String>,
     Json(_request): Json<TagRequest>,
 ) -> Result<StatusCode, AiChatError> {
@@ -238,7 +238,7 @@ async fn add_tag(
 ///
 /// Remove a tag from a thread.
 async fn remove_tag(
-    State(_state): State<Arc<AppState>>,
+    axum::Extension(_state): axum::Extension<Arc<AppState>>,
     Path((_thread_id, _tag)): Path<(String, String)>,
 ) -> Result<StatusCode, AiChatError> {
     // TODO: Add tag support to ChatService
@@ -249,7 +249,7 @@ async fn remove_tag(
 ///
 /// Get all tags for a thread.
 async fn get_tags(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(thread_id): Path<String>,
 ) -> Result<Json<Vec<String>>, AiChatError> {
     // Return tags from thread if found
@@ -272,7 +272,7 @@ async fn get_tags(
 /// This is used by mutation tool UIs (e.g., record_activity) to persist
 /// submission state after the backend operation succeeds.
 async fn update_tool_result(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<UpdateToolResultRequest>,
 ) -> Result<Json<ChatMessage>, AiChatError> {
     let message = state
@@ -332,7 +332,7 @@ impl IntoResponse for AiChatError {
 // Router
 // ============================================================================
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     use axum::routing::patch;
 
     Router::new()

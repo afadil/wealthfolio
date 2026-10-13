@@ -2,8 +2,10 @@ import { memo, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Account } from "@/lib/types";
+import { AccountType } from "@/lib/constants";
 import { TruncatedText } from "@/components/truncated-text";
 import { HOVER_SLOT } from "@/lib/hover-slot";
+import { isRowBodyClick } from "@/lib/row-click";
 import { cn } from "@/lib/utils";
 import {
   Button,
@@ -49,6 +51,8 @@ interface TransactionRowProps {
   onDelete: (row: TransactionRowVM) => void;
   onLinkTransfer?: (row: TransactionRowVM) => void;
   onUnlinkTransfer?: (row: TransactionRowVM) => void;
+  /** Count a withdrawal as a loan payment, or stop counting it. */
+  onLoanPayment?: (row: TransactionRowVM) => void;
   /**
    * Virtualizer wiring: it measures the rendered row through the ref and
    * identifies it by `data-index`. Both are unset when the list renders
@@ -80,6 +84,7 @@ function TransactionRowImpl({
   onDelete,
   onLinkTransfer,
   onUnlinkTransfer,
+  onLoanPayment,
 }: TransactionRowProps) {
   const { formatTime } = useDateFormatting();
 
@@ -98,6 +103,9 @@ function TransactionRowImpl({
   const transferLinkStatus = getTransferLinkStatus(a);
   const canMarkReimbursement =
     isIncome && !isCreditCardAccountType(account?.accountType) && activityType !== "CREDIT";
+  // Loans take payments only as withdrawals from a cash account.
+  const canPayLoan =
+    !!onLoanPayment && activityType === "WITHDRAWAL" && account?.accountType === AccountType.CASH;
   const time = formatTime(a.activityDate, {
     hour: "numeric",
     minute: "numeric",
@@ -109,9 +117,10 @@ function TransactionRowImpl({
       ref={ref}
       data-index={dataIndex}
       data-state={isSelected ? "selected" : undefined}
-      className={cn("group/row", row.needsReview && "bg-amber-500/5")}
+      className={cn("group/row cursor-pointer", row.needsReview && "bg-amber-500/5")}
+      onClick={(e) => isRowBodyClick(e) && onEdit(row)}
     >
-      <TableCell className="relative w-10 px-3 py-2">
+      <TableCell className="relative w-10 px-3 py-2" data-row-click-ignore>
         {row.needsReview && (
           <span className="absolute inset-y-0 left-0 w-[3px] bg-amber-500" aria-hidden="true" />
         )}
@@ -256,7 +265,7 @@ function TransactionRowImpl({
         {sign}
         <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
       </TableCell>
-      <TableCell className="w-10 px-3 py-2">
+      <TableCell className="w-10 px-3 py-2" data-row-click-ignore>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -304,6 +313,12 @@ function TransactionRowImpl({
                 </DropdownMenuItem>
               ) : null
             ) : null}
+            {canPayLoan && (
+              <DropdownMenuItem onClick={() => onLoanPayment(row)}>
+                <Icons.Link className="mr-2 h-4 w-4" aria-hidden="true" />
+                {t("asset:loanPayments.menu")}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(row)}>
               <Icons.Trash className="mr-2 h-4 w-4" aria-hidden="true" />
               {t("common:delete")}

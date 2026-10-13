@@ -1,0 +1,35 @@
+id: EDGE-ROC-04
+title: A return of capital paid after the units are sold is a capital gain on the lot the sale closed
+intent: >
+  Rule R7.4. A distribution of capital can arrive after the position is sold
+  (its record date came first). With no units and no cost left it recovers
+  nothing, so the whole amount is a capital gain (the IRS: once the basis is
+  zero, a further nondividend distribution is a capital gain; the CRA deems
+  a negative ACB one), recorded as a disposal with no units on the lot the
+  sale closed. A cash distribution books its cash. An adjustment that finds
+  dividends already recorded were capital moves income into the same gain,
+  and no cash.
+policy: { base_currency: USD, timezone: UTC, as_of: 2025-01-10 }
+accounts:
+  - { id: acc-1, currency: USD }
+assets:
+  - { id: fund, quote_ccy: USD }
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 1000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-03T10:00:00Z, asset: fund, quantity: 10, unit_price: 10, amount: 100, fee: 0 }
+  - { id: div-1, account: acc-1, type: DIVIDEND, date: 2025-01-06T10:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 5 }
+  - { id: sell-1, account: acc-1, type: SELL, date: 2025-01-07T10:00:00Z, asset: fund, quantity: 10, unit_price: 12, amount: 120, fee: 0 }
+  - { id: roc-1, account: acc-1, type: DIVIDEND, subtype: RETURN_OF_CAPITAL, date: 2025-01-08T10:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 30 }
+  - { id: roc-2, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-09T10:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 5 }
+quotes:
+  - { asset: fund, day: 2025-01-03, close: 10, currency: USD }
+  - { asset: fund, day: 2025-01-07, close: 12, currency: USD }
+expected_notes: >
+  buy-1: 10 fund, cost 100. div-1 pays 5 of income while they are held.
+  sell-1 sells all 10 at 12: proceeds 120, cost 100, P&L 20, and closes
+  buy-1. roc-1 pays 30 of capital: cash +30, no income; no units or cost are
+  left, so all 30 is a capital gain, one disposal row with no units on
+  buy-1 (proceeds 30, cost 0, P&L 30). roc-2 finds 5 of div-1 was capital:
+  income -5 and a capital gain of 5 on buy-1 (proceeds 5, cost 0, P&L 5); no
+  cash. Cash 1000 - 100 + 5 + 120 + 30 = 1055. Value 1055, a gain of 55:
+  realized 20 + 30 + 5 = 55, income 5 - 5 = 0.

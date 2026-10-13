@@ -359,6 +359,7 @@ function SymbolMappingRow({
           requestInstrumentType,
           requestProvider,
           requestQuoteCcy,
+          trimmedSymbol,
         );
         if (validationRequestSeq.current !== requestId) return;
 
@@ -532,7 +533,7 @@ export function AssetEditSheet({
   const exchangeOptions = useMemo(() => {
     const options = exchanges.map((e) => ({
       value: normalizeMic(e.mic),
-      label: `${e.longName} (${e.name})`,
+      label: `${e.longName} (${e.mic})`,
     }));
 
     if (currentMic && !options.some((option) => option.value === currentMic)) {
@@ -1279,7 +1280,9 @@ export function AssetEditSheet({
                               </FormControl>
                             )}
                             <p className="text-muted-foreground text-xs">
-                              {t("asset:editSheet.preferred_provider_hint")}
+                              {field.value?.startsWith("CUSTOM:")
+                                ? t("asset:editSheet.preferred_provider_custom_hint")
+                                : t("asset:editSheet.preferred_provider_hint")}
                             </p>
                           </FormItem>
                         )}

@@ -1,11 +1,8 @@
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use crate::{
-    error::{ApiError, ApiResult},
-    main_lib::AppState,
-};
+use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Query, State},
+    extract::Query,
     routing::{get, post},
     Json, Router,
 };
@@ -37,7 +34,7 @@ struct AccountsSimplePerfBody {
 }
 
 async fn calculate_accounts_simple_performance(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<AccountsSimplePerfBody>,
 ) -> ApiResult<Json<Vec<SimplePerformanceMetrics>>> {
     let ids: Vec<String> = if let Some(ids) = body.account_ids {
@@ -142,7 +139,7 @@ fn performance_accounts_by_id(
 }
 
 async fn calculate_performance_history(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<PerfBody>,
 ) -> ApiResult<Json<PerformanceResult>> {
     let start = parse_date_optional(body.start_date, "startDate")?;
@@ -150,7 +147,11 @@ async fn calculate_performance_history(
     let tracking_mode = parse_tracking_mode(body.tracking_mode);
     let metrics = if let (true, Some(filter)) = (body.item_type == "account", body.filter.as_ref())
     {
-        let base = state.base_currency.read().unwrap().clone();
+        let base = state
+            .base_currency
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
         let resolved = state
             .portfolio_service
             .resolve_account_scope(filter, &base)
@@ -229,7 +230,7 @@ async fn calculate_performance_history(
 }
 
 async fn calculate_performance_summary(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<PerfBody>,
 ) -> ApiResult<Json<PerformanceResult>> {
     let start = parse_date_optional(body.start_date, "startDate")?;
@@ -239,7 +240,11 @@ async fn calculate_performance_summary(
     let summary_start = Instant::now();
     let metrics = if let (true, Some(filter)) = (body.item_type == "account", body.filter.as_ref())
     {
-        let base = state.base_currency.read().unwrap().clone();
+        let base = state
+            .base_currency
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
         let resolved = state
             .portfolio_service
             .resolve_account_scope(filter, &base)
@@ -266,36 +271,19 @@ async fn calculate_performance_summary(
             performance_account_tracking_modes_from_map(&accounts_by_id, &account_ids);
         let account_types = performance_account_types_from_map(&accounts_by_id, &account_ids);
         let tracking_composition = performance_tracking_composition(&tracking_modes, &account_ids);
-        let performance_service = Arc::clone(&state.performance_service);
-        let handle = tokio::runtime::Handle::current();
-        let scope_id_for_task = resolved.scope_id.clone();
-        let base_for_task = resolved.base_currency.clone();
-        let account_ids_for_task = account_ids.clone();
-        let tracking_modes_for_task = tracking_modes.clone();
-        let account_types_for_task = account_types.clone();
-        let mut result = tokio::task::spawn_blocking(move || {
-            handle.block_on(async move {
-                performance_service
-                    .calculate_performance_summary_for_accounts(
-                        &scope_id_for_task,
-                        &account_ids_for_task,
-                        &base_for_task,
-                        &tracking_modes_for_task,
-                        &account_types_for_task,
-                        start,
-                        end,
-                        profile,
-                    )
-                    .await
-            })
-        })
-        .await
-        .map_err(|e| {
-            ApiError::Internal(format!(
-                "Failed to join performance summary calculation for {}: {}",
-                resolved.scope_id, e
-            ))
-        })??;
+        let mut result = state
+            .performance_service
+            .calculate_performance_summary_for_accounts(
+                &resolved.scope_id,
+                &account_ids,
+                &resolved.base_currency,
+                &tracking_modes,
+                &account_types,
+                start,
+                end,
+                profile,
+            )
+            .await?;
         tracing::debug!(
             item_type = %body.item_type,
             scope_id = %resolved.scope_id,
@@ -360,12 +348,16 @@ async fn calculate_performance_summary(
 }
 
 async fn get_performance_summaries(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<PerformanceSummariesBody>,
 ) -> ApiResult<Json<HashMap<String, PerformanceResult>>> {
     let start = parse_date_optional(body.start_date, "startDate")?;
     let end = parse_date_optional(body.end_date, "endDate")?;
-    let base = state.base_currency.read().unwrap().clone();
+    let base = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     let profile = body.profile.unwrap_or_default();
     let requested_account_ids = unique_account_ids(
         body.scopes
@@ -458,7 +450,7 @@ struct IncomeSummaryAccountQuery {
 
 /// GET /income/summary?accountId=... — single-account or all-accounts scope
 async fn get_income_summary_for_account(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<IncomeSummaryAccountQuery>,
 ) -> ApiResult<Json<Vec<IncomeSummary>>> {
     let account_ids: Vec<String> = if let Some(id) = q.account_id {
@@ -490,7 +482,7 @@ struct IncomeSummaryBody {
 
 /// POST /income/summary/query — typed scope query (all, portfolio, multi-account)
 async fn get_income_summary(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<IncomeSummaryBody>,
 ) -> ApiResult<Json<Vec<IncomeSummary>>> {
     let account_ids: Vec<String> = match &body.filter {
@@ -504,7 +496,11 @@ async fn get_income_summary(
             .map(|account| account.id)
             .collect(),
         Some(filter) => {
-            let base = state.base_currency.read().unwrap().clone();
+            let base = state
+                .base_currency
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone();
             let resolved = state
                 .portfolio_service
                 .resolve_account_scope(filter, &base)
@@ -521,7 +517,7 @@ async fn get_income_summary(
     Ok(Json(items))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/performance/accounts/simple",

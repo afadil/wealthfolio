@@ -3,12 +3,17 @@ on:
   push:
     tags:
       - "v*"
+  # Manual runs build, sign, notarize, and test without publishing.
   workflow_dispatch:
 
 jobs:
   release:
     permissions:
       contents: write
+      # Windows Authenticode signing authenticates to Azure Artifact Signing with OIDC.
+      id-token: write
+    # The Entra federated credential trusts only this environment's OIDC subject.
+    environment: ${{ contains(matrix.platform, 'windows') && 'windows-signing' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -74,7 +79,7 @@ jobs:
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version-file: .node-version
           cache: "pnpm" # Set this to npm, yarn or pnpm.
 
       - name: Install frontend dependencies
@@ -97,6 +102,32 @@ jobs:
           ")
           echo "args=$ARGS" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Windows code signing
+        if: contains(matrix.platform, 'windows')
+        id: win-signing
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+        run: ./.github/scripts/windows-signing.ps1 setup
+
+      - name: Materialize App Store Connect API key (macOS notarization)
+        if: contains(matrix.platform, 'macos')
+        shell: bash
+        run: printf '%s' "${{ secrets.APPLE_API_KEY_P8 }}" > "$RUNNER_TEMP/asc.p8"
+
+      - name: Check Connect build configuration
+        env:
+          CONNECT_AUTH_URL: ${{ vars.CONNECT_AUTH_URL }}
+          CONNECT_AUTH_PUBLISHABLE_KEY: ${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}
+          CONNECT_STORAGE_ALLOWED_HOSTS: ${{ secrets.CONNECT_STORAGE_ALLOWED_HOSTS }}
+        run:
+          ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+          .github/scripts/check_connect_build.py --github-env
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
 
@@ -110,18 +141,83 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/asc.p8
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          # Windows Authenticode signCommand (set only in the windows-signing environment)
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
         with:
-          tagName: ${{ github.ref_name }} # This only works if the workflow triggers on new tags.
-          releaseName: "Wealthfolio v__VERSION__" # tauri-action replaces \_\_VERSION\_\_ with the app version.
+          tagName: ${{ github.event_name == 'push' && github.ref_name || '' }}
+          releaseName: ${{ github.event_name == 'push' && 'Wealthfolio v__VERSION__' || '' }}
           releaseBody: "See the assets to download and install this version."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }} ${{ steps.win-bundles.outputs.args }} -- --locked
+          args:
+            ${{ matrix.args }} ${{ steps.win-bundles.outputs.args }} ${{
+            steps.win-signing.outputs.args }} -- --locked
+
+      - name: Verify Windows Authenticode signatures
+        if: contains(matrix.platform, 'windows')
+        shell: pwsh
+        run: ./.github/scripts/windows-signing.ps1 verify
+
+      # Tauri only notarizes the .app (tauri-bundler macos/app.rs calls notarize()
+      # on the app bundle; macos/dmg/mod.rs just codesigns the disk image), so the
+      # DMG ships without a stapled ticket unless we submit it ourselves here.
+      - name: Notarize and staple macOS DMGs (disk-image ticket)
+        if: contains(matrix.platform, 'macos')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_RELEASE: ${{ github.event_name == 'push' }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          found=0
+          # CI always passes --target <triple> → target/<triple>/release/…;
+          # keep target/release/… as a safety net if the matrix args ever change.
+          for dmg in target/*/release/bundle/dmg/*.dmg target/release/bundle/dmg/*.dmg; do
+            found=1
+            xcrun notarytool submit "$dmg" \
+              --key "$RUNNER_TEMP/asc.p8" \
+              --key-id "$APPLE_API_KEY" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait
+            xcrun stapler staple "$dmg"
+            xcrun stapler validate "$dmg"
+            # tauri-action already uploaded the unstapled copy; replace it in place
+            if [ "$PUBLISH_RELEASE" = true ]; then
+              gh release upload "$GITHUB_REF_NAME" "$dmg" --clobber
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No DMG found under target/*/release/bundle/dmg/"
+            exit 1
+          fi
+
+      - name: Upload validation packages
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wealthfolio-${{ matrix.cache-key }}-${{ github.sha }}
+          path: |
+            target/**/release/bundle/**/*.dmg
+            target/**/release/bundle/**/*.exe
+            target/**/release/bundle/**/*.msi
+            target/**/release/bundle/**/*.deb
+            target/**/release/bundle/**/*.rpm
+            target/**/release/bundle/**/*.AppImage
+            target/**/release/bundle/**/*.tar.gz
+            target/**/release/bundle/**/*.zip
+            target/**/release/bundle/**/*.sig
+          if-no-files-found: error
+          retention-days: 7
 
   prebuild-server-linux:
     # Standalone server tarball for self-hosters (Proxmox LXC, bare metal, systemd).
@@ -161,7 +257,7 @@ jobs:
       - name: Sync node version and setup cache
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version-file: .node-version
           cache: "pnpm"
 
       - name: Install frontend dependencies
@@ -173,6 +269,13 @@ jobs:
           CONNECT_AUTH_URL: ${{ vars.CONNECT_AUTH_URL }}
           CONNECT_AUTH_PUBLISHABLE_KEY: ${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}
         run: pnpm --filter frontend... build
+
+      - name: Check Connect build configuration
+        env:
+          CONNECT_AUTH_URL: ${{ vars.CONNECT_AUTH_URL }}
+          CONNECT_AUTH_PUBLISHABLE_KEY: ${{ vars.CONNECT_AUTH_PUBLISHABLE_KEY }}
+          CONNECT_STORAGE_ALLOWED_HOSTS: ${{ secrets.CONNECT_STORAGE_ALLOWED_HOSTS }}
+        run: python3 .github/scripts/check_connect_build.py --github-env
 
       - name: Build server binary
         env:
@@ -192,8 +295,13 @@ jobs:
 
       - name: Stage tarball contents
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(node -p "require('./apps/tauri/tauri.conf.json').version")
+          fi
           STAGE="wealthfolio-server-${VERSION}-linux-amd64"
+          echo "SERVER_PACKAGE=$STAGE" >> "$GITHUB_ENV"
           mkdir -p "${STAGE}"
           cp target/release/wealthfolio-server "${STAGE}/wealthfolio-server"
           cp -r dist "${STAGE}/dist"
@@ -203,18 +311,17 @@ jobs:
 
       - name: Create tarball + checksum
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          STAGE="wealthfolio-server-${VERSION}-linux-amd64"
-          tar -czf "${STAGE}.tar.gz" "${STAGE}"
-          sha256sum "${STAGE}.tar.gz" > "${STAGE}.tar.gz.sha256"
+          tar -czf "${SERVER_PACKAGE}.tar.gz" "$SERVER_PACKAGE"
+          sha256sum "${SERVER_PACKAGE}.tar.gz" > "${SERVER_PACKAGE}.tar.gz.sha256"
 
       - name: Smoke-test extracted server release on Debian 13
         run: |
           mkdir -p "$RUNNER_TEMP/server-smoke"
-          tar -xzf "wealthfolio-server-${GITHUB_REF_NAME#v}-linux-amd64.tar.gz" -C "$RUNNER_TEMP/server-smoke" --strip-components=1
+          tar -xzf "${SERVER_PACKAGE}.tar.gz" -C "$RUNNER_TEMP/server-smoke" --strip-components=1
           python3 .github/scripts/encryption_smoke.py --package "$RUNNER_TEMP/server-smoke"
 
       - name: Upload to GitHub release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -222,3 +329,14 @@ jobs:
           files: |
             wealthfolio-server-*-linux-amd64.tar.gz
             wealthfolio-server-*-linux-amd64.tar.gz.sha256
+
+      - name: Upload validation server package
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wealthfolio-server-linux-amd64-${{ github.sha }}
+          path: |
+            wealthfolio-server-*-linux-amd64.tar.gz
+            wealthfolio-server-*-linux-amd64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7

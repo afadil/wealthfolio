@@ -1,0 +1,51 @@
+id: EDGE-ROC-01
+title: Return of capital and notional distribution adjustments move FIFO lots' cost basis by units
+intent: >
+  Rule R7.4. A FIFO account holds two lots of one asset and one small lot of
+  another. A return of capital adjustment recovers cost and a notional
+  distribution adds it, each spread over the lots by units, with no unit or
+  cash effect and the purchase prices unchanged; a later sale relieves the
+  adjusted cost. A return of capital larger than a lot's cost takes the cost
+  to zero and realizes the excess as a capital gain. One on an asset the
+  account has never held is rejected. Income moves by each amount, so the gain
+  is the account's value change.
+policy: { base_currency: USD, timezone: UTC, as_of: 2025-01-10 }
+accounts:
+  - { id: acc-1, currency: USD }
+assets:
+  - { id: reit, quote_ccy: USD }
+  - { id: fund, quote_ccy: USD }
+  - { id: none, quote_ccy: USD }
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 3000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-03T10:00:00Z, asset: reit, quantity: 10, unit_price: 100, amount: 1005, fee: 5 }
+  - { id: buy-2, account: acc-1, type: BUY, date: 2025-01-06T10:00:00Z, asset: reit, quantity: 10, unit_price: 120, amount: 1200, fee: 0 }
+  - { id: buy-3, account: acc-1, type: BUY, date: 2025-01-06T11:00:00Z, asset: fund, quantity: 2, unit_price: 10, amount: 21, fee: 1 }
+  - { id: roc-1, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T10:00:00Z, asset: reit, quantity: 0, unit_price: 0, amount: 40 }
+  - { id: nd-1, account: acc-1, type: ADJUSTMENT, subtype: NOTIONAL_DISTRIBUTION, date: 2025-01-07T11:00:00Z, asset: reit, quantity: 0, unit_price: 0, amount: 10 }
+  - { id: roc-2, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T12:00:00Z, asset: fund, quantity: 0, unit_price: 0, amount: 25 }
+  - { id: roc-3, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-07T13:00:00Z, asset: none, quantity: 0, unit_price: 0, amount: 5 }
+  - { id: sell-1, account: acc-1, type: SELL, date: 2025-01-08T10:00:00Z, asset: reit, quantity: 5, unit_price: 130, amount: 650, fee: 0 }
+quotes:
+  - { asset: reit, day: 2025-01-03, close: 100 }
+  - { asset: reit, day: 2025-01-06, close: 120 }
+  - { asset: reit, day: 2025-01-08, close: 130 }
+  - { asset: reit, day: 2025-01-10, close: 130 }
+  - { asset: fund, day: 2025-01-06, close: 10 }
+  - { asset: fund, day: 2025-01-10, close: 10 }
+  - { asset: none, day: 2025-01-06, close: 1 }
+expected_notes: >
+  buy-1: 10 reit, cost 1005 (price 100, fee 5). buy-2: 10 reit, cost 1200
+  (price 120). roc-1 recovers 40 of reit, 2 per unit: buy-1 985, buy-2 1180;
+  prices stay 100 and 120. All in USD, so it realizes nothing and writes no
+  disposal row. nd-1 adds 10, 0.5 per unit: buy-1 990, buy-2 1185; reit holds
+  20 units at 2175, average 108.75. buy-3: 2 fund, cost 21 (price 10, fee 1).
+  roc-2 recovers 25 of fund: its lot's cost goes to zero and the 4 beyond it
+  is a capital gain, one disposal row with no units (proceeds 25, cost 21, P&L
+  4). roc-3 names an asset the account has never held: rejected. sell-1 (FIFO)
+  relieves 5 of buy-1's 10: cost 495, proceeds 650, P&L 155. Left: buy-1 5
+  units at 495, buy-2 10 at 1185, reit 1680 for 15 units (average 112); fund 2
+  units at 0. No adjustment moves units, cash or net contribution: cash 3000 -
+  1005 - 1200 - 21 + 650 = 1424. Value 1424 + 15 x 130 + 2 x 10 = 3394, a gain
+  of 394. Income -40 + 10 - 25 = -55 offsets the 51 the adjustments add to
+  unrealized P&L and the 4 they realize.

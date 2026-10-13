@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => native);
@@ -17,6 +17,12 @@ vi.mock("./files", () => ({
 }));
 
 import { setDatabaseEncryptionEnabled } from "./settings";
+
+// Adapter tests exercise transport behavior inside an admitted profile.
+beforeEach(async () => {
+  const { installProfileSession } = await import("@/features/profiles/session");
+  installProfileSession({ profileId: "test-profile", scopeId: "test-scope" });
+});
 
 afterEach(() => {
   vi.useRealTimers();

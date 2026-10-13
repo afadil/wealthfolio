@@ -258,6 +258,17 @@ pub const ACTIVITY_SUBTYPE_REIMBURSEMENT: &str = "REIMBURSEMENT";
 /// Removes lots via FIFO with no cash effect.
 pub const ACTIVITY_SUBTYPE_OPTION_EXPIRY: &str = "OPTION_EXPIRY";
 
+/// Return of capital: capital paid back, not income. It reduces the asset's
+/// cost basis, and beyond it is a capital gain. On a DIVIDEND, the cash
+/// distribution is capital; on an ADJUSTMENT (no cash), it reclassifies that
+/// amount of dividends already recorded as capital (a T3's box 42).
+pub const ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL: &str = "RETURN_OF_CAPITAL";
+
+/// Notional distribution: an ADJUSTMENT for a taxable distribution reinvested
+/// without new units (also called phantom or non-cash). It is income and raises
+/// the asset's cost basis by its amount, with no unit or cash effect.
+pub const ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION: &str = "NOTIONAL_DISTRIBUTION";
+
 /// Position-opening trade intent.
 /// Examples: buy-to-open for long options, sell-to-open for short options.
 pub const ACTIVITY_SUBTYPE_POSITION_OPEN: &str = "POSITION_OPEN";

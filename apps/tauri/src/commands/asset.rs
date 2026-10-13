@@ -1,12 +1,11 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 
-use tauri::State;
 use wealthfolio_core::assets::{Asset, AssetProfile, NewAsset, UpdateAssetProfile};
 
 #[tauri::command]
 pub async fn get_asset_profile(
     asset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AssetProfile, String> {
     let context = state.context()?;
     context
@@ -16,7 +15,7 @@ pub async fn get_asset_profile(
 }
 
 #[tauri::command]
-pub async fn get_assets(state: State<'_, DatabaseRuntime>) -> Result<Vec<Asset>, String> {
+pub async fn get_assets(state: ProfileAccess) -> Result<Vec<Asset>, String> {
     let context = state.context()?;
     context
         .asset_service()
@@ -28,7 +27,7 @@ pub async fn get_assets(state: State<'_, DatabaseRuntime>) -> Result<Vec<Asset>,
 pub async fn update_asset_profile(
     id: String,
     payload: UpdateAssetProfile,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Asset, String> {
     let context = state.context()?;
     context
@@ -42,7 +41,7 @@ pub async fn update_asset_profile(
 pub async fn update_quote_mode(
     id: String,
     quote_mode: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Asset, String> {
     let context = state.context()?;
     context
@@ -53,10 +52,7 @@ pub async fn update_quote_mode(
 }
 
 #[tauri::command]
-pub async fn create_asset(
-    payload: NewAsset,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Asset, String> {
+pub async fn create_asset(payload: NewAsset, state: ProfileAccess) -> Result<Asset, String> {
     let context = state.context()?;
     context
         .asset_service()
@@ -66,7 +62,7 @@ pub async fn create_asset(
 }
 
 #[tauri::command]
-pub async fn delete_asset(id: String, state: State<'_, DatabaseRuntime>) -> Result<(), String> {
+pub async fn delete_asset(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     // Domain events handle quote sync state cleanup automatically
     context

@@ -80,10 +80,12 @@ export function ImportQuotesSection({
   const renderStep = () => {
     switch (currentStep) {
       case 1:
+        // The form stays mounted and clickable while it animates out to the
+        // preview, so keep it locked once a preview exists.
         return (
           <QuoteImportForm
             file={file}
-            isValidating={isValidating}
+            isValidating={isValidating || preview !== null}
             error={error}
             onFileSelect={setFile}
             onValidate={validateFile}
@@ -135,7 +137,7 @@ export function ImportQuotesSection({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" onClick={handleStartOver}>
+                      <Button variant="outline" onClick={handleStartOver} disabled={isImporting}>
                         <Icons.ArrowLeft className="mr-2 h-4 w-4" />
                         {t("common:back")}
                       </Button>
@@ -197,7 +199,12 @@ export function ImportQuotesSection({
           {showHeaderButtons && (
             <div className="flex items-center gap-2">
               <QuoteImportHelpPopover />
-              <Button variant="outline" size="sm" onClick={handleStartOver}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartOver}
+                disabled={isValidating || isImporting}
+              >
                 <Icons.Refresh className="mr-2 h-4 w-4" />
                 {t("settings:market_data_page.start_over")}
               </Button>

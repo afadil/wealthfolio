@@ -106,9 +106,17 @@
     "values_without_returns": "I valori dei conti sono mostrati senza i rendimenti del periodo.",
     "failed_to_load": "Impossibile caricare i conti",
     "failed_to_load_performance": "Impossibile caricare le metriche di performance",
-    "try_restarting": "Prova a riavviare l'app. Se il problema persiste, potrebbe essere necessario reimpostare il database."
+    "try_restarting": "Riprova. Se il problema persiste, riavvia Wealthfolio o contatta l’assistenza."
   },
   "accounts_count_one": "{{count}} conto",
   "accounts_count_many": "{{count}} conti",
-  "accounts_count_other": "{{count}} conti"
+  "accounts_count_other": "{{count}} conti",
+  "portfolio_filter": {
+    "choose": "Scegli portafoglio",
+    "search": "Cerca portafogli…",
+    "manage": "Gestisci portafogli",
+    "unavailable": "Il portafoglio selezionato non è più disponibile. Sono visualizzati tutti i conti.",
+    "load_error": "Impossibile caricare il portafoglio selezionato.",
+    "empty": "Nessun conto da visualizzare in questo portafoglio."
+  }
 }

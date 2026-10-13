@@ -35,8 +35,8 @@ stops the upgrade before any migration runs.
 
 These snapshots appear as **Before database upgrade** in the backup list. Native
 desktop and mobile store them under the app data directory's `backups/`, even
-when desktop `DATABASE_URL` points elsewhere. Hosted servers use `backups/`
-beside `WF_DB_PATH`; a bare `app.db` uses the current directory. Backups are
+when desktop `DATABASE_URL` points elsewhere. Hosted servers keep backups beside
+each profile's database; a bare `app.db` uses the current directory. Backups are
 kept until manually deleted.
 
 Failed upgrades retain their snapshot and report its location. Relaunch retries
@@ -82,13 +82,22 @@ The secondary **Unencrypted database** choice exports a portable `.db`. Anyone
 with that file can read its financial data, even when the live database is
 encrypted. Each new export defaults back to password protection.
 
-Portable exports carry portfolio data and portable preferences, not the source
-installation's credentials and sessions. Reconnect Wealthfolio Connect, device
-sync and custom providers after restoring. Exporting does not remove credentials
-from the running source installation.
+Portable exports preserve database contents, including provider configuration,
+custom providers, addon data, preferences, broker associations, and MCP token
+records and audit history. Secrets stored in the Keychain or server secret store
+are separate and are not included; credentials embedded in custom configuration
+are included. Exporting does not change the source installation.
+
+Restore resets device-sync enrollment and event bookkeeping, keeps the
+destination installation ID when available, and requires explicit Wealthfolio
+Connect login before cloud sync resumes. Provider settings and saved provider
+API keys are not reset. MCP token records retain their backed-up expiry and
+revocation status; restoring an older backup can therefore reinstate access
+revoked afterward. Earlier portable exports may already have stripped
+configuration; restore cannot recover data absent from those files.
 
 **Advanced: original server snapshot → Save original snapshot** downloads the
-original database without portable sanitization or a new backup password. It may
+original database without portable conversion or a new backup password. It may
 contain installation-specific data. An encrypted original needs its original
 server secret, including when the list reports it as unavailable. Use this for
 operator recovery; use **Export** for transfers between installations.
@@ -116,12 +125,13 @@ The web UI creates, lists, exports and deletes backups. Restore is an offline
 command: stop the server/container and prevent automatic restarts first. There
 are no web upload, restore, maintenance-status or recovery-retry endpoints.
 
-Run as the server's normal user, with the same `WF_DB_PATH`, master-key source,
-`WF_DB_REQUIRE_ENCRYPTION` and data mounts. The ownership lock rejects
-restoration while another Wealthfolio process owns the database. Close external
-SQLite tools as well. The command requires an existing readable destination; for
-a fresh installation, start it once with the intended encryption policy, then
-stop it.
+Run as the server's normal user, with the same `WF_DATA_DIR` and `WF_DB_PATH`
+settings, master-key source, `WF_DB_REQUIRE_ENCRYPTION` and data mounts. The
+command selects the default profile unless you add `--profile PROFILE_UUID` for
+another registered profile. The ownership lock rejects restoration while another
+Wealthfolio process owns the database. Close external SQLite tools as well. The
+command requires an existing readable destination; for a fresh installation,
+start it once with the intended encryption policy, then stop it.
 
 For a plaintext portable export or original snapshot readable with this server's
 key, inspect first, then confirm replacement:
@@ -180,10 +190,11 @@ credentials.
 
 ## Storage, proxies and deployment platforms
 
-The parent of `WF_DB_PATH` is the data root. Keep that directory on persistent
-storage, including `backups/` and the private `scratch/` directory. The server
-account needs directory access to create, rename and remove files, not just
-write access to the database file. Keep one Wealthfolio process per data
+`WF_DATA_DIR` selects the installation root when set; otherwise the parent of
+`WF_DB_PATH` does. Keep that directory on persistent storage, including the
+profile registry, profile directories, backups and private scratch files. The
+server account needs directory access to create, rename and remove files, not
+just write access to the database file. Keep one Wealthfolio process per data
 directory and close external SQLite tools before maintenance. Do not remove its
 `.lock` file.
 
@@ -239,6 +250,64 @@ space, permissions, key or configuration errors before retrying. Do not replace
 files underneath a running server. A failed operation may have rolled back to
 the previous database; verify its contents before another restore.
 
+### Profile registry startup failures
+
+If the server cannot open its profile registry, it logs the cause and the
+absolute data directory, then exits with a nonzero status. It does not serve a
+browser recovery screen or reset the installation. The `Listening on` message
+appears only after server initialization succeeds.
+
+The registry lives in the installation root, in `profiles.json` and
+`profiles.json.bak`. These paths are inside the container when using Docker;
+check the corresponding host bind mount or named volume. A valid backup registry
+is used automatically if the primary cannot be read. Startup stops if neither
+can be read, or both are missing while existing profile directories remain.
+
+For the repository's Compose setup, inspect the error and stop the service:
+
+```sh
+docker compose --env-file .env.docker logs --tail=100 wealthfolio
+docker compose --env-file .env.docker stop wealthfolio
+```
+
+Use the same Compose files and environment file as your deployment. Disable any
+external supervisor that could restart it during recovery.
+
+1. Check the logged cause first: verify the intended mount, ownership and write
+   permissions, and stop any other instance using the same directory. A process
+   lock error does not mean the registry is damaged.
+2. With all writers stopped, preserve the complete data directory and any
+   externally configured database, vault or addon paths. Include both registry
+   files, `profiles/`, the legacy database and its sidecars, encrypted secrets,
+   backups and recovery archives. Retain the configuration and matching master
+   key separately.
+3. If metadata is missing or damaged, restore a known-good registry backup from
+   this installation as `profiles.json`, with service-user ownership. It must
+   match the retained profile directories and configured legacy database path.
+   Do not invent profile IDs, handcraft an empty registry or delete profile
+   directories to bypass the error. A database-only backup does not restore the
+   profile registry.
+4. Start one instance, inspect its logs and verify the expected profiles and
+   data before re-enabling automatic restarts.
+
+### Start fresh while preserving the old installation
+
+If you prefer a new installation, first stop the failed one and preserve it as
+described above. Configure a **new, empty data directory or separate Docker
+volume**, and select it with `WF_DATA_DIR` (clearing or updating any existing
+`WF_DB_PATH`) or by pointing `WF_DB_PATH` into it. Changing only the database
+filename in the same directory is insufficient: it still selects the same
+profile registry. Update explicit `WF_SECRET_FILE` and addon paths too, so the
+new installation does not write to the old vault or addon directory. Keep the
+old volume, files, configuration and master key; do not remove them to make
+startup succeed.
+
+Configure the new installation's master key, authentication and encryption
+policy before starting it. Normal first startup creates its initial profile.
+This does not recover the old profiles or their data. To import a portable
+export, stop the new server after its first successful startup and follow the
+[offline restore instructions](#restore-on-a-server-offline).
+
 ### Server cannot start
 
 There is no server web recovery screen. If startup fails:
@@ -253,9 +322,11 @@ There is no server web recovery screen. If startup fails:
 3. For an operator restore from an original snapshot, use a known complete,
    self-contained database backup with its matching key and policy. With all
    writers stopped, preserve the old main/WAL/SHM set together, then install the
-   backup at `WF_DB_PATH` with the service user's ownership. Never combine an
-   old WAL with a replacement main database. Start one instance and verify the
-   data.
+   backup at the affected profile's database path with the service user's
+   ownership. Find that profile in the retained `profiles.json`: new profiles
+   use `profiles/<uuid>/app.db`, while an adopted legacy profile can still use
+   `WF_DB_PATH`. Never replace another profile's database or combine an old WAL
+   with a replacement main database. Start one instance and verify the data.
 4. If only a portable export is usable, leave the failed installation preserved.
    Start a separate fresh installation in a new data directory, set its intended
    encryption policy and master key, start it once, stop it, and use

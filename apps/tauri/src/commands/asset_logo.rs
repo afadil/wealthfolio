@@ -1,11 +1,10 @@
-use crate::database::DatabaseRuntime;
-use tauri::State;
+use crate::profiles::ProfileAccess;
 use wealthfolio_core::assets::{AssetLogo, AssetLogoSummary, UpsertAssetLogo};
 
 #[tauri::command]
 pub async fn get_asset_logo(
     asset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Option<AssetLogo>, String> {
     let context = state.context()?;
     context
@@ -15,9 +14,7 @@ pub async fn get_asset_logo(
 }
 
 #[tauri::command]
-pub async fn list_asset_logos(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<AssetLogoSummary>, String> {
+pub async fn list_asset_logos(state: ProfileAccess) -> Result<Vec<AssetLogoSummary>, String> {
     let context = state.context()?;
     context
         .asset_logo_service()
@@ -29,7 +26,7 @@ pub async fn list_asset_logos(
 pub async fn upsert_asset_logo(
     asset_id: String,
     payload: UpsertAssetLogo,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<AssetLogo, String> {
     let context = state.context()?;
     context
@@ -40,10 +37,7 @@ pub async fn upsert_asset_logo(
 }
 
 #[tauri::command]
-pub async fn delete_asset_logo(
-    asset_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_asset_logo(asset_id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .asset_logo_service()

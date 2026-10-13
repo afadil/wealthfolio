@@ -11,37 +11,58 @@ use crate::{
     error::ApiResult,
     main_lib::AppState,
 };
-use axum::{extract::State, routing::get, Json, Router};
+use axum::{routing::get, Json, Router};
 use reqwest::StatusCode as HttpStatusCode;
 use semver::Version;
 use serde::Deserialize;
 use wealthfolio_core::{
-    portfolio::{snapshot::SnapshotRecalcMode, valuation::ValuationRecalcMode},
     quotes::MarketSyncMode,
     settings::{Settings, SettingsServiceTrait, SettingsUpdate},
 };
 
-async fn get_settings(State(state): State<Arc<AppState>>) -> ApiResult<Json<Settings>> {
+async fn get_settings(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Settings>> {
     let s = state.settings_service.get_settings()?;
     Ok(Json(s))
 }
 
 async fn update_settings(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<SettingsUpdate>,
 ) -> ApiResult<Json<Settings>> {
-    let previous_base_currency = state.base_currency.read().unwrap().clone();
-    let previous_timezone = state.timezone.read().unwrap().clone();
+    let _connect = payload
+        .sync_enabled
+        .map(|_| crate::profiles::connect_guard(&state))
+        .transpose()
+        .map_err(crate::error::ApiError::Forbidden)?;
+    let previous_base_currency = state
+        .base_currency
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
+    let previous_timezone = state
+        .timezone
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone();
     state.settings_service.update_settings(&payload).await?;
     let updated_settings = state.settings_service.get_settings()?;
-    *state.timezone.write().unwrap() = updated_settings.timezone.clone();
+    *state
+        .timezone
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = updated_settings.timezone.clone();
     state.health_service.clear_cache().await;
 
     let base_currency_changed = updated_settings.base_currency != previous_base_currency;
     let timezone_changed = updated_settings.timezone != previous_timezone;
 
     if base_currency_changed {
-        *state.base_currency.write().unwrap() = updated_settings.base_currency.clone();
+        *state
+            .base_currency
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+            updated_settings.base_currency.clone();
 
         let state_for_job = state.clone();
         tokio::spawn(async move {
@@ -53,9 +74,7 @@ async fn update_settings(
                     asset_ids: None,
                     days: wealthfolio_core::quotes::DEFAULT_HISTORY_DAYS,
                 },
-                snapshot_mode: SnapshotRecalcMode::Full,
-                valuation_mode: ValuationRecalcMode::Full,
-                since_date: None,
+                ..PortfolioJobConfig::default()
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
@@ -68,9 +87,7 @@ async fn update_settings(
             let job_config = PortfolioJobConfig {
                 account_ids: None,
                 market_sync_mode: MarketSyncMode::None,
-                snapshot_mode: SnapshotRecalcMode::Full,
-                valuation_mode: ValuationRecalcMode::Full,
-                since_date: None,
+                force_full: false,
             };
 
             if let Err(err) = process_portfolio_job(state_for_job, job_config).await {
@@ -82,7 +99,9 @@ async fn update_settings(
     Ok(Json(updated_settings))
 }
 
-async fn is_auto_update_check_enabled(State(state): State<Arc<AppState>>) -> ApiResult<Json<bool>> {
+async fn is_auto_update_check_enabled(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<bool>> {
     let enabled = state
         .settings_service
         .is_auto_update_check_enabled()
@@ -100,7 +119,9 @@ struct AppInfoResponse {
     logs_dir: String,
 }
 
-async fn get_app_info(State(state): State<Arc<AppState>>) -> ApiResult<Json<AppInfoResponse>> {
+async fn get_app_info(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<AppInfoResponse>> {
     let version = env!("CARGO_PKG_VERSION").to_string();
 
     let db_path = state.db_path.clone();
@@ -264,7 +285,7 @@ async fn check_update(
     Ok(Json(result))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/settings", get(get_settings).put(update_settings))
         .route(

@@ -78,6 +78,7 @@ it("stages mobile portable imports and preserves the exact password", async () =
   const preview = { id: "validated", summary: {} };
   mocks.invoke
     .mockResolvedValueOnce({ os: "android", is_mobile: true })
+    .mockResolvedValueOnce("/app/pending-restores/test/restore.db")
     .mockResolvedValueOnce(preview);
   expect(await inspectDatabaseBackup("content://backup", "  secret words  ")).toEqual(preview);
   expect(mocks.invoke).toHaveBeenLastCalledWith("inspect_database_backup", {

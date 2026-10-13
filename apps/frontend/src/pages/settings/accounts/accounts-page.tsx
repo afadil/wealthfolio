@@ -1,4 +1,6 @@
 import { getPlatforms } from "@/features/wealthfolio-connect";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, Platform } from "@/lib/types";
@@ -15,6 +17,7 @@ import {
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { SettingsHeader } from "../settings-header";
 import { AccountEditModal } from "./components/account-edit-modal";
 import { AccountItem } from "./components/account-item";
@@ -25,6 +28,7 @@ type FilterType = "all" | "active" | "archived" | "hidden";
 const SettingsAccountsPage = () => {
   const { t } = useTranslation();
   const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
+  const showConnectLink = useShowConnectAccountLink();
 
   const { data: platforms } = useQuery<Platform[], Error>({
     queryKey: [QueryKeys.PLATFORMS],
@@ -254,6 +258,13 @@ const SettingsAccountsPage = () => {
                 <Icons.Plus className="mr-2 h-4 w-4" />
                 {t("settings:accounts_add_first")}
               </Button>
+              {showConnectLink && (
+                <Button variant="link" asChild>
+                  <Link to={connectPagePath("settings_accounts")}>
+                    {t("settings:accounts_connect_account")}
+                  </Link>
+                </Button>
+              )}
             </EmptyPlaceholder>
           ) : filteredAccounts.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">

@@ -109,7 +109,12 @@ export const isAssetBackedIncomeSubtype = (
  */
 export const isAssetIdentityRequired = (activityType: string, subtype?: string | null): boolean => {
   if (activityType === ActivityType.ADJUSTMENT) {
-    return subtype?.trim().toUpperCase() === ACTIVITY_SUBTYPES.OPTION_EXPIRY;
+    const canonical = canonicalizeActivitySubtype(activityType, subtype);
+    return (
+      canonical === ACTIVITY_SUBTYPES.OPTION_EXPIRY ||
+      canonical === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL ||
+      canonical === ACTIVITY_SUBTYPES.NOTIONAL_DISTRIBUTION
+    );
   }
   return isSymbolRequired(activityType) || isAssetBackedIncomeSubtype(activityType, subtype);
 };
@@ -140,9 +145,10 @@ export const shouldResolveImportAsset = (
   // as errors. Optional-asset rows mirror backend classification and treat
   // placeholders as cash movements.
   if (
-    isSymbolRequired(activityType) &&
-    activityType !== ActivityType.DIVIDEND &&
-    activityType !== ActivityType.ADJUSTMENT
+    (isSymbolRequired(activityType) &&
+      activityType !== ActivityType.DIVIDEND &&
+      activityType !== ActivityType.ADJUSTMENT) ||
+    (activityType === ActivityType.ADJUSTMENT && isAssetIdentityRequired(activityType, subtype))
   ) {
     return true;
   }
@@ -181,6 +187,14 @@ export const canonicalizeActivitySubtype = (
     }
   }
 
+  const knownSubtype = trimmedSubtype.toUpperCase().replace(/[ -]/g, "_");
+  if (
+    knownSubtype === ACTIVITY_SUBTYPES.RETURN_OF_CAPITAL ||
+    knownSubtype === ACTIVITY_SUBTYPES.NOTIONAL_DISTRIBUTION ||
+    knownSubtype === ACTIVITY_SUBTYPES.OPTION_EXPIRY
+  ) {
+    return knownSubtype;
+  }
   return trimmedSubtype;
 };
 

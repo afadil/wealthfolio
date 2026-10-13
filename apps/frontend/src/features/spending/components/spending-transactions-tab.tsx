@@ -15,7 +15,8 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { createActivity, deleteActivity, updateActivity } from "@/adapters";
-import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
+import { localizeActivityTypeName } from "@/lib/activity-utils";
+import { generateId } from "@/lib/id";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useIsMobileViewport } from "@/hooks/use-platform";
@@ -46,21 +47,22 @@ import { ActivityType } from "@/lib/constants";
 import { ActivityForm } from "@/pages/activity/components/activity-form";
 import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
-import {
-  useAssignActivityCategory,
-  useBulkAssignCategories,
-  useClearActivitySplits,
-  useReplaceActivitySplits,
-  useSetActivityEvent,
-  useUnassignActivityCategory,
-} from "../hooks/use-cash-activities";
-import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
-import { useEventTypes, useSpendingEvents } from "../hooks/use-spending-events";
-import { useSpendingSettings } from "../hooks/use-spending-settings";
-import { cashActivityFlowMetadata } from "../lib/cash-activity-form-utils";
+import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
+import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
+import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
+import { ActivityType } from "@/lib/constants";
+import type { AmountRange } from "./amount-range-filter";
+import { DeleteTransactionsDialog, type DeletePreview } from "./delete-transactions-dialog";
+import { TransactionCard } from "./transaction-card";
+import { SelectionToolbar } from "./selection-toolbar";
+import { TransactionDayHeader, TransactionDayHeading } from "./transaction-day-header";
+import { TransactionRow } from "./transaction-row";
+import { SplitTransactionSheet } from "./split-transaction-sheet";
+import { TransactionsBulkBar } from "./transactions-bulk-bar";
+import { TransactionsFilterBar, type FilterOption } from "./transactions-filter-bar";
+import type { QuickCategorizeScope } from "./quick-categorize-popover";
 import {
   CASH_ACTIVITY_TYPES,
-  CASH_ACTIVITY_TYPE_LABELS,
   getEffectiveCashActivityType,
   isCreditCardAccountType,
   isSpendingAccountType,
@@ -243,6 +245,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       mode: "link" | "unlink";
       row: TransactionRowVM | null;
     }>({ open: false, mode: "link", row: null });
+    const [loanPaymentRow, setLoanPaymentRow] = useState<TransactionRowVM | null>(null);
     const [deletingIds, setDeletingIds] = useState<string[] | null>(null);
     const [deletePreview, setDeletePreview] = useState<DeletePreview | undefined>();
 
@@ -627,9 +630,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           currency: a.currency,
           fxRate: a.fxRate ?? undefined,
           amount: a.amount,
-          activityDate:
-            typeof a.activityDate === "string" ? a.activityDate : new Date().toISOString(),
-          comment: t("spending:txTab.duplicatedComment"),
+          activityDate: new Date().toISOString(),
+          comment: a.notes,
           metadata:
             activityType === ActivityType.CREDIT
               ? cashActivityFlowMetadata(activityType, a.subtype, boundaryMetadata)
@@ -786,11 +788,16 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     );
 
     const handleEditRow = useCallback(
-      (row: TransactionRowVM) => {
+      async (row: TransactionRowVM) => {
         if (isTransferCashActivity(row.activity)) {
           setEditingActivity(undefined);
           setShowForm(false);
-          setTransferFormActivity(toActivityDetails(row, accountById.get(row.activity.accountId)));
+          // Load the paired leg so the form pre-fills "To Account" (#1563).
+          setTransferFormActivity(
+            await attachTransferCounterpart(
+              toActivityDetails(row, accountById.get(row.activity.accountId)),
+            ),
+          );
           setShowTransferForm(true);
           return;
         }
@@ -867,11 +874,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const typeOptions = useMemo<FilterOption[]>(
       () =>
-        CASH_ACTIVITY_TYPES.map((t) => ({
-          value: t,
-          label: CASH_ACTIVITY_TYPE_LABELS[t],
+        CASH_ACTIVITY_TYPES.map((type) => ({
+          value: type,
+          label: localizeActivityTypeName(t, type),
         })),
-      [],
+      [t],
     );
     const accountOptions = useMemo<FilterOption[]>(
       () => spendingAccounts.map((a) => ({ value: a.id, label: a.name })),
@@ -1006,6 +1013,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         onDelete: handleDeleteRow,
         onLinkTransfer: handleLinkTransfer,
         onUnlinkTransfer: handleUnlinkTransfer,
+        onLoanPayment: setLoanPaymentRow,
       };
     };
 
@@ -1322,6 +1330,15 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
           }
           onComplete={refetch}
         />
+
+        {loanPaymentRow && (
+          <ActivityLoanPaymentSheet
+            open
+            activity={loanPaymentRow.activity}
+            onOpenChange={(open) => !open && setLoanPaymentRow(null)}
+            onChanged={refetch}
+          />
+        )}
       </div>
     );
   },

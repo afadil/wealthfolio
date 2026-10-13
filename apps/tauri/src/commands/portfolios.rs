@@ -1,13 +1,9 @@
-use crate::database::DatabaseRuntime;
-
-use tauri::State;
+use crate::profiles::ProfileAccess;
 
 use wealthfolio_core::portfolios::{NewPortfolio, PortfolioUpdate, PortfolioWithAccounts};
 
 #[tauri::command]
-pub async fn get_portfolios(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<PortfolioWithAccounts>, String> {
+pub async fn get_portfolios(state: ProfileAccess) -> Result<Vec<PortfolioWithAccounts>, String> {
     let context = state.context()?;
     context
         .portfolio_service()
@@ -18,7 +14,7 @@ pub async fn get_portfolios(
 #[tauri::command]
 pub async fn get_portfolio(
     portfolio_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<PortfolioWithAccounts, String> {
     let context = state.context()?;
     context
@@ -30,7 +26,7 @@ pub async fn get_portfolio(
 #[tauri::command]
 pub async fn create_portfolio(
     portfolio: NewPortfolio,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<PortfolioWithAccounts, String> {
     let context = state.context()?;
     context
@@ -43,7 +39,7 @@ pub async fn create_portfolio(
 #[tauri::command]
 pub async fn update_portfolio_entry(
     portfolio: PortfolioUpdate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<PortfolioWithAccounts, String> {
     let context = state.context()?;
     context
@@ -56,7 +52,7 @@ pub async fn update_portfolio_entry(
 #[tauri::command]
 pub async fn delete_portfolio_entry(
     portfolio_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     context

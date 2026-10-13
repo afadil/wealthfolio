@@ -1,6 +1,7 @@
 // AI Chat Streaming - Tauri-specific implementation
 // Uses Tauri's Channel for efficient streaming of events from the backend
 
+import { matchesProfileScope, profileScope } from "@/features/profiles/session";
 import { Channel } from "@tauri-apps/api/core";
 import { tauriInvoke } from "./core";
 
@@ -19,7 +20,8 @@ export async function* streamAiChat(
   request: AiSendMessageRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<AiStreamEvent, void, undefined> {
-  const channel = new Channel<AiStreamEvent>();
+  const scope = profileScope();
+  const channel = new Channel<{ scopeId: string; data: AiStreamEvent }>();
   const queue: AiStreamEvent[] = [];
   let done = false;
   let pendingResolve: (() => void) | null = null;
@@ -31,8 +33,9 @@ export async function* streamAiChat(
     }
   };
 
-  channel.onmessage = (event: AiStreamEvent) => {
-    queue.push(event);
+  channel.onmessage = (event) => {
+    if (event.scopeId !== scope || !matchesProfileScope(scope)) return;
+    queue.push(event.data);
     notifyPending();
   };
 
@@ -58,7 +61,7 @@ export async function* streamAiChat(
 
   try {
     while (!done || queue.length > 0) {
-      if (signal?.aborted) {
+      if (signal?.aborted || !matchesProfileScope(scope)) {
         break;
       }
 

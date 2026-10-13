@@ -1,8 +1,7 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::collections::HashMap;
 
 use log::debug;
-use tauri::State;
 use wealthfolio_core::activities::{
     Activity, ActivityBulkMutationRequest, ActivityBulkMutationResult, ActivityImport,
     ActivitySearchResponse, ActivityUpdate, ImportActivitiesResult, ImportAssetCandidate,
@@ -29,7 +28,7 @@ pub async fn search_activities(
     date_to: Option<String>,           // Optional end date filter (YYYY-MM-DD, inclusive)
     instrument_type_filter: Option<Vec<String>>, // Optional instrument_type filter
     activity_id_filter: Option<Vec<String>>, // Optional exact activity-id filter
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ActivitySearchResponse, String> {
     let context = state.context()?;
     debug!("Search activities... {}, {}", page, page_size);
@@ -67,7 +66,7 @@ pub async fn search_activities(
 #[tauri::command]
 pub async fn create_activity(
     activity: NewActivity,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Activity, String> {
     let context = state.context()?;
     debug!("Creating activity...");
@@ -84,7 +83,7 @@ pub async fn create_activity(
 #[tauri::command]
 pub async fn update_activity(
     activity: ActivityUpdate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Activity, String> {
     let context = state.context()?;
     debug!("Updating activity...");
@@ -101,7 +100,7 @@ pub async fn update_activity(
 #[tauri::command]
 pub async fn delete_activity(
     activity_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Activity, String> {
     let context = state.context()?;
     debug!("Deleting activity...");
@@ -118,7 +117,7 @@ pub async fn delete_activity(
 #[tauri::command]
 pub async fn get_transfer_pair_for_activity(
     activity_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Option<InternalTransferPairResponse>, String> {
     let context = state.context()?;
     debug!("Getting transfer pair...");
@@ -131,7 +130,7 @@ pub async fn get_transfer_pair_for_activity(
 #[tauri::command]
 pub async fn find_transfer_match_candidates(
     request: TransferMatchCandidateRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<TransferMatchCandidate>, String> {
     let context = state.context()?;
     debug!("Finding transfer match candidates...");
@@ -144,7 +143,7 @@ pub async fn find_transfer_match_candidates(
 #[tauri::command]
 pub async fn save_internal_transfer_pair(
     request: InternalTransferPairRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<InternalTransferPairResponse, String> {
     let context = state.context()?;
     debug!("Saving internal transfer pair...");
@@ -161,7 +160,7 @@ pub async fn save_internal_transfer_pair(
 pub async fn link_transfer_activities(
     activity_a_id: String,
     activity_b_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(Activity, Activity), String> {
     let context = state.context()?;
     debug!("Linking transfer activities...");
@@ -179,7 +178,7 @@ pub async fn link_transfer_activities(
 pub async fn unlink_transfer_activities(
     activity_a_id: String,
     activity_b_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(Activity, Activity), String> {
     let context = state.context()?;
     debug!("Unlinking transfer activities...");
@@ -196,7 +195,7 @@ pub async fn unlink_transfer_activities(
 #[tauri::command]
 pub async fn save_activities(
     request: ActivityBulkMutationRequest,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ActivityBulkMutationResult, String> {
     let context = state.context()?;
     let create_count = request.creates.len();
@@ -221,7 +220,7 @@ pub async fn save_activities(
 pub async fn get_account_import_mapping(
     account_id: String,
     context_kind: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportMappingData, String> {
     let context = state.context()?;
     debug!("Getting import mapping for account: {}", account_id);
@@ -233,7 +232,7 @@ pub async fn get_account_import_mapping(
 #[tauri::command]
 pub async fn save_account_import_mapping(
     mapping: ImportMappingData,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportMappingData, String> {
     let context = state.context()?;
     debug!("Saving import mapping for account: {}", mapping.account_id);
@@ -249,7 +248,7 @@ pub async fn link_account_template(
     account_id: String,
     template_id: String,
     context_kind: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<(), String> {
     let context = state.context()?;
     debug!("Linking account {} to template {}", account_id, template_id);
@@ -262,7 +261,7 @@ pub async fn link_account_template(
 
 #[tauri::command]
 pub async fn list_import_templates(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ImportTemplateData>, String> {
     let context = state.context()?;
     Ok(context.activity_service().list_import_templates()?)
@@ -271,7 +270,7 @@ pub async fn list_import_templates(
 #[tauri::command]
 pub async fn get_import_template(
     id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportTemplateData, String> {
     let context = state.context()?;
     Ok(context.activity_service().get_import_template(id)?)
@@ -280,7 +279,7 @@ pub async fn get_import_template(
 #[tauri::command]
 pub async fn save_import_template(
     template: ImportTemplateData,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportTemplateData, String> {
     let context = state.context()?;
     context
@@ -291,10 +290,7 @@ pub async fn save_import_template(
 }
 
 #[tauri::command]
-pub async fn delete_import_template(
-    id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_import_template(id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     context
         .activity_service()
@@ -306,7 +302,7 @@ pub async fn delete_import_template(
 #[tauri::command]
 pub async fn check_activities_import(
     activities: Vec<ActivityImport>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ActivityImport>, String> {
     let context = state.context()?;
     debug!("Checking activities import for {} rows", activities.len());
@@ -320,7 +316,7 @@ pub async fn check_activities_import(
 #[tauri::command]
 pub async fn preview_import_assets(
     candidates: Vec<ImportAssetCandidate>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<ImportAssetPreviewItem>, String> {
     let context = state.context()?;
     let result = context
@@ -333,7 +329,7 @@ pub async fn preview_import_assets(
 #[tauri::command]
 pub async fn import_activities(
     activities: Vec<ActivityImport>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ImportActivitiesResult, String> {
     let context = state.context()?;
     debug!("Importing {} activities", activities.len());
@@ -350,7 +346,7 @@ pub async fn import_activities(
 #[tauri::command]
 pub async fn check_existing_duplicates(
     idempotency_keys: Vec<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<HashMap<String, String>, String> {
     let context = state.context()?;
     debug!(
@@ -367,7 +363,7 @@ pub async fn check_existing_duplicates(
 pub async fn parse_csv(
     content: Vec<u8>,
     config: ParseConfig,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<ParsedCsvResult, String> {
     let context = state.context()?;
     debug!(

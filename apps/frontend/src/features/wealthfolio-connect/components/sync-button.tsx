@@ -20,6 +20,8 @@ interface SyncButtonProps {
 
 const statusColors: Record<AggregatedSyncStatus, string> = {
   not_connected: "text-muted-foreground",
+  restoring: "text-muted-foreground",
+  unavailable: "text-warning",
   subscription_required: "text-warning",
   idle: "text-green-500",
   running: "text-blue-500",

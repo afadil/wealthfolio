@@ -15,8 +15,12 @@ use wealthfolio_connect::{
     ImportRunRepositoryTrait, TokenLifecycleState,
 };
 use wealthfolio_core::addons::{AddonService, AddonServiceTrait};
+use wealthfolio_core::portfolio::coordinator::{
+    CoordinatorDeps, FactSources, PortfolioCoordinator, WindowCadence,
+};
+use wealthfolio_core::portfolio::projection::ProjectionStoreTrait;
 use wealthfolio_core::{
-    accounts::{AccountService, AccountServiceTrait},
+    accounts::AccountService,
     activities::{
         rebuild_pending_final_cash_accounts, run_final_cash_migration,
         ActivityService as CoreActivityService, ActivityServiceTrait,
@@ -33,7 +37,6 @@ use wealthfolio_core::{
     limits::{ContributionLimitService, ContributionLimitServiceTrait},
     portfolio::allocation::{AllocationService, AllocationServiceTrait},
     portfolio::income::{IncomeService, IncomeServiceTrait},
-    portfolio::recalculation_gate::PortfolioRecalculationGate,
     portfolio::{
         holdings::{
             holdings_valuation_service::HoldingsValuationService, HoldingsService,
@@ -71,7 +74,19 @@ use wealthfolio_storage_sqlite::{
 };
 
 pub struct AppState {
+    pub(crate) mcp_sessions:
+        Arc<rmcp::transport::streamable_http_server::session::local::LocalSessionManager>,
+    pub(crate) profile_lifecycle: tokio::sync::Mutex<()>,
+    pub(crate) connect_transition: Arc<tokio::sync::RwLock<()>>,
+    pub(crate) workers: std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>,
+    pub(crate) writer: write_actor::WriteHandle,
+    pub(crate) writer_task: tokio::sync::Mutex<Option<write_actor::WriterTask>>,
+    #[cfg(feature = "device-sync")]
+    pub sync_approvals: crate::api::device_sync_engine::SyncApprovals,
+    pub profile_binding:
+        Arc<std::sync::OnceLock<(Arc<wealthfolio_core::profiles::ProfileRegistry>, uuid::Uuid)>>,
     pub backup_exports: crate::api::portable_backups::BackupExports,
+    pub(crate) backup_scheduler: Arc<wealthfolio_device_sync::backups::scheduler::BackupScheduler>,
     /// Domain event sink for emitting events after mutations.
     /// Note: The sink is used by services injected at construction time; this field
     /// is kept for documentation and possible future access patterns.
@@ -81,6 +96,7 @@ pub struct AppState {
     pub settings_service: Arc<SettingsService>,
     pub holdings_service: Arc<dyn HoldingsServiceTrait + Send + Sync>,
     pub valuation_service: Arc<dyn ValuationServiceTrait + Send + Sync>,
+    pub portfolio_coordinator: Arc<PortfolioCoordinator>,
     pub allocation_service: Arc<dyn AllocationServiceTrait + Send + Sync>,
     pub quote_service: Arc<dyn QuoteServiceTrait + Send + Sync>,
     pub base_currency: Arc<RwLock<String>>,
@@ -151,7 +167,7 @@ pub struct AppState {
     /// Whether agent tool calls are audited (from `Config::mcp_audit_enabled`).
     pub mcp_audit_enabled: bool,
     // Drop after the services; retained even when all SQLite connections are idle.
-    _database_owner: Arc<db::DatabaseOwner>,
+    pub(crate) _database_owner: Arc<db::DatabaseOwner>,
 }
 
 pub(crate) fn read_runtime_setting(
@@ -191,62 +207,11 @@ pub fn init_tracing() {
     }
 }
 
-fn portfolio_history_backfill_needed(state: &AppState) -> bool {
-    let accounts = match state.account_service.get_non_archived_accounts() {
-        Ok(accounts) => accounts,
-        Err(err) => {
-            warn!("Failed to inspect accounts for valuation backfill: {}", err);
-            return false;
-        }
-    };
-    let account_ids: Vec<String> = accounts.into_iter().map(|account| account.id).collect();
-    if account_ids.is_empty() {
-        return false;
-    }
-
-    let latest = match state.valuation_service.get_latest_valuations(&account_ids) {
-        Ok(latest) => latest,
-        Err(err) => {
-            warn!("Failed to inspect valuation history for backfill: {}", err);
-            return false;
-        }
-    };
-    let accounts_with_valuations: std::collections::HashSet<_> = latest
-        .into_iter()
-        .map(|valuation| valuation.account_id)
-        .collect();
-    let missing_ids: Vec<String> = account_ids
-        .into_iter()
-        .filter(|account_id| !accounts_with_valuations.contains(account_id))
-        .collect();
-    if missing_ids.is_empty() {
-        return false;
-    }
-
-    if matches!(
-        state
-            .activity_service
-            .get_first_activity_date(Some(&missing_ids)),
-        Ok(Some(_))
-    ) {
-        return true;
-    }
-
-    missing_ids.iter().any(|account_id| {
-        matches!(
-            state
-                .snapshot_service
-                .get_latest_holdings_snapshot(account_id),
-            Ok(Some(_))
-        )
-    })
-}
-
 #[cfg(feature = "device-sync")]
 fn start_sync_outbox_wake_worker(
     mut receiver: tokio::sync::mpsc::Receiver<()>,
     state: Arc<AppState>,
-) {
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         while receiver.recv().await.is_some() {
             while receiver.try_recv().is_ok() {}
@@ -265,7 +230,7 @@ fn start_sync_outbox_wake_worker(
                 state.device_sync_runtime.notify_sync_work_available();
             }
         }
-    });
+    })
 }
 
 /// Supplies the database key derived from `WF_SECRET_KEY`.
@@ -335,6 +300,12 @@ fn open_database(config: &Config, db_path: &str) -> anyhow::Result<db::DbAccess>
 /// nothing is connected to it, which on the server means the process is not
 /// serving. Run it with the server stopped.
 pub fn run_database_maintenance(encrypt: bool) -> anyhow::Result<()> {
+    run_profile_database_maintenance(encrypt, None)
+}
+pub fn run_profile_database_maintenance(
+    encrypt: bool,
+    profile: Option<uuid::Uuid>,
+) -> anyhow::Result<()> {
     // Deliberately not `Config::from_env()`: that enforces the *listening*
     // server's policy (auth required off loopback, CORS, MCP) and panics when it
     // is unmet. Converting the database opens no socket, so it must not be
@@ -345,11 +316,10 @@ pub fn run_database_maintenance(encrypt: bool) -> anyhow::Result<()> {
         std::env::var_os("WF_SECRET_KEY"),
         std::env::var_os("WF_SECRET_KEY_FILE"),
     )?;
-    let db_path = std::env::var("WF_DB_PATH").unwrap_or_else(|_| DEFAULT_DB_PATH.to_string());
+    let db_path = crate::config::database_path_from_env()?;
 
-    std::env::set_var("DATABASE_URL", &db_path);
-
-    let database_key = crate::auth::derive_database_key(&raw_secret_key);
+    let (db_path, database_key, _registry) =
+        crate::profiles::offline_database(db_path, &raw_secret_key, profile)?;
     let provider = DerivedKeyProvider { key: database_key };
 
     // Converting a database that is not there is never what the operator meant.
@@ -357,7 +327,7 @@ pub fn run_database_maintenance(encrypt: bool) -> anyhow::Result<()> {
     // under the encrypt policy — and the run would report "already encrypted;
     // nothing to do", leaving an empty database at a mistyped WF_DB_PATH or on
     // an unmounted volume while the real data sits untouched elsewhere.
-    let resolved_path = db::get_db_path(&db_path);
+    let resolved_path = db_path;
     if !std::path::Path::new(&resolved_path).exists() {
         anyhow::bail!(
             "No database found at {resolved_path}.\n\n\
@@ -433,29 +403,71 @@ fn database_root(db_path: &str) -> &std::path::Path {
 }
 
 pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
-    let database_owner = Arc::new(db::DatabaseOwner::acquire(&config.db_path)?);
-    // Ensure DATABASE_URL aligns with WF_DB_PATH so core picks the right file
-    std::env::set_var("DATABASE_URL", &config.db_path);
-    let db_access = open_database(config, &config.db_path)?;
-    let db_path = db_access.path().to_string();
-    tracing::info!("Database path in use: {}", db_path);
-    let data_root_path = database_root(&db_path).to_path_buf();
-
-    let resolved_secret_path = std::env::var("WF_SECRET_FILE")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| data_root_path.join("secrets.json"));
+    let root = database_root(&config.db_path);
     let file_store = build_secret_store(
-        resolved_secret_path.clone(),
+        std::env::var("WF_SECRET_FILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| root.join("secrets.json")),
         Some(config.secrets_encryption_key),
         Some(&config.raw_secret_key),
     )
     .map_err(anyhow::Error::new)?;
-    let secret_store: Arc<dyn SecretStore> = Arc::new(file_store);
-    std::env::set_var(
-        "WF_SECRET_FILE",
-        resolved_secret_path.to_string_lossy().to_string(),
-    );
+    if !std::path::Path::new(&config.db_path).exists() {
+        let existing_data = root.join("profiles.json").exists()
+            || root.join("profiles.json.bak").exists()
+            || std::path::PathBuf::from(format!("{}.encrypted", config.db_path)).exists()
+            || root
+                .join("backups")
+                .read_dir()
+                .is_ok_and(|mut entries| entries.next().is_some());
+        let credentials = [
+            wealthfolio_core::secrets::CLOUD_REFRESH_TOKEN_KEY,
+            wealthfolio_core::secrets::SYNC_IDENTITY_KEY,
+        ]
+        .iter()
+        .any(|key| file_store.get_secret(key).ok().flatten().is_some());
+        anyhow::ensure!(!existing_data && !credentials,"The default database is missing. Restore its file before starting; existing profiles, credentials and backups were preserved.");
+    }
+    build_profile_state(config, Arc::new(file_store)).await
+}
+
+pub(crate) async fn build_profile_state(
+    config: &Config,
+    secret_store: Arc<dyn SecretStore>,
+) -> anyhow::Result<Arc<AppState>> {
+    std::fs::create_dir_all(database_root(&config.db_path))?;
+    let database_owner = Arc::new(db::DatabaseOwner::acquire(&config.db_path)?);
+    match initialize_profile_state(config, secret_store, &database_owner).await {
+        Ok(state) => Ok(state),
+        Err(error) => match wait_for_startup_cleanup(&database_owner).await {
+            Ok(()) => Err(error),
+            Err(cleanup_error) => Err(error.context(cleanup_error)),
+        },
+    }
+}
+
+async fn wait_for_startup_cleanup(owner: &Arc<db::DatabaseOwner>) -> anyhow::Result<()> {
+    // Dropping an r2d2 pool does not join its in-flight connection threads.
+    // Keep ownership until those threads finish, so the next startup can retry.
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    while Arc::strong_count(owner) > 1 {
+        anyhow::ensure!(
+            tokio::time::Instant::now() < deadline,
+            "Profile startup cleanup is pending; background database connections are still finishing"
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    Ok(())
+}
+
+async fn initialize_profile_state(
+    config: &Config,
+    secret_store: Arc<dyn SecretStore>,
+    database_owner: &Arc<db::DatabaseOwner>,
+) -> anyhow::Result<Arc<AppState>> {
+    let db_access = open_database(config, &config.db_path)?;
+    let db_path = db_access.path().to_string();
+    let data_root_path = database_root(&db_path).to_path_buf();
 
     let migration_access = db_access.clone();
     let migration_owner = database_owner.clone();
@@ -467,6 +479,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 
     let pool = db_access.create_pool_with_owner(database_owner.clone())?;
     let (sync_outbox_wake_sender, sync_outbox_wake_receiver) = tokio::sync::mpsc::channel(128);
+    #[cfg(not(feature = "device-sync"))]
+    drop(sync_outbox_wake_receiver);
     let writer_result = write_actor::spawn_writer_with_outbox_observer(
         (*pool).clone(),
         Arc::new(move || {
@@ -476,6 +490,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let (writer, writer_task) = writer_result?;
 
     let mut writer_task = Some(writer_task);
+    let mut workers = Vec::new();
     // Drop partially constructed services before draining the writer on failure.
     // Retain the owner outside this future until cleanup has finished.
     let result: anyhow::Result<Arc<AppState>> = async {
@@ -484,7 +499,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let domain_event_sink = Arc::new(WebDomainEventSink::new());
 
     let fx_repo = Arc::new(FxRepository::new(pool.clone(), writer.clone()));
-    let fx_service = Arc::new(FxService::new(fx_repo).with_event_sink(domain_event_sink.clone()));
+    let fx_service =
+        Arc::new(FxService::new(fx_repo.clone()).with_event_sink(domain_event_sink.clone()));
     fx_service.initialize()?;
 
     let settings_repo = Arc::new(SettingsRepository::new(pool.clone(), writer.clone()));
@@ -581,7 +597,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             secret_store.clone(),
             Some(custom_provider_repository.clone()),
         )
-        .await?,
+        .await?
+        .with_event_sink(domain_event_sink.clone()),
     );
     let custom_provider_service = Arc::new(
         wealthfolio_core::custom_provider::CustomProviderService::new(
@@ -609,46 +626,58 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         )?
         .with_event_sink(domain_event_sink.clone()),
     );
-    let recalculation_gate = Arc::new(PortfolioRecalculationGate::default());
     let snapshot_service = Arc::new(
-        SnapshotService::new_with_timezone(
-            base_currency.clone(),
+        SnapshotService::new(
             timezone.clone(),
             account_repo.clone(),
-            activity_repository.clone(),
             snapshot_repository.clone(),
-            asset_repository.clone(),
-            fx_service.clone(),
+            activity_repository.clone(),
         )
-        .with_event_sink(domain_event_sink.clone())
-        .with_lot_repository(lots_repository.clone())
-        .with_recalculation_gate(recalculation_gate.clone()),
+        .with_event_sink(domain_event_sink.clone()),
     );
 
     let valuation_repository = Arc::new(ValuationRepository::new(pool.clone(), writer.clone()));
-    let valuation_service = Arc::new(
-        ValuationService::new(
-            base_currency.clone(),
-            valuation_repository.clone(),
-            snapshot_service.clone(),
-            quote_service.clone(),
-            fx_service.clone(),
-        )
-        .with_activity_repository(activity_repository.clone(), timezone.clone())
-        .with_lot_repository(lots_repository.clone())
-        .with_recalculation_gate(recalculation_gate.clone()),
+    let projection_store: Arc<dyn ProjectionStoreTrait> = Arc::new(
+        wealthfolio_storage_sqlite::portfolio::projection::ProjectionStore::new(
+            pool.clone(),
+            writer.clone(),
+        ),
     );
+    let fact_sources = FactSources {
+        accounts: account_repo.clone(),
+        activities: activity_repository.clone(),
+        assets: asset_repository.clone(),
+        quotes: quote_service.clone(),
+        fx_rates: fx_repo.clone(),
+        snapshots: snapshot_repository.clone(),
+        projections: projection_store.clone(),
+    };
+    let valuation_service = Arc::new(ValuationService::new(
+        valuation_repository.clone(),
+        fact_sources.clone(),
+        lots_repository.clone(),
+        timezone.clone(),
+    ));
 
-    let net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync> =
-        Arc::new(NetWorthService::new(
+    // Alternative asset repository for alternative assets operations
+    let alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync> =
+        Arc::new(AlternativeAssetRepository::new(
+            pool.clone(),
+            writer.clone(),
+        ));
+
+    let net_worth_service: Arc<dyn NetWorthServiceTrait + Send + Sync> = Arc::new(
+        NetWorthService::new(
             base_currency.clone(),
             account_repo.clone(),
             asset_repository.clone(),
-            snapshot_repository.clone(),
+            snapshot_service.clone(),
             quote_service.clone(),
             valuation_repository.clone(),
             fx_service.clone(),
-        ));
+        )
+        .with_loan_payments(alternative_asset_repository.clone(), timezone.clone()),
+    );
 
     let holdings_valuation_service = Arc::new(HoldingsValuationService::new_with_timezone(
         fx_service.clone(),
@@ -665,7 +694,11 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
             classification_service.clone(),
             timezone.clone(),
         )
-        .with_income_dependencies(activity_repository.clone(), fx_service.clone())
+        .with_income_dependencies(
+            activity_repository.clone(),
+            fx_service.clone(),
+            projection_store.clone(),
+        )
         .with_lot_repository(lots_repository.clone()),
     );
 
@@ -712,13 +745,13 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     );
 
     let performance_service = Arc::new(
-        wealthfolio_core::portfolio::performance::PerformanceService::new_with_timezone(
-            valuation_service.clone(),
-            quote_service.clone(),
+        wealthfolio_core::portfolio::performance::PerformanceService::new(
+            base_currency.clone(),
             timezone.clone(),
-        )
-        .with_activity_repository(activity_repository.clone(), fx_service.clone())
-        .with_lot_repository(lots_repository.clone()),
+            fact_sources.clone(),
+            valuation_repository.clone(),
+            lots_repository.clone(),
+        ),
     );
 
     let income_service = Arc::new(IncomeService::new_with_timezone(
@@ -773,7 +806,16 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         asset_service.as_ref(),
     )
     .await?;
-    recalculation_gate.replace_pending_accounts(final_cash_migration.pending_account_ids.clone());
+    let portfolio_coordinator = Arc::new(PortfolioCoordinator::new(CoordinatorDeps {
+        base_currency: base_currency.clone(),
+        timezone: timezone.clone(),
+        sources: fact_sources.clone(),
+        fx_service: fx_service.clone(),
+        snapshot_service: snapshot_service.clone(),
+        projections: projection_store,
+        lots: lots_repository.clone(),
+        window_cadence: WindowCadence::Year,
+    }));
 
     // Spending: events + event_types
     let event_types_repo: Arc<dyn wealthfolio_spending::events::EventTypesRepositoryTrait> =
@@ -889,12 +931,6 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         fx_service.clone(),
     ));
 
-    // Alternative asset repository for alternative assets operations
-    let alternative_asset_repository: Arc<dyn AlternativeAssetRepositoryTrait + Send + Sync> =
-        Arc::new(AlternativeAssetRepository::new(
-            pool.clone(),
-            writer.clone(),
-        ));
 
     // Alternative asset service (delegates to core service)
     let alternative_asset_service: Arc<dyn AlternativeAssetServiceTrait + Send + Sync> = Arc::new(
@@ -948,8 +984,10 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     // Health service for portfolio health diagnostics
     let health_dismissal_repository =
         Arc::new(HealthDismissalRepository::new(pool.clone(), writer.clone()));
-    let health_service: Arc<dyn HealthServiceTrait + Send + Sync> =
-        Arc::new(HealthService::new(health_dismissal_repository));
+    let health_service: Arc<dyn HealthServiceTrait + Send + Sync> = Arc::new(
+        HealthService::new(health_dismissal_repository)
+            .with_projection_freshness(portfolio_coordinator.clone()),
+    );
 
     // AI chat repository for thread/message persistence
     let ai_chat_repository = Arc::new(AiChatRepository::new(pool.clone(), writer.clone()));
@@ -1002,6 +1040,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let device_sync_runtime = Arc::new(DeviceSyncRuntimeState::new());
     let broker_sync_running = Arc::new(AtomicBool::new(false));
     let token_lifecycle = Arc::new(TokenLifecycleState::new());
+    let profile_binding = Arc::new(std::sync::OnceLock::new());
     let now = chrono::Utc::now();
     if let Err(err) = app_sync_repository
         .prune_sync_outbox(
@@ -1027,33 +1066,27 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     let oidc_manager = auth.oidc;
 
     if !final_cash_migration.pending_account_ids.is_empty() {
-        // The recalculation gate already serializes and forces full
-        // recomputation for pending accounts, so the rebuild can always run
-        // in the background instead of blocking (or failing) startup.
+        // The coordinator serializes and forces a full rebuild per pending
+        // account, so the rebuild can run in the background instead of
+        // blocking (or failing) startup.
         tracing::info!(
             "Rebuilding {} account(s) after final-cash migration in the background",
             final_cash_migration.pending_account_ids.len()
         );
         let settings_service = settings_service.clone();
-        let snapshot_service = snapshot_service.clone();
-        let valuation_service = valuation_service.clone();
-        let recalculation_gate = recalculation_gate.clone();
-        tokio::spawn(async move {
-            if let Err(error) = rebuild_pending_final_cash_accounts(
-                settings_service.as_ref(),
-                snapshot_service.as_ref(),
-                valuation_service.as_ref(),
-                recalculation_gate.as_ref(),
-            )
-            .await
+        let coordinator = portfolio_coordinator.clone();
+        workers.push(tokio::spawn(async move {
+            if let Err(error) =
+                rebuild_pending_final_cash_accounts(settings_service.as_ref(), coordinator.as_ref())
+                    .await
             {
                 tracing::warn!("Background final-cash rebuild failed: {}", error);
             }
-        });
+        }));
     }
 
     // Domain event sink - Phase 2: Start the worker now that all services are ready
-    domain_event_sink.start_worker(
+    workers.push(domain_event_sink.start_worker(
         settings_service.clone(),
         asset_service.clone(),
         connect_sync_service.clone(),
@@ -1061,9 +1094,8 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         broker_sync_running.clone(),
         health_service.clone(),
         snapshot_service.clone(),
-        snapshot_repository.clone(),
         quote_service.clone(),
-        valuation_service.clone(),
+        portfolio_coordinator.clone(),
         account_service.clone(),
         goal_service.clone(),
         fx_service.clone(),
@@ -1071,17 +1103,29 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         timezone.clone(),
         secret_store.clone(),
         token_lifecycle.clone(),
+        profile_binding.clone(),
         spending_settings_service.clone(),
         categorization_rules_service.clone(),
-    )?;
+    )?);
 
     let state = Arc::new(AppState {
+        mcp_sessions: Arc::new(Default::default()),
+        profile_lifecycle: tokio::sync::Mutex::new(()),
+        connect_transition: Arc::new(tokio::sync::RwLock::new(())),
+        workers: std::sync::Mutex::new(workers),
+        writer: writer.clone(),
+        writer_task: tokio::sync::Mutex::new(writer_task.take()),
+        #[cfg(feature="device-sync")]
+        sync_approvals: Default::default(),
+        profile_binding,
         backup_exports: crate::api::portable_backups::BackupExports::default(),
+        backup_scheduler: Arc::default(),
         domain_event_sink,
         account_service,
         settings_service,
         holdings_service,
         valuation_service,
+        portfolio_coordinator,
         allocation_service,
         quote_service,
         base_currency,
@@ -1108,7 +1152,7 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
         db_path,
         db_access,
         database_key: Arc::new(db::DbEncryptionKey::from_bytes(&config.database_key)),
-        _database_owner: Arc::clone(&database_owner),
+        _database_owner: Arc::clone(database_owner),
         secret_store,
         event_bus,
         auth: auth_manager,
@@ -1139,14 +1183,9 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
     });
 
     #[cfg(feature = "device-sync")]
-    start_sync_outbox_wake_worker(sync_outbox_wake_receiver, Arc::clone(&state));
+    state.workers.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).push(start_sync_outbox_wake_worker(sync_outbox_wake_receiver, Arc::clone(&state)));
 
-    if portfolio_history_backfill_needed(&state) {
-        tracing::info!(
-            "Valuation rows are missing after startup; enqueueing full portfolio rebuild."
-        );
-        crate::api::shared::trigger_full_portfolio_recalc(Arc::clone(&state));
-    }
+    crate::api::shared::spawn_portfolio_update(Arc::clone(&state));
 
     Ok(state)
     }.await;
@@ -1164,6 +1203,38 @@ pub async fn build_state(config: &Config) -> anyhow::Result<Arc<AppState>> {
 mod runtime_setting_tests {
     use super::*;
     use axum::response::IntoResponse;
+
+    #[tokio::test]
+    async fn failed_startup_cleanup_waits_for_remaining_pool_connections_before_retry() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("app.db");
+        let path = path.to_str().unwrap();
+        let owner = Arc::new(db::DatabaseOwner::acquire(path).unwrap());
+        let pool = db::DbAccess::plaintext(path)
+            .create_pool_with_owner(owner.clone())
+            .unwrap();
+        let connection = pool.get().unwrap();
+        drop(pool);
+
+        {
+            let cleanup = wait_for_startup_cleanup(&owner);
+            tokio::pin!(cleanup);
+            assert!(
+                tokio::time::timeout(std::time::Duration::from_millis(100), &mut cleanup)
+                    .await
+                    .is_err()
+            );
+            assert!(db::DatabaseOwner::acquire(path).is_err());
+
+            drop(connection);
+            tokio::time::timeout(std::time::Duration::from_secs(5), &mut cleanup)
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        drop(owner);
+        db::DatabaseOwner::acquire(path).unwrap();
+    }
 
     #[test]
     fn poisoned_settings_return_internal_errors_instead_of_default_values() {

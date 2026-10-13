@@ -6,7 +6,7 @@ use crate::{
     models::{Account, AccountUpdate, NewAccount},
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::StatusCode,
     routing::{get, put},
     Json, Router,
@@ -22,7 +22,7 @@ struct ListAccountsQuery {
 
 #[utoipa::path(get, path="/api/v1/accounts", responses((status=200, body = [Account])))]
 async fn list_accounts(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(query): Query<ListAccountsQuery>,
 ) -> ApiResult<Json<Vec<Account>>> {
     let include_archived = query.include_archived.unwrap_or(false);
@@ -36,9 +36,14 @@ async fn list_accounts(
 
 #[utoipa::path(post, path="/api/v1/accounts", request_body = NewAccount, responses((status=200, body = Account)))]
 async fn create_account(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(payload): Json<NewAccount>,
 ) -> ApiResult<Json<Account>> {
+    // A supplied broker link must not race replacement of its Connect identity.
+    let _connect = (payload.provider.is_some() || payload.provider_account_id.is_some())
+        .then(|| crate::profiles::connect_guard(&state))
+        .transpose()
+        .map_err(crate::error::ApiError::Forbidden)?;
     let core_new = payload.into();
     let created = state.account_service.create_account(core_new).await?;
     // Domain events handle portfolio recalculation
@@ -48,7 +53,7 @@ async fn create_account(
 #[utoipa::path(put, path="/api/v1/accounts/{id}", request_body = AccountUpdate, responses((status=200, body=Account)))]
 async fn update_account(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(mut payload): Json<AccountUpdate>,
 ) -> ApiResult<Json<Account>> {
     payload.id = Some(id);
@@ -60,14 +65,14 @@ async fn update_account(
 #[utoipa::path(delete, path="/api/v1/accounts/{id}", responses((status=204)))]
 async fn delete_account(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     state.account_service.delete_account(&id).await?;
     // Domain events handle portfolio recalculation
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/accounts", get(list_accounts).post(create_account))
         .route("/accounts/{id}", put(update_account).delete(delete_account))

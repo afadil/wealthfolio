@@ -2,15 +2,16 @@
 
 use crate::activities::activities_constants::{
     ACTIVITY_SUBTYPE_BONUS, ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND, ACTIVITY_SUBTYPE_DRIP,
-    ACTIVITY_SUBTYPE_OPTION_EXPIRY, ACTIVITY_SUBTYPE_POSITION_CLOSE,
-    ACTIVITY_SUBTYPE_POSITION_OPEN, ACTIVITY_SUBTYPE_REBATE, ACTIVITY_SUBTYPE_REFUND,
-    ACTIVITY_SUBTYPE_REIMBURSEMENT, ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_ADJUSTMENT,
-    ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND,
-    ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT,
-    ACTIVITY_TYPE_TAX, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
-    ACTIVITY_TYPE_WITHDRAWAL,
+    ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION, ACTIVITY_SUBTYPE_OPTION_EXPIRY,
+    ACTIVITY_SUBTYPE_POSITION_CLOSE, ACTIVITY_SUBTYPE_POSITION_OPEN, ACTIVITY_SUBTYPE_REBATE,
+    ACTIVITY_SUBTYPE_REFUND, ACTIVITY_SUBTYPE_REIMBURSEMENT, ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL,
+    ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_ADJUSTMENT, ACTIVITY_TYPE_BUY,
+    ACTIVITY_TYPE_CREDIT, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_FEE,
+    ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TAX,
+    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
 };
 use crate::activities::csv_parser::ParseConfig;
+use crate::activities::TransferLinkState;
 use crate::assets::NewAsset;
 use crate::Result;
 use crate::{activities::activities_errors::ActivityError, QuoteMode};
@@ -212,18 +213,34 @@ pub struct Activity {
     pub updated_at: DateTime<Utc>,
 }
 
+/// An activity's type override, when it is not blank: a blank override is
+/// none, wherever the type is read (engine rules §5). SQL reads it through
+/// the storage crate's `effective_type_sql`, the frontend through
+/// `getEffectiveType`.
+pub fn type_override(type_override: Option<&str>) -> Option<&str> {
+    type_override.map(str::trim).filter(|s| !s.is_empty())
+}
+
+/// A type override as stored: as `type_override` reads it, trimmed and none
+/// when blank. Every write of `activities.activity_type_override` stores it
+/// through this, so a reader of the stored column that does not trim (the
+/// addon SDK's `getEffectiveType`) reads the type the engine reads in every
+/// row written since; rows stored before keep theirs until edited or device-synced.
+pub fn stored_type_override(value: Option<&str>) -> Option<String> {
+    type_override(value).map(str::to_string)
+}
+
+/// The type an activity computes as: its override when not blank, else its
+/// stored type.
+pub fn effective_activity_type<'a>(activity_type: &'a str, override_: Option<&'a str>) -> &'a str {
+    type_override(override_).unwrap_or(activity_type)
+}
+
 impl Activity {
     /// Returns the effective activity type, respecting user overrides.
     /// This is what the compiler and calculator should use.
     pub fn effective_type(&self) -> &str {
-        self.activity_type_override
-            .as_deref()
-            .unwrap_or(&self.activity_type)
-    }
-
-    /// Returns the effective date for this activity
-    pub fn effective_date(&self) -> NaiveDate {
-        self.activity_date.naive_utc().date()
+        effective_activity_type(&self.activity_type, self.activity_type_override.as_deref())
     }
 
     /// Check if this activity is posted (should affect calculations)
@@ -231,9 +248,24 @@ impl Activity {
         self.status == ActivityStatus::Posted
     }
 
+    /// The explicit external-transfer marker (`metadata.flow.is_external`),
+    /// when the row carries one.
+    pub fn explicit_external_transfer(&self) -> Option<bool> {
+        self.metadata
+            .as_ref()
+            .and_then(|m| m.get("flow"))
+            .and_then(|f| f.get("is_external"))
+            .and_then(|v| v.as_bool())
+    }
+
+    /// Whether the row is explicitly marked as an external transfer.
+    pub fn is_external_transfer(&self) -> bool {
+        self.explicit_external_transfer().unwrap_or(false)
+    }
+
     /// Check if this activity has a user override
     pub fn has_override(&self) -> bool {
-        self.activity_type_override.is_some()
+        type_override(self.activity_type_override.as_deref()).is_some()
     }
 
     /// Get quantity, defaulting to zero if not set.
@@ -382,26 +414,31 @@ impl NewActivity {
     pub fn canonicalize_subtype(subtype: Option<&str>) -> Option<String> {
         let subtype = subtype.map(str::trim).filter(|value| !value.is_empty())?;
 
-        let canonical = if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DRIP) {
+        let normalized = subtype.replace([' ', '-'], "_");
+        let canonical = if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DRIP) {
             ACTIVITY_SUBTYPE_DRIP
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND) {
             ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_STAKING_REWARD) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_STAKING_REWARD) {
             ACTIVITY_SUBTYPE_STAKING_REWARD
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_BONUS) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_BONUS) {
             ACTIVITY_SUBTYPE_BONUS
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REBATE) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REBATE) {
             ACTIVITY_SUBTYPE_REBATE
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REFUND) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REFUND) {
             ACTIVITY_SUBTYPE_REFUND
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REIMBURSEMENT) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_REIMBURSEMENT) {
             ACTIVITY_SUBTYPE_REIMBURSEMENT
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_OPTION_EXPIRY) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_OPTION_EXPIRY) {
             ACTIVITY_SUBTYPE_OPTION_EXPIRY
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_POSITION_OPEN) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_POSITION_OPEN) {
             ACTIVITY_SUBTYPE_POSITION_OPEN
-        } else if subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_POSITION_CLOSE) {
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_POSITION_CLOSE) {
             ACTIVITY_SUBTYPE_POSITION_CLOSE
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL) {
+            ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL
+        } else if normalized.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION) {
+            ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION
         } else {
             subtype
         };
@@ -525,6 +562,25 @@ impl NewActivity {
 
         validate_activity_date(&self.activity_date)?;
 
+        let subtype =
+            Self::canonicalize_subtype_for_activity(&self.activity_type, self.subtype.as_deref());
+        if self
+            .activity_type
+            .eq_ignore_ascii_case(ACTIVITY_TYPE_ADJUSTMENT)
+            && matches!(
+                subtype.as_deref(),
+                Some(ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL | ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION)
+            )
+            && ![self.get_asset_resolution_id(), self.get_asset_symbol()]
+                .into_iter()
+                .flatten()
+                .any(|value| !value.trim().is_empty())
+        {
+            return Err(ActivityError::InvalidData(
+                "Cost basis adjustments require an asset_id or symbol".to_string(),
+            ));
+        }
+
         Self::validate_asset_backed_income_values(
             &self.activity_type,
             self.subtype.as_deref(),
@@ -583,6 +639,27 @@ impl NewActivity {
             .as_ref()
             .and_then(|a| a.instrument_type.as_deref())
     }
+}
+
+/// One activity as an update would leave it, computed without writing.
+#[derive(Debug, Clone)]
+pub struct PreviewedActivityUpdate {
+    /// The stored activity.
+    pub existing: Activity,
+    /// The update as it would be written: omitted fields hydrated from
+    /// `existing` (a `None` patch still keeps the stored value), derived
+    /// amount and review flag applied, date and values normalized.
+    pub update: ActivityUpdate,
+    /// The instant `update.activity_date` is stored as.
+    pub activity_date: DateTime<Utc>,
+}
+
+/// What `update_activity` would write for an update, without writing it.
+#[derive(Debug, Clone)]
+pub struct ActivityUpdatePreview {
+    pub activity: PreviewedActivityUpdate,
+    /// The other leg of a linked transfer pair, which the update mirrors onto.
+    pub linked: Option<PreviewedActivityUpdate>,
 }
 
 /// Input model for updating an existing activity
@@ -792,6 +869,8 @@ pub struct InternalTransferPairRequest {
     pub destination_amount: Option<Decimal>,
     pub source_currency: String,
     pub destination_currency: String,
+    /// Legacy execution-rate hint. Amounts are authoritative; this is never
+    /// persisted as Activity.fx_rate (an activity-to-account valuation override).
     #[serde(
         default,
         deserialize_with = "decimal_input_format::deserialize_option_decimal"
@@ -829,6 +908,66 @@ pub struct TransferMatchCandidate {
     pub score: i32,
     pub reasons: Vec<String>,
     pub warnings: Vec<String>,
+}
+
+/// Scope of a scan for posted transfers with no linked other side.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlinkedTransfersRequest {
+    /// Look up this one activity instead of scanning.
+    #[serde(default)]
+    pub activity_id: Option<String>,
+    #[serde(default)]
+    pub account_id: Option<String>,
+    /// Inclusive UTC calendar dates of the transfer.
+    #[serde(default)]
+    pub start_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub end_date: Option<NaiveDate>,
+    /// Days a candidate may be from the transfer (default 7, at most 90).
+    #[serde(default)]
+    pub window_days: Option<i64>,
+    /// Candidates per transfer (default 3, at most 25).
+    #[serde(default)]
+    pub candidate_limit: Option<usize>,
+    /// Transfers returned (default 25, at most 100).
+    #[serde(default)]
+    pub limit: Option<usize>,
+    /// Transfers skipped before `limit`, for paging.
+    #[serde(default)]
+    pub offset: Option<usize>,
+    /// Only these unlinked states (default all three).
+    #[serde(default)]
+    pub link_states: Option<Vec<TransferLinkState>>,
+}
+
+/// A posted transfer with no linked other side, its link state, and the
+/// transfers it could pair with, best first.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlinkedTransfer {
+    pub activity: Activity,
+    pub link_state: TransferLinkState,
+    pub candidates: Vec<TransferMatchCandidate>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlinkedTransfers {
+    /// Newest first, at most the request's `limit`.
+    pub transfers: Vec<UnlinkedTransfer>,
+    /// Unlinked transfers in scope before the offset and limit.
+    pub total: usize,
+    /// For an `activity_id` lookup of a linked transfer: its other side.
+    pub linked: Option<LinkedTransfer>,
+}
+
+/// The other side of a linked transfer, and the transfer's link state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedTransfer {
+    pub counterpart_id: String,
+    pub link_state: TransferLinkState,
 }
 
 /// Structured error reported for a single bulk mutation entry.

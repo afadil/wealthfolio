@@ -1,3 +1,4 @@
+import { profileScope, matchesProfileScope } from "@/features/profiles/session";
 // Web adapter - SSE Bridge and Event Listeners
 
 import { logger, EVENTS_ENDPOINT } from "./core";
@@ -12,8 +13,14 @@ class ServerEventBridge {
   private readonly listeners = new Map<string, Set<EventCallback<unknown>>>();
   private readonly eventHandlers = new Map<string, EventListener>();
   private nextEventId = 0;
+  private scope = "";
 
-  constructor(private readonly url: string) {}
+  constructor(private readonly url: string) {
+    window.addEventListener("wealthfolio:profile-locked", () => {
+      this.teardown();
+      this.listeners.clear();
+    });
+  }
 
   listen<T>(eventName: string, handler: EventCallback<T>): Promise<UnlistenFn> {
     if (typeof window === "undefined" || typeof EventSource === "undefined") {
@@ -32,9 +39,24 @@ class ServerEventBridge {
     if (this.eventSource) {
       return;
     }
-    this.eventSource = new EventSource(this.url, { withCredentials: true });
+    this.scope = profileScope();
+    this.eventSource = new EventSource(
+      `${this.url}?profileScope=${encodeURIComponent(profileScope())}`,
+      { withCredentials: true },
+    );
+    let interrupted = false;
+    this.eventSource.onopen = () => {
+      if (interrupted) {
+        interrupted = false;
+        window.dispatchEvent(new Event("wealthfolio:event-stream-reconnected"));
+      }
+    };
     this.eventSource.onerror = (error) => {
+      interrupted = true;
       logger.warn("Portfolio event stream error", error);
+      // The server ends this stream when the profile session is revoked or
+      // idle-expires; with no polling, this is how an untouched screen locks.
+      window.dispatchEvent(new Event("wealthfolio:event-stream-error"));
     };
   }
 
@@ -97,6 +119,7 @@ class ServerEventBridge {
   }
 
   private emit(eventName: string, payload: unknown) {
+    if (!matchesProfileScope(this.scope)) return;
     const listeners = this.listeners.get(eventName);
     if (!listeners || listeners.size === 0) {
       return;
@@ -142,6 +165,11 @@ export const listenMarketSyncComplete = <T>(handler: EventCallback<T>): Promise<
 
 export const listenMarketSyncError = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
   return portfolioEventBridge.listen("market:sync-error", handler);
+};
+
+/** Restore operation changes for this profile, including from other tabs. */
+export const listenDeviceSyncRestore = <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {
+  return portfolioEventBridge.listen("device-sync:restore-operation", handler);
 };
 
 export const listenAssetClassificationsChanged = <T>(

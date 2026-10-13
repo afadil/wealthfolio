@@ -1,5 +1,5 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { useEffect, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { QueryKeys } from "@/lib/query-keys";
@@ -8,6 +8,7 @@ import { WealthfolioConnectProvider, useWealthfolioConnect } from "./wealthfolio
 
 const mocks = vi.hoisted(() => ({
   platform: "web",
+  capability: vi.fn(),
   configured: false,
   account: "",
   onAuth: (_event: string) => {},
@@ -27,19 +28,21 @@ const mocks = vi.hoisted(() => ({
   t: (key: string) => key,
 }));
 
-vi.mock("@/lib/connect-config", () => ({ CONNECT_ENABLED: true }));
+vi.mock("@/features/profiles/api", () => ({
+  profileCommand: vi.fn(async (_command, payload) => payload?.operation === "validate"),
+}));
+vi.mock(import("@/lib/connect-config"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  CONNECT_ENABLED: true,
+}));
 vi.mock("@/context/auth-context", () => ({ useAuth: () => ({ isAuthenticated: true }) }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: mocks.t }) }));
 vi.mock("@/hooks/use-platform", () => ({
-  getPlatform: async () => ({
-    os: mocks.platform,
-    is_mobile: mocks.platform !== "web",
-    capabilities: { cloud_sync: true },
-  }),
+  getPlatform: () => mocks.capability(),
 }));
 vi.mock("tauri-plugin-web-auth-api", () => ({ authenticate: vi.fn() }));
 vi.mock("@/adapters", () => ({
-  isDesktop: true,
+  isTauri: true,
   getCurrentDeepLinks: async () => [],
   listenDeepLink: async (callback: typeof mocks.onDeepLink) => {
     mocks.onDeepLink = callback;
@@ -113,6 +116,11 @@ beforeEach(() => {
   mocks.configured = false;
   mocks.account = "";
   mocks.platform = "web";
+  mocks.capability.mockImplementation(async () => ({
+    os: mocks.platform,
+    is_mobile: mocks.platform !== "web",
+    capabilities: { cloud_sync: true },
+  }));
   mocks.getStatus.mockImplementation(async () => ({ isConfigured: mocks.configured }));
   mocks.store.mockImplementation(async (account: string) => {
     mocks.account = account;
@@ -134,6 +142,101 @@ beforeEach(() => {
 });
 
 describe("Cloud session lifecycle", () => {
+  it.each([
+    [
+      "Profile operations are running. Wait for them to finish and try again.",
+      "profiles.errors.busy",
+    ],
+    [
+      "CONNECT_PROFILE_EXISTS: This Connect account belongs to profile 96b0ce9d-dbbb-484c-abe7-ca2f57e5ccf7.",
+      "profiles.errors.duplicateAccount",
+    ],
+  ])(
+    "shows friendly copy for native session-storage errors after OAuth: %s",
+    async (message, expected) => {
+      mocks.platform = "ios";
+      mocks.store.mockRejectedValueOnce(message);
+      const { result } = await setup();
+
+      act(() => {
+        mocks.onDeepLink({
+          payload: "wealthfolio://auth/callback?code=restore-login#wf_profile_flow=test-flow",
+        });
+      });
+
+      await waitFor(() => expect(result.current.error).toBe(expected));
+      expect(mocks.exchange).toHaveBeenCalledTimes(1);
+      expect(mocks.store).toHaveBeenCalledWith("B");
+      expect(result.current.isConnected).toBe(false);
+      expect(result.current.postLoginSyncRequest).toBeNull();
+    },
+  );
+
+  it("requires explicit confirmation before replacing a Connect account", async () => {
+    mocks.store.mockRejectedValueOnce(new Error("CONNECT_REBIND_REQUIRED"));
+    const { result } = await setup();
+    let login!: Promise<void>;
+    await act(async () => {
+      login = result.current.signInWithEmail("B", "password");
+    });
+    await screen.findByRole("dialog");
+    expect(mocks.store).toHaveBeenCalledTimes(1);
+    expect(result.current.isConnected).toBe(false);
+    expect(result.current.postLoginSyncRequest).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "connect:rebind.confirm" }));
+      await login;
+    });
+    expect(mocks.store).toHaveBeenLastCalledWith("B", true);
+    expect(result.current.user?.id).toBe("B");
+  });
+
+  it("canceling an account change preserves the current connection", async () => {
+    const { result } = await setup();
+    await act(() => result.current.signInWithEmail("A", "password"));
+    mocks.store.mockRejectedValueOnce(new Error("CONNECT_REBIND_REQUIRED"));
+    let login!: Promise<void>;
+    await act(async () => {
+      login = result.current.signInWithEmail("B", "password");
+    });
+    await screen.findByRole("dialog");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "connect:rebind.cancel" }));
+      await login;
+    });
+    expect(mocks.store).toHaveBeenCalledTimes(2);
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(result.current.user?.id).toBe("A");
+    expect(result.current.error).toBeNull();
+  });
+
+  it("locking or leaving a profile cancels pending confirmation", async () => {
+    mocks.store.mockRejectedValueOnce(new Error("CONNECT_REBIND_REQUIRED"));
+    const { result, unmount } = await setup();
+    let login!: Promise<void>;
+    await act(async () => {
+      login = result.current.signInWithEmail("B", "password");
+    });
+    await screen.findByRole("dialog");
+    unmount();
+    await login;
+    expect(mocks.store).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer to override another profile's account reservation", async () => {
+    mocks.store.mockRejectedValueOnce(new Error("CONNECT_PROFILE_EXISTS"));
+    const { result } = await setup();
+    await act(async () => {
+      await expect(result.current.signInWithEmail("B", "password")).rejects.toThrow(
+        "CONNECT_PROFILE_EXISTS",
+      );
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(result.current.error).toBe("profiles.errors.duplicateAccount");
+    expect(result.current.isConnected).toBe(false);
+    expect(mocks.store).toHaveBeenCalledTimes(1);
+  });
+
   it("invalidates restored settings only after the backend accepts reconnection", async () => {
     const stored = deferred<void>();
     mocks.store.mockReturnValueOnce(stored.promise);
@@ -258,7 +361,9 @@ describe("Cloud session lifecycle", () => {
     });
     await waitFor(() => expect(mocks.clear).toHaveBeenCalledTimes(1));
     await act(async () =>
-      mocks.onDeepLink({ payload: "wealthfolio://auth/callback?code=mobile-code" }),
+      mocks.onDeepLink({
+        payload: "wealthfolio://auth/callback?code=mobile-code#wf_profile_flow=test-flow",
+      }),
     );
     expect(mocks.exchange).not.toHaveBeenCalled();
     await act(async () => {
@@ -295,7 +400,10 @@ describe("Login and subscription bootstrap coordination", () => {
       await act(async () => {
         if (method === "email") await result.current.signInWithEmail("A", "password");
         else if (method === "otp") await result.current.verifyOtp("A", "123456");
-        else mocks.onDeepLink({ payload: "wealthfolio://auth/callback?code=activation-test" });
+        else
+          mocks.onDeepLink({
+            payload: "wealthfolio://auth/callback?code=activation-test#wf_profile_flow=test-flow",
+          });
       });
       await waitFor(() => expect(mocks.bootstrap).toHaveBeenCalledTimes(1));
       const loginRequest = result.current.postLoginSyncRequest;
@@ -325,4 +433,68 @@ describe("Login and subscription bootstrap coordination", () => {
     expect(result.current.postLoginSyncRequest).toBeNull();
     expect(mocks.signIn).not.toHaveBeenCalled();
   });
+});
+
+it("mounts local content once after capability resolution without waiting for cloud restoration", async () => {
+  const capability = deferred<{ capabilities: { cloud_sync: boolean } }>();
+  const restore = deferred<{ accessToken: string; refreshToken: string }>();
+  mocks.capability.mockReturnValue(capability.promise);
+  mocks.restore.mockReturnValue(restore.promise);
+  const mounted = vi.fn();
+  const unmounted = vi.fn();
+  function LocalPortfolio() {
+    useEffect(() => {
+      mounted();
+      return unmounted;
+    }, []);
+    return <div>Local portfolio available</div>;
+  }
+  render(wrapper({ children: <LocalPortfolio /> }));
+  expect(screen.queryByText("Local portfolio available")).not.toBeInTheDocument();
+  await act(async () => capability.resolve({ capabilities: { cloud_sync: true } }));
+  expect(await screen.findByText("Local portfolio available")).toBeInTheDocument();
+  expect(mounted).toHaveBeenCalledOnce();
+  expect(unmounted).not.toHaveBeenCalled();
+  await act(async () => restore.reject(new Error("offline")));
+  expect(mounted).toHaveBeenCalledOnce();
+  expect(unmounted).not.toHaveBeenCalled();
+});
+it("keeps configured credentials unavailable while offline and restores them on retry", async () => {
+  mocks.configured = true;
+  const { result } = await setup();
+  expect(result.current.isSessionUnavailable).toBe(true);
+  expect(result.current.isConnected).toBe(false);
+  expect(mocks.clear).not.toHaveBeenCalled();
+  mocks.restore.mockResolvedValue({ accessToken: "access", refreshToken: "refresh" });
+  await act(async () => result.current.retrySession());
+  expect(result.current.isConnected).toBe(true);
+  expect(result.current.isSessionUnavailable).toBe(false);
+});
+it("offers explicit reconnection when saved credentials need binding confirmation", async () => {
+  mocks.configured = true;
+  mocks.restore.mockRejectedValue(new Error("CONNECT_REBIND_REQUIRED"));
+  const { result } = await setup();
+  expect(result.current.isSessionUnavailable).toBe(false);
+  expect(result.current.isConnected).toBe(false);
+  expect(mocks.clear).not.toHaveBeenCalled();
+  expect(mocks.store).not.toHaveBeenCalled();
+});
+it("does not show signed-out status when the credential status check also fails", async () => {
+  mocks.getStatus.mockRejectedValue(new Error("backend unavailable"));
+  const { result } = await setup();
+  expect(result.current.isSessionUnavailable).toBe(true);
+  expect(mocks.clear).not.toHaveBeenCalled();
+});
+it("coalesces repeated offline retry triggers", async () => {
+  mocks.configured = true;
+  const { result } = await setup();
+  const restored = deferred<{ accessToken: string; refreshToken: string }>();
+  mocks.restore.mockClear().mockReturnValue(restored.promise);
+  await act(async () => {
+    void result.current.retrySession();
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(mocks.restore).toHaveBeenCalledOnce();
+  await act(async () => restored.reject(new Error("still offline")));
 });

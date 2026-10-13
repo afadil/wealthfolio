@@ -32,19 +32,20 @@ SQLCipher-enabled `libsqlite3-sys`. A connection without a key opens ordinary
 plaintext SQLite; encryption does not require a separate application build.
 
 The native runtime can stop and rebuild its database services for maintenance.
-The server instead has one application state for its process lifetime. Server
-restore and encryption conversion are offline commands; there is no dynamic
-server runtime replacement, web restore upload, maintenance polling or recovery
-API.
+The server retains one application state per profile, shared by browsers using
+that profile. See [profile architecture](multi-profile-and-app-lock.md) for
+runtime selection and access grants. Server restore and encryption conversion
+are offline commands; there is no dynamic server runtime replacement, web
+restore upload, maintenance polling or recovery API.
 
 ## Keys and encryption policy
 
-| Secret                   | Source and use                                                                           | Recovery implications                                                                                                 |
-| ------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Native database key      | Random 32-byte key stored through the OS credential backend as `database_encryption_key` | Keep the key after disabling encryption so older encrypted snapshots remain readable.                                 |
-| Server database key      | HKDF-SHA256 from the configured master secret, with the `wealthfolio-db` label           | Preserve the master secret separately from data backups. Database, vault and authentication derivations are distinct. |
-| Portable backup password | User-chosen password, processed by the portable SQLCipher profile                        | Unlocks that export without the source installation key. It is not an app login or destination database key.          |
-| Staging key              | Random temporary key held by a prepared operation                                        | Protects private working copies; it is not a user recovery mechanism.                                                 |
+| Secret                   | Source and use                                                                                                                                     | Recovery implications                                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Native database key      | Random 32-byte key stored through the OS credential backend as `database_encryption_key`                                                           | Keep the key after disabling encryption so older encrypted snapshots remain readable.                                 |
+| Server database key      | HKDF-SHA256 from the operator master secret; legacy `wealthfolio-db` derivation is retained, new profiles use a versioned profile-specific context | Preserve the master secret separately from data backups. Database, vault and authentication derivations are distinct. |
+| Portable backup password | User-chosen password, processed by the portable SQLCipher profile                                                                                  | Unlocks that export without the source installation key. It is not an app login or destination database key.          |
+| Staging key              | Random temporary key held by a prepared operation                                                                                                  | Protects private working copies; it is not a user recovery mechanism.                                                 |
 
 Native key creation is separate from key lookup. Before conversion uses a newly
 created key, the native provider persists it and reads it back. Startup
@@ -153,11 +154,15 @@ resembling SQLCipher raw-key syntax cannot bypass password derivation. Passwords
 are passed through explicit-length or bound APIs rather than interpolated SQL.
 
 Export copies the selected snapshot into private encrypted working storage,
-validates and sanitizes that copy, then creates a fresh password-protected or
-explicitly plaintext output. It does not change the source database or its
-credentials. The UI defaults to protection on every export and can generate a
-24-character password using `crypto.getRandomValues`, with unbiased selection
-from letters and digits that excludes easily confused characters.
+checks file length and database/cipher integrity, then creates a fresh
+password-protected or explicitly plaintext output with portable backup metadata.
+It preserves the snapshot schema, data and migration history without applying
+pending migrations or requiring restore compatibility. Unknown migration IDs do
+not block export; schema, migration-history and foreign-key validation belong to
+restore. It does not change the source database or its credentials. The UI
+defaults to protection on every export and can generate a 24-character password
+using `crypto.getRandomValues`, with unbiased selection from letters and digits
+that excludes easily confused characters.
 
 Import recognizes protected containers, plaintext standalone databases and
 compatible original encrypted snapshots with their retained installation key. It

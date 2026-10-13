@@ -5,6 +5,10 @@ import { useAggregatedSyncStatus } from "./use-aggregated-sync-status";
 const context = vi.hoisted(() => ({
   isConnected: true,
   isEnabled: true,
+  isInitializing: false,
+  isLoadingUserInfo: false,
+  isSessionUnavailable: false,
+  error: null as string | null,
   userInfo: null as unknown,
 }));
 vi.mock("../providers/wealthfolio-connect-provider", () => ({
@@ -18,6 +22,10 @@ afterEach(() => {
   context.isConnected = true;
   context.isEnabled = true;
   context.userInfo = null;
+  context.isInitializing = false;
+  context.isLoadingUserInfo = false;
+  context.isSessionUnavailable = false;
+  context.error = null;
 });
 
 describe("subscription navigation status", () => {
@@ -44,7 +52,27 @@ describe("subscription navigation status", () => {
 
   it("does not infer an inactive subscription before user info is available", () => {
     const { result } = renderHook(useAggregatedSyncStatus);
-    expect(result.current.status).toBe("not_connected");
+    expect(result.current.status).toBe("restoring");
+  });
+
+  it("shows restoring while session restoration is pending", () => {
+    context.isConnected = false;
+    context.isInitializing = true;
+    const { result } = renderHook(useAggregatedSyncStatus);
+    expect(result.current.status).toBe("restoring");
+  });
+
+  it("shows unavailable for retained credentials after a transient restore failure", () => {
+    context.isConnected = false;
+    context.isSessionUnavailable = true;
+    const { result } = renderHook(useAggregatedSyncStatus);
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("keeps user-info failure distinct from sign-out or subscription purchase", () => {
+    context.error = "Account details unavailable";
+    const { result } = renderHook(useAggregatedSyncStatus);
+    expect(result.current.status).toBe("unavailable");
   });
 
   it.each(["isConnected", "isEnabled"] as const)(

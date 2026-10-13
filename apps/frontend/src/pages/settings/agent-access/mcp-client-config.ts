@@ -1,3 +1,9 @@
+import { isWeb } from "@/adapters";
+import { selectedProfileId } from "@/features/profiles/session";
+const clientHeaders = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  ...(isWeb && selectedProfileId() ? { "X-WF-Profile-Id": selectedProfileId() } : {}),
+});
 // Ready-to-paste MCP client configuration snippets. Shared by the connect-client
 // card (token placeholder) and the token-created dialog (real token), so both
 // render identical configs for each known agent.
@@ -26,7 +32,7 @@ const mcpServers = (url: string, token: string) => ({
     wealthfolio: {
       type: "http",
       url,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: clientHeaders(token),
     },
   },
 });
@@ -71,7 +77,7 @@ export const CLIENT_PRESETS: ClientPreset[] = [
         wealthfolio: {
           type: "http",
           url,
-          headers: { Authorization: `Bearer ${token}` },
+          headers: clientHeaders(token),
         },
       },
     }),
@@ -86,7 +92,7 @@ export const CLIENT_PRESETS: ClientPreset[] = [
         args: [],
         command: "",
         env: {},
-        headers: { Authorization: `Bearer ${token}` },
+        headers: clientHeaders(token),
         type: "http",
         url,
       },
@@ -98,7 +104,7 @@ export const CLIENT_PRESETS: ClientPreset[] = [
     location: "Any client that speaks Streamable HTTP",
     build: (url, token) => ({
       url,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: clientHeaders(token),
     }),
   },
 ];

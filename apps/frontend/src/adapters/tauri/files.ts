@@ -3,9 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   BaseDirectory,
   type FileHandle,
-  mkdir,
   open as openFile,
-  remove,
   startAccessingSecurityScopedResource,
   stopAccessingSecurityScopedResource,
 } from "@tauri-apps/plugin-fs";
@@ -114,14 +112,28 @@ const copyFileByHandle = async (
   };
 
   try {
-    source = (await openFile(fromPath, sourceOptions)) as FileHandle;
-    destination = (await openFile(toPath, destinationOptions)) as FileHandle;
+    if (!options.fromPathBaseDir) source = await openFile(fromPath, sourceOptions);
+    if (source && options.maxBytes !== undefined && (await source.stat()).size > options.maxBytes) {
+      throw new Error("Backup exceeds the supported 2 GiB limit");
+    }
+    if (!options.toPathBaseDir) destination = await openFile(toPath, destinationOptions);
 
     const buffer = new Uint8Array(COPY_BUFFER_SIZE);
     let copied = 0;
     while (true) {
       options.signal?.throwIfAborted();
-      const bytesRead = await source.read(buffer);
+      let bytesRead: number | null;
+      if (source) bytesRead = await source.read(buffer);
+      else {
+        const encoded = await invoke<string>("profile_transfer_file", {
+          relativePath: fromPath,
+          operation: "read",
+          offset: copied,
+        });
+        const chunk = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+        bytesRead = chunk.length;
+        buffer.set(chunk);
+      }
       if (bytesRead === null || bytesRead === 0) {
         break;
       }
@@ -129,7 +141,14 @@ const copyFileByHandle = async (
       if (options.maxBytes !== undefined && copied > options.maxBytes) {
         throw new Error("Backup exceeds the supported 2 GiB limit");
       }
-      await writeAll(destination, buffer.subarray(0, bytesRead));
+      if (destination) await writeAll(destination, buffer.subarray(0, bytesRead));
+      else
+        await invoke("profile_transfer_file", {
+          relativePath: toPath,
+          operation: "write",
+          offset: copied - bytesRead,
+          content: toBase64(buffer.subarray(0, bytesRead)),
+        });
     }
   } finally {
     await destination?.close().catch(() => undefined);
@@ -248,8 +267,7 @@ export const saveAppDataFileViaPicker = async (
     }
     return true;
   } finally {
-    await remove(relativePath, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
-    await remove(pendingDir, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
+    await removeAppDataPath(pendingDir);
   }
 };
 
@@ -261,7 +279,6 @@ export const stagePickedDatabaseFileForRestore = async (
   const relativePath = `${pendingDir}/restore.db`;
 
   try {
-    await mkdir(pendingDir, { baseDir: BaseDirectory.AppData, recursive: true, mode: 0o700 });
     await copyFileByHandle(pickedFilePath, relativePath, {
       toPathBaseDir: BaseDirectory.AppData,
       maxBytes: 2 * 1024 * 1024 * 1024,
@@ -269,15 +286,13 @@ export const stagePickedDatabaseFileForRestore = async (
     });
     return { relativePath, pendingDir };
   } catch (error) {
-    await remove(pendingDir, { baseDir: BaseDirectory.AppData, recursive: true }).catch(
-      () => undefined,
-    );
+    await removeAppDataPath(pendingDir);
     throw error;
   }
 };
 
 export const removeAppDataPath = async (relativePath: string): Promise<void> => {
-  await remove(relativePath, { baseDir: BaseDirectory.AppData, recursive: true }).catch(
+  await invoke("profile_transfer_file", { relativePath, operation: "remove" }).catch(
     () => undefined,
   );
 };

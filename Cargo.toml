@@ -7,15 +7,33 @@ members = [
 ]
 
 [workspace.package]
-version = "3.9.0"
+version = "3.9.2"
 edition = "2021"
 license = "AGPL-3.0"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# deny, not forbid: the FFI calls that need unsafe allow it locally, with a reason.
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = "warn"
+# Production code returns errors instead of panicking. Where a value provably
+# cannot be missing, `expect("why it cannot fail")` states the invariant.
+# Tests are exempt (clippy.toml).
+unwrap_used = "warn"
+panic = "warn"
+
+[profile.dev]
+# Keep file/line backtraces without full type and variable debug information.
+debug = "line-tables-only"
+
+# portfolio-engine's property tests take minutes unoptimized. opt-level leaves
+# the test profile's overflow checks and debug assertions on.
+[profile.test.package.wealthfolio-portfolio-engine]
+opt-level = 3
+
+[profile.test.package.rust_decimal]
+opt-level = 3
 
 [workspace.dependencies]
 # Async runtime
@@ -50,7 +68,7 @@ anyhow = "1"
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
 
 # Numbers
-rust_decimal = { version = "1.39", features = ["maths", "serde-float"] }
+rust_decimal = { version = "1.39", features = ["maths", "serde-float", "serde-with-str"] }
 rust_decimal_macros = "1.39"
 num-traits = "0.2"
 
@@ -59,7 +77,7 @@ async-trait = "0.1"
 futures = "0.3"
 
 # MCP (Model Context Protocol)
-rmcp = { version = "1.7", default-features = false, features = ["server", "transport-streamable-http-server"] }
+rmcp = { version = "2.1", default-features = false, features = ["server", "transport-streamable-http-server"] }
 
 # Logging
 log = "0.4"
@@ -84,3 +102,4 @@ wealthfolio-ai = { path = "crates/ai" }
 wealthfolio-spending = { path = "crates/spending" }
 wealthfolio-agent-tools = { path = "crates/agent-tools" }
 wealthfolio-mcp = { path = "crates/wealthfolio-mcp" }
+wealthfolio-portfolio-engine = { path = "crates/portfolio-engine" }

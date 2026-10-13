@@ -100,7 +100,7 @@ async function ensureE2ELanguage(page: Page, settings?: E2ESettings | null) {
 }
 
 function appReadyLocator(page: Page) {
-  return page.locator("main").first();
+  return page.locator(".app-shell").first();
 }
 
 function isOnboardingUrl(page: Page) {

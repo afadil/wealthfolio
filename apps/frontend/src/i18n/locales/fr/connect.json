@@ -24,16 +24,16 @@
     "learnMore": "En savoir plus sur Connect",
     "features": {
       "brokerageSync": {
-        "title": "Synchronisation des courtiers",
-        "description": "Synchronisez automatiquement vos comptes et transactions chaque jour."
+        "title": "Comptes connectés",
+        "description": "Synchronisez automatiquement les transactions de vos courtiers."
       },
       "deviceSync": {
-        "title": "Synchronisation des appareils",
-        "description": "Synchronisez entre appareils avec un chiffrement de bout en bout."
+        "title": "Synchronisation et sauvegarde",
+        "description": "Synchronisation chiffrée de bout en bout et sauvegardes cloud automatiques."
       },
       "householdView": {
-        "title": "Vue foyer",
-        "description": "Partagez des comptes avec les membres de votre famille."
+        "title": "Portefeuilles familiaux",
+        "description": "Une vue partagée des investissements de votre famille."
       }
     }
   },
@@ -305,5 +305,16 @@
   },
   "errors": {
     "unknown": "Erreur inconnue"
+  },
+  "session": {
+    "restoring": "Restauration de Connect…",
+    "unavailable": "Connect est temporairement indisponible",
+    "localAvailable": "Votre portefeuille local reste accessible. Réessayez pour vous reconnecter."
+  },
+  "rebind": {
+    "title": "Changer la connexion Connect de ce profil ?",
+    "description": "Vous allez connecter un autre compte ou foyer. Les données locales de votre portefeuille seront conservées, mais les liens existants avec les courtiers et la configuration de synchronisation des appareils seront supprimés. Le nouveau compte pourra ajouter des données de courtage à ce profil. Configurez à nouveau la synchronisation des appareils lorsque vous le souhaitez. Utilisez un nouveau profil si vous préférez garder les données séparées.",
+    "cancel": "Annuler",
+    "confirm": "Changer de connexion"
   }
 }

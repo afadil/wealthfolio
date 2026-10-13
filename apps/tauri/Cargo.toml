@@ -23,7 +23,7 @@ wealthfolio-spending = { workspace = true }
 wealthfolio-agent-tools = { workspace = true }
 
 # Tauri
-tauri = { version = "2.11.5", features = [] }
+tauri = { version = "2.12.0", features = [] }
 tauri-plugin-fs = "2.5"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
@@ -65,6 +65,7 @@ rand = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
+tauri = { version = "2.12.0", features = ["test"] }
 
 [features]
 default = ["connect-sync", "device-sync"]
@@ -99,6 +100,9 @@ tauri-plugin-web-auth = "1"
 tauri-plugin-mobile-share = "0.1.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSObject", "NSNotification", "NSDistributedNotificationCenter", "NSOperation", "NSString", "block2"] }
+block2 = "0.6"
+
 apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
 
 [target.'cfg(target_os = "ios")'.dependencies.apple-native-keyring-store]
@@ -106,16 +110,35 @@ version = "1.0.2"
 features = ["protected"]
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-native-keyring-store = { version = "1.1.0", default-features = false }
+windows-native-keyring-store = { version = "1.1.0", default-features = false, features = ["search"] }
 
 [target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
 zbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rust"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android-native-keyring-store = "1.0.0"
-# The Android store's initialization API uses jni 0.21 types.
-jni = "0.21"
 
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
 # Compatibility fixture only: verify credentials written by our previous backend.
 legacy-keyring = { package = "keyring", version = "=2.3.3" }
+
+
+[target.'cfg(target_os = "macos")'.dependencies.objc2-app-kit]
+version = "0.3"
+default-features = false
+features = ["std", "NSWorkspace"]
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+version = "0.61"
+features = ["Win32_System_RemoteDesktop", "Win32_System_Power", "Win32_UI_WindowsAndMessaging"]
+
+[target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies.zbus]
+version = "5"
+default-features = false
+# Shared with the synchronous Secret Service store. Enabling `tokio` makes its
+# blocking calls nest Tokio runtimes and panic during async desktop startup.
+# The async logind API also works with this runtime-independent backend.
+features = ["async-io"]
+
+[lints]
+workspace = true

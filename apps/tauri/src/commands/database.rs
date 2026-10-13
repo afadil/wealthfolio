@@ -5,11 +5,11 @@
 //! a candidate, install it atomically, then continue (desktop restarts; mobile
 //! carries on over the rebuilt runtime).
 
+use crate::profiles::ProfileAccess;
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 
 use crate::commands::utilities::finish_database_maintenance;
-use crate::database::DatabaseRuntime;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,7 @@ pub struct DatabaseEncryptionStatus {
 
 #[tauri::command]
 pub async fn get_database_encryption_status(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
 ) -> Result<DatabaseEncryptionStatus, String> {
     Ok(DatabaseEncryptionStatus {
         enabled: runtime.is_encrypted()?,
@@ -40,7 +40,7 @@ pub async fn get_database_encryption_status(
 #[tauri::command]
 pub async fn set_database_encryption_enabled(
     app_handle: AppHandle,
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     enabled: bool,
 ) -> Result<(), String> {
     if enabled {

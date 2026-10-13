@@ -72,6 +72,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             crate::events::PortfolioRequestPayload::builder()
                                 .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
                                 .build(),
+                            context,
                         );
                     }
                 }
@@ -87,6 +88,7 @@ pub async fn run_startup_sync(handle: &AppHandle, context: &Arc<ServiceContext>)
                             crate::events::PortfolioRequestPayload::builder()
                                 .market_sync_mode(MarketSyncMode::Incremental { asset_ids: None })
                                 .build(),
+                            context,
                         );
                     }
                 }

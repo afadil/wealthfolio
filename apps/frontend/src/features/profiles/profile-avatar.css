@@ -1,0 +1,256 @@
+/* Shared motion, eye artwork, and style-specific overrides. Layout uses Tailwind. */
+.profile-line-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: profile-avatar-blink 6s var(--blink-delay, 0s) infinite;
+}
+
+@keyframes profile-avatar-blink {
+  0%,
+  16%,
+  20%,
+  100% {
+    transform: scaleY(1);
+  }
+  18% {
+    transform: scaleY(0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-line-eyes {
+    animation: none;
+  }
+}
+
+.profile-abstract-sculpture {
+  transform: translate(var(--sculpture-x, 0%), var(--sculpture-y, 0%));
+  transform-origin: center;
+  animation: profile-sculpture-sway 7s ease-in-out infinite;
+}
+
+@keyframes profile-sculpture-sway {
+  0%,
+  100% {
+    transform: translate(var(--sculpture-x, 0%), calc(var(--sculpture-y, 0%) + 1%)) rotate(-1.5deg);
+  }
+  50% {
+    transform: translate(var(--sculpture-x, 0%), calc(var(--sculpture-y, 0%) - 1%)) rotate(1.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-abstract-sculpture {
+    animation: none;
+  }
+}
+
+.profile-sculpture-eye-position {
+  transform: translate(-50%, -50%) rotate(-20deg);
+}
+.profile-sculpture-eye {
+  background: radial-gradient(at 35% 25%, #fff3dc, #e0c9a6);
+  box-shadow:
+    inset -1px -1px 2px #79695630,
+    0 1px 1px #00000020;
+  animation: profile-sculpture-blink 6.7s var(--sculpture-eye-delay, 0s) infinite;
+}
+.profile-sculpture-pupil {
+  background: radial-gradient(at 35% 20%, #41434a, #171a24);
+  animation: profile-sculpture-gaze 8s var(--sculpture-eye-delay, 0s) ease-in-out infinite;
+}
+@keyframes profile-sculpture-gaze {
+  0%,
+  4%,
+  100% {
+    transform: translate(0, 0);
+  }
+  10%,
+  30% {
+    transform: translate(-32%, 4%);
+  }
+  58%,
+  76% {
+    transform: translate(34%, -8%);
+  }
+}
+@keyframes profile-sculpture-blink {
+  0%,
+  16%,
+  20%,
+  100% {
+    transform: scaleY(1);
+  }
+  18% {
+    transform: scaleY(0.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-sculpture-eye,
+  .profile-sculpture-pupil {
+    animation: none;
+  }
+}
+
+.profile-clay-1 .profile-sculpture-eye {
+  background: radial-gradient(at 35% 25%, #fffafd, #d4c9e0);
+}
+.profile-clay-1 .profile-sculpture-pupil::after {
+  content: "";
+  position: absolute;
+  width: 25%;
+  height: 22%;
+  left: 25%;
+  top: 15%;
+  border-radius: 50%;
+  background: #ffffffdd;
+}
+.profile-clay-2 .profile-sculpture-eye {
+  background: #ffe6a2;
+  box-shadow:
+    0 0 3px #ffd078,
+    0 0 6px #f3ad3b90;
+}
+.profile-clay-2 .profile-sculpture-pupil {
+  background: #574325;
+}
+.profile-clay-3 .profile-sculpture-eye {
+  background: radial-gradient(at 35% 25%, #fff2d1, #edca75);
+}
+
+.profile-pixel-eye-position {
+  transform: translate(-50%, -50%);
+}
+.profile-pixel-gaze {
+  animation: profile-pixel-look 8s var(--pixel-eye-delay, 0s) steps(1, end) infinite;
+}
+.profile-pixel-blink {
+  animation: profile-pixel-blink 6.5s var(--pixel-eye-delay, 0s) steps(1, end) infinite;
+}
+.profile-pixel-eye {
+  background: var(--pixel-eye-color);
+  clip-path: polygon(
+    25% 0,
+    75% 0,
+    75% 20%,
+    100% 20%,
+    100% 80%,
+    75% 80%,
+    75% 100%,
+    25% 100%,
+    25% 80%,
+    0 80%,
+    0 20%,
+    25% 20%
+  );
+}
+.profile-pixel-eye::after {
+  content: "";
+  display: block;
+  position: relative;
+  left: 25%;
+  top: 20%;
+  width: 25%;
+  height: 20%;
+  background: #ffffffb0;
+}
+@keyframes profile-pixel-look {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  5%,
+  30% {
+    transform: translateX(-33.333%);
+  }
+  65%,
+  80% {
+    transform: translateX(33.333%);
+  }
+}
+@keyframes profile-pixel-blink {
+  0%,
+  16%,
+  20%,
+  100% {
+    clip-path: inset(0);
+  }
+  18% {
+    clip-path: inset(40% 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-pixel-gaze,
+  .profile-pixel-blink {
+    animation: none;
+  }
+}
+
+.profile-sketch-avatar .profile-sculpture-eye {
+  box-sizing: border-box;
+  border-radius: 60% 40% 55% 45% / 70% 65% 35% 30%;
+  background: #f9ecd3;
+  border-top: 1px solid #49382c;
+  border-bottom: 0.5px solid #75604b;
+  box-shadow: none;
+}
+.profile-sketch-avatar .profile-sculpture-pupil {
+  top: 3%;
+  height: 90%;
+  width: 43%;
+  border-radius: 45% 55% 48% 52%;
+  background: #493a2e;
+}
+
+.profile-portrait-gaze {
+  animation: profile-portrait-look 9s var(--blink-delay, 0s) ease-in-out infinite;
+}
+
+@keyframes profile-portrait-look {
+  0%,
+  4%,
+  48%,
+  100% {
+    transform: translate(0, 0);
+  }
+  10%,
+  30% {
+    transform: translate(3px, -1px);
+  }
+  65%,
+  78% {
+    transform: translate(-3px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-portrait-gaze {
+    animation: none;
+  }
+}
+
+.profile-portrait-pointer {
+  transform: translate(var(--pointer-x, 0px), var(--pointer-y, 0px));
+  transition: transform 150ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-portrait:hover .profile-portrait-gaze {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-portrait-pointer {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* The loading screen uses the same artwork without movement. */
+.profile-avatar-static,
+.profile-avatar-static * {
+  animation: none !important;
+  transition: none !important;
+  pointer-events: none;
+}

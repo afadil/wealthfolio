@@ -1,11 +1,7 @@
 use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
-use axum::{
-    extract::{Query, State},
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::Query, routing::get, Json, Router};
 use wealthfolio_core::portfolio::net_worth::{NetWorthHistoryPoint, NetWorthResponse};
 use wealthfolio_core::utils::time_utils::{parse_user_timezone_or_default, user_today};
 
@@ -18,12 +14,15 @@ struct NetWorthQuery {
 }
 
 async fn get_net_worth(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<NetWorthQuery>,
 ) -> ApiResult<Json<NetWorthResponse>> {
     let as_of_date = parse_date_optional(q.date, "date")?.unwrap_or_else(|| {
         user_today(parse_user_timezone_or_default(
-            &state.timezone.read().unwrap(),
+            &state
+                .timezone
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
         ))
     });
     let response = state.net_worth_service.get_net_worth(as_of_date).await?;
@@ -41,7 +40,7 @@ struct NetWorthHistoryQuery {
 }
 
 async fn get_net_worth_history(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<NetWorthHistoryQuery>,
 ) -> ApiResult<Json<Vec<NetWorthHistoryPoint>>> {
     let start = parse_date(&q.start_date, "startDate")?;
@@ -51,7 +50,7 @@ async fn get_net_worth_history(
     Ok(Json(history))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/net-worth", get(get_net_worth))
         .route("/net-worth/history", get(get_net_worth_history))

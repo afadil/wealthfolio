@@ -1,8 +1,10 @@
+#![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 use wealthfolio_server::{build_state, config::Config};
 use wealthfolio_storage_sqlite::db;
 
 #[tokio::test]
 async fn late_startup_failure_releases_database_users() {
+    std::env::set_var("WF_DATA_DIR", "");
     std::env::set_var("WF_AUTH_REQUIRED", "false");
     std::env::set_var(
         "WF_SECRET_KEY",

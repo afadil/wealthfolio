@@ -73,6 +73,14 @@
     }
   },
   "networth": {
+    "attention": {
+      "title": "Requiere atención",
+      "update_value": "Actualizar valor",
+      "update_balance": "Actualizar saldo",
+      "link_property": "Vincular una propiedad a {{name}}",
+      "add_property": "Añadir una propiedad para {{name}}",
+      "link_explanation": "Vincular una propiedad existente no cambia tu patrimonio neto."
+    },
     "failed_to_load": "No se pudo cargar el patrimonio neto",
     "stale_valuations_tooltip": "Valoraciones desactualizadas (más de 90 días):",
     "days_ago": "hace {{count}} d",
@@ -80,10 +88,6 @@
     "breakdown": "Desglose",
     "no_assets_found": "No se encontraron activos.",
     "add_first_asset": "Añade tu primer activo",
-    "update_valuations": "Actualiza tus valoraciones",
-    "assets_count_one": "{{count}} activo",
-    "assets_count_other": "{{count}} activos",
-    "assets_count_many": "{{count}} activos",
     "not_updated_over_90_days": "No se ha actualizado en más de 90 días.",
     "chart": {
       "net_worth": "Patrimonio neto",
@@ -119,14 +123,16 @@
     },
     "velocity": {
       "monthly_pace": "Ritmo mensual",
-      "over_months_one": "en {{count}} mes",
-      "over_months_other": "en {{count}} meses",
-      "over_months_many": "en {{count}} meses",
-      "trailing_pace": " · {{multiple}}× del ritmo de los últimos 12 meses",
+      "since": "desde el {{date}}",
+      "trailing_pace": " · {{multiple}}× el promedio de 12 meses",
       "drivers_of_change": "Factores del cambio",
-      "market_returns": "Rentabilidades del mercado",
+      "investment_gains": "Ganancias de inversión",
+      "investment_losses": "Pérdidas de inversión",
+      "other_assets": "Otros activos",
       "contributions": "Aportaciones",
-      "equity_built": "Capital acumulado",
+      "withdrawals": "Retiros",
+      "debt_paid_down": "Deuda amortizada",
+      "debt_added": "Nueva deuda",
       "per_month": "/mes"
     },
     "days_ago_one": "hace {{count}} d",

@@ -1,4 +1,4 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use std::collections::HashMap;
 use wealthfolio_core::events::DomainEvent;
 
@@ -7,7 +7,7 @@ use crate::events::{
 };
 
 use log::{debug, error, warn};
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 use wealthfolio_core::quotes::{
     service::ProviderInfo, FetchDividendsParams, LatestQuoteSnapshot, MarketSyncMode, Quote,
     QuoteImport, SymbolSearchResult,
@@ -41,7 +41,7 @@ impl ResetProviderHistoryError {
 #[tauri::command]
 pub async fn reset_provider_history(
     asset_id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<wealthfolio_core::quotes::ResetProviderHistoryResult, ResetProviderHistoryError> {
     let context = state
         .context()
@@ -65,7 +65,7 @@ pub async fn reset_provider_history(
 
 #[tauri::command]
 pub async fn reset_all_provider_history(
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<wealthfolio_core::quotes::ResetAllProviderHistoryResult, ResetProviderHistoryError> {
     let context = state
         .context()
@@ -89,7 +89,7 @@ pub async fn reset_all_provider_history(
 #[tauri::command]
 pub async fn search_symbol(
     query: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<SymbolSearchResult>, String> {
     let context = state.context()?;
     context
@@ -105,7 +105,9 @@ pub async fn sync_market_data(
     refetch_all: bool,
     refetch_recent_days: Option<i64>,
     handle: AppHandle,
+    state: ProfileAccess,
 ) -> Result<(), String> {
+    let context = state.context()?;
     // Determine the appropriate market sync mode based on refetch_all flag
     let market_sync_mode = if let Some(days) = refetch_recent_days {
         MarketSyncMode::RefetchRecent { asset_ids, days }
@@ -122,12 +124,12 @@ pub async fn sync_market_data(
         .account_ids(None)
         .market_sync_mode(market_sync_mode)
         .build();
-    emit_portfolio_trigger_update(&handle, payload);
+    emit_portfolio_trigger_update(&handle, payload, &context);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn synch_quotes(state: State<'_, DatabaseRuntime>) -> Result<(), String> {
+pub async fn synch_quotes(state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     let result = tauri::async_runtime::spawn(async move {
         let result = context.quote_service().resync(None).await;
@@ -149,7 +151,7 @@ pub async fn synch_quotes(state: State<'_, DatabaseRuntime>) -> Result<(), Strin
 #[tauri::command]
 pub async fn update_quote(
     quote: Quote,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<(), String> {
     let context = state.context()?;
@@ -169,7 +171,7 @@ pub async fn update_quote(
             .account_ids(None)
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     });
     Ok(())
 }
@@ -177,7 +179,7 @@ pub async fn update_quote(
 #[tauri::command]
 pub async fn delete_quote(
     id: String,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
     handle: AppHandle,
 ) -> Result<(), String> {
     let context = state.context()?;
@@ -196,16 +198,13 @@ pub async fn delete_quote(
             .account_ids(None)
             .market_sync_mode(MarketSyncMode::None)
             .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
+        emit_portfolio_trigger_recalculate(&handle, payload, &context);
     });
     Ok(())
 }
 
 #[tauri::command]
-pub async fn get_quote_history(
-    symbol: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<Quote>, String> {
+pub async fn get_quote_history(symbol: String, state: ProfileAccess) -> Result<Vec<Quote>, String> {
     let context = state.context()?;
     debug!("Fetching quote history for symbol: {}", symbol);
     context
@@ -217,7 +216,7 @@ pub async fn get_quote_history(
 #[tauri::command]
 pub async fn get_latest_quotes(
     asset_ids: Vec<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<HashMap<String, LatestQuoteSnapshot>, String> {
     let context = state.context()?;
     context
@@ -227,9 +226,7 @@ pub async fn get_latest_quotes(
 }
 
 #[tauri::command]
-pub async fn get_market_data_providers(
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Vec<ProviderInfo>, String> {
+pub async fn get_market_data_providers(state: ProfileAccess) -> Result<Vec<ProviderInfo>, String> {
     let context = state.context()?;
     debug!("Received request to get market data providers");
     context
@@ -246,7 +243,7 @@ pub async fn get_market_data_providers(
 pub async fn check_quotes_import(
     content: Vec<u8>,
     has_header_row: bool,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<QuoteImport>, String> {
     let context = state.context()?;
     debug!(
@@ -268,8 +265,7 @@ pub async fn check_quotes_import(
 pub async fn import_quotes_csv(
     quotes: Vec<QuoteImport>,
     overwrite_existing: bool,
-    state: State<'_, DatabaseRuntime>,
-    handle: AppHandle,
+    state: ProfileAccess,
 ) -> Result<Vec<QuoteImport>, String> {
     let context = state.context()?;
     debug!(
@@ -277,27 +273,15 @@ pub async fn import_quotes_csv(
         quotes.len(),
         overwrite_existing
     );
-    let result = context
+    // The quote service emits PriceHistoryChanged when the batch saves quotes.
+    context
         .quote_service()
         .import_quotes(quotes, overwrite_existing)
         .await
         .map_err(|e| {
             error!("TAURI COMMAND: import_quotes_csv failed: {}", e);
             format!("Failed to import CSV quotes: {}", e)
-        })?;
-
-    // Quote import - no market sync needed, just recalculate
-    let handle = handle.clone();
-    tauri::async_runtime::spawn(async move {
-        debug!("Triggering portfolio recalculation after quote import");
-        let payload = PortfolioRequestPayload::builder()
-            .account_ids(None)
-            .market_sync_mode(MarketSyncMode::None)
-            .build();
-        emit_portfolio_trigger_recalculate(&handle, payload);
-    });
-
-    Ok(result)
+        })
 }
 
 #[tauri::command]
@@ -307,7 +291,8 @@ pub async fn resolve_symbol_quote(
     instrument_type: Option<String>,
     quote_ccy: Option<String>,
     provider_id: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    provider_symbol: Option<String>,
+    state: ProfileAccess,
 ) -> Result<wealthfolio_core::quotes::ResolvedQuote, String> {
     let context = state.context()?;
     let inst_type = instrument_type
@@ -321,6 +306,7 @@ pub async fn resolve_symbol_quote(
             inst_type.as_ref(),
             quote_ccy.as_deref(),
             provider_id.as_deref(),
+            provider_symbol.as_deref(),
         )
         .await
         .map_err(|e| format!("Failed to resolve symbol quote: {}", e))
@@ -342,7 +328,7 @@ pub async fn fetch_dividends(
     provider_id: Option<String>,
     start_date: Option<String>,
     end_date: Option<String>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<DividendEvent>, String> {
     let context = state.context()?;
     let inst_type = instrument_type

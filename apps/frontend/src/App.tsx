@@ -1,5 +1,5 @@
+import { ProfileShell } from "@/features/profiles/profile-shell";
 import { NativeDatabaseGate } from "@/features/database-recovery/native-database-gate";
-import { RestoredPortfolioNotice } from "@/features/database-recovery/restored-portfolio-notice";
 import { isWeb } from "@/adapters";
 import { AddonRuntimeLoader } from "@/addons/addon-runtime-loader";
 import { setAddonQueryClient } from "@/addons/addons-runtime-context";
@@ -35,30 +35,37 @@ function App() {
   setAddonQueryClient(queryClient as unknown as Parameters<typeof setAddonQueryClient>[0]);
 
   const content = (
-    <WealthfolioConnectProvider>
-      <PrivacyProvider>
-        <SettingsProvider>
+    <SettingsProvider>
+      <WealthfolioConnectProvider>
+        <PrivacyProvider>
           <TooltipProvider>
             <Toaster mobileOffset={{ top: "68px" }} closeButton expand={false} />
-            <RestoredPortfolioNotice />
             <AddonRuntimeLoader />
             <EventDialogProvider>
               <AssetLogoRegistrySync />
               <AppRoutes />
             </EventDialogProvider>
           </TooltipProvider>
-        </SettingsProvider>
-      </PrivacyProvider>
-    </WealthfolioConnectProvider>
+        </PrivacyProvider>
+      </WealthfolioConnectProvider>
+    </SettingsProvider>
   );
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NativeDatabaseGate>
-        <AuthProvider>
-          {isWebEnv ? <AuthGate fallback={<LoginPage />}>{content}</AuthGate> : content}
-        </AuthProvider>
-      </NativeDatabaseGate>
+      <AuthProvider>
+        {isWebEnv ? (
+          <AuthGate fallback={<LoginPage />}>
+            <ProfileShell>
+              <NativeDatabaseGate>{content}</NativeDatabaseGate>
+            </ProfileShell>
+          </AuthGate>
+        ) : (
+          <ProfileShell>
+            <NativeDatabaseGate>{content}</NativeDatabaseGate>
+          </ProfileShell>
+        )}
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

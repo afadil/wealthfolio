@@ -111,11 +111,53 @@ mod tests {
         assert_eq!(activity.effective_type(), "DIVIDEND");
     }
 
+    /// Engine rules §5: core reads every override in the shared cases as the
+    /// engine does (the same file checks SQL and the frontend).
     #[test]
-    fn test_effective_date() {
-        let activity = create_test_activity();
-        let date = activity.effective_date();
-        assert_eq!(date.to_string(), "2024-01-15");
+    fn type_overrides_read_as_the_engine_reads_them() {
+        use wealthfolio_portfolio_engine::SplitRow;
+        let cases: Vec<(String, String)> =
+            serde_json::from_str(include_str!("type_override_cases.json")).unwrap();
+        for (override_, expected) in cases {
+            assert_eq!(
+                effective_activity_type("DIVIDEND", Some(&override_)),
+                expected,
+                "{override_:?}"
+            );
+            let mut split = create_test_activity();
+            split.activity_type = "SPLIT".to_string();
+            split.activity_type_override = Some(override_.clone());
+            split.amount = Some(dec!(2));
+            let raw = crate::portfolio::coordinator::raw_activity(&split);
+            assert_eq!(
+                SplitRow::from_raw(&raw, &chrono_tz::UTC).is_some(),
+                effective_activity_type("SPLIT", Some(&override_)) == "SPLIT",
+                "{override_:?}"
+            );
+        }
+    }
+
+    /// Every override in the shared cases is stored as it reads: none when
+    /// it reads as none (the stored DIVIDEND), else the type it reads as.
+    #[test]
+    fn type_overrides_are_stored_as_they_read() {
+        let cases: Vec<(String, String)> =
+            serde_json::from_str(include_str!("type_override_cases.json")).unwrap();
+        for (override_, expected) in cases {
+            assert_eq!(
+                stored_type_override(Some(&override_)),
+                (expected != "DIVIDEND").then_some(expected),
+                "{override_:?}"
+            );
+        }
+        assert_eq!(stored_type_override(None), None);
+    }
+
+    #[test]
+    fn test_effective_type_with_blank_override() {
+        let mut activity = create_test_activity();
+        activity.activity_type_override = Some(" ".to_string());
+        assert_eq!(activity.effective_type(), "BUY");
     }
 
     #[test]
@@ -297,6 +339,28 @@ mod tests {
         let activity = create_test_new_activity();
         let result = activity.validate();
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cost_adjustment_validation_requires_asset_identity() {
+        for subtype in [
+            "RETURN_OF_CAPITAL",
+            "Return of Capital",
+            "notional-distribution",
+        ] {
+            let mut activity = create_test_new_activity();
+            activity.activity_type = "ADJUSTMENT".to_string();
+            activity.subtype = Some(subtype.to_string());
+            activity.asset = None;
+            assert!(activity.validate().is_err(), "{subtype}");
+            activity.asset = Some(AssetResolutionInput {
+                symbol: Some(" ".to_string()),
+                ..Default::default()
+            });
+            assert!(activity.validate().is_err(), "{subtype}");
+            activity.asset.as_mut().unwrap().symbol = Some("ETF".to_string());
+            assert!(activity.validate().is_ok(), "{subtype}");
+        }
     }
 
     #[test]
@@ -482,6 +546,56 @@ mod tests {
         assert_eq!(
             NewActivity::canonicalize_subtype_for_activity("BUY", Some("BUY_TO_COVER")).as_deref(),
             Some("POSITION_CLOSE")
+        );
+    }
+
+    #[test]
+    fn test_cost_basis_subtypes_are_canonicalized() {
+        assert_eq!(
+            NewActivity::canonicalize_subtype_for_activity("ADJUSTMENT", Some("return_of_capital"))
+                .as_deref(),
+            Some("RETURN_OF_CAPITAL")
+        );
+        assert_eq!(
+            NewActivity::canonicalize_subtype_for_activity("DIVIDEND", Some(" Return_Of_Capital "))
+                .as_deref(),
+            Some("RETURN_OF_CAPITAL")
+        );
+        assert_eq!(
+            NewActivity::canonicalize_subtype_for_activity(
+                "ADJUSTMENT",
+                Some("notional_distribution")
+            )
+            .as_deref(),
+            Some("NOTIONAL_DISTRIBUTION")
+        );
+    }
+
+    #[test]
+    fn test_cost_basis_labels_normalize_separators_but_unknown_labels_stay_original() {
+        for label in [
+            "Return of Capital",
+            "return-of-capital",
+            " RETURN_OF_CAPITAL ",
+        ] {
+            assert_eq!(
+                NewActivity::canonicalize_subtype(Some(label)).as_deref(),
+                Some("RETURN_OF_CAPITAL")
+            );
+        }
+        for label in [
+            "Notional Distribution",
+            "notional-distribution",
+            "notional_distribution",
+        ] {
+            assert_eq!(
+                NewActivity::canonicalize_subtype(Some(label)).as_deref(),
+                Some("NOTIONAL_DISTRIBUTION")
+            );
+        }
+        assert_eq!(
+            NewActivity::canonicalize_subtype(Some("Provider Custom-Label")).as_deref(),
+            Some("Provider Custom-Label")
         );
     }
 

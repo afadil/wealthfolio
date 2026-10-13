@@ -1,3 +1,5 @@
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useHoldingsWithClosedProbe } from "@/hooks/use-holdings";
 import { useIsMobileViewport } from "@/hooks/use-platform";
@@ -16,7 +18,7 @@ import {
 } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import {
   DEFAULT_HOLDINGS_VISIBILITY,
@@ -52,7 +54,7 @@ const AccountHoldings = ({
     [...DEFAULT_HOLDINGS_VISIBILITY],
   );
 
-  const { accounts } = useAccounts();
+  const { accounts } = useAccounts({ filterActive: false });
 
   const selectedAccount = useMemo(() => {
     return accounts?.find((acc) => acc.id === accountId) ?? null;
@@ -98,6 +100,15 @@ const AccountHoldings = ({
     const accountType = selectedAccount?.accountType;
     return accountType === AccountType.CASH || isLiabilityAccountType(accountType);
   }, [selectedAccount]);
+
+  // Broker sync creates its own accounts, so an already-synced account gets no link.
+  const canShowConnectAccountLink = useShowConnectAccountLink();
+  const connectAccountLink =
+    canShowConnectAccountLink && !!selectedAccount && !selectedAccount.providerAccountId ? (
+      <Button variant="link" asChild>
+        <Link to={connectPagePath("account_empty")}>{t("settings:accounts_connect_account")}</Link>
+      </Button>
+    ) : null;
 
   const filteredHoldings = filterHoldingsByVisibility(holdings ?? [], effectiveVisibilityFilters);
   const hasHiddenPositions =
@@ -197,6 +208,7 @@ const AccountHoldings = ({
                 </Button>
               </div>
             )}
+            {canEditHoldingsDirectly && connectAccountLink}
           </EmptyPlaceholder>
         </div>
       );
@@ -231,6 +243,7 @@ const AccountHoldings = ({
               {t("account:actions_import_csv")}
             </Button>
           </div>
+          {connectAccountLink}
         </EmptyPlaceholder>
       </div>
     );

@@ -24,17 +24,10 @@
     "fs:allow-remove",
     "fs:allow-rename",
     "fs:allow-exists",
-    {
-      "identifier": "fs:scope",
-      "allow": [
-        "$APPDATA/**"
-      ]
-    },
     "core:window:allow-start-dragging",
     "shell:allow-open",
     "dialog:allow-open",
     "dialog:allow-save",
-    "fs:default",
     "dialog:default",
     "shell:default",
     "deep-link:default",
@@ -51,6 +44,17 @@
     "barcode-scanner:allow-scan",
     "barcode-scanner:allow-cancel",
     "barcode-scanner:allow-check-permissions",
-    "barcode-scanner:allow-request-permissions"
+    "barcode-scanner:allow-request-permissions",
+    "fs:deny-default",
+    "fs:allow-fstat",
+    {
+      "identifier": "fs:scope",
+      "deny": [
+        "$APPDATA",
+        "$APPDATA/**",
+        "$APPLOCALDATA",
+        "$APPLOCALDATA/**"
+      ]
+    }
   ]
 }

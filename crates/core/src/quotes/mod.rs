@@ -43,7 +43,6 @@ pub mod errors;
 pub mod import;
 pub mod model;
 pub mod provider_settings;
-pub mod scheduler;
 pub mod service;
 pub mod store;
 pub mod sync;
@@ -85,7 +84,8 @@ pub use service::{
 // Re-export import types
 pub use import::{
     ImportResult, ImportValidation, ImportValidationStatus, QuoteConverter, QuoteExport,
-    QuoteImport, QuoteImportService, QuoteValidator, ValidationStatus,
+    QuoteImport, QuoteImportOutcome, QuoteImportPreview, QuoteImportRow, QuoteImportService,
+    QuoteValidator, ValidationStatus,
 };
 
 // Re-export constants

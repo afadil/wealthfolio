@@ -106,9 +106,17 @@
     "values_without_returns": "Os valores das contas são exibidos sem a rentabilidade do período.",
     "failed_to_load": "Erro ao carregar as contas",
     "failed_to_load_performance": "Erro ao carregar as métricas de desempenho",
-    "try_restarting": "Tente reiniciar o aplicativo. Se o problema persistir, pode ser necessário redefinir seu banco de dados."
+    "try_restarting": "Tente novamente. Se o problema persistir, reinicie o Wealthfolio ou entre em contato com o suporte."
   },
   "accounts_count_one": "{{count}} conta",
   "accounts_count_other": "{{count}} contas",
-  "accounts_count_many": "{{count}} contas"
+  "accounts_count_many": "{{count}} contas",
+  "portfolio_filter": {
+    "choose": "Escolher carteira",
+    "search": "Pesquisar carteiras…",
+    "manage": "Gerir carteiras",
+    "unavailable": "A carteira selecionada já não está disponível. São apresentadas todas as contas.",
+    "load_error": "Não foi possível carregar a carteira selecionada.",
+    "empty": "Não há contas para exibir nesta carteira."
+  }
 }

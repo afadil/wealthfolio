@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Path, State},
+    extract::Path,
     routing::{get, post, put},
     Json, Router,
 };
@@ -12,14 +12,14 @@ use wealthfolio_ai::{
 };
 
 async fn get_ai_providers(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<AiProvidersResponse>> {
     let response = state.ai_provider_service.get_ai_providers()?;
     Ok(Json(response))
 }
 
 async fn update_provider_settings(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<UpdateProviderSettingsRequest>,
 ) -> ApiResult<Json<()>> {
     state
@@ -30,7 +30,7 @@ async fn update_provider_settings(
 }
 
 async fn set_default_provider(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<SetDefaultProviderRequest>,
 ) -> ApiResult<Json<()>> {
     state
@@ -44,14 +44,14 @@ async fn set_default_provider(
 /// Fetches models from the provider's API using backend-stored secrets.
 /// Frontend never needs to send API keys - they are retrieved internally.
 async fn list_models(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(provider_id): Path<String>,
 ) -> ApiResult<Json<ListModelsResponse>> {
     let response = state.ai_provider_service.list_models(&provider_id).await?;
     Ok(Json(response))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/ai/providers", get(get_ai_providers))
         .route("/ai/providers/settings", put(update_provider_settings))

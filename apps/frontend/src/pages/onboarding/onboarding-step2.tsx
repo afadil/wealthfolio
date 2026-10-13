@@ -80,8 +80,11 @@ const formattingRegions = [
   ["CA", "canada"],
   ["US", "unitedStates"],
   ["GB", "unitedKingdom"],
+  ["IN", "india"],
   ["FR", "france"],
   ["DE", "germany"],
+  ["AT", "austria"],
+  ["CH", "switzerland"],
   ["ES", "spain"],
   ["MX", "mexico"],
   ["BR", "brazil"],
@@ -91,6 +94,8 @@ const formattingRegions = [
   ["JP", "japan"],
   ["KR", "southKorea"],
   ["IT", "italy"],
+  ["RO", "romania"],
+  ["BG", "bulgaria"],
 ] as const;
 
 const popularFormattingRegions = ["system", "US", "CA", "GB"];

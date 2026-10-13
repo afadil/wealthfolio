@@ -54,7 +54,12 @@ impl ContributionLimitService {
     }
 
     fn user_timezone(&self) -> chrono_tz::Tz {
-        parse_user_timezone_or_default(&self.timezone.read().unwrap())
+        parse_user_timezone_or_default(
+            &self
+                .timezone
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        )
     }
 
     /// Checks if an activity has metadata.flow.is_external = true
@@ -305,13 +310,6 @@ mod tests {
         fn get_activity(&self, _: &str) -> Result<Activity> {
             unimplemented!()
         }
-        fn find_transfer_counterpart(
-            &self,
-            _group_id: &str,
-            _exclude_id: &str,
-        ) -> Result<Option<Activity>> {
-            Ok(None)
-        }
         fn get_activities(&self) -> Result<Vec<Activity>> {
             unimplemented!()
         }
@@ -436,9 +434,6 @@ mod tests {
             _source_system: &str,
         ) -> Result<()> {
             Ok(())
-        }
-        fn calculate_average_cost(&self, _: &str, _: &str) -> Result<Decimal> {
-            unimplemented!()
         }
         fn get_income_activities_data(
             &self,

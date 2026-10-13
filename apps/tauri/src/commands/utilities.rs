@@ -1,4 +1,4 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use chrono;
 use serde::Serialize;
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 use tauri::async_runtime::spawn_blocking;
 use tauri::Manager;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter};
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -62,7 +62,7 @@ fn pending_export_filename(file_name: &str) -> Result<String, String> {
     Ok(name.to_string())
 }
 
-fn prepare_pending_export_path(
+pub(crate) fn prepare_pending_export_path(
     app_data_dir_path: &Path,
     filename: &str,
 ) -> Result<(String, PathBuf), String> {
@@ -140,8 +140,8 @@ pub struct AppInfo {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PendingExport {
-    relative_path: String,
-    filename: String,
+    pub(crate) relative_path: String,
+    pub(crate) filename: String,
 }
 
 #[derive(Serialize)]
@@ -229,17 +229,12 @@ fn save_content_with_dialog(
 }
 
 fn write_pending_export_content(
-    app_handle: &AppHandle,
+    profile_root: &Path,
     file_name: &str,
     content: &[u8],
 ) -> Result<PendingExport, String> {
     let filename = pending_export_filename(file_name)?;
-    let app_data_dir_path = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-
-    let (relative_path, export_path) = prepare_pending_export_path(&app_data_dir_path, &filename)?;
+    let (relative_path, export_path) = prepare_pending_export_path(profile_root, &filename)?;
     fs::write(&export_path, content).map_err(|e| {
         format!(
             "Failed to write pending export {}: {}",
@@ -342,6 +337,7 @@ async fn build_data_export_content(
                     None,
                     None,
                 )
+                .await
                 .map_err(|e| format!("Failed to load portfolio history for export: {}", e))?;
             format_records(&records, format).map_err(|e| e.to_string())
         }
@@ -350,6 +346,7 @@ async fn build_data_export_content(
 
 #[tauri::command]
 pub async fn save_text_file_with_dialog(
+    _state: ProfileAccess,
     app_handle: AppHandle,
     file_name: String,
     content: String,
@@ -366,6 +363,7 @@ pub async fn save_text_file_with_dialog(
 
 #[tauri::command]
 pub async fn save_file_with_dialog(
+    _state: ProfileAccess,
     app_handle: AppHandle,
     file_name: String,
     content_base64: String,
@@ -388,16 +386,22 @@ pub async fn save_file_with_dialog(
 
 #[tauri::command]
 pub async fn write_pending_export_text_file(
-    app_handle: AppHandle,
+    profile: ProfileAccess,
+    _app_handle: AppHandle,
     file_name: String,
     content: String,
 ) -> Result<PendingExport, String> {
-    write_pending_export_content(&app_handle, &file_name, content.as_bytes())
+    write_pending_export_content(
+        Path::new(profile.app_data_dir()),
+        &file_name,
+        content.as_bytes(),
+    )
 }
 
 #[tauri::command]
 pub async fn write_pending_export_file(
-    app_handle: AppHandle,
+    profile: ProfileAccess,
+    _app_handle: AppHandle,
     file_name: String,
     content_base64: String,
 ) -> Result<PendingExport, String> {
@@ -405,17 +409,17 @@ pub async fn write_pending_export_file(
         .decode(content_base64)
         .map_err(|e| format!("Failed to decode export content: {}", e))?;
 
-    write_pending_export_content(&app_handle, &file_name, &content)
+    write_pending_export_content(Path::new(profile.app_data_dir()), &file_name, &content)
 }
 
 #[tauri::command]
 pub async fn export_data_file(
     app_handle: AppHandle,
-    state: State<'_, DatabaseRuntime>,
+    profile: ProfileAccess,
     data_type: String,
     format: String,
 ) -> Result<DataExportResult, String> {
-    let context = state.context()?;
+    let context = profile.context()?;
     let data_type = ExportDataType::parse(&data_type).map_err(|e| e.to_string())?;
     let format = ExportFileFormat::parse(&format).map_err(|e| e.to_string())?;
     let Some(content) = build_data_export_content(context.as_ref(), data_type, format).await?
@@ -427,7 +431,8 @@ pub async fn export_data_file(
 
     #[cfg(any(target_os = "ios", target_os = "android"))]
     {
-        let pending_export = write_pending_export_content(&app_handle, &filename, &content)?;
+        let pending_export =
+            write_pending_export_content(Path::new(profile.app_data_dir()), &filename, &content)?;
         Ok(DataExportResult::pending(pending_export))
     }
 
@@ -460,21 +465,10 @@ fn open_external_link(app_handle: &AppHandle, url: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn get_app_info(app_handle: AppHandle) -> Result<AppInfo, String> {
+pub async fn get_app_info(app_handle: AppHandle, state: ProfileAccess) -> Result<AppInfo, String> {
     let version = app_handle.package_info().version.to_string();
 
-    let app_data_dir_path = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?
-        .to_path_buf();
-
-    let app_data_dir = app_data_dir_path
-        .to_str()
-        .ok_or_else(|| "Failed to convert app data dir path to string".to_string())?
-        .to_string();
-
-    let db_path = db::get_db_path(&app_data_dir);
+    let db_path = state.database_path().to_string();
     let logs_dir = app_handle
         .path()
         .app_log_dir()
@@ -520,7 +514,7 @@ pub async fn install_app_update(app_handle: AppHandle) -> Result<(), String> {
 /// A faithful copy: it inherits the live database's encryption, so on an
 /// encrypted device only this device's retained key opens it.
 #[tauri::command]
-pub async fn backup_database(runtime: State<'_, DatabaseRuntime>) -> Result<String, String> {
+pub async fn backup_database(runtime: ProfileAccess) -> Result<String, String> {
     let access = runtime.access()?;
     let app_data_dir = runtime.app_data_dir().to_string();
 
@@ -541,7 +535,7 @@ pub async fn backup_database(runtime: State<'_, DatabaseRuntime>) -> Result<Stri
 #[tauri::command]
 pub async fn open_database_backup_folder(
     app_handle: AppHandle,
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
 ) -> Result<(), String> {
     #[cfg(desktop)]
     {
@@ -559,7 +553,7 @@ pub async fn open_database_backup_folder(
 
 #[tauri::command]
 pub async fn list_database_backups(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
 ) -> Result<Vec<db::snapshots::Snapshot>, String> {
     let access = runtime.access()?;
     let root = runtime.app_data_dir().to_string();
@@ -575,7 +569,7 @@ pub async fn list_database_backups(
 
 #[tauri::command]
 pub async fn delete_database_backup(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     filename: String,
 ) -> Result<(), String> {
     let access = runtime.access()?;
@@ -589,7 +583,7 @@ pub async fn delete_database_backup(
     .map_err(|error| error.to_string())
 }
 
-fn check_pending_backup_capacity(root: &Path) -> Result<(), String> {
+pub(crate) fn check_pending_backup_capacity(root: &Path) -> Result<(), String> {
     cleanup_stale_pending_exports(root);
     let directory = root.join(PENDING_EXPORTS_DIR);
     let entries = match fs::read_dir(directory) {
@@ -611,7 +605,7 @@ fn check_pending_backup_capacity(root: &Path) -> Result<(), String> {
             let path = file.map_err(|error| error.to_string())?.path();
             if matches!(
                 path.extension().and_then(|ext| ext.to_str()),
-                Some("db" | "wfbackup")
+                Some("db" | "wfbackup" | "wfrec")
             ) {
                 count += 1;
             }
@@ -647,7 +641,7 @@ mod backup_export_tests {
 /// Export the selected saved snapshot; never silently substitute live data.
 #[tauri::command]
 pub async fn export_database_backup(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     filename: String,
     password: Option<String>,
     unencrypted: bool,
@@ -671,7 +665,7 @@ pub async fn export_database_backup(
         check_pending_backup_capacity(Path::new(&root))?;
         let lease = db::snapshots::acquire(&root, &filename).map_err(|e| e.to_string())?;
         let source = lease.access(key).map_err(|e| e.to_string())?;
-        let scratch = db::scratch_dir(&root).map_err(|e| e.to_string())?;
+        let scratch = db::profile_scratch_dir(&root).map_err(|e| e.to_string())?;
         let output =
             db::portable::export(&source, &scratch, password.as_deref().map(String::as_str))
                 .map_err(|e| e.to_string())?;
@@ -694,13 +688,19 @@ pub async fn export_database_backup(
         })
     })
     .await
-    .map_err(|_| "Backup export task failed".to_string())?
+    .map_err(|error| {
+        log::error!(
+            "Backup export task failed (panic={})",
+            matches!(error, tauri::Error::JoinError(ref join) if join.is_panic())
+        );
+        "Backup export task failed".to_string()
+    })?
 }
 
 /// Inspect a private immutable candidate without changing the live database.
 #[tauri::command]
 pub async fn inspect_database_backup(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     backup_file_path: String,
     password: Option<String>,
 ) -> Result<db::imports::ImportPreview, String> {
@@ -711,14 +711,37 @@ pub async fn inspect_database_backup(
         .reserve()
         .map_err(|e| e.to_string())?;
     let key = runtime.retained_key()?;
-    let scratch = db::scratch_dir(runtime.app_data_dir()).map_err(|e| e.to_string())?;
+    let scratch = db::profile_scratch_dir(runtime.app_data_dir()).map_err(|e| e.to_string())?;
     let path = PathBuf::from(normalize_file_path(&backup_file_path));
+    if let Some(registry) = &runtime.profile_registry {
+        registry
+            .validate_import_path(runtime.profile_id, &path)
+            .map_err(|e| e.to_string())?;
+    }
+    let store = runtime.secret_store.clone();
     let candidate = spawn_blocking(move || {
         let _access = access;
+        let decoded;
+        let is_package = db::cloud_backups::is_recovery_package(&path)?;
+        let import_path = if is_package {
+            decoded = db::cloud_backups::decoded_package(
+                std::fs::File::open(&path)?,
+                store.as_ref(),
+                password.as_deref().map(String::as_str),
+                &scratch,
+            )?;
+            decoded.path()
+        } else {
+            path.as_path()
+        };
         reservation.prepare(
-            &path,
+            import_path,
             &scratch,
-            password.as_deref().map(String::as_str),
+            if is_package {
+                None
+            } else {
+                password.as_deref().map(String::as_str)
+            },
             key,
         )
     })
@@ -734,7 +757,7 @@ pub async fn inspect_database_backup(
 /// Inspect a managed snapshot while its catalogue lease prevents deletion.
 #[tauri::command]
 pub async fn inspect_saved_database_backup(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     filename: String,
 ) -> Result<db::imports::ImportPreview, String> {
     let access = runtime.import_lease()?;
@@ -747,7 +770,7 @@ pub async fn inspect_saved_database_backup(
     let candidate = spawn_blocking(move || {
         let _access = access;
         let lease = db::snapshots::acquire(&root, &filename)?;
-        let scratch = db::scratch_dir(&root)?;
+        let scratch = db::profile_scratch_dir(&root)?;
         reservation.prepare(&lease.path, &scratch, None, key)
     })
     .await
@@ -761,7 +784,7 @@ pub async fn inspect_saved_database_backup(
 
 #[tauri::command]
 pub async fn discard_database_backup_import(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     id: String,
 ) -> Result<(), String> {
     let id = uuid::Uuid::parse_str(&id).map_err(|_| "Invalid backup preview".to_string())?;
@@ -777,7 +800,7 @@ pub async fn discard_database_backup_import(
 #[tauri::command]
 pub async fn restore_database_backup_import(
     app_handle: AppHandle,
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     id: String,
 ) -> Result<(), String> {
     let id = uuid::Uuid::parse_str(&id).map_err(|_| "Invalid backup preview".to_string())?;
@@ -787,7 +810,7 @@ pub async fn restore_database_backup_import(
 #[tauri::command]
 pub async fn recover_database_from_import(
     app_handle: AppHandle,
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
     id: String,
 ) -> Result<(), String> {
     let id = uuid::Uuid::parse_str(&id).map_err(|_| "Invalid backup preview".to_string())?;
@@ -796,7 +819,7 @@ pub async fn recover_database_from_import(
 
 #[tauri::command]
 pub async fn get_database_startup_status(
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
 ) -> Result<crate::database::DatabaseStartupStatus, String> {
     Ok(runtime.startup_status())
 }
@@ -804,7 +827,7 @@ pub async fn get_database_startup_status(
 #[tauri::command]
 pub async fn retry_database_startup(
     app_handle: AppHandle,
-    runtime: State<'_, DatabaseRuntime>,
+    runtime: ProfileAccess,
 ) -> Result<(), String> {
     runtime.retry_startup(&app_handle).await
 }
@@ -823,9 +846,159 @@ pub(crate) fn finish_database_maintenance(
         .emit(event, ())
         .map_err(|e| format!("Failed to emit {} event: {}", event, e))?;
 
+    // Request the restart rather than wait for it: `restart` parks this async
+    // worker forever, stranding the profile worker it just started, which the
+    // exit release then waits on until its deadline.
     #[cfg(not(any(target_os = "ios", target_os = "android")))]
-    app_handle.restart();
+    app_handle.request_restart();
 
-    #[cfg(any(target_os = "ios", target_os = "android"))]
     Ok(())
+}
+
+fn profile_transfer_path(
+    profile_root: &Path,
+    relative_path: &str,
+) -> Result<std::path::PathBuf, String> {
+    let parts: Vec<_> = relative_path.split('/').collect();
+    if !(parts.len() == 2 || parts.len() == 3) {
+        return Err("Invalid transfer path".into());
+    }
+    let id = if parts[0] == "pending-exports" {
+        parts[1]
+    } else if parts[0] == "scratch" {
+        parts[1]
+            .strip_prefix("portable-picked-")
+            .ok_or("Invalid transfer path")?
+    } else {
+        return Err("Invalid transfer path".into());
+    };
+    uuid::Uuid::parse_str(id).map_err(|_| "Invalid transfer ID")?;
+    if parts.len() == 3
+        && (parts[2].is_empty()
+            || parts[2].contains(['\\', ':'])
+            || parts[2] == "."
+            || parts[2] == "..")
+    {
+        return Err("Invalid transfer filename".into());
+    }
+    let path = profile_root.join(relative_path);
+    let mut current = profile_root.to_path_buf();
+    for part in &parts {
+        current.push(part);
+        if std::fs::symlink_metadata(&current).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err("Transfer symlinks are not allowed".into());
+        }
+    }
+    Ok(path)
+}
+
+#[tauri::command]
+pub fn profile_transfer_file(
+    profile: ProfileAccess,
+    relative_path: String,
+    operation: String,
+    offset: Option<u64>,
+    content: Option<String>,
+) -> Result<serde_json::Value, String> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let path = profile_transfer_path(Path::new(profile.app_data_dir()), &relative_path)?;
+    let offset = offset.unwrap_or(0);
+    match operation.as_str() {
+        "path" => Ok(serde_json::json!(path)),
+        "remove" => {
+            if path.is_dir() {
+                fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
+            } else if path.exists() {
+                fs::remove_file(&path).map_err(|e| e.to_string())?;
+            }
+            Ok(serde_json::Value::Null)
+        }
+        "read" if relative_path.starts_with("pending-exports/") => {
+            let mut file = fs::File::open(path).map_err(|e| e.to_string())?;
+            file.seek(SeekFrom::Start(offset))
+                .map_err(|e| e.to_string())?;
+            let mut bytes = vec![0; 1024 * 1024];
+            let read = file.read(&mut bytes).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!(BASE64_STANDARD.encode(&bytes[..read])))
+        }
+        "write"
+            if relative_path.starts_with("scratch/portable-picked-")
+                && relative_path.ends_with("/restore.db") =>
+        {
+            let bytes = BASE64_STANDARD
+                .decode(content.ok_or("Missing content")?)
+                .map_err(|_| "Invalid transfer content")?;
+            if bytes.len() > 1024 * 1024 || offset > 2 * 1024 * 1024 * 1024 - bytes.len() as u64 {
+                return Err("Transfer limit exceeded".into());
+            }
+            fs::create_dir_all(path.parent().ok_or("Invalid transfer path")?)
+                .map_err(|e| e.to_string())?;
+            let mut file = if offset == 0 {
+                fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(path)
+            } else {
+                fs::OpenOptions::new().append(true).open(path)
+            }
+            .map_err(|e| e.to_string())?;
+            if file.metadata().map_err(|e| e.to_string())?.len() != offset {
+                return Err("Invalid transfer offset".into());
+            }
+            file.write_all(&bytes).map_err(|e| e.to_string())?;
+            Ok(serde_json::Value::Null)
+        }
+        _ => Err("Unsupported transfer operation".into()),
+    }
+}
+
+#[cfg(test)]
+mod profile_transfer_tests {
+    use super::*;
+    #[test]
+    fn pending_exports_stay_in_the_supplied_profile_root() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let first = write_pending_export_content(a.path(), "report.csv", b"profile a").unwrap();
+        let second = write_pending_export_content(b.path(), "report.csv", b"profile b").unwrap();
+        assert_eq!(
+            fs::read(a.path().join(&first.relative_path)).unwrap(),
+            b"profile a"
+        );
+        assert_eq!(
+            fs::read(b.path().join(&second.relative_path)).unwrap(),
+            b"profile b"
+        );
+        assert!(!b.path().join(&first.relative_path).exists());
+        assert!(!a.path().join(&second.relative_path).exists());
+    }
+
+    #[test]
+    fn internal_transfers_reject_other_roots_traversal_and_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = uuid::Uuid::new_v4();
+        for path in [
+            format!("profiles/{id}/app.db"),
+            format!("pending-exports/{id}/../app.db"),
+            format!("pending-exports/{id}/.."),
+            "app.db".into(),
+        ] {
+            assert!(profile_transfer_path(dir.path(), &path).is_err());
+        }
+        let relative = format!("pending-exports/{id}/report.csv");
+        assert_eq!(
+            profile_transfer_path(dir.path(), &relative).unwrap(),
+            dir.path().join(&relative)
+        );
+        #[cfg(unix)]
+        {
+            fs::create_dir(dir.path().join("pending-exports")).unwrap();
+            std::os::unix::fs::symlink(
+                dir.path(),
+                dir.path().join(format!("pending-exports/{id}")),
+            )
+            .unwrap();
+            assert!(profile_transfer_path(dir.path(), &relative).is_err());
+        }
+    }
 }

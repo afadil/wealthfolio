@@ -1,14 +1,13 @@
-use crate::database::DatabaseRuntime;
+use crate::profiles::ProfileAccess;
 
 use log::{debug, error};
-use tauri::State;
 
 use wealthfolio_core::accounts::{Account, AccountUpdate, NewAccount};
 
 #[tauri::command]
 pub async fn get_accounts(
     include_archived: Option<bool>,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Vec<Account>, String> {
     let context = state.context()?;
     debug!("Fetching accounts...");
@@ -27,10 +26,11 @@ pub async fn get_accounts(
 }
 
 #[tauri::command]
-pub async fn create_account(
-    account: NewAccount,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<Account, String> {
+pub async fn create_account(account: NewAccount, state: ProfileAccess) -> Result<Account, String> {
+    // A supplied broker link must not race replacement of its Connect identity.
+    let _connect = (account.provider.is_some() || account.provider_account_id.is_some())
+        .then(|| state.connect_guard())
+        .transpose()?;
     let context = state.context()?;
     debug!("Adding new account...");
     // Domain events handle recalculation automatically
@@ -47,7 +47,7 @@ pub async fn create_account(
 #[tauri::command]
 pub async fn update_account(
     account_update: AccountUpdate,
-    state: State<'_, DatabaseRuntime>,
+    state: ProfileAccess,
 ) -> Result<Account, String> {
     let context = state.context()?;
     debug!("Updating account {:?}...", account_update.id);
@@ -61,10 +61,7 @@ pub async fn update_account(
 }
 
 #[tauri::command]
-pub async fn delete_account(
-    account_id: String,
-    state: State<'_, DatabaseRuntime>,
-) -> Result<(), String> {
+pub async fn delete_account(account_id: String, state: ProfileAccess) -> Result<(), String> {
     let context = state.context()?;
     debug!("Deleting account {}...", account_id);
     // Domain events handle recalculation automatically

@@ -225,7 +225,7 @@ fn parse_event_start_bound(s: &str) -> Result<DateTime<Utc>> {
         return Ok(dt.with_timezone(&Utc));
     }
     if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        let naive = date.and_hms_opt(0, 0, 0).unwrap();
+        let naive = date.and_hms_opt(0, 0, 0).expect("00:00:00 is a valid time");
         return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
     }
     Err(SpendingError::InvalidInput {
@@ -242,7 +242,9 @@ fn parse_event_end_bound(s: &str) -> Result<DateTime<Utc>> {
         return Ok(dt.with_timezone(&Utc));
     }
     if let Ok(date) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        let naive = date.and_hms_nano_opt(23, 59, 59, 999_999_999).unwrap();
+        let naive = date
+            .and_hms_nano_opt(23, 59, 59, 999_999_999)
+            .expect("23:59:59.999999999 is a valid time");
         return Ok(DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc));
     }
     Err(SpendingError::InvalidInput {
@@ -486,13 +488,6 @@ mod tests {
                     )
                 })
         }
-        fn find_transfer_counterpart(
-            &self,
-            _group_id: &str,
-            _exclude_id: &str,
-        ) -> wealthfolio_core::Result<Option<Activity>> {
-            Ok(None)
-        }
         fn get_activities(&self) -> wealthfolio_core::Result<Vec<Activity>> {
             Ok(self.activities.lock().unwrap().clone())
         }
@@ -624,13 +619,6 @@ mod tests {
             _: &str,
             _: &str,
         ) -> wealthfolio_core::Result<()> {
-            unimplemented!()
-        }
-        fn calculate_average_cost(
-            &self,
-            _: &str,
-            _: &str,
-        ) -> wealthfolio_core::Result<rust_decimal::Decimal> {
             unimplemented!()
         }
         fn get_income_activities_data(

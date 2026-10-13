@@ -24,16 +24,16 @@
     "learnMore": "Connect에 대해 자세히 알아보기",
     "features": {
       "brokerageSync": {
-        "title": "증권사 동기화",
-        "description": "매일 자동으로 계좌와 거래 내역을 동기화합니다."
+        "title": "연결된 계좌",
+        "description": "증권사의 거래 내역을 자동으로 동기화하세요."
       },
       "deviceSync": {
-        "title": "기기 동기화",
-        "description": "종단 간 암호화로 기기 간 동기화합니다."
+        "title": "기기 동기화 및 백업",
+        "description": "종단 간 암호화 동기화 및 자동 클라우드 백업."
       },
       "householdView": {
-        "title": "가족 계좌 뷰",
-        "description": "가족 구성원과 계좌를 공유합니다."
+        "title": "가족 포트폴리오",
+        "description": "가족의 투자 현황을 함께 확인하세요."
       }
     }
   },
@@ -286,5 +286,16 @@
   },
   "errors": {
     "unknown": "알 수 없는 오류"
+  },
+  "session": {
+    "restoring": "Connect 복원 중…",
+    "unavailable": "Connect를 일시적으로 사용할 수 없습니다",
+    "localAvailable": "로컬 포트폴리오는 사용할 수 있습니다. 다시 연결해 보세요."
+  },
+  "rebind": {
+    "title": "이 프로필의 Connect 연결을 변경할까요?",
+    "description": "다른 계정 또는 가구에 연결하려고 합니다. 로컬 포트폴리오 데이터는 유지되지만 기존 증권사 연결과 기기 동기화 설정은 제거됩니다. 새 계정은 이 프로필에 증권사 데이터를 추가할 수 있습니다. 준비가 되면 기기 동기화를 다시 설정하세요. 데이터를 별도로 관리하려면 새 프로필을 사용하세요.",
+    "cancel": "취소",
+    "confirm": "연결 변경"
   }
 }

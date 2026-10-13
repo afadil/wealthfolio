@@ -1,3 +1,4 @@
+import { RestoredPortfolioNotice } from "@/features/database-recovery/restored-portfolio-notice";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -83,6 +84,7 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <NavigationEventBridge />
+      <RestoredPortfolioNotice />
       <Routes>
         {/* QR Scanner - No layout for fullscreen camera access */}
         {/* <Route path="/qr-scanner" element={<QRScannerPage />} /> */}

@@ -11,6 +11,10 @@ repository = "https://github.com/wealthfolio/wealthfolio"
 default = []
 
 [dependencies]
+argon2 = { version = "0.5", features = ["std"] }
+fs2 = "0.4"
+subtle = "2"
+zeroize = { workspace = true }
 wealthfolio-http = { workspace = true }
 # Workspace dependencies
 tokio = { workspace = true }
@@ -34,6 +38,7 @@ reqwest = { workspace = true, features = ["cookies"] }
 
 # Sibling crates
 wealthfolio-market-data = { path = "../market-data" }
+wealthfolio-portfolio-engine = { workspace = true }
 
 # Additional dependencies not in workspace
 regex = "1.10"
@@ -58,3 +63,8 @@ url = "2"
 [dev-dependencies]
 tempfile = "3"
 proptest = "1.4"
+insta = { version = "1", features = ["yaml"] }
+serde_yaml = "0.9"
+
+[lints]
+workspace = true

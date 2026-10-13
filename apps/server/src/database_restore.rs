@@ -8,16 +8,23 @@ pub fn run_database_restore(
     password: Option<&str>,
     confirmed: bool,
 ) -> anyhow::Result<()> {
+    run_profile_database_restore(path, password, confirmed, None)
+}
+pub fn run_profile_database_restore(
+    path: &Path,
+    password: Option<&str>,
+    confirmed: bool,
+    profile: Option<uuid::Uuid>,
+) -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     let secret = crate::config::load_secret_key(
         std::env::var_os("WF_SECRET_KEY"),
         std::env::var_os("WF_SECRET_KEY_FILE"),
     )?;
-    let key = Arc::new(DbEncryptionKey::from_bytes(
-        &crate::auth::derive_database_key(&secret),
-    ));
-    let database = std::env::var("WF_DB_PATH")
-        .unwrap_or_else(|_| crate::main_lib::DEFAULT_DB_PATH.to_string());
+    let database = crate::config::database_path_from_env()?;
+    let (database, database_key, registry) =
+        crate::profiles::offline_database(database, &secret, profile)?;
+    let key = Arc::new(DbEncryptionKey::from_bytes(&database_key));
     let required = std::env::var("WF_DB_REQUIRE_ENCRYPTION")
         .map(|value| {
             matches!(
@@ -49,9 +56,36 @@ pub fn run_database_restore(
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let root = root.to_str().context("Invalid database directory")?;
+    let scratch = db::profile_scratch_dir(root)?;
+
+    let decoded;
+    let (backup_path, backup_password) = if db::cloud_backups::is_recovery_package(path)? {
+        let store: Arc<dyn wealthfolio_core::secrets::SecretStore> =
+            if let Some(registry) = &registry {
+                let id = profile.unwrap_or(registry.default_id()?);
+                registry.secret_store(&registry.profile(id)?)
+            } else {
+                let (_, vault_key) = crate::auth::derive_keys(&secret);
+                Arc::new(crate::secrets::build_secret_store(
+                    std::env::var("WF_SECRET_FILE")
+                        .map(std::path::PathBuf::from)
+                        .unwrap_or_else(|_| Path::new(root).join("secrets.json")),
+                    Some(vault_key),
+                    Some(&secret),
+                )?)
+            };
+        decoded = db::cloud_backups::decoded_package(
+            fs::File::open(path)?,
+            store.as_ref(),
+            password,
+            &scratch,
+        )?;
+        (decoded.path(), None)
+    } else {
+        (path, password)
+    };
     // Match the existing offline conversion path and the shared scratch helper.
-    std::env::set_var("DATABASE_URL", &database);
-    let prepared = portable::prepare_import(path, &db::scratch_dir(root)?, password, Some(key))
+    let prepared = portable::prepare_import(backup_path, &scratch, backup_password, Some(key))
         .context("Backup validation failed; the destination database was not replaced")?;
     println!(
         "Validated backup: {} accounts, {} activities. Destination encryption: {}.",
@@ -72,7 +106,7 @@ pub fn run_database_restore(
         },
         &owner,
     )?;
-    println!("Restore completed. Reconnect Wealthfolio Connect, device sync and custom data providers after starting the server.");
+    println!("Restore completed. Reconnect Wealthfolio Connect and device sync after starting the server.");
     if let Some(backup) = outcome.pre_operation_backup {
         println!("Previous database snapshot: {backup}");
     }

@@ -2,16 +2,12 @@ mod dto;
 mod handlers;
 mod mappers;
 
-use std::sync::Arc;
-
 use axum::{
     routing::{get, post},
     Router,
 };
 
-use crate::main_lib::AppState;
-
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/holdings", get(handlers::get_holdings_for_account))
         .route("/holdings/query", post(handlers::get_holdings))

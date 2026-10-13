@@ -1,3 +1,4 @@
+import { profileFetch } from "@/features/profiles/session";
 import type { ExportDataType, ExportedFileFormat } from "@/lib/types";
 import { notifyUnauthorized } from "@/lib/auth-token";
 import type { DataExportResult } from "../types";
@@ -44,7 +45,7 @@ export const exportDataFile = async (
     format.toLowerCase(),
   )}`;
 
-  const response = await fetch(url, {
+  const response = await profileFetch(url, {
     method: "GET",
     credentials: "same-origin",
   });

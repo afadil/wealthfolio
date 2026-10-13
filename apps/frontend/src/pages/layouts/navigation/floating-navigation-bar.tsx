@@ -1,4 +1,5 @@
 import { LiquidGlass } from "@/components/liquid-glass";
+import { ProfileMenu } from "@/features/profiles/profile-menu";
 import { SyncStatusIcon } from "@/features/wealthfolio-connect/components/sync-status-icon";
 import { useAggregatedSyncStatus } from "@/features/wealthfolio-connect/hooks";
 import { cn } from "@/lib/utils";
@@ -205,6 +206,7 @@ export function FloatingNavigationBar({ navigation }: FloatingNavigationBarProps
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            <ProfileMenu collapsed />
           </nav>
         </LiquidGlass>
       </div>

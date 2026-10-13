@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,14 +13,6 @@ const getTimestamp = () => {
   )}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
 };
 
-const replaceDbPath = (content, timestamp) => {
-  if (!content.includes("WF_DB_PATH=")) {
-    throw new Error("WF_DB_PATH entry not found in .env.web");
-  }
-
-  return content.replace(/^WF_DB_PATH=.*$/m, `WF_DB_PATH=./db/app-testing-${timestamp}.db`);
-};
-
 const setEnvValue = (content, key, value) => {
   const line = `${key}=${value}`;
   const pattern = new RegExp(`^${key}=.*$`, "m");
@@ -32,8 +24,13 @@ const setEnvValue = (content, key, value) => {
   return `${content.trimEnd()}\n${line}\n`;
 };
 
-const prepareE2eEnvContent = (content, timestamp) => {
-  let updated = replaceDbPath(content, timestamp);
+export const prepareE2eEnvContent = (content, dataDirectory) => {
+  // The registry and per-profile databases live beside WF_DB_PATH. A new filename
+  // in a shared directory would still reuse the previous run's profiles and vault.
+  let updated = setEnvValue(content, "WF_DATA_DIR", dataDirectory);
+  updated = setEnvValue(updated, "WF_DB_PATH", join(dataDirectory, "app.db"));
+  updated = setEnvValue(updated, "WF_SECRET_FILE", join(dataDirectory, "vault.bin"));
+  updated = setEnvValue(updated, "WF_ADDONS_DIR", join(dataDirectory, "addons"));
 
   updated = setEnvValue(updated, "WF_AUTH_PASSWORD_HASH", "");
   updated = setEnvValue(updated, "WF_AUTH_REQUIRED", "false");
@@ -46,16 +43,12 @@ const prepareE2eEnvContent = (content, timestamp) => {
 
 export const prepE2eEnv = async () => {
   const content = await readFile(ENV_PATH, "utf8");
-  const timestamp = getTimestamp();
-  const updated = prepareE2eEnvContent(content, timestamp);
-
-  if (content === updated) {
-    console.log("WF_DB_PATH already set for this run, no update required.");
-    return;
-  }
-
+  const dbRoot = join(dirname(ENV_PATH), "db");
+  await mkdir(dbRoot, { recursive: true });
+  const dataDirectory = await mkdtemp(join(dbRoot, `app-testing-${getTimestamp()}-`));
+  const updated = prepareE2eEnvContent(content, dataDirectory);
   await writeFile(ENV_PATH, updated);
-  console.log(`Updated .env.web to use ./db/app-testing-${timestamp}.db`);
+  console.log(`Updated .env.web to use isolated data directory ${dataDirectory}`);
 };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

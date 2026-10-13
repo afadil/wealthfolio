@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Path, State},
+    extract::Path,
     http::StatusCode,
     routing::{delete, get, post, put},
     Json, Router,
@@ -36,7 +36,9 @@ pub struct ImportTaxonomyRequest {
 // Taxonomy Endpoints
 // ============================================================================
 
-async fn get_taxonomies(State(state): State<Arc<AppState>>) -> ApiResult<Json<Vec<Taxonomy>>> {
+async fn get_taxonomies(
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
+) -> ApiResult<Json<Vec<Taxonomy>>> {
     debug!("Fetching all taxonomies...");
     let taxonomies = state.taxonomy_service.get_taxonomies()?;
     Ok(Json(taxonomies))
@@ -44,7 +46,7 @@ async fn get_taxonomies(State(state): State<Arc<AppState>>) -> ApiResult<Json<Ve
 
 async fn get_taxonomy(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Option<TaxonomyWithCategories>>> {
     debug!("Fetching taxonomy {}...", id);
     let taxonomy = state.taxonomy_service.get_taxonomy(&id)?;
@@ -52,7 +54,7 @@ async fn get_taxonomy(
 }
 
 async fn create_taxonomy(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(taxonomy): Json<NewTaxonomy>,
 ) -> ApiResult<Json<Taxonomy>> {
     debug!("Creating taxonomy {}...", taxonomy.name);
@@ -61,7 +63,7 @@ async fn create_taxonomy(
 }
 
 async fn update_taxonomy(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(taxonomy): Json<Taxonomy>,
 ) -> ApiResult<Json<Taxonomy>> {
     debug!("Updating taxonomy {}...", taxonomy.id);
@@ -71,7 +73,7 @@ async fn update_taxonomy(
 
 async fn delete_taxonomy(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     debug!("Deleting taxonomy {}...", id);
     let _ = state.taxonomy_service.delete_taxonomy(&id).await?;
@@ -83,7 +85,7 @@ async fn delete_taxonomy(
 // ============================================================================
 
 async fn create_category(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(category): Json<NewCategory>,
 ) -> ApiResult<Json<Category>> {
     debug!("Creating category {}...", category.name);
@@ -92,7 +94,7 @@ async fn create_category(
 }
 
 async fn update_category(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(category): Json<Category>,
 ) -> ApiResult<Json<Category>> {
     debug!("Updating category {}...", category.id);
@@ -102,7 +104,7 @@ async fn update_category(
 
 async fn delete_category(
     Path((taxonomy_id, category_id)): Path<(String, String)>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     debug!("Deleting category {}...", category_id);
     let _ = state
@@ -113,7 +115,7 @@ async fn delete_category(
 }
 
 async fn move_category(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<MoveCategoryRequest>,
 ) -> ApiResult<Json<Category>> {
     debug!(
@@ -137,7 +139,7 @@ async fn move_category(
 // ============================================================================
 
 async fn import_taxonomy_json(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(request): Json<ImportTaxonomyRequest>,
 ) -> ApiResult<Json<Taxonomy>> {
     debug!("Importing taxonomy from JSON...");
@@ -150,7 +152,7 @@ async fn import_taxonomy_json(
 
 async fn export_taxonomy_json(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<String>> {
     debug!("Exporting taxonomy {} to JSON...", id);
     let json = state.taxonomy_service.export_taxonomy_json(&id)?;
@@ -163,7 +165,7 @@ async fn export_taxonomy_json(
 
 async fn get_asset_taxonomy_assignments(
     Path(asset_id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<Vec<AssetTaxonomyAssignment>>> {
     debug!("Fetching taxonomy assignments for asset {}...", asset_id);
     let assignments = state.taxonomy_service.get_asset_assignments(&asset_id)?;
@@ -171,7 +173,7 @@ async fn get_asset_taxonomy_assignments(
 }
 
 async fn assign_asset_to_category(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(assignment): Json<NewAssetTaxonomyAssignment>,
 ) -> ApiResult<Json<AssetTaxonomyAssignment>> {
     debug!(
@@ -187,7 +189,7 @@ async fn assign_asset_to_category(
 
 async fn replace_asset_taxonomy_assignments(
     Path((asset_id, taxonomy_id)): Path<(String, String)>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(assignments): Json<Vec<NewAssetTaxonomyAssignment>>,
 ) -> ApiResult<Json<Vec<AssetTaxonomyAssignment>>> {
     debug!(
@@ -203,7 +205,7 @@ async fn replace_asset_taxonomy_assignments(
 
 async fn remove_asset_taxonomy_assignment(
     Path(id): Path<String>,
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<StatusCode> {
     debug!("Removing taxonomy assignment {}...", id);
     let _ = state.taxonomy_service.remove_asset_assignment(&id).await?;
@@ -215,7 +217,7 @@ async fn remove_asset_taxonomy_assignment(
 // ============================================================================
 
 async fn get_migration_status(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<MigrationStatus>> {
     debug!("Checking migration status...");
     let status = wealthfolio_core::health::get_migration_status(
@@ -226,7 +228,7 @@ async fn get_migration_status(
 }
 
 async fn migrate_legacy_classifications(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
 ) -> ApiResult<Json<MigrationResult>> {
     debug!("Starting legacy classification migration...");
     let result = wealthfolio_core::health::migrate_legacy_classifications(
@@ -241,7 +243,7 @@ async fn migrate_legacy_classifications(
 // Router
 // ============================================================================
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         // Taxonomy CRUD
         .route(

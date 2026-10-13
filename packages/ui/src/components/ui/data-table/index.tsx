@@ -32,6 +32,8 @@ interface DataTableProps<TData, TValue> {
   defaultSorting?: SortingState;
   defaultColumnFilters?: ColumnFiltersState;
   storageKey?: string;
+  /** Read old preferences when the primary key is absent; updates use storageKey. */
+  fallbackStorageKey?: string;
   data: TData[];
   manualPagination?: boolean;
   scrollable?: boolean;
@@ -75,6 +77,7 @@ export function DataTable<TData, TValue>({
   defaultSorting,
   defaultColumnFilters,
   storageKey,
+  fallbackStorageKey,
   scrollable = false,
   showColumnToggle = false,
   toolbarView,
@@ -84,17 +87,29 @@ export function DataTable<TData, TValue>({
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [storedColumnVisibility, setColumnVisibility] = storageKey
-    ? usePersistentState<VisibilityState>(`${storageKey}:column-visibility`, defaultColumnVisibility || {})
+    ? usePersistentState<VisibilityState>(
+        `${storageKey}:column-visibility`,
+        defaultColumnVisibility || {},
+        fallbackStorageKey ? `${fallbackStorageKey}:column-visibility` : undefined,
+      )
     : React.useState<VisibilityState>(defaultColumnVisibility || {});
   const columnVisibility = {
     ...(defaultColumnVisibility || {}),
     ...storedColumnVisibility,
   };
   const [columnFilters, setColumnFilters] = storageKey
-    ? usePersistentState<ColumnFiltersState>(`${storageKey}:column-filters`, defaultColumnFilters || [])
+    ? usePersistentState<ColumnFiltersState>(
+        `${storageKey}:column-filters`,
+        defaultColumnFilters || [],
+        fallbackStorageKey ? `${fallbackStorageKey}:column-filters` : undefined,
+      )
     : React.useState<ColumnFiltersState>(defaultColumnFilters || []);
   const [storedSorting, setSorting] = storageKey
-    ? usePersistentState<SortingState>(`${storageKey}:sorting`, defaultSorting || [])
+    ? usePersistentState<SortingState>(
+        `${storageKey}:sorting`,
+        defaultSorting || [],
+        fallbackStorageKey ? `${fallbackStorageKey}:sorting` : undefined,
+      )
     : React.useState<SortingState>(defaultSorting || []);
 
   // Views sharing one storageKey can render different column sets, so a stored sort

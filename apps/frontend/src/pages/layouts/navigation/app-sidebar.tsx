@@ -1,6 +1,7 @@
 import { isWeb } from "@/adapters";
 import { isAppleDevice } from "@/lib/device-utils";
 import { useAuth } from "@/context/auth-context";
+import { ProfileMenu } from "@/features/profiles/profile-menu";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -41,8 +42,8 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
     >
       <div className="z-20 w-full rounded-xl md:flex">
         <div className="flex w-full flex-col">
-          <div className="flex w-full flex-1 flex-col overflow-y-auto">
-            <div data-tauri-drag-region="true" className="flex-1">
+          <div className="flex min-h-0 w-full flex-1 flex-col">
+            <div data-tauri-drag-region="true" className="min-h-0 flex-1 overflow-y-auto">
               <nav
                 data-tauri-drag-region="true"
                 aria-label={t("common:layout.sidebar")}
@@ -52,11 +53,14 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   data-tauri-drag-region="true"
                   className="draggable flex items-center justify-center pb-6"
                 >
-                  <Link to="/">
+                  <Link to="/" className="group/logo block shrink-0 [perspective:400px]">
                     <img
-                      className={`h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-700 ease-in-out [transform-style:preserve-3d] hover:[transform:rotateY(-180deg)] ${
-                        collapsed ? "[transform:rotateY(180deg)]" : ""
-                      }`}
+                      className={cn(
+                        "h-10 w-10 rounded-full bg-transparent shadow-lg transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+                        collapsed
+                          ? "motion-safe:[transform:rotateY(180deg)] motion-safe:group-hover/logo:[transform:rotateY(360deg)]"
+                          : "motion-safe:[transform:rotateY(0deg)] motion-safe:group-hover/logo:[transform:rotateY(180deg)]",
+                      )}
                       aria-hidden="true"
                       src="/logo.png"
                     />
@@ -143,10 +147,10 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
             </div>
 
             <div className="flex shrink-0 flex-col p-2">
+              <ConnectNavItem collapsed={collapsed} />
               {navigation?.secondary?.map((item) => (
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}
-              <ConnectNavItem collapsed={collapsed} />
               {isWeb && requiresAuth && (
                 <Button
                   type="button"
@@ -196,6 +200,9 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
                   />
                 </Button>
               </div>
+              <div className="flex justify-center pt-1">
+                <ProfileMenu collapsed={collapsed} />
+              </div>
             </div>
           </div>
         </div>
@@ -218,7 +225,7 @@ function PinnedAddonNavItem({ item, collapsed, onSetPinned }: PinnedAddonNavItem
 
   return (
     <div className="group relative">
-      <NavItem item={item} collapsed={collapsed} className="pr-10" />
+      <NavItem item={item} collapsed={collapsed} className="w-full pr-10" />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -80,13 +80,11 @@ async fn cache_headers(request: Request<Body>, next: Next) -> Response {
             .is_some_and(|value| value.as_bytes().starts_with(b"text/html"));
     response.headers_mut().insert(
         header::CACHE_CONTROL,
-        if reusable_asset {
+        header::HeaderValue::from_static(if reusable_asset {
             "public, max-age=31536000, immutable"
         } else {
             "no-cache"
-        }
-        .parse()
-        .unwrap(),
+        }),
     );
     response
 }
@@ -245,7 +243,10 @@ mod tests {
         )
         .unwrap();
         let future = std::time::SystemTime::now() + std::time::Duration::from_secs(2);
-        fs::File::open(dir.path().join("index.html"))
+        // Windows `SetFileTime` needs write access; a read-only handle fails.
+        fs::File::options()
+            .write(true)
+            .open(dir.path().join("index.html"))
             .unwrap()
             .set_times(fs::FileTimes::new().set_modified(future))
             .unwrap();

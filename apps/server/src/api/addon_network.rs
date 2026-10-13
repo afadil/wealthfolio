@@ -4,11 +4,7 @@ use crate::{
     error::{ApiError, ApiResult},
     main_lib::AppState,
 };
-use axum::{
-    extract::{Path, State},
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::Path, routing::post, Json, Router};
 use wealthfolio_core::addons::network::{
     resolve_addon_network_auth_header, AddonNetworkRequest, AddonNetworkResponse,
 };
@@ -20,7 +16,7 @@ struct AddonNetworkBody {
 }
 
 async fn addon_network_request(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(addon_id): Path<String>,
     Json(body): Json<AddonNetworkBody>,
 ) -> ApiResult<Json<AddonNetworkResponse>> {
@@ -40,7 +36,7 @@ async fn addon_network_request(
     Ok(Json(response))
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new().route(
         "/addons/{addon_id}/network/request",
         post(addon_network_request),

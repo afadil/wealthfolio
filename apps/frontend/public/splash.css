@@ -7,6 +7,155 @@
  * packaged builds only. Do not move these rules back inline.
  */
 
+/* Shared by the pre-React splash and profile screens. */
+.profile-lock-screen {
+  position: relative;
+  isolation: isolate;
+  background-image:
+    radial-gradient(ellipse at 10% 20%, #e5c68f66, transparent 70%),
+    radial-gradient(ellipse at 90% 80%, #b6b3df66, transparent 70%);
+}
+
+.dark .profile-lock-screen {
+  background-image:
+    radial-gradient(ellipse at 10% 20%, #9a743b33, transparent 70%),
+    radial-gradient(ellipse at 90% 80%, #7873a633, transparent 70%);
+}
+
+/* Fine dithering softens gradient banding, especially on dark displays. */
+.profile-lock-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23888' filter='url(%23n)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.profile-lock-avatar {
+  position: relative;
+  display: block;
+  padding: var(--avatar-rim, 7px);
+  border-radius: 50%;
+  background: conic-gradient(
+    from 145deg,
+    #c2bad3,
+    #ede3d2 18%,
+    #ad9772 33%,
+    #fff7df 46%,
+    #ffffff 53%,
+    #d9c9af 66%,
+    #c4bdd9 82%,
+    #f1eaf5 94%,
+    #c2bad3
+  );
+  box-shadow:
+    inset 0 2px 2px #ffffffd9,
+    inset 0 -3px 3px #67566b59,
+    0 2px 2px #5b455524,
+    0 6px 10px -4px #66513e30,
+    0 14px 22px -10px #75627b3d;
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out;
+}
+
+.profile-lock-avatar::after {
+  content: "";
+  position: absolute;
+  inset: var(--avatar-rim, 7px);
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(145deg, #ffffff33, transparent 45%, #0000000a);
+  box-shadow:
+    inset 0 1px 1px #ffffff66,
+    inset 0 -2px 3px #00000014;
+}
+
+.dark .profile-lock-avatar {
+  background: conic-gradient(
+    from 145deg,
+    #827891,
+    #c8bda8 18%,
+    #766246 33%,
+    #e5d2a7 46%,
+    #f4e9d5 53%,
+    #9c8a70 66%,
+    #8c829e 82%,
+    #d2c9dc 94%,
+    #827891
+  );
+  box-shadow:
+    inset 0 2px 2px #fff6e899,
+    inset 0 -3px 3px #2d243b99,
+    0 2px 3px #00000060,
+    0 7px 12px -4px #00000073,
+    0 15px 24px -10px #00000086;
+}
+
+/* A thin rim without an outer shadow at sidebar scale. */
+.profile-lock-avatar.profile-sidebar-avatar {
+  --avatar-rim: 2px;
+  box-shadow:
+    inset 0 1px 1px #ffffffcc,
+    inset 0 -1px 1px #67566b40;
+}
+.dark .profile-lock-avatar.profile-sidebar-avatar {
+  box-shadow:
+    inset 0 1px 1px #fff6e880,
+    inset 0 -1px 1px #2d243b80;
+}
+
+.profile-loading-avatar {
+  position: relative;
+  isolation: isolate;
+}
+.profile-loading-avatar::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(#e2bc70cc, #aa96d6bb, #f3d697cc, #e2bc70cc);
+  box-shadow: 0 0 18px 5px #d7b97755;
+  filter: blur(7px);
+  opacity: 1;
+  animation: profile-loading-glow 2.4s ease-in-out infinite;
+}
+@keyframes profile-loading-glow {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.99);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-loading-avatar::before {
+    animation: none;
+  }
+}
+
+/* Reuse the branded avatar frame before and after React mounts. */
+.profile-opening-placeholder {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: 94px;
+  height: 94px;
+}
+.profile-opening-placeholder::before {
+  content: "";
+  position: absolute;
+  inset: var(--avatar-rim, 7px);
+  border-radius: inherit;
+  background: #282726 url("/logo-gold.png") center / 48px 48px no-repeat;
+}
+
 /* Prevent mobile viewport bouncing */
 html,
 body {
@@ -16,12 +165,43 @@ body {
 
 /* Simulate a Splash screen before react app mount */
 body {
-  background-color: #09090b;
-  background-image: url("/logo-gold.png");
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: 100px auto;
-  background-attachment: fixed;
+  margin: 0;
+  background-color: #100f0f;
+}
+
+html:not(.profile-opening) #root:empty::before {
+  content: "";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 80px;
+  height: 80px;
+  background: url("/logo-gold.png") center / contain no-repeat;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+html:not(.profile-opening) #root:empty::before,
+.splash-logo-pulse {
+  animation: splash-logo-beat 4s ease-in-out infinite;
+}
+
+@keyframes splash-logo-beat {
+  0%,
+  65%,
+  100% {
+    scale: 1;
+  }
+  25% {
+    scale: 1.06;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(.profile-opening) #root:empty::before,
+  .splash-logo-pulse {
+    animation: none;
+  }
 }
 
 /*
@@ -32,4 +212,21 @@ body {
 #root {
   position: relative;
   background-color: transparent;
+}
+
+/* The shared glow bridges profile selection to React without an asset loader. */
+#profile-splash {
+  display: none;
+}
+.profile-opening #root:empty + #profile-splash {
+  position: fixed;
+  inset: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fffcf0;
+}
+.dark.profile-opening #root:empty + #profile-splash {
+  background-color: #100f0f;
 }

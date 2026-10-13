@@ -24,8 +24,11 @@ export const FORMATTING_REGIONS = [
   "CA",
   "US",
   "GB",
+  "IN",
   "FR",
   "DE",
+  "AT",
+  "CH",
   "ES",
   "MX",
   "BR",
@@ -35,6 +38,8 @@ export const FORMATTING_REGIONS = [
   "JP",
   "KR",
   "IT",
+  "RO",
+  "BG",
 ] as const;
 
 export type FormattingRegionSetting = (typeof FORMATTING_REGIONS)[number];
@@ -43,8 +48,11 @@ const FORMATTING_REGION_LOCALES: Record<Exclude<FormattingRegionSetting, "system
   CA: "en-CA",
   US: "en-US",
   GB: "en-GB",
+  IN: "en-IN",
   FR: "fr-FR",
   DE: "de-DE",
+  AT: "de-AT",
+  CH: "de-CH",
   ES: "es-ES",
   MX: "es-MX",
   BR: "pt-BR",
@@ -54,6 +62,8 @@ const FORMATTING_REGION_LOCALES: Record<Exclude<FormattingRegionSetting, "system
   JP: "ja-JP",
   KR: "ko-KR",
   IT: "it-IT",
+  RO: "ro-RO",
+  BG: "bg-BG",
 };
 
 export interface PercentFormatOptions {
@@ -171,6 +181,8 @@ export interface FormattingApi {
     value: number | string | null | undefined,
     currency: string,
     displayCurrency?: boolean,
+    /** "narrowSymbol" drops locale disambiguation (US$ -> $) for single-currency views. */
+    currencyDisplay?: "symbol" | "narrowSymbol",
   ) => string;
   formatPrice: (
     value: number | string | null | undefined,
@@ -230,6 +242,26 @@ export type DateFormatting = Pick<
   | "parseDate"
 >;
 
+/**
+ * The host reports its locale; it is not a user setting, so an unusable one (POSIX
+ * `C`/`POSIX`, or a tag Intl has no data for) falls through to the next reported
+ * locale and finally to Intl's own default instead of failing startup.
+ */
+function resolveSystemFormattingLocale(): string {
+  const reported =
+    typeof navigator !== "undefined" ? [...(navigator.languages ?? []), navigator.language] : [];
+  for (const tag of reported) {
+    if (!tag) continue;
+    try {
+      const [supported] = Intl.NumberFormat.supportedLocalesOf(tag);
+      if (supported) return supported;
+    } catch {
+      // Not a BCP 47 tag, e.g. "C" from LC_ALL=C.UTF-8.
+    }
+  }
+  return new Intl.NumberFormat().resolvedOptions().locale;
+}
+
 export function resolveFormattingLocale(
   setting: string | null | undefined,
   /** @deprecated UI language no longer affects formatting. */
@@ -239,16 +271,7 @@ export function resolveFormattingLocale(
     throw new Error("A formatting locale is required");
   }
   if (setting === "system") {
-    const systemLocale =
-      typeof navigator !== "undefined" ? navigator.languages?.[0] || navigator.language : undefined;
-    if (!systemLocale) {
-      throw new Error("The system formatting locale is unavailable; provide an explicit locale");
-    }
-    try {
-      return Intl.getCanonicalLocales(systemLocale)[0]!;
-    } catch {
-      throw new Error(`Invalid formatting locale: ${systemLocale}`);
-    }
+    return resolveSystemFormattingLocale();
   }
   try {
     const region = setting.toUpperCase() as Exclude<FormattingRegionSetting, "system">;
@@ -335,7 +358,12 @@ function getCurrencyAffixMatchers(locale: string): { prefix: RegExp; suffix: Reg
   return matchers;
 }
 
-function stripFinancialAffixes(value: string, locale: string): string | null {
+interface FinancialNumberInput {
+  value: string;
+  hasCurrencyAffix: boolean;
+}
+
+function stripFinancialAffixes(value: string, locale: string): FinancialNumberInput | null {
   const affixMatchers = getCurrencyAffixMatchers(locale);
   let result = value.replace(affixMatchers.prefix, "$1").replace(affixMatchers.suffix, "").trim();
   // A pasted machine-formatted value may carry a currency symbol from a
@@ -345,8 +373,9 @@ function stripFinancialAffixes(value: string, locale: string): string | null {
     .replace(/\s*\p{Sc}\s*$/u, "")
     .trim();
   if (/\p{L}|\p{Sc}/u.test(result)) return null;
+  const hasCurrencyAffix = result !== value.trim();
   result = result.replace(/^−/, "-");
-  return result;
+  return result ? { value: result, hasCurrencyAffix } : null;
 }
 
 function hasValidGrouping(value: string, locale: string, parsed: number): boolean {
@@ -379,13 +408,30 @@ function hasValidGrouping(value: string, locale: string, parsed: number): boolea
 const INVARIANT_NUMBER_PATTERN =
   /^[+-]?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
+function normalizeCurrencyGrouping(input: FinancialNumberInput, locale: string): string {
+  const { value, hasCurrencyAffix } = input;
+  const { decimal, group } = separators(locale);
+  // A currency affix or localized decimal mark disambiguates the input.
+  // In de-AT, currency amounts group with dots while decimals group with spaces.
+  if (!hasCurrencyAffix && !value.includes(decimal)) return value;
+  const currencyGroup = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "EUR",
+  })
+    .formatToParts(12345.6)
+    .find((part) => part.type === "group")?.value;
+  return currencyGroup && currencyGroup !== group ? value.replaceAll(currencyGroup, group) : value;
+}
+
 function parsePreparedNumber(
-  value: string,
+  input: FinancialNumberInput,
   locale: string,
   parser: NumberParser,
 ): number | undefined {
-  const localized = parser.parse(value);
-  if (Number.isFinite(localized) && hasValidGrouping(value, locale, localized)) {
+  const { value } = input;
+  const localizedValue = normalizeCurrencyGrouping(input, locale);
+  const localized = parser.parse(localizedValue);
+  if (Number.isFinite(localized) && hasValidGrouping(localizedValue, locale, localized)) {
     return localized;
   }
   if (!INVARIANT_NUMBER_PATTERN.test(value)) return undefined;
@@ -412,13 +458,15 @@ function localizedNumberToInvariant(value: string, locale: string): string | und
 }
 
 function parsePreparedDecimalString(
-  value: string,
+  input: FinancialNumberInput,
   locale: string,
   parser: NumberParser,
 ): string | undefined {
-  const localized = parser.parse(value);
-  if (Number.isFinite(localized) && hasValidGrouping(value, locale, localized)) {
-    return localizedNumberToInvariant(value, locale);
+  const { value } = input;
+  const localizedValue = normalizeCurrencyGrouping(input, locale);
+  const localized = parser.parse(localizedValue);
+  if (Number.isFinite(localized) && hasValidGrouping(localizedValue, locale, localized)) {
+    return localizedNumberToInvariant(localizedValue, locale);
   }
   if (!INVARIANT_NUMBER_PATTERN.test(value)) return undefined;
   return normalizeInvariantNumberString(value);
@@ -426,30 +474,30 @@ function parsePreparedDecimalString(
 
 export function parseLocalizedNumber(value: string, locale: string): number | undefined {
   const resolvedLocale = locale && locale !== "system" ? locale : resolveFormattingLocale(locale);
-  const text = stripFinancialAffixes(
+  const input = stripFinancialAffixes(
     value
       .normalize("NFKC")
       .trim()
       .replace(/[\u061c\u200e\u200f]/gu, ""),
     resolvedLocale,
   );
-  if (!text) return undefined;
+  if (!input) return undefined;
   const parser = new NumberParser(resolvedLocale, { style: "decimal" });
-  return parsePreparedNumber(text, resolvedLocale, parser);
+  return parsePreparedNumber(input, resolvedLocale, parser);
 }
 
 export function parseLocalizedDecimalString(value: string, locale: string): string | undefined {
   const resolvedLocale = locale && locale !== "system" ? locale : resolveFormattingLocale(locale);
-  const text = stripFinancialAffixes(
+  const input = stripFinancialAffixes(
     value
       .normalize("NFKC")
       .trim()
       .replace(/[\u061c\u200e\u200f]/gu, ""),
     resolvedLocale,
   );
-  if (!text) return undefined;
+  if (!input) return undefined;
   const parser = new NumberParser(resolvedLocale, { style: "decimal" });
-  return parsePreparedDecimalString(text, resolvedLocale, parser);
+  return parsePreparedDecimalString(input, resolvedLocale, parser);
 }
 
 const localizedMonths = new Map<string, Map<string, number>>();
@@ -831,7 +879,7 @@ export function createAmountFormatting(
     currencyFractionDigits(currency) {
       return getCurrencyFractionDigits(currency);
     },
-    formatCompactAmount(value, currency, displayCurrency = true) {
+    formatCompactAmount(value, currency, displayCurrency = true, currencyDisplay = "symbol") {
       const amount = numeric(value);
       if (amount == null) return "-";
       const max =
@@ -847,12 +895,13 @@ export function createAmountFormatting(
       if (quoteUnit) return `${compactDecimalFormatter(max).format(amount)}${quoteUnit.symbol}`;
       try {
         const normalizedCurrency = currency?.toUpperCase?.() || "USD";
-        const key = `${normalizedCurrency}:${max}`;
+        const key = `${normalizedCurrency}:${max}:${currencyDisplay}`;
         let formatter = compactFormatters.get(key);
         if (!formatter) {
           formatter = new Intl.NumberFormat(resolvedLocale, {
             style: "currency",
             currency: normalizedCurrency,
+            currencyDisplay,
             notation: "compact",
             maximumFractionDigits: max,
           });
@@ -965,15 +1014,15 @@ export function createNumberFormatting(
         : decimalFormatter.format(value as number);
     },
     parseNumber(value) {
-      const text = stripFinancialAffixes(
+      const input = stripFinancialAffixes(
         value
           .normalize("NFKC")
           .trim()
           .replace(/[\u061c\u200e\u200f]/gu, ""),
         resolvedLocale,
       );
-      if (!text) return undefined;
-      return parsePreparedNumber(text, resolvedLocale, numberParser);
+      if (!input) return undefined;
+      return parsePreparedNumber(input, resolvedLocale, numberParser);
     },
   };
 }

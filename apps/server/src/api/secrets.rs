@@ -5,7 +5,7 @@ use crate::{
     main_lib::AppState,
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     http::StatusCode,
     routing::post,
     Json, Router,
@@ -22,7 +22,7 @@ struct SecretSetBody {
 }
 
 async fn set_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Json(body): Json<SecretSetBody>,
 ) -> ApiResult<StatusCode> {
     validate_unscoped_secret_service_id(&body.secret_key).map_err(ApiError::BadRequest)?;
@@ -39,7 +39,7 @@ struct SecretQuery {
 }
 
 async fn get_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<SecretQuery>,
 ) -> ApiResult<Json<Option<String>>> {
     validate_unscoped_secret_service_id(&q.secret_key).map_err(ApiError::BadRequest)?;
@@ -48,7 +48,7 @@ async fn get_secret(
 }
 
 async fn delete_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Query(q): Query<SecretQuery>,
 ) -> ApiResult<StatusCode> {
     validate_unscoped_secret_service_id(&q.secret_key).map_err(ApiError::BadRequest)?;
@@ -63,7 +63,7 @@ struct AddonSecretSetBody {
 }
 
 async fn set_addon_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(addon_id): Path<String>,
     Json(body): Json<AddonSecretSetBody>,
 ) -> ApiResult<StatusCode> {
@@ -81,7 +81,7 @@ struct AddonSecretQuery {
 }
 
 async fn get_addon_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(addon_id): Path<String>,
     Query(q): Query<AddonSecretQuery>,
 ) -> ApiResult<Json<Option<String>>> {
@@ -101,7 +101,7 @@ async fn get_addon_secret(
 }
 
 async fn delete_addon_secret(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Path(addon_id): Path<String>,
     Query(q): Query<AddonSecretQuery>,
 ) -> ApiResult<StatusCode> {
@@ -113,7 +113,7 @@ async fn delete_addon_secret(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/secrets",

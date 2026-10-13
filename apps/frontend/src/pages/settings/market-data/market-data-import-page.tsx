@@ -37,7 +37,12 @@ export default function MarketDataImportPage() {
       >
         <div className="flex items-center gap-2">
           <QuoteImportHelpPopover />
-          <Button variant="outline" size="sm" onClick={handleStartOver}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStartOver}
+            disabled={quoteImport.isValidating || quoteImport.isImporting}
+          >
             <Icons.Refresh className="mr-2 h-4 w-4" />
             {t("settings:market_data_page.start_over")}
           </Button>

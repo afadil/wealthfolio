@@ -16,8 +16,8 @@ import {
   useDateFormatting,
   useIsMobile,
   useNumberFormatting,
-  usePersistentState,
 } from "@wealthfolio/ui";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 import { CategoryTransactionsSheet } from "../components/reports/category-transactions-sheet";
 import { HeatmapCellSheet } from "../components/reports/heatmap-cell-sheet";
@@ -111,7 +111,11 @@ function previousMonthMatchingRange(range: ReportsRange, timezone?: string | nul
   };
   const priorEnd = {
     ...priorEndBase,
-    day: Math.min(currentEnd.day, daysInCalendarMonth(priorEndBase.year, priorEndBase.month)),
+    // Completed months compare in full; in-progress months keep matching dates.
+    day:
+      currentEnd.day === daysInCalendarMonth(currentEnd.year, currentEnd.month)
+        ? daysInCalendarMonth(priorEndBase.year, priorEndBase.month)
+        : Math.min(currentEnd.day, daysInCalendarMonth(priorEndBase.year, priorEndBase.month)),
   };
 
   return {

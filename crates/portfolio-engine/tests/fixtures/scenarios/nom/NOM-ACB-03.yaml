@@ -1,0 +1,48 @@
+id: NOM-ACB-03
+title: A phantom distribution raises the ACB; one paid as a return of capital cancels out
+intent: >
+  Rules R7.2, R7.4. A notional (phantom) distribution is a taxable
+  distribution reinvested without new units, so New ACB = Previous ACB +
+  Reinvested Distribution (AdjustedCostBase.ca, "Phantom Distributions and
+  Their Effect on Adjusted Cost Base", with iShares XRE's 2013 non-cash
+  distribution of 0.62205 per unit, record date December 31, 2013). A
+  reinvested distribution in the form of a return of capital cancels out:
+  the ACB falls by the return of capital and rises by the reinvestment. A
+  later sale relieves the raised average cost.
+policy:
+  base_currency: CAD
+  timezone: UTC
+  as_of: 2025-01-10
+accounts:
+  - id: acc-1
+    name: Non-registered
+    currency: CAD
+    cost_basis_method: WAC
+assets:
+  - id: xre
+    quote_ccy: CAD
+activities:
+  - { id: dep-1, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 17000 }
+  - { id: buy-1, account: acc-1, type: BUY, date: 2025-01-02T11:00:00Z, asset: xre, quantity: 1000, unit_price: 17, amount: 17000, fee: 0 }
+  - { id: nd-1, account: acc-1, type: ADJUSTMENT, subtype: NOTIONAL_DISTRIBUTION, date: 2025-01-03T10:00:00Z, asset: xre, quantity: 0, unit_price: 0, amount: 622.05 }
+  - { id: roc-1, account: acc-1, type: ADJUSTMENT, subtype: RETURN_OF_CAPITAL, date: 2025-01-06T10:00:00Z, asset: xre, quantity: 0, unit_price: 0, amount: 50 }
+  - { id: nd-2, account: acc-1, type: ADJUSTMENT, subtype: NOTIONAL_DISTRIBUTION, date: 2025-01-06T11:00:00Z, asset: xre, quantity: 0, unit_price: 0, amount: 50 }
+  - { id: sell-1, account: acc-1, type: SELL, date: 2025-01-07T10:00:00Z, asset: xre, quantity: 400, unit_price: 18, amount: 7200, fee: 0 }
+quotes:
+  - { asset: xre, day: 2025-01-02, close: 17 }
+  - { asset: xre, day: 2025-01-03, close: 17 }
+  - { asset: xre, day: 2025-01-06, close: 17.5 }
+  - { asset: xre, day: 2025-01-07, close: 18 }
+  - { asset: xre, day: 2025-01-08, close: 18 }
+  - { asset: xre, day: 2025-01-09, close: 18 }
+  - { asset: xre, day: 2025-01-10, close: 18 }
+expected_notes: >
+  buy-1: 1,000 units, ACB 17,000. nd-1 reinvests 0.62205 x 1,000 = 622.05
+  without new units: ACB 17,622.05, average 17.62205; income 622.05. roc-1
+  and nd-2, a reinvested distribution paid as a return of capital, cancel
+  out: the ACB falls by 50 and rises by 50, back to 17,622.05, and income
+  moves -50 + 50 = 0. sell-1 sells 400 at 18: it relieves 400 / 1,000 of the
+  ACB, 7,048.82, proceeds 7,200, gain 151.18. Left 600 units, ACB 10,573.23,
+  average 17.62205. Cash 17,000 - 17,000 + 7,200 = 7,200. Value 7,200 + 600
+  x 18 = 18,000, a gain of 1,000: income 622.05, realized 151.18,
+  unrealized 10,800 - 10,573.23 = 226.77.

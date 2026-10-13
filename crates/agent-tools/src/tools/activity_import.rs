@@ -14,8 +14,9 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
-use wealthfolio_core::activities::ActivityImport;
+use serde_json::json;
+use wealthfolio_core::activities::{ActivityImport, ImportActivitiesSummary};
+use wealthfolio_core::assets::{InstrumentType, QuoteMode};
 
 use crate::env::AgentEnvironment;
 use crate::scope::AgentScope;
@@ -27,10 +28,10 @@ const MAX_IMPORT_ROWS: usize = 1000;
 /// A CSV row the agent has already mapped to activity fields. Maps to the
 /// core [`ActivityImport`]; omit fields that don't apply (e.g. `symbol` for
 /// pure cash activities).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityImportRow {
-    /// Activity date (the importer accepts ISO and common formats).
+    /// Activity date: `YYYY-MM-DD` or an RFC 3339 timestamp.
     pub date: String,
     pub activity_type: String,
     pub currency: String,
@@ -38,6 +39,23 @@ pub struct ActivityImportRow {
     pub symbol: Option<String>,
     #[serde(default)]
     pub symbol_name: Option<String>,
+    /// Reviewed identity, using the same fields as the CSV importer.
+    #[serde(default)]
+    pub asset_id: Option<String>,
+    #[serde(default)]
+    pub instrument_type: Option<String>,
+    #[serde(default)]
+    pub exchange_mic: Option<String>,
+    #[serde(default)]
+    pub quote_ccy: Option<String>,
+    #[serde(default)]
+    pub quote_mode: Option<QuoteMode>,
+    #[serde(default)]
+    pub isin: Option<String>,
+    #[serde(default)]
+    pub provider_id: Option<String>,
+    #[serde(default)]
+    pub provider_symbol: Option<String>,
     #[serde(default)]
     pub quantity: Option<f64>,
     #[serde(default)]
@@ -78,6 +96,14 @@ pub struct ImportRowResult {
     pub is_valid: bool,
     pub is_duplicate: bool,
     // ── Resolved asset identity (populated during validation) ──────────────
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub isin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_symbol: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -134,6 +160,11 @@ fn flatten_messages(map: &Option<std::collections::HashMap<String, Vec<String>>>
         .unwrap_or_default()
 }
 
+/// A row validation rejected; duplicates are warnings, not rejections.
+fn is_rejected(row: &ActivityImport) -> bool {
+    !row.is_valid || row.errors.as_ref().is_some_and(|e| !e.is_empty())
+}
+
 fn is_duplicate(row: &ActivityImport) -> bool {
     row.duplicate_of_id.is_some() || row.duplicate_of_line_number.is_some()
 }
@@ -146,6 +177,10 @@ fn to_result(row: &ActivityImport) -> ImportRowResult {
         activity_type: row.activity_type.clone(),
         is_valid: row.is_valid,
         is_duplicate: is_duplicate(row),
+        asset_id: row.asset_id.clone(),
+        isin: row.isin.clone(),
+        provider_id: row.provider_id.clone(),
+        provider_symbol: row.provider_symbol.clone(),
         symbol_name: row.symbol_name.clone(),
         exchange_mic: row.exchange_mic.clone(),
         quote_ccy: row.quote_ccy.clone(),
@@ -158,8 +193,48 @@ fn to_result(row: &ActivityImport) -> ImportRowResult {
     }
 }
 
-/// Convert the lean input rows into core `ActivityImport`s via serde (only
-/// present fields are set, so optional columns fall back to defaults).
+/// Match CSV label normalization while reusing the domain's instrument aliases.
+fn normalize_instrument_type(value: &str) -> Option<InstrumentType> {
+    let normalized = value
+        .trim()
+        .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("");
+    // Keep this allowlist aligned with the CSV importer's instrument-type.ts.
+    // The provider parser also accepts futures and money-market labels, which
+    // CSV does not support as explicit types or symbol prefixes.
+    match normalized.to_uppercase().as_str() {
+        "OPT" => Some(InstrumentType::Option),
+        "EQUITY" | "STOCK" | "ETF" | "MUTUALFUND" | "INDEX" | "BOND" | "FIXEDINCOME" | "DEBT"
+        | "OPTION" | "CRYPTO" | "CRYPTOCURRENCY" | "FX" | "FOREX" | "CURRENCY" | "METAL"
+        | "COMMODITY" => InstrumentType::from_external_str(&normalized),
+        _ => None,
+    }
+}
+
+/// CSV recognizes typed prefixes before sending rows to the shared importer.
+/// MCP needs the same preprocessing; otherwise `crypto:BNB-EUR` retains
+/// `crypto:` in the canonical asset symbol. Unknown prefixes remain symbols.
+fn split_instrument_prefixed_symbol(symbol: &str) -> (&str, Option<InstrumentType>) {
+    let symbol = symbol.trim();
+    if let Some((prefix, value)) = symbol.split_once(':') {
+        let value = value.trim();
+        let valid_prefix = (1..=21).contains(&prefix.len())
+            && prefix.starts_with(|c: char| c.is_ascii_alphabetic())
+            && prefix
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c.is_whitespace());
+        if valid_prefix && !value.is_empty() {
+            if let Some(kind) = normalize_instrument_type(prefix) {
+                return (value, Some(kind));
+            }
+        }
+    }
+    (symbol, None)
+}
+
+/// Convert the input allowlist into core rows, normalizing CSV identity hints.
 fn to_import_rows(rows: &[ActivityImportRow]) -> Result<Vec<ActivityImport>, AgentToolError> {
     if rows.is_empty() {
         return Err(AgentToolError::InvalidInput(
@@ -175,44 +250,27 @@ fn to_import_rows(rows: &[ActivityImportRow]) -> Result<Vec<ActivityImport>, Age
     rows.iter()
         .enumerate()
         .map(|(index, row)| {
-            let mut obj = Map::new();
-            obj.insert("date".into(), json!(row.date));
-            obj.insert(
-                "symbol".into(),
-                json!(row.symbol.clone().unwrap_or_default()),
-            );
-            obj.insert("activityType".into(), json!(row.activity_type));
-            obj.insert("currency".into(), json!(row.currency));
-            obj.insert("isDraft".into(), json!(false));
-            obj.insert("isValid".into(), json!(false));
-            obj.insert("forceImport".into(), json!(row.force_import));
-            obj.insert(
-                "lineNumber".into(),
-                json!(row.line_number.unwrap_or((index + 1) as i32)),
-            );
-            if let Some(v) = row.quantity {
-                obj.insert("quantity".into(), json!(v));
-            }
-            if let Some(v) = row.unit_price {
-                obj.insert("unitPrice".into(), json!(v));
-            }
-            if let Some(v) = row.amount {
-                obj.insert("amount".into(), json!(v));
-            }
-            if let Some(v) = row.fee {
-                obj.insert("fee".into(), json!(v));
-            }
-            if let Some(v) = &row.account_id {
-                obj.insert("accountId".into(), json!(v));
-            }
-            if let Some(v) = &row.symbol_name {
-                obj.insert("symbolName".into(), json!(v));
-            }
-            if let Some(v) = &row.comment {
-                obj.insert("comment".into(), json!(v));
-            }
-            serde_json::from_value::<ActivityImport>(Value::Object(obj))
-                .map_err(AgentToolError::from)
+            // Serialize the input allowlist so identity fields survive both tools.
+            // Validation status always belongs to the backend, never to the caller.
+            let mut obj = serde_json::to_value(row)?;
+            let (symbol, prefix_type) =
+                split_instrument_prefixed_symbol(row.symbol.as_deref().unwrap_or_default());
+            let instrument_type = match row.instrument_type.as_deref() {
+                Some(value) => Some(normalize_instrument_type(value).ok_or_else(|| {
+                    AgentToolError::InvalidInput(format!(
+                        "Row {}: unsupported instrumentType '{}'.",
+                        index + 1,
+                        value
+                    ))
+                })?),
+                None => prefix_type,
+            };
+            obj["symbol"] = json!(symbol);
+            obj["instrumentType"] = json!(instrument_type.map(|kind| kind.as_db_str()));
+            obj["isDraft"] = json!(false);
+            obj["isValid"] = json!(false);
+            obj["lineNumber"] = json!(row.line_number.unwrap_or((index + 1) as i32));
+            serde_json::from_value::<ActivityImport>(obj).map_err(AgentToolError::from)
         })
         .collect()
 }
@@ -314,7 +372,7 @@ impl AgentTool for PrepareActivityImport {
     }
 
     fn description(&self) -> &'static str {
-        "Validate a batch of activity rows you mapped from a CSV and detect duplicates, WITHOUT importing. Returns each row's validity, errors/warnings, and whether it duplicates an existing or in-batch activity, plus a summary. Review duplicates with the user, then call commit_activity_import (set forceImport on rows to import despite a duplicate)."
+        "Validate a batch of activity rows you mapped from a CSV and detect duplicates, WITHOUT importing. Returns each row's validity, errors/warnings, and whether it duplicates an existing or in-batch activity, plus a summary. Review resolved asset identities and duplicates with the user. Merge each reviewed row's assetId, symbol, instrumentType, exchangeMic, quoteCcy, quoteMode, providerId and providerSymbol into the original input before calling commit_activity_import (set forceImport on rows to import despite a duplicate)."
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -378,7 +436,7 @@ impl AgentTool for PrepareActivityImport {
 #[serde(rename_all = "camelCase")]
 pub struct CommitActivityImportOutput {
     pub import_run_id: String,
-    pub summary: wealthfolio_core::activities::ImportActivitiesSummary,
+    pub summary: ImportActivitiesSummary,
     /// Rows that failed validation/import (with their errors).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub failed: Vec<ImportRowResult>,
@@ -394,7 +452,7 @@ impl AgentTool for CommitActivityImport {
     }
 
     fn description(&self) -> &'static str {
-        "Import a batch of mapped activity rows through Wealthfolio's import pipeline as one import run. Duplicates are skipped unless a row sets forceImport=true. This MUTATES data — only call after previewing with prepare_activity_import and confirming with the user. Returns the import run id, a summary (imported/skipped/duplicates/assets created), and any failed rows."
+        "Import a batch of mapped activity rows through Wealthfolio's import pipeline as one import run. Include the reviewed identity fields returned by prepare_activity_import to preserve the selected assets; bare symbols are resolved again. Duplicates are skipped unless a row sets forceImport=true. Nothing is imported if any row fails validation; fix or remove the failed rows and retry. A row that passes validation but fails while being written is skipped and listed in failed, with success false; the other rows are still imported. This MUTATES data — only call after previewing with prepare_activity_import and confirming with the user. Returns the import run id, a summary (imported/skipped/duplicates/assets created), and any failed rows."
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -442,6 +500,34 @@ impl AgentTool for CommitActivityImport {
             .await
             .map_err(|e| AgentToolError::ExecutionFailed(e.to_string()))?;
 
+        // Import nothing when validation rejects a row, as the importer does for
+        // the errors it checks itself. Its checks are lighter, so a row the
+        // preview rejected (an unknown ticker that carries a quoteCcy) was
+        // otherwise imported and reported as both imported and failed.
+        let failed: Vec<ImportRowResult> = checked
+            .iter()
+            .filter(|row| is_rejected(row))
+            .map(to_result)
+            .collect();
+        if !failed.is_empty() {
+            let output = CommitActivityImportOutput {
+                import_run_id: String::new(),
+                summary: ImportActivitiesSummary {
+                    total: checked.len() as u32,
+                    imported: 0,
+                    skipped: checked.len() as u32,
+                    duplicates: 0,
+                    assets_created: 0,
+                    success: false,
+                    error_message: Some("Validation errors found in activities.".to_string()),
+                },
+                failed,
+            };
+            return Ok(AgentToolResult {
+                content: serde_json::to_value(output)?,
+            });
+        }
+
         let result = env
             .activity_service()
             .import_activities(checked)
@@ -456,13 +542,23 @@ impl AgentTool for CommitActivityImport {
         let failed: Vec<ImportRowResult> = result
             .activities
             .iter()
-            .filter(|r| !r.is_valid || r.errors.as_ref().is_some_and(|e| !e.is_empty()))
+            .filter(|row| is_rejected(row))
             .map(to_result)
             .collect();
 
+        // A row the check passed can still fail while being written (a split
+        // with a zero ratio fails its account's batch). The importer skips it
+        // and still reports success; the caller must not read that as success.
+        let mut summary = result.summary;
+        if !failed.is_empty() && summary.success {
+            summary.success = false;
+            summary.error_message.get_or_insert_with(|| {
+                "Some activities failed while being written; see failed.".to_string()
+            });
+        }
         let output = CommitActivityImportOutput {
             import_run_id: result.import_run_id,
-            summary: result.summary,
+            summary,
             failed,
         };
         Ok(AgentToolResult {
@@ -476,11 +572,19 @@ fn activity_row_schema() -> serde_json::Value {
     json!({
         "type": "object",
         "properties": {
-            "date": { "type": "string", "description": "Activity date (ISO or common format)." },
+            "date": { "type": "string", "description": "YYYY-MM-DD, or an RFC 3339 timestamp such as 2026-04-01T09:30:00-04:00. A bare date is stored on that day in the configured timezone." },
             "activityType": { "type": "string", "description": "e.g. BUY, SELL, DEPOSIT, DIVIDEND." },
             "currency": { "type": "string" },
-            "symbol": { "type": "string", "description": "Ticker; omit for pure cash activities." },
+            "symbol": { "type": "string", "description": "Ticker or typed symbol such as crypto:BNB-EUR, bond:<ISIN>, option:<OCC>. Omit when selecting assetId or for pure cash activities." },
             "symbolName": { "type": "string" },
+            "assetId": { "type": "string", "description": "Existing asset UUID selected during review. Omit symbol to use the stored identity; do not put UUIDs in symbol." },
+            "instrumentType": { "type": "string", "description": "EQUITY, CRYPTO, FX, OPTION, METAL or BOND (case-insensitive; CSV aliases accepted). Takes precedence over a typed symbol prefix." },
+            "exchangeMic": { "type": "string", "description": "Reviewed exchange MIC, e.g. XNAS or XETR." },
+            "quoteCcy": { "type": "string", "description": "Asset quote currency, distinct from the activity currency." },
+            "quoteMode": { "type": "string", "enum": ["MARKET", "MANUAL"] },
+            "isin": { "type": "string", "description": "Security ISIN used by the CSV asset resolver." },
+            "providerId": { "type": "string", "description": "Market data provider returned during review." },
+            "providerSymbol": { "type": "string", "description": "Provider-native symbol returned during review." },
             "quantity": { "type": "number" },
             "unitPrice": { "type": "number" },
             "amount": { "type": "number" },
@@ -505,6 +609,14 @@ mod tests {
             currency: "USD".to_string(),
             symbol: Some("AAPL".to_string()),
             symbol_name: None,
+            asset_id: None,
+            instrument_type: None,
+            exchange_mic: None,
+            quote_ccy: None,
+            quote_mode: None,
+            isin: None,
+            provider_id: None,
+            provider_symbol: None,
             quantity: Some(10.0),
             unit_price: Some(150.25),
             amount: None,
@@ -530,11 +642,178 @@ mod tests {
     }
 
     #[test]
+    fn preserves_unknown_suffix_for_core_import_resolution() {
+        let mut input = row(false);
+        input.symbol = Some("ABC.ZZ".to_string());
+
+        let mapped = to_import_rows(&[input]).unwrap();
+
+        assert_eq!(mapped[0].symbol, "ABC.ZZ");
+        assert_eq!(mapped[0].exchange_mic, None);
+    }
+
+    #[test]
     fn cash_row_without_symbol_defaults_to_empty() {
         let mut r = row(false);
         r.symbol = None;
         let mapped = to_import_rows(&[r]).unwrap();
         assert_eq!(mapped[0].symbol, "");
+    }
+
+    #[test]
+    fn typed_symbols_are_normalized_before_resolution() {
+        for (input, symbol, kind) in [
+            (" crypto:BNB-EUR ", "BNB-EUR", "CRYPTO"),
+            ("CRYPTOCURRENCY:PEPE-EUR", "PEPE-EUR", "CRYPTO"),
+            ("bond : US037833DU14", "US037833DU14", "BOND"),
+            ("fixed income:US037833DU14", "US037833DU14", "BOND"),
+            ("opt:AAPL260918C00200000", "AAPL260918C00200000", "OPTION"),
+        ] {
+            let mut input_row = row(false);
+            input_row.symbol = Some(input.to_string());
+            let mapped = to_import_rows(&[input_row]).unwrap();
+            assert_eq!(mapped[0].symbol, symbol);
+            assert_eq!(mapped[0].instrument_type.as_deref(), Some(kind));
+        }
+        for symbol in ["BNB", "PEPE", "vendor:BNB-EUR", "crypto:", "1crypto:BNB"] {
+            assert_eq!(split_instrument_prefixed_symbol(symbol), (symbol, None));
+        }
+    }
+
+    #[test]
+    fn explicit_type_takes_precedence_over_prefix_like_csv() {
+        let mut input = row(false);
+        input.symbol = Some("crypto:BNB-EUR".to_string());
+        input.instrument_type = Some("stock".to_string());
+        let mapped = to_import_rows(&[input]).unwrap();
+        assert_eq!(mapped[0].symbol, "BNB-EUR");
+        assert_eq!(mapped[0].instrument_type.as_deref(), Some("EQUITY"));
+    }
+
+    #[test]
+    fn explicit_crypto_hint_is_not_discarded_for_bare_tickers() {
+        for symbol in ["BNB", "PEPE"] {
+            for kind in ["CRYPTO", "Crypto", "crypto", "CRYPTOCURRENCY"] {
+                let mut input = row(false);
+                input.symbol = Some(symbol.to_string());
+                input.instrument_type = Some(kind.to_string());
+                let mapped = to_import_rows(&[input]).unwrap();
+                assert_eq!(mapped[0].symbol, symbol);
+                assert_eq!(mapped[0].instrument_type.as_deref(), Some("CRYPTO"));
+            }
+        }
+    }
+
+    #[test]
+    fn provider_only_aliases_do_not_expand_csv_import_types() {
+        // CSV deliberately leaves these prefixes intact; the broader provider
+        // parser must not silently reinterpret an unsupported instrument.
+        for label in ["future", "FUTURES", "money_market"] {
+            let symbol = format!("{label}:CL2412");
+            let mut input = row(false);
+            input.symbol = Some(symbol.clone());
+            let mapped = to_import_rows(&[input.clone()]).unwrap();
+            assert_eq!(mapped[0].symbol, symbol);
+            assert_eq!(mapped[0].instrument_type, None);
+
+            input.instrument_type = Some(label.to_string());
+            assert!(matches!(
+                to_import_rows(&[input]),
+                Err(AgentToolError::InvalidInput(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn unsupported_identity_labels_are_rejected() {
+        let mut input = row(false);
+        input.instrument_type = Some("CRPYTO".to_string());
+        assert!(matches!(
+            to_import_rows(&[input]),
+            Err(AgentToolError::InvalidInput(_))
+        ));
+        let mut value = serde_json::to_value(row(false)).unwrap();
+        value["quoteMode"] = json!("UNKNOWN");
+        assert!(serde_json::from_value::<ActivityImportRow>(value).is_err());
+    }
+
+    #[test]
+    fn existing_asset_can_be_selected_without_a_symbol() {
+        let mut value = serde_json::to_value(row(false)).unwrap();
+        value["assetId"] = json!("crypto-bnb-id");
+        value.as_object_mut().unwrap().remove("symbol");
+        // Backend-owned validation fields cannot be injected through the tool.
+        value["isValid"] = json!(true);
+        value["isDraft"] = json!(true);
+        let input: ActivityImportRow = serde_json::from_value(value).unwrap();
+        let mapped = to_import_rows(&[input]).unwrap();
+        assert_eq!(mapped[0].asset_id.as_deref(), Some("crypto-bnb-id"));
+        assert_eq!(mapped[0].symbol, "");
+        assert!(!mapped[0].is_valid);
+        assert!(!mapped[0].is_draft);
+    }
+
+    #[test]
+    fn reviewed_identity_survives_preview_and_commit_mapping() {
+        for asset_id in [None, Some("existing-id")] {
+            let mut input = serde_json::to_value(row(false)).unwrap();
+            let identity = json!({
+                "assetId": asset_id,
+                "symbol": "BNB",
+                "symbolName": "Binance Coin",
+                "instrumentType": "CRYPTO",
+                "exchangeMic": null,
+                "quoteCcy": "EUR",
+                "quoteMode": "MARKET",
+                "isin": null,
+                "providerId": "YAHOO",
+                "providerSymbol": "BNB-EUR"
+            });
+            input
+                .as_object_mut()
+                .unwrap()
+                .extend(identity.as_object().unwrap().clone());
+            let parsed: ActivityImportRow = serde_json::from_value(input.clone()).unwrap();
+            let checked = to_import_rows(&[parsed]).unwrap().remove(0);
+            let preview = serde_json::to_value(to_result(&checked)).unwrap();
+            for (field, value) in identity.as_object().unwrap() {
+                if !value.is_null() {
+                    assert_eq!(&preview[field], value, "preview dropped {field}");
+                }
+            }
+            // Clients merge reviewed fields into their original financial row.
+            input
+                .as_object_mut()
+                .unwrap()
+                .extend(preview.as_object().unwrap().clone());
+            let commit: ActivityImportRow = serde_json::from_value(input).unwrap();
+            let committed = to_import_rows(&[commit]).unwrap().remove(0);
+            assert_eq!(committed.asset_id, checked.asset_id);
+            assert_eq!(committed.provider_symbol, checked.provider_symbol);
+            assert_eq!(committed.instrument_type, checked.instrument_type);
+            assert_eq!(committed.quote_ccy, checked.quote_ccy);
+            assert_eq!(committed.quantity, checked.quantity);
+        }
+    }
+
+    #[test]
+    fn both_tools_advertise_the_csv_identity_fields() {
+        let prepare = PrepareActivityImport.input_schema();
+        let commit = CommitActivityImport.input_schema();
+        assert_eq!(prepare, commit);
+        let properties = &prepare["properties"]["activities"]["items"]["properties"];
+        for field in [
+            "assetId",
+            "instrumentType",
+            "exchangeMic",
+            "quoteCcy",
+            "quoteMode",
+            "isin",
+            "providerId",
+            "providerSymbol",
+        ] {
+            assert!(properties.get(field).is_some(), "missing {field}");
+        }
     }
 
     #[test]

@@ -24,13 +24,13 @@ pub use broker::{
 };
 
 // Re-export the HTTP client and public functions
-pub use client::{fetch_subscription_plans_public, ConnectApiClient, DEFAULT_CLOUD_API_URL};
+pub use client::{default_cloud_api_url, fetch_subscription_plans_public, ConnectApiClient};
 pub use post_login_bootstrap::{
     acquire_broker_sync_guard, BrokerSyncRunGuard, PostLoginBootstrapReason,
     PostLoginBootstrapResult, PostLoginBootstrapStatus, PostLoginBootstrapSyncResult,
 };
 pub use token_lifecycle::{
-    clear_restored_installation_credentials, ensure_valid_access_token, TokenLifecycleConfig,
+    clear_restored_sync_identity, ensure_valid_access_token, TokenLifecycleConfig,
     TokenLifecycleError, TokenLifecycleState, CLOUD_ACCESS_TOKEN_KEY, CLOUD_REFRESH_TOKEN_KEY,
 };
 

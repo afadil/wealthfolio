@@ -6,7 +6,7 @@ use crate::{
 };
 use axum::{
     body::{Body, Bytes},
-    extract::{Path, State},
+    extract::Path,
     http::{header, HeaderMap},
     response::Response,
     routing::{get, post},
@@ -32,7 +32,7 @@ struct ExportJob {
 }
 pub struct BackupExports {
     jobs: Mutex<Vec<ExportJob>>,
-    slot: Arc<Semaphore>,
+    pub(crate) slot: Arc<Semaphore>,
     outstanding: Arc<Semaphore>,
 }
 impl Default for BackupExports {
@@ -129,7 +129,7 @@ struct ExportResponse {
 }
 
 async fn export_snapshot(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Extension(session): Extension<BackupSession>,
     Path(filename): Path<String>,
     headers: HeaderMap,
@@ -160,13 +160,15 @@ async fn export_snapshot(
     let root = state.data_root.clone();
     let key = state.database_key.clone();
     let id = Uuid::new_v4();
+    let owner = state._database_owner.clone();
     let output = tokio::task::spawn_blocking(move || {
+        let _owner = owner;
         let _permit = permit;
         let lease = db::snapshots::acquire(&root, &filename)?;
         let source = lease.access(Some(key))?;
         let file = db::portable::export(
             &source,
-            &db::scratch_dir(&root)?,
+            &db::profile_scratch_dir(&root)?,
             password.as_deref().map(String::as_str),
         )?;
         Ok::<_, anyhow::Error>(ExportJob {
@@ -178,7 +180,10 @@ async fn export_snapshot(
         })
     })
     .await
-    .map_err(|_| ApiError::Internal("Backup export task failed".into()))?
+    .map_err(|error| {
+        tracing::error!(panic = error.is_panic(), "Backup export task failed");
+        ApiError::Internal("Backup export task failed".into())
+    })?
     .map_err(ApiError::backup)?;
     let filename = output.file.filename.clone();
     state.backup_exports.jobs()?.push(output);
@@ -186,7 +191,7 @@ async fn export_snapshot(
 }
 
 async fn download_export(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Extension(session): Extension<BackupSession>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Response> {
@@ -217,7 +222,7 @@ async fn download_export(
 }
 
 async fn discard_export(
-    State(state): State<Arc<AppState>>,
+    axum::Extension(state): axum::Extension<Arc<AppState>>,
     Extension(session): Extension<BackupSession>,
     Path(id): Path<Uuid>,
     headers: HeaderMap,
@@ -227,7 +232,7 @@ async fn discard_export(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
-pub fn router() -> Router<Arc<AppState>> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/utilities/database/backups/{filename}/export",

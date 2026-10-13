@@ -450,7 +450,14 @@ export function InsightsDashboard({ widgets, onCustomizeActionChange }: Insights
                           current.layouts.desktop.find((item) => item.i === "targets")?.y ===
                             current.layouts.desktop.find((item) => item.i === "composition")?.y
                         ? heights.desktop?.composition
-                        : undefined
+                        : id === "concentration" &&
+                            breakpoint !== "mobile" &&
+                            !current.hiddenWidgets.includes("movers") &&
+                            current.layouts[breakpoint].find((item) => item.i === "concentration")
+                              ?.y ===
+                              current.layouts[breakpoint].find((item) => item.i === "movers")?.y
+                          ? heights[breakpoint]?.movers
+                          : undefined
                   }
                 >
                   {widgets[id]}

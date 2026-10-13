@@ -11,7 +11,16 @@ interface SyncStatusIconProps {
 export function SyncStatusIcon({ status, className }: SyncStatusIconProps) {
   const iconClassName = cn("size-6", className);
 
-  if (status === "subscription_required") {
+  if (status === "restoring")
+    return (
+      <Icons.Spinner
+        className={cn(
+          iconClassName,
+          "text-muted-foreground animate-spin motion-reduce:animate-none",
+        )}
+      />
+    );
+  if (status === "subscription_required" || status === "unavailable") {
     return <CloudWarningIcon weight="duotone" className={cn(iconClassName, "text-warning")} />;
   }
 

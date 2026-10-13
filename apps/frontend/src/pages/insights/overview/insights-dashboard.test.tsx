@@ -195,6 +195,37 @@ describe("insights dashboard editing", () => {
     expect(state.gridProps.layouts.desktop.find((item) => item.i === "value")?.h).toBe(98);
   });
 
+  it.each([
+    [1200, false, false, "520px"],
+    [800, false, false, "520px"],
+    [390, false, false, ""],
+    [1200, true, false, ""],
+    [1200, false, true, ""],
+  ] as const)(
+    "aligns Concentration with Top Movers only when visible side by side (%s, %s, %s)",
+    (width, stacked, hidden, expected) => {
+      state.width = width;
+      const saved = defaultInsightsLayout();
+      const key = width > 1100 ? "desktop" : width > 700 ? "tablet" : "mobile";
+      const movers = saved.layouts[key].find((item) => item.i === "movers")!;
+      const concentration = saved.layouts[key].find((item) => item.i === "concentration")!;
+      concentration.y = movers.y + (stacked ? 600 : 0);
+      if (hidden) saved.hiddenWidgets.push("movers");
+      state.settings.insightsOverviewLayout = saved;
+      render(<InsightsDashboard widgets={widgets} />);
+      const observer = observers.find(({ element }) => element?.textContent === "widget:movers");
+      if (observer) {
+        vi.spyOn(observer.element!, "getBoundingClientRect").mockReturnValue({
+          height: 520,
+        } as DOMRect);
+        act(() => observer.callback([], {} as ResizeObserver));
+      }
+      expect(screen.getByText("widget:concentration").parentElement?.style.minHeight).toBe(
+        expected,
+      );
+    },
+  );
+
   it("only enables dragging while editing and Cancel restores saved visibility without writing", () => {
     render(<InsightsDashboard widgets={widgets} />);
     expect(state.gridProps.dragConfig.enabled).toBe(false);
