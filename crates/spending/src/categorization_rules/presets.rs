@@ -90,6 +90,7 @@ const PRESET_JSONS: &[(&str, &str)] = &[
     ("gb", include_str!("../../seeds/presets/gb.json")),
     ("es", include_str!("../../seeds/presets/es.json")),
     ("fr", include_str!("../../seeds/presets/fr.json")),
+    ("nl", include_str!("../../seeds/presets/nl.json")),
     ("au", include_str!("../../seeds/presets/au.json")),
     ("nz", include_str!("../../seeds/presets/nz.json")),
     ("se", include_str!("../../seeds/presets/se.json")),
@@ -263,8 +264,46 @@ mod tests {
     }
 
     #[test]
+    fn dutch_merchants_match_specific_categories() {
+        for (notes, category) in [
+            ("BEA, Betaalpas ALBERT HEIJN 1234,PAS123", "groceries"),
+            ("Jumbo Utrecht", "groceries"),
+            ("NS GROEP IZ NS REIZIGERS", "transport_public"),
+            ("Q-Park Nederland", "transport_parking"),
+            ("Eneco Services", "housing_utilities"),
+            ("Gemeentelijke belastingen Amsterdam", "housing_utilities"),
+            ("Zilveren Kruis Zorgverzekeringen", "health_insurance"),
+            ("Ziggo Services BV", "bills_internet"),
+            ("Thuisbezorgd.nl", "food_delivery"),
+            ("Kosten OranjePakket", "fees_bank"),
+            ("Coolblue BV", "shopping_electronics"),
+            ("Basic-Fit Nederland", "health_fitness"),
+        ] {
+            assert_eq!(
+                match_preset("nl", notes).as_deref(),
+                Some(category),
+                "{notes}"
+            );
+        }
+    }
+
+    #[test]
+    fn dutch_merchants_require_complete_names() {
+        for notes in [
+            "JUMBOREE",
+            "SPARTA ROTTERDAM",
+            "TRANSACTION 123",
+            "PICNICTAFEL",
+            "HUUR FIETS",
+            "GAMMASTRALING",
+        ] {
+            assert_eq!(match_preset("nl", notes), None, "{notes}");
+        }
+    }
+
+    #[test]
     fn bundled_presets_have_unique_keys_and_valid_regexes() {
-        for preset_id in ["us", "ca", "gb", "es", "fr", "au", "nz", "se"] {
+        for preset_id in ["us", "ca", "gb", "es", "fr", "nl", "au", "nz", "se"] {
             let preset = load_preset(preset_id).expect("preset should load");
             assert_eq!(preset.preset_id, preset_id);
             assert!(!preset.rules.is_empty(), "preset {preset_id} has no rules");
