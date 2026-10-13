@@ -232,7 +232,7 @@ async function getDesktopWindow() {
   const platform = await getPlatform();
   if (!platform.is_desktop) return null;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  return { window: getCurrentWindow(), os: platform.os };
+  return getCurrentWindow();
 }
 
 // Helper function to apply settings to the document
@@ -290,42 +290,19 @@ const applySettingsToDocument = async (newSettings: Settings) => {
     // On desktop, also sync with the window theme + listen to OS changes
     (async () => {
       try {
-        const desktop = await getDesktopWindow();
-        if (!desktop || application !== appearanceGeneration) return;
-        const currentWindow = desktop.window;
-        let current: "light" | "dark" | null;
-        if (desktop.os === "linux") {
-          // setTheme(null) forces GTK light. Read the desktop preference instead;
-          // window.theme() may still hold the user's previous explicit choice.
-          const { getSystemTheme } = await import("../adapters/tauri/settings");
-          current = await getSystemTheme();
-          if (!current || application !== appearanceGeneration) return;
-          await currentWindow.setTheme(current);
-        } else {
-          await currentWindow.setTheme(null);
-          current = await currentWindow.theme();
-        }
+        const currentWindow = await getDesktopWindow();
+        if (!currentWindow || application !== appearanceGeneration) return;
+        await currentWindow.setTheme(null);
+        const current = await currentWindow.theme();
         if (application !== appearanceGeneration) return;
         if (current === "dark" || current === "light") {
           applyResolvedTheme(current);
         }
-        const handleThemeChange = ({ payload }: { payload: "light" | "dark" }) => {
+        const unlisten = await currentWindow.onThemeChanged(({ payload }) => {
           if (application !== appearanceGeneration) return;
           const next = payload === "dark" ? "dark" : "light";
           applyResolvedTheme(next);
-          if (desktop.os === "linux") {
-            void currentWindow
-              .setTheme(next)
-              .catch(() => logger.error("Error setting window theme."));
-          }
-        };
-        let unlisten: () => void;
-        if (desktop.os === "linux") {
-          const { listenSystemThemeChanged } = await import("../adapters/tauri/events");
-          unlisten = await listenSystemThemeChanged<"light" | "dark">(handleThemeChange);
-        } else {
-          unlisten = await currentWindow.onThemeChanged(handleThemeChange);
-        }
+        });
         if (application !== appearanceGeneration) unlisten();
         else tauriThemeUnlisten = unlisten;
       } catch {
@@ -344,9 +321,9 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   // On desktop, match the window theme to the explicit mode
   (async () => {
     try {
-      const desktop = await getDesktopWindow();
-      if (!desktop || application !== appearanceGeneration) return;
-      await desktop.window.setTheme(explicit);
+      const currentWindow = await getDesktopWindow();
+      if (!currentWindow || application !== appearanceGeneration) return;
+      await currentWindow.setTheme(explicit);
     } catch {
       logger.error("Error setting window theme.");
     }

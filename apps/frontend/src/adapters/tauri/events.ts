@@ -1,7 +1,6 @@
 import { matchesProfileScope } from "@/features/profiles/session";
 
 export const DATABASE_STATE_CHANGED = "database-state-changed";
-const SYSTEM_THEME_CHANGED = "system-theme-changed";
 
 // Event Listeners
 import type {
@@ -38,13 +37,6 @@ const adaptUnlisten = (unlisten: TauriUnlistenFn): UnlistenFn => {
       // Listener was never fully registered or already removed — safe to ignore.
     }
   };
-};
-
-export const listenSystemThemeChanged = async <T>(
-  handler: EventCallback<T>,
-): Promise<UnlistenFn> => {
-  const unlisten = await listen<T>(SYSTEM_THEME_CHANGED, adaptCallback(handler));
-  return adaptUnlisten(unlisten);
 };
 
 export const listenFileDropHover = async <T>(handler: EventCallback<T>): Promise<UnlistenFn> => {

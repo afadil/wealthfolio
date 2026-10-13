@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), scope: vi.fn(() => "profile") }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/plugin-log", () => ({
   error: vi.fn(),
@@ -9,19 +9,10 @@ vi.mock("@tauri-apps/plugin-log", () => ({
   trace: vi.fn(),
 }));
 vi.mock("@/features/profiles/session", () => ({
-  profileScope: () => mocks.scope(),
+  profileScope: () => "profile",
   revokeProfileSession: vi.fn(),
 }));
 import { invoke } from "./core";
-it("reads the native system theme without acquiring a portfolio scope", async () => {
-  mocks.scope.mockImplementation(() => {
-    throw new Error("PROFILE_LOCKED");
-  });
-  mocks.invoke.mockResolvedValue("dark");
-  await expect(invoke("get_system_theme")).resolves.toBe("dark");
-  expect(mocks.invoke).toHaveBeenCalledWith("get_system_theme", undefined);
-  expect(mocks.scope).not.toHaveBeenCalled();
-});
 afterEach(() => {
   vi.useRealTimers();
   vi.resetAllMocks();
