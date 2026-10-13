@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{error::ApiResult, main_lib::AppState};
 use axum::{
-    extract::{Multipart, Path, Query},
+    extract::{DefaultBodyLimit, Multipart, Path, Query},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -442,6 +442,10 @@ async fn parse_csv_endpoint(
     Ok(Json(result))
 }
 
+/// Imports send every row of a CSV in one request; axum's 2 MB default rejects
+/// a few thousand rows with 413 Payload Too Large.
+const IMPORT_BODY_LIMIT: usize = 64 * 1024 * 1024;
+
 pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route("/activities/search", post(search_activities))
@@ -462,13 +466,22 @@ pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
         )
         .route("/activities/link", post(link_transfer_activities))
         .route("/activities/unlink", post(unlink_transfer_activities))
-        .route("/activities/import/check", post(check_activities_import))
+        .route(
+            "/activities/import/check",
+            post(check_activities_import).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
         .route(
             "/activities/import/assets/preview",
             post(preview_import_assets),
         )
-        .route("/activities/import", post(import_activities))
-        .route("/activities/import/parse", post(parse_csv_endpoint))
+        .route(
+            "/activities/import",
+            post(import_activities).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
+        .route(
+            "/activities/import/parse",
+            post(parse_csv_endpoint).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT)),
+        )
         .route(
             "/activities/import/mapping",
             get(get_account_import_mapping).post(save_account_import_mapping),
