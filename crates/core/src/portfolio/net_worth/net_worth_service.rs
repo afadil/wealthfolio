@@ -22,7 +22,9 @@ use crate::fx::FxServiceTrait;
 use crate::portfolio::snapshot::SnapshotServiceTrait;
 use crate::portfolio::valuation::{DailyAccountValuation, ValuationRepositoryTrait};
 use crate::quotes::QuoteServiceTrait;
-use crate::utils::time_utils::{parse_user_timezone_or_default, user_today, valuation_date_today};
+use crate::utils::time_utils::{
+    parse_user_timezone_or_default, user_date_from_utc, DEFAULT_VALUATION_TZ,
+};
 
 /// Number of days after which a valuation is considered stale.
 const STALENESS_THRESHOLD_DAYS: i64 = 90;
@@ -84,16 +86,16 @@ impl NetWorthService {
         self
     }
 
-    fn today(&self) -> NaiveDate {
+    fn timezone(&self) -> chrono_tz::Tz {
         self.loan_payments
             .as_ref()
-            .map_or_else(valuation_date_today, |source| {
-                user_today(parse_user_timezone_or_default(
+            .map_or(DEFAULT_VALUATION_TZ, |source| {
+                parse_user_timezone_or_default(
                     &source
                         .timezone
                         .read()
                         .unwrap_or_else(|poisoned| poisoned.into_inner()),
-                ))
+                )
             })
     }
 
@@ -714,7 +716,13 @@ impl NetWorthServiceTrait for NetWorthService {
                 .or_else(|| self.get_latest_quote_as_of(&asset.id, date))
                 .or_else(|| {
                     (asset.kind == AssetKind::Liability)
-                        .then(|| manual_loan_principal(asset.metadata.as_ref(), date, self.today()))
+                        .then(|| {
+                            manual_loan_principal(
+                                asset.metadata.as_ref(),
+                                date,
+                                user_date_from_utc(asset.created_at.and_utc(), self.timezone()),
+                            )
+                        })
                         .flatten()
                         .map(|(date, value)| (value, asset.quote_ccy.clone(), date))
                 })
@@ -946,8 +954,12 @@ impl NetWorthServiceTrait for NetWorthService {
             .iter()
             .filter(|asset| asset.kind == AssetKind::Liability)
             .filter_map(|asset| {
-                manual_loan_principal(asset.metadata.as_ref(), end_date, self.today())
-                    .map(|(date, value)| (*asset, date, value))
+                manual_loan_principal(
+                    asset.metadata.as_ref(),
+                    end_date,
+                    user_date_from_utc(asset.created_at.and_utc(), self.timezone()),
+                )
+                .map(|(date, value)| (*asset, date, value))
             })
             .collect();
 

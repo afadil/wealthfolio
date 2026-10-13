@@ -35,7 +35,7 @@ use crate::errors::{Error, Result, ValidationError};
 use crate::events::{DomainEvent, DomainEventSink, NoOpDomainEventSink};
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
-use crate::utils::time_utils::{parse_user_timezone_or_default, user_today};
+use crate::utils::time_utils::{parse_user_timezone_or_default, user_date_from_utc, user_today};
 
 /// `existing` metadata with the requested changes; an empty value removes a key.
 fn merged_details(
@@ -865,7 +865,13 @@ impl AlternativeAssetServiceTrait for AlternativeAssetService {
             .filter_map(|asset| {
                 let quote = quotes.get(&asset.id);
                 let principal = (asset.kind == AssetKind::Liability)
-                    .then(|| manual_loan_principal(asset.metadata.as_ref(), as_of, as_of))
+                    .then(|| {
+                        manual_loan_principal(
+                            asset.metadata.as_ref(),
+                            as_of,
+                            user_date_from_utc(asset.created_at.and_utc(), timezone),
+                        )
+                    })
                     .flatten();
                 let value = loan_values
                     .get(&asset.id)
@@ -1788,6 +1794,7 @@ mod tests {
                 kind: AssetKind::Liability,
                 quote_ccy: "USD".into(),
                 metadata: Some(metadata),
+                created_at: origin.and_hms_opt(12, 0, 0).unwrap(),
                 ..Default::default()
             };
             let quotes = quoted
@@ -1814,12 +1821,52 @@ mod tests {
             let holding = &holdings[0];
             assert_eq!(holding.market_value, expected);
             assert_eq!(holding.loan.as_ref().unwrap().balance_source, source);
-            if source == Some(LoanBalanceSource::Original) && holding.purchase_date.is_some() {
+            if source == Some(LoanBalanceSource::Original) {
                 assert_eq!(holding.valuation_date.date_naive(), origin);
             }
             if source.is_none() {
                 assert!(holding.unrealized_gain.is_none());
             }
+        }
+    }
+
+    #[test]
+    fn undated_manual_liability_keeps_its_creation_date_in_the_settings_timezone() {
+        let _clock = crate::utils::clock::freeze("2026-10-13T01:00:00Z".parse().unwrap());
+        let created = chrono::NaiveDate::from_ymd_opt(2026, 10, 2).unwrap();
+        let asset = Asset {
+            id: "loan".into(),
+            kind: AssetKind::Liability,
+            quote_ccy: "USD".into(),
+            metadata: Some(json!({"original_amount":"9000", "tracking_mode":"manual"})),
+            created_at: "2026-10-03T01:00:00Z"
+                .parse::<chrono::DateTime<Utc>>()
+                .unwrap()
+                .naive_utc(),
+            ..Default::default()
+        };
+        let service = AlternativeAssetService::new(
+            Arc::new(MockAltAssetRepository::default()),
+            Arc::new(MockAssetRepository {
+                assets: vec![asset],
+            }),
+            Arc::new(MockQuoteService {
+                cutoff: Arc::new(std::sync::Mutex::new(None)),
+                as_of_quotes: HashMap::new(),
+                latest_quotes: HashMap::new(),
+            }),
+        )
+        .with_timezone(Arc::new(RwLock::new("America/Toronto".into())));
+        for now in ["2026-10-13T01:00:00Z", "2026-10-14T01:00:00Z"] {
+            crate::utils::clock::set_frozen(now.parse().unwrap());
+            let holdings = service.get_alternative_holdings().unwrap();
+            assert_eq!(holdings.len(), 1);
+            assert_eq!(holdings[0].market_value, Decimal::new(9000, 0));
+            assert_eq!(holdings[0].valuation_date.date_naive(), created);
+            assert_eq!(
+                holdings[0].loan.as_ref().unwrap().balance_source,
+                Some(LoanBalanceSource::Original)
+            );
         }
     }
 }

@@ -526,12 +526,12 @@ pub fn loan_value(
 }
 
 /// A manual loan's unconfirmed principal when no dated quote is available.
-/// Undated legacy loans start today; they must not invent historical debt.
+/// Undated legacy loans start on their stored creation date, never before it.
 /// A dormant schedule on a manually tracked loan does not drive this value.
 pub fn manual_loan_principal(
     metadata: Option<&Value>,
     as_of: NaiveDate,
-    today: NaiveDate,
+    created_date: NaiveDate,
 ) -> Option<(NaiveDate, Decimal)> {
     let metadata = metadata?;
     if metadata.get(LOAN_PROJECTION_KEY).is_some()
@@ -551,7 +551,7 @@ pub fn manual_loan_principal(
         .or_else(|| metadata.get("purchase_date"));
     let date = match stored_date {
         Some(date) => date.as_str()?.parse::<NaiveDate>().ok()?,
-        None => today,
+        None => created_date,
     };
     if date > as_of {
         return None;

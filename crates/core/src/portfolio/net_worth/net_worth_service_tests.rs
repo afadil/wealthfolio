@@ -2907,34 +2907,56 @@ async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
 }
 
 #[tokio::test]
-async fn undated_manual_principal_starts_today_in_net_worth_and_history() {
-    let today = crate::utils::time_utils::valuation_date_today();
-    let before = today.pred_opt().unwrap();
+async fn undated_manual_principal_keeps_its_creation_anchor_as_today_advances() {
+    let _clock = crate::utils::clock::freeze("2026-10-13T12:00:00Z".parse().unwrap());
+    let created = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
     let mut asset = create_test_asset("LIAB-undated", AssetKind::Liability, "USD");
-    asset.metadata = Some(json!({"original_amount":"100", "tracking_mode":"manual"}));
-    let service = create_net_worth_service(vec![], vec![asset], vec![], vec![]);
+    asset.created_at = created.and_hms_opt(12, 0, 0).unwrap();
+    asset.metadata = Some(json!({"original_amount":"9000", "tracking_mode":"manual"}));
+    let property = create_test_asset("PROP-home", AssetKind::Property, "USD");
+    let service = create_net_worth_service(
+        vec![],
+        vec![asset, property],
+        vec![],
+        vec![create_test_quote("PROP-home", dec!(10000), created, "USD")],
+    );
     assert_eq!(
         service
-            .get_net_worth(before)
+            .get_net_worth(created.pred_opt().unwrap())
             .await
             .unwrap()
             .liabilities
             .total,
         dec!(0)
     );
-    assert_eq!(
-        service
-            .get_net_worth(today)
-            .await
-            .unwrap()
-            .liabilities
-            .total,
-        dec!(100)
-    );
-    let history = service.get_net_worth_history(before, today).unwrap();
-    assert_eq!(history.len(), 1);
-    assert_eq!(history[0].date, today);
-    assert_eq!(history[0].total_liabilities, dec!(100));
+    for now in ["2026-10-13T12:00:00Z", "2026-10-14T12:00:00Z"] {
+        let instant: chrono::DateTime<Utc> = now.parse().unwrap();
+        crate::utils::clock::set_frozen(instant);
+        let today = instant.date_naive();
+        let history = service.get_net_worth_history(created, today).unwrap();
+        assert_eq!(history.first().unwrap().date, created);
+        assert_eq!(history.last().unwrap().date, today);
+        for point in history {
+            assert_eq!(point.total_liabilities, dec!(9000));
+            assert_eq!(point.net_worth, dec!(1000));
+        }
+        // A range beginning after creation must retain debt on its first point,
+        // rather than introducing the same drop again on each new current day.
+        let yesterday = today.pred_opt().unwrap();
+        let recent = service.get_net_worth_history(yesterday, today).unwrap();
+        assert_eq!(recent.first().unwrap().date, yesterday);
+        assert_eq!(recent.first().unwrap().total_liabilities, dec!(9000));
+        assert_eq!(
+            recent.last().unwrap().net_worth,
+            recent.first().unwrap().net_worth
+        );
+        for date in [created, yesterday, today] {
+            assert_eq!(
+                service.get_net_worth(date).await.unwrap().liabilities.total,
+                dec!(9000)
+            );
+        }
+    }
 }
 
 #[tokio::test]
@@ -2968,8 +2990,12 @@ async fn manual_principal_history_revalues_foreign_currency_on_each_date() {
 #[tokio::test]
 async fn undated_manual_principal_uses_the_settings_timezone() {
     let _clock = crate::utils::clock::freeze("2026-10-13T01:00:00Z".parse().unwrap());
-    let today = NaiveDate::from_ymd_opt(2026, 10, 12).unwrap();
+    let created = NaiveDate::from_ymd_opt(2026, 10, 2).unwrap();
     let mut asset = create_test_asset("LIAB-undated", AssetKind::Liability, "USD");
+    asset.created_at = "2026-10-03T01:00:00Z"
+        .parse::<chrono::DateTime<Utc>>()
+        .unwrap()
+        .naive_utc();
     asset.metadata = Some(json!({"original_amount":"100"}));
     let service = create_net_worth_service(vec![], vec![asset], vec![], vec![]).with_loan_payments(
         Arc::new(TaggedPayments(HashMap::new())),
@@ -2977,7 +3003,7 @@ async fn undated_manual_principal_uses_the_settings_timezone() {
     );
     assert_eq!(
         service
-            .get_net_worth(today.pred_opt().unwrap())
+            .get_net_worth(created.pred_opt().unwrap())
             .await
             .unwrap()
             .liabilities
@@ -2986,7 +3012,7 @@ async fn undated_manual_principal_uses_the_settings_timezone() {
     );
     assert_eq!(
         service
-            .get_net_worth(today)
+            .get_net_worth(created)
             .await
             .unwrap()
             .liabilities
@@ -2995,7 +3021,7 @@ async fn undated_manual_principal_uses_the_settings_timezone() {
     );
     assert_eq!(
         service
-            .get_net_worth_history(today, today)
+            .get_net_worth_history(created, created)
             .unwrap()
             .last()
             .unwrap()
