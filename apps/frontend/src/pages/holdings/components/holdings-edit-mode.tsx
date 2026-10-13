@@ -42,6 +42,8 @@ interface EditableHolding {
   averageCost: string;
   /** Total cost basis (shares × cost per share). */
   totalCost: string;
+  /** How to reconcile the two cost fields when the share count changes. */
+  reconcileShares?: CostReconciler;
   currency: string;
   /** Exchange MIC code (e.g., "XNAS", "XTSE") for new holdings from search */
   exchangeMic?: string;
@@ -87,6 +89,26 @@ const deriveCostText = (sharesText: string, text: string, derive: CostMath): str
   const value = parseFloat(text);
   if (!Number.isFinite(shares) || shares <= 0 || !Number.isFinite(value)) return null;
   return formatCost(derive(shares, value));
+};
+
+/**
+ * Recomputes the cost field the user did not edit last, from the one held. Each
+ * reconciler closes over its own fields, so callers swap behaviour by swapping
+ * a function rather than passing a field name around. Applied both when the
+ * share count changes and when the other cost field is edited.
+ */
+type CostReconciler = (holding: EditableHolding) => EditableHolding;
+
+/** Cost per share was edited last: keep it and re-derive the total. */
+const recomputeTotalCost: CostReconciler = (holding) => {
+  const totalCost = deriveCostText(holding.quantity, holding.averageCost, totalCostFrom);
+  return totalCost === null ? holding : { ...holding, totalCost };
+};
+
+/** Total cost was edited last: keep it and re-derive the cost per share. */
+const recomputeAverageCost: CostReconciler = (holding) => {
+  const averageCost = deriveCostText(holding.quantity, holding.totalCost, averageCostFrom);
+  return averageCost === null ? holding : { ...holding, averageCost };
 };
 
 interface HoldingsEditModeProps {
@@ -221,11 +243,9 @@ export const HoldingsEditMode = ({
   const handleQuantityChange = useCallback((assetId: string, value: number | undefined) => {
     const quantity = value === undefined ? "" : String(value);
     setEditableHoldings((prev) =>
-      prev.map((h) => {
-        if (h.assetId !== assetId) return h;
-        const totalCost = deriveCostText(quantity, h.averageCost, totalCostFrom);
-        return { ...h, quantity, totalCost: totalCost ?? h.totalCost };
-      }),
+      prev.map((h) =>
+        h.assetId === assetId ? (h.reconcileShares ?? recomputeTotalCost)({ ...h, quantity }) : h,
+      ),
     );
   }, []);
 
@@ -235,15 +255,11 @@ export const HoldingsEditMode = ({
       if (!isUserEdit) return;
       const averageCost = value === undefined ? "" : String(value);
       setEditableHoldings((prev) =>
-        prev.map((h) => {
-          if (h.assetId !== assetId) return h;
-          const totalCost = deriveCostText(h.quantity, averageCost, totalCostFrom);
-          return {
-            ...h,
-            averageCost,
-            totalCost: totalCost ?? h.totalCost,
-          };
-        }),
+        prev.map((h) =>
+          h.assetId === assetId
+            ? recomputeTotalCost({ ...h, averageCost, reconcileShares: recomputeTotalCost })
+            : h,
+        ),
       );
     },
     [],
@@ -255,15 +271,11 @@ export const HoldingsEditMode = ({
       if (!isUserEdit) return;
       const totalCost = value === undefined ? "" : String(value);
       setEditableHoldings((prev) =>
-        prev.map((h) => {
-          if (h.assetId !== assetId) return h;
-          const averageCost = deriveCostText(h.quantity, totalCost, averageCostFrom);
-          return {
-            ...h,
-            totalCost,
-            averageCost: averageCost ?? h.averageCost,
-          };
-        }),
+        prev.map((h) =>
+          h.assetId === assetId
+            ? recomputeAverageCost({ ...h, totalCost, reconcileShares: recomputeAverageCost })
+            : h,
+        ),
       );
     },
     [],

@@ -99,4 +99,37 @@ describe("HoldingsEditMode cost fields", () => {
     expect(averageCost).toHaveValue("25");
     expect(totalCost).toHaveValue("500");
   });
+
+  it("keeps a Total entered before shares and derives cost per share", () => {
+    renderEditMode(makeHolding({ quantity: 0, costBasis: { local: 0, base: 0 } }));
+    const averageCost = screen.getByTestId("holding-average-cost-AAPL");
+    const totalCost = screen.getByTestId("holding-total-cost-AAPL");
+    const shares = screen.getByTestId("holding-shares-AAPL");
+
+    // Total is entered first, while shares are still zero.
+    fireEvent.change(totalCost, { target: { value: "500" } });
+    expect(totalCost).toHaveValue("500");
+    expect(averageCost).toHaveValue("");
+
+    // Entering shares should preserve the Total and derive cost per share.
+    fireEvent.change(shares, { target: { value: "10" } });
+
+    expect(totalCost).toHaveValue("500");
+    expect(averageCost).toHaveValue("50");
+  });
+
+  it("keeps a Total edited last when shares change", () => {
+    renderEditMode();
+    const averageCost = screen.getByTestId("holding-average-cost-AAPL");
+    const totalCost = screen.getByTestId("holding-total-cost-AAPL");
+    const shares = screen.getByTestId("holding-shares-AAPL");
+
+    fireEvent.change(totalCost, { target: { value: "500" } });
+    expect(averageCost).toHaveValue("50");
+
+    fireEvent.change(shares, { target: { value: "20" } });
+
+    expect(totalCost).toHaveValue("500");
+    expect(averageCost).toHaveValue("25");
+  });
 });
