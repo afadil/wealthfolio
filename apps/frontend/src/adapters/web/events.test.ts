@@ -6,19 +6,6 @@ vi.mock("@/features/profiles/session", () => ({
   matchesProfileScope: () => true,
 }));
 
-it("does not open an event stream for browser system appearance", async () => {
-  const source = vi.fn();
-  vi.stubGlobal("EventSource", source);
-  try {
-    const { listenSystemThemeChanged } = await import("./events");
-    const unlisten = await listenSystemThemeChanged(() => {});
-    expect(source).not.toHaveBeenCalled();
-    await unlisten();
-  } finally {
-    vi.unstubAllGlobals();
-  }
-});
-
 it("announces recovery after an interrupted event stream, without announcing the initial connection", async () => {
   const sources: FakeEventSource[] = [];
   class FakeEventSource {

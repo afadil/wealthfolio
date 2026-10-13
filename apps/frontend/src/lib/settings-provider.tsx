@@ -2,7 +2,7 @@ import { StartupScreen } from "@/components/startup-screen";
 import { useProfile } from "@/features/profiles/profile-context";
 import { Button } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { getSystemTheme, isTauri, listenSystemThemeChanged, logger } from "@/adapters";
+import { isTauri, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
@@ -297,6 +297,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
         if (desktop.os === "linux") {
           // setTheme(null) forces GTK light. Read the desktop preference instead;
           // window.theme() may still hold the user's previous explicit choice.
+          const { getSystemTheme } = await import("../adapters/tauri/settings");
           current = await getSystemTheme();
           if (!current || application !== appearanceGeneration) return;
           await currentWindow.setTheme(current);
@@ -318,10 +319,13 @@ const applySettingsToDocument = async (newSettings: Settings) => {
               .catch(() => logger.error("Error setting window theme."));
           }
         };
-        const unlisten =
-          desktop.os === "linux"
-            ? await listenSystemThemeChanged<"light" | "dark">(handleThemeChange)
-            : await currentWindow.onThemeChanged(handleThemeChange);
+        let unlisten: () => void;
+        if (desktop.os === "linux") {
+          const { listenSystemThemeChanged } = await import("../adapters/tauri/events");
+          unlisten = await listenSystemThemeChanged<"light" | "dark">(handleThemeChange);
+        } else {
+          unlisten = await currentWindow.onThemeChanged(handleThemeChange);
+        }
         if (application !== appearanceGeneration) unlisten();
         else tauriThemeUnlisten = unlisten;
       } catch {

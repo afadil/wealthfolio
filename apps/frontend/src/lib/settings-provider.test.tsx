@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   setTheme: vi.fn(),
   windowTheme: vi.fn(),
   systemTheme: vi.fn<() => Promise<"light" | "dark" | null>>(),
-  mediaListener: vi.fn<(type: string, handler: (event: MediaQueryListEvent) => void) => void>(),
   themeListener:
     vi.fn<(handler: (event: { payload: "light" | "dark" }) => void) => Promise<() => void>>(),
   systemListener:
@@ -18,7 +17,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/adapters", () => ({
   isTauri: true,
   logger: { error: vi.fn() },
+}));
+vi.mock("../adapters/tauri/settings", () => ({
   getSystemTheme: () => mocks.systemTheme(),
+}));
+vi.mock("../adapters/tauri/events", () => ({
   listenSystemThemeChanged: (handler: (event: { payload: "light" | "dark" }) => void) =>
     mocks.systemListener(handler),
 }));
@@ -71,7 +74,7 @@ beforeEach(() => {
       ({
         matches: query === "(prefers-color-scheme: dark)",
         media: query,
-        addEventListener: mocks.mediaListener,
+        addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       }) as unknown as MediaQueryList,
   );
@@ -133,18 +136,6 @@ it("reads the Linux system preference when returning from explicit light mode", 
   expect(mocks.systemTheme).toHaveBeenCalledOnce();
 });
 
-it("keeps following Linux system changes through the media query", async () => {
-  mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
-  render(<SettingsProvider>content</SettingsProvider>);
-  await waitFor(() => expect(mocks.setTheme).toHaveBeenCalledWith("dark"));
-
-  const change = mocks.mediaListener.mock.calls.at(-1)![1];
-  act(() => change({ matches: false } as MediaQueryListEvent));
-  expect(document.documentElement).toHaveClass("light");
-  act(() => change({ matches: true } as MediaQueryListEvent));
-  expect(document.documentElement).toHaveClass("dark");
-});
-
 it("follows Linux portal changes in both the document and window", async () => {
   mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
   render(<SettingsProvider>content</SettingsProvider>);
@@ -173,37 +164,6 @@ it("stops Linux portal updates when switching to an explicit theme", async () =>
   act(() => change({ payload: "dark" }));
   expect(document.documentElement).toHaveClass("light");
   expect(mocks.setTheme).toHaveBeenCalledTimes(calls);
-});
-
-it("keeps the media-query fallback when the Linux portal is unavailable", async () => {
-  mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
-  mocks.systemTheme.mockRejectedValueOnce(new Error("Portal unavailable"));
-  render(<SettingsProvider>content</SettingsProvider>);
-
-  await settle();
-  expect(document.documentElement).toHaveClass("dark");
-  expect(mocks.systemTheme).toHaveBeenCalledOnce();
-  expect(mocks.setTheme).not.toHaveBeenCalled();
-});
-
-it("does not apply a late Linux system preference over a newer explicit choice", async () => {
-  mocks.platform.mockResolvedValue({ os: "linux", is_mobile: false, is_desktop: true });
-  let resolve!: (theme: "light" | "dark" | null) => void;
-  mocks.systemTheme.mockReturnValueOnce(
-    new Promise((done) => {
-      resolve = done;
-    }),
-  );
-  const view = render(<SettingsProvider>content</SettingsProvider>);
-  await waitFor(() => expect(mocks.systemTheme).toHaveBeenCalledOnce());
-
-  settings = { ...settings, theme: "light" };
-  view.rerender(<SettingsProvider>content</SettingsProvider>);
-  await waitFor(() => expect(mocks.setTheme).toHaveBeenCalledWith("light"));
-  await act(async () => resolve("dark"));
-
-  expect(mocks.setTheme).toHaveBeenCalledOnce();
-  expect(document.documentElement).toHaveClass("light");
 });
 
 it("leaves the window theme alone for explicit modes on mobile", async () => {

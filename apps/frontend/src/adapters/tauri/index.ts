@@ -173,7 +173,6 @@ export {
   checkForUpdates,
   installUpdate,
   getPlatform,
-  getSystemTheme,
 } from "./settings";
 export type { BackupImportPreview, DatabaseBackup, DatabaseEncryptionStatus } from "./settings";
 
@@ -248,7 +247,6 @@ export {
   listenBrokerSyncError,
   listenNavigateToRoute,
   listenDeepLink,
-  listenSystemThemeChanged,
   getCurrentDeepLinks,
 } from "./events";
 

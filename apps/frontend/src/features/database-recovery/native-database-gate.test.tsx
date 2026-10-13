@@ -54,23 +54,6 @@ function mount() {
     </QueryClientProvider>,
   );
 }
-it("offers unlocking secure storage and retrying before restoring an encrypted portfolio", async () => {
-  mocks.status.mockResolvedValue({
-    ready: false,
-    error: "The database key could not be read: prompt dismissed",
-    canRecover: true,
-    recoveryEncrypted: true,
-  });
-  mount();
-
-  expect(await screen.findByText(copy.recovery_encrypted_description)).toBeInTheDocument();
-  expect(screen.queryByText(copy.recovery_description)).not.toBeInTheDocument();
-  mocks.status.mockResolvedValue({ ready: true, maintenance: false, generation: "1" });
-  mocks.retry.mockImplementation(async () => mocks.changed());
-  fireEvent.click(screen.getByRole("button", { name: copy.recovery_retry }));
-  expect(await screen.findByText("Portfolio mounted")).toBeInTheDocument();
-  expect(mocks.recover).not.toHaveBeenCalled();
-});
 it("renders the opening screen during migration and mounts providers after readiness", async () => {
   mocks.status
     .mockResolvedValueOnce({ ready: false, error: null, canRecover: false })

@@ -205,9 +205,7 @@ function NativeStartup({ children }: { children: ReactNode }) {
         <p className="text-muted-foreground">
           {t(
             status.data?.canRecover
-              ? status.data.recoveryEncrypted
-                ? "settings:recovery_encrypted_description"
-                : "settings:recovery_description"
+              ? "settings:recovery_description"
               : "settings:recovery_unavailable",
           )}
         </p>

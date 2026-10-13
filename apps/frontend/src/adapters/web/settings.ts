@@ -8,9 +8,6 @@ import type { Settings, UpdateInfo } from "@/lib/types";
 import type { AppInfo, PlatformInfo, BackupImportPreview } from "../types";
 export type { BackupImportPreview } from "../types";
 
-// Browser system appearance follows matchMedia; no native portal call is needed.
-export const getSystemTheme = async (): Promise<null> => null;
-
 // ============================================================================
 // Settings Commands
 // ============================================================================
