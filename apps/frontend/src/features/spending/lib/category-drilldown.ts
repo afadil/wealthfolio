@@ -42,8 +42,8 @@ export interface CategoryDrilldown {
    *  the breakdown table (`buildTree` clamps the same way). */
   spent: number;
   /** Composition by immediate child, descending. Non-positive rows are
-   *  dropped and `share` is relative to what remains, matching how the
-   *  breakdown table treats refund-dominated categories. */
+   *  dropped (a share bar can't show a refund) and `share` is relative to
+   *  what remains. */
   mix: CategoryMixRow[];
 }
 

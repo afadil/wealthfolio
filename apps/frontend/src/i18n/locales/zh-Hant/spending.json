@@ -743,19 +743,29 @@
     "title": "資金流向",
     "subtitle": "{{period}} 的資金來源與去向。",
     "focusSubtitle": "{{period}} 的所有類別。",
+    "focusSubcategoriesSubtitle": "{{period}} 的所有子類別。",
     "back": "全部流向",
+    "backTo": "返回{{name}}",
     "chartLabel": "資金流向圖。使用方向鍵在各項之間移動。",
     "nodeAria": "{{name}}，{{amount}}",
+    "nodeActionAria": "{{name}}，{{amount}}。{{action}}",
     "shareOfIncome": "佔收入的 {{pct}}",
     "shareOfTotal": "佔總額的 {{pct}}",
     "clickTransactions": "點擊查看交易",
     "clickCategories": "點擊查看所有類別",
+    "clickSubcategories": "點擊查看子類別",
+    "action": {
+      "categories": "查看所有類別",
+      "subcategories": "查看子類別",
+      "transactions": "查看交易"
+    },
     "node": {
       "total": "總額",
       "shortfall": "缺口",
       "refunds": "淨退款",
       "surplus": "剩餘",
-      "uncategorizedIncome": "未歸類收入"
+      "uncategorizedIncome": "未歸類收入",
+      "netSpending": "淨支出"
     },
     "hint": {
       "total": "流入加上淨退款和任何缺口，始終等於流出。",
@@ -764,9 +774,12 @@
       "refunds": "退款超過支出的類別。",
       "saved": "轉入儲蓄和投資帳戶的資金。",
       "surplus": "已流入但未支出或預留的資金。",
-      "uncategorized": "尚未歸類的支出。"
+      "uncategorized": "尚未歸類的支出。",
+      "net": "扣除退款後該類別的花費。",
+      "direct": "直接歸入該類別本身，而非子類別。"
     },
-    "groupRefunds": "未扣除 {{amount}} 淨退款。"
+    "groupRefunds": "未扣除 {{amount}} 淨退款。",
+    "categoryRefunds": "未扣除 {{refunds}} 淨退款。淨支出：{{net}}。"
   },
   "budgetChart": {
     "overBudget": "超出預算",

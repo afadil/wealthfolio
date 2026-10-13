@@ -23,7 +23,7 @@ import {
 } from "@wealthfolio/ui";
 
 import { useSpendingSettings } from "../../../hooks/use-spending-settings";
-import { rollUpToTopLevel, topCategoryId } from "../../../lib/category-rollup";
+import { ancestorChain, rollUpToTopLevel, topCategoryId } from "../../../lib/category-rollup";
 import { getZonedDateParts } from "../../../lib/timezone";
 import type { ReportsRange } from "../../../lib/reports-period";
 import type { BudgetCategoryRow, BudgetSnapshot } from "../../../types/budget";
@@ -40,6 +40,7 @@ const CARD_CLASS =
 const LABEL_CLASS =
   "text-muted-foreground/70 text-[10px] font-semibold uppercase tracking-[0.12em]";
 const SAVINGS_GROUP_KEY = "savings";
+const SPENDING_TAXONOMY = "spending_categories";
 
 // ═════════════════════════════════════════════════════════════════════════
 // Top of page — pace narrative + spent + cashflow
@@ -120,6 +121,7 @@ export function WhereIAmStage({
         periodLabel={periodLabel}
         currentReport={currentReport}
         budget={budget}
+        spendingCategories={taxonomyCategories}
         incomeCategories={incomeCategories}
         savingsCategories={savingsCategories}
         currency={currency}
@@ -898,7 +900,17 @@ function BreakdownCanvas({
     [budget],
   );
   const budgetRows = useMemo(() => groupRows.flatMap((row) => row.categories), [groupRows]);
-  const breakdown = useMemo(() => currentReport?.spendingBreakdown ?? [], [currentReport]);
+  const breakdown = useMemo(
+    () =>
+      currentReport
+        ? (spendingBySubcategory(
+            currentReport.byDayByCategory,
+            currentReport.spendingBreakdown,
+            taxonomyCategories,
+          ) ?? currentReport.spendingBreakdown)
+        : [],
+    [currentReport, taxonomyCategories],
+  );
   const priorBreakdown = useMemo(() => priorReport?.spendingBreakdown ?? [], [priorReport]);
 
   const counts = useMemo(
@@ -1085,6 +1097,46 @@ function BreakdownCanvas({
       </div>
     </section>
   );
+}
+
+/**
+ * The period's spending per subcategory, read from the daily buckets: the
+ * report's `spendingBreakdown` only has top-level categories. The table rolls
+ * these rows up to the same top-level totals, and a deeper category counts
+ * toward the subcategory above it, since the table has two levels.
+ *
+ * Only categories the top-level rows list are kept: those leave out one whose
+ * spending netted to exactly zero (a float sum here can miss that) and any in
+ * the savings group.
+ *
+ * `null` while a category isn't in the taxonomy yet (still loading): its row
+ * couldn't be placed under its parent, so the top-level rows stand in.
+ */
+function spendingBySubcategory(
+  buckets: MonthlyReport["byDayByCategory"],
+  topLevelRows: CategoryBreakdownRow[],
+  taxonomyCategories: TaxonomyCategory[],
+): CategoryBreakdownRow[] | null {
+  const meta = new Map(taxonomyCategories.map((c) => [c.id, c]));
+  const listed = new Set(topLevelRows.map((row) => row.categoryId));
+  const rows = new Map<string, CategoryBreakdownRow>();
+  for (const bucket of buckets) {
+    if (bucket.taxonomyId !== SPENDING_TAXONOMY) continue;
+    if (!meta.has(bucket.categoryId)) return null;
+    const chain = ancestorChain(bucket.categoryId, meta);
+    if (!listed.has(chain[chain.length - 1])) continue;
+    const categoryId = chain[Math.max(0, chain.length - 2)];
+    const row = rows.get(categoryId) ?? {
+      taxonomyId: SPENDING_TAXONOMY,
+      categoryId,
+      amount: 0,
+      count: 0,
+    };
+    row.amount += bucket.amount;
+    row.count += bucket.count;
+    rows.set(categoryId, row);
+  }
+  return Array.from(rows.values());
 }
 
 interface FilterCounts {

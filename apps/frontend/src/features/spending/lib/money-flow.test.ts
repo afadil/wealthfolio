@@ -3,8 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { TaxonomyCategory } from "@/lib/types";
 
 import type { BudgetCategoryRow, BudgetGroupRow } from "../types/budget";
-import type { CategoryInsight, GroupInsight, SpendingInsight } from "../types/insight";
+import type {
+  CategoryInsight,
+  DayCategoryBucket,
+  GroupInsight,
+  SpendingInsight,
+} from "../types/insight";
 import type { CategoryBreakdownRow } from "../types/report";
+import { DIRECT_ROW_ID } from "./category-drilldown";
 import { insightToReportProjection, UNCATEGORIZED_CATEGORY_ID } from "./insight-projection";
 import {
   buildMoneyFlowGraph,
@@ -25,6 +31,8 @@ const labels: MoneyFlowLabels = {
   uncategorized: "Uncategorized",
   uncategorizedIncome: "Uncategorized income",
   more: (count) => `+${count} more`,
+  direct: "Direct",
+  netSpending: "Net spending",
 };
 
 const category = (
@@ -46,6 +54,20 @@ const category = (
 
 const row = (categoryId: string, amount: number): CategoryBreakdownRow => ({
   taxonomyId: "income_sources",
+  categoryId,
+  amount,
+  count: 1,
+});
+
+const spendingCategory = (id: string, name: string, parentId: string | null = null) => ({
+  ...category(id, name, "#A35742", parentId),
+  taxonomyId: "spending_categories",
+});
+
+/** One day of spending tagged with `categoryId`, as `byDayByCategory` carries it. */
+const bucket = (categoryId: string, amount: number, date = "2026-04-01"): DayCategoryBucket => ({
+  date,
+  taxonomyId: "spending_categories",
   categoryId,
   amount,
   count: 1,
@@ -106,6 +128,8 @@ function finaryInput(overrides: Partial<MoneyFlowInput> = {}): MoneyFlowInput {
       group("subscriptions", [spend("phone", 50), spend("sport", 32)]),
     ],
     uncategorizedSpent: 0,
+    spendingBuckets: [],
+    spendingCategories: [],
     incomeCategories: [category("salary", "Salary")],
     savingsCategories: [category("stocks", "Stocks"), category("life", "Life insurance")],
     labels,
@@ -354,21 +378,73 @@ describe("buildMoneyFlowGraph", () => {
       }),
     );
 
-    expect(node(graph, `income:${UNCATEGORIZED_CATEGORY_ID}`)?.name).toBe("Uncategorized income");
+    expect(node(graph, `income:${UNCATEGORIZED_CATEGORY_ID}`)).toMatchObject({
+      name: "Uncategorized income",
+      subcategories: undefined,
+    });
     expect(node(graph, `savings-category:${UNCATEGORIZED_CATEGORY_ID}`)?.name).toBe(
       "Uncategorized",
     );
   });
 
-  it("names income and savings by the category each activity was assigned", () => {
+  it("rolls income up to its top-level category, adding each row once", () => {
     const graph = buildMoneyFlowGraph(
       finaryInput({
-        incomeBreakdown: [row("salary", 2000), row("bonus", 500)],
+        // Employment's own row is income assigned to the parent itself, not its total.
+        incomeBreakdown: [
+          row("salary", 2000),
+          row("bonus", 500),
+          row("employment", 100),
+          row("gifts", 50),
+        ],
         incomeCategories: [
           category("employment", "Employment", "#5A7A3E"),
           category("salary", "Salary", "#5A7A3E", "employment"),
-          category("bonus", "Bonus", "#5A7A3E", "employment"),
+          category("bonus", "Bonus", "#7A9A5E", "employment"),
+          category("other", "Other"),
+          category("gifts", "Gifts", "#9C998E", "other"),
         ],
+      }),
+    );
+
+    expectBalanced(graph);
+    expect(graph.totals.income).toBe(2650);
+    // 2,650 in, 2,500 spent and set aside: the parents add nothing on top.
+    expect(node(graph, "surplus")?.value).toBe(150);
+    expect(node(graph, "income:employment")).toMatchObject({ name: "Employment", value: 2600 });
+    expect(node(graph, "income:employment")?.subcategories).toEqual([
+      { id: "salary", name: "Salary", value: 2000, color: "#5A7A3E" },
+      { id: "bonus", name: "Bonus", value: 500, color: "#7A9A5E" },
+      { id: DIRECT_ROW_ID, name: "Direct", value: 100, color: "#5A7A3E" },
+    ]);
+    expect(node(graph, "income:salary")).toBeUndefined();
+    expect(isFocusable(node(graph, "income:employment")!)).toBe(true);
+    // A lone subcategory still names where the money came from.
+    expect(node(graph, "income:other")).toMatchObject({ name: "Other", value: 50 });
+    expect(isFocusable(node(graph, "income:other")!)).toBe(true);
+  });
+
+  it("keeps income assigned only to a top-level category a simple source", () => {
+    const graph = buildMoneyFlowGraph(
+      finaryInput({
+        incomeBreakdown: [row("employment", 2500)],
+        incomeCategories: [
+          category("employment", "Employment"),
+          category("salary", "Salary", "#123456", "employment"),
+        ],
+      }),
+    );
+
+    expect(node(graph, "income:employment")).toMatchObject({
+      value: 2500,
+      subcategories: undefined,
+    });
+    expect(isFocusable(node(graph, "income:employment")!)).toBe(false);
+  });
+
+  it("names savings by the category each activity was assigned", () => {
+    const graph = buildMoneyFlowGraph(
+      finaryInput({
         savingsBreakdown: [row("retirement", 300), row("emergency", 100)],
         savingsCategories: [
           category("savings", "Savings"),
@@ -379,9 +455,6 @@ describe("buildMoneyFlowGraph", () => {
     );
 
     expectBalanced(graph);
-    expect(node(graph, "income:salary")).toMatchObject({ name: "Salary", value: 2000 });
-    expect(node(graph, "income:bonus")).toMatchObject({ name: "Bonus", value: 500 });
-    expect(node(graph, "income:employment")).toBeUndefined();
     expect(ids(graph).filter((id) => id.startsWith("savings-category:"))).toEqual([
       "savings-category:retirement",
       "savings-category:emergency",
@@ -416,7 +489,7 @@ describe("focusMoneyFlowGraph", () => {
       }),
       { maxCategoriesPerGroup: Infinity, minLeafShare: 0 },
     );
-    const focused = focusMoneyFlowGraph(full, "group:daily");
+    const focused = focusMoneyFlowGraph(full, "group:daily", labels);
 
     expectBalanced(focused);
     expect(ids(focused)).toEqual([
@@ -428,12 +501,245 @@ describe("focusMoneyFlowGraph", () => {
     ]);
     expect(focused.nodes.map((n) => n.column)).toEqual([0, 1, 1, 1, 1]);
     expect(focused.totals).toBe(full.totals);
+    expect(focused.rootId).toBe("group:daily");
   });
 
   it("returns an empty graph for an unknown destination", () => {
-    const focused = focusMoneyFlowGraph(buildMoneyFlowGraph(finaryInput()), "group:gone");
+    const focused = focusMoneyFlowGraph(buildMoneyFlowGraph(finaryInput()), "group:gone", labels);
 
     expect(focused.nodes).toEqual([]);
+  });
+});
+
+describe("subcategories", () => {
+  const housingCategories = [
+    spendingCategory("housing", "Housing"),
+    spendingCategory("rent", "Rent", "housing"),
+    spendingCategory("maintenance", "Maintenance", "housing"),
+    spendingCategory("insurance", "Insurance", "housing"),
+    spendingCategory("returns", "Returns", "housing"),
+    spendingCategory("plumbing", "Plumbing", "maintenance"),
+    spendingCategory("bills", "Bills"),
+  ];
+
+  /** Housing's period total is what the insight reports; the buckets say where it went. */
+  function housingInput(housing: number, buckets: DayCategoryBucket[]) {
+    return finaryInput({
+      groupRows: [group("home", [spend("housing", housing, "Housing"), spend("bills", 120)])],
+      spendingBuckets: [...buckets, bucket("bills", 120)],
+      spendingCategories: housingCategories,
+    });
+  }
+
+  const subcategoriesOf = (graph: MoneyFlowGraph, id: string) =>
+    node(graph, id)?.subcategories?.map(({ id: childId, value }) => [childId, value]);
+
+  it("keeps subcategories out of the overview, behind their category", () => {
+    const graph = buildMoneyFlowGraph(
+      housingInput(1900, [
+        bucket("rent", 500, "2026-04-01"),
+        bucket("rent", 500, "2026-04-15"),
+        bucket("maintenance", 200),
+        // A grandchild counts toward the subcategory it sits under.
+        bucket("plumbing", 100),
+        bucket("insurance", 100),
+        bucket("housing", 500),
+        // Uncategorized spending has a destination of its own.
+        bucket(UNCATEGORIZED_CATEGORY_ID, 75),
+      ]),
+    );
+
+    expectBalanced(graph);
+    expect(ids(graph).some((id) => id.startsWith("subcategory:"))).toBe(false);
+    expect(node(graph, "category:housing")).toMatchObject({ value: 1900, categoryId: "housing" });
+    expect(subcategoriesOf(graph, "category:housing")).toEqual([
+      ["rent", 1000],
+      [DIRECT_ROW_ID, 500],
+      ["maintenance", 300],
+      ["insurance", 100],
+    ]);
+    expect(isFocusable(node(graph, "category:housing")!)).toBe(true);
+  });
+
+  it("leaves a category without subcategory activity to open its transactions", () => {
+    const graph = buildMoneyFlowGraph(
+      housingInput(1000, [bucket("housing", 1000), bucket("rent", 0.001)]),
+    );
+
+    expect(node(graph, "category:housing")).toMatchObject({ subcategories: undefined });
+    expect(isFocusable(node(graph, "category:housing")!)).toBe(false);
+    expect(node(graph, "category:bills")).toMatchObject({ categoryId: "bills" });
+    expect(isFocusable(node(graph, "category:bills")!)).toBe(false);
+  });
+
+  it("has nothing to zoom into once a category or income source has no subcategory activity", () => {
+    const graph = buildMoneyFlowGraph({
+      ...housingInput(1000, [bucket("housing", 1000)]),
+      incomeBreakdown: [row("employment", 2500)],
+      incomeCategories: [
+        category("employment", "Employment"),
+        category("salary", "Salary", "#123456", "employment"),
+      ],
+    });
+
+    expect(focusMoneyFlowGraph(graph, "category:housing", labels).nodes).toEqual([]);
+    expect(focusMoneyFlowGraph(graph, "income:employment", labels).nodes).toEqual([]);
+  });
+
+  it("zooms into a category: every subcategory and the direct spending, balanced", () => {
+    const full = buildMoneyFlowGraph(
+      housingInput(1900, [
+        bucket("rent", 1000),
+        bucket("maintenance", 300),
+        bucket("insurance", 100),
+        bucket("housing", 500),
+      ]),
+      { maxCategoriesPerGroup: Infinity, minLeafShare: 0 },
+    );
+    const focused = focusMoneyFlowGraph(full, "category:housing", labels);
+
+    expectBalanced(focused);
+    expect(focused.rootId).toBe("category:housing");
+    expect(ids(focused)).toEqual([
+      "category:housing",
+      "subcategory:rent",
+      "category:housing:direct",
+      "subcategory:maintenance",
+      "subcategory:insurance",
+    ]);
+    expect(focused.nodes.map((n) => n.column)).toEqual([0, 1, 1, 1, 1]);
+    expect(node(focused, "category:housing")).toMatchObject({
+      value: 1900,
+      categoryId: "housing",
+      subcategories: undefined,
+    });
+    expect(isFocusable(node(focused, "category:housing")!)).toBe(false);
+    expect(node(focused, "subcategory:rent")).toMatchObject({
+      kind: "subcategory",
+      name: "Rent",
+      categoryId: "rent",
+    });
+    expect(node(focused, "category:housing:direct")).toMatchObject({
+      kind: "direct",
+      name: "Direct",
+      value: 500,
+    });
+    expect(node(focused, "category:housing:direct")?.categoryId).toBeUndefined();
+    expect(focused.totals).toBe(full.totals);
+  });
+
+  it("reaches a category's subcategories through its group when the overview stops at groups", () => {
+    const input = housingInput(1300, [bucket("rent", 1000), bucket("maintenance", 300)]);
+    expect(node(buildMoneyFlowGraph(input, { includeCategories: false }), "category:housing")).toBe(
+      undefined,
+    );
+
+    const unfolded = buildMoneyFlowGraph(input, {
+      maxCategoriesPerGroup: Infinity,
+      minLeafShare: 0,
+    });
+    const groupView = focusMoneyFlowGraph(unfolded, "group:home", labels);
+    expect(isFocusable(node(groupView, "category:housing")!)).toBe(true);
+
+    const categoryView = focusMoneyFlowGraph(unfolded, "category:housing", labels);
+    expectBalanced(categoryView);
+    expect(ids(categoryView)).toEqual([
+      "category:housing",
+      "subcategory:rent",
+      "subcategory:maintenance",
+    ]);
+  });
+
+  it("brings a refund-dominated subcategory in as net refunds beside the net spending", () => {
+    const full = buildMoneyFlowGraph(
+      housingInput(1700, [
+        bucket("rent", 1500),
+        bucket("maintenance", 400),
+        bucket("returns", -200),
+      ]),
+    );
+    const focused = focusMoneyFlowGraph(full, "category:housing", labels);
+
+    expectBalanced(focused);
+    expect(ids(focused)).toEqual([
+      "category:housing:net",
+      "category:housing:refunds",
+      "category:housing",
+      "subcategory:rent",
+      "subcategory:maintenance",
+    ]);
+    expect(focused.nodes.map((n) => n.column)).toEqual([0, 0, 1, 2, 2]);
+    // Net spending is the category as the overview shows it.
+    expect(node(focused, "category:housing:net")).toMatchObject({
+      kind: "net",
+      name: "Net spending",
+      value: node(full, "category:housing")?.value,
+    });
+    expect(node(focused, "category:housing:refunds")).toMatchObject({
+      kind: "refunds",
+      value: 200,
+      members: [{ name: "Returns", value: 200 }],
+    });
+    // The category stands at its gross spending and says how much nets out.
+    expect(node(focused, "category:housing")).toMatchObject({ value: 1900, netRefunds: 200 });
+  });
+
+  it("nets refunds assigned to the category itself the same way", () => {
+    const focused = focusMoneyFlowGraph(
+      buildMoneyFlowGraph(housingInput(500, [bucket("rent", 600), bucket("housing", -100)])),
+      "category:housing",
+      labels,
+    );
+
+    expectBalanced(focused);
+    expect(node(focused, "category:housing:net")?.value).toBe(500);
+    expect(node(focused, "category:housing:refunds")?.members).toEqual([
+      { name: "Direct", value: 100 },
+    ]);
+    expect(ids(focused)).not.toContain("category:housing:direct");
+  });
+
+  it("zooms into an income category: its subcategories flow into it", () => {
+    const full = buildMoneyFlowGraph(
+      finaryInput({
+        incomeBreakdown: [row("salary", 2000), row("bonus", 400), row("employment", 100)],
+        incomeCategories: [
+          category("employment", "Employment"),
+          category("salary", "Salary", "#123456", "employment"),
+          category("bonus", "Bonus", "#123456", "employment"),
+        ],
+      }),
+    );
+    const focused = focusMoneyFlowGraph(full, "income:employment", labels);
+
+    expectBalanced(focused);
+    expect(focused.rootId).toBe("income:employment");
+    expect(ids(focused)).toEqual([
+      "income-subcategory:salary",
+      "income-subcategory:bonus",
+      "income:employment:direct",
+      "income:employment",
+    ]);
+    expect(focused.nodes.map((n) => n.column)).toEqual([0, 0, 0, 1]);
+    expect(node(focused, "income:employment")).toMatchObject({
+      value: 2500,
+      subcategories: undefined,
+    });
+    expect(focused.nodes.every((n) => !n.categoryId)).toBe(true);
+    expect(focused.nodes.some(isFocusable)).toBe(false);
+  });
+
+  it("keeps the zoom working when nothing came in", () => {
+    const full = buildMoneyFlowGraph({
+      ...housingInput(1300, [bucket("rent", 1000), bucket("maintenance", 300)]),
+      incomeBreakdown: [],
+      savingsBreakdown: [],
+    });
+    const focused = focusMoneyFlowGraph(full, "category:housing", labels);
+
+    expect(full.totals.income).toBe(0);
+    expectBalanced(focused);
+    expect(focused.totals).toBe(full.totals);
   });
 });
 
@@ -488,6 +794,16 @@ describe("money flow against the spending insight", () => {
       insightGroup("needs", [insightCategory("rent", 1500), insightCategory("deposit", -300)]),
       insightGroup("wants", [insightCategory("dining", 420.55)]),
     ];
+    // Rent splits into subcategories, one of them refund-dominated.
+    const byDayByCategory = [
+      bucket("rent_main", 1200),
+      bucket("rent_fees", 400.25),
+      bucket("rent_refund", -150.25),
+      bucket("rent", 50),
+      bucket("deposit", -300),
+      bucket("dining", 420.55),
+      bucket(UNCATEGORIZED_CATEGORY_ID, 79.45),
+    ];
     const uncategorized = 79.45;
     const saved = 600;
     const spent = groups.reduce((total, g) => total + g.spent, 0) + uncategorized;
@@ -523,13 +839,16 @@ describe("money flow against the spending insight", () => {
         txnCount: 2,
       },
       incomeBreakdown: income
-        ? [{ taxonomyId: "income_sources", categoryId: "salary", amount: income, count: 1 }]
+        ? [
+            { taxonomyId: "income_sources", categoryId: "salary", amount: income - 250, count: 1 },
+            { taxonomyId: "income_sources", categoryId: "bonus", amount: 250, count: 1 },
+          ]
         : [],
       savingsBreakdown: [
         { taxonomyId: "savings_categories", categoryId: "retirement", amount: saved, count: 1 },
       ],
       byDay: [],
-      byDayByCategory: [],
+      byDayByCategory,
       byMonth: [],
     };
   }
@@ -539,7 +858,25 @@ describe("money flow against the spending insight", () => {
       formatCalendarDate: () => "",
     });
     return buildMoneyFlowGraph(
-      moneyFlowInputFromReport(currentReport, budget, { income: [], savings: [] }, labels),
+      moneyFlowInputFromReport(
+        currentReport,
+        budget,
+        {
+          spending: [
+            spendingCategory("rent", "Rent"),
+            spendingCategory("rent_main", "Main", "rent"),
+            spendingCategory("rent_fees", "Fees", "rent"),
+            spendingCategory("rent_refund", "Refund", "rent"),
+          ],
+          income: [
+            category("employment", "Employment"),
+            category("salary", "Salary", "#123456", "employment"),
+            category("bonus", "Bonus", "#123456", "employment"),
+          ],
+          savings: [],
+        },
+        labels,
+      ),
     );
   }
 
@@ -550,6 +887,17 @@ describe("money flow against the spending insight", () => {
     expectBalanced(graph);
     expect(source.headline.netCashflow).toBeGreaterThan(0);
     expect(node(graph, "surplus")?.value).toBeCloseTo(source.headline.netCashflow, 6);
+    expect(node(graph, "income:employment")?.value).toBeCloseTo(source.headline.income, 6);
+  });
+
+  it("zooms into a category whose subcategories add up to its reconciled spending", () => {
+    const graph = graphFor(insight(4000));
+    const focused = focusMoneyFlowGraph(graph, "category:rent", labels);
+
+    expectBalanced(focused);
+    expect(node(focused, "category:rent:net")?.value).toBeCloseTo(1500, 6);
+    expect(node(focused, "category:rent:refunds")?.value).toBeCloseTo(150.25, 6);
+    expect(node(focused, "category:rent")?.value).toBeCloseTo(1650.25, 6);
   });
 
   it("falls short by exactly the headline net cashflow", () => {
