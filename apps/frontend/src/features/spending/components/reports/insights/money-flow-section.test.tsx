@@ -573,6 +573,38 @@ describe("MoneyFlowSection subcategories", () => {
     ).toBeInTheDocument();
   });
 
+  it("reaches an income category folded into +N more, then its subcategories", () => {
+    setup({
+      income: 6050,
+      incomeBreakdown: [
+        incomeRow("cat_income_salary", 6000),
+        incomeRow("cat_income_dividends", 30),
+        incomeRow("cat_income_gifts", 20),
+      ],
+      incomeCategories: [
+        ...employment,
+        taxonomyCategory("cat_income_investment", "Investment", null, "income_sources"),
+        taxonomyCategory(
+          "cat_income_dividends",
+          "Dividends",
+          "cat_income_investment",
+          "income_sources",
+        ),
+        taxonomyCategory("cat_income_other", "Other", null, "income_sources"),
+        taxonomyCategory("cat_income_gifts", "Gifts", "cat_income_other", "income_sources"),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "+2 more, $50. Show every category" }));
+
+    expect(screen.getByRole("heading", { name: "Total" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Investment, $30. Show subcategories" }));
+
+    expect(screen.getByRole("heading", { name: "Investment" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Dividends, $30" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to Total" })).toHaveFocus();
+  });
+
   it("rolls income up to its category and zooms into where it came from", () => {
     setup({
       incomeBreakdown: [incomeRow("cat_income_salary", 2000), incomeRow("cat_income_bonus", 500)],

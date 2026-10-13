@@ -86,7 +86,11 @@ export interface MoneyFlowNode {
   column: number;
   /** Spending category behind a `category` or `subcategory` node — opens its transactions. */
   categoryId?: string;
-  /** Destination node a leaf (or its folded remainder) flows out of. */
+  /**
+   * Destination node a leaf (or its folded remainder) flows out of; for the
+   * folded income remainder, the total it flows into. Zooming into the
+   * remainder zooms into this node.
+   */
   parentId?: string;
   /** What a `more` node folds, or which categories a `refunds` node nets. */
   members?: MoneyFlowMember[];
@@ -296,7 +300,10 @@ export function buildMoneyFlowGraph(
       nodes.push({ ...entry, id: `income:${entry.id}`, kind: "income", column: 0 });
     }
     if (folded.length > 0) {
-      nodes.push(moreNode("income:more", folded, labels, FALLBACK_COLOR, 0));
+      nodes.push({
+        ...moreNode("income:more", folded, labels, FALLBACK_COLOR, 0),
+        parentId: totalNode.id,
+      });
     }
     if (refunds > EPSILON) {
       nodes.push({
@@ -415,8 +422,10 @@ export function buildMoneyFlowGraph(
 /**
  * Zoom into one node. A destination sits on the left with every one of its
  * leaves on the right: pass a graph built without folding so nothing hides
- * behind "+N more". A category with subcategories shows them flowing the way
- * the category does: out of a spending category, into an income one.
+ * behind "+N more". The total shows everything flowing into it, so income
+ * folded into "+N more" stays reachable. A category with subcategories shows
+ * them flowing the way the category does: out of a spending category, into an
+ * income one.
  */
 export function focusMoneyFlowGraph(
   graph: MoneyFlowGraph,
@@ -425,7 +434,10 @@ export function focusMoneyFlowGraph(
 ): MoneyFlowGraph {
   const parent = graph.nodes.find((node) => node.id === parentId);
   // Gone, or nothing left to show (a refetch moved a zoomed category's activity onto itself).
-  if (!parent || !isFocusable(parent)) return { nodes: [], links: [], totals: graph.totals };
+  if (!parent || (parent.kind !== "total" && !isFocusable(parent))) {
+    return { nodes: [], links: [], totals: graph.totals };
+  }
+  if (parent.kind === "total") return focusMoneyIn(graph, parent);
   if (parent.subcategories) {
     return parent.kind === "income"
       ? focusIncomeCategory(parent, graph.totals)
@@ -448,6 +460,20 @@ export function isFocusable(node: MoneyFlowNode): boolean {
     (node.kind === "more" && !!node.parentId) ||
     !!node.subcategories
   );
+}
+
+/** Everything flowing into the total: every income source, net refunds, any shortfall. */
+function focusMoneyIn(graph: MoneyFlowGraph, total: MoneyFlowNode): MoneyFlowGraph {
+  const links = graph.links.filter((link) => link.target === total.id);
+  const sources = graph.nodes.filter((node) => links.some((link) => link.source === node.id));
+  // Without income the total is the root: nothing flows in.
+  if (sources.length === 0) return { nodes: [], links: [], totals: graph.totals };
+  return {
+    nodes: [...sources.map((source) => ({ ...source, column: 0 })), { ...total, column: 1 }],
+    links,
+    totals: graph.totals,
+    rootId: total.id,
+  };
 }
 
 /**

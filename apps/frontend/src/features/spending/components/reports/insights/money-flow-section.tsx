@@ -13,8 +13,8 @@ import type { BudgetSnapshot } from "../../../types/budget";
 import type { MonthlyReport } from "../../../types/report";
 import { MoneyFlowChart } from "./money-flow-chart";
 
-/** Zoomed views show every category; nothing folds into "+N more". */
-const UNFOLDED = { maxCategoriesPerGroup: Infinity, minLeafShare: 0 };
+/** Zoomed views show every category and income source; nothing folds into "+N more". */
+const UNFOLDED = { maxSources: Infinity, maxCategoriesPerGroup: Infinity, minLeafShare: 0 };
 
 interface MoneyFlowSectionProps {
   periodLabel: string;

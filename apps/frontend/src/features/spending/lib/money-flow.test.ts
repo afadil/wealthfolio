@@ -365,7 +365,9 @@ describe("buildMoneyFlowGraph", () => {
 
     expectBalanced(graph);
     expect(node(graph, "income:more")).toMatchObject({ value: 600, column: 0 });
-    expect(isFocusable(node(graph, "income:more")!)).toBe(false);
+    // It zooms into the total, where every source is unfolded.
+    expect(node(graph, "income:more")?.parentId).toBe("total");
+    expect(isFocusable(node(graph, "income:more")!)).toBe(true);
     // Unknown category ids keep their id as the name rather than vanishing.
     expect(node(graph, "income:more")?.members).toContainEqual({ name: "d", value: 300 });
   });
@@ -727,6 +729,44 @@ describe("subcategories", () => {
     });
     expect(focused.nodes.every((n) => !n.categoryId)).toBe(true);
     expect(focused.nodes.some(isFocusable)).toBe(false);
+  });
+
+  it("reaches income categories folded into +N more, and their subcategories", () => {
+    const input = finaryInput({
+      incomeBreakdown: [row("salary", 6000), row("dividends", 30), row("gifts", 20)],
+      incomeCategories: [
+        category("employment", "Employment"),
+        category("salary", "Salary", "#123456", "employment"),
+        category("investment", "Investment"),
+        category("dividends", "Dividends", "#123456", "investment"),
+        category("other", "Other"),
+        category("gifts", "Gifts", "#123456", "other"),
+      ],
+    });
+    const more = node(buildMoneyFlowGraph(input), "income:more")!;
+    expect(more.members?.map((member) => member.name)).toEqual(["Investment", "Other"]);
+    expect(isFocusable(more)).toBe(true);
+
+    const unfolded = buildMoneyFlowGraph(input, {
+      maxSources: Infinity,
+      maxCategoriesPerGroup: Infinity,
+      minLeafShare: 0,
+    });
+    // The remainder zooms into everything flowing into the total, unfolded.
+    const moneyIn = focusMoneyFlowGraph(unfolded, more.parentId!, labels);
+    expectBalanced(moneyIn);
+    expect(moneyIn.rootId).toBe("total");
+    expect(ids(moneyIn)).toEqual([
+      "income:employment",
+      "income:investment",
+      "income:other",
+      "total",
+    ]);
+    expect(isFocusable(node(moneyIn, "income:investment")!)).toBe(true);
+    expect(ids(focusMoneyFlowGraph(unfolded, "income:investment", labels))).toEqual([
+      "income-subcategory:dividends",
+      "income:investment",
+    ]);
   });
 
   it("keeps the zoom working when nothing came in", () => {
