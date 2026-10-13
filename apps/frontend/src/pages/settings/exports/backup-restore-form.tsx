@@ -1,4 +1,5 @@
 import type { BackupFailure } from "./backup-error";
+import { DatabaseIcon } from "@phosphor-icons/react/dist/csr/Database";
 import { getDatabaseBackupDownloadUrl, isWeb, openDatabaseBackupFolder } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
 import { useState } from "react";
@@ -61,7 +62,7 @@ export function BackupRestoreForm() {
     <Card className="overflow-hidden rounded-2xl shadow-none">
       <CardHeader className="space-y-4 p-5 sm:p-6">
         <BackupCardHeader
-          icon={<Icons.DatabaseBackup aria-hidden />}
+          icon={<DatabaseIcon weight="duotone" aria-hidden />}
           title={t("settings:backup_title")}
           info={
             <InfoPopover

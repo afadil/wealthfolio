@@ -326,6 +326,26 @@ it("Connect shows real backup status and links to management without uploading",
   );
   expect(mocks.capture).not.toHaveBeenCalled();
 });
+it("Connect shows an overdue backup as waiting, not as a next backup in the past", async () => {
+  mocks.action.mockResolvedValue({
+    ...status,
+    hasKey: true,
+    keyReady: true,
+    isSource: true,
+    sourceConsented: true,
+    history: [{ backupId: "point", publishedAt: "2026-10-01T00:00:00Z", sizeBytes: 123 }],
+    policy: {
+      ...status.policy,
+      enabled: true,
+      lastBackupAt: "2026-10-01T00:00:00Z",
+      nextDueAt: "2026-10-02T00:00:00Z",
+    },
+  });
+  mount(true);
+  expect(await screen.findByText(copy.cloud_backup_state_due)).toBeInTheDocument();
+  expect(screen.getByText(new RegExp(`^${copy.cloud_backup_last_label} `))).toBeInTheDocument();
+  expect(screen.queryByText(new RegExp(copy.cloud_backup_next_label))).not.toBeInTheDocument();
+});
 it("keeps automatic backups paused until the user enables the source", async () => {
   mocks.action.mockResolvedValue({
     ...status,
