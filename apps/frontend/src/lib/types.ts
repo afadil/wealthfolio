@@ -269,11 +269,19 @@ export interface ActivityDetails {
   subRows?: ActivityDetails[];
 }
 
+/** An account's cash in one currency after an activity. */
+export interface ActivityCashBalance {
+  currency: string;
+  balance: number;
+}
+
 export interface ActivitySearchResponse {
   data: ActivityDetails[];
   meta: {
     totalRowCount: number;
   };
+  /** Balance after each row, by activity id: only when asked for one cash account. */
+  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 /**

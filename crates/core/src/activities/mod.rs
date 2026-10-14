@@ -6,6 +6,7 @@ mod activities_model;
 mod activities_service;
 mod activities_traits;
 mod activity_cash_migration;
+mod cash_balances;
 mod compiler;
 mod csv_parser;
 mod idempotency;
@@ -44,6 +45,7 @@ pub use activity_cash_migration::{
     get_final_cash_migration_status, rebuild_pending_final_cash_accounts,
     record_final_cash_rebuild_attempt, run_final_cash_migration, ActivityFinalCashMigrationStatus,
 };
+pub use cash_balances::ActivityCashBalance;
 pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
 pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};
 pub use idempotency::{

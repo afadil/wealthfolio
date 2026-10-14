@@ -11,7 +11,7 @@ use crate::activities::activities_constants::{
     ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
 };
 use crate::activities::csv_parser::ParseConfig;
-use crate::activities::TransferLinkState;
+use crate::activities::{ActivityCashBalance, TransferLinkState};
 use crate::assets::NewAsset;
 use crate::Result;
 use crate::{activities::activities_errors::ActivityError, QuoteMode};
@@ -1093,6 +1093,10 @@ pub struct ActivitySearchResponseMeta {
 pub struct ActivitySearchResponse {
     pub data: Vec<ActivityDetails>,
     pub meta: ActivitySearchResponseMeta,
+    /// The cash balance after each row, by activity id: present only when the
+    /// caller asked for it and searched one cash or credit-card account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balances: Option<std::collections::HashMap<String, ActivityCashBalance>>,
 }
 
 /// Model for importing activities

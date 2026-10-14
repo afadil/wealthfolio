@@ -1392,8 +1392,15 @@ pub(crate) mod tests {
             Ok(self.activities.lock().unwrap().clone())
         }
 
-        fn get_activities_by_account_id(&self, _account_id: &str) -> Result<Vec<Activity>> {
-            unimplemented!()
+        fn get_activities_by_account_id(&self, account_id: &str) -> Result<Vec<Activity>> {
+            Ok(self
+                .activities
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|activity| activity.account_id == account_id)
+                .cloned()
+                .collect())
         }
 
         fn get_activities_by_account_ids(&self, _account_ids: &[String]) -> Result<Vec<Activity>> {
@@ -16241,5 +16248,177 @@ pub(crate) mod tests {
             .to_string();
         assert!(error.contains("not by symbol"), "{error}");
         assert_eq!(stored_snapshot(&activity_repository), before);
+    }
+
+    fn cash_balance_service(accounts: Vec<Account>, activities: Vec<Activity>) -> ActivityService {
+        let account_service = Arc::new(MockAccountService::new());
+        for account in accounts {
+            account_service.add_account(account);
+        }
+        let activity_repository = Arc::new(MockActivityRepository::new());
+        activity_repository
+            .activities
+            .lock()
+            .unwrap()
+            .extend(activities);
+        ActivityService::new(
+            activity_repository,
+            account_service,
+            Arc::new(MockAssetService::new()),
+            Arc::new(MockFxService::new()),
+            Arc::new(MockQuoteService),
+        )
+    }
+
+    fn cash_row(
+        id: &str,
+        account_id: &str,
+        activity_type: &str,
+        day: u32,
+        amount: Decimal,
+    ) -> Activity {
+        let mut activity = create_stored_activity(id, account_id, None);
+        activity.activity_type = activity_type.to_string();
+        activity.activity_date = format!("2026-04-{day:02}T00:00:00Z").parse().unwrap();
+        activity.quantity = None;
+        activity.unit_price = None;
+        activity.amount = Some(amount);
+        activity
+    }
+
+    fn page_row(id: &str, account_id: &str) -> ActivityDetails {
+        ActivityDetails {
+            id: id.to_string(),
+            account_id: account_id.to_string(),
+            asset_id: String::new(),
+            activity_type: "WITHDRAWAL".to_string(),
+            subtype: None,
+            status: ActivityStatus::Posted,
+            date: "2026-04-01T00:00:00Z".to_string(),
+            quantity: None,
+            unit_price: None,
+            currency: "USD".to_string(),
+            fee: None,
+            tax: None,
+            amount: None,
+            needs_review: false,
+            comment: None,
+            fx_rate: None,
+            created_at: "2026-04-01T00:00:00Z".to_string(),
+            updated_at: "2026-04-01T00:00:00Z".to_string(),
+            account_name: "Account".to_string(),
+            account_currency: "USD".to_string(),
+            asset_symbol: String::new(),
+            asset_name: None,
+            exchange_mic: None,
+            asset_pricing_mode: "NONE".to_string(),
+            instrument_type: None,
+            asset_contract_multiplier: None,
+            source_system: None,
+            source_record_id: None,
+            source_group_id: None,
+            idempotency_key: None,
+            import_run_id: None,
+            is_user_modified: false,
+            metadata: None,
+        }
+    }
+
+    fn page(rows: Vec<ActivityDetails>) -> ActivitySearchResponse {
+        ActivitySearchResponse {
+            meta: ActivitySearchResponseMeta {
+                total_row_count: rows.len() as i64,
+            },
+            data: rows,
+            cash_balances: None,
+        }
+    }
+
+    fn cash_account(id: &str, account_type: &str) -> Account {
+        let mut account = create_test_account(id, "USD");
+        account.account_type = account_type.to_string();
+        account
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_balances_a_page_from_the_whole_history() {
+        let service = cash_balance_service(
+            vec![cash_account("checking", "CASH")],
+            vec![
+                cash_row("opening", "checking", "DEPOSIT", 1, dec!(100)),
+                cash_row("rent", "checking", "WITHDRAWAL", 2, dec!(30)),
+                cash_row("coffee", "checking", "WITHDRAWAL", 3, dec!(20)),
+            ],
+        );
+        // A second page: the opening deposit is on an earlier page.
+        let mut response = page(vec![
+            page_row("coffee", "checking"),
+            page_row("rent", "checking"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response, Some(&["checking".to_string()]))
+            .await
+            .expect("attach balances");
+
+        let balances = response
+            .cash_balances
+            .expect("balances for one cash account");
+        assert_eq!(balances.len(), 2);
+        assert_eq!(balances["coffee"].balance, dec!(50));
+        assert_eq!(balances["rent"].balance, dec!(70));
+        assert_eq!(balances["rent"].currency, "USD");
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_skips_several_accounts_and_investment_accounts() {
+        let service = cash_balance_service(
+            vec![
+                cash_account("checking", "CASH"),
+                cash_account("savings", "CASH"),
+                cash_account("brokerage", "SECURITIES"),
+            ],
+            vec![
+                cash_row("deposit", "checking", "DEPOSIT", 1, dec!(100)),
+                cash_row("funding", "brokerage", "DEPOSIT", 1, dec!(100)),
+            ],
+        );
+
+        let mut both = page(vec![page_row("deposit", "checking")]);
+        service
+            .attach_cash_balances(
+                &mut both,
+                Some(&["checking".to_string(), "savings".to_string()]),
+            )
+            .await
+            .expect("attach balances");
+        assert!(both.cash_balances.is_none());
+
+        let mut all = page(vec![page_row("deposit", "checking")]);
+        service
+            .attach_cash_balances(&mut all, None)
+            .await
+            .expect("attach balances");
+        assert!(all.cash_balances.is_none());
+
+        let mut brokerage = page(vec![page_row("funding", "brokerage")]);
+        service
+            .attach_cash_balances(&mut brokerage, Some(&["brokerage".to_string()]))
+            .await
+            .expect("attach balances");
+        assert!(brokerage.cash_balances.is_none());
+    }
+
+    #[test]
+    fn a_search_response_without_balances_serializes_as_before() {
+        let json = serde_json::to_value(page(vec![page_row("deposit", "checking")]))
+            .expect("serialize response");
+        let keys: Vec<&str> = json
+            .as_object()
+            .expect("response object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(keys, vec!["data", "meta"]);
     }
 }

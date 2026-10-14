@@ -57,6 +57,9 @@ struct ActivitySearchBody {
     instrument_type_filter: Option<StringOrVec>,
     #[serde(rename = "activityIdFilter")]
     activity_id_filter: Option<StringOrVec>,
+    /// Cash balance after each row, for one cash or credit-card account.
+    #[serde(rename = "includeCashBalances")]
+    include_cash_balances: Option<bool>,
 }
 
 async fn search_activities(
@@ -101,10 +104,10 @@ async fn search_activities(
     let (date_from_utc, date_to_utc_exclusive) =
         local_date_range_utc_bounds(date_from_parsed, date_to_parsed, tz)?;
 
-    let resp = state.activity_service.search_activities_in_utc_range(
+    let mut resp = state.activity_service.search_activities_in_utc_range(
         body.page,
         body.page_size,
-        account_ids,
+        account_ids.clone(),
         types,
         body.asset_id_keyword,
         sort_normalized,
@@ -114,6 +117,12 @@ async fn search_activities(
         instrument_types,
         activity_ids,
     )?;
+    if body.include_cash_balances.unwrap_or(false) {
+        state
+            .activity_service
+            .attach_cash_balances(&mut resp, account_ids.as_deref())
+            .await?;
+    }
     Ok(Json(resp))
 }
 

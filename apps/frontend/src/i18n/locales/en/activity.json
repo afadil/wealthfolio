@@ -243,6 +243,7 @@
   "table_price_amount": "Price/Amount",
   "table_fee": "Fee",
   "table_total": "Total",
+  "table_balance": "Balance",
   "table_account": "Account",
   "table_currency": "Currency",
   "table_comment": "Comment",

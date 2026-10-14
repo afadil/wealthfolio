@@ -491,6 +491,41 @@ describe("AccountPage", () => {
     });
   });
 
+  it.each([AccountType.CASH, AccountType.CREDIT_CARD])(
+    "asks for running balances on a %s account's activities",
+    (accountType) => {
+      mockAccountPage([{ ...createAccount(), accountType, name: "Checking" }]);
+
+      render(<AccountPage />);
+
+      expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+        filters: { accountIds: ["account-1"] },
+        includeCashBalances: true,
+      });
+    },
+  );
+
+  it("does not ask for running balances on an investment or holdings-mode account", () => {
+    mockAccountPage([createAccount()]);
+    const { unmount } = render(<AccountPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Activities" }));
+
+    expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+      filters: { accountIds: ["account-1"] },
+      includeCashBalances: false,
+    });
+    unmount();
+
+    mockAccountPage([
+      { ...createAccount(), accountType: AccountType.CASH, trackingMode: "HOLDINGS" },
+    ]);
+    render(<AccountPage />);
+
+    expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
+      includeCashBalances: false,
+    });
+  });
+
   it("offers a hidden account in its own activity form and switcher", () => {
     mockAccountPage([
       { ...createAccount(), isActive: false },

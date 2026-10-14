@@ -94,7 +94,74 @@ describe("useActivitySearch", () => {
       expect.objectContaining({ accountIds: undefined }),
       "",
       { id: "date", desc: true },
+      { includeCashBalances: false },
     );
+  });
+
+  it("asks for cash balances and merges them across loaded pages", async () => {
+    adapterMocks.searchActivities
+      .mockResolvedValueOnce({
+        data: [{ id: "coffee" }],
+        meta: { totalRowCount: 2 },
+        cashBalances: { coffee: { currency: "USD", balance: 50 } },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "rent" }],
+        meta: { totalRowCount: 2 },
+        cashBalances: { rent: { currency: "USD", balance: 70 } },
+      });
+
+    const { result } = renderHook(
+      () =>
+        useActivitySearch({
+          filters: { accountIds: ["checking"], activityTypes: [] },
+          searchQuery: "",
+          sorting: [],
+          pageSize: 1,
+          includeCashBalances: true,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true));
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+    expect(adapterMocks.searchActivities).toHaveBeenLastCalledWith(
+      1,
+      1,
+      expect.objectContaining({ accountIds: ["checking"] }),
+      "",
+      { id: "date", desc: true },
+      { includeCashBalances: true },
+    );
+    expect(result.current.cashBalances).toEqual({
+      coffee: { currency: "USD", balance: 50 },
+      rent: { currency: "USD", balance: 70 },
+    });
+  });
+
+  it("returns no cash balances when the response has none", async () => {
+    adapterMocks.searchActivities.mockResolvedValueOnce({
+      data: [{ id: "deposit" }],
+      meta: { totalRowCount: 1 },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useActivitySearch({
+          filters: { accountIds: ["brokerage"], activityTypes: [] },
+          searchQuery: "",
+          sorting: [],
+          includeCashBalances: true,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    expect(result.current.cashBalances).toBeUndefined();
   });
 
   it("exposes a next-page error without discarding the first page", async () => {

@@ -16,7 +16,7 @@ import {
 import { ActivityType } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { ActivityDetails } from "@/lib/types";
+import { ActivityCashBalance, ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
   AmountDisplay,
@@ -70,6 +70,8 @@ interface ActivityTableMobileProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
+  /** The account's cash after each row; shown on each card when given. */
+  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 export const ActivityTableMobile = ({
@@ -90,6 +92,7 @@ export const ActivityTableMobile = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
+  cashBalances,
 }: ActivityTableMobileProps) => {
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
@@ -203,6 +206,7 @@ export const ActivityTableMobile = ({
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
+    const cashBalance = cashBalances?.[activity.id];
 
     // Compact View
     if (isCompactView) {
@@ -254,6 +258,16 @@ export const ActivityTableMobile = ({
                             </span>
                           </>
                         )}
+                      {cashBalance && (
+                        <span className="ml-auto flex shrink-0 items-center gap-1">
+                          {t("activity:table_balance")}
+                          <AmountDisplay
+                            value={cashBalance.balance}
+                            currency={cashBalance.currency}
+                            isHidden={isBalanceHidden}
+                          />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </>
@@ -442,6 +456,18 @@ export const ActivityTableMobile = ({
                   currency={activity.currency}
                   isHidden={isBalanceHidden}
                   className="font-semibold"
+                />
+              </div>
+            )}
+
+            {cashBalance && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("activity:table_balance")}</span>
+                <AmountDisplay
+                  value={cashBalance.balance}
+                  currency={cashBalance.currency}
+                  isHidden={isBalanceHidden}
+                  className="font-medium"
                 />
               </div>
             )}

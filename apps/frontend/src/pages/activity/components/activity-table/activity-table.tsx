@@ -17,7 +17,7 @@ import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { isRowBodyClick } from "@/lib/row-click";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { ActivityDetails } from "@/lib/types";
+import { ActivityCashBalance, ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
   type OnChangeFn,
@@ -94,6 +94,8 @@ interface ActivityTableProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
+  /** The account's cash after each row; adds a Balance column when given. */
+  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 export const ActivityTable = ({
@@ -114,6 +116,7 @@ export const ActivityTable = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
+  cashBalances,
 }: ActivityTableProps) => {
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
@@ -531,6 +534,41 @@ export const ActivityTable = ({
           );
         },
       },
+      ...(cashBalances
+        ? [
+            {
+              id: "cashBalance",
+              accessorFn: (activity) => cashBalances[activity.id]?.balance,
+              enableSorting: false,
+              enableHiding: true,
+              meta: {
+                label: t("activity:table_balance"),
+              },
+              header: ({ column }) => (
+                <DataTableColumnHeader
+                  className="justify-end text-right"
+                  column={column}
+                  title={t("activity:table_balance")}
+                />
+              ),
+              cell: ({ row }) => {
+                const cashBalance = cashBalances[row.original.id];
+                if (!cashBalance) {
+                  return <div className="pr-4 text-right">-</div>;
+                }
+                return (
+                  <div className="whitespace-nowrap pr-4 text-right">
+                    <AmountDisplay
+                      value={cashBalance.balance}
+                      currency={cashBalance.currency}
+                      isHidden={isBalanceHidden}
+                    />
+                  </div>
+                );
+              },
+            } satisfies ColumnDef<ActivityDetails>,
+          ]
+        : []),
       {
         id: "account",
         accessorKey: "accountName",
@@ -645,6 +683,7 @@ export const ActivityTable = ({
     ],
     [
       appTimezone,
+      cashBalances,
       dateFormatting,
       isBalanceHidden,
       handleEdit,

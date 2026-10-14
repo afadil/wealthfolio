@@ -1,7 +1,7 @@
 import { searchActivities } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { ActivityType } from "@/lib/constants";
-import { ActivityDetails, ActivitySearchResponse } from "@/lib/types";
+import { ActivityCashBalance, ActivityDetails, ActivitySearchResponse } from "@/lib/types";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
@@ -25,6 +25,8 @@ interface BaseOptions {
   searchQuery: string;
   sorting: SortingState;
   pageSize?: number;
+  /** Ask for the cash balance after each row (one cash or credit-card account). */
+  includeCashBalances?: boolean;
 }
 
 export interface UseActivitySearchInfiniteOptions extends BaseOptions {
@@ -44,6 +46,8 @@ export type UseActivitySearchOptions =
 export interface UseActivitySearchInfiniteResult {
   mode: "infinite";
   data: ActivityDetails[];
+  /** Balances for every loaded row, when asked for and available. */
+  cashBalances?: Record<string, ActivityCashBalance>;
   totalRowCount: number;
   fetchNextPage: () => Promise<unknown>;
   hasNextPage: boolean | undefined;
@@ -58,6 +62,7 @@ export interface UseActivitySearchInfiniteResult {
 export interface UseActivitySearchPaginatedResult {
   mode: "paginated";
   data: ActivityDetails[];
+  cashBalances?: Record<string, ActivityCashBalance>;
   totalRowCount: number;
   pageCount: number;
   isFetching: boolean;
@@ -80,7 +85,13 @@ export function useActivitySearch(
   options: UseActivitySearchPaginatedOptions,
 ): UseActivitySearchPaginatedResult;
 export function useActivitySearch(options: UseActivitySearchOptions): UseActivitySearchResult {
-  const { filters, searchQuery, sorting, pageSize = DEFAULT_PAGE_SIZE } = options;
+  const {
+    filters,
+    searchQuery,
+    sorting,
+    pageSize = DEFAULT_PAGE_SIZE,
+    includeCashBalances = false,
+  } = options;
   const mode = options.mode ?? "infinite";
   const pageIndex = "pageIndex" in options ? options.pageIndex : 0;
   const hasClosedAccountScope = filters.accountIds?.length === 0;
@@ -135,12 +146,15 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
       hasClosedAccountScope,
       primarySort,
       pageSize,
+      includeCashBalances,
     ],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       if (hasClosedAccountScope) return EMPTY_RESPONSE;
       const page = typeof pageParam === "number" ? pageParam : 0;
-      return searchActivities(page, pageSize, normalizedFilters, searchQuery, primarySort);
+      return searchActivities(page, pageSize, normalizedFilters, searchQuery, primarySort, {
+        includeCashBalances,
+      });
     },
     getNextPageParam: (lastPage, allPages) => {
       const fetched = allPages.reduce((acc, page) => acc + page.data.length, 0);
@@ -160,10 +174,13 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
       primarySort,
       pageIndex,
       pageSize,
+      includeCashBalances,
     ],
     queryFn: async () => {
       if (hasClosedAccountScope) return EMPTY_RESPONSE;
-      return searchActivities(pageIndex, pageSize, normalizedFilters, searchQuery, primarySort);
+      return searchActivities(pageIndex, pageSize, normalizedFilters, searchQuery, primarySort, {
+        includeCashBalances,
+      });
     },
     enabled: mode === "paginated",
   });
@@ -173,6 +190,16 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     () => infiniteQuery.data?.pages.flatMap((page) => page.data) ?? [],
     [infiniteQuery.data?.pages],
   );
+
+  // Each page balances its own rows from the account's whole history, so the
+  // maps merge without overlap.
+  const infiniteCashBalances = useMemo(() => {
+    const pages = infiniteQuery.data?.pages;
+    if (!pages?.some((page) => page.cashBalances)) return undefined;
+    const merged: Record<string, ActivityCashBalance> = {};
+    for (const page of pages) Object.assign(merged, page.cashBalances);
+    return merged;
+  }, [infiniteQuery.data?.pages]);
 
   const infiniteTotalRowCount = useMemo(
     () => infiniteQuery.data?.pages?.[0]?.meta.totalRowCount ?? 0,
@@ -188,6 +215,7 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     return {
       mode: "paginated",
       data: paginatedData,
+      cashBalances: paginatedQuery.data?.cashBalances,
       totalRowCount: paginatedTotalRowCount,
       pageCount,
       isFetching: paginatedQuery.isFetching,
@@ -199,6 +227,7 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
   return {
     mode: "infinite",
     data: infiniteData,
+    cashBalances: infiniteCashBalances,
     totalRowCount: infiniteTotalRowCount,
     fetchNextPage: infiniteQuery.fetchNextPage,
     hasNextPage: infiniteQuery.hasNextPage,

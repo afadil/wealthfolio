@@ -242,6 +242,7 @@
   "table_price_amount": "가격/금액",
   "table_fee": "수수료",
   "table_total": "합계",
+  "table_balance": "잔액",
   "table_account": "계좌",
   "table_currency": "통화",
   "table_comment": "메모",

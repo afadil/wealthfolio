@@ -246,6 +246,11 @@ const AccountPage = () => {
     return account.trackingMode === "HOLDINGS";
   }, [account]);
 
+  // A cash or credit-card account reads like a statement: the balance after
+  // each row, while the list runs in date order.
+  const showsRunningBalance =
+    isCashOnlyAccount && !isHoldingsMode && (accountActivitiesSorting[0]?.id ?? "date") === "date";
+
   // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)
   const canEditHoldingsDirectly = useMemo(() => {
     return canAddHoldings(account);
@@ -343,6 +348,7 @@ const AccountPage = () => {
     },
     searchQuery: "",
     sorting: accountActivitiesSorting,
+    includeCashBalances: showsRunningBalance,
   });
 
   const activityFormAccounts = useMemo<AccountSelectOption[]>(
@@ -679,6 +685,7 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
+        cashBalances={accountActivitiesSearch.cashBalances}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}
@@ -701,6 +708,7 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
+        cashBalances={accountActivitiesSearch.cashBalances}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}
