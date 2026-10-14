@@ -1,5 +1,6 @@
 /* @name Terminal */
 /* @font font-mono */
+/* @mode dark */
 :root {
   --radius: 0rem;
   --theme-control-radius: 0rem;

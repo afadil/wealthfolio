@@ -250,6 +250,18 @@ test("font roles keep their generic family and @font suggests one", async (t) =>
   assert.equal(themes.find(({ id }) => id === "flexoki").font, "font-mono");
 });
 
+test("@mode suggests light or dark and nothing else", async (t) => {
+  const dir = await workspace(t);
+  const renamed = fixtureCss.replace("@name Flexoki", "@name Example");
+  await writeFile(resolve(dir, "system.css"), "/* @mode system */\n" + renamed);
+  await assert.rejects(loadThemes(dir), /@mode must be one of light, dark/);
+  await rm(resolve(dir, "system.css"));
+  await writeFile(resolve(dir, "example.css"), "/* @mode dark */\n" + renamed);
+  const { themes } = await loadThemes(dir);
+  assert.equal(themes.find(({ id }) => id === "example").mode, "dark");
+  assert.equal(themes.find(({ id }) => id === "flexoki").mode, undefined);
+});
+
 test("heatmap tiles keep gain and loss apart by hue and stand off the card", async () => {
   const { auditHeatmap } = await import("./theme-generate.mjs");
   // Newspaper's former ink ramps: different lightness, no hue.

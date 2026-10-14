@@ -113,11 +113,14 @@ for (const theme of themes) {
       (JSON.parse(await page.getByTestId("addon").innerText()) as { chart: string }).chart,
     ).toBe(hostChart);
     await assertGeometryParity(page);
-    // A theme's suggested font is saved with it; themes without one keep the user's font.
-    expect(writes).toContainEqual(
-      theme.font ? { themeId: theme.id, font: theme.font } : { themeId: theme.id },
-    );
+    // A theme's suggested font and mode are saved with it; otherwise the user's choices stay.
+    expect(writes).toContainEqual({
+      themeId: theme.id,
+      ...(theme.font ? { font: theme.font } : {}),
+      ...(theme.mode ? { theme: theme.mode } : {}),
+    });
     await expect(page.locator("body")).toHaveClass(new RegExp(theme.font ?? "font-serif"));
+    if (theme.mode === "dark") await expect(page.locator("html")).toHaveClass(/dark/);
     await page.getByLabel("Appearance mode").selectOption("dark");
     await expect(page.locator("html")).toHaveClass(/dark/);
     await expect(page.getByTestId("addon")).toContainText('"mode":"dark"');
@@ -128,7 +131,7 @@ for (const theme of themes) {
       (JSON.parse(await page.getByTestId("addon").innerText()) as { chart: string }).chart,
     ).toBe(darkChart);
     await assertGeometryParity(page);
-    await page.getByRole("button", { name: "Aa Sans" }).click();
+    await page.getByRole("button", { name: "Sans" }).click();
     await expect(page.locator("body")).toHaveClass(/font-sans/);
     await expect(page.getByTestId("addon")).toContainText("font-sans");
     await page.reload();

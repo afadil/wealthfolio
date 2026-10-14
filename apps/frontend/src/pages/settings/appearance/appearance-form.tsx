@@ -1,27 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
 import { CuratedThemeSelector } from "@/components/curated-theme-selector";
-import { isThemeId } from "@/themes/generated/registry";
-import { themeSelectionUpdate } from "@/themes/selection";
 import { FontSelector } from "@/components/font-selector";
-import { NavigationStyleSelector } from "@/components/navigation-style-selector";
 import { ThemeSelector } from "@/components/theme-selector";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@wealthfolio/ui/components/ui/form";
-import { Switch } from "@wealthfolio/ui/components/ui/switch";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
+import {
+  type NavigationMode,
+  useNavigationMode,
+} from "@/pages/layouts/navigation/navigation-mode-context";
+import { isThemeId, resolveThemeId, themes } from "@/themes/generated/registry";
+import { themeSelectionUpdate } from "@/themes/selection";
+import { AnimatedToggleGroup, Button, Card, Icons } from "@wealthfolio/ui";
+import { Form, FormField } from "@wealthfolio/ui/components/ui/form";
+import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 interface AppearanceFormValues {
   theme: "light" | "dark" | "system";
@@ -29,8 +26,60 @@ interface AppearanceFormValues {
   menuBarVisible: boolean;
 }
 
+const modeLabelKeys = {
+  light: "common:component.theme_light_label",
+  dark: "common:component.theme_dark_label",
+  system: "common:component.theme_system_label",
+} as const;
+const fontLabelKeys = {
+  "font-sans": "common:component.font_sans",
+  "font-serif": "common:component.font_serif",
+  "font-mono": "common:component.font_mono",
+} as const;
+
+function SectionHeading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-4">
+      <div className="space-y-1">
+        <h2 className="text-base font-medium">{title}</h2>
+        {description && <p className="text-muted-foreground text-sm">{description}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/** One preference: what it is on the left, its control on the right (stacked on phones). */
+function SettingRow({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-muted-foreground text-xs">{description}</p>
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
 export function AppearanceForm() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { settings, updateSettings } = useSettingsContext();
   const { isMobile } = usePlatform();
   const { mode: navigationMode, setMode: setNavigationMode } = useNavigationMode();
@@ -53,128 +102,185 @@ export function AppearanceForm() {
     resolver: zodResolver(appearanceFormSchema),
     values: defaultValues,
   });
+  const activeTheme = themes.find(({ id }) => id === resolveThemeId(settings?.themeId));
 
-  function handlePartialUpdate(data: Partial<AppearanceFormValues>) {
-    updateSettings(data).catch((error) => {
+  function save(data: Parameters<typeof updateSettings>[0]) {
+    return updateSettings(data).catch((error) => {
       console.error("Failed to update appearance settings:", error);
     });
   }
 
+  // Picking a theme also applies the mode and font it suggests; say what changed
+  // and let the user keep the theme without those changes.
+  function selectTheme(themeId: string) {
+    if (!isThemeId(themeId) || !settings) return;
+    const update = themeSelectionUpdate(themeId);
+    const changes: string[] = [];
+    const previous: Partial<AppearanceFormValues> = {};
+    if (update.theme && update.theme !== settings.theme) {
+      changes.push(t(modeLabelKeys[update.theme as AppearanceFormValues["theme"]]));
+      previous.theme = settings.theme as AppearanceFormValues["theme"];
+    }
+    if (update.font && update.font !== settings.font) {
+      changes.push(t(fontLabelKeys[update.font as AppearanceFormValues["font"]]));
+      previous.font = settings.font as AppearanceFormValues["font"];
+    }
+    void save(update).then(() => {
+      if (!changes.length) return;
+      const name = themes.find(({ id }) => id === themeId)?.name ?? themeId;
+      toast.message(
+        t("settings:appearance_theme_applied", {
+          theme: name,
+          changes: new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(changes),
+        }),
+        { action: { label: t("settings:appearance_undo"), onClick: () => void save(previous) } },
+      );
+    });
+  }
+
+  const suggestion = (value: string) =>
+    t("settings:appearance_theme_suggests", { theme: activeTheme?.name, value });
+  const differsFromTheme =
+    !!activeTheme &&
+    ((!!activeTheme.mode && settings?.theme !== activeTheme.mode) ||
+      (!!activeTheme.font && settings?.font !== activeTheme.font));
+
   return (
     <Form {...form}>
-      <div className="max-w-4xl space-y-6">
-        <FormField
-          control={form.control}
-          name="font"
-          render={({ field }) => (
-            <FormItem className="space-y-3">
-              <div className="space-y-1">
-                <FormLabel className="text-base font-medium">
-                  {t("settings:appearance_font_title")}
-                </FormLabel>
-                <FormDescription className="text-sm">
-                  {t("settings:appearance_font_description")}
-                </FormDescription>
-              </div>
-              <FormControl>
-                <FontSelector
-                  value={field.value}
-                  onChange={(value) => {
-                    field.onChange(value);
-                    handlePartialUpdate({ font: value as AppearanceFormValues["font"] });
-                  }}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="theme"
-          render={({ field }) => (
-            <FormItem className="space-y-3">
-              <div className="space-y-1">
-                <FormLabel className="text-base font-medium">
-                  {t("settings:appearance_mode_title")}
-                </FormLabel>
-                <FormDescription className="text-sm">
-                  {t("settings:appearance_theme_description")}
-                </FormDescription>
-              </div>
-              <FormMessage />
-              <FormControl>
-                <ThemeSelector
-                  value={field.value}
-                  themeId={settings?.themeId}
-                  onChange={(value) => {
-                    field.onChange(value);
-                    handlePartialUpdate({ theme: value as AppearanceFormValues["theme"] });
-                  }}
-                  className="pt-2"
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
+      <div className="max-w-4xl space-y-8">
+        <section className="space-y-3">
+          <SectionHeading
+            title={t("settings:appearance_palette_title")}
+            description={t("settings:appearance_palette_description")}
+          />
+          <CuratedThemeSelector value={settings?.themeId} onChange={selectTheme} />
+        </section>
 
         <section className="space-y-3">
-          <div className="space-y-1">
-            <h2 className="text-base font-medium">{t("settings:appearance_palette_title")}</h2>
-            <p className="text-muted-foreground text-sm">
-              {t("settings:appearance_palette_description")}
-            </p>
-          </div>
-          <CuratedThemeSelector
-            value={settings?.themeId}
-            onChange={(themeId) => {
-              if (isThemeId(themeId)) {
-                updateSettings(themeSelectionUpdate(themeId)).catch((error) => {
-                  console.error("Failed to update appearance settings:", error);
-                });
-              }
-            }}
+          <SectionHeading
+            title={t("settings:appearance_customize_title")}
+            action={
+              differsFromTheme && activeTheme ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto px-0"
+                  onClick={() => void save(themeSelectionUpdate(activeTheme.id))}
+                >
+                  {t("settings:appearance_use_theme_defaults")}
+                </Button>
+              ) : undefined
+            }
           />
+          <Card className="divide-y overflow-hidden">
+            <FormField
+              control={form.control}
+              name="theme"
+              render={({ field }) => (
+                <SettingRow
+                  title={t("settings:appearance_mode_title")}
+                  description={
+                    activeTheme?.mode
+                      ? suggestion(t(modeLabelKeys[activeTheme.mode]))
+                      : t("settings:appearance_mode_description")
+                  }
+                >
+                  <ThemeSelector
+                    aria-label={t("settings:appearance_mode_title")}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      void save({ theme: value });
+                    }}
+                  />
+                </SettingRow>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="font"
+              render={({ field }) => (
+                <SettingRow
+                  title={t("settings:appearance_font_title")}
+                  description={
+                    activeTheme?.font
+                      ? suggestion(t(fontLabelKeys[activeTheme.font]))
+                      : t("settings:appearance_font_description")
+                  }
+                >
+                  <FontSelector
+                    aria-label={t("settings:appearance_font_title")}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      void save({ font: value });
+                    }}
+                  />
+                </SettingRow>
+              )}
+            />
+          </Card>
         </section>
 
         {!isMobile && (
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <p className="text-base font-medium">{t("settings:appearance_navigation_title")}</p>
-              <p className="text-muted-foreground text-sm">
-                {t("settings:appearance_navigation_description")}
-              </p>
-            </div>
-            <NavigationStyleSelector
-              value={navigationMode}
-              onChange={setNavigationMode}
-              className="max-w-md"
-            />
-          </div>
-        )}
-
-        {!isMobile && (
-          <FormField
-            control={form.control}
-            name="menuBarVisible"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <FormLabel>{t("settings:appearance_menu_bar")}</FormLabel>
-                  <FormDescription>{t("settings:appearance_menu_bar_description")}</FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={(value) => {
-                      field.onChange(value);
-                      handlePartialUpdate({ menuBarVisible: value });
-                    }}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+          <section className="space-y-3">
+            <SectionHeading title={t("settings:appearance_layout_title")} />
+            <Card className="divide-y overflow-hidden">
+              <SettingRow
+                title={t("settings:appearance_navigation_title")}
+                description={t("settings:appearance_navigation_description")}
+              >
+                <AnimatedToggleGroup<NavigationMode>
+                  aria-label={t("settings:appearance_navigation_title")}
+                  size="sm"
+                  value={navigationMode}
+                  onValueChange={setNavigationMode}
+                  items={[
+                    {
+                      value: "sidebar",
+                      label: (
+                        <span className="flex items-center gap-1.5">
+                          <Icons.PanelLeft className="size-3.5" />
+                          {t("common:navStyle.sidebar")}
+                        </span>
+                      ),
+                      "data-testid": "nav-sidebar-button",
+                    },
+                    {
+                      value: "launchbar",
+                      label: (
+                        <span className="flex items-center gap-1.5">
+                          <Icons.RectangleEllipsis className="size-3.5" />
+                          {t("common:navStyle.floating")}
+                        </span>
+                      ),
+                      "data-testid": "nav-launchbar-button",
+                    },
+                  ]}
+                />
+              </SettingRow>
+              <FormField
+                control={form.control}
+                name="menuBarVisible"
+                render={({ field }) => (
+                  <SettingRow
+                    title={t("settings:appearance_menu_bar")}
+                    description={t("settings:appearance_menu_bar_description")}
+                  >
+                    <Switch
+                      checked={field.value}
+                      aria-label={t("settings:appearance_menu_bar")}
+                      onCheckedChange={(value) => {
+                        field.onChange(value);
+                        void save({ menuBarVisible: value });
+                      }}
+                    />
+                  </SettingRow>
+                )}
+              />
+            </Card>
+          </section>
         )}
       </div>
     </Form>
