@@ -17,7 +17,7 @@ const data = Array.from({ length: 8 }, (_, index) => ({
 }));
 
 export function PerformanceThemeFixture() {
-  const [themeId, setThemeId] = useState("flexoki");
+  const [themeId, setThemeId] = useState("classic");
   const [mode, setMode] = useState("light");
   useEffect(() => {
     document.documentElement.dataset.theme = themeId;

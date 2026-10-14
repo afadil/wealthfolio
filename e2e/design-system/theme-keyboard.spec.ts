@@ -23,7 +23,7 @@ for (const mode of ["light", "dark"]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(
-        `/e2e/design-system/?theme=flexoki&mode=${mode}&gallery=1&rtl=1&locale=de-DE`,
+        `/e2e/design-system/?theme=classic&mode=${mode}&gallery=1&rtl=1&locale=de-DE`,
       );
       const radios = page.getByRole("radio");
       await expect(radios).toHaveCount(themes.length);
@@ -77,7 +77,7 @@ test("theme gallery retains visible keyboard focus in forced colors", async ({
   page,
 }, testInfo) => {
   await page.emulateMedia({ forcedColors: "active" });
-  await page.goto("/e2e/design-system/?theme=flexoki&mode=dark&gallery=1");
+  await page.goto("/e2e/design-system/?theme=classic&mode=dark&gallery=1");
   expect(await page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
   await tabToThemeGallery(page);
   await expect(page.getByRole("radio").first()).toBeFocused();

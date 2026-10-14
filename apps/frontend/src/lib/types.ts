@@ -919,7 +919,7 @@ export interface Settings {
   insightsOverviewLayout?: Record<string, unknown> | null;
   /** Read-only restore state, absent on older backends. */
   restoreReconnectRequired?: boolean;
-  /** Absent on older hosts; the provider resolves missing IDs to Classic (`flexoki`). */
+  /** Absent on older hosts; the provider resolves missing IDs to Classic. */
   themeId?: string;
   theme: string;
   font: string;

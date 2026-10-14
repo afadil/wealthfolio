@@ -29,7 +29,7 @@ pub struct Settings {
 }
 
 fn default_theme_id() -> String {
-    "flexoki".to_string()
+    "classic".to_string()
 }
 
 impl Default for Settings {
@@ -98,7 +98,7 @@ mod tests {
         value["font"] = serde_json::json!("font-serif");
 
         let settings: Settings = serde_json::from_value(value).unwrap();
-        assert_eq!(settings.theme_id, "flexoki");
+        assert_eq!(settings.theme_id, "classic");
         assert_eq!(settings.theme, "system");
         assert_eq!(settings.font, "font-serif");
     }

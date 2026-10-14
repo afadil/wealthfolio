@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mockRolloutRoutes } from "./rollout-route-helpers";
 for (const [theme, radius] of Object.entries({
-  flexoki: "9999px",
+  classic: "9999px",
 }))
   for (const width of [390, 1440]) {
     test(`${theme} dashboard navigation ${width}`, async ({ page }, info) => {
@@ -29,7 +29,7 @@ for (const [theme, radius] of Object.entries({
     });
   }
 
-for (const [theme, radius] of Object.entries({ flexoki: "8px" }))
+for (const [theme, radius] of Object.entries({ classic: "8px" }))
   for (const mode of ["light", "dark"] as const)
     for (const width of [1440]) {
       test(`${theme} ${mode} holdings account selector ${width}`, async ({ page }) => {

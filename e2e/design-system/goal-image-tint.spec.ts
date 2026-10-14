@@ -4,7 +4,7 @@ import { mockRolloutRoutes } from "./rollout-route-helpers";
 for (const [theme, mode, opacity] of [
   ["terminal", "dark", "0.65"],
   ["terminal", "light", "0.15"],
-  ["flexoki", "dark", "0"],
+  ["classic", "dark", "0"],
 ] as const) {
   test(`${theme} ${mode} goal image tint`, async ({ page }, info) => {
     await page.setViewportSize({ width: 1440, height: 900 });

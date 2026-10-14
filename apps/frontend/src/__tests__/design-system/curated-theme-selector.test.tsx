@@ -6,13 +6,13 @@ import { CuratedThemeSelector } from "@/components/curated-theme-selector";
 import { themes } from "@/themes/generated/registry";
 
 function InteractiveSelector() {
-  const [value, setValue] = useState("flexoki");
+  const [value, setValue] = useState("classic");
   return <CuratedThemeSelector value={value} onChange={setValue} />;
 }
 
 describe("curated theme selection", () => {
   it("discovers every theme and renders both previews directly from its tokens", () => {
-    const { container } = render(<CuratedThemeSelector value="flexoki" onChange={vi.fn()} />);
+    const { container } = render(<CuratedThemeSelector value="classic" onChange={vi.fn()} />);
     expect(screen.getAllByRole("radio")).toHaveLength(themes.length);
     for (const theme of themes) {
       const radio = screen.getByRole("radio", { name: theme.name });
@@ -43,7 +43,7 @@ describe("curated theme selection", () => {
     const onChange = vi.fn();
     render(<CuratedThemeSelector value="future-theme" onChange={onChange} />);
     await userEvent.click(screen.getByRole("radio", { name: "Classic" }));
-    expect(onChange).toHaveBeenCalledExactlyOnceWith("flexoki");
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("classic");
   });
 
   it("supports native arrow selection and controlled preference changes", async () => {

@@ -93,7 +93,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       void applySettingsToDocument(data)
         .then(() => {
           if (!cancelled) {
-            setSettings({ ...data, themeId: data.themeId ?? "flexoki" });
+            setSettings({ ...data, themeId: data.themeId ?? "classic" });
             setAppearanceReady(true);
             setAppearanceError(undefined);
           }
@@ -263,7 +263,7 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   document.documentElement.setAttribute("lang", language);
   document.documentElement.setAttribute("dir", i18n.dir(language));
 
-  const requestedThemeId = newSettings.themeId ?? "flexoki";
+  const requestedThemeId = newSettings.themeId ?? "classic";
   document.documentElement.dataset.theme = resolveThemeId(requestedThemeId);
 
   // Font classes

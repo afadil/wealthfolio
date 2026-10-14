@@ -104,16 +104,16 @@ describe("settings theme runtime", () => {
     async (themeId) => {
       state.data = { ...base, themeId };
       render(fixture());
-      await ready(themeId ?? "flexoki");
-      expect(document.documentElement.dataset.theme).toBe("flexoki");
-      expect(localStorage.getItem("wealthfolio-theme-id")).toBe(themeId ?? "flexoki");
+      await ready(themeId ?? "classic");
+      expect(document.documentElement.dataset.theme).toBe("classic");
+      expect(localStorage.getItem("wealthfolio-theme-id")).toBe(themeId ?? "classic");
       expect(state.mutateAsync).not.toHaveBeenCalled();
     },
   );
 
   it("rejects unknown selections and sends only the valid selection to the mutation", async () => {
     render(fixture());
-    await ready("flexoki");
+    await ready("classic");
     await expect(context.updateSettings({ themeId: "unregistered" })).rejects.toThrow(
       "Unknown theme selection",
     );

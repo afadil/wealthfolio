@@ -44,7 +44,7 @@ test("unknown cached ID falls back without replacing it and system mode resolves
     localStorage.setItem("wealthfolio-theme", "system");
   });
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "flexoki");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "classic");
   await expect(page.locator("html")).toHaveClass(/dark/);
   expect(await page.evaluate(() => localStorage.getItem("wealthfolio-theme-id"))).toBe(
     "future-palette",
@@ -52,7 +52,7 @@ test("unknown cached ID falls back without replacing it and system mode resolves
 });
 
 test("an open body portal inherits a same-mode palette switch", async ({ page }) => {
-  await page.goto("/e2e/design-system/?theme=flexoki&mode=dark");
+  await page.goto("/e2e/design-system/?theme=classic&mode=dark");
   await page.getByRole("button", { name: "Open dialog" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

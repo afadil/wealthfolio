@@ -37,7 +37,7 @@ test("desktop and mobile lines and legends follow all palette modes without rema
               element.remove();
               return resolved;
             }),
-          theme.id === "flexoki"
+          theme.id === "classic"
             ? originalFlexoki
             : Array.from(
                 { length: 8 },

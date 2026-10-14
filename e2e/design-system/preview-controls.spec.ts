@@ -12,7 +12,7 @@ for (const theme of themes) {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       await page.goto(
-        "/e2e/design-system/?theme=flexoki&mode=light&treatment=proposed&contrast=proposed&gallery=1",
+        "/e2e/design-system/?theme=classic&mode=light&treatment=proposed&contrast=proposed&gallery=1",
       );
       await expect(page.getByLabel("Shape style")).toHaveCount(0);
       await page.getByRole("radio", { name: theme.name, exact: true }).locator("..").click();

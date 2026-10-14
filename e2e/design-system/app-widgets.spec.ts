@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { themes } from "../../apps/frontend/src/themes/generated/registry";
 
-const sampled = ["flexoki", "ember", "newspaper", "cupertino"];
+const sampled = ["classic", "ember", "newspaper", "cupertino"];
 
 for (const width of [390, 1440]) {
   test(`real app widgets follow all themes and modes at ${width}px`, async ({ page }, testInfo) => {
@@ -12,7 +12,7 @@ for (const width of [390, 1440]) {
     page.on("request", (request) => {
       if (new URL(request.url()).pathname.startsWith("/api/")) apiRequests.push(request.url());
     });
-    await page.goto("/e2e/design-system/?theme=flexoki&mode=light&gallery=1");
+    await page.goto("/e2e/design-system/?theme=classic&mode=light&gallery=1");
     const holdings = page.getByRole("region", { name: "Holdings list", exact: true });
     await expect(holdings.getByRole("button", { name: /ACME.*120 shares/ })).toBeVisible();
     await expect(

@@ -7,14 +7,14 @@ import { generate, loadThemes, auditContrast, themeOrder } from "./theme-generat
 import { parseColor, contrast } from "./theme-colors.mjs";
 
 const fixtureCss = await readFile(
-  new URL("../src/themes/definitions/flexoki.css", import.meta.url),
+  new URL("../src/themes/definitions/classic.css", import.meta.url),
   "utf8",
 );
-const fixture = (await loadThemes()).themes.find(({ id }) => id === "flexoki");
+const fixture = (await loadThemes()).themes.find(({ id }) => id === "classic");
 async function workspace(t) {
   const dir = await mkdtemp(resolve(tmpdir(), "wealthfolio-themes-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
-  await writeFile(resolve(dir, "flexoki.css"), fixtureCss);
+  await writeFile(resolve(dir, "classic.css"), fixtureCss);
   return dir;
 }
 test("discovers CSS themes, scopes selectors and removes deleted themes deterministically", async (t) => {
@@ -31,7 +31,7 @@ test("discovers CSS themes, scopes selectors and removes deleted themes determin
   const { themes } = await generate(options);
   assert.deepEqual(
     themes.map(({ id }) => id),
-    ["flexoki", "example"],
+    ["classic", "example"],
   );
   const css = await readFile(options.cssPath, "utf8");
   assert.match(css, /:root\[data-theme="example"\] h1/);
@@ -98,13 +98,13 @@ test("supports exact extracted colors and reports deficiencies without exemption
   assert.ok(Math.abs(contrast("oklch(0 0 0)", "oklch(1 0 0)") - 21) < 0.01);
   // A deliberately deficient palette proves deficiencies are reported with no
   // exemptions. A shipped theme must not be the fixture for that: the shipped
-  // ones are expected to pass, and flexoki now does.
+  // ones are expected to pass, and classic now does.
   const deficient = {
     light: { ...fixture.light, "muted-foreground": fixture.light.muted },
     dark: fixture.dark,
   };
   assert.ok(auditContrast([{ id: "deficient", ...deficient }]).some(({ pass }) => !pass));
-  assert.ok(auditContrast([{ id: "flexoki", ...fixture }]).every(({ pass }) => pass));
+  assert.ok(auditContrast([{ id: "classic", ...fixture }]).every(({ pass }) => pass));
 });
 test("bootstrap applies cached palette/mode before React and preserves unknown storage", async (t) => {
   const { runInNewContext } = await import("node:vm");
@@ -138,7 +138,7 @@ test("bootstrap applies cached palette/mode before React and preserves unknown s
         setItem: () => assert.fail("Must not overwrite saved preference"),
       },
     });
-    assert.equal(attrs["data-theme"], "flexoki");
+    assert.equal(attrs["data-theme"], "classic");
     assert.equal(root.style.colorScheme, missingMedia ? "light" : "dark");
     assert.ok(classes.has(missingMedia ? "light" : "dark"));
   }
@@ -158,13 +158,13 @@ test("OKLCH conversion matches known sRGB red and transparency is restricted onl
     "heatmap-label-light",
   ]) {
     await writeFile(
-      resolve(dir, "flexoki.css"),
+      resolve(dir, "classic.css"),
       fixtureCss + `\n:root { --${token}: rgba(255, 0, 0, 0.5); }`,
     );
     await assert.rejects(loadThemes(dir), /must be opaque/);
   }
   await writeFile(
-    resolve(dir, "flexoki.css"),
+    resolve(dir, "classic.css"),
     fixtureCss + "\n:root { --bar-stripe: rgba(255, 0, 0, 0.5); }",
   );
   assert.equal((await loadThemes(dir)).themes.length, 1);
@@ -198,7 +198,7 @@ test("checks transparent control states against their actual surface", () => {
 test("preserves Flexoki's pre-migration colors in both modes", async () => {
   const { createHash } = await import("node:crypto");
   const expected = {
-    flexoki: "c20cb45a31697da5bd80000c189d84a678efaffdf958bf947398783c13117685",
+    classic: "c20cb45a31697da5bd80000c189d84a678efaffdf958bf947398783c13117685",
   };
   const { themes, colorTokens } = await loadThemes();
   // Roles added after the migration have no legacy value; the audits cover them.
@@ -247,7 +247,7 @@ test("font roles keep their generic family and @font suggests one", async (t) =>
   );
   const { themes } = await loadThemes(dir);
   assert.equal(themes.find(({ id }) => id === "example").font, "font-sans");
-  assert.equal(themes.find(({ id }) => id === "flexoki").font, "font-mono");
+  assert.equal(themes.find(({ id }) => id === "classic").font, "font-mono");
 });
 
 test("every shipped theme has a place in the picker order", async () => {
@@ -266,7 +266,7 @@ test("@mode suggests light or dark and nothing else", async (t) => {
   await writeFile(resolve(dir, "example.css"), "/* @mode dark */\n" + renamed);
   const { themes } = await loadThemes(dir);
   assert.equal(themes.find(({ id }) => id === "example").mode, "dark");
-  assert.equal(themes.find(({ id }) => id === "flexoki").mode, undefined);
+  assert.equal(themes.find(({ id }) => id === "classic").mode, undefined);
 });
 
 test("heatmap tiles keep gain and loss apart by hue and stand off the card", async () => {

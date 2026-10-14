@@ -48,7 +48,7 @@ describe("addon curated palette transport", () => {
 
   it("broadcasts an attribute-only palette switch to the existing iframe without reload", async () => {
     document.documentElement.className = "dark";
-    document.documentElement.dataset.theme = "flexoki";
+    document.documentElement.dataset.theme = "classic";
     const manager = new AddonIframeManager();
     const starting = manager.startAddon({
       addonId: "palette-probe",

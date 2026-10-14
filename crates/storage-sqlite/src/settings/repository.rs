@@ -224,7 +224,7 @@ impl SettingsRepositoryTrait for SettingsRepository {
             Err(diesel::result::Error::NotFound) => {
                 // Return default values for known settings
                 let default_value = match setting_key_param {
-                    "theme_id" => "flexoki",
+                    "theme_id" => "classic",
                     "theme" => "light",
                     "font" => "font-mono",
                     "language" => "en",
@@ -447,8 +447,8 @@ mod tests {
     #[tokio::test]
     async fn palette_defaults_and_partial_updates_preserve_unknown_ids() {
         let (repo, _dir) = setup().await;
-        assert_eq!(repo.get_setting("theme_id").unwrap(), "flexoki");
-        assert_eq!(repo.get_settings().unwrap().theme_id, "flexoki");
+        assert_eq!(repo.get_setting("theme_id").unwrap(), "classic");
+        assert_eq!(repo.get_settings().unwrap().theme_id, "classic");
 
         let palette_update: SettingsUpdate = serde_json::from_value(serde_json::json!({
             "themeId": "future-palette",

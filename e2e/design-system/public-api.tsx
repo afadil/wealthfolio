@@ -30,7 +30,7 @@ export function PublicApiFixture({ settings }: { settings: Settings }) {
   const buttonRef = createRef<HTMLButtonElement>();
   const dialogRef = createRef<HTMLDivElement>();
   const sheetRef = createRef<HTMLDivElement>();
-  const palette: string = settings.themeId ?? "flexoki";
+  const palette: string = settings.themeId ?? "classic";
   return (
     <FormattingProvider locale="CA" uiLocale="en" timezone="America/Toronto">
       <section data-theme={palette}>

@@ -76,8 +76,8 @@ segments; optional `--theme-button-radius`, `--theme-segmented-radius`,
 `--theme-card-radius`, `--theme-dialog-radius`, `--theme-popover-radius` and
 `--theme-badge-radius` retain specialized geometry. `--theme-control-height`,
 padding, surface and shadow variables allow density/elevation overrides. Classic
-(`flexoki`) retains 8px fields, pill buttons/segments and its original
-card/dialog fallbacks.
+retains 8px fields, pill buttons/segments and its original card/dialog
+fallbacks.
 
 Fonts belong to the user. A theme may choose the typeface for each role
 (`--font-sans`, `--font-serif`, `--font-mono`), but each role must keep its
@@ -97,7 +97,7 @@ default to the theme's destructive and info text colours; override them when
 those clash with the palette.
 
 Theme selection remains
-`{ themeId: "flexoki", theme: "system", font: "font-sans" }`. Unknown saved IDs
+`{ themeId: "classic", theme: "system", font: "font-sans" }`. Unknown saved IDs
 render Classic without overwriting the preference. Appearance stays
 device-local. Settings, charts, startup caching and addons use the same resolved
 themes. The small build step scopes CSS and generates discovery/startup
@@ -105,8 +105,8 @@ metadata; contributors do not author generated files.
 
 ## Provenance and contrast
 
-Classic (`flexoki`) preserves the original Flexoki palette. Ember's light card
-and control surfaces and geometry come from the
+Classic preserves the original Flexoki palette. Ember's light card and control
+surfaces and geometry come from the
 [tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r) "Claude +"
 theme; see [theme attribution](../apps/frontend/src/themes/NOTICE.md).
 

@@ -42,7 +42,7 @@ for (const theme of themes)
               result.contrast,
               `${surface}/${kind}/${hover ? "hover" : "rest"}`,
             ).toBeGreaterThanOrEqual(4.5);
-            if (theme.id === "flexoki") {
+            if (theme.id === "classic") {
               const reference = page.getByTestId(`${surface}-legacy`);
               if (hover && kind !== "badge") await reference.hover();
               else await page.mouse.move(0, 0);
@@ -56,7 +56,7 @@ for (const theme of themes)
   }
 test("published host without new control tokens retains prior rendering", async ({ page }) => {
   for (const mode of ["light", "dark"]) {
-    await page.goto(`/e2e/design-system/?theme=flexoki&mode=${mode}&controls=1`);
+    await page.goto(`/e2e/design-system/?theme=classic&mode=${mode}&controls=1`);
     await page.addStyleTag({
       content:
         ":root { --destructive-control: initial !important; --destructive-control-hover: initial !important; --destructive-control-foreground: initial !important; } * { transition:none !important; }",

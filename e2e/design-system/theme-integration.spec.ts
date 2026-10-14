@@ -2,7 +2,7 @@ import { readThemeGeometry } from "./theme-geometry";
 import { expect, test, type Page } from "@playwright/test";
 import { themes } from "../../apps/frontend/src/themes/generated/registry";
 
-async function mockSettings(page: Page, initialId = "flexoki") {
+async function mockSettings(page: Page, initialId = "classic") {
   await page.addInitScript(() => {
     (window as Window & { themeIntegrationMocked?: boolean }).themeIntegrationMocked = true;
   });
@@ -94,7 +94,7 @@ for (const theme of themes) {
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    const writes = await mockSettings(page, theme.id === "flexoki" ? "newspaper" : "flexoki");
+    const writes = await mockSettings(page, theme.id === "classic" ? "newspaper" : "classic");
     await page.goto("/e2e/theme-integration/");
     await expect(page.getByTestId("addon")).toContainText('"themeId"');
     const iframeCount = page.frames().length;
@@ -173,7 +173,7 @@ test("unknown saved IDs fall back without a backend write", async ({ page }) => 
   const writes = await mockSettings(page, "future-theme");
   await page.goto("/e2e/theme-integration/");
   await expect(page.getByRole("radio", { name: "Classic" })).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "flexoki");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "classic");
   expect(await page.evaluate(() => localStorage.getItem("wealthfolio-theme-id"))).toBe(
     "future-theme",
   );
