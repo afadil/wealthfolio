@@ -78,6 +78,16 @@ export const standardTokens = [
 export const fontRoles = ["font-sans", "font-serif", "font-mono"];
 // Modes a theme may suggest with /* @mode dark */; every theme keeps both appearances.
 export const suggestedModes = ["light", "dark"];
+// The order the theme picker shows; themes not listed follow alphabetically.
+export const themeOrder = [
+  "flexoki",
+  "ember",
+  "signature",
+  "cupertino",
+  "newspaper",
+  "cyber",
+  "terminal",
+];
 // A theme picks the typeface for each role; the role keeps its generic family,
 // so the user's Font setting still means sans, serif or mono.
 const fontGenerics = {
@@ -218,7 +228,8 @@ export async function loadThemes(definitionsDir = resolve(frontend, "src/themes/
   }
   if (!themes.some(({ id }) => id === "flexoki"))
     throw new Error("Required fallback theme flexoki is missing");
-  themes.sort((a, b) => (a.id === "flexoki" ? -1 : b.id === "flexoki" ? 1 : a.id < b.id ? -1 : 1));
+  const rank = ({ id }) => (themeOrder.includes(id) ? themeOrder.indexOf(id) : themeOrder.length);
+  themes.sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : 1));
   return { themes, colorTokens };
 }
 export function auditContrast(themes) {

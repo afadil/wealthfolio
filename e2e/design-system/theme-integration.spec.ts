@@ -172,7 +172,7 @@ test("system mode keeps palette/font and first paint uses cached settings before
 test("unknown saved IDs fall back without a backend write", async ({ page }) => {
   const writes = await mockSettings(page, "future-theme");
   await page.goto("/e2e/theme-integration/");
-  await expect(page.getByRole("radio", { name: "Flexoki" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Classic" })).toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "flexoki");
   expect(await page.evaluate(() => localStorage.getItem("wealthfolio-theme-id"))).toBe(
     "future-theme",

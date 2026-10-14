@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { generate, loadThemes, auditContrast } from "./theme-generate.mjs";
+import { generate, loadThemes, auditContrast, themeOrder } from "./theme-generate.mjs";
 import { parseColor, contrast } from "./theme-colors.mjs";
 
 const fixtureCss = await readFile(
@@ -21,7 +21,7 @@ test("discovers CSS themes, scopes selectors and removes deleted themes determin
   const definitionsDir = await workspace(t);
   await writeFile(
     resolve(definitionsDir, "example.css"),
-    fixtureCss.replace("@name Flexoki", "@name Example") + "\n:root h1 { letter-spacing: 0; }",
+    fixtureCss.replace("@name Classic", "@name Example") + "\n:root h1 { letter-spacing: 0; }",
   );
   const options = {
     definitionsDir,
@@ -48,7 +48,7 @@ test("discovers CSS themes, scopes selectors and removes deleted themes determin
 });
 test("rejects unsafe IDs, duplicate names, missing modes and unsupported CSS", async (t) => {
   const dir = await workspace(t);
-  const renamed = fixtureCss.replace("@name Flexoki", "@name Example");
+  const renamed = fixtureCss.replace("@name Classic", "@name Example");
   const cases = [
     ["Bad-ID", renamed, /Unsafe/],
     ["duplicate", fixtureCss, /Duplicate/],
@@ -221,7 +221,7 @@ test("preserves Flexoki's pre-migration colors in both modes", async () => {
 
 test("font roles keep their generic family and @font suggests one", async (t) => {
   const dir = await workspace(t);
-  const renamed = fixtureCss.replace("@name Flexoki", "@name Example");
+  const renamed = fixtureCss.replace("@name Classic", "@name Example");
   for (const [id, source, error] of [
     [
       "remap",
@@ -250,9 +250,16 @@ test("font roles keep their generic family and @font suggests one", async (t) =>
   assert.equal(themes.find(({ id }) => id === "flexoki").font, "font-mono");
 });
 
+test("every shipped theme has a place in the picker order", async () => {
+  assert.deepEqual(
+    (await loadThemes()).themes.map(({ id }) => id),
+    themeOrder,
+  );
+});
+
 test("@mode suggests light or dark and nothing else", async (t) => {
   const dir = await workspace(t);
-  const renamed = fixtureCss.replace("@name Flexoki", "@name Example");
+  const renamed = fixtureCss.replace("@name Classic", "@name Example");
   await writeFile(resolve(dir, "system.css"), "/* @mode system */\n" + renamed);
   await assert.rejects(loadThemes(dir), /@mode must be one of light, dark/);
   await rm(resolve(dir, "system.css"));

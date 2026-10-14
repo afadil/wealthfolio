@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { themes } from "../../apps/frontend/src/themes/generated/registry";
+
+const sampled = ["flexoki", "ember", "newspaper", "cupertino"];
 
 for (const width of [390, 1440]) {
   test(`real app widgets follow all themes and modes at ${width}px`, async ({ page }, testInfo) => {
@@ -36,13 +39,13 @@ for (const width of [390, 1440]) {
       "aria-pressed",
       "true",
     );
-    for (const theme of ["Flexoki", "Ember", "Newspaper", "Cupertino"]) {
-      await page.getByRole("radio", { name: theme, exact: true }).locator("..").click();
+    for (const theme of themes.filter(({ id }) => sampled.includes(id))) {
+      await page.getByRole("radio", { name: theme.name, exact: true }).locator("..").click();
       for (const mode of ["light", "dark"]) {
         await page
           .getByRole("switch", { name: "Dark mode", exact: true })
           .setChecked(mode === "dark");
-        await expect(page.locator("html")).toHaveAttribute("data-theme", theme.toLowerCase());
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
         await expect(composition.locator(".recharts-surface")).toBeVisible();
         await expect(performance.locator(".recharts-line-curve:visible")).toHaveCount(2);
         await expect(donuts.locator(".recharts-surface")).toHaveCount(3);

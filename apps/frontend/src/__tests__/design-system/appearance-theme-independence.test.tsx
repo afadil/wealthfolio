@@ -31,7 +31,7 @@ describe("appearance preference independence", () => {
   it("saves only the chosen palette and does not rewrite an unknown ID on mount", async () => {
     const user = userEvent.setup();
     render(<AppearanceForm />);
-    expect(screen.getByRole("radio", { name: "Flexoki" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Classic" })).toBeChecked();
     expect(updateSettings).not.toHaveBeenCalled();
     await user.click(screen.getByRole("radio", { name: "Newspaper" }));
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ themeId: "newspaper" });

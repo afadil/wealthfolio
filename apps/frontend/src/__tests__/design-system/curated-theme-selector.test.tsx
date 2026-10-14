@@ -30,19 +30,19 @@ describe("curated theme selection", () => {
   });
 
   it.each([undefined, "theme-from-a-newer-version"])(
-    "renders Flexoki for %s without writing a replacement preference",
+    "renders Classic for %s without writing a replacement preference",
     (value) => {
       const onChange = vi.fn();
       render(<CuratedThemeSelector value={value} onChange={onChange} />);
-      expect(screen.getByRole("radio", { name: "Flexoki" })).toBeChecked();
+      expect(screen.getByRole("radio", { name: "Classic" })).toBeChecked();
       expect(onChange).not.toHaveBeenCalled();
     },
   );
 
-  it("allows an explicit Flexoki selection to replace an unknown saved ID", async () => {
+  it("allows an explicit Classic selection to replace an unknown saved ID", async () => {
     const onChange = vi.fn();
     render(<CuratedThemeSelector value="future-theme" onChange={onChange} />);
-    await userEvent.click(screen.getByRole("radio", { name: "Flexoki" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Classic" }));
     expect(onChange).toHaveBeenCalledExactlyOnceWith("flexoki");
   });
 
@@ -50,11 +50,11 @@ describe("curated theme selection", () => {
     const user = userEvent.setup();
     render(<InteractiveSelector />);
     await user.tab();
-    expect(screen.getByRole("radio", { name: "Flexoki" })).toHaveFocus();
+    expect(screen.getByRole("radio", { name: "Classic" })).toHaveFocus();
     await user.keyboard("{ArrowRight}");
     expect(screen.getByRole("radio", { name: themes[1].name })).toBeChecked();
     expect(screen.getByRole("radio", { name: themes[1].name })).toHaveFocus();
-    await user.click(screen.getByRole("radio", { name: "Flexoki" }));
-    expect(screen.getByRole("radio", { name: "Flexoki" })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: "Classic" }));
+    expect(screen.getByRole("radio", { name: "Classic" })).toBeChecked();
   });
 });

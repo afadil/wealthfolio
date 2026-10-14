@@ -3,7 +3,10 @@
 Add one CSS file to `apps/frontend/src/themes/definitions/`. Its filename is the
 stable theme ID; an optional `/* @name Display Name */` comment supplies the
 name. Files are discovered automatically. No JSON definition or shape registry
-is needed.
+is needed. The picker lists themes in the order of `themeOrder` in
+`apps/frontend/scripts/theme-generate.mjs`; unlisted themes follow
+alphabetically, and the generator test asks for every shipped theme to be
+listed.
 
 1. Copy a shadcn theme's `:root` and `.dark` variable blocks into
    `your-theme.css`. Use a lowercase filename with optional hyphens, at most 48
@@ -72,9 +75,9 @@ Shape is also part of the CSS file. `--radius` drives default controls and
 segments; optional `--theme-button-radius`, `--theme-segmented-radius`,
 `--theme-card-radius`, `--theme-dialog-radius`, `--theme-popover-radius` and
 `--theme-badge-radius` retain specialized geometry. `--theme-control-height`,
-padding, surface and shadow variables allow density/elevation overrides. Flexoki
-retains 8px fields, pill buttons/segments and its original card/dialog
-fallbacks.
+padding, surface and shadow variables allow density/elevation overrides. Classic
+(`flexoki`) retains 8px fields, pill buttons/segments and its original
+card/dialog fallbacks.
 
 Fonts belong to the user. A theme may choose the typeface for each role
 (`--font-sans`, `--font-serif`, `--font-mono`), but each role must keep its
@@ -95,17 +98,17 @@ those clash with the palette.
 
 Theme selection remains
 `{ themeId: "flexoki", theme: "system", font: "font-sans" }`. Unknown saved IDs
-render Flexoki without overwriting the preference. Appearance stays
+render Classic without overwriting the preference. Appearance stays
 device-local. Settings, charts, startup caching and addons use the same resolved
 themes. The small build step scopes CSS and generates discovery/startup
 metadata; contributors do not author generated files.
 
 ## Provenance and contrast
 
-Flexoki preserves its original palette. Ember's light surfaces and geometry come
-from the [tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r)
-"Claude +" theme; see
-[theme attribution](../apps/frontend/src/themes/NOTICE.md).
+Classic (`flexoki`) preserves the original Flexoki palette. Ember's light
+surfaces and geometry come from the
+[tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r) "Claude +"
+theme; see [theme attribution](../apps/frontend/src/themes/NOTICE.md).
 
 The generated report checks normal-text pairs at 4.5:1, including destructive
 control states and target-allocation text on cards. It also checks the

@@ -1,7 +1,7 @@
 # Theme source attribution
 
-Flexoki retains its original color maps. Wealthfolio supplies the extended
-financial/chart contract and curated adaptations.
+Flexoki (shown as Classic) retains its original color maps. Wealthfolio supplies
+the extended financial/chart contract and curated adaptations.
 
 Ember's light surfaces and geometry (radii, shadows) are adapted from the
 community theme "Claude +" by Luis Llanes, published on tweakcn
