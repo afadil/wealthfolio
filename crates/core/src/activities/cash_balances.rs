@@ -7,6 +7,7 @@
 //! FX rate in a foreign currency booked in the account currency. Contract
 //! multipliers are not read, so only cash and credit-card accounts show it.
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use rust_decimal::Decimal;
@@ -23,6 +24,16 @@ pub struct ActivityCashBalance {
     pub currency: String,
     /// The account's cash in that currency after the row.
     pub balance: Decimal,
+}
+
+/// The order the engine applies an account's activities in: by timestamp,
+/// then created_at (date-only imports share a timestamp), then id. A list
+/// showing running balances must follow it, reversed for newest-first.
+pub fn application_order(a: &Activity, b: &Activity) -> Ordering {
+    a.activity_date
+        .cmp(&b.activity_date)
+        .then_with(|| a.created_at.cmp(&b.created_at))
+        .then_with(|| a.id.cmp(&b.id))
 }
 
 /// Cash and credit-card accounts whose cash comes from their activities.
@@ -44,12 +55,7 @@ pub fn running_cash_balances(
         .iter()
         .filter(|activity| activity.account_id == account.id && activity.is_posted())
         .collect();
-    ordered.sort_by(|a, b| {
-        a.activity_date
-            .cmp(&b.activity_date)
-            .then_with(|| a.created_at.cmp(&b.created_at))
-            .then_with(|| a.id.cmp(&b.id))
-    });
+    ordered.sort_by(|a, b| application_order(a, b));
 
     let mut cash: HashMap<String, Decimal> = HashMap::new();
     let mut balances = HashMap::with_capacity(ordered.len());
@@ -219,12 +225,7 @@ mod tests {
             .iter()
             .filter(|activity| balances.contains_key(&activity.id))
             .collect();
-        ordered.sort_by(|a, b| {
-            a.activity_date
-                .cmp(&b.activity_date)
-                .then_with(|| a.created_at.cmp(&b.created_at))
-                .then_with(|| a.id.cmp(&b.id))
-        });
+        ordered.sort_by(|a, b| application_order(a, b));
         let mut closing = BTreeMap::new();
         for activity in ordered {
             let row = &balances[&activity.id];

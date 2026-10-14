@@ -163,6 +163,7 @@ async fn search_cash_activities(
             total_count: 0,
             net: Some(Default::default()),
             base_currency: None,
+            cash_balances: None,
         }));
     }
     let base = state.base_currency()?;

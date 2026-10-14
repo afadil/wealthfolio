@@ -45,7 +45,9 @@ pub use activity_cash_migration::{
     get_final_cash_migration_status, rebuild_pending_final_cash_accounts,
     record_final_cash_rebuild_attempt, run_final_cash_migration, ActivityFinalCashMigrationStatus,
 };
-pub use cash_balances::ActivityCashBalance;
+pub use cash_balances::{
+    application_order, running_cash_balances, shows_running_cash_balance, ActivityCashBalance,
+};
 pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
 pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};
 pub use idempotency::{
