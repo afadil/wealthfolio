@@ -27,7 +27,10 @@ Use full hex, rgb/rgba, hsl/hsla or oklch color values. Color aliases such as
 and cycles are rejected. Color-mix, relative colors and var fallbacks are not
 supported by the color validator. Geometry/shadow variables may use CSS
 expressions. Optional component refinements must begin with `:root` or `.dark`
-(for example `:root h1`). They are scoped to that theme automatically.
+(for example `:root h1`). They are scoped to that theme automatically. Target
+components through their `data-slot` hooks, not utility class names, so one rule
+reaches every instance: for example `[data-slot="segmented-thumb"]` is the
+selected thumb of every tab bar and segmented toggle.
 
 Paste the theme variable blocks, not the complete Tailwind stylesheet. Imports,
 `@theme`, media queries, global selectors and `!important` are rejected. Shared

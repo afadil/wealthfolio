@@ -134,6 +134,7 @@ export function AnimatedToggleGroup<T extends string = string>(props: AnimatedTo
           {selected === item.value && (
             <motion.div
               layoutId={`toggle-indicator-${uniqueId}`}
+              data-slot="segmented-thumb"
               className={cn("bg-background absolute inset-0 -z-10 shadow-sm", roundedClass)}
               initial={false}
               transition={{

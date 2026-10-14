@@ -85,6 +85,7 @@ const TabsTrigger = React.forwardRef<
         <motion.span
           layout
           layoutId={layoutId}
+          data-slot="segmented-thumb"
           className="bg-background ring-border/40 pointer-events-none absolute inset-0 z-0 shadow-sm ring-1"
           style={{ borderRadius: "inherit" }}
           transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.6 }}

@@ -67,6 +67,7 @@ function NavigationPills({
             {isActive && (
               <motion.div
                 layoutId={`nav-pill-${layoutId}`}
+                data-slot="segmented-thumb"
                 className="bg-background rounded-(--theme-segmented-radius,9999px) absolute inset-0 shadow-sm"
                 initial={false}
                 transition={{
@@ -130,6 +131,7 @@ function MobileNavigation({
             {isActive && (
               <motion.div
                 layoutId={`mobile-nav-bg-${layoutId}`}
+                data-slot="segmented-thumb"
                 className="bg-background rounded-(--theme-segmented-radius,9999px) absolute inset-0 shadow-sm"
                 initial={false}
                 transition={{

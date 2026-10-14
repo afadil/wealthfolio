@@ -342,14 +342,14 @@
 /* Segmented controls: one 32pt item height (UISegmentedControl), a raised thumb
    on a filled capsule track. A 44pt hit area needs a component change: the
    groups scroll horizontally, which clips any overflowing tap target. */
-:root :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+:root [data-slot="segmented-thumb"] {
   background-color: #ffffff;
   box-shadow:
     0 0 0 0.5px rgb(0 0 0 / 0.04),
     0 3px 8px rgb(0 0 0 / 0.12),
     0 3px 1px rgb(0 0 0 / 0.04);
 }
-.dark :is([role="tab"], [role="group"] > button[aria-pressed]) > .absolute.inset-0 {
+.dark [data-slot="segmented-thumb"] {
   background-color: #636366;
   box-shadow: 0 3px 8px rgb(0 0 0 / 0.3);
 }

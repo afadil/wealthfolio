@@ -74,6 +74,7 @@ export function AssetTypeSelector<TFieldValues extends FieldValues = FieldValues
             {isSelected && (
               <motion.div
                 layoutId={`asset-type-indicator-${uniqueId}`}
+                data-slot="segmented-thumb"
                 className="bg-background absolute inset-0 -z-10 rounded-[max(0px,calc(var(--theme-segmented-radius,var(--radius))-4px))] shadow-sm"
                 initial={false}
                 transition={{
