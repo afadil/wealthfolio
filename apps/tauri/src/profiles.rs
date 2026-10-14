@@ -808,11 +808,16 @@ mod sync_state_tests {
     use super::*;
     use wealthfolio_core::secrets::SecretStore;
 
+    /// Secrets plus the threads that read them.
     #[derive(Default)]
-    struct Secrets(Mutex<HashMap<String, String>>);
+    struct Secrets(
+        Mutex<HashMap<String, String>>,
+        Mutex<Vec<std::thread::ThreadId>>,
+    );
 
     impl SecretStore for Secrets {
         fn get_secret(&self, key: &str) -> wealthfolio_core::Result<Option<String>> {
+            self.1.lock().unwrap().push(std::thread::current().id());
             Ok(self.0.lock().unwrap().get(key).cloned())
         }
         fn set_secret(&self, key: &str, value: &str) -> wealthfolio_core::Result<()> {
@@ -831,12 +836,23 @@ mod sync_state_tests {
         Arc<DatabaseRuntime>,
         Uuid,
     ) {
+        connect_profile_with(Arc::new(Secrets::default()))
+    }
+
+    fn connect_profile_with(
+        secrets: Arc<Secrets>,
+    ) -> (
+        tempfile::TempDir,
+        NativeProfiles,
+        Arc<DatabaseRuntime>,
+        Uuid,
+    ) {
         let directory = tempfile::tempdir().unwrap();
         let registry = Arc::new(
             ProfileRegistry::open(
                 directory.path().to_path_buf(),
                 directory.path().join("app.db"),
-                Arc::new(Secrets::default()),
+                secrets,
             )
             .unwrap(),
         );
@@ -927,6 +943,78 @@ mod sync_state_tests {
         drop(login.await.unwrap());
         profiles.registry.sessions.revoke(NATIVE_OWNER).unwrap();
         assert!(invoke("get_holdings_list", scope).is_err());
+        runtime.shutdown_for_test().await;
+    }
+
+    #[cfg(any(feature = "connect-sync", feature = "device-sync"))]
+    #[tokio::test]
+    async fn keyring_commands_read_secrets_off_the_ipc_thread() {
+        use crate::commands::{secrets, wealthfolio_connect};
+        use tauri::test::{get_ipc_response, mock_builder, mock_context, noop_assets};
+
+        // Sync commands run on the thread that delivers IPC (the UI thread on desktop),
+        // where a slow or locked keyring freezes the window.
+        let store = Arc::new(Secrets::default());
+        let (_directory, profiles, runtime, scope) = connect_profile_with(store.clone());
+        runtime.initialize_for_test(None).await;
+        let scope = profiles
+            .registry
+            .sessions
+            .rotate(NATIVE_OWNER, scope, runtime.generation())
+            .unwrap()
+            .scope_id;
+        let app = mock_builder()
+            .manage(profiles)
+            .invoke_handler(tauri::generate_handler![
+                secrets::get_profile_sync_identity,
+                secrets::update_profile_sync_identity,
+                wealthfolio_connect::get_sync_session_status
+            ])
+            .build(mock_context(noop_assets()))
+            .unwrap();
+        let window = tauri::WebviewWindowBuilder::new(&app, NATIVE_OWNER, Default::default())
+            .build()
+            .unwrap();
+        for (command, body) in [
+            (
+                "get_profile_sync_identity",
+                serde_json::json!({"scopeId": scope}),
+            ),
+            (
+                "update_profile_sync_identity",
+                serde_json::json!({"scopeId": scope, "identity": "{}"}),
+            ),
+            (
+                "get_sync_session_status",
+                serde_json::json!({"scopeId": scope}),
+            ),
+        ] {
+            let before = store.1.lock().unwrap().len();
+            let _ = get_ipc_response(
+                &window,
+                tauri::webview::InvokeRequest {
+                    cmd: command.into(),
+                    callback: tauri::ipc::CallbackFn(0),
+                    error: tauri::ipc::CallbackFn(1),
+                    url: if cfg!(windows) {
+                        "http://tauri.localhost"
+                    } else {
+                        "tauri://localhost"
+                    }
+                    .parse()
+                    .unwrap(),
+                    body: tauri::ipc::InvokeBody::Json(body),
+                    headers: Default::default(),
+                    invoke_key: tauri::test::INVOKE_KEY.into(),
+                },
+            );
+            let readers = store.1.lock().unwrap();
+            assert!(readers.len() > before, "{command} must read the keyring");
+            assert!(
+                !readers[before..].contains(&std::thread::current().id()),
+                "{command} read the keyring on the IPC thread"
+            );
+        }
         runtime.shutdown_for_test().await;
     }
 
