@@ -1,13 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import type { DateRange } from "react-day-picker";
 import { useTranslation } from "react-i18next";
@@ -29,17 +29,17 @@ import type { Account, ActivityDetails, TaxonomyCategory } from "@/lib/types";
 import { formatDateISO } from "@/lib/utils";
 
 import {
-  Button,
-  Checkbox,
-  EmptyPlaceholder,
-  Icons,
-  Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Button,
+    Checkbox,
+    EmptyPlaceholder,
+    Icons,
+    Skeleton,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@wealthfolio/ui";
 
 import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
@@ -49,28 +49,38 @@ import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mob
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
 import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
 import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
+import {
+    useAssignActivityCategory,
+    useBulkAssignCategories,
+    useClearActivitySplits,
+    useReplaceActivitySplits,
+    useSetActivityEvent,
+    useUnassignActivityCategory,
+} from "../hooks/use-cash-activities";
+import { useCashActivitySearch } from "../hooks/use-cash-activity-search";
+import { useEventTypes, useSpendingEvents } from "../hooks/use-spending-events";
 import { useSpendingSettings } from "../hooks/use-spending-settings";
 import {
-  CASH_ACTIVITY_TYPES,
-  getEffectiveCashActivityType,
-  isCreditCardAccountType,
-  isSpendingAccountType,
+    CASH_ACTIVITY_TYPES,
+    getEffectiveCashActivityType,
+    isCreditCardAccountType,
+    isSpendingAccountType,
 } from "../lib/constants";
 import { invalidateSpendingCaches } from "../lib/invalidation";
 import {
-  flattenDayGroups,
-  groupRowsByDay,
-  isTransferCashActivity,
-  netSummary,
-  stableArr,
-  toRowVM,
-  type TransactionDayGroup,
-  type TransactionRowVM,
+    flattenDayGroups,
+    groupRowsByDay,
+    isTransferCashActivity,
+    netSummary,
+    stableArr,
+    toRowVM,
+    type TransactionDayGroup,
+    type TransactionRowVM,
 } from "../lib/transactions-helpers";
 import type {
-  CashActivitySearchRequest,
-  CashActivityStatusFilter,
-  NewActivitySplit,
+    CashActivitySearchRequest,
+    CashActivityStatusFilter,
+    NewActivitySplit,
 } from "../types/cash-activity";
 import type { AmountRange } from "./amount-range-filter";
 import { CashActivityForm } from "./cash-activity-form";
