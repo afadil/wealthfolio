@@ -1,17 +1,15 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppearanceForm } from "@/pages/settings/appearance/appearance-form";
 
-const { updateSettings, settings, toastMessage } = vi.hoisted(() => ({
+const { updateSettings, settings } = vi.hoisted(() => ({
   updateSettings: vi.fn().mockResolvedValue(undefined),
   settings: {} as Record<string, string>,
-  toastMessage: vi.fn(),
 }));
 vi.mock("@/lib/settings-provider", () => ({
   useSettingsContext: () => ({ settings, updateSettings }),
 }));
-vi.mock("@wealthfolio/ui/components/ui/use-toast", () => ({ toast: { message: toastMessage } }));
 vi.mock("@/hooks/use-platform", () => ({ usePlatform: () => ({ isMobile: true }) }));
 vi.mock("@/pages/layouts/navigation/navigation-mode-context", () => ({
   useNavigationMode: () => ({ mode: "sidebar", setMode: vi.fn() }),
@@ -19,7 +17,6 @@ vi.mock("@/pages/layouts/navigation/navigation-mode-context", () => ({
 
 beforeEach(() => {
   updateSettings.mockClear();
-  toastMessage.mockClear();
   Object.assign(settings, {
     themeId: "theme-from-a-newer-version",
     theme: "dark",
@@ -35,7 +32,6 @@ describe("appearance preference independence", () => {
     expect(updateSettings).not.toHaveBeenCalled();
     await user.click(screen.getByRole("radio", { name: "Newspaper" }));
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ themeId: "newspaper" });
-    expect(toastMessage).not.toHaveBeenCalled();
   });
 
   it("changing font saves only font, preserving palette and mode", async () => {
@@ -54,7 +50,7 @@ describe("appearance preference independence", () => {
 });
 
 describe("theme suggestions", () => {
-  it("picking Terminal switches a system user to dark and mono, and Undo restores both", async () => {
+  it("picking Terminal applies its font and leaves a system user's mode alone", async () => {
     settings.theme = "system";
     const user = userEvent.setup();
     render(<AppearanceForm />);
@@ -62,45 +58,42 @@ describe("theme suggestions", () => {
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
       themeId: "terminal",
       font: "font-mono",
-      theme: "dark",
     });
-    await waitFor(() => expect(toastMessage).toHaveBeenCalledOnce());
-    const [message, options] = toastMessage.mock.calls[0] as [
-      string,
-      { action: { label: string; onClick: () => void } },
-    ];
-    expect(message).toBe("Terminal switched you to Dark and Mono");
-    expect(options.action.label).toBe("Undo");
-    options.action.onClick();
-    expect(updateSettings).toHaveBeenLastCalledWith({ theme: "system", font: "font-serif" });
   });
 
-  it("says nothing when the theme's suggestions are already in effect", async () => {
-    Object.assign(settings, { theme: "dark", font: "font-mono" });
+  it("marks themes designed for dark without changing their names", () => {
+    render(<AppearanceForm />);
+    expect(screen.getByRole("radio", { name: "Terminal" })).toHaveAccessibleDescription(
+      "Terminal is designed for dark mode.",
+    );
+    expect(screen.getByRole("radio", { name: "Classic" })).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("offers the mode a theme is designed for and switches only on request", async () => {
+    Object.assign(settings, { themeId: "terminal", theme: "light", font: "font-mono" });
     const user = userEvent.setup();
     render(<AppearanceForm />);
-    await user.click(screen.getByRole("radio", { name: "Terminal" }));
-    expect(updateSettings).toHaveBeenCalledOnce();
-    await Promise.resolve();
-    expect(toastMessage).not.toHaveBeenCalled();
+    const switchToDark = screen.getByRole("button", { name: "Switch to dark" });
+    expect(switchToDark.parentElement).toHaveTextContent("Terminal is designed for dark mode.");
+    expect(updateSettings).not.toHaveBeenCalled();
+    await user.click(switchToDark);
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ theme: "dark" });
   });
 
-  it("shows what the theme suggests and restores it on request", async () => {
+  it("shows the font the theme suggests and restores it on request", async () => {
     Object.assign(settings, { themeId: "terminal", theme: "light", font: "font-serif" });
     const user = userEvent.setup();
     render(<AppearanceForm />);
-    expect(screen.getByText("Terminal suggests Dark")).toBeInTheDocument();
     expect(screen.getByText("Terminal suggests Mono")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Use theme defaults" }));
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
       themeId: "terminal",
       font: "font-mono",
-      theme: "dark",
     });
   });
 
-  it("hides the reset link once the user's choices match the theme", () => {
-    Object.assign(settings, { themeId: "terminal", theme: "dark", font: "font-mono" });
+  it("hides the reset link once the font matches the theme, whatever the mode", () => {
+    Object.assign(settings, { themeId: "terminal", theme: "light", font: "font-mono" });
     render(<AppearanceForm />);
     expect(screen.queryByRole("button", { name: "Use theme defaults" })).not.toBeInTheDocument();
   });

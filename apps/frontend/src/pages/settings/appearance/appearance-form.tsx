@@ -4,11 +4,12 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import * as z from "zod";
 
-import { CuratedThemeSelector } from "@/components/curated-theme-selector";
+import { CuratedThemeSelector, designedForKeys } from "@/components/curated-theme-selector";
 import { FontSelector } from "@/components/font-selector";
 import { ThemeSelector } from "@/components/theme-selector";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
+import { cn } from "@/lib/utils";
 import {
   type NavigationMode,
   useNavigationMode,
@@ -18,7 +19,6 @@ import { themeSelectionUpdate } from "@/themes/selection";
 import { AnimatedToggleGroup, Button, Card, Icons } from "@wealthfolio/ui";
 import { Form, FormField } from "@wealthfolio/ui/components/ui/form";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
-import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
 interface AppearanceFormValues {
   theme: "light" | "dark" | "system";
@@ -26,15 +26,14 @@ interface AppearanceFormValues {
   menuBarVisible: boolean;
 }
 
-const modeLabelKeys = {
-  light: "common:component.theme_light_label",
-  dark: "common:component.theme_dark_label",
-  system: "common:component.theme_system_label",
-} as const;
 const fontLabelKeys = {
   "font-sans": "common:component.font_sans",
   "font-serif": "common:component.font_serif",
   "font-mono": "common:component.font_mono",
+} as const;
+const switchModeKeys = {
+  dark: "settings:appearance_switch_to_dark",
+  light: "settings:appearance_switch_to_light",
 } as const;
 
 function SectionHeading({
@@ -79,7 +78,7 @@ function SettingRow({
 }
 
 export function AppearanceForm() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { settings, updateSettings } = useSettingsContext();
   const { isMobile } = usePlatform();
   const { mode: navigationMode, setMode: setNavigationMode } = useNavigationMode();
@@ -103,6 +102,7 @@ export function AppearanceForm() {
     values: defaultValues,
   });
   const activeTheme = themes.find(({ id }) => id === resolveThemeId(settings?.themeId));
+  const ModeIcon = activeTheme?.mode === "dark" ? Icons.Moon : Icons.Sun;
 
   function save(data: Parameters<typeof updateSettings>[0]) {
     return updateSettings(data).catch((error) => {
@@ -110,57 +110,78 @@ export function AppearanceForm() {
     });
   }
 
-  // Picking a theme also applies the mode and font it suggests; say what changed
-  // and let the user keep the theme without those changes.
+  // Picking a theme also applies the font it suggests; the mode stays the user's.
   function selectTheme(themeId: string) {
-    if (!isThemeId(themeId) || !settings) return;
-    const update = themeSelectionUpdate(themeId);
-    const changes: string[] = [];
-    const previous: Partial<AppearanceFormValues> = {};
-    if (update.theme && update.theme !== settings.theme) {
-      changes.push(t(modeLabelKeys[update.theme as AppearanceFormValues["theme"]]));
-      previous.theme = settings.theme as AppearanceFormValues["theme"];
-    }
-    if (update.font && update.font !== settings.font) {
-      changes.push(t(fontLabelKeys[update.font as AppearanceFormValues["font"]]));
-      previous.font = settings.font as AppearanceFormValues["font"];
-    }
-    void save(update).then(() => {
-      if (!changes.length) return;
-      const name = themes.find(({ id }) => id === themeId)?.name ?? themeId;
-      toast.message(
-        t("settings:appearance_theme_applied", {
-          theme: name,
-          changes: new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(changes),
-        }),
-        { action: { label: t("settings:appearance_undo"), onClick: () => void save(previous) } },
-      );
-    });
+    if (!isThemeId(themeId)) return;
+    void save(themeSelectionUpdate(themeId));
   }
 
-  const suggestion = (value: string) =>
-    t("settings:appearance_theme_suggests", { theme: activeTheme?.name, value });
-  const differsFromTheme =
-    !!activeTheme &&
-    ((!!activeTheme.mode && settings?.theme !== activeTheme.mode) ||
-      (!!activeTheme.font && settings?.font !== activeTheme.font));
+  const fontDiffersFromTheme = !!activeTheme?.font && settings?.font !== activeTheme.font;
 
   return (
     <Form {...form}>
       <div className="max-w-4xl space-y-8">
+        <Card className="overflow-hidden">
+          <FormField
+            control={form.control}
+            name="theme"
+            render={({ field }) => (
+              <SettingRow
+                title={t("settings:appearance_mode_title")}
+                description={t("settings:appearance_mode_description")}
+              >
+                <ThemeSelector
+                  aria-label={t("settings:appearance_mode_title")}
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    void save({ theme: value });
+                  }}
+                />
+              </SettingRow>
+            )}
+          />
+        </Card>
+
         <section className="space-y-3">
           <SectionHeading
             title={t("settings:appearance_palette_title")}
             description={t("settings:appearance_palette_description")}
           />
           <CuratedThemeSelector value={settings?.themeId} onChange={selectTheme} />
+          {activeTheme?.mode && (
+            // Shown only while the other mode is in effect, including through System.
+            <div
+              className={cn(
+                "bg-muted/40 items-center gap-3 rounded-lg border px-4 py-3",
+                activeTheme.mode === "dark" ? "flex dark:hidden" : "hidden dark:flex",
+              )}
+            >
+              <ModeIcon className="text-muted-foreground size-4 shrink-0" />
+              <p className="min-w-0 flex-1 text-sm">
+                {t(designedForKeys[activeTheme.mode], { theme: activeTheme.name })}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => {
+                  const mode = activeTheme.mode;
+                  if (mode) void save({ theme: mode });
+                }}
+              >
+                {t(switchModeKeys[activeTheme.mode])}
+              </Button>
+            </div>
+          )}
         </section>
 
         <section className="space-y-3">
           <SectionHeading
-            title={t("settings:appearance_customize_title")}
+            title={t("settings:appearance_text_title")}
             action={
-              differsFromTheme && activeTheme ? (
+              fontDiffersFromTheme && activeTheme ? (
                 <Button
                   type="button"
                   variant="link"
@@ -176,36 +197,16 @@ export function AppearanceForm() {
           <Card className="divide-y overflow-hidden">
             <FormField
               control={form.control}
-              name="theme"
-              render={({ field }) => (
-                <SettingRow
-                  title={t("settings:appearance_mode_title")}
-                  description={
-                    activeTheme?.mode
-                      ? suggestion(t(modeLabelKeys[activeTheme.mode]))
-                      : t("settings:appearance_mode_description")
-                  }
-                >
-                  <ThemeSelector
-                    aria-label={t("settings:appearance_mode_title")}
-                    value={field.value}
-                    onChange={(value) => {
-                      field.onChange(value);
-                      void save({ theme: value });
-                    }}
-                  />
-                </SettingRow>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="font"
               render={({ field }) => (
                 <SettingRow
                   title={t("settings:appearance_font_title")}
                   description={
                     activeTheme?.font
-                      ? suggestion(t(fontLabelKeys[activeTheme.font]))
+                      ? t("settings:appearance_theme_suggests", {
+                          theme: activeTheme.name,
+                          value: t(fontLabelKeys[activeTheme.font]),
+                        })
                       : t("settings:appearance_font_description")
                   }
                 >

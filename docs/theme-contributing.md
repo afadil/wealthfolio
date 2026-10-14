@@ -87,10 +87,10 @@ add `/* @font font-sans */` (or `font-serif`, `font-mono`): choosing the theme
 also sets the Font setting, which the user can change afterwards.
 
 Every theme ships both a light and a dark palette. A theme designed for one of
-them may add `/* @mode dark */` (or `light`): choosing the theme also sets the
-Appearance mode, including for users on System. Settings names the change and
-offers Undo, so suggest a mode only when the other one is a lesser version of
-the theme.
+them may add `/* @mode dark */` (or `light`). Choosing the theme never changes
+the user's Appearance mode: its card carries a moon (or sun), and while the
+other mode is in effect Settings offers a one-click switch. Mark a mode only
+when the other one is a lesser version of the theme.
 
 Target allocation drift uses `--allocation-over` and `--allocation-under`. They
 default to the theme's destructive and info text colours; override them when

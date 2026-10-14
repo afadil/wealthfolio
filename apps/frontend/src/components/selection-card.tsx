@@ -24,7 +24,7 @@ export function SelectionCard({ selected, label, children, className }: Selectio
       {children}
       <span
         className={cn(
-          "relative flex items-center justify-center py-2.5 text-sm font-medium sm:py-3",
+          "relative flex items-center justify-center py-2 text-sm font-medium",
           selected ? "bg-primary/10" : "bg-muted/50",
         )}
       >

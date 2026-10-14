@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { SelectionCard } from "@/components/selection-card";
 import { isThemeId, resolveThemeId, themes } from "@/themes/generated/registry";
+import { Icons } from "@wealthfolio/ui";
 
 interface ThemePreviewProps {
   tokens: Record<string, string>;
@@ -60,7 +61,7 @@ export function ThemePreview({ tokens, variables, font, className }: ThemePrevie
   return (
     <div
       aria-hidden="true"
-      className={cn("flex h-36 w-full min-w-0 overflow-hidden sm:h-40", className)}
+      className={cn("flex h-28 w-full min-w-0 overflow-hidden sm:h-32", className)}
       style={
         {
           ...Object.fromEntries(
@@ -206,6 +207,11 @@ export function ThemePreview({ tokens, variables, font, className }: ThemePrevie
   );
 }
 
+export const designedForKeys = {
+  dark: "settings:appearance_theme_designed_for_dark",
+  light: "settings:appearance_theme_designed_for_light",
+} as const;
+
 interface CuratedThemeSelectorProps {
   value?: string;
   onChange: (value: string) => void;
@@ -221,6 +227,8 @@ export function CuratedThemeSelector({ value, onChange, className }: CuratedThem
       <legend className="sr-only">{t("settings:appearance_palette_title")}</legend>
       {themes.map((theme) => {
         const isSelected = selectedId === theme.id;
+        const ModeIcon = theme.mode === "dark" ? Icons.Moon : Icons.Sun;
+        const designedFor = theme.mode && t(designedForKeys[theme.mode], { theme: theme.name });
         return (
           <label key={theme.id} className="relative min-w-0 cursor-pointer">
             <input
@@ -228,6 +236,7 @@ export function CuratedThemeSelector({ value, onChange, className }: CuratedThem
               name={name}
               value={theme.id}
               checked={isSelected}
+              aria-describedby={designedFor ? `${name}-${theme.id}-mode` : undefined}
               onClick={() => {
                 if (value !== selectedId && theme.id === selectedId) onChange(theme.id);
               }}
@@ -238,7 +247,17 @@ export function CuratedThemeSelector({ value, onChange, className }: CuratedThem
             />
             <SelectionCard
               selected={isSelected}
-              label={theme.name}
+              label={
+                <span className="flex items-center gap-1.5">
+                  {theme.name}
+                  {designedFor && (
+                    <span id={`${name}-${theme.id}-mode`} title={designedFor} aria-hidden="true">
+                      <span className="sr-only">{designedFor}</span>
+                      <ModeIcon className="text-muted-foreground size-3.5" />
+                    </span>
+                  )}
+                </span>
+              }
               className="peer-focus:ring-ring peer-focus:ring-2 peer-focus:ring-offset-2 forced-colors:peer-focus:outline-2 forced-colors:peer-focus:outline-offset-2 forced-colors:peer-focus:outline-[Highlight]"
             >
               <div className="dark:hidden">

@@ -113,14 +113,12 @@ for (const theme of themes) {
       (JSON.parse(await page.getByTestId("addon").innerText()) as { chart: string }).chart,
     ).toBe(hostChart);
     await assertGeometryParity(page);
-    // A theme's suggested font and mode are saved with it; otherwise the user's choices stay.
-    expect(writes).toContainEqual({
-      themeId: theme.id,
-      ...(theme.font ? { font: theme.font } : {}),
-      ...(theme.mode ? { theme: theme.mode } : {}),
-    });
+    // A theme's suggested font is saved with it; the mode always stays the user's.
+    expect(writes).toContainEqual(
+      theme.font ? { themeId: theme.id, font: theme.font } : { themeId: theme.id },
+    );
     await expect(page.locator("body")).toHaveClass(new RegExp(theme.font ?? "font-serif"));
-    if (theme.mode === "dark") await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(page.locator("html")).not.toHaveClass(/dark/);
     await page.getByLabel("Appearance mode").selectOption("dark");
     await expect(page.locator("html")).toHaveClass(/dark/);
     await expect(page.getByTestId("addon")).toContainText('"mode":"dark"');
