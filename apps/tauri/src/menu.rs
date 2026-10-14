@@ -1,4 +1,6 @@
-use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+#[cfg(not(target_os = "linux"))]
+use tauri::menu::PredefinedMenuItem;
+use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
@@ -21,29 +23,38 @@ pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Err
     let app_menu = app_menu.build()?;
 
     let edit_menu = SubmenuBuilder::new(app, "Edit");
+    // On GTK 3, muda 0.20's predefined Cut, Copy, Paste and Select All only work
+    // through libxdo, which isn't enabled, so Linux handles them in
+    // handle_menu_event too. They get no accelerators: WebKitGTK and the data
+    // grid's keydown handler already handle those keys, and an accelerator
+    // would take them first.
     #[cfg(target_os = "linux")]
     let edit_menu = edit_menu
         .item(
-            &MenuItemBuilder::with_id("undo", "Undo")
+            &MenuItemBuilder::with_id("Undo", "Undo")
                 .accelerator("Ctrl+Z")
                 .build(app)?,
         )
         .item(
-            &MenuItemBuilder::with_id("redo", "Redo")
+            &MenuItemBuilder::with_id("Redo", "Redo")
                 .accelerator("Ctrl+Shift+Z")
                 .build(app)?,
-        );
+        )
+        .separator()
+        .item(&MenuItemBuilder::with_id("Cut", "Cut").build(app)?)
+        .item(&MenuItemBuilder::with_id("Copy", "Copy").build(app)?)
+        .item(&MenuItemBuilder::with_id("Paste", "Paste").build(app)?)
+        .item(&MenuItemBuilder::with_id("SelectAll", "Select All").build(app)?);
     #[cfg(not(target_os = "linux"))]
     let edit_menu = edit_menu
         .item(&PredefinedMenuItem::undo(app, None)?)
-        .item(&PredefinedMenuItem::redo(app, None)?);
-    let edit_menu = edit_menu
+        .item(&PredefinedMenuItem::redo(app, None)?)
         .separator()
         .item(&PredefinedMenuItem::cut(app, None)?)
         .item(&PredefinedMenuItem::copy(app, None)?)
         .item(&PredefinedMenuItem::paste(app, None)?)
-        .item(&PredefinedMenuItem::select_all(app, None)?)
-        .build()?;
+        .item(&PredefinedMenuItem::select_all(app, None)?);
+    let edit_menu = edit_menu.build()?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(
@@ -84,10 +95,16 @@ pub fn handle_menu_event(app: &AppHandle, event_id: &str) {
         // cleanup in lib.rs.
         #[cfg(target_os = "linux")]
         "quit" => app.exit(0),
+        // On Linux the Edit menu's IDs are WebKitGTK editing commands, which,
+        // unlike document.execCommand run through eval, can also paste.
         #[cfg(target_os = "linux")]
-        "undo" | "redo" => {
+        "Undo" | "Redo" | "Cut" | "Copy" | "Paste" | "SelectAll" => {
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.eval(format!("document.execCommand('{event_id}')"));
+                let command = event_id.to_owned();
+                let _ = window.with_webview(move |webview| {
+                    use webkit2gtk::WebViewExt;
+                    webview.inner().execute_editing_command(&command);
+                });
             }
         }
         "report_issue" => {
