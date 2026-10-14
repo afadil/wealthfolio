@@ -12,12 +12,11 @@ import { AccountType } from "@/lib/constants";
 import { useTaxonomy } from "@/hooks/use-taxonomies";
 import { cn } from "@/lib/utils";
 import {
+  AnimatedToggleGroup,
   CurrencyInput,
   RadioGroup,
   RadioGroupItem,
   ResponsiveSelect,
-  ToggleGroup,
-  ToggleGroupItem,
   type ResponsiveSelectOption,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
@@ -143,9 +142,6 @@ const formSectionLabelClassName =
   "text-muted-foreground text-xs font-semibold uppercase tracking-[0.18em]";
 const trackingOptionClassName =
   "hover:bg-accent/50 relative flex cursor-pointer gap-3 rounded-xl border bg-card p-4 transition-colors dark:bg-muted/20 dark:hover:bg-muted/30";
-const cashClassificationItemClassName =
-  "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground h-9 rounded-md text-sm data-[state=on]:shadow-sm dark:data-[state=on]:bg-secondary dark:data-[state=on]:text-foreground";
-
 // Input type (what the form receives)
 type AccountFormInput = z.input<typeof newAccountSchema>;
 // Output type after zod parsing (with defaults applied)
@@ -442,12 +438,11 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         {t("settings:accounts.form_cash_classification_description")}
                       </p>
                     </div>
-                    <ToggleGroup
-                      type="single"
+                    <AnimatedToggleGroup
+                      size="md"
                       aria-label={t("settings:accounts.form_cash_classification_aria")}
                       value={getSelectableCashCategoryFromMeta(form.watch("meta"))}
                       onValueChange={(v) => {
-                        if (!v) return;
                         const categoryId = v === CASH_ALLOCATION_DEFAULT_VALUE ? null : v;
                         const updatedMeta = setCashCategoryInMeta(
                           form.getValues("meta"),
@@ -455,21 +450,15 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
                         );
                         form.setValue("meta", updatedMeta, { shouldDirty: true });
                       }}
-                      className="bg-muted grid h-11 grid-cols-2 rounded-lg p-1"
-                    >
-                      <ToggleGroupItem
-                        value={CASH_ALLOCATION_DEFAULT_VALUE}
-                        className={cashClassificationItemClassName}
-                      >
-                        {t("settings:accounts.form_cash_classification_cash")}
-                      </ToggleGroupItem>
-                      <ToggleGroupItem
-                        value={CASH_FIXED_INCOME_CATEGORY_ID}
-                        className={cashClassificationItemClassName}
-                      >
-                        {fixedIncomeCategoryName}
-                      </ToggleGroupItem>
-                    </ToggleGroup>
+                      className="grid w-full grid-cols-2"
+                      items={[
+                        {
+                          value: CASH_ALLOCATION_DEFAULT_VALUE,
+                          label: t("settings:accounts.form_cash_classification_cash"),
+                        },
+                        { value: CASH_FIXED_INCOME_CATEGORY_ID, label: fixedIncomeCategoryName },
+                      ]}
+                    />
                   </div>
                 )}
               </div>

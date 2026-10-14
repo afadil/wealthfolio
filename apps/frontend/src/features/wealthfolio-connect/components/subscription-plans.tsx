@@ -15,7 +15,7 @@ import {
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@wealthfolio/ui/components/ui/toggle-group";
+import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -327,27 +327,23 @@ export function SubscriptionPlans({
               {t("connect:subscription.choosePlanDescription")}
             </CardDescription>
           </div>
-          <ToggleGroup
-            type="single"
+          <AnimatedToggleGroup<BillingPeriod>
+            size="xs"
             value={billingPeriod}
-            onValueChange={(value) => value && setBillingPeriod(value as BillingPeriod)}
-            className="bg-muted h-8 rounded-md p-0.5"
-          >
-            <ToggleGroupItem
-              value="monthly"
-              aria-label={t("connect:subscription.monthlyBilling")}
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs data-[state=on]:shadow-sm"
-            >
-              {t("connect:subscription.monthly")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="yearly"
-              aria-label={t("connect:subscription.yearlyBilling")}
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs data-[state=on]:shadow-sm"
-            >
-              {t("connect:subscription.yearly")}
-            </ToggleGroupItem>
-          </ToggleGroup>
+            onValueChange={setBillingPeriod}
+            items={[
+              {
+                value: "monthly",
+                label: t("connect:subscription.monthly"),
+                "aria-label": t("connect:subscription.monthlyBilling"),
+              },
+              {
+                value: "yearly",
+                label: t("connect:subscription.yearly"),
+                "aria-label": t("connect:subscription.yearlyBilling"),
+              },
+            ]}
+          />
         </div>
       </CardHeader>
       <CardContent className="pt-0">

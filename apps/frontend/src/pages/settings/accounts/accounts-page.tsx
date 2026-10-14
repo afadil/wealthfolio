@@ -6,13 +6,12 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { Account, Platform } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
+  AnimatedToggleGroup,
   Button,
   EmptyPlaceholder,
   Icons,
   Separator,
   Skeleton,
-  ToggleGroup,
-  ToggleGroupItem,
 } from "@wealthfolio/ui";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { useMemo, useState } from "react";
@@ -212,37 +211,17 @@ const SettingsAccountsPage = () => {
             )}
           </div>
 
-          <ToggleGroup
-            type="single"
+          <AnimatedToggleGroup<FilterType>
+            size="sm"
             value={filter}
-            onValueChange={(value) => value && setFilter(value as FilterType)}
-            className="bg-muted h-9 rounded-md p-1"
-          >
-            <ToggleGroupItem
-              value="all"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
-            >
-              {t("settings:accounts.filter_all")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="active"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
-            >
-              {t("settings:accounts.filter_active")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="hidden"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
-            >
-              {t("settings:accounts.filter_hidden")}
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="archived"
-              className="data-[state=on]:bg-background h-7 rounded px-3 text-xs"
-            >
-              {t("settings:accounts.filter_archived")}
-            </ToggleGroupItem>
-          </ToggleGroup>
+            onValueChange={setFilter}
+            items={[
+              { value: "all", label: t("settings:accounts.filter_all") },
+              { value: "active", label: t("settings:accounts.filter_active") },
+              { value: "hidden", label: t("settings:accounts.filter_hidden") },
+              { value: "archived", label: t("settings:accounts.filter_archived") },
+            ]}
+          />
         </div>
 
         {/* Account Lists */}
