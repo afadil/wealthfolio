@@ -5,17 +5,39 @@ use tauri_plugin_dialog::DialogExt;
 pub fn create_menu<R: Runtime>(app: &AppHandle<R>) -> Result<Menu<R>, tauri::Error> {
     let app_menu = SubmenuBuilder::new(app, "Wealthfolio")
         .item(&MenuItemBuilder::with_id("open_settings", "Settings...").build(app)?)
-        .separator()
+        .separator();
+    // muda 0.20 shows the predefined Hide, Hide Others, Show All, Quit, Undo and
+    // Redo disabled on GTK 3. Linux leaves out the Hide items and handles the
+    // others in handle_menu_event.
+    #[cfg(target_os = "linux")]
+    let app_menu = app_menu.item(&MenuItemBuilder::with_id("quit", "Quit").build(app)?);
+    #[cfg(not(target_os = "linux"))]
+    let app_menu = app_menu
         .item(&PredefinedMenuItem::hide(app, None)?)
         .item(&PredefinedMenuItem::hide_others(app, None)?)
         .item(&PredefinedMenuItem::show_all(app, None)?)
         .separator()
-        .item(&PredefinedMenuItem::quit(app, None)?)
-        .build()?;
+        .item(&PredefinedMenuItem::quit(app, None)?);
+    let app_menu = app_menu.build()?;
 
-    let edit_menu = SubmenuBuilder::new(app, "Edit")
+    let edit_menu = SubmenuBuilder::new(app, "Edit");
+    #[cfg(target_os = "linux")]
+    let edit_menu = edit_menu
+        .item(
+            &MenuItemBuilder::with_id("undo", "Undo")
+                .accelerator("Ctrl+Z")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id("redo", "Redo")
+                .accelerator("Ctrl+Shift+Z")
+                .build(app)?,
+        );
+    #[cfg(not(target_os = "linux"))]
+    let edit_menu = edit_menu
         .item(&PredefinedMenuItem::undo(app, None)?)
-        .item(&PredefinedMenuItem::redo(app, None)?)
+        .item(&PredefinedMenuItem::redo(app, None)?);
+    let edit_menu = edit_menu
         .separator()
         .item(&PredefinedMenuItem::cut(app, None)?)
         .item(&PredefinedMenuItem::copy(app, None)?)
@@ -56,6 +78,16 @@ pub fn handle_menu_event(app: &AppHandle, event_id: &str) {
             if let Some(window) = app.get_webview_window("main") {
                 let payload = serde_json::json!({ "route": "/settings/general" });
                 let _ = window.emit("navigate-to-route", payload);
+            }
+        }
+        // Linux only (see create_menu). exit(0) still runs the RunEvent::Exit
+        // cleanup in lib.rs.
+        #[cfg(target_os = "linux")]
+        "quit" => app.exit(0),
+        #[cfg(target_os = "linux")]
+        "undo" | "redo" => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.eval(format!("document.execCommand('{event_id}')"));
             }
         }
         "report_issue" => {
