@@ -17,7 +17,6 @@ use crate::broker_ingest::{
 };
 use crate::platform::Platform;
 use chrono::{DateTime, NaiveDate, Utc};
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 use wealthfolio_core::accounts::{
@@ -78,19 +77,6 @@ fn broker_cash_balances(balances: &[HoldingsBalance]) -> HashMap<String, Decimal
         }
     }
     cash_balances
-}
-
-/// Converts a broker position's units to its stored quantity, along with the
-/// quantity `Decimal::from_f64` produced before exact conversion. Snapshots
-/// written before then hold that value; see `resolve_position_average_cost`.
-fn holdings_quantities(units: f64) -> (Decimal, Decimal) {
-    let quantity = mapping::decimal_from_f64(units)
-        .unwrap_or(Decimal::ZERO)
-        .round_dp(HOLDINGS_DECIMAL_PRECISION);
-    let legacy_quantity = Decimal::from_f64(units)
-        .unwrap_or(Decimal::ZERO)
-        .round_dp(HOLDINGS_DECIMAL_PRECISION);
-    (quantity, legacy_quantity)
 }
 
 fn normalize_regular_average_cost(
@@ -282,8 +268,6 @@ fn contract_multiplier_metadata_update(
 struct HoldingsPositionData {
     spec_key: String,
     quantity: Decimal,
-    /// The `from_f64` quantity older snapshots hold; see `holdings_quantities`.
-    legacy_quantity: Decimal,
     quote_price: Decimal,
     quote_currency: String,
     average_cost: Option<Decimal>,
@@ -1020,7 +1004,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 spec_key_to_idx.insert(spec_key.clone(), idx);
             }
 
-            let (quantity, legacy_quantity) = holdings_quantities(units);
+            let quantity = mapping::decimal_from_f64(units)
+                .unwrap_or(Decimal::ZERO)
+                .round_dp(HOLDINGS_DECIMAL_PRECISION);
             let raw_price =
                 mapping::decimal_from_f64(pos.price.unwrap_or(0.0)).unwrap_or(Decimal::ZERO);
             let quote_price = raw_price.round_dp(HOLDINGS_DECIMAL_PRECISION);
@@ -1036,7 +1022,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             position_data.push(HoldingsPositionData {
                 spec_key,
                 quantity,
-                legacy_quantity,
                 quote_price,
                 quote_currency: raw_quote_currency,
                 average_cost: avg_cost,
@@ -1128,7 +1113,9 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 spec_key_to_idx.insert(spec_key.clone(), idx);
             }
 
-            let (quantity, legacy_quantity) = holdings_quantities(units);
+            let quantity = mapping::decimal_from_f64(units)
+                .unwrap_or(Decimal::ZERO)
+                .round_dp(HOLDINGS_DECIMAL_PRECISION);
             let raw_price =
                 mapping::decimal_from_f64(opt_pos.price.unwrap_or(0.0)).unwrap_or(Decimal::ZERO);
             let quote_price = raw_price.round_dp(HOLDINGS_DECIMAL_PRECISION);
@@ -1142,7 +1129,6 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
             position_data.push(HoldingsPositionData {
                 spec_key,
                 quantity,
-                legacy_quantity,
                 quote_price,
                 quote_currency: raw_quote_currency,
                 average_cost: avg_cost,
@@ -1295,13 +1281,7 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
         }
 
         let combined_quantities =
-            Self::combined_quantities_by_asset(&position_data, &spec_key_to_asset_id, |position| {
-                position.quantity
-            });
-        let combined_legacy_quantities =
-            Self::combined_quantities_by_asset(&position_data, &spec_key_to_asset_id, |position| {
-                position.legacy_quantity
-            });
+            Self::combined_quantities_by_asset(&position_data, &spec_key_to_asset_id);
         let mut positions_map: HashMap<String, Position> = HashMap::new();
         let mut total_cost_basis = Decimal::ZERO;
 
@@ -1323,17 +1303,12 @@ impl BrokerSyncServiceTrait for BrokerSyncService {
                 .get(&asset_id)
                 .copied()
                 .unwrap_or(position.quantity);
-            let combined_legacy_quantity = combined_legacy_quantities
-                .get(&asset_id)
-                .copied()
-                .unwrap_or(position.legacy_quantity);
             let avg_cost = Self::resolve_position_average_cost(
                 position.average_cost,
                 latest
                     .as_ref()
                     .and_then(|snapshot| snapshot.positions.get(&asset_id)),
                 combined_quantity,
-                combined_legacy_quantity,
                 &position.position_currency,
                 position.contract_multiplier,
                 position.rescale_average_cost_with_multiplier,
@@ -1476,12 +1451,11 @@ impl BrokerSyncService {
     fn combined_quantities_by_asset(
         position_data: &[HoldingsPositionData],
         spec_key_to_asset_id: &HashMap<String, String>,
-        quantity: impl Fn(&HoldingsPositionData) -> Decimal,
     ) -> HashMap<String, Decimal> {
         let mut totals: HashMap<String, Decimal> = HashMap::new();
         for position in position_data {
             if let Some(asset_id) = spec_key_to_asset_id.get(&position.spec_key) {
-                *totals.entry(asset_id.clone()).or_insert(Decimal::ZERO) += quantity(position);
+                *totals.entry(asset_id.clone()).or_insert(Decimal::ZERO) += position.quantity;
             }
         }
         totals
@@ -1491,7 +1465,6 @@ impl BrokerSyncService {
         broker_average_cost: Option<Decimal>,
         latest_position: Option<&Position>,
         quantity: Decimal,
-        legacy_quantity: Decimal,
         currency: &str,
         contract_multiplier: Decimal,
         rescale_with_multiplier: bool,
@@ -1501,11 +1474,8 @@ impl BrokerSyncService {
         }
 
         if let Some(previous) = latest_position {
-            // Snapshots written before exact f64 conversion hold the `from_f64`
-            // quantity, which can differ in the last digits (4096.029000000001).
-            let previous_quantity = previous.quantity.round_dp(HOLDINGS_DECIMAL_PRECISION);
-            let same_quantity = previous_quantity == quantity.round_dp(HOLDINGS_DECIMAL_PRECISION)
-                || previous_quantity == legacy_quantity.round_dp(HOLDINGS_DECIMAL_PRECISION);
+            let same_quantity = previous.quantity.round_dp(HOLDINGS_DECIMAL_PRECISION)
+                == quantity.round_dp(HOLDINGS_DECIMAL_PRECISION);
             if same_quantity && previous.currency == currency {
                 let previous_average_cost = previous.average_cost;
                 if rescale_with_multiplier {
@@ -1775,9 +1745,8 @@ mod tests {
     use super::{
         broker_cash_balances, contract_multiplier_metadata_update,
         default_tracking_mode_for_broker_account_type, holdings_option_metadata,
-        holdings_quantities, normalize_holdings_money, normalize_regular_average_cost,
-        option_contract_multiplier, positive_contract_multiplier,
-        regular_contract_multiplier_metadata, BrokerSyncService,
+        normalize_holdings_money, normalize_regular_average_cost, option_contract_multiplier,
+        positive_contract_multiplier, regular_contract_multiplier_metadata, BrokerSyncService,
     };
     use crate::broker::models::{
         HoldingsBalance, HoldingsOptionPosition, HoldingsOptionSymbol, HoldingsPosition,
@@ -1800,7 +1769,6 @@ mod tests {
         super::HoldingsPositionData {
             spec_key: "SEC:CFD".to_string(),
             quantity: decimal("10"),
-            legacy_quantity: decimal("10"),
             quote_price: decimal("100"),
             quote_currency: "USD".to_string(),
             average_cost,
@@ -1896,7 +1864,6 @@ mod tests {
         let position = super::HoldingsPositionData {
             spec_key: "SEC:VUSA:XLON".to_string(),
             quantity: decimal("10"),
-            legacy_quantity: decimal("10"),
             quote_price: decimal("85"),
             quote_currency: raw_quote_currency,
             average_cost: Some(normalize_holdings_money(decimal("82.5"), "GBp").0),
@@ -2368,7 +2335,6 @@ mod tests {
             Some(decimal("125.50")),
             Some(&latest),
             decimal("10"),
-            decimal("10"),
             "USD",
             decimal("50"),
             true,
@@ -2384,7 +2350,6 @@ mod tests {
         let resolved = BrokerSyncService::resolve_position_average_cost(
             None,
             Some(&latest),
-            decimal("10.0000000000004"),
             decimal("10.0000000000004"),
             "USD",
             Decimal::ONE,
@@ -2402,7 +2367,6 @@ mod tests {
             None,
             Some(&latest),
             decimal("11"),
-            decimal("11"),
             "USD",
             Decimal::ONE,
             true,
@@ -2411,7 +2375,6 @@ mod tests {
             None,
             Some(&latest),
             decimal("10"),
-            decimal("10"),
             "CAD",
             Decimal::ONE,
             true,
@@ -2419,7 +2382,6 @@ mod tests {
         let missing = BrokerSyncService::resolve_position_average_cost(
             None,
             None,
-            decimal("10"),
             decimal("10"),
             "USD",
             Decimal::ONE,
@@ -2439,7 +2401,6 @@ mod tests {
             None,
             Some(&latest),
             decimal("2"),
-            decimal("2"),
             "USD",
             decimal("50"),
             true,
@@ -2456,7 +2417,6 @@ mod tests {
         let resolved = BrokerSyncService::resolve_position_average_cost(
             None,
             Some(&latest),
-            decimal("2"),
             decimal("2"),
             "USD",
             decimal("50"),
@@ -2555,7 +2515,6 @@ mod tests {
         let row = |spec_key: &str, quantity: &str| super::HoldingsPositionData {
             spec_key: spec_key.to_string(),
             quantity: decimal(quantity),
-            legacy_quantity: decimal(quantity),
             quote_price: decimal("100"),
             quote_currency: "USD".to_string(),
             average_cost: None,
@@ -2573,11 +2532,8 @@ mod tests {
         spec_key_to_asset_id.insert("EQUITY:VTI".to_string(), "asset-vti".to_string());
         spec_key_to_asset_id.insert("EQUITY:VXUS".to_string(), "asset-vxus".to_string());
 
-        let totals = BrokerSyncService::combined_quantities_by_asset(
-            &position_data,
-            &spec_key_to_asset_id,
-            |row| row.quantity,
-        );
+        let totals =
+            BrokerSyncService::combined_quantities_by_asset(&position_data, &spec_key_to_asset_id);
 
         assert_eq!(totals.get("asset-vti").copied(), Some(decimal("50.428")));
         assert_eq!(totals.get("asset-vxus").copied(), Some(decimal("10")));
@@ -2594,7 +2550,6 @@ mod tests {
             None,
             Some(&latest),
             decimal("50.428"),
-            decimal("50.428"),
             "USD",
             Decimal::ONE,
             true,
@@ -2602,7 +2557,6 @@ mod tests {
         let single_row = BrokerSyncService::resolve_position_average_cost(
             None,
             Some(&latest),
-            decimal("32.005"),
             decimal("32.005"),
             "USD",
             Decimal::ONE,
@@ -2612,106 +2566,5 @@ mod tests {
         assert_eq!(combined, decimal("300"));
         // The pre-fix per-row path compared 32.005 against 50.428 and lost the known basis.
         assert_eq!(single_row, Decimal::ZERO);
-    }
-
-    #[test]
-    fn resolve_position_average_cost_reuses_cost_stored_with_a_from_f64_quantity() {
-        // Snapshots written before exact conversion hold `from_f64`'s 4096.029000000001 for a
-        // broker quantity of 4096.029. The first exact sync must still see it as unchanged.
-        let (quantity, legacy_quantity) = holdings_quantities(4096.029);
-        assert_eq!(quantity, decimal("4096.029"));
-        assert_eq!(legacy_quantity, decimal("4096.029000000001"));
-
-        let latest = position(
-            "acc-1",
-            "fund",
-            "4096.029000000001",
-            "25.5",
-            "104448.7395",
-            "USD",
-        );
-        let mut latest_option = position(
-            "acc-1",
-            "option",
-            "4096.029000000001",
-            "5000",
-            "20480145",
-            "USD",
-        );
-        latest_option.contract_multiplier = decimal("100");
-
-        let regular = BrokerSyncService::resolve_position_average_cost(
-            None,
-            Some(&latest),
-            quantity,
-            legacy_quantity,
-            "USD",
-            Decimal::ONE,
-            true,
-        );
-        let option = BrokerSyncService::resolve_position_average_cost(
-            None,
-            Some(&latest_option),
-            quantity,
-            legacy_quantity,
-            "USD",
-            decimal("100"),
-            false,
-        );
-
-        assert_eq!(regular, decimal("25.5"));
-        assert_eq!(option, decimal("5000"));
-    }
-
-    #[test]
-    fn combined_legacy_quantity_matches_a_split_holding_stored_with_from_f64() {
-        let (quantity, legacy_quantity) = holdings_quantities(4096.029);
-        let row = || super::HoldingsPositionData {
-            spec_key: "EQUITY:FUND".to_string(),
-            quantity,
-            legacy_quantity,
-            quote_price: decimal("100"),
-            quote_currency: "USD".to_string(),
-            average_cost: None,
-            position_currency: "USD".to_string(),
-            contract_multiplier: Decimal::ONE,
-            rescale_average_cost_with_multiplier: true,
-            multiplier_from_broker: true,
-        };
-        let position_data = vec![row(), row()];
-        let mut spec_key_to_asset_id = HashMap::new();
-        spec_key_to_asset_id.insert("EQUITY:FUND".to_string(), "asset-fund".to_string());
-        let combined = BrokerSyncService::combined_quantities_by_asset(
-            &position_data,
-            &spec_key_to_asset_id,
-            |row| row.quantity,
-        )["asset-fund"];
-        let combined_legacy = BrokerSyncService::combined_quantities_by_asset(
-            &position_data,
-            &spec_key_to_asset_id,
-            |row| row.legacy_quantity,
-        )["asset-fund"];
-        // The stored split holding is the sum of the two `from_f64` rows.
-        let latest = position(
-            "acc-1",
-            "fund",
-            "8192.058000000002",
-            "25.5",
-            "208897.479",
-            "USD",
-        );
-
-        let resolved = BrokerSyncService::resolve_position_average_cost(
-            None,
-            Some(&latest),
-            combined,
-            combined_legacy,
-            "USD",
-            Decimal::ONE,
-            true,
-        );
-
-        assert_eq!(combined, decimal("8192.058"));
-        assert_eq!(resolved, decimal("25.5"));
     }
 }
