@@ -62,7 +62,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  useAmountFormatting,
   useNumberFormatting,
   type FormattingApi,
 } from "@wealthfolio/ui";
@@ -325,16 +324,18 @@ function humanizeAccountIds(text: string, namesById: Map<string, string>): strin
 /** Trim long raw decimals (e.g. "95.50000000") in warnings to readable amounts. */
 function formatWarningNumbers(
   text: string,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
-  return text.replace(DECIMAL_RE, (value) => formatting.formatAmount(Number(value), "USD", false));
+  return text.replace(DECIMAL_RE, (value) =>
+    formatting.formatDecimal(Number(value), { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  );
 }
 
 /** Make a data-quality warning user-facing: real account names + tidy numbers. */
 function presentWarning(
   text: string,
   namesById: Map<string, string>,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
   return formatWarningNumbers(humanizeAccountIds(text, namesById), formatting);
 }
@@ -343,7 +344,7 @@ function presentMoneyWeightedWarning(
   text: string,
   namesById: Map<string, string>,
   t: TFunction,
-  formatting: Pick<FormattingApi, "formatAmount">,
+  formatting: Pick<FormattingApi, "formatDecimal">,
 ): string {
   return presentWarning(text, namesById, formatting)
     .replace(/\bXIRR\b/gi, t("performance:metric.annualized_mwr"))
@@ -1050,7 +1051,7 @@ const SelectedItemBadge = ({
 };
 
 export default function PerformancePage() {
-  const amountFormatting = useAmountFormatting();
+  const numberFormatting = useNumberFormatting();
 
   const { t } = useTranslation();
   const isMobile = useIsMobileViewport();
@@ -1263,9 +1264,9 @@ export default function PerformancePage() {
     const rawMoneyWeightedWarnings = rawWarnings.filter(isMoneyWeightedMessage);
     const visibleWarnings = rawWarnings
       .filter((warning) => !isMoneyWeightedMessage(warning))
-      .map((warning) => presentWarning(warning, accountNamesById, amountFormatting));
+      .map((warning) => presentWarning(warning, accountNamesById, numberFormatting));
     const moneyWeightedWarnings = rawMoneyWeightedWarnings.map((warning) =>
-      presentMoneyWeightedWarning(warning, accountNamesById, t, amountFormatting),
+      presentMoneyWeightedWarning(warning, accountNamesById, t, numberFormatting),
     );
     const rawReason = selectedMetricValue == null ? firstNotApplicableReason(found) : undefined;
     const showAnnualizedMoneyWeightedReturn =
@@ -1276,7 +1277,7 @@ export default function PerformancePage() {
     const rawMoneyWeightedReason =
       moneyWeightedReturn == null ? firstMoneyWeightedReason(found) : undefined;
     const presentedMoneyWeightedReason = rawMoneyWeightedReason
-      ? presentMoneyWeightedWarning(rawMoneyWeightedReason, accountNamesById, t, amountFormatting)
+      ? presentMoneyWeightedWarning(rawMoneyWeightedReason, accountNamesById, t, numberFormatting)
       : undefined;
     const moneyWeightedReason =
       presentedMoneyWeightedReason ??
@@ -1339,7 +1340,7 @@ export default function PerformancePage() {
       chartMetric: selectedMetric,
       selectedMetricValue,
       selectedMetricReason: rawReason
-        ? presentWarning(rawReason, accountNamesById, amountFormatting)
+        ? presentWarning(rawReason, accountNamesById, numberFormatting)
         : undefined,
       warningTerms: Array.from(accountNamesById.values()),
       annualizedReturn: annualizedDisplayMetricValue(found, selectedMetric),
@@ -1364,7 +1365,7 @@ export default function PerformancePage() {
       warnings: visibleWarnings,
       notApplicableReasons: found.dataQuality.notApplicableReasons ?? [],
     };
-  }, [selectedPerformanceData, accountNamesById, amountFormatting, t]);
+  }, [selectedPerformanceData, accountNamesById, numberFormatting, t]);
 
   const preserveCurrentChartAnchor = (fallbackId: string) => {
     setSelectedItemId(
