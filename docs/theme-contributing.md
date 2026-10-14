@@ -105,8 +105,8 @@ metadata; contributors do not author generated files.
 
 ## Provenance and contrast
 
-Classic (`flexoki`) preserves the original Flexoki palette. Ember's light
-surfaces and geometry come from the
+Classic (`flexoki`) preserves the original Flexoki palette. Ember's light card
+and control surfaces and geometry come from the
 [tweakcn](https://tweakcn.com/r/themes/cmdght103000n04lh3e2ae93r) "Claude +"
 theme; see [theme attribution](../apps/frontend/src/themes/NOTICE.md).
 

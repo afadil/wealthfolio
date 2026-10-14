@@ -23,7 +23,7 @@
   --theme-field-background-dark: color-mix(in oklab, var(--input) 30%, transparent);
   --theme-image-tint: var(--primary);
   --theme-image-tint-opacity: 0.14;
-  --background: oklch(0.9818 0.0054 95.0986);
+  --background: oklch(0.993 0 0);
   --foreground: oklch(0.3438 0.0269 95.7226);
   --card: oklch(0.9665 0.0067 97.3521);
   --card-foreground: oklch(0.1908 0.002 106.5859);
@@ -74,7 +74,7 @@
   --performance-series-6: #847c9a;
   --performance-series-7: #9b7561;
   --performance-series-8: #6f805f;
-  --sidebar: oklch(0.9663 0.008 98.8792);
+  --sidebar: oklch(0.993 0 0);
   --sidebar-foreground: oklch(0.359 0.0051 106.6524);
   --sidebar-primary: hsl(40 3% 20%);
   --sidebar-primary-foreground: #ffffff;
