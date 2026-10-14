@@ -118,6 +118,10 @@ zbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rus
 [target.'cfg(target_os = "android")'.dependencies]
 android-native-keyring-store = "1.0.0"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# The WebKitGTK version Tauri uses, for the Edit menu (see menu.rs).
+webkit2gtk = "2.0"
+
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
 # Compatibility fixture only: verify credentials written by our previous backend.
 legacy-keyring = { package = "keyring", version = "=2.3.3" }
