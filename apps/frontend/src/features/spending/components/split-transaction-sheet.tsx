@@ -277,10 +277,11 @@ export function SplitTransactionSheet({
 
         <div className={cn("min-h-0 flex-1 overflow-y-auto", isMobile ? "px-4" : "px-1")}>
           <div className="space-y-4 py-4">
+            {/* Splits are summed in cents, so these keep cents even for currencies without them. */}
             <div className="bg-muted/50 flex items-center justify-between rounded-2xl px-4 py-4">
               <span className="text-muted-foreground text-sm">
                 {t("spending:split.remainingOf", {
-                  amount: formatting.formatAmount(centsToAmount(totalAbsCents), currency),
+                  amount: formatting.formatPrice(centsToAmount(totalAbsCents), currency),
                 })}
               </span>
               <span
@@ -293,7 +294,6 @@ export function SplitTransactionSheet({
                       : "text-foreground",
                 )}
               >
-                {/* Splits are summed in cents, so show cents even for currencies without them. */}
                 {formatting.formatPrice(centsToAmount(remainingCents), currency, false)}{" "}
                 {activity?.currency}
               </span>
