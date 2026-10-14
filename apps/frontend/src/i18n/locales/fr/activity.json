@@ -244,6 +244,7 @@
   "table_price_amount": "Prix/Montant",
   "table_fee": "Frais",
   "table_total": "Total",
+  "table_balance": "Solde",
   "table_account": "Compte",
   "table_currency": "Devise",
   "table_comment": "Commentaire",

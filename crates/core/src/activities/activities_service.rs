@@ -52,6 +52,7 @@ use crate::activities::activities_constants::{
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
+use crate::activities::cash_balances::{running_cash_balances, shows_running_cash_balance};
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
 use crate::activities::{
@@ -4965,6 +4966,40 @@ impl ActivityServiceTrait for ActivityService {
             instrument_type_filter,
             activity_id_filter,
         )
+    }
+
+    /// Balances come from the account's whole history, not the page: a row's
+    /// balance depends on every earlier row, loaded or not.
+    async fn attach_cash_balances(
+        &self,
+        response: &mut ActivitySearchResponse,
+        account_ids: Option<&[String]>,
+    ) -> Result<()> {
+        let Some([account_id]) = account_ids else {
+            return Ok(());
+        };
+        let account_id = account_id.clone();
+        let activity_repository = Arc::clone(&self.activity_repository);
+        let account_service = Arc::clone(&self.account_service);
+        let balances = crate::portfolio::coordinator::blocking(move || {
+            let account = account_service.get_account(&account_id)?;
+            if !shows_running_cash_balance(&account) {
+                return Ok(None);
+            }
+            let activities = activity_repository.get_activities_by_account_id(&account_id)?;
+            Ok(Some(running_cash_balances(&account, &activities)))
+        })
+        .await?;
+        if let Some(mut balances) = balances {
+            response.cash_balances = Some(
+                response
+                    .data
+                    .iter()
+                    .filter_map(|row| balances.remove_entry(&row.id))
+                    .collect(),
+            );
+        }
+        Ok(())
     }
 
     /// Creates a new activity

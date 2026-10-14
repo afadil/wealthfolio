@@ -618,6 +618,7 @@ impl ActivityRepository {
         Ok(ActivitySearchResponse {
             data: results,
             meta: ActivitySearchResponseMeta { total_row_count },
+            cash_balances: None,
         })
     }
 }

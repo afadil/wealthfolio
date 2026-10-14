@@ -244,6 +244,7 @@
   "table_price_amount": "Precio/Importe",
   "table_fee": "Comisión",
   "table_total": "Total",
+  "table_balance": "Saldo",
   "table_account": "Cuenta",
   "table_currency": "Moneda",
   "table_comment": "Comentario",

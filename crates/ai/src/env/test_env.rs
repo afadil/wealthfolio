@@ -443,6 +443,7 @@ impl ActivityServiceTrait for MockActivityService {
             meta: ActivitySearchResponseMeta {
                 total_row_count: self.activities.len() as i64,
             },
+            cash_balances: None,
         })
     }
 
