@@ -492,6 +492,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         maxAmount: amountRange.max ?? undefined,
         sortBy: "date",
         sortDir: "desc",
+        // Filled only when the search covers exactly one account.
+        includeCashBalances: true,
       };
     }, [
       debouncedSearch,
@@ -510,6 +512,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       totalCount,
       net,
       baseCurrency,
+      cashBalances,
       isLoading,
       isFetching,
       isFetchingNextPage,
@@ -520,6 +523,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       fetchNextPage,
       refetch,
     } = useCashActivitySearch(searchRequest);
+    const showBalance = cashBalances !== undefined;
 
     const accountById = useMemo(() => {
       const m = new Map<string, Account>();
@@ -1001,6 +1005,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         event: ev ?? null,
         eventTypeColor: ev ? (eventTypeById.get(ev.eventTypeId)?.color ?? null) : null,
         appTimezone,
+        cashBalance: cashBalances?.[r.activity.id],
         isSelected: selectedRowIds.has(r.activity.id),
         onToggleSelect: handleToggleRow,
         onAssignCategory: handleAssignCategory,
@@ -1066,7 +1071,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       <>
         {firstItemStart > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: firstItemStart }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: firstItemStart }}
+            />
           </TableRow>
         )}
         {virtualItems.map((virtualItem) => {
@@ -1082,6 +1091,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               selectionState={daySelectionState(item.group)}
               onToggleDay={handleToggleDay}
               isPartial={hasNextPage === true && item.isLastGroup}
+              showBalance={showBalance}
             />
           ) : (
             <TransactionRow
@@ -1090,12 +1100,17 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               data-index={virtualItem.index}
               {...sharedRowProps(item.row)}
               showAccount={showAccount}
+              showBalance={showBalance}
             />
           );
         })}
         {totalSize - lastItemEnd > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: totalSize - lastItemEnd }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: totalSize - lastItemEnd }}
+            />
           </TableRow>
         )}
       </>
@@ -1248,6 +1263,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                     {t("spending:filters.category")}
                   </TableHead>
                   <TableHead className="w-28 px-3 text-right">{t("common:amount")}</TableHead>
+                  {showBalance && (
+                    <TableHead className="hidden w-28 px-3 text-right sm:table-cell">
+                      {t("activity:table_balance")}
+                    </TableHead>
+                  )}
                   <TableHead className="w-10 px-3" />
                 </TableRow>
               </TableHeader>

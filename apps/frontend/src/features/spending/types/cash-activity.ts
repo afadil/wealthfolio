@@ -1,4 +1,4 @@
-import type { Activity } from "@/lib/types";
+import type { Activity, ActivityCashBalance } from "@/lib/types";
 
 export interface CashActivityFilter {
   accountIds?: string[];
@@ -63,6 +63,8 @@ export interface CashActivitySearchRequest {
   sortDir?: CashActivitySortDirection;
   offset?: number;
   limit?: number;
+  /** Ask for the cash balance after each row (filled for exactly one account). */
+  includeCashBalances?: boolean;
 }
 
 /**
@@ -134,4 +136,9 @@ export interface CashActivitySearchResponse {
    * base-currency setting changes.
    */
   baseCurrency?: string | null;
+  /**
+   * The account's cash after each row of this page, by activity id: only when
+   * asked for and the search covers exactly one cash or credit-card account.
+   */
+  cashBalances?: Record<string, ActivityCashBalance>;
 }

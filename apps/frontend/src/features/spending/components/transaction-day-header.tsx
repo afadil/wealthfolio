@@ -50,6 +50,8 @@ interface TransactionDayHeaderProps {
    * are pending, since that day is still missing rows.
    */
   isPartial: boolean;
+  /** Keeps the row aligned with a table that shows the Balance column. */
+  showBalance?: boolean;
   /**
    * Virtualizer wiring: it measures the rendered header through the ref and
    * identifies it by `data-index`. Both are unset when the list renders
@@ -67,6 +69,7 @@ function TransactionDayHeaderImpl({
   selectionState,
   onToggleDay,
   isPartial,
+  showBalance = false,
 }: TransactionDayHeaderProps) {
   const { t } = useTranslation();
   const label = useDayLabel(group, appTimezone);
@@ -103,6 +106,7 @@ function TransactionDayHeaderImpl({
       <TableCell className="w-28 px-3 py-1.5 text-right">
         {!isPartial && <DayNet group={group} />}
       </TableCell>
+      {showBalance && <TableCell className="hidden px-3 py-1.5 sm:table-cell" />}
       <TableCell className="px-3 py-1.5" />
     </TableRow>
   );

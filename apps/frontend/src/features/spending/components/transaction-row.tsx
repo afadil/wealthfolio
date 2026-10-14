@@ -1,7 +1,7 @@
 import { memo, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Account } from "@/lib/types";
+import type { Account, ActivityCashBalance } from "@/lib/types";
 import { AccountType } from "@/lib/constants";
 import { TruncatedText } from "@/components/truncated-text";
 import { HOVER_SLOT } from "@/lib/hover-slot";
@@ -39,6 +39,10 @@ interface TransactionRowProps {
   appTimezone?: string;
   /** True when the loaded result set spans more than one account. */
   showAccount: boolean;
+  /** Adds the Balance cell: the list shows one account's running balance. */
+  showBalance?: boolean;
+  /** The account's cash after this row; none for a row that is not posted. */
+  cashBalance?: ActivityCashBalance;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onAssignCategory: (activityId: string, taxonomyId: string, categoryId: string) => void;
@@ -72,6 +76,8 @@ function TransactionRowImpl({
   eventTypeColor,
   appTimezone,
   showAccount,
+  showBalance = false,
+  cashBalance,
   isSelected,
   onToggleSelect,
   onAssignCategory,
@@ -265,6 +271,13 @@ function TransactionRowImpl({
         {sign}
         <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
       </TableCell>
+      {showBalance && (
+        <TableCell className="text-muted-foreground hidden w-28 whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums sm:table-cell">
+          {cashBalance && (
+            <PrivacyAmount value={cashBalance.balance} currency={cashBalance.currency} />
+          )}
+        </TableCell>
+      )}
       <TableCell className="w-10 px-3 py-2" data-row-click-ignore>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
