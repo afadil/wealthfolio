@@ -317,6 +317,11 @@ described above.
 | `REFUND`  | No change        | Reversal of existing fee, not new capital   |
 | (default) | No change        | Internal adjustment                         |
 
+`metadata.flow.is_external` overrides the subtype: `true` adds the gross amount
+to net contribution as an external flow (for example a refund or reimbursement
+paid from outside the portfolio), and `false` keeps any credit internal, `BONUS`
+included.
+
 ---
 
 ### Fee & Tax Activities
@@ -588,12 +593,12 @@ Activities support a `metadata` JSON field for additional context:
 
 ### Key Metadata Fields
 
-| Field                  | Type    | Used By         | Description                                   |
-| ---------------------- | ------- | --------------- | --------------------------------------------- |
-| `flow.is_external`     | boolean | TRANSFER_IN/OUT | Marks transfer as crossing portfolio boundary |
-| `split_ratio`          | string  | SPLIT           | Human-readable split ratio (e.g., "2:1")      |
-| `source.broker`        | string  | All             | Original broker name                          |
-| `source.original_type` | string  | All             | Raw activity type from provider               |
+| Field                  | Type    | Used By                 | Description                                       |
+| ---------------------- | ------- | ----------------------- | ------------------------------------------------- |
+| `flow.is_external`     | boolean | TRANSFER_IN/OUT, CREDIT | Marks the flow as crossing the portfolio boundary |
+| `split_ratio`          | string  | SPLIT                   | Human-readable split ratio (e.g., "2:1")          |
+| `source.broker`        | string  | All                     | Original broker name                              |
+| `source.original_type` | string  | All                     | Raw activity type from provider                   |
 
 ---
 
