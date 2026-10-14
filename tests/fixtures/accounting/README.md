@@ -8,9 +8,9 @@ These fixtures are the shared accounting contract for activity semantics.
   individually plausible classifications that produce an impossible result when
   combined.
 
-The core flow classifier, holdings calculator, performance calculation, and
-spending classifier consume the same cases. Import and form tests verify that
-the boundary metadata required by those cases survives activity creation.
+The portfolio engine (`crates/portfolio-engine/tests/accounting_contract.rs`)
+and the spending classifier consume the same cases. Import and form tests verify
+that the boundary metadata required by those cases survives activity creation.
 
 ## Required invariants
 
