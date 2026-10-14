@@ -17,7 +17,8 @@ describe("curated theme selection", () => {
     for (const theme of themes) {
       const radio = screen.getByRole("radio", { name: theme.name });
       const card = radio.closest("label")!;
-      expect(within(card).getAllByText("Aa")).toHaveLength(2);
+      // A light and a dark dashboard miniature, each showing the portfolio figure.
+      expect(within(card).getAllByText("48,250")).toHaveLength(2);
       const previews = card.querySelectorAll<HTMLElement>('div[aria-hidden="true"]');
       const expected = document.createElement("div");
       expected.style.background = theme.light.background;
