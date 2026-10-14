@@ -54,9 +54,10 @@ describe("SplitTransactionSheet", () => {
     expect(screen.getByText(/^234,50\sEUR$/)).toBeInTheDocument();
   });
 
-  it("shows the cents left to assign for currencies without minor units", () => {
-    renderSheet(splitRow("1000", "JPY", ["333.34", "333.33", "333"]));
+  it("keeps cents for currencies without minor units", () => {
+    renderSheet(splitRow("1000.33", "JPY", ["333.34", "333.33", "333"]));
 
-    expect(screen.getByText(/^0,33\sJPY$/)).toBeInTheDocument();
+    expect(screen.getByText(/1\.000,33\s¥/)).toBeInTheDocument();
+    expect(screen.getByText(/^0,66\sJPY$/)).toBeInTheDocument();
   });
 });
