@@ -156,4 +156,29 @@ describe("useSettingsMutation", () => {
     expect(invalidated).not.toContain(QueryKeys.SAVE_UP_PREVIEW);
     expect(invalidated).not.toContain(QueryKeys.ALTERNATIVE_HOLDINGS);
   });
+
+  it("saves appearance changes without a confirmation toast", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      language: "en",
+      onboardingCompleted: true,
+    } as Settings);
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSettingsMutation(vi.fn(), vi.fn()), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ themeId: "terminal", theme: "dark", font: "font-mono" });
+      await result.current.mutateAsync({ menuBarVisible: false });
+    });
+    expect(toast).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.mutateAsync({ theme: "dark", language: "en" });
+    });
+    expect(toast).toHaveBeenCalledOnce();
+  });
 });
