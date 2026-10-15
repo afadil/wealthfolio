@@ -19,15 +19,17 @@ use wealthfolio_core::activities::{
     Activity, ActivityBulkIdentifierMapping, ActivityBulkMutationResult, ActivityDetails,
     ActivityFinalCashMigrationUpdate, ActivityFinalCashMigrationWriteResult,
     ActivityRepositoryTrait, ActivitySearchResponse, ActivitySearchResponseMeta, ActivityUpdate,
-    ActivityUpsert, BulkUpsertResult, ImportMapping, ImportTemplate, IncomeData, NewActivity, Sort,
-    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, INCOME_ACTIVITY_TYPES,
-    TRADING_ACTIVITY_TYPES,
+    ActivityUpsert, BulkUpsertResult, CashLedgerActivity, ImportMapping, ImportTemplate,
+    IncomeData, NewActivity, Sort, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
+    INCOME_ACTIVITY_TYPES, TRADING_ACTIVITY_TYPES,
 };
 use wealthfolio_core::assets::{contract_multiplier_from_asset_metadata, InstrumentType};
 use wealthfolio_core::limits::ContributionActivity;
 use wealthfolio_core::{Error, Result};
 
-use super::model::{ActivityDB, ActivityDetailsDB, ImportAccountTemplateDB, ImportTemplateDB};
+use super::model::{
+    ActivityDB, ActivityDetailsDB, CashLedgerActivityDB, ImportAccountTemplateDB, ImportTemplateDB,
+};
 use crate::db::{get_connection, WriteHandle};
 use crate::errors::StorageError;
 use crate::schema::{
@@ -1474,6 +1476,24 @@ impl ActivityRepositoryTrait for ActivityRepository {
             .map_err(StorageError::from)?;
 
         Ok(activities_db.into_iter().map(Activity::from).collect())
+    }
+
+    fn get_cash_ledger_activities(
+        &self,
+        account_ids: &[String],
+    ) -> Result<Vec<CashLedgerActivity>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let rows = activities::table
+            .inner_join(accounts::table.on(activities::account_id.eq(accounts::id)))
+            .filter(accounts::is_archived.eq(false))
+            .filter(activities::account_id.eq_any(account_ids))
+            .select(CashLedgerActivityDB::as_select())
+            .order(activities::activity_date.asc())
+            .load::<CashLedgerActivityDB>(&mut conn)
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(CashLedgerActivity::from).collect())
     }
 
     fn get_activities_by_ids(&self, activity_ids: &[String]) -> Result<Vec<Activity>> {
@@ -3480,6 +3500,55 @@ mod tests {
             .values(&activity)
             .execute(conn)
             .expect("insert transfer activity");
+    }
+
+    #[tokio::test]
+    async fn cash_ledger_activities_read_as_whole_activities_do() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "checking");
+            insert_account_with_archived(&mut conn, "closed", true);
+            // Every column the ledger reads, in each stored shape it parses:
+            // RFC 3339 and SQLite timestamps, a bare date, an override, a
+            // subtype, a draft, charges and a quantity.
+            diesel::sql_query(
+                "INSERT INTO activities (id, account_id, activity_type, activity_type_override, \
+                 subtype, status, activity_date, quantity, unit_price, amount, fee, tax, currency, \
+                 notes, metadata, is_user_modified, needs_review, created_at, updated_at) VALUES \
+                 ('deposit', 'checking', 'DEPOSIT', NULL, NULL, 'POSTED', \
+                  '2026-04-01T09:30:00.123456Z', NULL, NULL, '100.25', NULL, NULL, 'USD', 'a note', \
+                  '{\"source\":\"csv\"}', 0, 0, '2026-04-01T09:30:00Z', '2026-04-01T09:30:00Z'), \
+                 ('fee', 'checking', 'FEE', NULL, NULL, 'POSTED', '2026-04-02', NULL, NULL, '4', \
+                  '0.5', '0.1', 'USD', NULL, NULL, 0, 0, '2026-04-02 10:00:00', '2026-04-02 10:00:00'), \
+                 ('refund', 'checking', 'WITHDRAWAL', 'CREDIT', 'REFUND', 'POSTED', \
+                  '2026-04-03T00:00:00+00:00', NULL, NULL, '12', NULL, NULL, 'USD', NULL, NULL, 0, 0, \
+                  '2026-04-03 10:00:00.250', '2026-04-03 10:00:00.250'), \
+                 ('draft', 'checking', 'DEPOSIT', NULL, NULL, 'DRAFT', '2026-04-04T00:00:00Z', '3', \
+                  '2', NULL, NULL, NULL, 'USD', NULL, NULL, 0, 0, '2026-04-04T00:00:00Z', \
+                  '2026-04-04T00:00:00Z'), \
+                 ('archived', 'closed', 'DEPOSIT', NULL, NULL, 'POSTED', '2026-04-01T00:00:00Z', \
+                  NULL, NULL, '9', NULL, NULL, 'USD', NULL, NULL, 0, 0, '2026-04-01T00:00:00Z', \
+                  '2026-04-01T00:00:00Z')",
+            )
+            .execute(&mut conn)
+            .expect("insert activities");
+        }
+        let accounts = vec!["checking".to_string(), "closed".to_string()];
+
+        let ledger = repo
+            .get_cash_ledger_activities(&accounts)
+            .expect("ledger read");
+        let whole: Vec<CashLedgerActivity> = repo
+            .get_activities_by_account_ids(&accounts)
+            .expect("full read")
+            .iter()
+            .map(CashLedgerActivity::from)
+            .collect();
+
+        assert_eq!(ledger.len(), 4, "the archived account's row is left out");
+        assert_eq!(ledger, whole);
     }
 
     #[tokio::test]

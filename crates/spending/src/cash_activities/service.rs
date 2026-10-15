@@ -10,7 +10,7 @@ use wealthfolio_core::accounts::{
 };
 use wealthfolio_core::activities::{
     application_order, running_cash_balances, shows_running_cash_balance, Activity,
-    ActivityCashBalance, ActivityRepositoryTrait, TransferPairResolution,
+    ActivityCashBalance, ActivityRepositoryTrait, CashLedgerActivity, TransferPairResolution,
     ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
 };
 use wealthfolio_core::taxonomies::TaxonomyServiceTrait;
@@ -716,7 +716,12 @@ impl CashActivityService {
         if !shows_running_cash_balance(&account) {
             return Ok(None);
         }
-        Ok(running_cash_balances(&account, activities))
+        let ledger: Vec<CashLedgerActivity> = activities
+            .iter()
+            .filter(|activity| activity.account_id == account.id)
+            .map(CashLedgerActivity::from)
+            .collect();
+        Ok(running_cash_balances(&account, &ledger))
     }
 
     /// Fetch explicit activity ids without applying the normal status/date/limit

@@ -53,7 +53,8 @@ use crate::activities::activities_constants::{
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
 use crate::activities::cash_balances::{
-    running_cash_balances, shows_cash_balance, shows_running_cash_balance,
+    running_cash_balances, shows_cash_balance, shows_running_cash_balance, ActivityCashBalance,
+    CashLedgerActivity,
 };
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
@@ -78,7 +79,7 @@ use crate::fx::currency::{
 };
 use crate::fx::FxServiceTrait;
 use crate::portfolio::economic_events::{ActivityCashInputs, ActivityEconomicsResolver};
-use crate::portfolio::valuation::ValuationRepositoryTrait;
+use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait};
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::utils::time_utils::{
@@ -5040,14 +5041,15 @@ impl ActivityServiceTrait for ActivityService {
                 .into_iter()
                 .filter(shows_cash_balance)
                 .partition(shows_running_cash_balance);
-            let mut balances: HashMap<String, (String, String, CashBalanceScope)> = HashMap::new();
+            let mut balances: HashMap<String, (ActivityCashBalance, CashBalanceScope)> =
+                HashMap::new();
 
             // Cash and credit-card accounts: the cash after each row, from one
             // read of their whole histories.
             if !running.is_empty() {
                 let ids: Vec<String> = running.iter().map(|account| account.id.clone()).collect();
-                let mut histories: HashMap<String, Vec<Activity>> = HashMap::new();
-                for activity in activity_repository.get_activities_by_account_ids(&ids)? {
+                let mut histories: HashMap<String, Vec<CashLedgerActivity>> = HashMap::new();
+                for activity in activity_repository.get_cash_ledger_activities(&ids)? {
                     histories
                         .entry(activity.account_id.clone())
                         .or_default()
@@ -5056,16 +5058,10 @@ impl ActivityServiceTrait for ActivityService {
                 for account in running {
                     let history = histories.remove(&account.id).unwrap_or_default();
                     match running_cash_balances(&account, &history) {
-                        Some(rows) => balances.extend(rows.into_iter().map(|(id, balance)| {
-                            (
-                                id,
-                                (
-                                    balance.balance.to_string(),
-                                    balance.currency,
-                                    CashBalanceScope::Row,
-                                ),
-                            )
-                        })),
+                        Some(rows) => balances.extend(
+                            rows.into_iter()
+                                .map(|(id, balance)| (id, (balance, CashBalanceScope::Row))),
+                        ),
                         // Its history holds securities, whose cash only the
                         // engine books: fall back to the engine's day-end cash.
                         None => day_end.push(account),
@@ -5090,22 +5086,18 @@ impl ActivityServiceTrait for ActivityService {
                 ) else {
                     continue;
                 };
-                let by_day: HashMap<NaiveDate, (Decimal, String)> = valuations
-                    .get_historical_valuations(&account.id, Some(first), Some(last))?
+                let by_day: HashMap<NaiveDate, DailyCashBalance> = valuations
+                    .get_daily_cash_balances(&account.id, Some(first), Some(last))?
                     .into_iter()
-                    .map(|valuation| {
-                        (
-                            valuation.valuation_date,
-                            (valuation.cash_balance, valuation.account_currency),
-                        )
-                    })
+                    .map(|cash| (cash.valuation_date, cash))
                     .collect();
                 for (id, day) in days {
-                    if let Some((cash, currency)) = by_day.get(&day) {
-                        balances.insert(
-                            id.clone(),
-                            (cash.to_string(), currency.clone(), CashBalanceScope::Day),
-                        );
+                    if let Some(cash) = by_day.get(&day) {
+                        let balance = ActivityCashBalance {
+                            currency: cash.account_currency.clone(),
+                            balance: cash.cash_balance,
+                        };
+                        balances.insert(id.clone(), (balance, CashBalanceScope::Day));
                     }
                 }
             }
@@ -5113,9 +5105,9 @@ impl ActivityServiceTrait for ActivityService {
         })
         .await?;
         for row in &mut response.data {
-            if let Some((balance, currency, scope)) = balances.remove(&row.id) {
-                row.cash_balance = Some(balance);
-                row.cash_balance_currency = Some(currency);
+            if let Some((balance, scope)) = balances.remove(&row.id) {
+                row.cash_balance = Some(balance.balance.to_string());
+                row.cash_balance_currency = Some(balance.currency);
                 row.cash_balance_scope = Some(scope);
             }
         }

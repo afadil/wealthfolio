@@ -16,7 +16,7 @@ use crate::schema::daily_account_valuation;
 use crate::schema::daily_account_valuation::dsl::*;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::portfolio::valuation::{
-    DailyAccountValuation, NegativeBalanceInfo, ValuationRepositoryTrait,
+    DailyAccountValuation, DailyCashBalance, NegativeBalanceInfo, ValuationRepositoryTrait,
 };
 
 pub struct ValuationRepository {
@@ -113,6 +113,40 @@ impl ValuationRepositoryTrait for ValuationRepository {
             .collect();
 
         Ok(history_records)
+    }
+
+    fn get_daily_cash_balances(
+        &self,
+        input_account_id: &str,
+        start_date_opt: Option<NaiveDate>,
+        end_date_opt: Option<NaiveDate>,
+    ) -> Result<Vec<DailyCashBalance>> {
+        let mut conn = get_connection(&self.pool)?;
+
+        let mut query = daily_account_valuation::table
+            .filter(account_id.eq(input_account_id))
+            .select((valuation_date, cash_balance, account_currency))
+            .order(valuation_date.asc())
+            .into_boxed();
+        if let Some(start_date_val) = start_date_opt {
+            query = query.filter(valuation_date.ge(start_date_val));
+        }
+        if let Some(end_date_val) = end_date_opt {
+            query = query.filter(valuation_date.le(end_date_val));
+        }
+
+        let rows = query
+            .load::<(NaiveDate, String, String)>(&mut conn)
+            .map_err(StorageError::from)?;
+        // Parsed as `From<DailyAccountValuationDB>` does.
+        Ok(rows
+            .into_iter()
+            .map(|(date, cash, currency)| DailyCashBalance {
+                valuation_date: date,
+                cash_balance: cash.parse::<rust_decimal::Decimal>().unwrap_or_default(),
+                account_currency: currency,
+            })
+            .collect())
     }
 
     fn get_historical_valuations_for_accounts(
@@ -424,6 +458,56 @@ mod tests {
             basis_status: BasisStatus::Complete,
             calculated_at: Utc::now(),
         }
+    }
+
+    #[tokio::test]
+    async fn daily_cash_balances_read_as_whole_valuations_do() {
+        std::env::set_var("CONNECT_API_URL", "http://test.local");
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test.db").to_string_lossy().to_string();
+        run_migrations(&db_path).unwrap();
+        let pool = create_pool(&db_path).unwrap();
+        let writer = spawn_writer((*pool).clone()).unwrap();
+        sql_query(
+            "INSERT INTO accounts (id, name, account_type, currency, is_default, is_active, \
+             created_at, updated_at, tracking_mode, is_archived) \
+             VALUES ('brokerage', 'brokerage', 'SECURITIES', 'USD', 0, 1, datetime('now'), \
+             datetime('now'), 'TRANSACTIONS', 0)",
+        )
+        .execute(&mut get_connection(&pool).unwrap())
+        .unwrap();
+        let repository = ValuationRepository::new(pool.clone(), writer);
+        repository
+            .replace_valuations_for_account(
+                "brokerage",
+                None,
+                &[
+                    valuation("brokerage", 1, 900, 900),
+                    valuation("brokerage", 2, -1250, 300),
+                    valuation("brokerage", 3, 750, 1200),
+                    valuation("brokerage", 4, 0, 1100),
+                ],
+            )
+            .await
+            .unwrap();
+
+        let range = (Some(date(2)), Some(date(4)));
+        let narrow = repository
+            .get_daily_cash_balances("brokerage", range.0, range.1)
+            .unwrap();
+        let whole: Vec<DailyCashBalance> = repository
+            .get_historical_valuations("brokerage", range.0, range.1)
+            .unwrap()
+            .into_iter()
+            .map(|valuation| DailyCashBalance {
+                valuation_date: valuation.valuation_date,
+                cash_balance: valuation.cash_balance,
+                account_currency: valuation.account_currency,
+            })
+            .collect();
+
+        assert_eq!(narrow.len(), 3);
+        assert_eq!(narrow, whole);
     }
 
     #[tokio::test]
