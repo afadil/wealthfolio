@@ -402,8 +402,9 @@ pub trait ActivityServiceTrait: Send + Sync {
         )
     }
     /// Fills `response.cash_balances` with the cash balance after each of its
-    /// rows when `account_ids` names exactly one cash or credit-card account.
-    /// The default leaves the response without balances.
+    /// rows when `account_ids` names exactly one cash or credit-card account
+    /// that holds no securities. The default leaves the response without
+    /// balances.
     async fn attach_cash_balances(
         &self,
         _response: &mut ActivitySearchResponse,

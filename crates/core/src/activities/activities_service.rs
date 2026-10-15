@@ -4987,7 +4987,7 @@ impl ActivityServiceTrait for ActivityService {
                 return Ok(None);
             }
             let activities = activity_repository.get_activities_by_account_id(&account_id)?;
-            Ok(Some(running_cash_balances(&account, &activities)))
+            Ok(running_cash_balances(&account, &activities))
         })
         .await?;
         if let Some(mut balances) = balances {
