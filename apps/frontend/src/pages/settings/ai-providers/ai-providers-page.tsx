@@ -14,7 +14,11 @@ import {
   useAiProviderApiKey,
   useListAiModels,
 } from "@/features/ai-assistant";
-import type { ModelCapabilityOverrides, ProviderTuningOverrides } from "@/lib/types";
+import type {
+  ModelCapabilityOverrides,
+  ModelCapabilityOverrideUpdate,
+  ProviderTuningOverrides,
+} from "@/lib/types";
 
 /**
  * AI Providers settings page - configure AI provider API keys and preferences.
@@ -35,8 +39,12 @@ export default function AiProvidersPage() {
     updateSettings({ providerId, selectedModel: modelId });
   };
 
-  const handleSetFavoriteModels = (providerId: string, modelIds: string[]) => {
-    updateSettings({ providerId, favoriteModels: modelIds });
+  const handleSetFavoriteModels = (
+    providerId: string,
+    modelIds: string[],
+    modelCapabilityOverride?: ModelCapabilityOverrideUpdate,
+  ) => {
+    updateSettings({ providerId, favoriteModels: modelIds, modelCapabilityOverride });
   };
 
   const handleSetCapabilityOverride = (
@@ -150,7 +158,9 @@ export default function AiProvidersPage() {
                 onSetDefault={() => setDefault({ providerId: provider.id })}
                 onCustomUrlChange={(url) => handleCustomUrlChange(provider.id, url)}
                 onSelectModel={(modelId) => handleSelectModel(provider.id, modelId)}
-                onSetFavoriteModels={(modelIds) => handleSetFavoriteModels(provider.id, modelIds)}
+                onSetFavoriteModels={(modelIds, capabilityOverride) =>
+                  handleSetFavoriteModels(provider.id, modelIds, capabilityOverride)
+                }
                 onSetCapabilityOverride={(modelId, overrides) =>
                   handleSetCapabilityOverride(provider.id, modelId, overrides)
                 }
@@ -188,7 +198,10 @@ function ProviderSettingsCardWrapper({
   onSetDefault: () => void;
   onCustomUrlChange: (url: string) => void;
   onSelectModel: (modelId: string) => void;
-  onSetFavoriteModels: (modelIds: string[]) => void;
+  onSetFavoriteModels: (
+    modelIds: string[],
+    capabilityOverride?: ModelCapabilityOverrideUpdate,
+  ) => void;
   onSetCapabilityOverride: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange: (tools: string[] | null) => void;
   onTuningOverridesChange: (overrides: ProviderTuningOverrides | null) => void;

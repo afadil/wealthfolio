@@ -2231,6 +2231,8 @@ export interface SetDefaultProviderRequest {
 export interface FetchedModel {
   id: string;
   name?: string;
+  /** From the provider's model metadata, or the provider's defaults. */
+  capabilities?: ModelCapabilities;
 }
 
 /**
