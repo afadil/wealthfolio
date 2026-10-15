@@ -107,7 +107,8 @@ The map value is shown in the failure message — keep it actionable.
 ```
 
 Keys are regexes matched against the final text; use TOML literal strings
-(single quotes) so backslashes stay as written.
+(single quotes) so backslashes stay as written. An empty reply fails the case,
+since there is nothing to check.
 
 ### Frequency caps
 
