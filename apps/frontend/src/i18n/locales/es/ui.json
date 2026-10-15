@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "Seleccionar moneda",
-    "selectDescription": "Elige la moneda de tu actividad",
+    "selectDescription": "Elige una moneda",
+    "placeholder": "Seleccionar moneda",
+    "popular": "Populares",
     "more": "Más",
     "search": "Buscar moneda...",
     "searchAll": "Buscar todas las monedas...",

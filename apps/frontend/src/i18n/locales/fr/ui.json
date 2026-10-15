@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "Sélectionner une devise",
-    "selectDescription": "Choisissez la devise de votre activité",
+    "selectDescription": "Choisissez une devise",
+    "placeholder": "Sélectionner une devise",
+    "popular": "Populaires",
     "more": "Plus",
     "search": "Rechercher une devise...",
     "searchAll": "Rechercher toutes les devises...",

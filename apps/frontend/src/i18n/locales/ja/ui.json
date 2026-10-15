@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "通貨を選択",
-    "selectDescription": "取引の通貨を選択してください",
+    "selectDescription": "通貨を選択してください",
+    "placeholder": "通貨を選択",
+    "popular": "人気",
     "more": "もっと見る",
     "search": "通貨を検索...",
     "searchAll": "すべての通貨から検索...",
