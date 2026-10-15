@@ -32,7 +32,20 @@ describe("shownCashBalanceIds", () => {
     ];
     const byId = [row("a-row", day, "DAY"), row("b-row", day, "DAY")];
 
-    for (const rows of [byCreation, byId]) {
+    // Within one millisecond the stored microseconds still order the rows,
+    // ahead of creation time.
+    const byMicros = [
+      row("later-micro", "2026-04-02T10:00:00.000002Z", "DAY", "brokerage", "2026-04-05T09:00:00Z"),
+      row(
+        "earlier-micro",
+        "2026-04-02T10:00:00.000001Z",
+        "DAY",
+        "brokerage",
+        "2026-04-05T10:00:00Z",
+      ),
+    ].reverse();
+
+    for (const rows of [byCreation, byId, byMicros]) {
       const last = rows[1].id;
       expect(shownCashBalanceIds(rows)).toEqual(new Set([last]));
       expect(shownCashBalanceIds([...rows].reverse())).toEqual(new Set([last]));
