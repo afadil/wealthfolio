@@ -104,12 +104,26 @@ const MarkdownLink: FC<React.AnchorHTMLAttributes<HTMLAnchorElement>> = ({
 };
 
 /**
+ * Shows an image's alt text instead of loading it. An instruction injected into
+ * the model's input could otherwise put portfolio data in an image URL, which
+ * the webview would fetch on render without a click.
+ */
+const MarkdownImage: FC<React.ImgHTMLAttributes<HTMLImageElement>> = ({ alt }) => (
+  <span className="aui-md-img text-muted-foreground inline-flex items-center gap-1">
+    <Icons.FileImage className="size-4" aria-hidden="true" />
+    {alt}
+  </span>
+);
+
+/**
  * Custom components for elements that need special handling beyond prose defaults.
  * Most elements use Tailwind Typography prose-sm defaults automatically.
  */
 const customComponents = memoizeMarkdownComponents({
   // Custom link handling for React Router
   a: MarkdownLink,
+  // Never fetch images from model output
+  img: MarkdownImage,
   // Custom code block styling with dark background
   pre: ({ className, ...props }) => (
     <pre
