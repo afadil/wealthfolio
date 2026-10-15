@@ -227,7 +227,7 @@ pub struct Activity {
     pub fx_conversion: Option<RawFxConversion>,
     /// Transfer of a non-cash asset (cash placeholders count as cash).
     pub is_security_transfer: bool,
-    /// Provenance used to rank competing split rows (`resolve_surfaces`).
+    /// Provenance for split ranking and explicitly internal manual FX pairs.
     pub source_system: Option<String>,
     pub is_user_modified: bool,
     pub updated_at: DateTime<Utc>,
@@ -241,9 +241,8 @@ pub struct TransferPair {
     pub out_account: AccountId,
     pub in_account: AccountId,
     pub security: bool,
-    /// A same-account cash FX conversion the import linker recorded as
-    /// internal: the money only changes currency, so neither leg moves net
-    /// contribution.
+    /// A same-account cash FX conversion explicitly recorded as internal by
+    /// the user or import linker: neither leg moves net contribution.
     #[serde(default)]
     pub contribution_neutral: bool,
 }

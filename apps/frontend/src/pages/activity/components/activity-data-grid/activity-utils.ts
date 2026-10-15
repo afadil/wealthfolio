@@ -27,7 +27,6 @@ export function isPairedInternalCashTransfer(transaction: LocalTransaction): boo
     transaction.sourceGroupId &&
     transaction.counterpartActivityId &&
     transaction.counterpartAccountId &&
-    transaction.counterpartAccountId !== transaction.accountId &&
     transaction.isExternal !== true &&
     (transaction.activityType === ActivityType.TRANSFER_IN ||
       transaction.activityType === ActivityType.TRANSFER_OUT) &&
@@ -666,6 +665,7 @@ export function buildSavePayload(
 
     if (isNew) {
       const createPayload: ActivityCreatePayload = {
+        sourceGroupId: transaction.sourceGroupId,
         ...basePayload,
         amount: sendsAmount ? basePayload.amount : undefined,
         ...(attestsCustomTotal && { needsReview: false }),

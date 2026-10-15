@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 
 use super::policy::Policy;
 
+/// Persisted provenance of activities explicitly entered by the user.
+pub const ACTIVITY_SOURCE_MANUAL: &str = "MANUAL";
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RawFacts {
     pub policy: Policy,

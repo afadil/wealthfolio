@@ -56,6 +56,57 @@ const createMockTransaction = (overrides: Partial<LocalTransaction> = {}): Local
 });
 
 describe("activity-utils", () => {
+  it("preserves both amounts and the new group when saving duplicated FX cash legs", () => {
+    const transactions = [
+      createMockTransaction({
+        id: "out-copy",
+        activityType: ActivityType.TRANSFER_OUT,
+        amount: "100",
+        currency: "USD",
+      }),
+      createMockTransaction({
+        id: "in-copy",
+        activityType: ActivityType.TRANSFER_IN,
+        amount: "92.12345678",
+        currency: "EUR",
+      }),
+    ].map((row) => ({
+      ...row,
+      isNew: true,
+      assetId: "",
+      assetSymbol: "CASH",
+      isExternal: false,
+      sourceGroupId: "new-pair",
+      idempotencyKey: row.id,
+      _amountEdited: true,
+    }));
+    const payload = buildSavePayload(
+      transactions,
+      new Set(transactions.map((row) => row.id)),
+      new Set(),
+      (row) => row.currency,
+      new Map(),
+      new Map(),
+      "USD",
+    );
+    expect(payload.creates).toHaveLength(2);
+    expect(payload.creates[0]).toMatchObject({
+      sourceGroupId: "new-pair",
+      idempotencyKey: "out-copy",
+      amount: "100",
+      currency: "USD",
+    });
+    expect(payload.creates[1]).toMatchObject({
+      sourceGroupId: "new-pair",
+      idempotencyKey: "in-copy",
+      amount: "92.12345678",
+      currency: "EUR",
+    });
+    expect(
+      payload.creates.every((row) => JSON.parse(row.metadata!).flow.is_external === false),
+    ).toBe(true);
+  });
+
   it("routes paired cash account/currency edits through the pair editor, including paste/clear", () => {
     const previous = createMockTransaction({
       activityType: ActivityType.TRANSFER_OUT,
@@ -69,9 +120,10 @@ describe("activity-utils", () => {
       expect(requiresTransferPairEditor(previous, { ...previous, ...patch })).toBe(true);
     }
     expect(requiresTransferPairEditor(previous, { ...previous, amount: "5" })).toBe(false);
+    const sameAccount = { ...previous, counterpartAccountId: previous.accountId };
+    expect(requiresTransferPairEditor(sameAccount, { ...sameAccount, currency: "HKD" })).toBe(true);
     for (const patch of [
       { sourceGroupId: undefined },
-      { counterpartAccountId: previous.accountId },
       { assetSymbol: "AAPL", assetId: "AAPL" },
       { isNew: true },
     ]) {
