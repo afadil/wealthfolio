@@ -219,6 +219,10 @@ export const ActivityTableMobile = ({
               activity.cashBalanceScope === "DAY"
                 ? t("activity:table_day_end_balance")
                 : t("activity:table_balance"),
+            shortLabel:
+              activity.cashBalanceScope === "DAY"
+                ? t("activity:table_day_end_balance_short")
+                : t("activity:table_balance"),
           }
         : undefined;
 
@@ -255,8 +259,8 @@ export const ActivityTableMobile = ({
                         ? `${activityTypeLabel} · ${optionSubtitle}`
                         : activityTypeLabel}
                     </p>
-                    <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-                      <span>{formattedDate.date}</span>
+                    <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
+                      <span className="whitespace-nowrap">{formattedDate.date}</span>
                       {!isCash &&
                         !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                         !isSplitActivity(activity.activityType) &&
@@ -274,7 +278,7 @@ export const ActivityTableMobile = ({
                         )}
                       {cashBalance && (
                         <span className="ml-auto flex shrink-0 items-center gap-1">
-                          {cashBalance.label}
+                          {cashBalance.shortLabel}
                           <AmountDisplay
                             value={cashBalance.balance}
                             currency={cashBalance.currency}
