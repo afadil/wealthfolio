@@ -41,6 +41,7 @@ import type {
   ProviderTuningOverrides,
 } from "../types";
 import { ProviderIcon } from "./provider-icons";
+import { listedCapabilityOverride } from "./provider-settings-utils";
 
 interface ProviderSettingsCardProps {
   provider: MergedProvider;
@@ -73,10 +74,6 @@ interface ProviderSettingsCardProps {
   fetchModelsError?: string | null;
   onRefreshModels?: () => void;
 }
-
-// Providers whose model lists say which models take tools and images, while
-// chat requests carry only the model ID.
-const PROVIDERS_WITH_LISTED_CAPABILITIES = new Set(["openrouter", "ollama"]);
 
 // Novice-friendly tool mapping for data access settings.
 // Each card can represent multiple backend tools that belong to the same user capability.
@@ -294,19 +291,11 @@ export function ProviderSettingsCard({
       onSetFavoriteModels(currentFavorites.filter((id) => id !== modelId));
       return;
     }
-    // Chat only knows the model ID, so keep what the provider's list said about
-    // tools and images for a model the catalog doesn't cover, unless the user
-    // already configured it.
-    const reported = fetchedModels.find((m) => m.id === modelId)?.capabilities;
-    const isCatalog = provider.models.some((m) => m.id === modelId && m.isCatalog);
-    const capabilityOverride =
-      reported &&
-      PROVIDERS_WITH_LISTED_CAPABILITIES.has(provider.id) &&
-      !isCatalog &&
-      !provider.modelCapabilityOverrides[modelId]
-        ? { modelId, overrides: { tools: reported.tools, vision: reported.vision } }
-        : undefined;
-    onSetFavoriteModels([...currentFavorites, modelId], capabilityOverride);
+    // Chat only knows the model ID, so keep what the provider's list said.
+    onSetFavoriteModels(
+      [...currentFavorites, modelId],
+      listedCapabilityOverride(provider, fetchedModels, modelId),
+    );
   };
 
   const handleCapabilityChange = (
