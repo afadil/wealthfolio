@@ -111,9 +111,10 @@ impl ManualSnapshotService {
                 _ => Uuid::new_v4().to_string(),
             };
 
+            // A custom "Other" holding sits in the account: an investment, not
+            // the alternative kind net worth adds on its own.
             let kind = match holding.asset_kind.as_deref() {
-                Some("OTHER") => Some(AssetKind::Other),
-                Some("INVESTMENT") => Some(AssetKind::Investment),
+                Some("OTHER") | Some("INVESTMENT") => Some(AssetKind::Investment),
                 _ => None,
             };
 
