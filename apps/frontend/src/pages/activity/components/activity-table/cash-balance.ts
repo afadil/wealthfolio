@@ -2,6 +2,14 @@ import type { ActivityDetails } from "@/lib/types";
 import { toDateKey } from "@/pages/account/cash-audit";
 
 /**
+ * A timestamp's fraction of a second past the millisecond, which `Date`
+ * drops: up to six digits, padded so two compare as text.
+ */
+function beyondMillis(value: unknown): string {
+  return (/\.\d{3}(\d{1,6})/.exec(String(value))?.[1] ?? "").padEnd(6, "0");
+}
+
+/**
  * Whether `a` comes after `b` in the engine's application order, which the
  * search's date sort follows: timestamp, then created_at, then id. Date-only
  * imports share a timestamp, so the tie-breaks decide the day's last row.
@@ -9,6 +17,9 @@ import { toDateKey } from "@/pages/account/cash-audit";
 function appliedAfter(a: ActivityDetails, b: ActivityDetails): boolean {
   const byInstant = new Date(a.date).getTime() - new Date(b.date).getTime();
   if (byInstant !== 0) return byInstant > 0;
+  const aBeyondMillis = beyondMillis(a.date);
+  const bBeyondMillis = beyondMillis(b.date);
+  if (aBeyondMillis !== bBeyondMillis) return aBeyondMillis > bBeyondMillis;
   // The stored text the search orders by.
   const aCreated = String(a.createdAt);
   const bCreated = String(b.createdAt);
