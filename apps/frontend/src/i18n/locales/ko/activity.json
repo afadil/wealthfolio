@@ -244,6 +244,7 @@
   "table_total": "합계",
   "table_balance": "잔액",
   "table_day_end_balance": "일일 마감 잔액",
+  "table_day_end_balance_short": "일 마감",
   "table_account": "계좌",
   "table_currency": "통화",
   "table_comment": "메모",

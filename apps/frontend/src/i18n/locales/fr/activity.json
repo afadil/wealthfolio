@@ -246,6 +246,7 @@
   "table_total": "Total",
   "table_balance": "Solde",
   "table_day_end_balance": "Solde de fin de journée",
+  "table_day_end_balance_short": "Fin de journée",
   "table_account": "Compte",
   "table_currency": "Devise",
   "table_comment": "Commentaire",

@@ -245,6 +245,7 @@
   "table_total": "Total",
   "table_balance": "Balance",
   "table_day_end_balance": "End-of-day balance",
+  "table_day_end_balance_short": "End of day",
   "table_account": "Account",
   "table_currency": "Currency",
   "table_comment": "Comment",
