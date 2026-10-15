@@ -8,11 +8,13 @@ function row(
   date: string,
   scope: CashBalanceScope | null,
   accountId = "brokerage",
+  createdAt = "2026-04-01T00:00:00Z",
 ): ActivityDetails {
   return {
     id,
     accountId,
     date: date as unknown as Date,
+    createdAt: createdAt as unknown as Date,
     cashBalance: scope ? "750" : null,
     cashBalanceCurrency: scope ? "USD" : null,
     cashBalanceScope: scope,
@@ -20,6 +22,23 @@ function row(
 }
 
 describe("shownCashBalanceIds", () => {
+  it("breaks a shared timestamp by creation time, then id, in either order", () => {
+    // Date-only imports share a timestamp: the engine applies them by
+    // created_at, then id, and the day's balance belongs on the last one.
+    const day = "2026-04-02T00:00:00Z";
+    const byCreation = [
+      row("saved-first", day, "DAY", "brokerage", "2026-04-05T09:00:00Z"),
+      row("saved-last", day, "DAY", "brokerage", "2026-04-05T10:00:00Z"),
+    ];
+    const byId = [row("a-row", day, "DAY"), row("b-row", day, "DAY")];
+
+    for (const rows of [byCreation, byId]) {
+      const last = rows[1].id;
+      expect(shownCashBalanceIds(rows)).toEqual(new Set([last]));
+      expect(shownCashBalanceIds([...rows].reverse())).toEqual(new Set([last]));
+    }
+  });
+
   it("shows every row balance", () => {
     const shown = shownCashBalanceIds([
       row("rent", "2026-04-02T10:00:00Z", "ROW"),
