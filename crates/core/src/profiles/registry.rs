@@ -44,10 +44,8 @@ struct LockRecord {
 
 pub struct ProfileRegistry {
     root: PathBuf,
-    /// The legacy database as the host resolves it for this launch. An update
-    /// can move the data directory (iOS renames the app container), so the path
-    /// stored at adoption only marks which profile is the legacy one.
-    legacy_database: PathBuf,
+    /// An in-memory override for hosts whose sandbox moves between launches.
+    legacy_database_override: Option<PathBuf>,
     data: Mutex<RegistryData>,
     secrets: Arc<dyn SecretStore>,
     secret_gate: Arc<Mutex<()>>,
@@ -189,6 +187,14 @@ impl ProfileRegistry {
         Self::open_with_recovery(root, legacy_database, secrets, false)
     }
 
+    /// Use the host's current sandbox path for the adopted legacy profile.
+    /// Mobile sandboxes can move; other hosts retain the saved path.
+    /// This does not change the registry on disk or paths for newer profiles.
+    pub fn with_legacy_database_path(mut self, database: PathBuf) -> Self {
+        self.legacy_database_override = Some(database);
+        self
+    }
+
     /// Explicit recovery only: preserve orphaned data and credentials, then allow
     /// a new, independently scoped profile to be created through normal setup.
     pub fn start_new(
@@ -291,7 +297,7 @@ impl ProfileRegistry {
                 lock_enabled: false,
                 // Lost registry files must not bypass an inherited legacy lock.
                 never_protected: !legacy_database.exists() || !had_owner_file,
-                legacy_database: legacy_database.exists().then(|| legacy_database.clone()),
+                legacy_database: legacy_database.exists().then_some(legacy_database),
                 legacy_addons_root: None,
                 connect: None,
             };
@@ -308,7 +314,7 @@ impl ProfileRegistry {
         };
         Ok(Self {
             root,
-            legacy_database,
+            legacy_database_override: None,
             data: Mutex::new(data),
             secrets,
             secret_gate: Arc::new(Mutex::new(())),
@@ -517,9 +523,13 @@ impl ProfileRegistry {
 
     pub fn paths(&self, profile: &Profile) -> ProfilePaths {
         match &profile.legacy_database {
-            Some(_) => ProfilePaths {
+            Some(database) => ProfilePaths {
                 root: self.root.clone(),
-                database: self.legacy_database.clone(),
+                database: self
+                    .legacy_database_override
+                    .as_ref()
+                    .unwrap_or(database)
+                    .clone(),
             },
             None => {
                 let root = self.root.join("profiles").join(profile.id.to_string());
@@ -1312,6 +1322,31 @@ mod tests {
     }
 
     #[test]
+    fn legacy_profile_keeps_saved_database_when_launch_candidate_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let database = dir.path().join("custom-legacy.db");
+        fs::write(&database, b"existing database").unwrap();
+        let secrets = Arc::new(Secrets::default());
+        drop(ProfileRegistry::open(dir.path().into(), database.clone(), secrets.clone()).unwrap());
+        let saved_registry = fs::read(dir.path().join(REGISTRY_FILE)).unwrap();
+
+        for candidate_exists in [false, true] {
+            let candidate = dir.path().join("app.db");
+            if candidate_exists {
+                fs::write(&candidate, b"unrelated database").unwrap();
+            }
+            let registry =
+                ProfileRegistry::open(dir.path().into(), candidate, secrets.clone()).unwrap();
+            let default = registry.profile(registry.default_id().unwrap()).unwrap();
+            assert_eq!(registry.paths(&default).database, database);
+            assert_eq!(
+                fs::read(dir.path().join(REGISTRY_FILE)).unwrap(),
+                saved_registry
+            );
+        }
+    }
+
+    #[test]
     fn legacy_profile_follows_a_moved_data_directory() {
         // An iOS update renames the app container but keeps its files.
         let base = tempfile::tempdir().unwrap();
@@ -1330,13 +1365,29 @@ mod tests {
         )
         .unwrap();
 
-        let registry =
-            ProfileRegistry::open(new_root.clone(), new_root.join("app.db"), secrets).unwrap();
+        let saved_registry = fs::read(new_root.join(REGISTRY_FILE)).unwrap();
+        let registry = ProfileRegistry::open(new_root.clone(), new_root.join("app.db"), secrets)
+            .unwrap()
+            .with_legacy_database_path(new_root.join("app.db"));
         let default = registry.profile(registry.default_id().unwrap()).unwrap();
         assert!(ProfileSummary::from(&default).is_legacy);
         let paths = registry.paths(&default);
         assert_eq!(paths.root, new_root);
         assert_eq!(paths.database, new_root.join("app.db"));
+        assert_eq!(
+            fs::read(new_root.join(REGISTRY_FILE)).unwrap(),
+            saved_registry
+        );
+
+        let second = registry.create("Second", DEFAULT_PROFILE_AVATAR).unwrap();
+        let second = registry.profile(second.id).unwrap();
+        assert_eq!(
+            registry.paths(&second).database,
+            new_root
+                .join("profiles")
+                .join(second.id.to_string())
+                .join("app.db")
+        );
     }
 
     #[test]

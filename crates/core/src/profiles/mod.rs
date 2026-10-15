@@ -114,8 +114,8 @@ pub struct Profile {
     #[serde(default)]
     pub(crate) never_protected: bool,
     /// Only the migrated default may own the pre-profile namespace and database.
-    /// `Some` marks that profile; `ProfileRegistry::paths` resolves its database
-    /// at each launch rather than trusting this stored path.
+    /// Hosts retain this saved path unless they explicitly override it in memory
+    /// to follow a moved mobile sandbox.
     pub legacy_database: Option<PathBuf>,
     #[serde(default)]
     pub legacy_addons_root: Option<PathBuf>,
