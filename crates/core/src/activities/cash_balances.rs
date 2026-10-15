@@ -15,7 +15,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    is_cash_symbol, Activity, ActivityCompiler, DefaultActivityCompiler, NewActivity,
+    is_cash_symbol, Activity, DefaultActivityCompiler, NewActivity,
     ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL,
 };
 use crate::accounts::{account_types, Account, TrackingMode};
@@ -111,9 +111,7 @@ fn holds_security(activity: &Activity) -> bool {
             .as_deref()
             .map(str::trim)
             .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
-        || DefaultActivityCompiler::new()
-            .compile(activity)
-            .map_or(true, |postings| postings.len() != 1)
+        || DefaultActivityCompiler::expands(activity)
 }
 
 #[cfg(test)]
