@@ -38,6 +38,7 @@ fn generated_facts() -> RawFacts {
             kind: "INVESTMENT".to_string(),
             instrument_type: Some("EQUITY".to_string()),
             contract_multiplier: None,
+            alternative: false,
         })
         .collect::<Vec<_>>();
 

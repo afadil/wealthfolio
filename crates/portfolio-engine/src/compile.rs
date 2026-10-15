@@ -606,6 +606,7 @@ mod tests {
                 kind: "INVESTMENT".into(),
                 instrument_type: Some("EQUITY".into()),
                 contract_multiplier: None,
+                alternative: false,
             }],
             activities,
             quotes: vec![],

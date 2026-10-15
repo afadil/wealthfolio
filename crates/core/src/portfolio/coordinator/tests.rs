@@ -2974,3 +2974,54 @@ async fn valuation_totals_leave_the_async_worker_free() {
 
     assert!(gate.released_in_time(), "the read held the async worker");
 }
+
+/// Whether a holding counts toward its account's value is core's rule
+/// (`AssetKind::is_alternative`); the engine applies it as a fact. An
+/// alternative asset bought in an account stays out of the account's value,
+/// for net worth to add on its own.
+#[tokio::test]
+async fn an_account_values_a_holding_unless_its_kind_is_alternative() {
+    use crate::assets::AssetKind;
+    for kind in [
+        AssetKind::Investment,
+        AssetKind::Property,
+        AssetKind::Vehicle,
+        AssetKind::Collectible,
+        AssetKind::PreciousMetal,
+        AssetKind::PrivateEquity,
+        AssetKind::Liability,
+        AssetKind::Other,
+    ] {
+        let yaml = format!(
+            r#"
+id: KIND-{kind}
+title: a {kind} holding
+policy: {{ base_currency: USD, timezone: UTC, as_of: 2025-01-04 }}
+accounts:
+  - {{ id: acc-1, currency: USD }}
+assets:
+  - {{ id: thing, quote_ccy: USD, kind: {kind}, instrument_type: NONE, quote_mode: MANUAL }}
+activities:
+  - {{ id: dep, account: acc-1, type: DEPOSIT, date: 2025-01-02T10:00:00Z, amount: 1000 }}
+  - {{ id: buy, account: acc-1, type: BUY, asset: thing, date: 2025-01-03T10:00:00Z, quantity: 2, unit_price: 100, amount: 200 }}
+quotes:
+  - {{ asset: thing, day: 2025-01-03, close: 100, currency: USD, source: MANUAL }}
+"#,
+            kind = kind.as_db_str()
+        );
+        let scenario: Scenario = serde_yaml::from_str(&yaml).unwrap();
+        scenario.validate().unwrap();
+        let h = harness(scenario.facts()).await;
+        h.coordinator
+            .run_job(request(), &SilentObserver)
+            .await
+            .unwrap();
+        let value = h.rows("acc-1").last().unwrap().investment_market_value;
+        let expected = if kind.is_alternative() {
+            Decimal::ZERO
+        } else {
+            dec!(200)
+        };
+        assert_eq!(value, expected, "{kind:?}");
+    }
+}

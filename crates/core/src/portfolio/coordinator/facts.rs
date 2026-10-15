@@ -283,6 +283,7 @@ pub(super) fn raw_asset(a: &crate::assets::Asset) -> RawAsset {
             .as_ref()
             .map(|t| t.as_db_str().to_string()),
         contract_multiplier: Some(a.contract_multiplier()),
+        alternative: a.kind.is_alternative(),
     }
 }
 
@@ -653,19 +654,7 @@ pub fn load(
     } else {
         deps.assets.list_by_asset_ids(&asset_id_vec)?
     };
-    let assets: Vec<RawAsset> = asset_rows
-        .iter()
-        .map(|a| RawAsset {
-            id: a.id.clone(),
-            quote_currency: a.quote_ccy.clone(),
-            kind: a.kind.as_db_str().to_string(),
-            instrument_type: a
-                .instrument_type
-                .as_ref()
-                .map(|t| t.as_db_str().to_string()),
-            contract_multiplier: Some(a.contract_multiplier()),
-        })
-        .collect();
+    let assets: Vec<RawAsset> = asset_rows.iter().map(raw_asset).collect();
 
     // Splits of these assets recorded elsewhere, and the closes around every
     // split, over the whole range; every other quote is read per window.
