@@ -25,7 +25,7 @@ import {
   Icons,
   PriceDisplay,
   Separator,
-  useNumberFormatting,
+  useAmountFormatting,
   useDateFormatting,
 } from "@wealthfolio/ui";
 import { Card } from "@wealthfolio/ui/components/ui/card";
@@ -100,7 +100,7 @@ export const ActivityTableMobile = ({
   isFetchingNextPage = false,
   hasLoadMoreError = false,
 }: ActivityTableMobileProps) => {
-  const numberFormatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
   const { isBalanceHidden } = useBalancePrivacy();
   const { t } = useTranslation();
@@ -230,7 +230,10 @@ export const ActivityTableMobile = ({
         : symbol;
     const avatarSymbol = isCash ? "$CASH" : symbol;
     const optionSubtitle = parsedOption
-      ? formatOptionSubtitle(parsedOption, { ...numberFormatting, ...dateFormatting })
+      ? formatOptionSubtitle(parsedOption, activity.assetQuoteCcy ?? activity.currency, {
+          ...amountFormatting,
+          ...dateFormatting,
+        })
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     // Under a day heading a card gives only the time; the heading has the date.
