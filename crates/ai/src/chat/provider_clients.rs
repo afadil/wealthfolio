@@ -1,7 +1,8 @@
 //! Provider-specific rig client constructors + error remapping.
 //!
 //! Each function builds a configured rig client for one provider (Anthropic,
-//! Gemini, Groq, OpenAI, OpenRouter, Ollama). Kept here so the streaming agent
+//! Gemini, Groq, OpenAI Responses, OpenAI-compatible Chat Completions,
+//! OpenRouter, Ollama). Kept here so the streaming agent
 //! builder doesn't have to mix provider plumbing with response handling.
 
 use log::debug;
@@ -67,9 +68,30 @@ pub(crate) fn create_groq_client(
         .map_err(|e| AiError::Provider(e.to_string()))
 }
 
-/// Create OpenAI client using Completions API (not Responses API).
-/// Responses API has issues with reasoning items in multi-turn conversations.
-/// See: <https://community.openai.com/t/error-badrequesterror-400-item-of-type-reasoning-was-provided-without-its-required-following-item/1303809>
+/// Create an OpenAI client on the Responses API, which current GPT models
+/// need for tool calls. Requests set `store: false` (see
+/// `request_params::openai_responses_params`), so reasoning travels between
+/// tool calls as encrypted items instead of being kept by OpenAI.
+pub(crate) fn create_openai_responses_client(
+    api_key: Option<String>,
+    provider_id: &str,
+    provider_url: Option<String>,
+) -> Result<openai::Client<HttpClient>, AiError> {
+    let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
+    let mut builder = openai::Client::builder()
+        .api_key(&key)
+        .http_client(wealthfolio_http::client());
+    if let Some(url) = provider_url {
+        let normalized = ensure_openai_v1_base_url(&url);
+        builder = builder.base_url(&normalized);
+    }
+    builder
+        .build()
+        .map_err(|e| AiError::Provider(e.to_string()))
+}
+
+/// Create an OpenAI-compatible client on the Chat Completions API, for custom
+/// endpoints that don't serve the Responses API.
 pub(crate) fn create_openai_client(
     api_key: Option<String>,
     provider_id: &str,
@@ -825,6 +847,450 @@ mod transport_tests {
     async fn openai_reasoning_tool_round_trip() {
         verify_provider_round_trip("openai").await;
     }
+
+    /// Serve `rounds` streamed responses and return the request bodies.
+    async fn serve_rounds(
+        listener: TcpListener,
+        rounds: Vec<String>,
+    ) -> Vec<(String, serde_json::Value)> {
+        let mut requests = Vec::new();
+        for body in rounds {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let request = read_request(&mut socket).await;
+            let (head, json) = request.split_once("\r\n\r\n").unwrap();
+            requests.push((
+                head.lines().next().unwrap().to_string(),
+                serde_json::from_str(json).unwrap(),
+            ));
+            socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+        }
+        requests
+    }
+
+    async fn run_echo_agent(agent: rig::agent::Agent, provider: &str) -> String {
+        let mut stream = agent
+            .runner("Use echo")
+            .add_hook(crate::stream_hook::WealthfolioStreamHook::for_provider(
+                provider,
+            ))
+            .max_turns(2)
+            .stream()
+            .await;
+        let mut text = String::new();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(item) = stream.next().await {
+                if let MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(t)) =
+                    item.unwrap()
+                {
+                    text.push_str(&t.text);
+                }
+            }
+        })
+        .await
+        .unwrap();
+        text
+    }
+
+    #[tokio::test]
+    async fn openai_responses_carry_encrypted_reasoning_across_tool_calls() {
+        use serde_json::json;
+        let event = |v: serde_json::Value| format!("data: {v}\n\n");
+        let completed = |seq: u64| {
+            event(
+                json!({"type":"response.completed","sequence_number":seq,"response":{
+                    "id":"resp_fixture","object":"response","created_at":0,"status":"completed",
+                    "model":"gpt-6-astra","output":[],"tools":[]
+                }}),
+            )
+        };
+        let tool_round = event(
+            json!({"type":"response.output_item.done","output_index":0,"sequence_number":1,
+            "item":{"type":"reasoning","id":"rs_fixture","summary":[],"encrypted_content":"enc-fixture"}}),
+        ) + &event(
+            json!({"type":"response.output_item.done","output_index":1,"sequence_number":2,
+            "item":{"type":"function_call","id":"fc_fixture","call_id":"call_fixture","name":"echo",
+                "arguments":"{\"value\":\"fixture\"}","status":"completed"}}),
+        ) + &completed(3);
+        let answer_round = event(
+            json!({"type":"response.output_text.delta","item_id":"msg_fixture",
+            "output_index":0,"content_index":0,"sequence_number":1,"delta":"Complete"}),
+        ) + &completed(2);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_rounds(listener, vec![tool_round, answer_round]));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let agent = create_openai_responses_client(Some("fixture-key".into()), "openai", Some(url))
+            .unwrap()
+            .agent("gpt-6-astra")
+            .additional_params(super::super::request_params::openai_responses_params(
+                "gpt-6-astra",
+                true,
+            ))
+            .dynamic_tools(vec![echo_tool(calls.clone())])
+            .build();
+        let text = run_echo_agent(agent, "openai").await;
+        let requests = server.await.unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(text, "Complete");
+        for (line, body) in &requests {
+            assert!(line.starts_with("POST /v1/responses "), "{line}");
+            assert_eq!(body["store"], json!(false));
+            assert_eq!(body["include"], json!(["reasoning.encrypted_content"]));
+            assert_eq!(body["reasoning"]["effort"], json!("medium"));
+            assert!(body.get("temperature").is_none());
+        }
+        let input = requests[1].1["input"].as_array().unwrap();
+        let item = |kind: &str| {
+            input
+                .iter()
+                .find(|item| item["type"] == kind)
+                .unwrap_or_else(|| panic!("no {kind} item in {input:?}"))
+        };
+        assert_eq!(item("reasoning")["id"], json!("rs_fixture"));
+        assert_eq!(item("reasoning")["encrypted_content"], json!("enc-fixture"));
+        assert_eq!(item("function_call")["call_id"], json!("call_fixture"));
+        assert_eq!(
+            item("function_call_output")["call_id"],
+            json!("call_fixture")
+        );
+        assert!(item("function_call_output")["output"]
+            .to_string()
+            .contains("fixture"));
+    }
+
+    /// Answer every request until none arrives for a second. Title requests
+    /// get a 500 so the title falls back; chat requests get `chat_body`.
+    async fn serve_chat(
+        listener: TcpListener,
+        chat_body: String,
+    ) -> Vec<(String, serde_json::Value)> {
+        let mut chats = Vec::new();
+        while let Ok(Ok((mut socket, _))) =
+            tokio::time::timeout(Duration::from_secs(1), listener.accept()).await
+        {
+            // A request the client dropped before sending (the title request
+            // when the chat finishes first) arrives as an empty connection.
+            let mut first = [0; 1];
+            if socket.peek(&mut first).await.unwrap_or(0) == 0 {
+                continue;
+            }
+            let request = read_request(&mut socket).await;
+            let (head, json) = request.split_once("\r\n\r\n").unwrap();
+            if json.contains("Generate a very short plain-text title") {
+                socket.write_all(b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
+                continue;
+            }
+            chats.push((
+                head.lines().next().unwrap().to_string(),
+                serde_json::from_str(json).unwrap(),
+            ));
+            socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{chat_body}", chat_body.len()).as_bytes()).await.unwrap();
+        }
+        chats
+    }
+
+    /// Send one message through `ChatService` with the provider pointed at a
+    /// local fixture server, and return the chat requests it made.
+    async fn chat_through_service(
+        provider: &str,
+        model: &str,
+        thinking: bool,
+        provider_settings: serde_json::Value,
+    ) -> Vec<(String, serde_json::Value)> {
+        use crate::chat::{ChatConfig, ChatService};
+        use crate::env::test_env::{MockEnvironment, MockSettingsService};
+        use crate::provider_model::AI_PROVIDER_SETTINGS_KEY;
+        use crate::types::{AiStreamEvent, ChatModelConfig, SendMessageRequest};
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let fixture = if provider == "google" {
+            "gemini"
+        } else {
+            provider
+        };
+        let server = tokio::spawn(serve_chat(listener, provider_fixture(fixture, false)));
+
+        let mut user = provider_settings;
+        user["enabled"] = serde_json::json!(true);
+        user["customUrl"] = serde_json::json!(url);
+        let settings = serde_json::json!({ "schemaVersion": 2, "providers": { provider: user } });
+        let mut env = MockEnvironment::new().with_secret(&format!("ai_{provider}"), "fixture-key");
+        env.settings_service = Arc::new(MockSettingsService {
+            settings: std::sync::RwLock::new(std::collections::HashMap::from([(
+                AI_PROVIDER_SETTINGS_KEY.to_string(),
+                settings.to_string(),
+            )])),
+        });
+        let service = ChatService::new(Arc::new(env), ChatConfig::default());
+        let mut stream = service
+            .send_message(SendMessageRequest {
+                content: "Hello".into(),
+                config: Some(ChatModelConfig {
+                    provider: Some(provider.into()),
+                    model: Some(model.into()),
+                    thinking: Some(thinking),
+                }),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while let Some(event) = stream.next().await {
+                if let AiStreamEvent::Error { message, .. } = event {
+                    panic!("chat failed: {message}");
+                }
+            }
+        })
+        .await
+        .unwrap();
+        let chats = server.await.unwrap();
+        assert_eq!(chats.len(), 1, "one chat request");
+        chats
+    }
+
+    #[tokio::test]
+    async fn chat_sends_adaptive_thinking_to_claude_5_and_drops_its_temperature() {
+        let chats = chat_through_service(
+            "anthropic",
+            "claude-opus-5-5",
+            true,
+            serde_json::json!({ "tuningOverrides": { "temperature": 0.5 } }),
+        )
+        .await;
+        let (line, body) = &chats[0];
+        assert!(line.starts_with("POST /v1/messages "), "{line}");
+        assert_eq!(
+            body["thinking"],
+            serde_json::json!({"type":"adaptive","display":"summarized"})
+        );
+        assert!(body.get("temperature").is_none());
+        assert_eq!(body["max_tokens"], serde_json::json!(32000));
+        assert!(!body["tools"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_keeps_a_user_temperature_where_claude_accepts_it() {
+        let chats = chat_through_service(
+            "anthropic",
+            "claude-sonnet-4-6",
+            false,
+            serde_json::json!({ "tuningOverrides": { "temperature": 0.5 } }),
+        )
+        .await;
+        let body = &chats[0].1;
+        assert!(body.get("thinking").is_none());
+        assert_eq!(body["temperature"], serde_json::json!(0.5));
+        assert_eq!(body["max_tokens"], serde_json::json!(16384));
+    }
+
+    #[tokio::test]
+    async fn chat_sends_a_thinking_level_to_gemini_3_with_catalog_options() {
+        let chats =
+            chat_through_service("google", "gemini-3.8-flash", true, serde_json::json!({})).await;
+        let (line, body) = &chats[0];
+        assert!(
+            line.contains("/models/gemini-3.8-flash:streamGenerateContent"),
+            "{line}"
+        );
+        let config = &body["generationConfig"];
+        assert_eq!(
+            config["thinkingConfig"],
+            serde_json::json!({"thinkingLevel":"high","includeThoughts":true})
+        );
+        assert!(config.get("temperature").is_none());
+        assert_eq!(body["safetySettings"].as_array().unwrap().len(), 4);
+    }
+
+    #[tokio::test]
+    async fn chat_keeps_the_budget_and_temperature_for_gemini_2_5() {
+        let chats =
+            chat_through_service("google", "gemini-2.5-flash", true, serde_json::json!({})).await;
+        let config = &chats[0].1["generationConfig"];
+        assert_eq!(
+            config["thinkingConfig"],
+            serde_json::json!({"thinkingBudget":8192,"includeThoughts":true})
+        );
+        assert_eq!(config["temperature"], serde_json::json!(0.2));
+    }
+
+    #[tokio::test]
+    async fn chat_uses_chat_completions_for_an_openai_compatible_endpoint() {
+        let chats =
+            chat_through_service("openai", "gpt-6-astra", true, serde_json::json!({})).await;
+        let (line, body) = &chats[0];
+        assert!(line.starts_with("POST /v1/chat/completions "), "{line}");
+        assert!(body.get("temperature").is_none());
+        assert!(body.get("store").is_none());
+        assert!(!body["tools"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn gemini_3_sends_thinking_level_without_a_budget() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_rounds(
+            listener,
+            vec![
+                provider_fixture("gemini", true),
+                provider_fixture("gemini", false),
+            ],
+        ));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let params =
+            super::super::request_params::gemini_thinking_params("gemini-3.8-flash", true).unwrap();
+        let agent = create_gemini_client(Some("fixture-key".into()), "google", Some(url))
+            .unwrap()
+            .agent("gemini-3.8-flash")
+            .additional_params(params)
+            .dynamic_tools(vec![echo_tool(calls.clone())])
+            .build();
+        assert_eq!(run_echo_agent(agent, "google").await, "Complete");
+        let requests = server.await.unwrap();
+        for (_, body) in &requests {
+            assert_eq!(
+                body["generationConfig"]["thinkingConfig"],
+                serde_json::json!({"thinkingLevel":"high","includeThoughts":true})
+            );
+            assert!(body["generationConfig"].get("temperature").is_none());
+        }
+        assert!(requests[1].1.to_string().contains("fixture-signature"));
+    }
+
+    #[tokio::test]
+    async fn anthropic_adaptive_thinking_replays_signature_only_blocks() {
+        use serde_json::json;
+        // Claude 4.7 and later stream thinking blocks with empty text unless
+        // `display` asks for a summary; the signature alone must go back with
+        // the tool result.
+        let event = |v: serde_json::Value| format!("data: {v}\n\n");
+        let message = |stop: &str, blocks: Vec<serde_json::Value>| {
+            let mut body = event(json!({"type":"message_start","message":{"id":"msg_fixture",
+                "type":"message","role":"assistant","model":"claude-opus-5-5","content":[],
+                "stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":0}}}));
+            for block in blocks {
+                body += &event(block);
+            }
+            body += &event(json!({"type":"message_delta","delta":{"stop_reason":stop,
+                "stop_sequence":null},"usage":{"output_tokens":1}}));
+            body + &event(json!({"type":"message_stop"}))
+        };
+        let tool_round = message(
+            "tool_use",
+            vec![
+                json!({"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}),
+                json!({"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"sig-adaptive"}}),
+                json!({"type":"content_block_stop","index":0}),
+                json!({"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_fixture","name":"echo","input":{}}}),
+                json!({"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"value\":\"fixture\"}"}}),
+                json!({"type":"content_block_stop","index":1}),
+            ],
+        );
+        let answer_round = message(
+            "end_turn",
+            vec![
+                json!({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}),
+                json!({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Complete"}}),
+                json!({"type":"content_block_stop","index":0}),
+            ],
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_rounds(listener, vec![tool_round, answer_round]));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let params =
+            super::super::request_params::anthropic_thinking_params("claude-opus-5-5", true)
+                .unwrap();
+        let agent = create_anthropic_client(Some("fixture-key".into()), "anthropic", Some(url))
+            .unwrap()
+            .agent("claude-opus-5-5")
+            .max_tokens(1024)
+            .additional_params(params)
+            .dynamic_tools(vec![echo_tool(calls.clone())])
+            .build();
+        let text = run_echo_agent(agent, "anthropic").await;
+        let requests = server.await.unwrap();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(text, "Complete");
+        for (_, body) in &requests {
+            assert_eq!(
+                body["thinking"],
+                json!({"type":"adaptive","display":"summarized"})
+            );
+            assert!(body.get("temperature").is_none());
+            assert!(body.get("output_config").is_none());
+        }
+        let messages = requests[1].1["messages"].as_array().unwrap();
+        let assistant = messages
+            .iter()
+            .find(|m| m["role"] == "assistant")
+            .expect("assistant turn is replayed");
+        let content = assistant["content"].as_array().unwrap();
+        assert_eq!(content[0]["type"], json!("thinking"));
+        assert_eq!(content[0]["signature"], json!("sig-adaptive"));
+        assert_eq!(content[0]["thinking"], json!(""));
+        assert_eq!(content[1]["type"], json!("tool_use"));
+        assert!(messages.last().unwrap()["content"]
+            .to_string()
+            .contains("toolu_fixture"));
+    }
+    /// One real chat through `ChatService` with tools, on the provider's own
+    /// endpoint. The key is read from `WF_LIVE_API_KEY` and never printed.
+    #[tokio::test]
+    #[ignore = "calls a real provider: set WF_LIVE_PROVIDER, WF_LIVE_MODEL and WF_LIVE_API_KEY"]
+    async fn live_chat_calls_a_tool_through_the_service() {
+        use crate::chat::{ChatConfig, ChatService};
+        use crate::env::test_env::MockEnvironment;
+        use crate::types::{AiStreamEvent, ChatModelConfig, SendMessageRequest};
+
+        let provider = std::env::var("WF_LIVE_PROVIDER").expect("set WF_LIVE_PROVIDER");
+        let model = std::env::var("WF_LIVE_MODEL").expect("set WF_LIVE_MODEL");
+        let key = std::env::var("WF_LIVE_API_KEY").expect("set WF_LIVE_API_KEY");
+        let thinking = std::env::var("WF_LIVE_THINKING").map_or(true, |v| v != "false");
+        let env = MockEnvironment::new().with_secret(&format!("ai_{provider}"), &key);
+        let service = ChatService::new(Arc::new(env), ChatConfig::default());
+        let mut stream = service
+            .send_message(SendMessageRequest {
+                content: "Show me my holdings.".into(),
+                config: Some(ChatModelConfig {
+                    provider: Some(provider.clone()),
+                    model: Some(model.clone()),
+                    thinking: Some(thinking),
+                }),
+                ..Default::default()
+            })
+            .await
+            .expect("send_message");
+
+        let (mut tools, mut results, mut reasoning, mut text) = (Vec::new(), 0, 0, 0);
+        tokio::time::timeout(Duration::from_secs(300), async {
+            while let Some(event) = stream.next().await {
+                match event {
+                    AiStreamEvent::ToolCall { tool_call, .. } => tools.push(tool_call.name),
+                    AiStreamEvent::ToolResult { result, .. } if result.success => results += 1,
+                    AiStreamEvent::ReasoningDelta { delta, .. } => reasoning += delta.len(),
+                    AiStreamEvent::TextDelta { delta, .. } => text += delta.len(),
+                    AiStreamEvent::Error { code, message, .. } => {
+                        panic!("{provider}/{model} thinking={thinking}: {code}: {message}")
+                    }
+                    _ => {}
+                }
+            }
+        })
+        .await
+        .expect("live chat must finish within 300 seconds");
+        println!(
+            "{provider}/{model} thinking={thinking}: tools={tools:?} results={results} reasoning_chars={reasoning} text_chars={text}"
+        );
+        assert!(tools.iter().any(|name| name == "get_holdings"), "{tools:?}");
+        assert!(results > 0, "a tool result reached the model");
+        assert!(text > 0, "the model answered after the tool result");
+    }
+
     #[tokio::test]
     #[ignore = "requires a running Ollama and WF_TEST_OLLAMA_MODEL"]
     async fn live_ollama_streams_and_executes_tool() {

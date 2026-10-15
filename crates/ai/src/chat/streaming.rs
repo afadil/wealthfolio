@@ -27,6 +27,7 @@ use tokio::sync::mpsc;
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
+use crate::provider_urls::is_openai_platform_url;
 use crate::providers::ProviderService;
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::ToolSet;
@@ -38,10 +39,14 @@ use crate::types::{
 use super::history::build_user_prompt;
 use super::provider_clients::{
     create_anthropic_client, create_gemini_client, create_groq_client, create_ollama_client,
-    create_openai_client, create_openrouter_client, remap_provider_error,
-    validate_ollama_model_if_possible,
+    create_openai_client, create_openai_responses_client, create_openrouter_client,
+    remap_provider_error, validate_ollama_model_if_possible,
 };
 use super::redact_tool_arguments_for_persistence;
+use super::request_params::{
+    anthropic_thinking_params, effective_temperature, gemini_thinking_params,
+    openai_responses_params,
+};
 use super::working_context::{user_time_context, ChatWorkingContext};
 
 // ============================================================================
@@ -264,12 +269,18 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Drives temperature, max_tokens, and provider-specific extra_options for
     // every builder path below.
     let resolved_tuning = provider_service.get_resolved_tuning(&provider_id);
+    let temperature = effective_temperature(
+        &provider_id,
+        &model_id,
+        capabilities.thinking,
+        resolved_tuning.temperature,
+    );
 
     // Merge catalog's extra_options with per-call thinking params. The thinking
-    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking.budget_tokens`,
-    // Gemini's `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`,
-    // OpenAI's `reasoning_effort`) that can't live in the JSON catalog because
-    // they're dynamic per-capability. Catalog holds the rest
+    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking`, Gemini's
+    // `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`, OpenAI's
+    // `reasoning`) that can't live in the JSON catalog because they depend on
+    // the model and the thinking toggle. Catalog holds the rest
     // (Ollama's `num_ctx`/`repeat_penalty`, Gemini's `safetySettings`).
     fn merge_json_into(dest: &mut serde_json::Value, src: serde_json::Value) {
         match (dest, src) {
@@ -349,10 +360,9 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 builder = builder.tool(tool_set.import_csv);
             }
 
-            // Temperature from resolved tuning. Providers that shouldn't set
-            // temperature (e.g. Anthropic, per their own guidance) simply omit
-            // it from the catalog.
-            if let Some(temp) = resolved_tuning.temperature {
+            // Temperature from resolved tuning, dropped for models that
+            // reject sampling parameters.
+            if let Some(temp) = temperature {
                 builder = builder.temperature(temp);
             }
 
@@ -388,7 +398,7 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let mut builder = $client.agent(&model_id).preamble(&preamble);
 
-            if let Some(temp) = resolved_tuning.temperature {
+            if let Some(temp) = temperature {
                 builder = builder.temperature(temp);
             }
 
@@ -416,9 +426,7 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // - Groq: GroqAdditionalParameters with reasoning_format OR include_reasoning (mutually exclusive!)
     //   Note: gpt-oss models don't support reasoning_format - they include reasoning by default
     // - Ollama: Raw JSON with think: true/false
-    // - Gemini: GenerationConfig with ThinkingConfig
-    // - Anthropic: Raw JSON (no native rig-core struct)
-    // - OpenAI: Raw JSON (Reasoning struct is for responses_api only)
+    // - Gemini, Anthropic, OpenAI: per-model shapes from `request_params`
     let is_groq_gpt_oss = model_id.contains("gpt-oss");
 
     // Groq params: reasoning_format and include_reasoning are MUTUALLY EXCLUSIVE
@@ -465,22 +473,17 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         "think": capabilities.thinking,
     }));
 
-    // Anthropic: extended thinking with budget_tokens
-    // Only enable thinking when capabilities.thinking is true
-    let anthropic_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
-        Some(serde_json::json!({
-            "thinking": {
-                "type": "enabled",
-                "budget_tokens": 8000
-            }
-        }))
-    } else {
-        None
-    };
+    // Anthropic: adaptive thinking or a budget, by model generation.
+    let anthropic_thinking_params = anthropic_thinking_params(&model_id, capabilities.thinking);
 
-    // OpenAI: reasoning_effort for o1/o3 models
-    // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
-    // in multi-turn conversations. Only enable reasoning when NOT using tools.
+    // OpenAI: the Responses API carries reasoning between tool calls, so
+    // reasoning stays on with tools.
+    let uses_openai_platform = is_openai_platform_url(provider_url.as_deref());
+    let openai_params = openai_responses_params(&model_id, capabilities.thinking);
+
+    // OpenAI-compatible custom endpoints (Chat Completions): reasoning with tool
+    // calls causes "reasoning item without required following item" errors in
+    // multi-turn conversations. Only enable reasoning when NOT using tools.
     // See: https://community.openai.com/t/error-badrequesterror-400-item-of-type-reasoning-was-provided-without-its-required-following-item/1303809
     let openai_thinking_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
         Some(serde_json::json!({
@@ -490,25 +493,8 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None // Don't send reasoning_effort when thinking disabled
     };
 
-    // Gemini: Only pass thinking_config to avoid sending unsupported fields.
-    // The full GenerationConfig struct includes fields (temperature, maxOutputTokens)
-    // that may not be accepted by all Gemini API versions/models.
-    let gemini_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
-        // Enable thinking with a reasonable budget.
-        // Must be nested inside generationConfig to match rig's AdditionalParameters struct
-        // which deserializes "generationConfig" into GenerationConfig (has thinkingConfig field).
-        Some(serde_json::json!({
-            "generationConfig": {
-                "thinkingConfig": {
-                    "thinkingBudget": 8192,
-                    "includeThoughts": true
-                }
-            }
-        }))
-    } else {
-        // Don't send thinking_config at all when disabled - simpler and avoids API issues
-        None
-    };
+    // Gemini: a thinking level on Gemini 3, a budget on 2.5.
+    let gemini_thinking_params = gemini_thinking_params(&model_id, capabilities.thinking);
 
     // Route to provider with tool support check
     if capabilities.tools {
@@ -529,8 +515,14 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 let client = create_ollama_client(provider_url)?;
                 build_with_tools_and_stream!(client, ollama_thinking_params.clone())
             }
+            "openai" if uses_openai_platform => {
+                let client = create_openai_responses_client(api_key, &provider_id, provider_url)?;
+                build_with_tools_and_stream!(client, Some(openai_params.clone()))
+            }
             "openai" => {
-                // Don't pass reasoning params with tools - causes multi-turn errors
+                // OpenAI-compatible custom endpoint on Chat Completions. Don't
+                // pass reasoning params with tools - Chat Completions rejects
+                // reasoning items in multi-turn tool calls.
                 let client = create_openai_client(api_key, &provider_id, provider_url)?;
                 build_with_tools_and_stream!(client, None::<serde_json::Value>)
             }
@@ -560,6 +552,10 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
                 build_without_tools_and_stream!(client, ollama_thinking_params.clone())
+            }
+            "openai" if uses_openai_platform => {
+                let client = create_openai_responses_client(api_key, &provider_id, provider_url)?;
+                build_without_tools_and_stream!(client, Some(openai_params.clone()))
             }
             "openai" => {
                 // Reasoning params OK without tools

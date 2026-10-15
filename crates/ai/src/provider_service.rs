@@ -8,6 +8,7 @@ use wealthfolio_core::errors::{Result, ValidationError};
 use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_core::settings::SettingsRepositoryTrait;
 
+use crate::model_families::{default_capabilities, non_catalog_capabilities};
 use crate::provider_model::{
     default_priority, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
     ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
@@ -269,12 +270,7 @@ impl AiProviderServiceTrait for AiProviderService {
 
                 for model_id in non_catalog_model_ids {
                     let has_overrides = user.model_capability_overrides.contains_key(&model_id);
-                    let base_capabilities = ModelCapabilities {
-                        tools: false,
-                        thinking: false,
-                        vision: false,
-                        streaming: true,
-                    };
+                    let base_capabilities = non_catalog_capabilities(id, &model_id, has_overrides);
                     let capabilities =
                         if let Some(overrides) = user.model_capability_overrides.get(&model_id) {
                             Self::apply_capability_overrides(&base_capabilities, overrides)
@@ -581,134 +577,417 @@ impl AiProviderServiceTrait for AiProviderService {
             });
         }
 
-        // Parse response based on provider format
-        let models = match provider_id {
-            "anthropic" => {
-                // Anthropic format: { "data": [{ "id": "claude-...", "display_name": "Claude ..." }] }
-                #[derive(serde::Deserialize)]
-                struct AnthropicResponse {
-                    data: Vec<AnthropicModel>,
-                }
-                #[derive(serde::Deserialize)]
-                struct AnthropicModel {
-                    id: String,
-                    display_name: Option<String>,
-                }
-
-                let resp: AnthropicResponse =
-                    response
-                        .json()
-                        .await
-                        .map_err(|e| ProviderApiError::ProviderError {
-                            message: format!("Failed to parse Anthropic response: {}", e),
-                        })?;
-
-                resp.data
-                    .into_iter()
-                    .map(|m| FetchedModel {
-                        id: m.id,
-                        name: m.display_name,
-                    })
-                    .collect()
-            }
-            "ollama" => {
-                // Ollama format: { "models": [{ "name": "llama3.2", ... }] }
-                #[derive(serde::Deserialize)]
-                struct OllamaResponse {
-                    models: Vec<OllamaModel>,
-                }
-                #[derive(serde::Deserialize)]
-                struct OllamaModel {
-                    name: String,
-                }
-
-                let resp: OllamaResponse =
-                    response
-                        .json()
-                        .await
-                        .map_err(|e| ProviderApiError::ProviderError {
-                            message: format!("Failed to parse Ollama response: {}", e),
-                        })?;
-
-                resp.models
-                    .into_iter()
-                    .map(|m| FetchedModel {
-                        id: m.name.clone(),
-                        name: Some(m.name),
-                    })
-                    .collect()
-            }
-            "google" => {
-                // Google format: { "models": [{ "name": "models/gemini-pro", ... }] }
-                #[derive(serde::Deserialize)]
-                struct GoogleResponse {
-                    models: Vec<GoogleModel>,
-                }
-                #[derive(serde::Deserialize)]
-                #[serde(rename_all = "camelCase")]
-                struct GoogleModel {
-                    name: String,
-                    display_name: Option<String>,
-                }
-
-                let resp: GoogleResponse =
-                    response
-                        .json()
-                        .await
-                        .map_err(|e| ProviderApiError::ProviderError {
-                            message: format!("Failed to parse Google response: {}", e),
-                        })?;
-
-                resp.models
-                    .into_iter()
-                    .filter(|m| m.name.contains("gemini"))
-                    .map(|m| {
-                        // Google returns "models/gemini-pro", we want just "gemini-pro"
-                        let id = m
-                            .name
-                            .strip_prefix("models/")
-                            .unwrap_or(&m.name)
-                            .to_string();
-                        FetchedModel {
-                            id,
-                            name: m.display_name,
-                        }
-                    })
-                    .collect()
-            }
-            // OpenAI-compatible format: OpenAI, Groq, OpenRouter
-            _ => {
-                // OpenAI format: { "data": [{ "id": "gpt-4", ... }] }
-                #[derive(serde::Deserialize)]
-                struct OpenAIResponse {
-                    data: Vec<OpenAIModel>,
-                }
-                #[derive(serde::Deserialize)]
-                struct OpenAIModel {
-                    id: String,
-                }
-
-                let resp: OpenAIResponse =
-                    response
-                        .json()
-                        .await
-                        .map_err(|e| ProviderApiError::ProviderError {
-                            message: format!("Failed to parse provider response: {}", e),
-                        })?;
-
-                resp.data
-                    .into_iter()
-                    .map(|m| FetchedModel {
-                        id: m.id.clone(),
-                        name: Some(m.id),
-                    })
-                    .collect()
-            }
-        };
+        let body = response
+            .text()
+            .await
+            .map_err(|e| ProviderApiError::ProviderError {
+                message: format!("Failed to read provider response: {}", e),
+            })?;
+        let models = parse_fetched_models(provider_id, &body)?;
 
         Ok(ListModelsResponse {
             models,
             supports_listing: true,
         })
+    }
+}
+
+/// Parse a provider's model list. Capabilities come from the metadata the
+/// list already carries (Anthropic `capabilities`, Gemini
+/// `supportedGenerationMethods`/`thinking`, OpenRouter `supported_parameters`,
+/// Ollama `capabilities`), falling back to the provider's defaults for models
+/// it doesn't describe.
+fn parse_fetched_models(
+    provider_id: &str,
+    body: &str,
+) -> std::result::Result<Vec<FetchedModel>, ProviderApiError> {
+    use serde_json::Value;
+
+    fn parse<T: serde::de::DeserializeOwned>(
+        body: &str,
+        provider_name: &str,
+    ) -> std::result::Result<T, ProviderApiError> {
+        serde_json::from_str(body).map_err(|e| ProviderApiError::ProviderError {
+            message: format!("Failed to parse {} response: {}", provider_name, e),
+        })
+    }
+
+    /// Anthropic reports `{"supported": bool}` at each capability leaf.
+    fn supported(capabilities: &Value, key: &str) -> Option<bool> {
+        capabilities.get(key)?.get("supported")?.as_bool()
+    }
+
+    let models = match provider_id {
+        "anthropic" => {
+            // Anthropic format: { "data": [{ "id": "claude-...", "display_name": "Claude ...",
+            // "capabilities": { "image_input": { "supported": true }, "thinking": { ... } } }] }
+            #[derive(serde::Deserialize)]
+            struct AnthropicResponse {
+                data: Vec<AnthropicModel>,
+            }
+            #[derive(serde::Deserialize)]
+            struct AnthropicModel {
+                id: String,
+                display_name: Option<String>,
+                #[serde(default)]
+                capabilities: Option<Value>,
+            }
+
+            let resp: AnthropicResponse = parse(body, "Anthropic")?;
+            resp.data
+                .into_iter()
+                .map(|m| {
+                    let mut capabilities = default_capabilities(provider_id, &m.id);
+                    if let Some(reported) = &m.capabilities {
+                        if let Some(vision) = supported(reported, "image_input") {
+                            capabilities.vision = vision;
+                        }
+                        if let Some(thinking) = supported(reported, "thinking") {
+                            capabilities.thinking = thinking;
+                        }
+                    }
+                    FetchedModel {
+                        id: m.id,
+                        name: m.display_name,
+                        capabilities: Some(capabilities),
+                    }
+                })
+                .collect()
+        }
+        "ollama" => {
+            // Ollama format: { "models": [{ "name": "llama3.2", "capabilities": ["tools"], ... }] }
+            #[derive(serde::Deserialize)]
+            struct OllamaResponse {
+                models: Vec<OllamaModel>,
+            }
+            #[derive(serde::Deserialize)]
+            struct OllamaModel {
+                name: String,
+                #[serde(default)]
+                capabilities: Option<Vec<String>>,
+            }
+
+            let resp: OllamaResponse = parse(body, "Ollama")?;
+            resp.models
+                .into_iter()
+                .map(|m| {
+                    let capabilities = m.capabilities.map(|reported| {
+                        let has = |c: &str| reported.iter().any(|r| r == c);
+                        ModelCapabilities {
+                            tools: has("tools"),
+                            thinking: has("thinking"),
+                            vision: has("vision"),
+                            streaming: true,
+                        }
+                    });
+                    FetchedModel {
+                        id: m.name.clone(),
+                        name: Some(m.name),
+                        capabilities,
+                    }
+                })
+                .collect()
+        }
+        "google" => {
+            // Google format: { "models": [{ "name": "models/gemini-pro",
+            // "supportedGenerationMethods": ["generateContent"], "thinking": true, ... }] }
+            #[derive(serde::Deserialize)]
+            struct GoogleResponse {
+                models: Vec<GoogleModel>,
+            }
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct GoogleModel {
+                name: String,
+                display_name: Option<String>,
+                #[serde(default)]
+                supported_generation_methods: Vec<String>,
+                #[serde(default)]
+                thinking: Option<bool>,
+            }
+
+            let resp: GoogleResponse = parse(body, "Google")?;
+            resp.models
+                .into_iter()
+                .filter(|m| m.name.contains("gemini"))
+                .map(|m| {
+                    // Google returns "models/gemini-pro", we want just "gemini-pro"
+                    let id = m
+                        .name
+                        .strip_prefix("models/")
+                        .unwrap_or(&m.name)
+                        .to_string();
+                    let mut capabilities = default_capabilities(provider_id, &id);
+                    let generates_content = m.supported_generation_methods.is_empty()
+                        || m.supported_generation_methods
+                            .iter()
+                            .any(|method| method == "generateContent");
+                    if !generates_content {
+                        capabilities.tools = false;
+                        capabilities.thinking = false;
+                        capabilities.vision = false;
+                    } else if let Some(thinking) = m.thinking {
+                        capabilities.thinking = thinking;
+                    }
+                    FetchedModel {
+                        id,
+                        name: m.display_name,
+                        capabilities: Some(capabilities),
+                    }
+                })
+                .collect()
+        }
+        "openrouter" => {
+            // OpenRouter format: { "data": [{ "id": "vendor/model", "supported_parameters": ["tools"],
+            // "architecture": { "input_modalities": ["text", "image"] } }] }
+            #[derive(serde::Deserialize)]
+            struct OpenRouterResponse {
+                data: Vec<OpenRouterModel>,
+            }
+            #[derive(serde::Deserialize)]
+            struct OpenRouterModel {
+                id: String,
+                #[serde(default)]
+                supported_parameters: Option<Vec<String>>,
+                #[serde(default)]
+                architecture: Option<OpenRouterArchitecture>,
+            }
+            #[derive(serde::Deserialize)]
+            struct OpenRouterArchitecture {
+                #[serde(default)]
+                input_modalities: Vec<String>,
+            }
+
+            let resp: OpenRouterResponse = parse(body, "provider")?;
+            resp.data
+                .into_iter()
+                .map(|m| {
+                    let capabilities = m.supported_parameters.map(|parameters| {
+                        let has = |p: &str| parameters.iter().any(|param| param == p);
+                        ModelCapabilities {
+                            tools: has("tools"),
+                            thinking: has("reasoning"),
+                            vision: m.architecture.as_ref().is_some_and(|a| {
+                                a.input_modalities.iter().any(|input| input == "image")
+                            }),
+                            streaming: true,
+                        }
+                    });
+                    FetchedModel {
+                        id: m.id.clone(),
+                        name: Some(m.id),
+                        capabilities,
+                    }
+                })
+                .collect()
+        }
+        // OpenAI-compatible format: OpenAI, Groq
+        _ => {
+            // OpenAI format: { "data": [{ "id": "gpt-4", ... }] }
+            #[derive(serde::Deserialize)]
+            struct OpenAIResponse {
+                data: Vec<OpenAIModel>,
+            }
+            #[derive(serde::Deserialize)]
+            struct OpenAIModel {
+                id: String,
+            }
+
+            let resp: OpenAIResponse = parse(body, "provider")?;
+            resp.data
+                .into_iter()
+                .map(|m| {
+                    // The list carries no capability metadata; only OpenAI's
+                    // own models have useful defaults.
+                    let capabilities =
+                        (provider_id == "openai").then(|| default_capabilities(provider_id, &m.id));
+                    FetchedModel {
+                        id: m.id.clone(),
+                        name: Some(m.id),
+                        capabilities,
+                    }
+                })
+                .collect()
+        }
+    };
+    Ok(models)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn caps(models: &[FetchedModel], id: &str) -> Option<(bool, bool, bool)> {
+        let model = models.iter().find(|m| m.id == id).expect(id);
+        model
+            .capabilities
+            .as_ref()
+            .map(|c| (c.tools, c.thinking, c.vision))
+    }
+
+    #[test]
+    fn anthropic_list_reads_reported_capabilities() {
+        let body = json!({ "data": [
+            { "id": "claude-opus-5-5", "display_name": "Claude Opus 5.5", "capabilities": {
+                "image_input": { "supported": true },
+                "thinking": { "supported": true, "types": {
+                    "enabled": { "supported": false }, "adaptive": { "supported": true } } }
+            } },
+            { "id": "claude-text-only", "capabilities": {
+                "image_input": { "supported": false }, "thinking": { "supported": false }
+            } },
+            { "id": "claude-sonnet-4-6" }
+        ] })
+        .to_string();
+        let models = parse_fetched_models("anthropic", &body).unwrap();
+        assert_eq!(caps(&models, "claude-opus-5-5"), Some((true, true, true)));
+        assert_eq!(
+            caps(&models, "claude-text-only"),
+            Some((true, false, false))
+        );
+        assert_eq!(caps(&models, "claude-sonnet-4-6"), Some((true, true, true)));
+        assert_eq!(models[0].name.as_deref(), Some("Claude Opus 5.5"));
+    }
+
+    #[test]
+    fn google_list_reads_thinking_and_skips_tools_for_non_chat_models() {
+        let body = json!({ "models": [
+            { "name": "models/gemini-3-flash-preview", "displayName": "Gemini 3 Flash",
+              "supportedGenerationMethods": ["generateContent", "countTokens"], "thinking": true },
+            { "name": "models/gemini-2.0-flash",
+              "supportedGenerationMethods": ["generateContent"], "thinking": false },
+            { "name": "models/gemini-embedding-001",
+              "supportedGenerationMethods": ["embedContent"] },
+            { "name": "models/imagen-4.0-generate-001",
+              "supportedGenerationMethods": ["predict"] }
+        ] })
+        .to_string();
+        let models = parse_fetched_models("google", &body).unwrap();
+        assert_eq!(models.len(), 3, "non-Gemini models stay filtered out");
+        assert_eq!(
+            caps(&models, "gemini-3-flash-preview"),
+            Some((true, true, true))
+        );
+        assert_eq!(caps(&models, "gemini-2.0-flash"), Some((true, false, true)));
+        assert_eq!(
+            caps(&models, "gemini-embedding-001"),
+            Some((false, false, false))
+        );
+    }
+
+    #[test]
+    fn openrouter_list_reads_supported_parameters_and_modalities() {
+        let body = json!({ "data": [
+            { "id": "anthropic/claude-opus-5-5", "name": "Anthropic: Claude Opus 5.5",
+              "supported_parameters": ["tools", "tool_choice", "reasoning", "max_tokens"],
+              "architecture": { "input_modalities": ["text", "image", "file"] } },
+            { "id": "some/text-model", "supported_parameters": ["max_tokens", "temperature"],
+              "architecture": { "input_modalities": ["text"] } },
+            { "id": "legacy/no-metadata" }
+        ] })
+        .to_string();
+        let models = parse_fetched_models("openrouter", &body).unwrap();
+        assert_eq!(
+            caps(&models, "anthropic/claude-opus-5-5"),
+            Some((true, true, true))
+        );
+        assert_eq!(
+            caps(&models, "some/text-model"),
+            Some((false, false, false))
+        );
+        assert_eq!(caps(&models, "legacy/no-metadata"), None);
+        assert_eq!(
+            models[0].name.as_deref(),
+            Some("anthropic/claude-opus-5-5"),
+            "display names stay the model IDs"
+        );
+    }
+
+    #[test]
+    fn ollama_list_reads_capabilities_when_present() {
+        let body = json!({ "models": [
+            { "name": "qwen3.5:9b", "capabilities": ["completion", "tools", "thinking", "vision"] },
+            { "name": "deepseek-r1:8b", "capabilities": ["completion", "thinking"] },
+            { "name": "old-ollama:latest" }
+        ] })
+        .to_string();
+        let models = parse_fetched_models("ollama", &body).unwrap();
+        assert_eq!(caps(&models, "qwen3.5:9b"), Some((true, true, true)));
+        assert_eq!(caps(&models, "deepseek-r1:8b"), Some((false, true, false)));
+        assert_eq!(caps(&models, "old-ollama:latest"), None);
+    }
+
+    #[test]
+    fn openai_compatible_lists_use_defaults_only_for_openai() {
+        let body = json!({ "data": [{ "id": "gpt-6-astra" }, { "id": "text-embedding-3-large" }] })
+            .to_string();
+        let models = parse_fetched_models("openai", &body).unwrap();
+        assert_eq!(caps(&models, "gpt-6-astra"), Some((true, true, true)));
+        assert_eq!(
+            caps(&models, "text-embedding-3-large"),
+            Some((false, false, false))
+        );
+
+        let groq = parse_fetched_models("groq", &body).unwrap();
+        assert_eq!(caps(&groq, "gpt-6-astra"), None);
+    }
+
+    struct StoredSettings(String);
+
+    #[async_trait]
+    impl SettingsRepositoryTrait for StoredSettings {
+        fn get_settings(&self) -> Result<wealthfolio_core::settings::Settings> {
+            Ok(Default::default())
+        }
+        async fn update_settings(
+            &self,
+            _: &wealthfolio_core::settings::SettingsUpdate,
+        ) -> Result<()> {
+            Ok(())
+        }
+        fn get_setting(&self, _: &str) -> Result<String> {
+            Ok(self.0.clone())
+        }
+        async fn update_setting(&self, _: &str, _: &str) -> Result<()> {
+            Ok(())
+        }
+        fn get_distinct_currencies_excluding_base(&self, _: &str) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+    }
+
+    #[test]
+    fn settings_view_matches_runtime_defaults_and_overrides() {
+        let settings = json!({ "schemaVersion": 2, "providers": { "anthropic": {
+            "favoriteModels": ["claude-opus-4-8", "claude-partly-set"],
+            "modelCapabilityOverrides": { "claude-partly-set": { "tools": true } }
+        } } });
+        let service = AiProviderService::new(
+            Arc::new(StoredSettings(settings.to_string())),
+            Arc::new(crate::env::test_env::MockSecretStore::default()),
+            include_str!("ai_providers.json"),
+        )
+        .unwrap();
+        let providers = service.get_ai_providers().unwrap().providers;
+        let anthropic = providers.iter().find(|p| p.id == "anthropic").unwrap();
+        let caps = |id: &str| {
+            let model = anthropic.models.iter().find(|m| m.id == id).expect(id);
+            assert!(!model.is_catalog);
+            (
+                model.capabilities.tools,
+                model.capabilities.thinking,
+                model.capabilities.vision,
+            )
+        };
+        assert_eq!(caps("claude-opus-4-8"), (true, true, true));
+        assert_eq!(caps("claude-partly-set"), (true, false, false));
+    }
+
+    #[test]
+    fn unparseable_list_reports_the_provider() {
+        let error = parse_fetched_models("anthropic", "{}").unwrap_err();
+        assert!(matches!(error, ProviderApiError::ProviderError { message }
+            if message.starts_with("Failed to parse Anthropic response")));
     }
 }
