@@ -1645,6 +1645,13 @@ describe("activity-utils", () => {
         ["an orphan leg", [out]],
         ["one currency in one account", [out, { ...incoming, currency: "usd" }]],
         ["two outgoing legs", [out, { ...incoming, activityType: ActivityType.TRANSFER_OUT }]],
+        [
+          "a minor unit of the other leg's currency",
+          [
+            { ...out, currency: "GBP" },
+            { ...incoming, currency: "GBX" },
+          ],
+        ],
       ])("rejects %s", (_case, rows) => {
         expect(pairErrors(rows).map((error) => error.transactionId)).toEqual(
           rows.map((row) => row.id),
