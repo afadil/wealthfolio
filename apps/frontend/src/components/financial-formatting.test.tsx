@@ -23,6 +23,21 @@ describe("localized financial components", () => {
     expect(screen.getByText("+$1,234,567.89")).toBeInTheDocument();
   });
 
+  it("shows gain amounts with each currency's minor units", () => {
+    render(
+      <FormattingProvider locale="US" uiLocale="en">
+        <GainAmount value={1234} currency="JPY" />
+        <GainAmount value={1.2345} currency="KWD" />
+        <GainAmount value={0.004} currency="KWD" />
+        <GainAmount value={0.4} currency="JPY" displayCurrency={false} />
+      </FormattingProvider>,
+    );
+    expect(screen.getByText("+¥1,234")).toBeInTheDocument();
+    expect(screen.getByText("+KWD 1.235")).toBeInTheDocument();
+    expect(screen.getByText("+KWD 0.004")).toBeInTheDocument();
+    expect(screen.getByText("0").parentElement).toHaveClass("text-foreground");
+  });
+
   it("preserves locale percent spacing in the animated fallback", () => {
     const { container } = render(
       <FormattingProvider locale="FR" uiLocale="fr">

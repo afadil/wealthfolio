@@ -31,6 +31,7 @@ const Balance: React.FC<BalanceProps> = ({
 
   const { isBalanceHidden } = useBalancePrivacy();
   const validCurrency = isValidCurrencyCode(currency);
+  const fractionDigits = displayDecimal ? amountFormatting.currencyFractionDigits(currency) : 0;
 
   const currencySymbol = useMemo(() => {
     if (!validCurrency) return currency;
@@ -45,8 +46,8 @@ const Balance: React.FC<BalanceProps> = ({
       ...(useCurrencyStyle ? { currency, currencyDisplay: "narrowSymbol" as const } : {}),
       style: useCurrencyStyle ? "currency" : "decimal",
       notation: compact ? "compact" : "standard",
-      minimumFractionDigits: compact ? 0 : displayDecimal ? 2 : 0,
-      maximumFractionDigits: compact ? 1 : displayDecimal ? 2 : 0,
+      minimumFractionDigits: compact ? 0 : fractionDigits,
+      maximumFractionDigits: compact ? 1 : fractionDigits,
     }).format(targetValue);
   }, [
     currency,
@@ -54,7 +55,7 @@ const Balance: React.FC<BalanceProps> = ({
     locale,
     validCurrency,
     displayCurrency,
-    displayDecimal,
+    fractionDigits,
     compact,
     targetValue,
   ]);
@@ -99,8 +100,8 @@ const Balance: React.FC<BalanceProps> = ({
                 : {}),
               style: displayCurrency && validCurrency ? "currency" : "decimal",
               notation: compact ? ("compact" as const) : ("standard" as const),
-              minimumFractionDigits: compact ? 0 : displayDecimal ? 2 : 0,
-              maximumFractionDigits: compact ? 1 : displayDecimal ? 2 : 0,
+              minimumFractionDigits: compact ? 0 : fractionDigits,
+              maximumFractionDigits: compact ? 1 : fractionDigits,
             }}
           />
           <span className="sr-only" data-testid="portfolio-balance-value">
