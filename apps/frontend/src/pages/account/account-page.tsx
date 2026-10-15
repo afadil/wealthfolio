@@ -246,10 +246,11 @@ const AccountPage = () => {
     return account.trackingMode === "HOLDINGS";
   }, [account]);
 
-  // A cash or credit-card account reads like a statement: the balance after
-  // each row, while the list runs in date order.
+  // While the list runs in date order it reads like a statement: a cash or
+  // credit-card account shows the balance after each row, any other account
+  // its cash at the end of each day.
   const showsRunningBalance =
-    isCashOnlyAccount && !isHoldingsMode && (accountActivitiesSorting[0]?.id ?? "date") === "date";
+    !isHoldingsMode && (accountActivitiesSorting[0]?.id ?? "date") === "date";
 
   // Check if user can directly edit holdings (manual HOLDINGS-mode accounts only)
   const canEditHoldingsDirectly = useMemo(() => {

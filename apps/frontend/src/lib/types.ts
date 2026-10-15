@@ -268,13 +268,21 @@ export interface ActivityDetails {
   counterpartFxRate?: string | null;
   subRows?: ActivityDetails[];
   /**
-   * The account's cash after this row, in `cashBalanceCurrency`: only when the
-   * search asked for balances and the account is a cash or credit-card
-   * account that holds no securities.
+   * The account's cash in `cashBalanceCurrency`, as `cashBalanceScope` says:
+   * only when the search asked for balances and the account's holdings come
+   * from its activities.
    */
   cashBalance?: string | null;
   cashBalanceCurrency?: string | null;
+  cashBalanceScope?: CashBalanceScope | null;
 }
+
+/**
+ * What a row's `cashBalance` measures: the cash after the row (`ROW`, cash and
+ * credit-card accounts), or at the end of the row's day in the account
+ * currency (`DAY`, every posted row of that day carries it).
+ */
+export type CashBalanceScope = "ROW" | "DAY";
 
 export interface ActivitySearchResponse {
   data: ActivityDetails[];

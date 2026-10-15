@@ -38,12 +38,18 @@ pub fn application_order(a: &Activity, b: &Activity) -> Ordering {
         .then_with(|| a.id.cmp(&b.id))
 }
 
+/// Accounts whose cash comes from their activities: all but holdings-tracked
+/// ones, whose holdings are entered rather than derived.
+pub fn shows_cash_balance(account: &Account) -> bool {
+    account.tracking_mode != TrackingMode::Holdings
+}
+
 /// Cash and credit-card accounts whose cash comes from their activities.
 pub fn shows_running_cash_balance(account: &Account) -> bool {
     matches!(
         account.account_type.as_str(),
         account_types::CASH | account_types::CREDIT_CARD
-    ) && account.tracking_mode != TrackingMode::Holdings
+    ) && shows_cash_balance(account)
 }
 
 /// The balance after each of `account`'s posted activities, by activity id, or

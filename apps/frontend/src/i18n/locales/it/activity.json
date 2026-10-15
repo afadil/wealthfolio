@@ -245,6 +245,7 @@
   "table_fee": "Commissione",
   "table_total": "Totale",
   "table_balance": "Saldo",
+  "table_day_end_balance": "Saldo di fine giornata",
   "table_account": "Conto",
   "table_currency": "Valuta",
   "table_comment": "Commento",

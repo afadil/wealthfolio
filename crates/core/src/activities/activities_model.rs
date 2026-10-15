@@ -987,6 +987,17 @@ pub struct ActivityBulkIdentifierMapping {
     pub activity_id: String,
 }
 
+/// What a row's `cash_balance` measures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CashBalanceScope {
+    /// The account's cash in the row's currency after this row.
+    Row,
+    /// The account's cash at the end of the row's day, in the account
+    /// currency: the same figure as that day's valuation.
+    Day,
+}
+
 /// Model for activity details including related data
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -1027,13 +1038,13 @@ pub struct ActivityDetails {
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,
     pub metadata: Option<Value>,
-    /// The cash of the row's account after this row, in
-    /// `cash_balance_currency`: filled only when the search asked for
-    /// balances and the account is a cash or credit-card account holding no
-    /// securities. Serialized as null otherwise, so every export has the
-    /// columns.
+    /// The cash of the row's account, in `cash_balance_currency`, as
+    /// `cash_balance_scope` says: filled only when the search asked for
+    /// balances and the account's holdings come from its activities.
+    /// Serialized as null otherwise, so every export has the columns.
     pub cash_balance: Option<String>,
     pub cash_balance_currency: Option<String>,
+    pub cash_balance_scope: Option<CashBalanceScope>,
 }
 
 impl ActivityDetails {
