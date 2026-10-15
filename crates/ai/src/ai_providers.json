@@ -86,9 +86,6 @@
         },
         "openai/gpt-oss-120b": {
           "capabilities": { "tools": true, "thinking": true, "vision": false }
-        },
-        "moonshotai/kimi-k2-instruct-0905": {
-          "capabilities": { "tools": true, "thinking": false, "vision": false }
         }
       },
       "defaultModel": "openai/gpt-oss-120b",
@@ -127,18 +124,18 @@
         }
       ],
       "models": {
-        "gemini-3-flash-preview": {
+        "gemini-3.8-flash": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
-        "gemini-2.5-flash": {
+        "gemini-4-argon": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
-        "gemini-2.5-pro": {
+        "gemini-3.5-flash-lite": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         }
       },
-      "defaultModel": "gemini-2.5-flash",
-      "titleModelId": "gemini-2.5-flash",
+      "defaultModel": "gemini-3.8-flash",
+      "titleModelId": "gemini-3.5-flash-lite",
       "documentationUrl": "https://ai.google.dev/docs",
       "tuning": {
         "temperature": 0.2,
@@ -181,17 +178,20 @@
         }
       ],
       "models": {
-        "claude-sonnet-4-6": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        "claude-sonnet-5-5": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
+        "claude-opus-5-5": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
+        },
+        "claude-haiku-5-5": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
         "claude-haiku-4-5-20251001": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
-        },
-        "claude-opus-4-7": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         }
       },
-      "defaultModel": "claude-sonnet-4-6",
+      "defaultModel": "claude-sonnet-5-5",
       "titleModelId": "claude-haiku-4-5-20251001",
       "documentationUrl": "https://docs.anthropic.com/en/api/getting-started",
       "tuning": {
@@ -227,18 +227,18 @@
         }
       ],
       "models": {
-        "gpt-5.4": {
+        "gpt-6-astra": {
           "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
-        "gpt-5.4-mini": {
-          "capabilities": { "tools": true, "thinking": false, "vision": true }
+        "gpt-6.1-sol": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         },
-        "gpt-5.4-nano": {
-          "capabilities": { "tools": true, "thinking": false, "vision": false }
+        "gpt-6-luna": {
+          "capabilities": { "tools": true, "thinking": true, "vision": true }
         }
       },
-      "defaultModel": "gpt-5.4-mini",
-      "titleModelId": "gpt-5.4-nano",
+      "defaultModel": "gpt-6-astra",
+      "titleModelId": "gpt-6-luna",
       "documentationUrl": "https://platform.openai.com/docs/introduction",
       "tuning": {
         "temperature": 0.2,
