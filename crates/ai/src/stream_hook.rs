@@ -5,13 +5,13 @@
 //!
 //! 1. **Tool-call storms** — the model re-emits the same tool call dozens of
 //!    times per turn. Detected via a per-`(tool, args)` counter in
-//!    [`WealthfolioStreamHook::on_tool_call`]. Repeated calls are short-circuited
-//!    with `ToolCallAction::Skip(reason)` — which rig feeds back to the
+//!    [`WealthfolioStreamHook::on_dispatch`]. Repeated calls are short-circuited
+//!    with `DispatchAction::skip(reason)` — which rig feeds back to the
 //!    model as the tool result, so the model sees the cached data it already
 //!    received and a nudge to stop re-calling.
 //!
 //! 2. **Global runaway** — total tool calls across a turn can still blow up even
-//!    with dedup. Hard cap via `ToolCallAction::Stop` when over
+//!    with dedup. Hard cap via `DispatchAction::stop` when over
 //!    [`MAX_TOTAL_TOOL_CALLS`].
 //!
 //! 3. **Token-level repetition loops** — the model streams
@@ -28,10 +28,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use log::{debug, warn};
-use rig::agent::hook::{
-    AgentHook, CompletionCall, CompletionCallAction, HookContext, ObservationAction, RequestPatch,
-    TextDelta, ToolCall, ToolCallAction, ToolResultAction, ToolResultEvent,
+use rig::agent::{
+    AgentHook, CompletionCallAction, CompletionCallEvent, DispatchAction, DispatchEvent,
+    HookContext, ObservationAction, OutcomeAction, OutcomeEvent, RequestPatch, TextDelta,
 };
+use rig::completion::{Message, PromptError};
 
 /// Maximum distinct identical `(tool_name, args_json)` calls we'll execute.
 /// Beyond this count the hook returns a "stop calling this" skip. Two is
@@ -64,8 +65,8 @@ struct HookState {
     /// Per `(tool_name, args_json)` call counter.
     tool_call_counts: HashMap<String, usize>,
     /// Previously executed tool results, keyed the same way. Populated by
-    /// `on_tool_result` so that a `Skip` response can feed the real data back
-    /// to the model instead of a bare error.
+    /// `on_outcome` so that a skip can feed the real data back to the model
+    /// instead of a bare error.
     tool_result_cache: HashMap<String, String>,
     /// Total tool calls seen this stream.
     total_tool_calls: usize,
@@ -97,22 +98,45 @@ impl WealthfolioStreamHook {
             .unwrap_or(false)
     }
 
-    pub fn is_asset_selection_pause(&self, error: &rig::agent::StreamingError) -> bool {
+    pub fn is_asset_selection_pause(&self, error: &PromptError) -> bool {
         self.paused_for_asset_selection()
-            && matches!(error, rig::agent::StreamingError::Prompt(error)
-                if matches!(error.as_ref(), rig::completion::PromptError::PromptCancelled { reason, .. } if reason == ASSET_SELECTION_PAUSE))
+            && matches!(error, PromptError::Cancelled { reason, .. } if reason == ASSET_SELECTION_PAUSE)
     }
 
     fn key(tool_name: &str, args: &str) -> String {
-        format!("{}::{}", tool_name, args)
+        format!("{}::{}", tool_name, canonical_args(args))
     }
+}
+
+/// The arguments with object keys sorted at every level, so a call matches
+/// its repeats however the model ordered the keys. serde_json keeps insertion
+/// order in this build, because rig enables its `preserve_order` feature.
+fn canonical_args(args: &str) -> String {
+    fn sorted(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut entries: Vec<_> = map.into_iter().collect();
+                entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+                serde_json::Value::Object(
+                    entries.into_iter().map(|(k, v)| (k, sorted(v))).collect(),
+                )
+            }
+            serde_json::Value::Array(items) => {
+                serde_json::Value::Array(items.into_iter().map(sorted).collect())
+            }
+            other => other,
+        }
+    }
+    serde_json::from_str(args)
+        .map(|value| sorted(value).to_string())
+        .unwrap_or_else(|_| args.to_string())
 }
 
 impl AgentHook for WealthfolioStreamHook {
     async fn on_completion_call(
         &self,
         _ctx: &HookContext,
-        event: CompletionCall<'_>,
+        event: CompletionCallEvent<'_>,
     ) -> CompletionCallAction {
         if self.paused_for_asset_selection() {
             CompletionCallAction::Stop(ASSET_SELECTION_PAUSE.into())
@@ -121,13 +145,15 @@ impl AgentHook for WealthfolioStreamHook {
             // streamed reasoning in the UI, but omit it from provider requests.
             let mut history = event.history.to_vec();
             for message in &mut history {
-                if let rig::completion::Message::Assistant { content, .. } = message {
-                    content.retain(|part| {
+                if let Message::Assistant(assistant) = message {
+                    assistant.content.retain(|part| {
                         !matches!(part, rig::message::AssistantContent::Reasoning(_))
                     });
                 }
             }
-            history.retain(|message| !matches!(message, rig::completion::Message::Assistant { content, .. } if content.is_empty()));
+            history.retain(
+                |message| !matches!(message, Message::Assistant(assistant) if assistant.content.is_empty()),
+            );
             CompletionCallAction::Patch(RequestPatch {
                 history: Some(history),
                 ..Default::default()
@@ -137,20 +163,24 @@ impl AgentHook for WealthfolioStreamHook {
         }
     }
 
-    fn on_tool_call(
+    fn on_dispatch(
         &self,
         _ctx: &HookContext,
-        event: ToolCall<'_>,
-    ) -> impl std::future::Future<Output = ToolCallAction> + Send {
-        let tool_name = event.tool_name;
-        let args = event.args;
+        event: DispatchEvent<'_>,
+    ) -> impl std::future::Future<Output = DispatchAction> + Send {
+        let call = event
+            .tool_name()
+            .zip(event.tool_args())
+            .map(|(tool_name, args)| (tool_name.to_string(), args.to_string()));
         let state = self.state.clone();
-        let tool_name = tool_name.to_string();
-        let args = args.to_string();
         async move {
+            // Completions and other effects pass through.
+            let Some((tool_name, args)) = call else {
+                return DispatchAction::Proceed;
+            };
             let key = Self::key(&tool_name, &args);
             let Ok(mut state) = state.lock() else {
-                return ToolCallAction::Run;
+                return DispatchAction::Proceed;
             };
 
             state.total_tool_calls += 1;
@@ -159,7 +189,7 @@ impl AgentHook for WealthfolioStreamHook {
                     "Tool-call cap tripped: {} total calls this turn — terminating",
                     state.total_tool_calls
                 );
-                return ToolCallAction::stop(
+                return DispatchAction::stop(
                     "The model exceeded the tool-call limit for a single turn. \
                      Ending the run; ask the user to rephrase or switch to a more capable model.",
                 );
@@ -186,26 +216,31 @@ impl AgentHook for WealthfolioStreamHook {
                          you already have in the conversation."
                     ),
                 };
-                return ToolCallAction::skip(reason);
+                return DispatchAction::skip(reason);
             }
 
             debug!(
                 "Tool call allowed: {}({}) [hit {}/{}]",
                 tool_name, args, hits, MAX_DUPLICATE_CALLS
             );
-            ToolCallAction::Run
+            DispatchAction::Proceed
         }
     }
 
-    fn on_tool_result(
+    fn on_outcome(
         &self,
         _ctx: &HookContext,
-        event: ToolResultEvent<'_>,
-    ) -> impl std::future::Future<Output = ToolResultAction> + Send {
+        event: OutcomeEvent<'_>,
+    ) -> impl std::future::Future<Output = OutcomeAction> + Send {
         let state = self.state.clone();
-        let key = Self::key(event.tool_name, event.args);
-        let result = (!event.raw_result.is_skipped()).then(|| event.presentation.render());
-        let pause = event.tool_name == "prepare_asset_classification"
+        let tool_name = event.tool_name().unwrap_or_default();
+        let key = Self::key(tool_name, event.tool_args().unwrap_or_default());
+        // A skipped call has no result to cache.
+        let result = event
+            .tool_result()
+            .filter(|result| !result.is_skipped())
+            .map(|result| result.output().render());
+        let pause = tool_name == "prepare_asset_classification"
             && result
                 .as_deref()
                 .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
@@ -220,7 +255,7 @@ impl AgentHook for WealthfolioStreamHook {
                     state.pause_for_asset_selection |= pause;
                 }
             }
-            ToolResultAction::Keep
+            OutcomeAction::Proceed
         }
     }
 
@@ -299,6 +334,18 @@ fn is_repetitive(aggregated_text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repeated_calls_match_whatever_the_key_order() {
+        assert_eq!(
+            WealthfolioStreamHook::key("t", r#"{"a":1,"b":{"d":2,"c":[{"f":3,"e":4}]}}"#),
+            WealthfolioStreamHook::key("t", r#"{"b":{"c":[{"e":4,"f":3}],"d":2},"a":1}"#),
+        );
+        assert_ne!(
+            WealthfolioStreamHook::key("t", r#"{"a":1}"#),
+            WealthfolioStreamHook::key("t", r#"{"a":2}"#),
+        );
+    }
 
     #[test]
     fn non_repetitive_text_passes() {

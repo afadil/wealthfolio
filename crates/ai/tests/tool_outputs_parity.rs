@@ -37,6 +37,16 @@ use wealthfolio_core::taxonomies::{
 use wealthfolio_spending::cash_activities::model::CashFlowBucket;
 use wealthfolio_spending::cash_activities::CashActivity;
 
+/// A JSON snapshot with sorted keys. Rig enables serde_json's
+/// `preserve_order`, so keys would otherwise follow insertion order.
+macro_rules! assert_sorted_json_snapshot {
+    ($value:expr) => {
+        insta::with_settings!({ sort_maps => true }, {
+            insta::assert_json_snapshot!($value);
+        })
+    };
+}
+
 fn fixture_account(id: &str, name: &str, account_type: &str, currency: &str) -> Account {
     let ts = NaiveDate::from_ymd_opt(2024, 1, 1)
         .unwrap()
@@ -110,7 +120,7 @@ macro_rules! output_test_dyn {
         #[tokio::test]
         async fn $test_name() {
             let result = call_json_dyn($tool, env(), serde_json::json!($args)).await;
-            insta::assert_json_snapshot!(result);
+            assert_sorted_json_snapshot!(result);
         }
     };
 }
@@ -121,7 +131,7 @@ macro_rules! output_test_dyn_env {
         #[tokio::test]
         async fn $test_name() {
             let result = call_json_dyn($tool, $env, serde_json::json!($args)).await;
-            insta::assert_json_snapshot!(result);
+            assert_sorted_json_snapshot!(result);
         }
     };
 }
@@ -768,9 +778,12 @@ async fn live_ollama_each_assistant_tool() {
     use futures::StreamExt;
     use rig::{
         agent::MultiTurnStreamItem,
-        client::{AgentClientExt, Nothing},
-        streaming::StreamedAssistantContent,
+        http_client::ReqwestClient,
+        message::ToolName,
+        providers::ollama::wire::OllamaConfig,
+        streaming::{Item, StreamEvent},
         tool::{DynamicTool, PortableTool, ToolOutput},
+        AgentBuilder,
     };
     use std::sync::Mutex;
     use wealthfolio_ai::tools::{agent_catalog, ImportCsvTool};
@@ -822,7 +835,7 @@ async fn live_ollama_each_assistant_tool() {
             let definition = adapter.definition();
             let tool_name = definition.name.clone();
             let observed = observations.clone();
-            tools.push(DynamicTool::new(definition.name, definition.description, definition.parameters, move |_, args| {
+            tools.push(DynamicTool::new(definition.name, definition.description, definition.parameters, move |args| {
                 let adapter=adapter.clone(); let observed=observed.clone(); let tool_name=tool_name.clone();
                 Box::pin(async move {
                     let result=adapter.call(args).await;
@@ -833,12 +846,12 @@ async fn live_ollama_each_assistant_tool() {
         }
         let csv = Arc::new(ImportCsvTool::new(test_env.clone(), "USD".into()));
         let def = rig::completion::ToolDefinition {
-            name: "import_csv".into(),
+            name: ToolName::new("import_csv").unwrap(),
             description: csv.description(),
             parameters: csv.parameters(),
         };
         let observed = observations.clone();
-        tools.push(DynamicTool::new(def.name,def.description,def.parameters,move |_,args| {
+        tools.push(DynamicTool::new(def.name,def.description,def.parameters,move |args| {
             let csv=csv.clone();let observed=observed.clone();
             Box::pin(async move {
                 let parsed=serde_json::from_value(args).map_err(rig::tool::ToolExecutionError::from_error)?;
@@ -847,26 +860,22 @@ async fn live_ollama_each_assistant_tool() {
                 result.map(|r| ToolOutput::json(serde_json::to_value(r).unwrap()))
             })
         }));
-        let client = rig::providers::ollama::Client::builder()
-            .api_key(Nothing)
-            .http_client(wealthfolio_http::client())
-            .build()
-            .unwrap();
-        let agent=client.agent(&model).temperature(0.0)
+        let client = OllamaConfig::new().connect(ReqwestClient::from(wealthfolio_http::client()));
+        let agent=AgentBuilder::new(client.native_completion(&model)).temperature(0.0)
             .preamble("You are testing tool integration against synthetic fixtures. Call the specifically requested tool once with the supplied arguments. Do not call other tools. After its response, briefly report the result and stop.")
             .additional_params(serde_json::json!({"think":thinking,"options":{"num_ctx":32768,"num_predict":1024}}))
             .dynamic_tools(tools).build();
         let prompt =
             format!("Call {name} with these arguments: {args}. Then briefly report its result.");
-        let mut stream = agent.runner(prompt).max_turns(2).stream().await;
+        let mut stream = agent.prompt(prompt).max_turns(2).stream();
         let mut text = String::new();
         let mut stream_error = None;
         let finished = tokio::time::timeout(std::time::Duration::from_secs(120), async {
             while let Some(item) = stream.next().await {
                 match item {
-                    Ok(MultiTurnStreamItem::StreamAssistantItem(
-                        StreamedAssistantContent::Text(t),
-                    )) => text.push_str(&t.text),
+                    Ok(MultiTurnStreamItem::StreamAssistantItem(Item::Event(
+                        StreamEvent::Text { text: t, .. },
+                    ))) => text.push_str(&t),
                     Err(e) => {
                         stream_error = Some(e.to_string());
                         break;
