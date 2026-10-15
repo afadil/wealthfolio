@@ -272,8 +272,8 @@ export interface ActivityDetails {
    * search asked for balances and the account is a cash or credit-card
    * account that holds no securities.
    */
-  cashBalance?: string;
-  cashBalanceCurrency?: string;
+  cashBalance?: string | null;
+  cashBalanceCurrency?: string | null;
 }
 
 export interface ActivitySearchResponse {

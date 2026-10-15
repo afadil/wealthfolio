@@ -612,19 +612,24 @@ mod tests {
             }))
             .unwrap()
         };
-        // The first row has no balance, so its keys alone would leave the
-        // columns out.
         let plain = row("brokerage-row");
         let mut balanced = row("checking-row");
         balanced.cash_balance = Some("954.90".to_string());
         balanced.cash_balance_currency = Some("USD".to_string());
 
-        let csv = records_to_csv(&[plain, balanced]).unwrap();
+        let csv = records_to_csv(&[plain.clone(), balanced]).unwrap();
 
         let lines: Vec<&str> = csv.lines().collect();
         assert!(lines[0].ends_with(",\"cashBalance\",\"cashBalanceCurrency\""));
         assert!(lines[1].ends_with(",\"\",\"\""));
         assert!(lines[2].ends_with(",\"954.90\",\"USD\""));
+
+        // An export where no row has a balance keeps the same columns.
+        let csv = records_to_csv(&[plain]).unwrap();
+
+        let lines: Vec<&str> = csv.lines().collect();
+        assert!(lines[0].ends_with(",\"cashBalance\",\"cashBalanceCurrency\""));
+        assert!(lines[1].ends_with(",\"\",\"\""));
     }
 
     #[test]

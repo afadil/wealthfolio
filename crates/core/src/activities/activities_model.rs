@@ -1030,10 +1030,9 @@ pub struct ActivityDetails {
     /// The cash of the row's account after this row, in
     /// `cash_balance_currency`: filled only when the search asked for
     /// balances and the account is a cash or credit-card account holding no
-    /// securities.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// securities. Serialized as null otherwise, so every export has the
+    /// columns.
     pub cash_balance: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash_balance_currency: Option<String>,
 }
 
