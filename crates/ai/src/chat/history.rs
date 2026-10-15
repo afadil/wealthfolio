@@ -11,8 +11,8 @@ use log::debug;
 use rig::{
     completion::Message,
     message::{
-        AssistantContent, Document, DocumentMediaType, DocumentSourceKind, Image, ImageDetail,
-        ImageMediaType, Text, UserContent,
+        AssistantContent, AssistantMessage, Document, DocumentMediaType, DocumentSourceKind, Image,
+        ImageDetail, ImageMediaType, Text, UserContent,
     },
 };
 
@@ -22,29 +22,20 @@ use crate::types::{MessageAttachment, SimpleChatMessage};
 pub(super) fn build_user_prompt(user_message: &str, attachments: &[MessageAttachment]) -> Message {
     if attachments.is_empty() {
         return Message::User {
-            content: vec![UserContent::Text(Text {
-                additional_params: None,
-                text: user_message.to_string(),
-            })],
+            content: vec![UserContent::Text(Text::new(user_message.to_string()))],
         };
     }
 
     let mut parts: Vec<UserContent> = Vec::new();
-    parts.push(UserContent::Text(Text {
-        additional_params: None,
-        text: user_message.to_string(),
-    }));
+    parts.push(UserContent::Text(Text::new(user_message.to_string())));
 
     for att in attachments {
         match att.content_type.as_str() {
             "text/csv" | "application/csv" => {
-                parts.push(UserContent::Text(Text {
-                    additional_params: None,
-                    text: format!(
-                        "[BEGIN UNTRUSTED CSV DATA: {}]\n{}\n[END UNTRUSTED CSV DATA]",
-                        att.name, att.data
-                    ),
-                }));
+                parts.push(UserContent::Text(Text::new(format!(
+                    "[BEGIN UNTRUSTED CSV DATA: {}]\n{}\n[END UNTRUSTED CSV DATA]",
+                    att.name, att.data
+                ))));
             }
             ct if ct.starts_with("image/") => {
                 let media_type = match ct {
@@ -58,7 +49,7 @@ pub(super) fn build_user_prompt(user_message: &str, attachments: &[MessageAttach
                     data: DocumentSourceKind::Base64(att.data.clone()),
                     media_type,
                     detail: Some(ImageDetail::Auto),
-                    additional_params: None,
+                    native: None,
                 }));
             }
             "application/pdf" => {
@@ -97,10 +88,7 @@ pub(super) fn build_history(
         .unwrap_or_default();
 
     let prompt = Message::User {
-        content: vec![UserContent::Text(Text {
-            additional_params: None,
-            text: prompt_content,
-        })],
+        content: vec![UserContent::Text(Text::new(prompt_content))],
     };
 
     let mut history = Vec::new();
@@ -113,20 +101,13 @@ pub(super) fn build_history(
         match msg.role.as_str() {
             role if role.eq_ignore_ascii_case("user") => {
                 history.push(Message::User {
-                    content: vec![UserContent::Text(Text {
-                        additional_params: None,
-                        text: msg.content.clone(),
-                    })],
+                    content: vec![UserContent::Text(Text::new(msg.content.clone()))],
                 });
             }
             role if role.eq_ignore_ascii_case("assistant") => {
-                history.push(Message::Assistant {
-                    id: None,
-                    content: vec![AssistantContent::Text(Text {
-                        additional_params: None,
-                        text: msg.content.clone(),
-                    })],
-                });
+                history.push(Message::Assistant(AssistantMessage::new(vec![
+                    AssistantContent::Text(Text::new(msg.content.clone())),
+                ])));
             }
             _ => {}
         }
