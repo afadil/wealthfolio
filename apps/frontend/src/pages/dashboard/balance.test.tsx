@@ -8,8 +8,10 @@ vi.mock("@/hooks/use-balance-privacy", () => ({
 }));
 
 vi.mock("@number-flow/react", () => ({
-  default: ({ locales }: { locales?: string }) => (
-    <span data-testid="visible-balance-locale">{locales}</span>
+  default: ({ locales, format }: { locales?: string; format?: Intl.NumberFormatOptions }) => (
+    <span data-testid="visible-balance-locale" data-fraction-digits={format?.maximumFractionDigits}>
+      {locales}
+    </span>
   ),
 }));
 
@@ -43,5 +45,32 @@ describe("Balance", () => {
 
     expect(screen.getByTestId("visible-balance-locale")).toHaveTextContent("en-US");
     expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("$1,234,567.89");
+  });
+
+  it("shows each currency's minor units", () => {
+    const { unmount } = render(
+      <FormattingProvider locale="US">
+        <Balance targetValue={1234.56} currency="JPY" displayCurrency />
+      </FormattingProvider>,
+    );
+
+    expect(screen.getByTestId("visible-balance-locale")).toHaveAttribute(
+      "data-fraction-digits",
+      "0",
+    );
+    expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("¥1,235");
+    unmount();
+
+    render(
+      <FormattingProvider locale="US">
+        <Balance targetValue={1.2345} currency="KWD" displayCurrency />
+      </FormattingProvider>,
+    );
+
+    expect(screen.getByTestId("visible-balance-locale")).toHaveAttribute(
+      "data-fraction-digits",
+      "3",
+    );
+    expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("KWD 1.235");
   });
 });
