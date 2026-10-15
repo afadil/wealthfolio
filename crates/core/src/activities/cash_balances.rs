@@ -3,9 +3,10 @@
 //!
 //! Books cash the way the portfolio engine does (`compile` + `project`):
 //! posted rows only, in application order (timestamp, created_at, then id),
-//! signed by the activity economics resolver, and a BUY or SELL carrying an
-//! FX rate in a foreign currency booked in the account currency. Contract
-//! multipliers are not read, so only cash and credit-card accounts show it.
+//! each signed by the activity economics resolver in its own currency. An
+//! account whose history holds securities gets no balances: their cash turns
+//! on what only the engine resolves (contract multipliers, composite rows
+//! booked in two currencies), so this ledger would drift from it.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ use std::collections::HashMap;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use super::{Activity, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL};
+use super::{is_cash_symbol, Activity, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL};
 use crate::accounts::{account_types, Account, TrackingMode};
 use crate::portfolio::economic_events::ActivityEconomicsResolver;
 
@@ -44,23 +45,41 @@ pub fn shows_running_cash_balance(account: &Account) -> bool {
     ) && account.tracking_mode != TrackingMode::Holdings
 }
 
-/// The balance after each of `account`'s posted activities, by activity id.
-/// Rows that are not posted move no cash and get no balance.
+/// The balance after each of `account`'s posted activities, by activity id, or
+/// none when its posted history holds securities. Rows that are not posted
+/// move no cash and get no balance.
 pub fn running_cash_balances(
     account: &Account,
     activities: &[Activity],
-) -> HashMap<String, ActivityCashBalance> {
-    let is_credit_card = account.account_type == account_types::CREDIT_CARD;
+) -> Option<HashMap<String, ActivityCashBalance>> {
     let mut ordered: Vec<&Activity> = activities
         .iter()
         .filter(|activity| activity.account_id == account.id && activity.is_posted())
         .collect();
+    if ordered.iter().any(|activity| holds_security(activity)) {
+        return None;
+    }
     ordered.sort_by(|a, b| application_order(a, b));
 
+    let is_credit_card = account.account_type == account_types::CREDIT_CARD;
     let mut cash: HashMap<String, Decimal> = HashMap::new();
     let mut balances = HashMap::with_capacity(ordered.len());
     for activity in ordered {
-        let (currency, amount) = booked_cash(account, activity, is_credit_card);
+        // A row the engine books no cash for (a split, an adjustment, a
+        // missing amount) adds zero; a row with no currency books in the
+        // account's, as the engine assumes.
+        let amount = ActivityEconomicsResolver::resolve_cash_with_account_context(
+            activity,
+            Decimal::ONE,
+            is_credit_card,
+        )
+        .signed_cash_effect
+        .unwrap_or(Decimal::ZERO);
+        let currency = match activity.currency.trim() {
+            "" => account.currency.trim(),
+            currency => currency,
+        }
+        .to_string();
         let balance = cash.entry(currency.clone()).or_insert(Decimal::ZERO);
         *balance += amount;
         balances.insert(
@@ -71,34 +90,19 @@ pub fn running_cash_balances(
             },
         );
     }
-    balances
+    Some(balances)
 }
 
-/// The currency and signed amount the engine books for `activity`. A row the
-/// engine books no cash for (a split, an adjustment, a missing amount) adds
-/// zero to its currency.
-fn booked_cash(account: &Account, activity: &Activity, is_credit_card: bool) -> (String, Decimal) {
-    let amount =
-        ActivityEconomicsResolver::resolve_compiled_cash(activity, Decimal::ONE, is_credit_card)
-            .ok()
-            .and_then(|resolved| resolved.signed_cash_effect)
-            .unwrap_or(Decimal::ZERO);
-    let account_currency = account.currency.trim();
-    let currency = match activity.currency.trim() {
-        "" => account_currency,
-        currency => currency,
-    };
-    let is_trade = matches!(
+/// A trade, or a row tied to an asset other than cash.
+fn holds_security(activity: &Activity) -> bool {
+    matches!(
         activity.effective_type(),
         ACTIVITY_TYPE_BUY | ACTIVITY_TYPE_SELL
-    );
-    match activity.fx_rate.filter(|rate| *rate > Decimal::ZERO) {
-        Some(rate) if is_trade && currency != account_currency => (
-            account_currency.to_string(),
-            amount.checked_mul(rate).unwrap_or(Decimal::ZERO),
-        ),
-        _ => (currency.to_string(), amount),
-    }
+    ) || activity
+        .asset_id
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
 }
 
 #[cfg(test)]
@@ -107,16 +111,14 @@ mod tests {
 
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal_macros::dec;
-    use wealthfolio_portfolio_engine::model::{
-        AccountId, Currency, Policy, RawAccount, RawAsset, RawFacts,
-    };
+    use wealthfolio_portfolio_engine::model::{AccountId, Currency, Policy, RawAccount, RawFacts};
     use wealthfolio_portfolio_engine::Engine;
 
     use super::*;
     use crate::activities::{
-        ActivityStatus, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST,
-        ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
-        ACTIVITY_TYPE_WITHDRAWAL,
+        ActivityStatus, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_FEE,
+        ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN,
+        ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
     };
     use crate::portfolio::coordinator::raw_activity;
 
@@ -179,11 +181,7 @@ mod tests {
     }
 
     /// The engine's cash for `account` after folding `activities`.
-    fn engine_cash(
-        account: &Account,
-        assets: Vec<RawAsset>,
-        activities: &[Activity],
-    ) -> BTreeMap<String, Decimal> {
+    fn engine_cash(account: &Account, activities: &[Activity]) -> BTreeMap<String, Decimal> {
         let raw = RawFacts {
             policy: Policy::new(
                 Currency::parse(&account.currency).expect("account currency"),
@@ -198,7 +196,7 @@ mod tests {
                 is_archived: false,
                 cost_basis_method: None,
             }],
-            assets,
+            assets: Vec::new(),
             activities: activities.iter().map(raw_activity).collect(),
             quotes: Vec::new(),
             fx_rates: Vec::new(),
@@ -284,7 +282,8 @@ mod tests {
         let mut salary = activity("d", ACTIVITY_TYPE_DEPOSIT, "2026-04-03T09:00:00Z", dec!(50));
         salary.created_at = at("2026-04-01T00:00:00Z");
 
-        let balances = running_cash_balances(&account, &[salary, rent, coffee, opening]);
+        let balances = running_cash_balances(&account, &[salary, rent, coffee, opening])
+            .expect("a cash-only history");
 
         assert_eq!(balances["a"], balance("USD", dec!(100)));
         assert_eq!(balances["b"], balance("USD", dec!(95)));
@@ -317,7 +316,8 @@ mod tests {
         draft.status = ActivityStatus::Draft;
         let fee = activity("fee", ACTIVITY_TYPE_FEE, "2026-04-04T00:00:00Z", dec!(2));
 
-        let balances = running_cash_balances(&account, &[deposit, pending, draft, fee]);
+        let balances = running_cash_balances(&account, &[deposit, pending, draft, fee])
+            .expect("a cash-only history");
 
         assert!(!balances.contains_key("pending"));
         assert!(!balances.contains_key("draft"));
@@ -346,7 +346,8 @@ mod tests {
             dec!(100),
         );
 
-        let balances = running_cash_balances(&account, &[charge, interest, payment]);
+        let balances = running_cash_balances(&account, &[charge, interest, payment])
+            .expect("a cash-only history");
 
         assert_eq!(balances["charge"], balance("USD", dec!(-120)));
         assert_eq!(balances["interest"], balance("USD", dec!(-123)));
@@ -370,7 +371,8 @@ mod tests {
             dec!(9.59),
         );
 
-        let balances = running_cash_balances(&account, &[home, abroad]);
+        let balances =
+            running_cash_balances(&account, &[home, abroad]).expect("a cash-only history");
 
         assert_eq!(balances["home"], balance("CAD", dec!(-40)));
         assert_eq!(balances["abroad"], balance("USD", dec!(-9.59)));
@@ -393,7 +395,7 @@ mod tests {
         );
         other.account_id = "someone-else".to_string();
 
-        let balances = running_cash_balances(&account, &[own, other]);
+        let balances = running_cash_balances(&account, &[own, other]).expect("a cash-only history");
 
         assert_eq!(balances.len(), 1);
         assert_eq!(balances["own"], balance("USD", dec!(10)));
@@ -448,13 +450,6 @@ mod tests {
             dec!(60),
         );
         draft.status = ActivityStatus::Draft;
-        // A foreign-currency buy with a broker rate settles in USD at 1.1.
-        let mut buy = activity("buy", ACTIVITY_TYPE_BUY, "2026-04-09T00:00:00Z", dec!(50));
-        buy.asset_id = Some("SAP.DE".to_string());
-        buy.quantity = Some(dec!(1));
-        buy.unit_price = Some(dec!(50));
-        buy.currency = "EUR".to_string();
-        buy.fx_rate = Some(dec!(1.1));
         let activities = vec![
             deposit,
             withdrawal,
@@ -464,22 +459,15 @@ mod tests {
             euros,
             split,
             draft,
-            buy,
         ];
-        let assets = vec![RawAsset {
-            id: "SAP.DE".to_string(),
-            quote_currency: "EUR".to_string(),
-            kind: "INVESTMENT".to_string(),
-            instrument_type: Some("EQUITY".to_string()),
-            contract_multiplier: None,
-        }];
 
-        let balances = running_cash_balances(&account, &activities);
+        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
 
-        assert_eq!(balances["buy"], balance("USD", dec!(590.98)));
+        assert_eq!(balances["transfer-out"], balance("USD", dec!(645.98)));
+        assert_eq!(balances["euros"], balance("EUR", dec!(80)));
         assert_eq!(
             closing_cash(&balances, &activities),
-            engine_cash(&account, assets, &activities)
+            engine_cash(&account, &activities)
         );
     }
 
@@ -523,11 +511,51 @@ mod tests {
         payment.currency = "CAD".to_string();
         let activities = vec![groceries, refund, interest, abroad, payment];
 
-        let balances = running_cash_balances(&account, &activities);
+        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
 
         assert_eq!(
             closing_cash(&balances, &activities),
-            engine_cash(&account, Vec::new(), &activities)
+            engine_cash(&account, &activities)
         );
+    }
+
+    #[test]
+    fn an_account_that_held_securities_gets_no_balances() {
+        let account = account(account_types::CASH, "CAD");
+        let mut deposit = activity(
+            "deposit",
+            ACTIVITY_TYPE_DEPOSIT,
+            "2026-04-01T00:00:00Z",
+            dec!(100),
+        );
+        deposit.currency = "CAD".to_string();
+        let security_row = |id: &str, activity_type: &str, asset_id: &str| {
+            let mut row = activity(id, activity_type, "2026-04-02T00:00:00Z", dec!(10));
+            row.asset_id = Some(asset_id.to_string());
+            row.quantity = Some(dec!(1));
+            row.unit_price = Some(dec!(10));
+            row
+        };
+
+        // The engine books a foreign DRIP's income and purchase in two
+        // currencies, and an option sale's sign turns on its multiplier.
+        let mut drip = security_row("drip", ACTIVITY_TYPE_DIVIDEND, "AAPL");
+        drip.subtype = Some("DRIP".to_string());
+        drip.fx_rate = Some(dec!(1.35));
+        let mut option_sale = security_row("sale", ACTIVITY_TYPE_SELL, "AAPL261218C00150000");
+        option_sale.fee = Some(dec!(15));
+        // A trade is a security row even when its asset is a cash symbol.
+        let cash_symbol_trade = security_row("conversion", ACTIVITY_TYPE_BUY, "$CASH-EUR");
+        for row in [drip, option_sale, cash_symbol_trade] {
+            assert!(
+                running_cash_balances(&account, &[deposit.clone(), row]).is_none(),
+                "a security row withholds the balances"
+            );
+        }
+
+        // A draft trade moves no cash, so the account still has balances.
+        let mut draft = security_row("draft", ACTIVITY_TYPE_BUY, "AAPL");
+        draft.status = ActivityStatus::Draft;
+        assert!(running_cash_balances(&account, &[deposit, draft]).is_some());
     }
 }

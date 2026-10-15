@@ -138,7 +138,8 @@ export interface CashActivitySearchResponse {
   baseCurrency?: string | null;
   /**
    * The account's cash after each row of this page, by activity id: only when
-   * asked for and the search covers exactly one cash or credit-card account.
+   * asked for and the search covers exactly one cash or credit-card account
+   * that holds no securities.
    */
   cashBalances?: Record<string, ActivityCashBalance>;
 }

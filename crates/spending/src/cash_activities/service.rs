@@ -699,7 +699,8 @@ impl CashActivityService {
     }
 
     /// The balance after each row of the one account the search covers, when
-    /// it covers exactly one cash or credit-card account.
+    /// it covers exactly one cash or credit-card account that holds no
+    /// securities.
     fn cash_balances_for(
         &self,
         target_accounts: &HashSet<String>,
@@ -713,8 +714,10 @@ impl CashActivityService {
             .account_repo
             .get_by_id(account_id)
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        Ok(shows_running_cash_balance(&account)
-            .then(|| running_cash_balances(&account, activities)))
+        if !shows_running_cash_balance(&account) {
+            return Ok(None);
+        }
+        Ok(running_cash_balances(&account, activities))
     }
 
     /// Fetch explicit activity ids without applying the normal status/date/limit
@@ -2709,6 +2712,21 @@ mod tests {
         assert!(response.cash_balances.is_none());
         let json = serde_json::to_value(&response).unwrap();
         assert!(json.get("cashBalances").is_none());
+    }
+
+    #[tokio::test]
+    async fn search_leaves_balances_out_for_an_account_holding_securities() {
+        let mut trade = cash_row("trade", "BUY", 50, "USD");
+        trade.asset_id = Some("AAPL".to_string());
+        let (service, _, _) =
+            make_service_with(vec![cash_row("deposit", "DEPOSIT", 100, "USD"), trade]);
+
+        let response = service
+            .search(balances_request(None, 0, 50), None, "UTC")
+            .await
+            .unwrap();
+
+        assert!(response.cash_balances.is_none());
     }
 
     #[tokio::test]

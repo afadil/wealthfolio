@@ -16409,6 +16409,27 @@ pub(crate) mod tests {
         assert!(brokerage.cash_balances.is_none());
     }
 
+    #[tokio::test]
+    async fn attach_cash_balances_skips_a_cash_account_holding_securities() {
+        let mut trade = create_stored_activity("trade", "checking", Some("asset-aapl"));
+        trade.activity_date = "2026-04-02T00:00:00Z".parse().unwrap();
+        let service = cash_balance_service(
+            vec![cash_account("checking", "CASH")],
+            vec![
+                cash_row("deposit", "checking", "DEPOSIT", 1, dec!(100)),
+                trade,
+            ],
+        );
+
+        let mut response = page(vec![page_row("deposit", "checking")]);
+        service
+            .attach_cash_balances(&mut response, Some(&["checking".to_string()]))
+            .await
+            .expect("attach balances");
+
+        assert!(response.cash_balances.is_none());
+    }
+
     #[test]
     fn a_search_response_without_balances_serializes_as_before() {
         let json = serde_json::to_value(page(vec![page_row("deposit", "checking")]))

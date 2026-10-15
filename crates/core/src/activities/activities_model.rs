@@ -1094,7 +1094,8 @@ pub struct ActivitySearchResponse {
     pub data: Vec<ActivityDetails>,
     pub meta: ActivitySearchResponseMeta,
     /// The cash balance after each row, by activity id: present only when the
-    /// caller asked for it and searched one cash or credit-card account.
+    /// caller asked for it and searched one cash or credit-card account that
+    /// holds no securities.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash_balances: Option<std::collections::HashMap<String, ActivityCashBalance>>,
 }

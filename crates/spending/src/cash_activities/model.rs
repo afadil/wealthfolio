@@ -88,7 +88,7 @@ pub struct CashActivitySearchRequest {
     #[serde(default = "default_limit")]
     pub limit: usize,
     /// Ask for the cash balance after each row. Filled only when the search
-    /// covers exactly one cash or credit-card account.
+    /// covers exactly one cash or credit-card account that holds no securities.
     #[serde(default)]
     pub include_cash_balances: bool,
 }
@@ -225,7 +225,8 @@ pub struct CashActivitySearchResponse {
     pub base_currency: Option<String>,
     /// The account's cash after each row of this page, by activity id: only
     /// when asked for and the search covers exactly one cash or credit-card
-    /// account. Taken from the account's whole history, before any filter.
+    /// account that holds no securities. Taken from the account's whole
+    /// history, before any filter.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cash_balances: Option<HashMap<String, ActivityCashBalance>>,
