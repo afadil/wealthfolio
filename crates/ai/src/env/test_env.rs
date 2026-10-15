@@ -906,10 +906,6 @@ impl SettingsServiceTrait for MockSettingsService {
         Ok(Some("USD".to_string()))
     }
 
-    async fn update_base_currency(&self, _new_base_currency: &str) -> CoreResult<()> {
-        Ok(())
-    }
-
     fn is_auto_update_check_enabled(&self) -> CoreResult<bool> {
         Ok(true)
     }
