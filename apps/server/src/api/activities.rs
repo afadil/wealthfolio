@@ -107,7 +107,7 @@ async fn search_activities(
     let mut resp = state.activity_service.search_activities_in_utc_range(
         body.page,
         body.page_size,
-        account_ids.clone(),
+        account_ids,
         types,
         body.asset_id_keyword,
         sort_normalized,
@@ -120,7 +120,7 @@ async fn search_activities(
     if body.include_cash_balances.unwrap_or(false) {
         state
             .activity_service
-            .attach_cash_balances(&mut resp, account_ids.as_deref())
+            .attach_cash_balances(&mut resp)
             .await?;
     }
     Ok(Json(resp))

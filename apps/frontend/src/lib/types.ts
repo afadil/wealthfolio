@@ -267,12 +267,13 @@ export interface ActivityDetails {
   counterpartCurrency?: string | null;
   counterpartFxRate?: string | null;
   subRows?: ActivityDetails[];
-}
-
-/** An account's cash in one currency after an activity. */
-export interface ActivityCashBalance {
-  currency: string;
-  balance: number;
+  /**
+   * The account's cash after this row, in `cashBalanceCurrency`: only when the
+   * search asked for balances and the account is a cash or credit-card
+   * account that holds no securities.
+   */
+  cashBalance?: string;
+  cashBalanceCurrency?: string;
 }
 
 export interface ActivitySearchResponse {
@@ -280,8 +281,6 @@ export interface ActivitySearchResponse {
   meta: {
     totalRowCount: number;
   };
-  /** Balance after each row, by activity id: only when asked for one cash account. */
-  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 /**

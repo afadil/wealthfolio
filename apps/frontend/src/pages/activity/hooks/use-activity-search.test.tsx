@@ -98,17 +98,15 @@ describe("useActivitySearch", () => {
     );
   });
 
-  it("asks for cash balances and merges them across loaded pages", async () => {
+  it("asks every page for cash balances and keeps them on the rows", async () => {
     adapterMocks.searchActivities
       .mockResolvedValueOnce({
-        data: [{ id: "coffee" }],
+        data: [{ id: "coffee", cashBalance: "50", cashBalanceCurrency: "USD" }],
         meta: { totalRowCount: 2 },
-        cashBalances: { coffee: { currency: "USD", balance: 50 } },
       })
       .mockResolvedValueOnce({
-        data: [{ id: "rent" }],
+        data: [{ id: "rent", cashBalance: "70", cashBalanceCurrency: "USD" }],
         meta: { totalRowCount: 2 },
-        cashBalances: { rent: { currency: "USD", balance: 70 } },
       });
 
     const { result } = renderHook(
@@ -137,31 +135,7 @@ describe("useActivitySearch", () => {
       { id: "date", desc: true },
       { includeCashBalances: true },
     );
-    expect(result.current.cashBalances).toEqual({
-      coffee: { currency: "USD", balance: 50 },
-      rent: { currency: "USD", balance: 70 },
-    });
-  });
-
-  it("returns no cash balances when the response has none", async () => {
-    adapterMocks.searchActivities.mockResolvedValueOnce({
-      data: [{ id: "deposit" }],
-      meta: { totalRowCount: 1 },
-    });
-
-    const { result } = renderHook(
-      () =>
-        useActivitySearch({
-          filters: { accountIds: ["brokerage"], activityTypes: [] },
-          searchQuery: "",
-          sorting: [],
-          includeCashBalances: true,
-        }),
-      { wrapper: createWrapper() },
-    );
-
-    await waitFor(() => expect(result.current.data).toHaveLength(1));
-    expect(result.current.cashBalances).toBeUndefined();
+    expect(result.current.data.map((row) => row.cashBalance)).toEqual(["50", "70"]);
   });
 
   it("exposes a next-page error without discarding the first page", async () => {

@@ -46,42 +46,9 @@ describe("useCashActivitySearch", () => {
     expect(result.current.hasNextPage).toBe(true);
   });
 
-  it("merges each page's cash balances", async () => {
-    adapterMocks.searchCashActivities
-      .mockResolvedValueOnce({
-        items: [{ id: "coffee" }],
-        totalCount: 2,
-        cashBalances: { coffee: { currency: "USD", balance: 50 } },
-      })
-      .mockResolvedValueOnce({
-        items: [{ id: "rent" }],
-        totalCount: 2,
-        cashBalances: { rent: { currency: "USD", balance: 70 } },
-      });
-
-    const { result } = renderHook(
-      () => useCashActivitySearch({ includeCashBalances: true }, { pageSize: 1 }),
-      { wrapper: createWrapper() },
-    );
-
-    await waitFor(() => expect(result.current.hasNextPage).toBe(true));
-    await act(async () => {
-      await result.current.fetchNextPage();
-    });
-
-    await waitFor(() => expect(result.current.items).toHaveLength(2));
-    expect(adapterMocks.searchCashActivities).toHaveBeenLastCalledWith(
-      expect.objectContaining({ includeCashBalances: true, offset: 1, limit: 1 }),
-    );
-    expect(result.current.cashBalances).toEqual({
-      coffee: { currency: "USD", balance: 50 },
-      rent: { currency: "USD", balance: 70 },
-    });
-  });
-
-  it("has no cash balances when the search covers several accounts", async () => {
+  it("asks for cash balances and keeps them on the rows", async () => {
     adapterMocks.searchCashActivities.mockResolvedValueOnce({
-      items: [{ id: "coffee" }],
+      items: [{ id: "coffee", cashBalance: "50", cashBalanceCurrency: "USD" }],
       totalCount: 1,
     });
 
@@ -90,6 +57,9 @@ describe("useCashActivitySearch", () => {
     });
 
     await waitFor(() => expect(result.current.items).toHaveLength(1));
-    expect(result.current.cashBalances).toBeUndefined();
+    expect(adapterMocks.searchCashActivities).toHaveBeenCalledWith(
+      expect.objectContaining({ includeCashBalances: true }),
+    );
+    expect(result.current.items[0]?.cashBalance).toBe("50");
   });
 });

@@ -512,7 +512,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       totalCount,
       net,
       baseCurrency,
-      cashBalances,
       isLoading,
       isFetching,
       isFetchingNextPage,
@@ -523,7 +522,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       fetchNextPage,
       refetch,
     } = useCashActivitySearch(searchRequest);
-    const showBalance = cashBalances !== undefined;
+    // Rows carry a balance only when the search covers one cash or
+    // credit-card account, so their presence decides the column.
+    const showBalance = useMemo(() => items.some((item) => item.cashBalance != null), [items]);
 
     const accountById = useMemo(() => {
       const m = new Map<string, Account>();
@@ -1005,7 +1006,6 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         event: ev ?? null,
         eventTypeColor: ev ? (eventTypeById.get(ev.eventTypeId)?.color ?? null) : null,
         appTimezone,
-        cashBalance: cashBalances?.[r.activity.id],
         isSelected: selectedRowIds.has(r.activity.id),
         onToggleSelect: handleToggleRow,
         onAssignCategory: handleAssignCategory,

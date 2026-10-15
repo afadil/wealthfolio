@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::activity_assignments::ActivityTaxonomyAssignment;
 use crate::activity_splits::ActivitySplit;
-use wealthfolio_core::activities::{Activity, ActivityCashBalance};
+use wealthfolio_core::activities::Activity;
 
 /// Filter for listing cash activities. All fields optional.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -172,6 +170,16 @@ pub struct CashActivity {
     /// agree with the server headline without re-deriving either rule.
     #[serde(default)]
     pub visible_spending_amount: f64,
+    /// The cash of this row's account after the row, in
+    /// `cash_balance_currency`: filled only when the search asked for balances
+    /// and covers exactly one cash or credit-card account that holds no
+    /// securities. Taken from the account's whole history, before any filter.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cash_balance: Option<String>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cash_balance_currency: Option<String>,
 }
 
 /// A signed net in one currency.
@@ -223,11 +231,4 @@ pub struct CashActivitySearchResponse {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_currency: Option<String>,
-    /// The account's cash after each row of this page, by activity id: only
-    /// when asked for and the search covers exactly one cash or credit-card
-    /// account that holds no securities. Taken from the account's whole
-    /// history, before any filter.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cash_balances: Option<HashMap<String, ActivityCashBalance>>,
 }

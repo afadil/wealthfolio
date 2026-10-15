@@ -87,8 +87,15 @@ pub(crate) mod tests {
             Ok(self.accounts.lock().unwrap().clone())
         }
 
-        fn get_accounts_by_ids(&self, _account_ids: &[String]) -> Result<Vec<Account>> {
-            unimplemented!()
+        fn get_accounts_by_ids(&self, account_ids: &[String]) -> Result<Vec<Account>> {
+            Ok(self
+                .accounts
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|account| account_ids.contains(&account.id))
+                .cloned()
+                .collect())
         }
 
         fn get_non_archived_accounts(&self) -> Result<Vec<Account>> {
@@ -1408,8 +1415,15 @@ pub(crate) mod tests {
                 .collect())
         }
 
-        fn get_activities_by_account_ids(&self, _account_ids: &[String]) -> Result<Vec<Activity>> {
-            unimplemented!()
+        fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>> {
+            Ok(self
+                .activities
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|activity| account_ids.contains(&activity.account_id))
+                .cloned()
+                .collect())
         }
 
         fn get_trading_activities(&self) -> Result<Vec<Activity>> {
@@ -16382,6 +16396,8 @@ pub(crate) mod tests {
             import_run_id: None,
             is_user_modified: false,
             metadata: None,
+            cash_balance: None,
+            cash_balance_currency: None,
         }
     }
 
@@ -16391,7 +16407,6 @@ pub(crate) mod tests {
                 total_row_count: rows.len() as i64,
             },
             data: rows,
-            cash_balances: None,
         }
     }
 
@@ -16399,6 +16414,18 @@ pub(crate) mod tests {
         let mut account = create_test_account(id, "USD");
         account.account_type = account_type.to_string();
         account
+    }
+
+    fn balance_of(response: &ActivitySearchResponse, id: &str) -> Option<(String, String)> {
+        let row = response
+            .data
+            .iter()
+            .find(|row| row.id == id)
+            .expect("row on the page");
+        Some((
+            row.cash_balance.clone()?,
+            row.cash_balance_currency.clone()?,
+        ))
     }
 
     #[tokio::test]
@@ -16418,21 +16445,22 @@ pub(crate) mod tests {
         ]);
 
         service
-            .attach_cash_balances(&mut response, Some(&["checking".to_string()]))
+            .attach_cash_balances(&mut response)
             .await
             .expect("attach balances");
 
-        let balances = response
-            .cash_balances
-            .expect("balances for one cash account");
-        assert_eq!(balances.len(), 2);
-        assert_eq!(balances["coffee"].balance, dec!(50));
-        assert_eq!(balances["rent"].balance, dec!(70));
-        assert_eq!(balances["rent"].currency, "USD");
+        assert_eq!(
+            balance_of(&response, "coffee"),
+            Some(("50".to_string(), "USD".to_string()))
+        );
+        assert_eq!(
+            balance_of(&response, "rent"),
+            Some(("70".to_string(), "USD".to_string()))
+        );
     }
 
     #[tokio::test]
-    async fn attach_cash_balances_skips_several_accounts_and_investment_accounts() {
+    async fn attach_cash_balances_balances_each_eligible_account_from_its_own_history() {
         let service = cash_balance_service(
             vec![
                 cash_account("checking", "CASH"),
@@ -16440,34 +16468,32 @@ pub(crate) mod tests {
                 cash_account("brokerage", "SECURITIES"),
             ],
             vec![
-                cash_row("deposit", "checking", "DEPOSIT", 1, dec!(100)),
+                cash_row("pay", "checking", "DEPOSIT", 1, dec!(100)),
+                cash_row("rent", "checking", "WITHDRAWAL", 2, dec!(30)),
+                cash_row("save", "savings", "DEPOSIT", 1, dec!(500)),
                 cash_row("funding", "brokerage", "DEPOSIT", 1, dec!(100)),
             ],
         );
+        let mut response = page(vec![
+            page_row("rent", "checking"),
+            page_row("save", "savings"),
+            page_row("funding", "brokerage"),
+        ]);
 
-        let mut both = page(vec![page_row("deposit", "checking")]);
         service
-            .attach_cash_balances(
-                &mut both,
-                Some(&["checking".to_string(), "savings".to_string()]),
-            )
+            .attach_cash_balances(&mut response)
             .await
             .expect("attach balances");
-        assert!(both.cash_balances.is_none());
 
-        let mut all = page(vec![page_row("deposit", "checking")]);
-        service
-            .attach_cash_balances(&mut all, None)
-            .await
-            .expect("attach balances");
-        assert!(all.cash_balances.is_none());
-
-        let mut brokerage = page(vec![page_row("funding", "brokerage")]);
-        service
-            .attach_cash_balances(&mut brokerage, Some(&["brokerage".to_string()]))
-            .await
-            .expect("attach balances");
-        assert!(brokerage.cash_balances.is_none());
+        assert_eq!(
+            balance_of(&response, "rent"),
+            Some(("70".to_string(), "USD".to_string()))
+        );
+        assert_eq!(
+            balance_of(&response, "save"),
+            Some(("500".to_string(), "USD".to_string()))
+        );
+        assert_eq!(balance_of(&response, "funding"), None);
     }
 
     #[tokio::test]
@@ -16484,23 +16510,24 @@ pub(crate) mod tests {
 
         let mut response = page(vec![page_row("deposit", "checking")]);
         service
-            .attach_cash_balances(&mut response, Some(&["checking".to_string()]))
+            .attach_cash_balances(&mut response)
             .await
             .expect("attach balances");
 
-        assert!(response.cash_balances.is_none());
+        assert_eq!(balance_of(&response, "deposit"), None);
     }
 
     #[test]
-    fn a_search_response_without_balances_serializes_as_before() {
-        let json = serde_json::to_value(page(vec![page_row("deposit", "checking")]))
-            .expect("serialize response");
-        let keys: Vec<&str> = json
-            .as_object()
-            .expect("response object")
-            .keys()
-            .map(String::as_str)
-            .collect();
-        assert_eq!(keys, vec!["data", "meta"]);
+    fn a_row_without_a_balance_serializes_as_before() {
+        let mut row = page_row("deposit", "checking");
+        let json = serde_json::to_value(&row).expect("serialize row");
+        assert!(json.get("cashBalance").is_none());
+        assert!(json.get("cashBalanceCurrency").is_none());
+
+        row.cash_balance = Some("70".to_string());
+        row.cash_balance_currency = Some("USD".to_string());
+        let json = serde_json::to_value(&row).expect("serialize row");
+        assert_eq!(json["cashBalance"], "70");
+        assert_eq!(json["cashBalanceCurrency"], "USD");
     }
 }

@@ -16,7 +16,7 @@ import {
 import { ActivityType } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { ActivityCashBalance, ActivityDetails } from "@/lib/types";
+import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
   AmountDisplay,
@@ -70,8 +70,6 @@ interface ActivityTableMobileProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
-  /** The account's cash after each row; shown on each card when given. */
-  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 export const ActivityTableMobile = ({
@@ -92,7 +90,6 @@ export const ActivityTableMobile = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
-  cashBalances,
 }: ActivityTableMobileProps) => {
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
@@ -206,7 +203,10 @@ export const ActivityTableMobile = ({
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
-    const cashBalance = cashBalances?.[activity.id];
+    const cashBalance =
+      activity.cashBalance != null && activity.cashBalanceCurrency
+        ? { balance: Number(activity.cashBalance), currency: activity.cashBalanceCurrency }
+        : undefined;
 
     // Compact View
     if (isCompactView) {

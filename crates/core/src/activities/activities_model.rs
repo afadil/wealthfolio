@@ -11,7 +11,7 @@ use crate::activities::activities_constants::{
     ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
 };
 use crate::activities::csv_parser::ParseConfig;
-use crate::activities::{ActivityCashBalance, TransferLinkState};
+use crate::activities::TransferLinkState;
 use crate::assets::NewAsset;
 use crate::Result;
 use crate::{activities::activities_errors::ActivityError, QuoteMode};
@@ -1027,6 +1027,14 @@ pub struct ActivityDetails {
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,
     pub metadata: Option<Value>,
+    /// The cash of the row's account after this row, in
+    /// `cash_balance_currency`: filled only when the search asked for
+    /// balances and the account is a cash or credit-card account holding no
+    /// securities.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balance_currency: Option<String>,
 }
 
 impl ActivityDetails {
@@ -1093,11 +1101,6 @@ pub struct ActivitySearchResponseMeta {
 pub struct ActivitySearchResponse {
     pub data: Vec<ActivityDetails>,
     pub meta: ActivitySearchResponseMeta,
-    /// The cash balance after each row, by activity id: present only when the
-    /// caller asked for it and searched one cash or credit-card account that
-    /// holds no securities.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cash_balances: Option<std::collections::HashMap<String, ActivityCashBalance>>,
 }
 
 /// Model for importing activities
