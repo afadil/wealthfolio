@@ -320,26 +320,6 @@ impl Scenario {
                             .and_then(|m| m.get("flow"))
                             .and_then(|f| f.get("is_external"))
                             .and_then(Value::as_bool),
-                        fx_conversion: a.metadata.as_ref().and_then(|m| m.get("fx")).map(|fx| {
-                            let text = |key: &str| {
-                                fx.get(key)
-                                    .and_then(Value::as_str)
-                                    .unwrap_or_default()
-                                    .to_string()
-                            };
-                            let amount = |key: &str| {
-                                fx.get(key)
-                                    .and_then(Value::as_str)
-                                    .and_then(|v| Decimal::from_str(v).ok())
-                            };
-                            RawFxConversion {
-                                rate_source: text("rateSource"),
-                                source_currency: text("sourceCurrency"),
-                                destination_currency: text("destinationCurrency"),
-                                source_amount: amount("sourceAmount"),
-                                destination_amount: amount("destinationAmount"),
-                            }
-                        }),
                         source_system: a.source_system.clone(),
                         is_user_modified: a.is_user_modified,
                         updated_at: timestamp,

@@ -112,8 +112,29 @@ describe("useActivityMutations", () => {
     },
   );
 
-  it("never duplicates just one leg when a linked pair cannot be resolved", async () => {
+  it("duplicates a single leg, without its group, when the group resolves to no pair", async () => {
     adapterMocks.getTransferPairForActivity.mockResolvedValue(null);
+    const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.duplicateActivityMutation.mutateAsync({
+        id: "out",
+        accountId: "acc-1",
+        activityType: ActivityType.TRANSFER_OUT,
+        sourceGroupId: "missing",
+        amount: "100",
+        currency: "USD",
+      } as ActivityDetails);
+    });
+    expect(adapterMocks.saveActivities).not.toHaveBeenCalled();
+    expect(adapterMocks.createActivity).toHaveBeenCalledTimes(1);
+    expect(adapterMocks.createActivity.mock.calls[0][0]).not.toHaveProperty("sourceGroupId");
+  });
+
+  it("never duplicates just one leg when the lookup returns another pair", async () => {
+    adapterMocks.getTransferPairForActivity.mockResolvedValue({
+      transferOut: { id: "other-out" },
+      transferIn: { id: "other-in" },
+    });
     const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
     await act(async () => {
       await expect(

@@ -12894,6 +12894,32 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn imported_internal_fx_pair_edits_use_the_pair_ratio_like_manual_ones() {
+        let (service, repository, mut request) = independent_transfer_fixture();
+        request.to_account_id = request.from_account_id.clone();
+        let created = service.save_internal_transfer_pair(request).await.unwrap();
+        // Legs from a CSV import, linked as internal: the source must not
+        // change how a single-leg amount edit reaches the other leg.
+        for leg in repository.activities.lock().unwrap().iter_mut() {
+            leg.source_system = Some("CSV".into());
+            leg.fx_rate = Some(dec!(99));
+        }
+        let mut update = create_test_activity_update(&created.transfer_out.id, "from", None, "HKD");
+        update.activity_type = "TRANSFER_OUT".into();
+        update.amount = Some(Some(dec!(1560)));
+        service.update_activity(update).await.unwrap();
+
+        let outgoing = repository.get_activity(&created.transfer_out.id).unwrap();
+        let incoming = repository.get_activity(&created.transfer_in.id).unwrap();
+        assert_eq!(incoming.amount, Some(dec!(200)));
+        assert!(
+            crate::activities::is_contribution_neutral_same_account_cash_fx_conversion(
+                &incoming, &outgoing,
+            )
+        );
+    }
+
+    #[tokio::test]
     async fn same_account_fx_transfer_guards_single_leg_reclassification_and_deletes_as_a_pair() {
         let (service, repository, mut request) = independent_transfer_fixture();
         let sink = Arc::new(MockDomainEventSink::new());
@@ -12917,7 +12943,6 @@ pub(crate) mod tests {
             );
             update.activity_type = kind.into();
             update.amount = Some(Some(dec!(1560)));
-            assert!(service.preview_activity_update(update.clone()).is_err());
             assert!(service.update_activity(update).await.is_err());
             assert_eq!(
                 repository

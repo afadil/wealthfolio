@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use super::policy::Policy;
 
-/// Persisted provenance of activities explicitly entered by the user.
-pub const ACTIVITY_SOURCE_MANUAL: &str = "MANUAL";
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RawFacts {
     pub policy: Policy,
@@ -88,26 +85,9 @@ pub struct RawActivity {
     pub source_group_id: Option<String>,
     /// `metadata.flow.is_external` when present.
     pub external_transfer: Option<bool>,
-    /// `metadata.fx` when present: what the import linker recorded for a
-    /// same-account cash FX conversion.
-    #[serde(default)]
-    pub fx_conversion: Option<RawFxConversion>,
     pub source_system: Option<String>,
     pub is_user_modified: bool,
     pub updated_at: DateTime<Utc>,
-}
-
-/// The FX pair an importer linked two cash legs with (`metadata.fx`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RawFxConversion {
-    /// `implied_from_import` for pairs the import linker built.
-    pub rate_source: String,
-    pub source_currency: String,
-    pub destination_currency: String,
-    #[serde(default, with = "crate::model::decimal_serde::option")]
-    pub source_amount: Option<Decimal>,
-    #[serde(default, with = "crate::model::decimal_serde::option")]
-    pub destination_amount: Option<Decimal>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

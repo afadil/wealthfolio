@@ -15,7 +15,10 @@ export async function buildSameAccountFxDuplicate(activity: ActivityDetails) {
     return null;
   }
   const pair = await getTransferPairForActivity(activity.id);
-  if (!pair || ![pair.transferOut.id, pair.transferIn.id].includes(activity.id)) {
+  // A group that resolves to no pair (a broken link, or broker legs sharing a
+  // provider group) is not a pair anywhere else either: duplicate the leg.
+  if (!pair) return null;
+  if (![pair.transferOut.id, pair.transferIn.id].includes(activity.id)) {
     throw new Error("Cannot duplicate an unresolved transfer pair.");
   }
   if (!isSameAccountCashFxConversion(pair.transferOut, pair.transferIn)) return null;

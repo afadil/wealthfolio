@@ -598,7 +598,6 @@ fn canonical_activity(
             .map(|g| g.trim().to_string())
             .filter(|g| !g.is_empty()),
         external_transfer: raw.external_transfer,
-        fx_conversion: raw.fx_conversion,
         is_security_transfer,
         source_system: raw
             .source_system
@@ -790,40 +789,16 @@ fn build_pair(group: &str, legs: &[&Activity]) -> Result<TransferPair, String> {
     })
 }
 
-/// Explicitly internal manual cash exchanges are contribution-neutral, as
-/// are pairs carrying the import linker's matching FX record. Unmarked
-/// structural pairs keep their legacy contribution behaviour.
+/// A same-account cash FX conversion whose legs are both explicitly internal
+/// (`flow.is_external: false`), as the pair form, the transfer link and the
+/// import linker record it, whatever the legs' source. A structurally valid
+/// pair without that mark keeps the legacy behaviour.
 fn is_recorded_fx_conversion(transfer_in: &Activity, transfer_out: &Activity) -> bool {
-    if transfer_in.account != transfer_out.account
-        || transfer_in.is_security_transfer
-        || transfer_out.is_security_transfer
-    {
-        return false;
-    }
-    if [transfer_in, transfer_out].iter().all(|leg| {
-        leg.external_transfer == Some(false)
-            && leg.source_system.as_deref() == Some(ACTIVITY_SOURCE_MANUAL)
-    }) {
-        return true;
-    }
-    let (Some(source_amount), Some(destination_amount)) = (transfer_out.amount, transfer_in.amount)
-    else {
-        return false;
-    };
-    [transfer_in, transfer_out].iter().all(|leg| {
-        leg.external_transfer == Some(false)
-            && leg.fx_conversion.as_ref().is_some_and(|fx| {
-                fx.rate_source == "implied_from_import"
-                    && fx
-                        .source_currency
-                        .eq_ignore_ascii_case(transfer_out.currency.as_str())
-                    && fx
-                        .destination_currency
-                        .eq_ignore_ascii_case(transfer_in.currency.as_str())
-                    && fx.source_amount.map(|a| a.abs()) == Some(source_amount)
-                    && fx.destination_amount.map(|a| a.abs()) == Some(destination_amount)
-            })
-    })
+    transfer_in.account == transfer_out.account
+        && !transfer_in.is_security_transfer
+        && !transfer_out.is_security_transfer
+        && transfer_in.external_transfer == Some(false)
+        && transfer_out.external_transfer == Some(false)
 }
 
 #[cfg(test)]
@@ -894,7 +869,6 @@ mod tests {
             fx_rate: None,
             source_group_id: None,
             external_transfer: None,
-            fx_conversion: None,
             source_system: None,
             is_user_modified: false,
             created_at: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),

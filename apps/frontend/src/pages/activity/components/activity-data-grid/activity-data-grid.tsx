@@ -30,6 +30,7 @@ import {
   PINNED_COLUMNS,
   TRACKED_FIELDS,
   valuesAreEqual,
+  withNewPairPartners,
 } from "./activity-utils";
 import { isPendingReview, toLocalTransaction, type LocalTransaction } from "./types";
 import { useActivityColumns } from "./use-activity-columns";
@@ -582,9 +583,14 @@ export function ActivityDataGrid({
   const onRowsDelete = useCallback(
     (rowsToDelete: LocalTransaction[]) => {
       if (rowsToDelete.length === 0) return;
-      markForDeletionBatch(rowsToDelete.map((row) => ({ id: row.id, isNew: !!row.isNew })));
+      markForDeletionBatch(
+        withNewPairPartners(rowsToDelete, localTransactions).map((row) => ({
+          id: row.id,
+          isNew: !!row.isNew,
+        })),
+      );
     },
-    [markForDeletionBatch],
+    [markForDeletionBatch, localTransactions],
   );
 
   // Initialize data grid

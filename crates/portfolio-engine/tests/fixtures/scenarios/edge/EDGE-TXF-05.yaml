@@ -3,11 +3,11 @@ title: A linked same-account FX conversion leaves net contribution unchanged
 intent: >
   Kernel-only; ports #1655 from the previous pipeline. Converting cash
   between two currencies inside one account moves no money in or out, so
-  when the import linker recorded the pair (internal flow, rateSource
-  implied_from_import, matching currencies and amounts) neither leg moves
-  net contribution, and any difference between the conversion rate and the
+  when both legs are explicitly internal (as the import linker, the pair
+  form and the transfer link record them) neither leg moves net
+  contribution, and any difference between the conversion rate and the
   market rate shows up as a gain, not as a contribution. A structurally
-  valid pair without that record keeps the legacy behaviour: each leg moves
+  valid pair without that mark keeps the legacy behaviour: each leg moves
   net contribution at the market rate. Marked [K].
 markers: [K]
 policy:
