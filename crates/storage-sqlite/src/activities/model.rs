@@ -9,6 +9,7 @@ use std::str::FromStr;
 use wealthfolio_core::activities::{
     Activity, ActivityStatus, ActivityUpdate, ActivityUpsert, CashLedgerActivity, NewActivity,
 };
+use wealthfolio_core::utils::time_utils::parse_stored_instant;
 
 fn normalize_subtype_for_storage(subtype: Option<String>) -> Option<String> {
     NewActivity::canonicalize_subtype(subtype.as_deref())
@@ -16,28 +17,11 @@ fn normalize_subtype_for_storage(subtype: Option<String>) -> Option<String> {
 
 /// Helper function to parse a string into a Decimal,
 /// with a fallback for scientific notation by parsing as f64 first.
-/// Parse a datetime stored as TEXT in SQLite, tolerating multiple historical formats.
-///
-/// Priority:
-///   1. RFC3339 / ISO 8601 with timezone (`2026-05-04T08:18:00.000Z`) — what we always write now
-///   2. Naive `YYYY-MM-DD HH:MM:SS[.fff]` (SQLite's default `CURRENT_TIMESTAMP` shape, legacy seed rows) — assume UTC
-///   3. Date-only `YYYY-MM-DD` — midnight UTC (matches the JSON-side `timestamp_format` deserializer)
-///
-/// Returns `None` only when none of the above match; callers fall back to `Utc::now()` and log.
+/// Parse a datetime stored as TEXT in SQLite, tolerating its historical
+/// formats (see [`parse_stored_instant`]). Returns `None` only when none
+/// match; callers fall back to `Utc::now()` and log.
 fn parse_db_datetime(s: &str) -> Option<chrono::DateTime<Utc>> {
-    use chrono::DateTime;
-    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-        return Some(dt.with_timezone(&Utc));
-    }
-    for fmt in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%d %H:%M:%S"] {
-        if let Ok(naive) = NaiveDateTime::parse_from_str(s, fmt) {
-            return Some(Utc.from_utc_datetime(&naive));
-        }
-    }
-    if let Ok(date) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        return Some(Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0)?));
-    }
-    None
+    parse_stored_instant(s)
 }
 
 fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
