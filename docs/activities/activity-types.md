@@ -193,9 +193,11 @@ cash FX conversion within the same account is a narrow exception:
 - Account-level `net_contribution` and `net_contribution_base` do not change.
 - No external portfolio flow or TWR cash-flow event is created.
 
-This exception uses Wealthfolio's qualified FX-pair recognition. Same-account
-transfers or transfers that merely share a group identifier are not
-automatically contribution-neutral.
+The pair is recognized when its two cash legs are in the same account, in
+different currencies, linked by one group identifier, and both explicitly
+internal (`flow.is_external: false`). The transfer form, the transfer link and
+the import linker record pairs that way. Legs that merely share a group
+identifier, without that mark, are not contribution-neutral.
 
 #### TRANSFER_IN
 

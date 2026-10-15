@@ -577,7 +577,6 @@ mod tests {
             fx_rate: None,
             source_group_id: None,
             external_transfer: None,
-            fx_conversion: None,
             source_system: None,
             is_user_modified: false,
             created_at: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),

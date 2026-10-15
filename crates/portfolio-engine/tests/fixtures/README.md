@@ -78,10 +78,8 @@ activities:
     override: DIVIDEND      # activity_type_override
     source_group_id: g1     # transfer pairing key
     metadata: { flow: { is_external: true } }
-                            # or, for a linked same-account FX conversion leg:
-                            # { flow: { is_external: false }, fx: { rateSource: implied_from_import,
-                            #   sourceCurrency: USD, destinationCurrency: EUR,
-                            #   sourceAmount: "100", destinationAmount: "92" } }
+                            # or { flow: { is_external: false } } for a leg of an
+                            # internal pair, such as a same-account FX conversion
     source_system: MANUAL
     is_user_modified: false
     updated_at: 2025-01-02T10:00:00Z  # default: date

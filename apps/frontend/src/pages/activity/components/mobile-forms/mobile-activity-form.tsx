@@ -591,6 +591,7 @@ export function MobileActivityForm({
       const transferError = validateTransferFields(
         {
           activityType: submitData.activityType,
+          accountId: submitData.accountId,
           transferMode: _tm,
           isExternal: _isExternal,
           direction: _direction,

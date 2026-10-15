@@ -82,13 +82,13 @@ EDGE-SPLIT-01, EDGE-SPLIT-02, EDGE-SPLIT-03, EDGE-SPLIT-04, EDGE-QT-05.
 
 **R2.2 A currency conversion inside one account.** A valid cash transfer pair in
 different currencies is contribution-neutral when both legs are explicitly
-internal (`flow.is_external: false`) and `source_system: MANUAL`, or when the
-import linker recorded the matching FX metadata. It moves no money in or out; a
-better rate than the market's is a gain, not new capital. Unmarked structural
-pairs retain legacy behaviour: each leg moves net contribution at the market
-rate and the difference reads as an estimated flow. Execution ratios are not
-valuation FX overrides. Fixtures: EDGE-TXF-05, EDGE-TXF-13; manual parity and
-provenance checks: `crates/portfolio-engine/tests/manual_fx_transfer.rs`.
+internal (`flow.is_external: false`), whatever their source: the pair form, the
+transfer link and the import linker all record it that way. It moves no money in
+or out; a better rate than the market's is a gain, not new capital. Unmarked
+structural pairs retain legacy behaviour: each leg moves net contribution at the
+market rate and the difference reads as an estimated flow. Execution ratios are
+not valuation FX overrides. Fixtures: EDGE-TXF-05, EDGE-TXF-13; source and flag
+checks: `crates/portfolio-engine/tests/manual_fx_transfer.rs`.
 
 **R2.3 A transfer between a transactions account and a holdings account** is not
 netted as a pair. The transactions side is money (or shares) leaving or entering

@@ -1,4 +1,4 @@
-//! Manual same-account transfers reuse the imported FX pair's accounting.
+//! Same-account FX pairs entered by hand reuse the imported pair's accounting.
 #![allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 
 mod support;
@@ -7,7 +7,9 @@ use rust_decimal_macros::dec;
 use support::*;
 use wealthfolio_portfolio_engine::model::*;
 
-fn manual_fx_scenario() -> Scenario {
+/// EDGE-TXF-05's linked pair with only the internal-flow mark the pair form,
+/// the transfer link and the import linker share: no import FX record.
+fn internal_fx_scenario(source_system: Option<&str>) -> Scenario {
     let mut scenario = load_all_scenarios()
         .into_iter()
         .find(|s| s.id == "EDGE-TXF-05")
@@ -17,36 +19,48 @@ fn manual_fx_scenario() -> Scenario {
         .iter_mut()
         .filter(|a| a.id.ends_with("-linked") && a.id.starts_with("fx-"))
     {
-        activity.source_system = Some(ACTIVITY_SOURCE_MANUAL.into());
+        activity.source_system = source_system.map(str::to_string);
         activity.metadata = Some(serde_json::json!({ "flow": { "is_external": false } }));
     }
     scenario
 }
 
+fn linked_net_contribution(scenario: &Scenario) -> rust_decimal::Decimal {
+    let pipeline = Pipeline::from_scenario(scenario);
+    pipeline.series[&AccountId::new("acc-linked")]
+        .days
+        .last()
+        .unwrap()
+        .net_contribution_base
+}
+
 #[test]
-fn manual_fx_transfer_matches_imported_balances_contributions_flows_and_returns() {
+fn internal_fx_transfer_matches_imported_balances_contributions_flows_and_returns() {
     let imported = load_all_scenarios()
         .into_iter()
         .find(|s| s.id == "EDGE-TXF-05")
         .unwrap();
-    let manual = manual_fx_scenario();
-    let pipeline = Pipeline::from_scenario(&manual);
-    let last = pipeline.series[&AccountId::new("acc-linked")]
-        .days
-        .last()
-        .unwrap();
-    assert_eq!(last.total_value_base, dec!(1001.2));
-    assert_eq!(last.net_contribution_base, dec!(1000));
-    assert_eq!(
-        capture_body(&pipeline, &all_windows(&manual)),
-        capture_body(&Pipeline::from_scenario(&imported), &all_windows(&imported)),
-    );
+    for source_system in [Some("MANUAL"), Some("CSV"), Some("SNAPTRADE"), None] {
+        let internal = internal_fx_scenario(source_system);
+        let pipeline = Pipeline::from_scenario(&internal);
+        let last = pipeline.series[&AccountId::new("acc-linked")]
+            .days
+            .last()
+            .unwrap();
+        assert_eq!(last.total_value_base, dec!(1001.2), "{source_system:?}");
+        assert_eq!(last.net_contribution_base, dec!(1000), "{source_system:?}");
+        assert_eq!(
+            capture_body(&pipeline, &all_windows(&internal)),
+            capture_body(&Pipeline::from_scenario(&imported), &all_windows(&imported)),
+            "{source_system:?}"
+        );
+    }
 }
 
 #[test]
-fn manual_fx_transfer_requires_both_legs_to_be_explicitly_internal_and_manual() {
-    for patch in 0..3 {
-        let mut scenario = manual_fx_scenario();
+fn fx_transfer_without_two_explicitly_internal_legs_keeps_legacy_contributions() {
+    for patch in 0..2 {
+        let mut scenario = internal_fx_scenario(Some("MANUAL"));
         let incoming = scenario
             .activities
             .iter_mut()
@@ -54,14 +68,8 @@ fn manual_fx_transfer_requires_both_legs_to_be_explicitly_internal_and_manual() 
             .unwrap();
         match patch {
             0 => incoming.metadata = None,
-            1 => incoming.metadata = Some(serde_json::json!({ "flow": { "is_external": true } })),
-            _ => incoming.source_system = Some("CSV".into()),
+            _ => incoming.metadata = Some(serde_json::json!({ "flow": { "is_external": true } })),
         }
-        let pipeline = Pipeline::from_scenario(&scenario);
-        let last = pipeline.series[&AccountId::new("acc-linked")]
-            .days
-            .last()
-            .unwrap();
-        assert_eq!(last.net_contribution_base, dec!(1001.2));
+        assert_eq!(linked_net_contribution(&scenario), dec!(1001.2));
     }
 }

@@ -1942,9 +1942,7 @@ impl ActivityService {
                 fx_rate: None,
                 metadata: metadata.clone(),
                 needs_review: None,
-                source_system: Some(
-                    wealthfolio_portfolio_engine::model::ACTIVITY_SOURCE_MANUAL.to_string(),
-                ),
+                source_system: Some("MANUAL".to_string()),
                 source_record_id: None,
                 source_group_id: Some(group_id.clone()),
                 idempotency_key: None,
@@ -1968,9 +1966,7 @@ impl ActivityService {
                 fx_rate: None,
                 metadata,
                 needs_review: None,
-                source_system: Some(
-                    wealthfolio_portfolio_engine::model::ACTIVITY_SOURCE_MANUAL.to_string(),
-                ),
+                source_system: Some("MANUAL".to_string()),
                 source_record_id: None,
                 source_group_id: Some(group_id),
                 idempotency_key: None,
@@ -2128,9 +2124,10 @@ impl ActivityService {
         }
 
         if pair.transfer_out.account_id != pair.transfer_in.account_id
-            || [&pair.transfer_in, &pair.transfer_out]
-                .into_iter()
-                .all(super::transfer_pairs::is_manual_internal_transfer)
+            || super::is_contribution_neutral_same_account_cash_fx_conversion(
+                &pair.transfer_in,
+                &pair.transfer_out,
+            )
         {
             // Grid saves can echo the original amount. A notes/rate-only edit
             // must not recalculate the other leg using a rounded ratio.
@@ -5203,10 +5200,7 @@ impl ActivityServiceTrait for ActivityService {
 
         let pair = self.load_internal_transfer_pair_for_activity(&activity.id)?;
         let counterpart_update = match pair.as_ref() {
-            Some(pair) => {
-                Self::validate_internal_cash_pair_currency_update(&activity, &existing, pair)?;
-                self.build_counterpart_update(&activity, &existing, pair)?
-            }
+            Some(pair) => self.build_counterpart_update(&activity, &existing, pair)?,
             None => None,
         };
         let activity = self.preview_prepared_update(activity, existing)?;
