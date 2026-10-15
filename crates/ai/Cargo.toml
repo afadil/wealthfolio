@@ -31,7 +31,7 @@ reqwest = { workspace = true }
 sha2 = { workspace = true }
 
 # LLM orchestration facade (portable contracts + agent runtime)
-rig = { version = "0.42.0", default-features = false, features = ["agent", "reqwest"] }
+rig = { version = "0.44.0", default-features = false, features = ["agent", "reqwest"] }
 wealthfolio-http = { workspace = true }
 
 # Lazy static initialization
