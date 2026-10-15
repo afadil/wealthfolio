@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "Select Currency",
-    "selectDescription": "Choose your activity currency",
+    "selectDescription": "Choose a currency",
+    "placeholder": "Select currency",
+    "popular": "Popular",
     "more": "More",
     "search": "Search currency...",
     "searchAll": "Search all currencies...",
