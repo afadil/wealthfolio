@@ -15,8 +15,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    is_cash_symbol, Activity, ActivityCompiler, DefaultActivityCompiler, ACTIVITY_TYPE_BUY,
-    ACTIVITY_TYPE_SELL,
+    is_cash_symbol, Activity, ActivityCompiler, DefaultActivityCompiler, NewActivity,
+    ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL,
 };
 use crate::accounts::{account_types, Account, TrackingMode};
 use crate::portfolio::economic_events::ActivityEconomicsResolver;
@@ -96,18 +96,21 @@ pub fn running_cash_balances(
     Some(balances)
 }
 
-/// A trade, a row tied to an asset other than cash, or a row the compiler
-/// expands into income and a purchase (DRIP, dividend in kind, staking
-/// reward), with or without an asset.
+/// A trade, a row tied to an asset other than cash, a return of capital
+/// (which reduces a holding: against a cash symbol the engine rejects it),
+/// or a row the compiler expands into income and a purchase (DRIP, dividend
+/// in kind, staking reward), with or without an asset.
 fn holds_security(activity: &Activity) -> bool {
-    matches!(
-        activity.effective_type(),
-        ACTIVITY_TYPE_BUY | ACTIVITY_TYPE_SELL
-    ) || activity
-        .asset_id
-        .as_deref()
-        .map(str::trim)
-        .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
+    let activity_type = activity.effective_type();
+    let subtype =
+        NewActivity::canonicalize_subtype_for_activity(activity_type, activity.subtype.as_deref());
+    matches!(activity_type, ACTIVITY_TYPE_BUY | ACTIVITY_TYPE_SELL)
+        || subtype.as_deref() == Some(ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL)
+        || activity
+            .asset_id
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
         || DefaultActivityCompiler::new()
             .compile(activity)
             .map_or(true, |postings| postings.len() != 1)
@@ -119,14 +122,22 @@ mod tests {
 
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal_macros::dec;
-    use wealthfolio_portfolio_engine::model::{AccountId, Currency, Policy, RawAccount, RawFacts};
+    use wealthfolio_portfolio_engine::model::{
+        AccountId, Currency, Policy, RawAccount, RawAsset, RawFacts,
+    };
     use wealthfolio_portfolio_engine::Engine;
 
     use super::*;
     use crate::activities::{
-        ActivityStatus, ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_FEE,
-        ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TRANSFER_IN,
-        ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_WITHDRAWAL,
+        ActivityStatus, ACTIVITY_SUBTYPE_BONUS, ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND,
+        ACTIVITY_SUBTYPE_DRIP, ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION,
+        ACTIVITY_SUBTYPE_OPTION_EXPIRY, ACTIVITY_SUBTYPE_POSITION_CLOSE,
+        ACTIVITY_SUBTYPE_POSITION_OPEN, ACTIVITY_SUBTYPE_REBATE, ACTIVITY_SUBTYPE_REFUND,
+        ACTIVITY_SUBTYPE_REIMBURSEMENT, ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL,
+        ACTIVITY_SUBTYPE_STAKING_REWARD, ACTIVITY_TYPE_ADJUSTMENT, ACTIVITY_TYPE_CREDIT,
+        ACTIVITY_TYPE_DEPOSIT, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_FEE, ACTIVITY_TYPE_INTEREST,
+        ACTIVITY_TYPE_SPLIT, ACTIVITY_TYPE_TAX, ACTIVITY_TYPE_TRANSFER_IN,
+        ACTIVITY_TYPE_TRANSFER_OUT, ACTIVITY_TYPE_UNKNOWN, ACTIVITY_TYPE_WITHDRAWAL,
     };
     use crate::portfolio::coordinator::raw_activity;
 
@@ -190,6 +201,14 @@ mod tests {
 
     /// The engine's cash for `account` after folding `activities`.
     fn engine_cash(account: &Account, activities: &[Activity]) -> BTreeMap<String, Decimal> {
+        engine_cash_for(account, Vec::new(), activities)
+    }
+
+    fn engine_cash_for(
+        account: &Account,
+        assets: Vec<RawAsset>,
+        activities: &[Activity],
+    ) -> BTreeMap<String, Decimal> {
         let raw = RawFacts {
             policy: Policy::new(
                 Currency::parse(&account.currency).expect("account currency"),
@@ -204,7 +223,7 @@ mod tests {
                 is_archived: false,
                 cost_basis_method: None,
             }],
-            assets: Vec::new(),
+            assets,
             activities: activities.iter().map(raw_activity).collect(),
             quotes: Vec::new(),
             fx_rates: Vec::new(),
@@ -568,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn composite_rows_get_no_balances_even_without_an_asset() {
+    fn holding_income_rows_get_no_balances_even_without_an_asset() {
         let account = account(account_types::CASH, "CAD");
         let mut deposit = activity(
             "deposit",
@@ -586,12 +605,15 @@ mod tests {
             row
         };
 
-        // The engine books the income and the purchase it pays for, which net
-        // to nothing here; the row's own amount would count only the income.
+        // The engine books a composite's income and the purchase it pays for,
+        // which net to nothing here; the row's own amount counts only the
+        // income. A return of capital reduces a holding the account may not
+        // have, and then the engine rejects it.
         for (activity_type, subtype) in [
             (ACTIVITY_TYPE_DIVIDEND, "DRIP"),
             (ACTIVITY_TYPE_DIVIDEND, "DIVIDEND_IN_KIND"),
             (ACTIVITY_TYPE_INTEREST, "STAKING_REWARD"),
+            (ACTIVITY_TYPE_DIVIDEND, "RETURN_OF_CAPITAL"),
         ] {
             assert!(
                 running_cash_balances(&account, &[deposit.clone(), income(activity_type, subtype)])
@@ -600,12 +622,139 @@ mod tests {
             );
         }
 
-        // A return of capital moves only cash, so the account keeps them.
-        let activities = vec![deposit, income(ACTIVITY_TYPE_DIVIDEND, "RETURN_OF_CAPITAL")];
+        // Plain income moves only cash, so the account keeps them.
+        let mut dividend = income(ACTIVITY_TYPE_DIVIDEND, "");
+        dividend.subtype = None;
+        let activities = vec![deposit, dividend];
         let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
         assert_eq!(
             closing_cash(&balances, &activities),
             engine_cash(&account, &activities)
         );
+    }
+
+    /// Every activity type, subtype, asset and currency the ledger can meet,
+    /// one row after an opening deposit: the ledger either withholds the
+    /// balances or ends where the engine does. Hand-picked cases missed rows
+    /// the engine books differently; this covers the space instead.
+    #[test]
+    fn every_row_kind_is_withheld_or_matches_the_engine() {
+        let types = [
+            ACTIVITY_TYPE_BUY,
+            ACTIVITY_TYPE_SELL,
+            ACTIVITY_TYPE_DIVIDEND,
+            ACTIVITY_TYPE_INTEREST,
+            ACTIVITY_TYPE_DEPOSIT,
+            ACTIVITY_TYPE_WITHDRAWAL,
+            ACTIVITY_TYPE_TRANSFER_IN,
+            ACTIVITY_TYPE_TRANSFER_OUT,
+            ACTIVITY_TYPE_FEE,
+            ACTIVITY_TYPE_TAX,
+            ACTIVITY_TYPE_SPLIT,
+            ACTIVITY_TYPE_CREDIT,
+            ACTIVITY_TYPE_ADJUSTMENT,
+            ACTIVITY_TYPE_UNKNOWN,
+        ];
+        let subtypes = [
+            None,
+            Some(ACTIVITY_SUBTYPE_DRIP),
+            Some(ACTIVITY_SUBTYPE_STAKING_REWARD),
+            Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND),
+            Some(ACTIVITY_SUBTYPE_BONUS),
+            Some(ACTIVITY_SUBTYPE_REBATE),
+            Some(ACTIVITY_SUBTYPE_REFUND),
+            Some(ACTIVITY_SUBTYPE_REIMBURSEMENT),
+            Some(ACTIVITY_SUBTYPE_OPTION_EXPIRY),
+            Some(ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL),
+            Some(ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION),
+            Some(ACTIVITY_SUBTYPE_POSITION_OPEN),
+            Some(ACTIVITY_SUBTYPE_POSITION_CLOSE),
+        ];
+        let assets = [None, Some("$CASH-USD"), Some("AAPL"), Some(OPTION)];
+        // The account's own currency, a foreign one with no rate, and a
+        // foreign one at a broker rate.
+        let currencies = [("CAD", None), ("USD", None), ("USD", Some(dec!(1.35)))];
+
+        let mut checked = 0;
+        let mut compared = 0;
+        let mut failures = Vec::new();
+        for account_type in [account_types::CASH, account_types::CREDIT_CARD] {
+            let account = account(account_type, "CAD");
+            for activity_type in types {
+                for subtype in subtypes {
+                    for asset in assets {
+                        for (currency, fx_rate) in currencies {
+                            let mut deposit = activity(
+                                "opening",
+                                ACTIVITY_TYPE_DEPOSIT,
+                                "2026-04-01T00:00:00Z",
+                                dec!(1000),
+                            );
+                            deposit.currency = "CAD".to_string();
+                            let mut row =
+                                activity("row", activity_type, "2026-04-02T00:00:00Z", dec!(6));
+                            row.subtype = subtype.map(str::to_string);
+                            row.asset_id = asset.map(str::to_string);
+                            row.quantity = Some(dec!(2));
+                            row.unit_price = Some(dec!(3));
+                            row.fee = Some(dec!(1));
+                            row.currency = currency.to_string();
+                            row.fx_rate = fx_rate;
+                            let activities = vec![deposit, row];
+
+                            checked += 1;
+                            let Some(balances) = running_cash_balances(&account, &activities)
+                            else {
+                                continue;
+                            };
+                            compared += 1;
+                            let ledger = closing_cash(&balances, &activities);
+                            let engine = engine_cash_with_assets(&account, &activities);
+                            if ledger != engine {
+                                failures.push(format!(
+                                    "{account_type} {activity_type} {subtype:?} asset={asset:?} \
+                                     {currency} fx={fx_rate:?}: ledger {ledger:?}, engine {engine:?}"
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        assert_eq!(checked, 2 * 14 * 13 * 4 * 3);
+        // Cash rows must still reach the comparison, or the table proves nothing.
+        assert!(
+            compared >= 1_500,
+            "only {compared} of {checked} cases reached the engine"
+        );
+        assert!(
+            failures.is_empty(),
+            "{} of {checked} cases diverge:\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+
+    const OPTION: &str = "AAPL261218C00150000";
+
+    /// `engine_cash` with the table's equity and option known to the engine,
+    /// as the facts loader would supply them for rows that name them.
+    fn engine_cash_with_assets(
+        account: &Account,
+        activities: &[Activity],
+    ) -> BTreeMap<String, Decimal> {
+        let asset = |id: &str, instrument_type: &str| RawAsset {
+            id: id.to_string(),
+            quote_currency: "USD".to_string(),
+            kind: "INVESTMENT".to_string(),
+            instrument_type: Some(instrument_type.to_string()),
+            contract_multiplier: None,
+        };
+        engine_cash_for(
+            account,
+            vec![asset("AAPL", "EQUITY"), asset(OPTION, "OPTION")],
+            activities,
+        )
     }
 }
