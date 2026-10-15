@@ -16518,11 +16518,14 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_row_without_a_balance_serializes_as_before() {
+    fn a_row_without_a_balance_serializes_null_balance_fields() {
         let mut row = page_row("deposit", "checking");
         let json = serde_json::to_value(&row).expect("serialize row");
-        assert!(json.get("cashBalance").is_none());
-        assert!(json.get("cashBalanceCurrency").is_none());
+        assert_eq!(json.get("cashBalance"), Some(&serde_json::Value::Null));
+        assert_eq!(
+            json.get("cashBalanceCurrency"),
+            Some(&serde_json::Value::Null)
+        );
 
         row.cash_balance = Some("70".to_string());
         row.cash_balance_currency = Some("USD".to_string());
