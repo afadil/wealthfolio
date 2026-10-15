@@ -22,6 +22,30 @@ function row(
 }
 
 describe("shownCashBalanceIds", () => {
+  it("holds an oldest-first list's last day until its next page loads", () => {
+    const loaded = [
+      row("monday", "2026-04-01T10:00:00Z", "DAY"),
+      row("tuesday-ira", "2026-04-02T08:00:00Z", "DAY", "ira"),
+      row("tuesday-buy", "2026-04-02T09:00:00Z", "DAY"),
+    ];
+    // Tuesday may continue on the next page, for either account.
+    expect(shownCashBalanceIds(loaded, undefined, true)).toEqual(new Set(["monday"]));
+
+    const nextPage = [row("tuesday-dividend", "2026-04-02T15:00:00Z", "DAY")];
+    expect(shownCashBalanceIds([...loaded, ...nextPage], undefined, false)).toEqual(
+      new Set(["monday", "tuesday-ira", "tuesday-dividend"]),
+    );
+  });
+
+  it("shows a newest-first list's last loaded day, whose last row comes first", () => {
+    const loaded = [
+      row("tuesday-dividend", "2026-04-02T15:00:00Z", "DAY"),
+      row("tuesday-buy", "2026-04-02T09:00:00Z", "DAY"),
+    ];
+
+    expect(shownCashBalanceIds(loaded, undefined, true)).toEqual(new Set(["tuesday-dividend"]));
+  });
+
   it("breaks a shared timestamp by creation time, then id, in either order", () => {
     // Date-only imports share a timestamp: the engine applies them by
     // created_at, then id, and the day's balance belongs on the last one.

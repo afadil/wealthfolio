@@ -99,8 +99,8 @@ export const ActivityTableMobile = ({
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
   const shownBalanceIds = useMemo(
-    () => shownCashBalanceIds(activities, appTimezone),
-    [activities, appTimezone],
+    () => shownCashBalanceIds(activities, appTimezone, hasNextPage),
+    [activities, appTimezone, hasNextPage],
   );
 
   // Embedded lists can share an already-scrolled page rather than their own box.
