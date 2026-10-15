@@ -448,10 +448,7 @@ fn asset_facts(id: &AssetId, asset: &RawAsset, diagnostics: &mut Vec<Diagnostic>
         .instrument_type
         .as_deref()
         .map(|s| s.trim().to_ascii_uppercase());
-    let alternative = matches!(
-        kind.as_str(),
-        "PROPERTY" | "VEHICLE" | "COLLECTIBLE" | "PRECIOUS_METAL"
-    );
+    let alternative = asset.alternative;
     let is_option = instrument.as_deref() == Some("OPTION");
     let equity_like =
         kind == "INVESTMENT" && matches!(instrument.as_deref(), None | Some("EQUITY"));

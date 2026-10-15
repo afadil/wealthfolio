@@ -135,6 +135,9 @@ pub struct AssetSpec {
     pub instrument_type: String,
     #[serde(default)]
     pub contract_multiplier: Option<Dec>,
+    /// The host's alternative-asset fact (core derives it from the kind).
+    #[serde(default)]
+    pub alternative: bool,
 }
 
 fn investment() -> String {
@@ -278,6 +281,7 @@ impl Scenario {
                     instrument_type: (a.instrument_type != "NONE")
                         .then(|| a.instrument_type.clone()),
                     contract_multiplier: a.contract_multiplier.map(|d| d.0),
+                    alternative: a.alternative,
                 })
                 .collect(),
             activities: self

@@ -47,6 +47,11 @@ pub struct RawAsset {
     /// default (100 for options, 1 otherwise).
     #[serde(default, with = "crate::model::decimal_serde::option")]
     pub contract_multiplier: Option<Decimal>,
+    /// An alternative asset (property, vehicle, ...), valued on its own: a
+    /// position an account holds in it stays out of the account's value. The
+    /// host decides which kinds are alternative.
+    #[serde(default)]
+    pub alternative: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
