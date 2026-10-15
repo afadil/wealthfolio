@@ -2,7 +2,6 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { QueryKeys } from "@/lib/query-keys";
-import type { ActivityCashBalance } from "@/lib/types";
 
 import { searchCashActivities } from "../adapters/cash-activities";
 import type {
@@ -55,22 +54,11 @@ export function useCashActivitySearch(
   // `netAmountBase` is actually denominated in, so a cached page stays labelled
   // correctly even if the setting has since changed.
   const baseCurrency = query.data?.pages[0]?.baseCurrency ?? undefined;
-  // Each page balances its own rows from the account's whole history, so the
-  // maps merge without overlap.
-  const cashBalances = useMemo(() => {
-    const pages = query.data?.pages;
-    if (!pages?.some((page) => page.cashBalances)) return undefined;
-    const merged: Record<string, ActivityCashBalance> = {};
-    for (const page of pages) Object.assign(merged, page.cashBalances);
-    return merged;
-  }, [query.data]);
-
   return {
     items,
     totalCount,
     net,
     baseCurrency,
-    cashBalances,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isFetchingNextPage: query.isFetchingNextPage,

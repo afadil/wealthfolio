@@ -4970,36 +4970,52 @@ impl ActivityServiceTrait for ActivityService {
         )
     }
 
-    /// Balances come from the account's whole history, not the page: a row's
-    /// balance depends on every earlier row, loaded or not.
-    async fn attach_cash_balances(
-        &self,
-        response: &mut ActivitySearchResponse,
-        account_ids: Option<&[String]>,
-    ) -> Result<()> {
-        let Some([account_id]) = account_ids else {
+    /// Balances come from each account's whole history, not the page: a row's
+    /// balance depends on every earlier row of its account, loaded or not.
+    async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> Result<()> {
+        let account_ids: Vec<String> = response
+            .data
+            .iter()
+            .map(|row| row.account_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        if account_ids.is_empty() {
             return Ok(());
-        };
-        let account_id = account_id.clone();
+        }
         let activity_repository = Arc::clone(&self.activity_repository);
         let account_service = Arc::clone(&self.account_service);
-        let balances = crate::portfolio::coordinator::blocking(move || {
-            let account = account_service.get_account(&account_id)?;
-            if !shows_running_cash_balance(&account) {
-                return Ok(None);
+        let mut balances = crate::portfolio::coordinator::blocking(move || {
+            let accounts: Vec<Account> = account_service
+                .get_accounts_by_ids(&account_ids)?
+                .into_iter()
+                .filter(shows_running_cash_balance)
+                .collect();
+            if accounts.is_empty() {
+                return Ok(HashMap::new());
             }
-            let activities = activity_repository.get_activities_by_account_id(&account_id)?;
-            Ok(running_cash_balances(&account, &activities))
+            let eligible: Vec<String> = accounts.iter().map(|account| account.id.clone()).collect();
+            // One read for every eligible account's history, split per account.
+            let mut histories: HashMap<String, Vec<Activity>> = HashMap::new();
+            for activity in activity_repository.get_activities_by_account_ids(&eligible)? {
+                histories
+                    .entry(activity.account_id.clone())
+                    .or_default()
+                    .push(activity);
+            }
+            let mut balances = HashMap::new();
+            for account in &accounts {
+                let history = histories.remove(&account.id).unwrap_or_default();
+                balances.extend(running_cash_balances(account, &history).unwrap_or_default());
+            }
+            Ok(balances)
         })
         .await?;
-        if let Some(mut balances) = balances {
-            response.cash_balances = Some(
-                response
-                    .data
-                    .iter()
-                    .filter_map(|row| balances.remove_entry(&row.id))
-                    .collect(),
-            );
+        for row in &mut response.data {
+            if let Some(balance) = balances.remove(&row.id) {
+                row.cash_balance = Some(balance.balance.to_string());
+                row.cash_balance_currency = Some(balance.currency);
+            }
         }
         Ok(())
     }

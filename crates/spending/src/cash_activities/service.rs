@@ -222,6 +222,8 @@ impl CashActivityService {
                     net_amount,
                     net_amount_base: None,
                     visible_spending_amount,
+                    cash_balance: None,
+                    cash_balance_currency: None,
                 }
             })
             .collect();
@@ -379,7 +381,6 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
-                cash_balances: None,
             });
         }
 
@@ -394,7 +395,6 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
-                cash_balances: None,
             });
         }
         let all_spending_account_ids: HashSet<&str> =
@@ -412,7 +412,6 @@ impl CashActivityService {
                 total_count: 0,
                 net: Some(NetSummary::default()),
                 base_currency: base_currency.map(str::to_string),
-                cash_balances: None,
             });
         }
 
@@ -635,11 +634,7 @@ impl CashActivityService {
         let page: Vec<Activity> = activities.drain(offset..end).collect();
         // Drop the rest — we no longer need them.
         drop(activities);
-        let cash_balances = cash_balances.map(|mut balances| {
-            page.iter()
-                .filter_map(|a| balances.remove_entry(&a.id))
-                .collect()
-        });
+        let mut cash_balances = cash_balances.unwrap_or_default();
 
         // Batch-fetch assignments + event tags for the paginated slice.
         // (Always — clients use both for display.)
@@ -668,6 +663,7 @@ impl CashActivityService {
                 let cash_flow_bucket = cash_flow_bucket_for(&a, &account_types, &transfer_groups);
                 let transfer_link_status = transfer_link_status_for(&a, &transfer_link_resolution);
                 let net = net_amount(&a, &account_types);
+                let cash_balance = cash_balances.remove(&a.id);
                 let net_amount_base = base_currency
                     .and_then(|base| {
                         let account_currency =
@@ -685,6 +681,10 @@ impl CashActivityService {
                     net_amount: decimal_to_f64(net),
                     net_amount_base,
                     visible_spending_amount,
+                    cash_balance_currency: cash_balance
+                        .as_ref()
+                        .map(|balance| balance.currency.clone()),
+                    cash_balance: cash_balance.map(|balance| balance.balance.to_string()),
                 }
             })
             .collect();
@@ -694,7 +694,6 @@ impl CashActivityService {
             total_count,
             net,
             base_currency: base_currency.map(str::to_string),
-            cash_balances,
         })
     }
 
@@ -792,6 +791,8 @@ impl CashActivityService {
                     net_amount,
                     net_amount_base: None,
                     visible_spending_amount,
+                    cash_balance: None,
+                    cash_balance_currency: None,
                 }
             })
             .collect())
@@ -2684,13 +2685,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.items.len(), 1);
-        assert_eq!(response.items[0].activity.id, "coffee");
-        let balances = response
-            .cash_balances
-            .expect("balances for one cash account");
-        assert_eq!(balances.len(), 1);
-        assert_eq!(balances["coffee"].balance, Decimal::new(850, 0));
-        assert_eq!(balances["coffee"].currency, "USD");
+        let coffee = &response.items[0];
+        assert_eq!(coffee.activity.id, "coffee");
+        assert_eq!(coffee.cash_balance.as_deref(), Some("850"));
+        assert_eq!(coffee.cash_balance_currency.as_deref(), Some("USD"));
     }
 
     #[tokio::test]
@@ -2709,9 +2707,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(response.cash_balances.is_none());
-        let json = serde_json::to_value(&response).unwrap();
-        assert!(json.get("cashBalances").is_none());
+        assert!(response.items[0].cash_balance.is_none());
+        let json = serde_json::to_value(&response.items[0]).unwrap();
+        assert!(json.get("cashBalance").is_none());
+        assert!(json.get("cashBalanceCurrency").is_none());
     }
 
     #[tokio::test]
@@ -2726,7 +2725,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(response.cash_balances.is_none());
+        assert!(response
+            .items
+            .iter()
+            .all(|item| item.cash_balance.is_none()));
     }
 
     #[tokio::test]
@@ -2761,10 +2763,12 @@ mod tests {
             .map(|item| item.activity.id.as_str())
             .collect();
         assert_eq!(ids, vec!["gas", "coffee", "opening"]);
-        let balances = response.cash_balances.unwrap();
-        assert_eq!(balances["opening"].balance, Decimal::new(100, 0));
-        assert_eq!(balances["coffee"].balance, Decimal::new(95, 0));
-        assert_eq!(balances["gas"].balance, Decimal::new(65, 0));
+        let balances: Vec<Option<&str>> = response
+            .items
+            .iter()
+            .map(|item| item.cash_balance.as_deref())
+            .collect();
+        assert_eq!(balances, vec![Some("65"), Some("95"), Some("100")]);
     }
 
     /// A single currency already is the total, so converting it would only add

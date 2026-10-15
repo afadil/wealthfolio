@@ -392,10 +392,22 @@ impl TaxonomyServiceTrait for MockTaxonomyService {
 #[derive(Default)]
 pub struct MockActivityService {
     pub activities: Vec<ActivityDetails>,
+    /// Balance and currency `attach_cash_balances` fills in, by activity id.
+    pub cash_balances: std::collections::HashMap<String, (String, String)>,
 }
 
 #[async_trait]
 impl ActivityServiceTrait for MockActivityService {
+    async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> CoreResult<()> {
+        for row in &mut response.data {
+            if let Some((balance, currency)) = self.cash_balances.get(&row.id) {
+                row.cash_balance = Some(balance.clone());
+                row.cash_balance_currency = Some(currency.clone());
+            }
+        }
+        Ok(())
+    }
+
     fn get_activity(&self, _activity_id: &str) -> CoreResult<Activity> {
         unimplemented!("MockActivityService::get_activity")
     }
@@ -443,7 +455,6 @@ impl ActivityServiceTrait for MockActivityService {
             meta: ActivitySearchResponseMeta {
                 total_row_count: self.activities.len() as i64,
             },
-            cash_balances: None,
         })
     }
 
@@ -1600,7 +1611,6 @@ impl CashActivityServiceTrait for MockCashActivityService {
                 total_count,
                 net: None,
                 base_currency: None,
-                cash_balances: None,
             },
         )
     }

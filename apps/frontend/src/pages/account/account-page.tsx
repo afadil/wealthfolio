@@ -685,7 +685,6 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
-        cashBalances={accountActivitiesSearch.cashBalances}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}
@@ -708,7 +707,6 @@ const AccountPage = () => {
         isFetching={accountActivitiesSearch.isFetching}
         isFetchingNextPage={accountActivitiesSearch.isFetchingNextPage}
         hasLoadMoreError={accountActivitiesSearch.isFetchNextPageError}
-        cashBalances={accountActivitiesSearch.cashBalances}
       />
       <ActivityPagination
         isFetching={accountActivitiesSearch.isFetchingNextPage}

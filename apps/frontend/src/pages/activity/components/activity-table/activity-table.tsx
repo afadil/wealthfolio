@@ -17,7 +17,7 @@ import { ActivityType, getExchangeDisplayName } from "@/lib/constants";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
 import { isRowBodyClick } from "@/lib/row-click";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { ActivityCashBalance, ActivityDetails } from "@/lib/types";
+import { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import {
   type OnChangeFn,
@@ -94,8 +94,6 @@ interface ActivityTableProps {
   isFetching?: boolean;
   isFetchingNextPage?: boolean;
   hasLoadMoreError?: boolean;
-  /** The account's cash after each row; adds a Balance column when given. */
-  cashBalances?: Record<string, ActivityCashBalance>;
 }
 
 export const ActivityTable = ({
@@ -116,7 +114,6 @@ export const ActivityTable = ({
   isFetching,
   isFetchingNextPage = false,
   hasLoadMoreError = false,
-  cashBalances,
 }: ActivityTableProps) => {
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
@@ -141,6 +138,12 @@ export const ActivityTable = ({
       assetName: false,
       currency: false,
     },
+  );
+  // Rows carry a balance only when the search asked for them (one cash or
+  // credit-card account in date order), so their presence decides the column.
+  const showsCashBalance = React.useMemo(
+    () => activities.some((activity) => activity.cashBalance != null),
+    [activities],
   );
   const symbolExchangeCountMap = React.useMemo(() => {
     const exchangesBySymbol = new Map<string, Set<string>>();
@@ -534,11 +537,11 @@ export const ActivityTable = ({
           );
         },
       },
-      ...(cashBalances
+      ...(showsCashBalance
         ? [
             {
               id: "cashBalance",
-              accessorFn: (activity) => cashBalances[activity.id]?.balance,
+              accessorKey: "cashBalance",
               enableSorting: false,
               enableHiding: true,
               meta: {
@@ -552,15 +555,15 @@ export const ActivityTable = ({
                 />
               ),
               cell: ({ row }) => {
-                const cashBalance = cashBalances[row.original.id];
-                if (!cashBalance) {
+                const { cashBalance, cashBalanceCurrency } = row.original;
+                if (cashBalance == null || !cashBalanceCurrency) {
                   return <div className="pr-4 text-right">-</div>;
                 }
                 return (
                   <div className="whitespace-nowrap pr-4 text-right">
                     <AmountDisplay
-                      value={cashBalance.balance}
-                      currency={cashBalance.currency}
+                      value={Number(cashBalance)}
+                      currency={cashBalanceCurrency}
                       isHidden={isBalanceHidden}
                     />
                   </div>
@@ -683,7 +686,6 @@ export const ActivityTable = ({
     ],
     [
       appTimezone,
-      cashBalances,
       dateFormatting,
       isBalanceHidden,
       handleEdit,
@@ -692,6 +694,7 @@ export const ActivityTable = ({
       onLinkTransfer,
       onUnlinkTransfer,
       numberFormatting,
+      showsCashBalance,
       symbolExchangeCountMap,
       t,
     ],

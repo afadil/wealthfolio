@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Account, ActivityCashBalance } from "@/lib/types";
+import type { Account } from "@/lib/types";
 import { AccountType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Card, Icons, PrivacyAmount, useDateFormatting } from "@wealthfolio/ui";
@@ -27,8 +27,6 @@ interface TransactionCardProps {
   appTimezone?: string;
   /** True when the loaded result set spans more than one account. */
   showAccount: boolean;
-  /** The account's cash after this row, when the list shows one account's. */
-  cashBalance?: ActivityCashBalance;
   /** Checkboxes only appear once the list is in selection mode. */
   selectionMode: boolean;
   isSelected: boolean;
@@ -62,7 +60,6 @@ function TransactionCardImpl({
   eventTypeColor,
   appTimezone,
   showAccount,
-  cashBalance,
   selectionMode,
   isSelected,
   onToggleSelect,
@@ -259,10 +256,10 @@ function TransactionCardImpl({
                 </button>
               }
             />
-            {cashBalance && (
+            {a.cashBalance != null && a.cashBalanceCurrency && (
               <span className="shrink-0 tabular-nums">
                 {t("activity:table_balance")}{" "}
-                <PrivacyAmount value={cashBalance.balance} currency={cashBalance.currency} />
+                <PrivacyAmount value={Number(a.cashBalance)} currency={a.cashBalanceCurrency} />
               </span>
             )}
           </div>

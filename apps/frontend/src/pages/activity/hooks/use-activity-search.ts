@@ -1,7 +1,7 @@
 import { searchActivities } from "@/adapters";
 import { QueryKeys } from "@/lib/query-keys";
 import { ActivityType } from "@/lib/constants";
-import { ActivityCashBalance, ActivityDetails, ActivitySearchResponse } from "@/lib/types";
+import { ActivityDetails, ActivitySearchResponse } from "@/lib/types";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
@@ -46,8 +46,6 @@ export type UseActivitySearchOptions =
 export interface UseActivitySearchInfiniteResult {
   mode: "infinite";
   data: ActivityDetails[];
-  /** Balances for every loaded row, when asked for and available. */
-  cashBalances?: Record<string, ActivityCashBalance>;
   totalRowCount: number;
   fetchNextPage: () => Promise<unknown>;
   hasNextPage: boolean | undefined;
@@ -62,7 +60,6 @@ export interface UseActivitySearchInfiniteResult {
 export interface UseActivitySearchPaginatedResult {
   mode: "paginated";
   data: ActivityDetails[];
-  cashBalances?: Record<string, ActivityCashBalance>;
   totalRowCount: number;
   pageCount: number;
   isFetching: boolean;
@@ -191,16 +188,6 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     [infiniteQuery.data?.pages],
   );
 
-  // Each page balances its own rows from the account's whole history, so the
-  // maps merge without overlap.
-  const infiniteCashBalances = useMemo(() => {
-    const pages = infiniteQuery.data?.pages;
-    if (!pages?.some((page) => page.cashBalances)) return undefined;
-    const merged: Record<string, ActivityCashBalance> = {};
-    for (const page of pages) Object.assign(merged, page.cashBalances);
-    return merged;
-  }, [infiniteQuery.data?.pages]);
-
   const infiniteTotalRowCount = useMemo(
     () => infiniteQuery.data?.pages?.[0]?.meta.totalRowCount ?? 0,
     [infiniteQuery.data?.pages],
@@ -215,7 +202,6 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
     return {
       mode: "paginated",
       data: paginatedData,
-      cashBalances: paginatedQuery.data?.cashBalances,
       totalRowCount: paginatedTotalRowCount,
       pageCount,
       isFetching: paginatedQuery.isFetching,
@@ -227,7 +213,6 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
   return {
     mode: "infinite",
     data: infiniteData,
-    cashBalances: infiniteCashBalances,
     totalRowCount: infiniteTotalRowCount,
     fetchNextPage: infiniteQuery.fetchNextPage,
     hasNextPage: infiniteQuery.hasNextPage,

@@ -53,7 +53,7 @@ pub async fn search_activities(
     let mut response = activity_service.search_activities_in_utc_range(
         page,
         page_size,
-        account_id_filter.clone(),
+        account_id_filter,
         activity_type_filter,
         asset_id_keyword,
         sort,
@@ -64,9 +64,7 @@ pub async fn search_activities(
         activity_id_filter,
     )?;
     if include_cash_balances.unwrap_or(false) {
-        activity_service
-            .attach_cash_balances(&mut response, account_id_filter.as_deref())
-            .await?;
+        activity_service.attach_cash_balances(&mut response).await?;
     }
     Ok(response)
 }

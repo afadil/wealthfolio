@@ -401,15 +401,9 @@ pub trait ActivityServiceTrait: Send + Sync {
             activity_id_filter,
         )
     }
-    /// Fills `response.cash_balances` with the cash balance after each of its
-    /// rows when `account_ids` names exactly one cash or credit-card account
-    /// that holds no securities. The default leaves the response without
-    /// balances.
-    async fn attach_cash_balances(
-        &self,
-        _response: &mut ActivitySearchResponse,
-        _account_ids: Option<&[String]>,
-    ) -> Result<()> {
+    /// Fills each row's cash balance, for rows of cash or credit-card accounts
+    /// that hold no securities. The default leaves the rows without balances.
+    async fn attach_cash_balances(&self, _response: &mut ActivitySearchResponse) -> Result<()> {
         Ok(())
     }
     fn get_first_activity_date(

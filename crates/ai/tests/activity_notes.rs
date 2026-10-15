@@ -38,6 +38,7 @@ async fn search_activities_returns_stored_notes() {
     let mut env = MockEnvironment::new();
     env.activity_service = Arc::new(MockActivityService {
         activities: notes.into_iter().map(activity_with_notes).collect(),
+        ..Default::default()
     });
 
     let env = Arc::new(env);
@@ -70,4 +71,44 @@ async fn search_activities_returns_stored_notes() {
         .unwrap()
         .notes
         .is_none());
+}
+
+#[tokio::test]
+async fn search_activities_returns_each_row_cash_balance() {
+    // The service fills balances only when the tool asks it to.
+    let balanced = activity_with_notes(None);
+    let mut unbalanced = activity_with_notes(None);
+    unbalanced.id = "activity-2".to_string();
+    let mut env = MockEnvironment::new();
+    env.activity_service = Arc::new(MockActivityService {
+        activities: vec![balanced, unbalanced],
+        cash_balances: [(
+            "activity-1".to_string(),
+            ("954.90".to_string(), "EUR".to_string()),
+        )]
+        .into(),
+    });
+
+    let env = Arc::new(env);
+    let result = SearchActivities
+        .call(env.clone(), serde_json::json!({}))
+        .await
+        .unwrap();
+    let mcp_result = AgentToolCatalog::mcp_catalog()
+        .execute(
+            env,
+            &AgentScopeSet::from_strs(["activities:read"]),
+            "search_activities",
+            serde_json::json!({}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(mcp_result.content, result.content);
+
+    let activities = result.content["activities"].as_array().unwrap();
+    assert_eq!(activities[0]["cashBalance"], serde_json::json!(954.9));
+    assert_eq!(activities[0]["cashBalanceCurrency"], "EUR");
+    // Rows without a balance leave both fields out.
+    assert!(activities[1].get("cashBalance").is_none());
+    assert!(activities[1].get("cashBalanceCurrency").is_none());
 }

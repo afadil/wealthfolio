@@ -1,4 +1,4 @@
-import type { Activity, ActivityCashBalance } from "@/lib/types";
+import type { Activity } from "@/lib/types";
 
 export interface CashActivityFilter {
   accountIds?: string[];
@@ -102,6 +102,13 @@ export interface CashActivity extends Activity {
    * Absent only from rows produced by a backend that predates exclusions.
    */
   visibleSpendingAmount?: number;
+  /**
+   * The account's cash after this row, in `cashBalanceCurrency`: only when
+   * asked for and the search covers exactly one cash or credit-card account
+   * that holds no securities.
+   */
+  cashBalance?: string;
+  cashBalanceCurrency?: string;
 }
 
 /** A signed net in one currency. */
@@ -136,10 +143,4 @@ export interface CashActivitySearchResponse {
    * base-currency setting changes.
    */
   baseCurrency?: string | null;
-  /**
-   * The account's cash after each row of this page, by activity id: only when
-   * asked for and the search covers exactly one cash or credit-card account
-   * that holds no securities.
-   */
-  cashBalances?: Record<string, ActivityCashBalance>;
 }

@@ -162,18 +162,13 @@ describe("needs-review state", () => {
 });
 
 describe("running balance", () => {
-  const cashBalance = { currency: "USD", balance: 850 };
+  const balanced = { cashBalance: "850", cashBalanceCurrency: "USD" };
 
   it("shows the balance in its own cell when the table shows the column", () => {
     const { container } = render(
       <Table>
         <TableBody>
-          <TransactionRow
-            row={toRowVM(activity({}), new Map())}
-            {...shared}
-            showBalance
-            cashBalance={cashBalance}
-          />
+          <TransactionRow row={toRowVM(activity(balanced), new Map())} {...shared} showBalance />
         </TableBody>
       </Table>,
       { wrapper: withProviders },
@@ -201,10 +196,9 @@ describe("running balance", () => {
   it("shows the balance on a card", () => {
     render(
       <TransactionCard
-        row={toRowVM(activity({}), new Map())}
+        row={toRowVM(activity(balanced), new Map())}
         selectionMode={false}
         {...shared}
-        cashBalance={cashBalance}
       />,
       { wrapper: withProviders },
     );

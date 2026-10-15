@@ -12,7 +12,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
 
 use super::{
     is_cash_symbol, Activity, DefaultActivityCompiler, NewActivity,
@@ -21,8 +20,7 @@ use super::{
 use crate::accounts::{account_types, Account, TrackingMode};
 use crate::portfolio::economic_events::ActivityEconomicsResolver;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ActivityCashBalance {
     /// The cash currency the row booked into.
     pub currency: String,

@@ -606,6 +606,8 @@ fn fixture_cash_activity(
         net_amount: -12.5,
         net_amount_base: None,
         visible_spending_amount: 0.0,
+        cash_balance: None,
+        cash_balance_currency: None,
     }
 }
 

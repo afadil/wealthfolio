@@ -458,6 +458,7 @@ fn seed_untrusted_image_egress_fixture(env: &mut MockEnvironment) {
     env.activity_service = Arc::new(MockActivityService {
         activities: serde_json::from_value(activities)
             .expect("egress fixture matches ActivityDetails"),
+        ..Default::default()
     });
 }
 
