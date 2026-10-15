@@ -2650,7 +2650,9 @@ impl ActivityService {
                 "PRECIOUS_METAL" | "PREC" => return (AssetKind::PreciousMetal, None),
                 "PRIVATE_EQUITY" | "PEQ" => return (AssetKind::PrivateEquity, None),
                 "LIABILITY" | "LIAB" => return (AssetKind::Liability, None),
-                "OTHER" | "ALT" => return (AssetKind::Other, None),
+                // A custom "Other" asset bought in an account is held there: an
+                // investment, not the alternative kind net worth adds on its own.
+                "OTHER" | "ALT" => return (AssetKind::Investment, None),
                 _ => {} // Fall through to inference
             }
         }

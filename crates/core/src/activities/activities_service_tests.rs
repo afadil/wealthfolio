@@ -188,14 +188,19 @@ pub(crate) mod tests {
             &self,
             asset_id: &str,
             context_currency: Option<String>,
-            _metadata: Option<crate::assets::AssetMetadata>,
+            metadata: Option<crate::assets::AssetMetadata>,
             _quote_mode: Option<String>,
         ) -> Result<Asset> {
             if let Ok(existing) = self.get_asset_by_id(asset_id) {
                 return Ok(existing);
             }
-            // Mirror the real service: a missing asset is created minimally.
-            let created = create_test_asset(asset_id, context_currency.as_deref().unwrap_or("USD"));
+            // Mirror the real service: a missing asset is created minimally,
+            // with the kind the activity resolved.
+            let mut created =
+                create_test_asset(asset_id, context_currency.as_deref().unwrap_or("USD"));
+            if let Some(kind) = metadata.and_then(|metadata| metadata.kind) {
+                created.kind = kind;
+            }
             self.assets.lock().unwrap().push(created.clone());
             Ok(created)
         }
@@ -8214,6 +8219,62 @@ pub(crate) mod tests {
             Some("btc-equity-uuid".to_string()),
             "Explicit SECURITY input with exchange should find existing equity asset"
         );
+    }
+
+    /// A custom asset of type "Other" bought in an account is held there, so it
+    /// is an investment, not the alternative "Other" kind net worth adds on its
+    /// own.
+    #[tokio::test]
+    async fn test_custom_other_asset_bought_in_an_account_is_an_investment() {
+        let account_service = Arc::new(MockAccountService::new());
+        let asset_service = Arc::new(MockAssetService::new());
+        account_service.add_account(create_test_account("acc-1", "USD"));
+        let activity_service = ActivityService::new(
+            Arc::new(MockActivityRepository::new()),
+            account_service,
+            asset_service.clone(),
+            Arc::new(MockFxService::new()),
+            Arc::new(MockQuoteService),
+        );
+
+        let created = activity_service
+            .create_activity(NewActivity {
+                id: Some("activity-1".to_string()),
+                account_id: "acc-1".to_string(),
+                asset: Some(AssetResolutionInput {
+                    symbol: Some("MYOTHER".to_string()),
+                    kind: Some("OTHER".to_string()),
+                    name: Some("My other thing".to_string()),
+                    quote_mode: Some("MANUAL".to_string()),
+                    quote_ccy: Some("USD".to_string()),
+                    ..Default::default()
+                }),
+                activity_type: "BUY".to_string(),
+                subtype: None,
+                activity_date: "2024-01-15".to_string(),
+                quantity: Some(dec!(2)),
+                unit_price: Some(dec!(75)),
+                currency: "USD".to_string(),
+                fee: Some(dec!(0)),
+                tax: None,
+                amount: Some(dec!(150)),
+                status: None,
+                notes: None,
+                fx_rate: None,
+                metadata: None,
+                needs_review: None,
+                source_system: None,
+                source_record_id: None,
+                source_group_id: None,
+                idempotency_key: None,
+                import_run_id: None,
+            })
+            .await
+            .unwrap();
+
+        let asset_id = created.asset_id.unwrap();
+        let asset = asset_service.get_asset_by_id(&asset_id).unwrap();
+        assert_eq!(asset.kind, AssetKind::Investment);
     }
 
     /// Test: Exchange MIC presence forces Security kind
