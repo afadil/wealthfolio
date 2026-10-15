@@ -48,7 +48,7 @@ pub use activity_cash_migration::{
 };
 pub use cash_balances::{
     application_order, running_cash_balances, shows_cash_balance, shows_running_cash_balance,
-    ActivityCashBalance,
+    ActivityCashBalance, CashLedgerActivity,
 };
 pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
 pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};
