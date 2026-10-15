@@ -242,12 +242,14 @@ export function AssetsTable({
               <div className="text-right">
                 <div className="flex items-center justify-end gap-1.5">
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={noQuoteReason}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="h-3.5 w-3.5 text-amber-500"
+                          aria-label={noQuoteReason}
+                        />
+                      }
+                    />
                     <TooltipContent>{noQuoteReason}</TooltipContent>
                   </Tooltip>
                   <span className="text-muted-foreground text-sm">
@@ -263,12 +265,14 @@ export function AssetsTable({
               <div className="flex items-center justify-end gap-1.5">
                 {stale ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Icons.AlertTriangle
-                        className="h-3.5 w-3.5 text-amber-500"
-                        aria-label={t("asset:table.quote_behind_aria")}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger
+                      render={
+                        <Icons.AlertTriangle
+                          className="h-3.5 w-3.5 text-amber-500"
+                          aria-label={t("asset:table.quote_behind_aria")}
+                        />
+                      }
+                    />
                     <TooltipContent>{t("asset:table.quote_behind_tooltip")}</TooltipContent>
                   </Tooltip>
                 ) : null}
