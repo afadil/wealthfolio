@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use rust_decimal::Decimal;
+use wealthfolio_portfolio_engine::model::ACTIVITY_SOURCE_MANUAL;
 
 use super::{
     activities_constants::is_cash_symbol, Activity, ACTIVITY_TYPE_TRANSFER_IN,
@@ -273,9 +274,14 @@ fn has_imported_fx_pair_metadata(
         && metadata_amount_matches("destinationAmount", destination_amount)
 }
 
-/// Returns true only for a complete same-account cash FX pair carrying the
-/// internal-flow metadata written by the import linker. Structural pairing
-/// alone is deliberately insufficient for contribution-neutral accounting.
+pub(crate) fn is_manual_internal_transfer(activity: &Activity) -> bool {
+    activity.source_system.as_deref() == Some(ACTIVITY_SOURCE_MANUAL)
+        && activity.explicit_external_transfer() == Some(false)
+}
+
+/// A complete same-account cash FX pair explicitly entered as internal, or
+/// carrying the import linker's FX record. Unmarked structural pairs keep
+/// their legacy contribution behaviour.
 pub fn is_contribution_neutral_same_account_cash_fx_conversion(
     transfer_in: &Activity,
     transfer_out: &Activity,
@@ -302,6 +308,13 @@ pub fn is_contribution_neutral_same_account_cash_fx_conversion(
     };
     if in_group_id != out_group_id {
         return false;
+    }
+
+    if [transfer_in, transfer_out]
+        .into_iter()
+        .all(is_manual_internal_transfer)
+    {
+        return true;
     }
 
     let Some(source_amount) = transfer_out.amount.map(|amount| amount.abs()) else {
@@ -557,6 +570,34 @@ mod tests {
             &transfer_in,
             &transfer_out
         ));
+    }
+
+    #[test]
+    fn manual_same_account_fx_is_neutral_only_with_two_explicit_internal_legs() {
+        let mut outgoing = activity("out", ACTIVITY_TYPE_TRANSFER_OUT, "a1", Some("g1"), "USD");
+        let mut incoming = activity("in", ACTIVITY_TYPE_TRANSFER_IN, "a1", Some("g1"), "EUR");
+        for leg in [&mut outgoing, &mut incoming] {
+            leg.source_system = Some(ACTIVITY_SOURCE_MANUAL.into());
+            leg.metadata = Some(serde_json::json!({ "flow": { "is_external": false } }));
+        }
+        assert!(is_contribution_neutral_same_account_cash_fx_conversion(
+            &incoming, &outgoing
+        ));
+        for patch in 0..5 {
+            let mut changed = incoming.clone();
+            match patch {
+                0 => changed.metadata = None,
+                1 => {
+                    changed.metadata = Some(serde_json::json!({ "flow": { "is_external": true } }))
+                }
+                2 => changed.source_system = Some("CSV".into()),
+                3 => changed.source_group_id = Some("different".into()),
+                _ => changed.account_id = "another".into(),
+            }
+            assert!(!is_contribution_neutral_same_account_cash_fx_conversion(
+                &changed, &outgoing
+            ));
+        }
     }
 
     #[test]

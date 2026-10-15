@@ -14,7 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { DateRange } from "react-day-picker";
 
-import { createActivity, deleteActivity, updateActivity } from "@/adapters";
+import { createActivity, deleteActivity, saveActivities, updateActivity } from "@/adapters";
 import { localizeActivityTypeName } from "@/lib/activity-utils";
 import { generateId } from "@/lib/id";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -47,6 +47,7 @@ import { ActivityForm } from "@/pages/activity/components/activity-form";
 import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
 import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
+import { buildSameAccountFxDuplicate } from "@/pages/activity/utils/duplicate-fx-transfer";
 import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
 import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
 import { ActivityType } from "@/lib/constants";
@@ -177,7 +178,7 @@ export interface SpendingTransactionsTabHandle {
   openAddForm: () => void;
 }
 
-function toActivityDetails(row: TransactionRowVM, account?: Account): Partial<ActivityDetails> {
+function toActivityDetails(row: TransactionRowVM, account?: Account): ActivityDetails {
   const activity = row.activity;
   const activityType = getEffectiveCashActivityType(activity);
   return {
@@ -616,6 +617,14 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const { mutate: duplicateTransaction } = useMutation({
       mutationFn: async (row: TransactionRowVM) => {
+        const exchange = await buildSameAccountFxDuplicate(toActivityDetails(row));
+        if (exchange) {
+          const result = await saveActivities({ creates: exchange });
+          if (result.errors.length || result.created.length !== 2) {
+            throw new Error("Failed duplicating transfer pair.");
+          }
+          return result.created[0];
+        }
         const a = row.activity;
         const activityType = getEffectiveCashActivityType(a);
         const supportsBoundary =

@@ -130,6 +130,7 @@ struct ResolvedSymbolInfo {
 /// What an update makes of a transfer leg when it turns it into a securities
 /// transfer: its direction, the security and the quantity moved.
 struct SecuritiesTransferLeg {
+    account_id: String,
     activity_type: String,
     asset: String,
     quantity: Decimal,
@@ -152,6 +153,7 @@ impl SecuritiesTransferLeg {
             .flatten()
             .filter(|quantity| !quantity.is_zero())?;
         Some(Self {
+            account_id: update.account_id.clone(),
             activity_type: update.activity_type.clone(),
             asset: asset.to_uppercase(),
             quantity: quantity.abs(),
@@ -160,7 +162,8 @@ impl SecuritiesTransferLeg {
 
     /// Whether the two legs are the opposite sides of one securities transfer.
     fn pairs_with(&self, other: &Self) -> bool {
-        self.activity_type != other.activity_type
+        self.account_id != other.account_id
+            && self.activity_type != other.activity_type
             && self.asset == other.asset
             && self.quantity == other.quantity
     }
@@ -1833,12 +1836,6 @@ impl ActivityService {
                 "Destination account is required",
             ));
         }
-        if request.from_account_id == request.to_account_id {
-            return Err(Self::invalid_activity_data(
-                "Source and destination accounts must be different",
-            ));
-        }
-
         if request
             .transfer_mode
             .as_deref()
@@ -1876,6 +1873,14 @@ impl ActivityService {
         );
         let source_currency = source_currency.to_uppercase();
         let destination_currency = destination_currency.to_uppercase();
+
+        if request.from_account_id == request.to_account_id
+            && source_currency == destination_currency
+        {
+            return Err(Self::invalid_activity_data(
+                "Same-account cash transfers require different currencies",
+            ));
+        }
 
         let destination_amount = if source_currency == destination_currency {
             source_amount
@@ -1937,7 +1942,9 @@ impl ActivityService {
                 fx_rate: None,
                 metadata: metadata.clone(),
                 needs_review: None,
-                source_system: Some("MANUAL".to_string()),
+                source_system: Some(
+                    wealthfolio_portfolio_engine::model::ACTIVITY_SOURCE_MANUAL.to_string(),
+                ),
                 source_record_id: None,
                 source_group_id: Some(group_id.clone()),
                 idempotency_key: None,
@@ -1961,7 +1968,9 @@ impl ActivityService {
                 fx_rate: None,
                 metadata,
                 needs_review: None,
-                source_system: Some("MANUAL".to_string()),
+                source_system: Some(
+                    wealthfolio_portfolio_engine::model::ACTIVITY_SOURCE_MANUAL.to_string(),
+                ),
                 source_record_id: None,
                 source_group_id: Some(group_id),
                 idempotency_key: None,
@@ -2042,9 +2051,14 @@ impl ActivityService {
         pair: &TransferPair,
     ) -> Result<()> {
         if Self::is_cash_transfer_pair(pair)
-            && pair.transfer_out.account_id != pair.transfer_in.account_id
             && (update.account_id != existing.account_id
-                || (!update.currency.is_empty() && update.currency != existing.currency))
+                || (!update.currency.is_empty() && update.currency != existing.currency)
+                || (pair.transfer_out.account_id == pair.transfer_in.account_id
+                    && (update.activity_type != existing.effective_type()
+                        || is_securities_transfer(
+                            &update.activity_type,
+                            update.get_symbol_id().or(update.get_symbol_code()),
+                        ))))
         {
             return Err(Self::invalid_activity_data(
                 "Use the transfer pair editor to change transfer accounts or currencies",
@@ -2113,7 +2127,11 @@ impl ActivityService {
             return Ok(Some(counterpart_update));
         }
 
-        if pair.transfer_out.account_id != pair.transfer_in.account_id {
+        if pair.transfer_out.account_id != pair.transfer_in.account_id
+            || [&pair.transfer_in, &pair.transfer_out]
+                .into_iter()
+                .all(super::transfer_pairs::is_manual_internal_transfer)
+        {
             // Grid saves can echo the original amount. A notes/rate-only edit
             // must not recalculate the other leg using a rounded ratio.
             if existing.amount.map(|value| value.abs()) == Some(amount.abs()) {
@@ -5185,7 +5203,10 @@ impl ActivityServiceTrait for ActivityService {
 
         let pair = self.load_internal_transfer_pair_for_activity(&activity.id)?;
         let counterpart_update = match pair.as_ref() {
-            Some(pair) => self.build_counterpart_update(&activity, &existing, pair)?,
+            Some(pair) => {
+                Self::validate_internal_cash_pair_currency_update(&activity, &existing, pair)?;
+                self.build_counterpart_update(&activity, &existing, pair)?
+            }
             None => None,
         };
         let activity = self.preview_prepared_update(activity, existing)?;

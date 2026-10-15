@@ -181,6 +181,8 @@ interface ActivityBasePayload {
  * - For CASH activities: don't send asset, backend generates CASH:{currency}
  */
 export interface ActivityCreatePayload extends ActivityBasePayload {
+  /** New group shared by both legs of an intentional transfer-pair duplicate. */
+  sourceGroupId?: string;
   /** Explicit key for intentional manual duplicates. */
   idempotencyKey?: string;
   /** Asset resolution input - id plus natural identity and creation hints */

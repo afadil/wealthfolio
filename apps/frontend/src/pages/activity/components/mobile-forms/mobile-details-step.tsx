@@ -354,8 +354,11 @@ export function MobileDetailsStep({
     setValue("assetMetadata" as any, undefined);
   };
 
-  // Filter destination accounts to exclude source account (for internal transfers)
-  const toAccountOptions = filteredAccounts.filter((acc) => acc.value !== accountId);
+  const toAccountOptions = filteredAccounts.filter(
+    (acc) => transferMode === "cash" || acc.value !== accountId,
+  );
+  const isSameAccountCashTransfer =
+    needsInternalCashTransferAmounts && !!accountId && accountId === toAccountId;
 
   useActivityCurrency(form, filteredAccounts, {
     isEditing,
@@ -758,6 +761,8 @@ export function MobileDetailsStep({
               />
             )}
 
+            {isSameAccountCashTransfer && <InternalTransferCurrencyFields />}
+
             {/* Date */}
             <FormField
               control={control}
@@ -1148,7 +1153,9 @@ export function MobileDetailsStep({
             showCurrency={!isTransfer || isExternal}
             showFxRate={!isTransfer || isExternal}
           >
-            {needsInternalCashTransferAmounts && <InternalTransferCurrencyFields />}
+            {needsInternalCashTransferAmounts && !isSameAccountCashTransfer && (
+              <InternalTransferCurrencyFields />
+            )}
             {/* Comment */}
             <FormField
               control={control}

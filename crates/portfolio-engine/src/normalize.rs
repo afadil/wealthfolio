@@ -790,16 +790,21 @@ fn build_pair(group: &str, legs: &[&Activity]) -> Result<TransferPair, String> {
     })
 }
 
-/// A same-account cash FX conversion whose legs both carry the import
-/// linker's record of it (internal flow, `implied_from_import`, matching
-/// currencies and amounts). Structural pairing alone is deliberately not
-/// enough to make a conversion contribution-neutral.
+/// Explicitly internal manual cash exchanges are contribution-neutral, as
+/// are pairs carrying the import linker's matching FX record. Unmarked
+/// structural pairs keep their legacy contribution behaviour.
 fn is_recorded_fx_conversion(transfer_in: &Activity, transfer_out: &Activity) -> bool {
     if transfer_in.account != transfer_out.account
         || transfer_in.is_security_transfer
         || transfer_out.is_security_transfer
     {
         return false;
+    }
+    if [transfer_in, transfer_out].iter().all(|leg| {
+        leg.external_transfer == Some(false)
+            && leg.source_system.as_deref() == Some(ACTIVITY_SOURCE_MANUAL)
+    }) {
+        return true;
     }
     let (Some(source_amount), Some(destination_amount)) = (transfer_out.amount, transfer_in.amount)
     else {
