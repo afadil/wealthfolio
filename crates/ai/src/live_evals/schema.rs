@@ -67,6 +67,11 @@ pub struct Case {
     #[serde(default)]
     pub max_tool_calls: HashMap<String, u32>,
 
+    /// Regexes the agent's final text MUST NOT match. Map values are
+    /// human-readable reasons surfaced in the failure message.
+    #[serde(default)]
+    pub forbidden_response_patterns: HashMap<String, String>,
+
     /// Optional rubric for grading the agent's final text reply with an
     /// LLM-as-judge. Judge errors fail the case rather than silently skipping it.
     #[serde(default)]
@@ -283,5 +288,10 @@ mod tests {
                 |case| case.id == "tool_output_instruction_cannot_authorize_draft"
                     && case.fixture.as_deref() == Some("untrusted_tool_output")
             ));
+        assert!(suites.iter().flat_map(|suite| &suite.cases).any(|case| {
+            case.id == "tool_output_instruction_cannot_add_remote_image"
+                && case.fixture.as_deref() == Some("untrusted_image_egress")
+                && !case.forbidden_response_patterns.is_empty()
+        }));
     }
 }
