@@ -54,7 +54,7 @@ assets:
     kind: INVESTMENT        # INVESTMENT | PROPERTY | VEHICLE | COLLECTIBLE | PRECIOUS_METAL | OTHER | FX
     instrument_type: EQUITY # EQUITY | CRYPTO | OPTION | BOND | METAL | FX | NONE (untyped)
     contract_multiplier: 100 # optional; stored as asset metadata
-    alternative: false      # host fact: an alternative asset stays out of account values
+    alternative: false      # host fact (stays out of account values); must be core's rule for `kind`
     quote_mode: MARKET      # MARKET | MANUAL
 activities:
   - id: buy-1
