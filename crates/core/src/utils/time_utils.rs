@@ -1,11 +1,33 @@
 use crate::errors::{Error, Result, ValidationError};
 use chrono::{
-    DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveTime, TimeZone, Utc, Weekday,
+    DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc,
+    Weekday,
 };
 use chrono_tz::Tz;
 use wealthfolio_market_data::resolver::exchange_metadata;
 
 pub type UtcDateRangeBounds = (Option<DateTime<Utc>>, Option<DateTime<Utc>>);
+
+/// Reads an activity timestamp as stored, tolerating its historical formats:
+///   1. RFC 3339 with an offset (`2026-05-04T08:18:00.000Z`), what is written now;
+///   2. SQLite's `YYYY-MM-DD HH:MM:SS[.fff]` (its `CURRENT_TIMESTAMP` shape, older
+///      rows), as UTC;
+///   3. a bare `YYYY-MM-DD`, as midnight UTC.
+///
+/// The activity reader and anything dating a stored row read it this way, so
+/// both put a row on the same instant. `None` when nothing matches.
+pub fn parse_stored_instant(raw: &str) -> Option<DateTime<Utc>> {
+    if let Ok(instant) = DateTime::parse_from_rfc3339(raw) {
+        return Some(instant.with_timezone(&Utc));
+    }
+    for format in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%d %H:%M:%S"] {
+        if let Ok(naive) = NaiveDateTime::parse_from_str(raw, format) {
+            return Some(Utc.from_utc_datetime(&naive));
+        }
+    }
+    let date = NaiveDate::parse_from_str(raw, "%Y-%m-%d").ok()?;
+    Some(Utc.from_utc_datetime(&date.and_hms_opt(0, 0, 0)?))
+}
 
 /// Default timezone for valuation dates.
 /// This is used as a runtime fallback when user timezone is missing.

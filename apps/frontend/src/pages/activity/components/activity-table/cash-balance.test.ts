@@ -22,6 +22,21 @@ function row(
 }
 
 describe("shownCashBalanceIds", () => {
+  it("dates stored bare dates and SQLite timestamps as the backend does", () => {
+    // In Toronto, a bare 2026-04-02 is midnight UTC: 20:00 on April 1, the
+    // same day as the 18:00 row; SQLite's shape is UTC too.
+    const rows = [
+      row("evening", "2026-04-01T22:00:00Z", "DAY"),
+      row("bare-date", "2026-04-02", "DAY"),
+      row("sqlite-shape", "2026-04-02 03:30:00.250", "DAY"),
+      row("next-morning", "2026-04-02T12:00:00Z", "DAY"),
+    ];
+
+    expect(shownCashBalanceIds(rows, "America/Toronto")).toEqual(
+      new Set(["sqlite-shape", "next-morning"]),
+    );
+  });
+
   it("holds an oldest-first list's last day until its next page loads", () => {
     const loaded = [
       row("monday", "2026-04-01T10:00:00Z", "DAY"),
