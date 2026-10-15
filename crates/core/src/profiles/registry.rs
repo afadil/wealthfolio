@@ -44,6 +44,10 @@ struct LockRecord {
 
 pub struct ProfileRegistry {
     root: PathBuf,
+    /// The legacy database as the host resolves it for this launch. An update
+    /// can move the data directory (iOS renames the app container), so the path
+    /// stored at adoption only marks which profile is the legacy one.
+    legacy_database: PathBuf,
     data: Mutex<RegistryData>,
     secrets: Arc<dyn SecretStore>,
     secret_gate: Arc<Mutex<()>>,
@@ -287,7 +291,7 @@ impl ProfileRegistry {
                 lock_enabled: false,
                 // Lost registry files must not bypass an inherited legacy lock.
                 never_protected: !legacy_database.exists() || !had_owner_file,
-                legacy_database: legacy_database.exists().then_some(legacy_database),
+                legacy_database: legacy_database.exists().then(|| legacy_database.clone()),
                 legacy_addons_root: None,
                 connect: None,
             };
@@ -304,6 +308,7 @@ impl ProfileRegistry {
         };
         Ok(Self {
             root,
+            legacy_database,
             data: Mutex::new(data),
             secrets,
             secret_gate: Arc::new(Mutex::new(())),
@@ -512,9 +517,9 @@ impl ProfileRegistry {
 
     pub fn paths(&self, profile: &Profile) -> ProfilePaths {
         match &profile.legacy_database {
-            Some(database) => ProfilePaths {
+            Some(_) => ProfilePaths {
                 root: self.root.clone(),
-                database: database.clone(),
+                database: self.legacy_database.clone(),
             },
             None => {
                 let root = self.root.join("profiles").join(profile.id.to_string());
@@ -1304,6 +1309,34 @@ mod tests {
             assert!(outside.path().join("keep").exists());
             assert!(!root.exists());
         }
+    }
+
+    #[test]
+    fn legacy_profile_follows_a_moved_data_directory() {
+        // An iOS update renames the app container but keeps its files.
+        let base = tempfile::tempdir().unwrap();
+        let old_root = base.path().join("OLD-CONTAINER/app");
+        let new_root = base.path().join("NEW-CONTAINER/app");
+        fs::create_dir_all(&old_root).unwrap();
+        fs::write(old_root.join("app.db"), b"existing database").unwrap();
+        let secrets = Arc::new(Secrets::default());
+        drop(
+            ProfileRegistry::open(old_root.clone(), old_root.join("app.db"), secrets.clone())
+                .unwrap(),
+        );
+        fs::rename(
+            base.path().join("OLD-CONTAINER"),
+            base.path().join("NEW-CONTAINER"),
+        )
+        .unwrap();
+
+        let registry =
+            ProfileRegistry::open(new_root.clone(), new_root.join("app.db"), secrets).unwrap();
+        let default = registry.profile(registry.default_id().unwrap()).unwrap();
+        assert!(ProfileSummary::from(&default).is_legacy);
+        let paths = registry.paths(&default);
+        assert_eq!(paths.root, new_root);
+        assert_eq!(paths.database, new_root.join("app.db"));
     }
 
     #[test]
