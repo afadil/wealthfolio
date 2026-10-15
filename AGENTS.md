@@ -73,11 +73,11 @@ guarantees from unverified assumptions.
   service, through `blocking` in `crates/core/src/portfolio/coordinator/mod.rs`,
   so callers await them directly rather than wrapping them in `spawn_blocking`.
   Give new history-sized reads the same treatment.
-- Domain rules (asset kinds and which are alternative, account types, activity
-  semantics) belong to `crates/core`. The portfolio engine receives them as
-  facts that `crates/core/src/portfolio/coordinator/facts.rs` derives, as it
-  does `Asset::contract_multiplier`; the engine must not keep its own copy of a
-  core rule. Core models may call the engine only to ask about the engine's own
+- Classifications of core records, such as which asset kinds are alternative,
+  belong to `crates/core`. The portfolio engine receives them as facts that
+  `crates/core/src/portfolio/coordinator/facts.rs` derives, as it does
+  `Asset::contract_multiplier`; the engine must not keep its own copy of such a
+  rule. Core models may call the engine only to ask about the engine's own
   capabilities, such as which cost basis methods it computes.
 
 When adding or changing a backend call, trace both runtime paths: the frontend
