@@ -14,7 +14,10 @@ use std::collections::HashMap;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use super::{is_cash_symbol, Activity, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL};
+use super::{
+    is_cash_symbol, Activity, ActivityCompiler, DefaultActivityCompiler, ACTIVITY_TYPE_BUY,
+    ACTIVITY_TYPE_SELL,
+};
 use crate::accounts::{account_types, Account, TrackingMode};
 use crate::portfolio::economic_events::ActivityEconomicsResolver;
 
@@ -93,7 +96,9 @@ pub fn running_cash_balances(
     Some(balances)
 }
 
-/// A trade, or a row tied to an asset other than cash.
+/// A trade, a row tied to an asset other than cash, or a row the compiler
+/// expands into income and a purchase (DRIP, dividend in kind, staking
+/// reward), with or without an asset.
 fn holds_security(activity: &Activity) -> bool {
     matches!(
         activity.effective_type(),
@@ -103,6 +108,9 @@ fn holds_security(activity: &Activity) -> bool {
         .as_deref()
         .map(str::trim)
         .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
+        || DefaultActivityCompiler::new()
+            .compile(activity)
+            .map_or(true, |postings| postings.len() != 1)
 }
 
 #[cfg(test)]
@@ -557,5 +565,47 @@ mod tests {
         let mut draft = security_row("draft", ACTIVITY_TYPE_BUY, "AAPL");
         draft.status = ActivityStatus::Draft;
         assert!(running_cash_balances(&account, &[deposit, draft]).is_some());
+    }
+
+    #[test]
+    fn composite_rows_get_no_balances_even_without_an_asset() {
+        let account = account(account_types::CASH, "CAD");
+        let mut deposit = activity(
+            "deposit",
+            ACTIVITY_TYPE_DEPOSIT,
+            "2026-04-01T00:00:00Z",
+            dec!(100),
+        );
+        deposit.currency = "CAD".to_string();
+        let income = |activity_type: &str, subtype: &str| {
+            let mut row = activity("income", activity_type, "2026-04-02T00:00:00Z", dec!(10));
+            row.currency = "CAD".to_string();
+            row.subtype = Some(subtype.to_string());
+            row.quantity = Some(dec!(1));
+            row.unit_price = Some(dec!(10));
+            row
+        };
+
+        // The engine books the income and the purchase it pays for, which net
+        // to nothing here; the row's own amount would count only the income.
+        for (activity_type, subtype) in [
+            (ACTIVITY_TYPE_DIVIDEND, "DRIP"),
+            (ACTIVITY_TYPE_DIVIDEND, "DIVIDEND_IN_KIND"),
+            (ACTIVITY_TYPE_INTEREST, "STAKING_REWARD"),
+        ] {
+            assert!(
+                running_cash_balances(&account, &[deposit.clone(), income(activity_type, subtype)])
+                    .is_none(),
+                "{subtype} withholds the balances"
+            );
+        }
+
+        // A return of capital moves only cash, so the account keeps them.
+        let activities = vec![deposit, income(ACTIVITY_TYPE_DIVIDEND, "RETURN_OF_CAPITAL")];
+        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
+        assert_eq!(
+            closing_cash(&balances, &activities),
+            engine_cash(&account, &activities)
+        );
     }
 }
