@@ -31,8 +31,23 @@ function appliedAfter(a: ActivityDetails, b: ActivityDetails): boolean {
  * Ids of the rows whose balance the list shows. A row balance shows on its
  * row. A day-end balance, which every posted row of the day carries, shows
  * once: on the day's last row in application order.
+ *
+ * `hasMoreRows` says further pages may follow. Newest first, a day's last
+ * row comes first, so it is always loaded; oldest first, the last loaded day
+ * may continue on the next page, so its balance waits for that page.
  */
-export function shownCashBalanceIds(activities: ActivityDetails[], timezone?: string): Set<string> {
+export function shownCashBalanceIds(
+  activities: ActivityDetails[],
+  timezone?: string,
+  hasMoreRows = false,
+): Set<string> {
+  const first = activities[0];
+  const last = activities[activities.length - 1];
+  const unfinishedDay =
+    hasMoreRows && first && last && appliedAfter(last, first)
+      ? toDateKey(last.date, timezone)
+      : null;
+
   const shown = new Set<string>();
   const lastOfDay = new Map<string, ActivityDetails>();
   for (const activity of activities) {
@@ -41,9 +56,11 @@ export function shownCashBalanceIds(activities: ActivityDetails[], timezone?: st
       shown.add(activity.id);
       continue;
     }
-    const day = `${activity.accountId}|${toDateKey(activity.date, timezone)}`;
-    const last = lastOfDay.get(day);
-    if (!last || appliedAfter(activity, last)) {
+    const dayKey = toDateKey(activity.date, timezone);
+    if (dayKey === unfinishedDay) continue;
+    const day = `${activity.accountId}|${dayKey}`;
+    const lastSoFar = lastOfDay.get(day);
+    if (!lastSoFar || appliedAfter(activity, lastSoFar)) {
       lastOfDay.set(day, activity);
     }
   }

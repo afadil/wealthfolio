@@ -147,8 +147,8 @@ export const ActivityTable = ({
     [activities],
   );
   const shownBalanceIds = React.useMemo(
-    () => shownCashBalanceIds(activities, appTimezone),
-    [activities, appTimezone],
+    () => shownCashBalanceIds(activities, appTimezone, hasNextPage),
+    [activities, appTimezone, hasNextPage],
   );
   // An account's rows share one scope: the cash after each row, or at the end
   // of each day.
