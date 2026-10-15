@@ -351,6 +351,7 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             metadata: db.metadata.and_then(|s| serde_json::from_str(&s).ok()),
             cash_balance: None,
             cash_balance_currency: None,
+            cash_balance_scope: None,
         }
     }
 }

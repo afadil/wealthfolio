@@ -64,6 +64,7 @@ import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container"
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
+import { shownCashBalanceIds } from "./cash-balance";
 
 /**
  * Starting height for a virtualized row. Rows report their real height once
@@ -139,12 +140,23 @@ export const ActivityTable = ({
       currency: false,
     },
   );
-  // Rows carry a balance only when the search asked for them (one cash or
-  // credit-card account in date order), so their presence decides the column.
+  // Rows carry a balance only when the search asked for them (one account
+  // in date order), so their presence decides the column.
   const showsCashBalance = React.useMemo(
     () => activities.some((activity) => activity.cashBalance != null),
     [activities],
   );
+  const shownBalanceIds = React.useMemo(
+    () => shownCashBalanceIds(activities, appTimezone),
+    [activities, appTimezone],
+  );
+  // An account's rows share one scope: the cash after each row, or at the end
+  // of each day.
+  const balanceTitle = activities.some(
+    (activity) => activity.cashBalance != null && activity.cashBalanceScope !== "DAY",
+  )
+    ? t("activity:table_balance")
+    : t("activity:table_day_end_balance");
   const symbolExchangeCountMap = React.useMemo(() => {
     const exchangesBySymbol = new Map<string, Set<string>>();
 
@@ -545,19 +557,23 @@ export const ActivityTable = ({
               enableSorting: false,
               enableHiding: true,
               meta: {
-                label: t("activity:table_balance"),
+                label: balanceTitle,
               },
               header: ({ column }) => (
                 <DataTableColumnHeader
                   className="justify-end text-right"
                   column={column}
-                  title={t("activity:table_balance")}
+                  title={balanceTitle}
                 />
               ),
               cell: ({ row }) => {
-                const { cashBalance, cashBalanceCurrency } = row.original;
+                const { id, cashBalance, cashBalanceCurrency } = row.original;
                 if (cashBalance == null || !cashBalanceCurrency) {
                   return <div className="pr-4 text-right">-</div>;
+                }
+                // The day's balance shows on its latest row only.
+                if (!shownBalanceIds.has(id)) {
+                  return null;
                 }
                 return (
                   <div className="whitespace-nowrap pr-4 text-right">
@@ -695,6 +711,8 @@ export const ActivityTable = ({
       onUnlinkTransfer,
       numberFormatting,
       showsCashBalance,
+      shownBalanceIds,
+      balanceTitle,
       symbolExchangeCountMap,
       t,
     ],

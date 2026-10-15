@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import {
@@ -38,6 +38,7 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
+import { shownCashBalanceIds } from "./cash-balance";
 
 /**
  * Starting heights for virtualized cards. The detailed card grows with the
@@ -97,6 +98,10 @@ export const ActivityTableMobile = ({
   const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
+  const shownBalanceIds = useMemo(
+    () => shownCashBalanceIds(activities, appTimezone),
+    [activities, appTimezone],
+  );
 
   // Embedded lists can share an already-scrolled page rather than their own box.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
@@ -204,8 +209,17 @@ export const ActivityTableMobile = ({
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
     const cashBalance =
-      activity.cashBalance != null && activity.cashBalanceCurrency
-        ? { balance: Number(activity.cashBalance), currency: activity.cashBalanceCurrency }
+      activity.cashBalance != null &&
+      activity.cashBalanceCurrency &&
+      shownBalanceIds.has(activity.id)
+        ? {
+            balance: Number(activity.cashBalance),
+            currency: activity.cashBalanceCurrency,
+            label:
+              activity.cashBalanceScope === "DAY"
+                ? t("activity:table_day_end_balance")
+                : t("activity:table_balance"),
+          }
         : undefined;
 
     // Compact View
@@ -260,7 +274,7 @@ export const ActivityTableMobile = ({
                         )}
                       {cashBalance && (
                         <span className="ml-auto flex shrink-0 items-center gap-1">
-                          {t("activity:table_balance")}
+                          {cashBalance.label}
                           <AmountDisplay
                             value={cashBalance.balance}
                             currency={cashBalance.currency}
@@ -462,7 +476,7 @@ export const ActivityTableMobile = ({
 
             {cashBalance && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t("activity:table_balance")}</span>
+                <span className="text-muted-foreground">{cashBalance.label}</span>
                 <AmountDisplay
                   value={cashBalance.balance}
                   currency={cashBalance.currency}
