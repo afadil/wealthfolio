@@ -1,3 +1,4 @@
+import { amountDifference, sumAmounts } from "@/lib/amount-math";
 import type { CategoryAllocation, NetWorthHistoryPoint, TaxonomyAllocation } from "@/lib/types";
 import type { FormattingApi } from "@wealthfolio/ui";
 
@@ -163,7 +164,7 @@ export function deriveChange(series: number[], isLiability: boolean): Change {
   if (series.length < 2) return { amount: 0, percent: 0, isNew: false };
   const first = series[0];
   const last = series[series.length - 1];
-  const amount = isLiability ? first - last : last - first;
+  const amount = isLiability ? amountDifference(first, last) : amountDifference(last, first);
   const base = Math.abs(first);
   const hasBaseline = base >= BASELINE_FLOOR;
   return {
@@ -240,12 +241,16 @@ export function computeVelocity(history: ParsedHistoryPoint[]): Velocity | null 
   const first = history[0];
   const last = history[history.length - 1];
 
-  const portfolioGain =
-    last.portfolioValue - last.netContribution - (first.portfolioValue - first.netContribution);
-  const altGain = last.alternativeAssetsValue - first.alternativeAssetsValue;
-  const contributions = last.netContribution - first.netContribution;
-  const equityBuilt = first.totalLiabilities - last.totalLiabilities;
-  const netChange = last.netWorth - first.netWorth;
+  const portfolioGain = sumAmounts([
+    last.portfolioValue,
+    -last.netContribution,
+    -first.portfolioValue,
+    first.netContribution,
+  ]);
+  const altGain = amountDifference(last.alternativeAssetsValue, first.alternativeAssetsValue);
+  const contributions = amountDifference(last.netContribution, first.netContribution);
+  const equityBuilt = amountDifference(first.totalLiabilities, last.totalLiabilities);
+  const netChange = amountDifference(last.netWorth, first.netWorth);
 
   const months = daysBetween(first.date, last.date) / DAYS_PER_MONTH;
   const perMonth = months > 0 ? netChange / months : netChange;
@@ -287,13 +292,13 @@ export function computeMomentum(
 
   const nwEnd = netWorthAsOf(longHistory, rangeEndISO);
   const nwStart = netWorthAsOf(longHistory, rangeStartISO);
-  const currentChange = nwEnd - nwStart;
+  const currentChange = amountDifference(nwEnd, nwStart);
 
   const earliest = longHistory[0].date;
   const hasPrior = earliest <= priorStartISO;
   const nwPriorStart = netWorthAsOf(longHistory, priorStartISO);
-  const priorChange = hasPrior ? nwStart - nwPriorStart : null;
-  const beatBy = priorChange != null ? currentChange - priorChange : null;
+  const priorChange = hasPrior ? amountDifference(nwStart, nwPriorStart) : null;
+  const beatBy = priorChange != null ? amountDifference(currentChange, priorChange) : null;
 
   // Monthly net worth change bars across the prior + current windows.
   const monthEnd = new Map<string, number>();
@@ -306,7 +311,7 @@ export function computeMomentum(
   let prev: number | null = null;
   const bars = months.map((month) => {
     const end = monthEnd.get(month)!;
-    const value = prev == null ? 0 : end - prev;
+    const value = prev == null ? 0 : amountDifference(end, prev);
     prev = end;
     return { month, value, current: month >= currentMonth };
   });

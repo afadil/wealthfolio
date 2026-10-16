@@ -116,6 +116,22 @@ function createPerformance(overrides: Partial<PerformanceResult> = {}): Performa
 }
 
 describe("AccountMetrics", () => {
+  it("treats cancellation noise in locally computed returns and P&L as zero", () => {
+    render(
+      <AccountMetrics
+        valuation={createValuation({
+          investmentMarketValue: 3 * 10.1,
+          costBasis: 30.3,
+          totalValue: 3 * 10.1,
+          netContribution: 30.3,
+          basisStatus: "complete",
+        })}
+      />,
+    );
+
+    expect(screen.getAllByText("gain-amount:0")).toHaveLength(2);
+  });
+
   it("shows unrealized P&L after cost basis for transaction accounts with complete basis", () => {
     render(
       <AccountMetrics

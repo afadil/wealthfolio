@@ -1,3 +1,5 @@
+import { sumAmounts } from "@/lib/amount-math";
+
 export type ReturnType = "daily" | "pnl" | "return";
 
 interface BaseHoldingPerformanceAmounts {
@@ -33,8 +35,6 @@ export function calculateBasePortfolioPerformance(
   holdings: BaseHoldingPerformanceAmounts[],
 ): BasePortfolioPerformance {
   let basis = 0;
-  let totalPnl = 0;
-  let totalReturn = 0;
   let hasUnbasedPnl = false;
   let hasUnbasedReturn = false;
 
@@ -44,11 +44,14 @@ export function calculateBasePortfolioPerformance(
     const holdingReturn = holding.totalReturnBase ?? holding.totalGainBase ?? 0;
 
     basis += holdingBasis;
-    totalPnl += holdingPnl;
-    totalReturn += holdingReturn;
     hasUnbasedPnl ||= holdingBasis === 0 && holdingPnl !== 0;
     hasUnbasedReturn ||= holdingBasis === 0 && holdingReturn !== 0;
   });
+
+  const totalPnl = sumAmounts(holdings.map((holding) => holding.totalGainBase ?? 0));
+  const totalReturn = sumAmounts(
+    holdings.map((holding) => holding.totalReturnBase ?? holding.totalGainBase ?? 0),
+  );
 
   return {
     totalPnl,
@@ -62,7 +65,7 @@ export function calculateDailyPortfolioPerformance(
   holdings: DailyHoldingPerformanceAmounts[],
 ): DailyPortfolioPerformance {
   let grossExposure = 0;
-  let changeAmount = 0;
+  const changes: number[] = [];
   let hasDailyPerformance = false;
 
   holdings.forEach((holding) => {
@@ -71,8 +74,10 @@ export function calculateDailyPortfolioPerformance(
     const exposure = Math.abs(holding.marketValueBase);
     hasDailyPerformance = true;
     grossExposure += exposure;
-    changeAmount += exposure * holding.dayChangePct;
+    changes.push(exposure * holding.dayChangePct);
   });
+
+  const changeAmount = sumAmounts(changes);
 
   return {
     changeAmount,

@@ -1,4 +1,5 @@
 import { performancePeriodPnl, performanceSummaryReturn } from "@/lib/performance";
+import { amountDifference } from "@/lib/amount-math";
 import { AccountValuation, CurrentValuationSplit, PerformanceResult } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 import { PerformanceGrid } from "@/pages/account/performance-grid";
@@ -189,11 +190,11 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
   const performanceCurrency = performance?.scope.currency || displayCurrency;
   const performancePnl = performancePeriodPnl(performance);
   const performanceReturn = performanceSummaryReturn(performance);
-  const allTimeReturnAmount = valuation.totalValue - valuation.netContribution;
+  const allTimeReturnAmount = amountDifference(valuation.totalValue, valuation.netContribution);
   const allTimeReturnValue = (
     <GainAmount value={allTimeReturnAmount} currency={displayCurrency} className="text-sm" />
   );
-  const unrealizedPnl = valuation.investmentMarketValue - valuation.costBasis;
+  const unrealizedPnl = amountDifference(valuation.investmentMarketValue, valuation.costBasis);
   const canShowUnrealizedPnl = valuation.basisStatus === "complete";
   const unrealizedPnlValue = canShowUnrealizedPnl ? (
     <GainAmount value={unrealizedPnl} currency={displayCurrency} className="text-sm" />

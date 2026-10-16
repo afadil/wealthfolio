@@ -1,4 +1,5 @@
 import type { AssetLotView } from "@/lib/types";
+import { amountDifference, sumAmounts } from "@/lib/amount-math";
 import { useNameComparator } from "@/hooks/use-name-comparator";
 import { cn, formatDate, normalizeCurrency } from "@/lib/utils";
 import {
@@ -213,7 +214,9 @@ function groupLotsByAccount(
         0,
       );
       const marketValue = computed.reduce((acc, item) => acc + item.aggregateMarketValue, 0);
-      const gainLossAmount = marketValue - costBasis;
+      const gainLossAmount = sumAmounts(
+        computed.map((item) => (item.canAggregate ? (item.gainLossAmount ?? 0) : 0)),
+      );
       const gainLossPercent = costBasis !== 0 ? gainLossAmount / costBasis : 0;
       const allSnapshot = computed.every((item) => item.lot.source === "SNAPSHOT_POSITION");
 
@@ -257,7 +260,7 @@ function computeLot(
   const gainLossAmount = lot.isClosed
     ? realizedGainLoss
     : canAggregate && openCostBasis != null
-      ? marketValue - openCostBasis
+      ? amountDifference(marketValue, openCostBasis)
       : null;
   const gainLossPercent =
     gainLossAmount != null && valuationCostBasis != null && valuationCostBasis !== 0
@@ -309,7 +312,7 @@ function computeTotals(groups: AccountLotGroupData[]): LotTotals {
   const marketValue = groups.reduce((acc, g) => acc + g.marketValue, 0);
   const costBasis = groups.reduce((acc, g) => acc + g.costBasis, 0);
   const shares = groups.reduce((acc, g) => acc + g.shares, 0);
-  const gainLossAmount = marketValue - costBasis;
+  const gainLossAmount = sumAmounts(groups.map((group) => group.gainLossAmount));
   const gainLossPercent = costBasis !== 0 ? gainLossAmount / costBasis : 0;
   const averageUnitCost = shares !== 0 ? costBasis / shares : 0;
   return { marketValue, costBasis, gainLossAmount, gainLossPercent, shares, averageUnitCost };

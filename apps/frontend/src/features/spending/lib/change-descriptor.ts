@@ -10,6 +10,7 @@
  * The descriptor carries no localized copy, no tone, no arrows. Those are
  * presentation concerns and stay in components.
  */
+import { amountDifference, sumAmounts } from "@/lib/amount-math";
 
 export type ChangeKind = "no_activity" | "new" | "ended" | "valid";
 
@@ -87,7 +88,7 @@ export function describeChange(input: DescribeChangeInput): Omit<ChangeDescripto
   kind: ChangeKind;
 } {
   const { current, prior, currentPeriodTotal, totalAbsoluteMovement, netChange } = input;
-  const delta = current - prior;
+  const delta = amountDifference(current, prior);
   const absDelta = Math.abs(delta);
 
   const shareOfMovement = totalAbsoluteMovement > 0 ? absDelta / totalAbsoluteMovement : null;
@@ -152,12 +153,14 @@ export function describeCategories(
   priorPeriodTotal: number,
 ): (ChangeDescriptor & { id: string })[] {
   let totalAbsoluteMovement = 0;
-  let netChange = 0;
+  const changes: number[] = [];
   for (const r of rows) {
-    const d = r.current - r.prior;
+    const d = amountDifference(r.current, r.prior);
     totalAbsoluteMovement += Math.abs(d);
-    netChange += d;
+    changes.push(d);
   }
+
+  const netChange = sumAmounts(changes);
 
   return rows
     .map((r) => ({
