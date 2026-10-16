@@ -743,7 +743,9 @@ function BudgetRing({
       }&to=${activityRange.to}`}
       className="hover:bg-muted/40 flex w-16 shrink-0 flex-col items-center gap-1 rounded-md px-1 py-1 transition-colors"
       title={`${ring.name}: ${
-        isBalanceHidden ? "•••• / ••••" : `${ring.spent.toFixed(2)} / ${ring.target.toFixed(2)}`
+        isBalanceHidden
+          ? "•••• / ••••"
+          : `${formatting.formatAmount(ring.spent, currency, false)} / ${formatting.formatAmount(ring.target, currency, false)}`
       }`}
     >
       <div className="relative" style={{ width: size, height: size }}>
