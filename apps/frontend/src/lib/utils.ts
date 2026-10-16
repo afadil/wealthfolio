@@ -313,6 +313,12 @@ export const formatDateTime = (
   date: string | Date,
   formatting: Pick<FormattingApi, "formatDate" | "formatTime">,
   timezone?: string,
+  options?: {
+    /** Adds the weekday to `date`, for a heading over that day's rows. */
+    weekday?: Intl.DateTimeFormatOptions["weekday"];
+    /** Leaves seconds out of `time`, for a row whose day is shown above it. */
+    omitSeconds?: boolean;
+  },
 ) => {
   if (!date) return { date: "-", time: "-" };
 
@@ -339,6 +345,7 @@ export const formatDateTime = (
   const effectiveTimezone = explicitTimezone ? resolveDisplayTimezone(explicitTimezone) : undefined;
 
   const dateOptions: Intl.DateTimeFormatOptions = {
+    ...(options?.weekday ? { weekday: options.weekday } : {}),
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -348,7 +355,7 @@ export const formatDateTime = (
   const timeOptions: Intl.DateTimeFormatOptions = {
     hour: "numeric",
     minute: "numeric",
-    second: "numeric",
+    ...(options?.omitSeconds ? {} : { second: "numeric" }),
     ...(effectiveTimezone ? { timeZone: effectiveTimezone } : {}),
   };
   return {

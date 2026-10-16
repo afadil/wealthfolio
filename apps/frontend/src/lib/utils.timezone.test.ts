@@ -65,6 +65,22 @@ describe("timezone formatting", () => {
     }
   });
 
+  it("writes out the weekday and leaves seconds out when asked", () => {
+    const instant = "2025-01-01T00:30:15Z";
+    const timezone = "America/Los_Angeles";
+
+    const plain = formatDateTime(instant, formatting, timezone);
+    const heading = formatDateTime(instant, formatting, timezone, {
+      weekday: "long",
+      omitSeconds: true,
+    });
+
+    expect(plain.date).toBe("Dec 31, 2024");
+    expect(plain.time).toBe("4:30:15 PM");
+    expect(heading.date).toBe("Tuesday, Dec 31, 2024");
+    expect(heading.time).toBe("4:30 PM");
+  });
+
   it("formats date picker dates without UTC day shift", () => {
     const originalTimezone = process.env.TZ;
     process.env.TZ = "Europe/Helsinki";
