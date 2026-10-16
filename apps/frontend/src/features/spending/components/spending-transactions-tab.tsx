@@ -383,7 +383,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     /**
      * Mobile only. The card list hides its checkboxes until the user asks to
      * select, the way a phone list normally does — a checkbox on every row is a
-     * permanent cost for an occasional task. The table always shows them.
+     * permanent cost for an occasional task. The table has hover and keyboard
+     * focus, so it reveals each row's checkbox on those instead.
      */
     const [selectionMode, setSelectionMode] = useState(false);
 
@@ -1247,10 +1248,18 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             {loadMoreTrigger && <div className="flex justify-center pt-1">{loadMoreTrigger}</div>}
           </div>
         ) : (
-          <div className="rounded-md border" style={{ overflowAnchor: "none" }}>
+          // Row checkboxes show on hover or focus until something is selected,
+          // then on every row; `data-selecting` is what switches them on.
+          <div
+            className="group/list rounded-md border"
+            data-selecting={selectedRowIds.size > 0 || undefined}
+            style={{ overflowAnchor: "none" }}
+          >
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted-foreground/5">
                 <TableRow>
+                  {/* Select-all stays visible: with the row boxes hidden at
+                      rest, it is what shows the list can be selected. */}
                   <TableHead className="w-10 px-3">
                     <Checkbox
                       checked={
