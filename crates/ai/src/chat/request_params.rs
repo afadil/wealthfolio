@@ -70,13 +70,19 @@ pub(super) fn openai_responses_params(model_id: &str, thinking: bool) -> Value {
     let mut params = json!({ "store": false });
     if is_openai_reasoning_model(model_id) {
         params["include"] = json!(["reasoning.encrypted_content"]);
-        // "medium" is accepted by every reasoning model, including the ones
-        // that reject "none" (GPT-6 Astra, GPT-6.1 Sol).
-        if thinking {
+        // "medium" is accepted by the models that reject "none" (GPT-6
+        // Astra, GPT-6.1 Sol). Pro models each take their own efforts (GPT-5
+        // Pro only "high"), so they run at their default.
+        if thinking && !is_pro_model(model_id) {
             params["reasoning"] = json!({ "effort": "medium" });
         }
     }
     params
+}
+
+/// OpenAI's Pro models, such as `gpt-5-pro` or `o3-pro-2025-06-10`.
+fn is_pro_model(model_id: &str) -> bool {
+    model_id.ends_with("-pro") || model_id.contains("-pro-")
 }
 
 /// Temperature to send, or `None` to use the model's default.
@@ -238,5 +244,17 @@ mod tests {
             openai_responses_params("gpt-4.1", true),
             json!({ "store": false })
         );
+    }
+
+    #[test]
+    fn openai_pro_models_reason_at_their_default_effort() {
+        // GPT-5 Pro accepts only "high"; GPT-5.4 Pro defaults to "medium".
+        for model in ["gpt-5-pro", "gpt-5-pro-2025-10-06", "gpt-5.4-pro", "o3-pro"] {
+            assert_eq!(
+                openai_responses_params(model, true),
+                json!({ "store": false, "include": ["reasoning.encrypted_content"] }),
+                "{model}"
+            );
+        }
     }
 }
