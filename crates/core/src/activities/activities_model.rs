@@ -1027,6 +1027,13 @@ pub struct ActivityDetails {
     pub import_run_id: Option<String>,
     pub is_user_modified: bool,
     pub metadata: Option<Value>,
+    /// The cash of the row's account after this row, in
+    /// `cash_balance_currency`: filled only when the search asked for
+    /// balances and the account is a cash or credit-card account holding no
+    /// securities. Serialized as null otherwise, so every export has the
+    /// columns.
+    pub cash_balance: Option<String>,
+    pub cash_balance_currency: Option<String>,
 }
 
 impl ActivityDetails {

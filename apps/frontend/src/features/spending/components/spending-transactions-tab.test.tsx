@@ -69,12 +69,14 @@ const mocks = vi.hoisted(() => {
     getTransferPairForActivity: vi.fn(),
     invalidateQueries: vi.fn(),
     createActivity: vi.fn(),
+    saveActivities: vi.fn(),
     useMutation: vi.fn(),
   };
 });
 
 vi.mock("@/adapters", () => ({
   createActivity: mocks.createActivity,
+  saveActivities: mocks.saveActivities,
   deleteActivity: vi.fn(),
   updateActivity: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -211,13 +213,74 @@ vi.mock("./transaction-row", async () => {
 
 describe("SpendingTransactionsTab transfer edit", () => {
   beforeEach(() => {
-    mocks.getTransferPairForActivity.mockReset();
+    mocks.getTransferPairForActivity.mockReset().mockResolvedValue({
+      transferOut: mocks.transferOut,
+      transferIn: {
+        ...mocks.transferOut,
+        id: "in-1",
+        accountId: EUR_ACCOUNT,
+        activityType: "TRANSFER_IN",
+        currency: "EUR",
+        amount: "920",
+      },
+    });
     mocks.createActivity.mockReset();
+    mocks.saveActivities.mockReset();
     mocks.useMutation.mockReset().mockReturnValue(mocks.mutation);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("duplicates both legs of a same-account exchange through the atomic bulk API", async () => {
+    const transferIn = {
+      ...mocks.transferOut,
+      id: "in-1",
+      activityType: "TRANSFER_IN",
+      currency: "EUR",
+      amount: "920",
+    };
+    mocks.getTransferPairForActivity.mockResolvedValue({
+      transferOut: mocks.transferOut,
+      transferIn,
+    });
+    mocks.saveActivities.mockResolvedValue({
+      created: [mocks.transferOut, transferIn],
+      errors: [],
+    });
+    render(<SpendingTransactionsTab />);
+    const duplicateOptions = mocks.useMutation.mock.calls[0][0] as {
+      mutationFn: (row: TransactionRowVM) => Promise<unknown>;
+    };
+    await duplicateOptions.mutationFn({
+      activity: {
+        ...mocks.transferOut,
+        activityType: ActivityType.TRANSFER_OUT,
+        status: ActivityStatus.POSTED,
+        cashFlowBucket: "neutral",
+      },
+      category: null,
+      splitCount: 0,
+      needsReview: false,
+    });
+    expect(mocks.createActivity).not.toHaveBeenCalled();
+    expect(mocks.saveActivities).toHaveBeenCalledWith({
+      creates: [
+        expect.objectContaining({
+          activityType: "TRANSFER_OUT",
+          amount: "1000",
+          currency: "USD",
+          accountId: USD_ACCOUNT,
+        }),
+        expect.objectContaining({
+          activityType: "TRANSFER_IN",
+          amount: "920",
+          currency: "EUR",
+          accountId: USD_ACCOUNT,
+        }),
+      ],
+    });
   });
 
   it.each(["Original notes\nSecond line", "", undefined])(

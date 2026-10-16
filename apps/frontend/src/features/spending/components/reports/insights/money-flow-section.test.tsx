@@ -3,8 +3,11 @@ import { FormattingProvider } from "@wealthfolio/ui";
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { TaxonomyCategory } from "@/lib/types";
+
 import type { BudgetCategoryRow, BudgetGroupRow, BudgetSnapshot } from "../../../types/budget";
-import type { MonthlyReport } from "../../../types/report";
+import type { DayCategoryBucket } from "../../../types/insight";
+import type { CategoryBreakdownRow, MonthlyReport } from "../../../types/report";
 import { MoneyFlowSection } from "./money-flow-section";
 
 const privacy = vi.hoisted(() => ({ isBalanceHidden: false }));
@@ -43,6 +46,7 @@ beforeAll(() => {
 
 afterEach(() => {
   privacy.isBalanceHidden = false;
+  localStorage.removeItem("privacy-settings");
   focusModality = "keyboard";
 });
 
@@ -92,67 +96,127 @@ const needs: BudgetGroupRow = {
 // The section reads only the computed group rows of the budget snapshot.
 const budget = { computed: { groupRows: [needs] } } as unknown as BudgetSnapshot;
 
-function report(income: number): MonthlyReport {
+const taxonomyCategory = (
+  id: string,
+  name: string,
+  parentId: string | null = null,
+  taxonomyId = "spending_categories",
+): TaxonomyCategory => ({
+  id,
+  taxonomyId,
+  parentId,
+  name,
+  key: id,
+  color: "#5A7A3E",
+  sortOrder: 0,
+  createdAt: "",
+  updatedAt: "",
+});
+
+const spendingCategories = [
+  taxonomyCategory("cat_housing", "Housing"),
+  taxonomyCategory("cat_rent", "Rent", "cat_housing"),
+  taxonomyCategory("cat_maintenance", "Maintenance", "cat_housing"),
+  taxonomyCategory("cat_returns", "Returns", "cat_housing"),
+  taxonomyCategory("cat_bills", "Bills"),
+];
+
+const salaryOnly = [taxonomyCategory("cat_income_salary", "Salary", null, "income_sources")];
+const employment = [
+  taxonomyCategory("cat_income_employment", "Employment", null, "income_sources"),
+  taxonomyCategory("cat_income_salary", "Salary", "cat_income_employment", "income_sources"),
+  taxonomyCategory("cat_income_bonus", "Bonus", "cat_income_employment", "income_sources"),
+];
+
+const incomeRow = (categoryId: string, amount: number): CategoryBreakdownRow => ({
+  taxonomyId: "income_sources",
+  categoryId,
+  amount,
+  count: 1,
+});
+
+const bucket = (categoryId: string, amount: number): DayCategoryBucket => ({
+  date: "2026-04-01",
+  taxonomyId: "spending_categories",
+  categoryId,
+  amount,
+  count: 1,
+});
+
+/** Housing's $1,498 by subcategory, with $198 assigned to Housing itself. */
+const housingDetail = [
+  bucket("cat_rent", 1000),
+  bucket("cat_maintenance", 300),
+  bucket("cat_housing", 198),
+  bucket("cat_bills", 120),
+];
+
+/** The same $1,498 net, after a $200 refund that outweighs Returns' spending. */
+const refundedHousing = [
+  bucket("cat_rent", 1500),
+  bucket("cat_maintenance", 198),
+  bucket("cat_returns", -200),
+  bucket("cat_bills", 120),
+];
+
+function report(
+  income: number,
+  buckets: DayCategoryBucket[],
+  incomeBreakdown?: CategoryBreakdownRow[],
+): MonthlyReport {
   const summary = { income, outflow: 1618, saved: 0, net: income - 1618, count: 3 };
   return {
     baseCurrency: "USD",
     current: summary,
     prior: summary,
     spendingBreakdown: [],
-    incomeBreakdown: income
-      ? [
-          {
-            taxonomyId: "income_sources",
-            categoryId: "cat_income_salary",
-            amount: income,
-            count: 1,
-          },
-        ]
-      : [],
+    incomeBreakdown: incomeBreakdown ?? (income ? [incomeRow("cat_income_salary", income)] : []),
     savingsBreakdown: [],
     byDay: [],
-    byDayByCategory: [],
+    byDayByCategory: buckets,
   };
 }
 
-function setup({
-  income = 2500,
-  onCategoryClick = vi.fn(),
-  groups = budget,
-  isMobile = false,
-}: {
+interface FlowOptions {
   income?: number;
   onCategoryClick?: (id: string) => void;
   groups?: BudgetSnapshot;
   isMobile?: boolean;
-} = {}) {
-  const view = render(
+  buckets?: DayCategoryBucket[];
+  incomeBreakdown?: CategoryBreakdownRow[];
+  incomeCategories?: TaxonomyCategory[];
+}
+
+function flow({
+  income = 2500,
+  onCategoryClick,
+  groups = budget,
+  isMobile = false,
+  buckets = [],
+  incomeBreakdown,
+  incomeCategories = salaryOnly,
+}: FlowOptions) {
+  return (
     <FormattingProvider locale="en-US">
       <MoneyFlowSection
         periodLabel="April"
-        currentReport={report(income)}
+        currentReport={report(income, buckets, incomeBreakdown)}
         budget={groups}
-        incomeCategories={[
-          {
-            id: "cat_income_salary",
-            taxonomyId: "income_sources",
-            parentId: null,
-            name: "Salary",
-            key: "salary",
-            color: "#5A7A3E",
-            sortOrder: 0,
-            createdAt: "",
-            updatedAt: "",
-          },
-        ]}
+        spendingCategories={spendingCategories}
+        incomeCategories={incomeCategories}
         savingsCategories={[]}
         currency="USD"
         isLoading={false}
         isMobile={isMobile}
         onCategoryClick={onCategoryClick}
       />
-    </FormattingProvider>,
+    </FormattingProvider>
   );
+}
+
+function setup(options: FlowOptions = {}) {
+  const onCategoryClick = options.onCategoryClick ?? vi.fn();
+  const view = render(flow({ ...options, onCategoryClick }));
   return { onCategoryClick, ...view };
 }
 
@@ -162,8 +226,12 @@ describe("MoneyFlowSection", () => {
 
     expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
     expect(screen.getByText("Salary")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Needs, $1,618" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Housing, $1,498" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Housing, $1,498. View transactions" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Left over")).toBeInTheDocument();
     expect(screen.getByText("$882")).toBeInTheDocument();
   });
@@ -171,7 +239,7 @@ describe("MoneyFlowSection", () => {
   it("opens a category's transactions", () => {
     const { onCategoryClick } = setup();
 
-    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498" }));
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. View transactions" }));
 
     expect(onCategoryClick).toHaveBeenCalledWith("cat_housing");
   });
@@ -179,7 +247,7 @@ describe("MoneyFlowSection", () => {
   it("zooms into a group, focuses the way back, and returns focus to the group on Escape", () => {
     setup();
 
-    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618" }));
+    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618. Show every category" }));
 
     expect(screen.getByRole("heading", { name: "Needs" })).toBeInTheDocument();
     const back = screen.getByRole("button", { name: "All flows" });
@@ -190,23 +258,29 @@ describe("MoneyFlowSection", () => {
 
     expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
     expect(screen.getByText("Salary")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Needs, $1,618" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toHaveFocus();
   });
 
   it("leaves focus alone when the zoom is left with the mouse", () => {
     setup();
 
-    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618" }));
+    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618. Show every category" }));
     fireEvent.click(screen.getByRole("button", { name: "All flows" }), { detail: 1 });
 
     expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Needs, $1,618" })).not.toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).not.toHaveFocus();
   });
 
   it("opens a category from the keyboard", () => {
     const { onCategoryClick } = setup();
 
-    fireEvent.keyDown(screen.getByRole("button", { name: "Bills, $120" }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Bills, $120. View transactions" }), {
+      key: "Enter",
+    });
 
     expect(onCategoryClick).toHaveBeenCalledWith("cat_bills");
   });
@@ -225,7 +299,7 @@ describe("MoneyFlowSection", () => {
     expect(total).toHaveFocus();
 
     fireEvent.keyDown(total, { key: "ArrowRight" });
-    const needs = screen.getByRole("button", { name: "Needs, $1,618" });
+    const needs = screen.getByRole("button", { name: "Needs, $1,618. Show every category" });
     expect(needs).toHaveFocus();
 
     fireEvent.keyDown(needs, { key: "ArrowDown" });
@@ -243,7 +317,7 @@ describe("MoneyFlowSection", () => {
 
     const leftOver = screen.getByRole("img", { name: "Left over, $882" });
     act(() => leftOver.focus());
-    const housing = screen.getByRole("button", { name: "Housing, $1,498" });
+    const housing = screen.getByRole("button", { name: "Housing, $1,498. View transactions" });
     fireEvent.mouseEnter(housing);
     expect(screen.getByRole("tooltip")).toHaveTextContent("Housing");
 
@@ -315,7 +389,9 @@ describe("MoneyFlowSection", () => {
     expect(screen.getByRole("img", { name: "Net refunds, $200" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Shortfall, $418" })).toBeInTheDocument();
 
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "Needs, $1,618" }));
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    );
     expect(screen.getByRole("tooltip")).toHaveTextContent(
       "Before subtracting $200.00 in net refunds.",
     );
@@ -325,7 +401,9 @@ describe("MoneyFlowSection", () => {
     privacy.isBalanceHidden = true;
     const { container } = setup();
 
-    expect(screen.getByRole("button", { name: "Needs, ••••" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Needs, ••••. Show every category" }),
+    ).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\$\d/);
   });
 
@@ -343,8 +421,12 @@ describe("MoneyFlowSection", () => {
   it("stops at groups on mobile and shows a tooltip on tap", () => {
     setup({ isMobile: true });
 
-    expect(screen.queryByRole("button", { name: "Housing, $1,498" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Needs, $1,618" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Housing, $1,498. View transactions" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("img", { name: "Total, $2,500" }));
     expect(screen.getByRole("tooltip")).toHaveTextContent(
@@ -364,5 +446,219 @@ describe("MoneyFlowSection", () => {
     setup({ income: 0, groups: empty });
 
     expect(screen.queryByRole("heading", { name: "Money flow" })).not.toBeInTheDocument();
+  });
+});
+
+describe("MoneyFlowSection subcategories", () => {
+  it("marks a category that zooms in apart from one that opens its transactions", () => {
+    setup({ buckets: housingDetail });
+
+    const housing = screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" });
+    expect(housing).toHaveTextContent("›");
+    const bills = screen.getByRole("button", { name: "Bills, $120. View transactions" });
+    expect(bills).not.toHaveTextContent("›");
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toHaveTextContent("›");
+
+    act(() => housing.focus());
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Click to see subcategories");
+  });
+
+  it("zooms into a category's subcategories, each opening its own transactions", () => {
+    const { onCategoryClick } = setup({ buckets: housingDetail });
+
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+
+    expect(onCategoryClick).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: "Housing" })).toBeInTheDocument();
+    expect(screen.getByText("Every subcategory for April.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All flows" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Maintenance, $300. View transactions" }),
+    ).toBeVisible();
+    // Spending assigned to Housing itself stays its own leaf, with nothing to open.
+    expect(screen.getByRole("img", { name: "Direct, $198" })).toBeInTheDocument();
+    expect(screen.queryByText("Salary")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rent, $1,000. View transactions" }));
+    expect(onCategoryClick).toHaveBeenLastCalledWith("cat_rent");
+
+    fireEvent.click(screen.getByRole("button", { name: "View transactions" }));
+    expect(onCategoryClick).toHaveBeenLastCalledWith("cat_housing");
+  });
+
+  it("zooms into a category from the keyboard and returns to it on Escape", () => {
+    setup({ buckets: housingDetail });
+
+    const housing = screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" });
+    act(() => housing.focus());
+    fireEvent.keyDown(housing, { key: "Enter" });
+
+    const back = screen.getByRole("button", { name: "All flows" });
+    expect(back).toHaveFocus();
+    fireEvent.keyDown(back, { key: "Escape" });
+
+    expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }),
+    ).toHaveFocus();
+  });
+
+  it("reaches subcategories through a group on mobile, then steps back one level at a time", () => {
+    setup({ buckets: housingDetail, isMobile: true });
+
+    expect(screen.queryByRole("button", { name: /^Housing/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618. Show every category" }));
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+
+    expect(screen.getByRole("heading", { name: "Housing" })).toBeInTheDocument();
+    const back = screen.getByRole("button", { name: "Back to Needs" });
+    expect(back).toHaveFocus();
+    expect(screen.getByRole("button", { name: "All flows" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Rent, $1,000. View transactions" })).toBeVisible();
+
+    fireEvent.keyDown(back, { key: "Escape" });
+
+    expect(screen.getByRole("heading", { name: "Needs" })).toBeInTheDocument();
+    const housing = screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" });
+    expect(housing).toHaveFocus();
+
+    fireEvent.keyDown(housing, { key: "Escape" });
+
+    expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toHaveFocus();
+  });
+
+  it("returns straight to the overview with All flows", () => {
+    setup({ buckets: housingDetail, isMobile: true });
+    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618. Show every category" }));
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+
+    // Enter on the button: the keyboard lands on the node that opened the first zoom.
+    fireEvent.click(screen.getByRole("button", { name: "All flows" }), { detail: 0 });
+
+    expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Needs, $1,618. Show every category" }),
+    ).toHaveFocus();
+  });
+
+  it("steps back to the group with the mouse without moving focus to the category", () => {
+    setup({ buckets: housingDetail });
+    fireEvent.click(screen.getByRole("button", { name: "Needs, $1,618. Show every category" }));
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Needs" }), { detail: 1 });
+
+    expect(screen.getByRole("heading", { name: "Needs" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }),
+    ).not.toHaveFocus();
+  });
+
+  it("falls back to the overview when a refresh leaves the zoomed category without subcategories", () => {
+    const { rerender } = setup({ buckets: housingDetail });
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+    expect(screen.getByRole("heading", { name: "Housing" })).toBeInTheDocument();
+
+    // Everything recategorized onto Housing itself while the zoom was open.
+    rerender(flow({ buckets: [bucket("cat_housing", 1498), bucket("cat_bills", 120)] }));
+
+    expect(screen.getByRole("heading", { name: "Money flow" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Housing, $1,498. View transactions" }),
+    ).toBeInTheDocument();
+  });
+
+  it("reaches an income category folded into +N more, then its subcategories", () => {
+    setup({
+      income: 6050,
+      incomeBreakdown: [
+        incomeRow("cat_income_salary", 6000),
+        incomeRow("cat_income_dividends", 30),
+        incomeRow("cat_income_gifts", 20),
+      ],
+      incomeCategories: [
+        ...employment,
+        taxonomyCategory("cat_income_investment", "Investment", null, "income_sources"),
+        taxonomyCategory(
+          "cat_income_dividends",
+          "Dividends",
+          "cat_income_investment",
+          "income_sources",
+        ),
+        taxonomyCategory("cat_income_other", "Other", null, "income_sources"),
+        taxonomyCategory("cat_income_gifts", "Gifts", "cat_income_other", "income_sources"),
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "+2 more, $50. Show every category" }));
+
+    expect(screen.getByRole("heading", { name: "Total" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Investment, $30. Show subcategories" }));
+
+    expect(screen.getByRole("heading", { name: "Investment" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Dividends, $30" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to Total" })).toHaveFocus();
+  });
+
+  it("rolls income up to its category and zooms into where it came from", () => {
+    setup({
+      incomeBreakdown: [incomeRow("cat_income_salary", 2000), incomeRow("cat_income_bonus", 500)],
+      incomeCategories: employment,
+    });
+
+    expect(screen.queryByText("Salary")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Left over, $882" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Employment, $2,500. Show subcategories" }));
+
+    expect(screen.getByRole("heading", { name: "Employment" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Salary, $2,000" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Bonus, $500" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Employment, $2,500" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View transactions" })).not.toBeInTheDocument();
+  });
+
+  it("explains gross and net spending when a subcategory was mostly refunded", () => {
+    setup({ buckets: refundedHousing });
+
+    fireEvent.click(screen.getByRole("button", { name: "Housing, $1,498. Show subcategories" }));
+
+    expect(screen.getByRole("img", { name: "Net spending, $1,498" })).toBeInTheDocument();
+    const refunds = screen.getByRole("img", { name: "Net refunds, $200" });
+    fireEvent.mouseEnter(refunds);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Returns");
+
+    fireEvent.mouseEnter(
+      screen.getByRole("button", { name: "Housing, $1,698. View transactions" }),
+    );
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Before subtracting $200.00 in net refunds. Net spending: $1,498.00.",
+    );
+  });
+
+  it("masks every amount of a zoomed category in privacy mode", () => {
+    privacy.isBalanceHidden = true;
+    // `PrivacyAmount` reads the stored setting the app's privacy hook is built on.
+    localStorage.setItem("privacy-settings", "true");
+    const { container } = setup({ buckets: refundedHousing });
+
+    fireEvent.click(screen.getByRole("button", { name: "Housing, ••••. Show subcategories" }));
+
+    expect(screen.getByRole("img", { name: "Net spending, ••••" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Rent, ••••. View transactions" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View transactions" })).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Housing, ••••. View transactions" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Before subtracting •••• in net refunds. Net spending: ••••.",
+    );
+    fireEvent.mouseEnter(screen.getByRole("img", { name: "Net refunds, ••••" }));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Returns");
+    expect(container.textContent).not.toMatch(/\$\d/);
   });
 });

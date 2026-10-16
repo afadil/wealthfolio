@@ -48,6 +48,7 @@ import { ActivityForm } from "@/pages/activity/components/activity-form";
 import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
 import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
+import { buildSameAccountFxDuplicate } from "@/pages/activity/utils/duplicate-fx-transfer";
 import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
 import {
     useAssignActivityCategory,
@@ -176,7 +177,7 @@ export interface SpendingTransactionsTabHandle {
   openAddForm: () => void;
 }
 
-function toActivityDetails(row: TransactionRowVM, account?: Account): Partial<ActivityDetails> {
+function toActivityDetails(row: TransactionRowVM, account?: Account): ActivityDetails {
   const activity = row.activity;
   const activityType = getEffectiveCashActivityType(activity);
   return {
@@ -491,6 +492,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         maxAmount: amountRange.max ?? undefined,
         sortBy: "date",
         sortDir: "desc",
+        // Filled only when the search covers exactly one account.
+        includeCashBalances: true,
       };
     }, [
       debouncedSearch,
@@ -519,6 +522,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       fetchNextPage,
       refetch,
     } = useCashActivitySearch(searchRequest);
+    // Rows carry a balance only when the search covers one cash or
+    // credit-card account, so their presence decides the column.
+    const showBalance = useMemo(() => items.some((item) => item.cashBalance != null), [items]);
 
     const accountById = useMemo(() => {
       const m = new Map<string, Account>();
@@ -610,6 +616,14 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const { mutate: duplicateTransaction } = useMutation({
       mutationFn: async (row: TransactionRowVM) => {
+        const exchange = await buildSameAccountFxDuplicate(toActivityDetails(row));
+        if (exchange) {
+          const result = await saveActivities({ creates: exchange });
+          if (result.errors.length || result.created.length !== 2) {
+            throw new Error("Failed duplicating transfer pair.");
+          }
+          return result.created[0];
+        }
         const a = row.activity;
         const activityType = getEffectiveCashActivityType(a);
         const supportsBoundary =
@@ -1065,7 +1079,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       <>
         {firstItemStart > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: firstItemStart }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: firstItemStart }}
+            />
           </TableRow>
         )}
         {virtualItems.map((virtualItem) => {
@@ -1081,6 +1099,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               selectionState={daySelectionState(item.group)}
               onToggleDay={handleToggleDay}
               isPartial={hasNextPage === true && item.isLastGroup}
+              showBalance={showBalance}
             />
           ) : (
             <TransactionRow
@@ -1089,12 +1108,17 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               data-index={virtualItem.index}
               {...sharedRowProps(item.row)}
               showAccount={showAccount}
+              showBalance={showBalance}
             />
           );
         })}
         {totalSize - lastItemEnd > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: totalSize - lastItemEnd }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: totalSize - lastItemEnd }}
+            />
           </TableRow>
         )}
       </>
@@ -1247,6 +1271,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                     {t("spending:filters.category")}
                   </TableHead>
                   <TableHead className="w-28 px-3 text-right">{t("common:amount")}</TableHead>
+                  {showBalance && (
+                    <TableHead className="hidden w-28 px-3 text-right sm:table-cell">
+                      {t("activity:table_balance")}
+                    </TableHead>
+                  )}
                   <TableHead className="w-10 px-3" />
                 </TableRow>
               </TableHeader>

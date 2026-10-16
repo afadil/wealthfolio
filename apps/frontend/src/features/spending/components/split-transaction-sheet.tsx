@@ -84,11 +84,6 @@ function categoryLabel(
   return parent ? `${parent.name} / ${category.name}` : category.name;
 }
 
-function formatCents(cents: number) {
-  const prefix = cents < 0 ? "-" : "";
-  return `${prefix}${centsToAmount(Math.abs(cents)).toFixed(2)}`;
-}
-
 function fallbackLineColor(index: number) {
   return SPLIT_LINE_COLORS[index % SPLIT_LINE_COLORS.length];
 }
@@ -118,7 +113,8 @@ export function SplitTransactionSheet({
   const taxonomyId = taxonomyForBucket(activity?.cashFlowBucket);
   const totalCents = toCents(activity?.amount);
   const totalAmount = Math.abs(totalCents) / 100;
-  const currencySymbol = formatting.formatCurrencySymbol(activity?.currency || "USD");
+  const currency = activity?.currency || "USD";
+  const currencySymbol = formatting.formatCurrencySymbol(currency);
 
   const [lines, setLines] = useState<SplitLineState[]>([]);
   const [expandedNoteLineIds, setExpandedNoteLineIds] = useState<Set<string>>(new Set());
@@ -281,10 +277,11 @@ export function SplitTransactionSheet({
 
         <div className={cn("min-h-0 flex-1 overflow-y-auto", isMobile ? "px-4" : "px-1")}>
           <div className="space-y-4 py-4">
+            {/* Splits are summed in cents, so these keep cents even for currencies without them. */}
             <div className="bg-muted/50 flex items-center justify-between rounded-2xl px-4 py-4">
               <span className="text-muted-foreground text-sm">
                 {t("spending:split.remainingOf", {
-                  amount: `${currencySymbol}${formatCents(totalAbsCents)}`,
+                  amount: formatting.formatPrice(centsToAmount(totalAbsCents), currency),
                 })}
               </span>
               <span
@@ -297,7 +294,8 @@ export function SplitTransactionSheet({
                       : "text-foreground",
                 )}
               >
-                {formatCents(remainingCents)} {activity?.currency}
+                {formatting.formatPrice(centsToAmount(remainingCents), currency, false)}{" "}
+                {activity?.currency}
               </span>
             </div>
 

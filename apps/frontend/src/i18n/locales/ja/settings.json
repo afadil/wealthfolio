@@ -323,12 +323,15 @@
   "backup_export_ready": "バックアップをエクスポートしました",
   "recovery_opening": "ポートフォリオを開いています…",
   "recovery_title": "ポートフォリオを開けませんでした",
-  "recovery_description": "バックアップを復元してポートフォリオを回復できます。Wealthfolioは既存のデータファイルを別のフォルダに保管します。",
+  "recovery_description": "デバイスの安全なストレージがロックされている場合は、バックアップを復元する前にロックを解除して再試行してください。それでも開けない場合は、バックアップを復元できます。既存のデータファイルは別に保存されます。",
   "recovery_unavailable": "ポートフォリオをもう一度開いてみてください。問題が続く場合は、エラーの詳細を確認してください。",
   "recovery_retry": "再試行",
   "recovery_encrypted": "復元したデータはこのデバイスで暗号化されます。",
   "recovery_plain": "復元したデータは暗号化されません。このデバイスの現在の設定が維持されます。",
   "recovery_details": "エラーの詳細",
+  "recovery_copy_details": "エラーの詳細をコピー",
+  "recovery_details_copied": "エラーの詳細をコピーしました",
+  "recovery_retry_failed": "まだポートフォリオを開けません。",
   "recovery_preview": "バックアップのプレビュー",
   "recovery_counts": "口座：{{accounts}} · 取引：{{activities}}",
   "recovery_created": "バックアップの作成日時：{{date}}",
@@ -1511,6 +1514,16 @@
       "romania": "ルーマニア",
       "bulgaria": "ブルガリア"
     }
+  },
+  "currencyFormats": {
+    "title": "通貨ごとの表示形式をカスタマイズ",
+    "customCount_one": "カスタム形式 {{count}} 件",
+    "customCount_other": "カスタム形式 {{count}} 件",
+    "description": "特定の通貨の金額を別の地域の表記規則で表示します。その他の通貨は「地域と表示形式」に従います。",
+    "currencyPlaceholder": "通貨を選択",
+    "regionPlaceholder": "地域を選択",
+    "regionFor": "{{currency}} の地域",
+    "remove": "{{currency}} の表示形式を削除"
   },
   "appearance_navigation_title": "ナビゲーション",
   "appearance_navigation_description": "大きな画面での操作方法を選択します。",

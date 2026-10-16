@@ -253,12 +253,15 @@
   "backup_export_ready": "Sicherung exportiert",
   "recovery_opening": "Portfolio wird geöffnet…",
   "recovery_title": "Ihr Portfolio konnte nicht geöffnet werden",
-  "recovery_description": "Stellen Sie eine Sicherung wieder her, um Ihr Portfolio zurückzuerhalten. Wealthfolio bewahrt Ihre vorhandenen Datendateien in einem separaten Ordner auf.",
+  "recovery_description": "Wenn der sichere Speicher Ihres Geräts gesperrt ist, entsperren Sie ihn und versuchen Sie es erneut, bevor Sie eine Sicherung wiederherstellen. Falls das weiterhin fehlschlägt, können Sie eine Sicherung wiederherstellen. Ihre vorhandenen Datendateien werden separat aufbewahrt.",
   "recovery_unavailable": "Versuchen Sie erneut, Ihr Portfolio zu öffnen. Wenn das Problem weiterhin besteht, prüfen Sie die Fehlerdetails.",
   "recovery_retry": "Erneut versuchen",
   "recovery_encrypted": "Ihre wiederhergestellten Daten werden auf diesem Gerät verschlüsselt.",
   "recovery_plain": "Ihre wiederhergestellten Daten werden nicht verschlüsselt. Das entspricht der aktuellen Einstellung dieses Geräts.",
   "recovery_details": "Fehlerdetails",
+  "recovery_copy_details": "Fehlerdetails kopieren",
+  "recovery_details_copied": "Fehlerdetails kopiert",
+  "recovery_retry_failed": "Ihr Portfolio konnte weiterhin nicht geöffnet werden.",
   "recovery_preview": "Vorschau der Sicherung",
   "recovery_counts": "Konten: {{accounts}} · Aktivitäten: {{activities}}",
   "recovery_created": "Sicherung erstellt: {{date}}",
@@ -1529,6 +1532,16 @@
       "romania": "Rumänien",
       "bulgaria": "Bulgarien"
     }
+  },
+  "currencyFormats": {
+    "title": "Währungsformate anpassen",
+    "customCount_one": "{{count}} angepasstes Format",
+    "customCount_other": "{{count}} angepasste Formate",
+    "description": "Beträge in bestimmten Währungen nach den Konventionen einer anderen Region formatieren. Andere Währungen folgen „Region und Formate“.",
+    "currencyPlaceholder": "Währung auswählen",
+    "regionPlaceholder": "Region auswählen",
+    "regionFor": "Region für {{currency}}",
+    "remove": "Format für {{currency}} entfernen"
   },
   "appearance_navigation_title": "Navigation",
   "appearance_navigation_description": "Wählen Sie die Navigation auf großen Bildschirmen.",

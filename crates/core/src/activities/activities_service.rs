@@ -52,6 +52,7 @@ use crate::activities::activities_constants::{
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
+use crate::activities::cash_balances::{running_cash_balances, shows_running_cash_balance};
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
 use crate::activities::{
@@ -129,6 +130,7 @@ struct ResolvedSymbolInfo {
 /// What an update makes of a transfer leg when it turns it into a securities
 /// transfer: its direction, the security and the quantity moved.
 struct SecuritiesTransferLeg {
+    account_id: String,
     activity_type: String,
     asset: String,
     quantity: Decimal,
@@ -151,6 +153,7 @@ impl SecuritiesTransferLeg {
             .flatten()
             .filter(|quantity| !quantity.is_zero())?;
         Some(Self {
+            account_id: update.account_id.clone(),
             activity_type: update.activity_type.clone(),
             asset: asset.to_uppercase(),
             quantity: quantity.abs(),
@@ -159,7 +162,8 @@ impl SecuritiesTransferLeg {
 
     /// Whether the two legs are the opposite sides of one securities transfer.
     fn pairs_with(&self, other: &Self) -> bool {
-        self.activity_type != other.activity_type
+        self.account_id != other.account_id
+            && self.activity_type != other.activity_type
             && self.asset == other.asset
             && self.quantity == other.quantity
     }
@@ -1832,12 +1836,6 @@ impl ActivityService {
                 "Destination account is required",
             ));
         }
-        if request.from_account_id == request.to_account_id {
-            return Err(Self::invalid_activity_data(
-                "Source and destination accounts must be different",
-            ));
-        }
-
         if request
             .transfer_mode
             .as_deref()
@@ -1875,6 +1873,14 @@ impl ActivityService {
         );
         let source_currency = source_currency.to_uppercase();
         let destination_currency = destination_currency.to_uppercase();
+
+        if request.from_account_id == request.to_account_id
+            && source_currency == destination_currency
+        {
+            return Err(Self::invalid_activity_data(
+                "Same-account cash transfers require different currencies",
+            ));
+        }
 
         let destination_amount = if source_currency == destination_currency {
             source_amount
@@ -2041,9 +2047,14 @@ impl ActivityService {
         pair: &TransferPair,
     ) -> Result<()> {
         if Self::is_cash_transfer_pair(pair)
-            && pair.transfer_out.account_id != pair.transfer_in.account_id
             && (update.account_id != existing.account_id
-                || (!update.currency.is_empty() && update.currency != existing.currency))
+                || (!update.currency.is_empty() && update.currency != existing.currency)
+                || (pair.transfer_out.account_id == pair.transfer_in.account_id
+                    && (update.activity_type != existing.effective_type()
+                        || is_securities_transfer(
+                            &update.activity_type,
+                            update.get_symbol_id().or(update.get_symbol_code()),
+                        ))))
         {
             return Err(Self::invalid_activity_data(
                 "Use the transfer pair editor to change transfer accounts or currencies",
@@ -2112,7 +2123,12 @@ impl ActivityService {
             return Ok(Some(counterpart_update));
         }
 
-        if pair.transfer_out.account_id != pair.transfer_in.account_id {
+        if pair.transfer_out.account_id != pair.transfer_in.account_id
+            || super::is_contribution_neutral_same_account_cash_fx_conversion(
+                &pair.transfer_in,
+                &pair.transfer_out,
+            )
+        {
             // Grid saves can echo the original amount. A notes/rate-only edit
             // must not recalculate the other leg using a rounded ratio.
             if existing.amount.map(|value| value.abs()) == Some(amount.abs()) {
@@ -2649,7 +2665,9 @@ impl ActivityService {
                 "PRECIOUS_METAL" | "PREC" => return (AssetKind::PreciousMetal, None),
                 "PRIVATE_EQUITY" | "PEQ" => return (AssetKind::PrivateEquity, None),
                 "LIABILITY" | "LIAB" => return (AssetKind::Liability, None),
-                "OTHER" | "ALT" => return (AssetKind::Other, None),
+                // A custom "Other" asset bought in an account is held there: an
+                // investment, not the alternative kind net worth adds on its own.
+                "OTHER" | "ALT" => return (AssetKind::Investment, None),
                 _ => {} // Fall through to inference
             }
         }
@@ -4965,6 +4983,56 @@ impl ActivityServiceTrait for ActivityService {
             instrument_type_filter,
             activity_id_filter,
         )
+    }
+
+    /// Balances come from each account's whole history, not the page: a row's
+    /// balance depends on every earlier row of its account, loaded or not.
+    async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> Result<()> {
+        let account_ids: Vec<String> = response
+            .data
+            .iter()
+            .map(|row| row.account_id.clone())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        if account_ids.is_empty() {
+            return Ok(());
+        }
+        let activity_repository = Arc::clone(&self.activity_repository);
+        let account_service = Arc::clone(&self.account_service);
+        let mut balances = crate::portfolio::coordinator::blocking(move || {
+            let accounts: Vec<Account> = account_service
+                .get_accounts_by_ids(&account_ids)?
+                .into_iter()
+                .filter(shows_running_cash_balance)
+                .collect();
+            if accounts.is_empty() {
+                return Ok(HashMap::new());
+            }
+            let eligible: Vec<String> = accounts.iter().map(|account| account.id.clone()).collect();
+            // One read for every eligible account's history, split per account.
+            let mut histories: HashMap<String, Vec<Activity>> = HashMap::new();
+            for activity in activity_repository.get_activities_by_account_ids(&eligible)? {
+                histories
+                    .entry(activity.account_id.clone())
+                    .or_default()
+                    .push(activity);
+            }
+            let mut balances = HashMap::new();
+            for account in &accounts {
+                let history = histories.remove(&account.id).unwrap_or_default();
+                balances.extend(running_cash_balances(account, &history).unwrap_or_default());
+            }
+            Ok(balances)
+        })
+        .await?;
+        for row in &mut response.data {
+            if let Some(balance) = balances.remove(&row.id) {
+                row.cash_balance = Some(balance.balance.to_string());
+                row.cash_balance_currency = Some(balance.currency);
+            }
+        }
+        Ok(())
     }
 
     /// Creates a new activity

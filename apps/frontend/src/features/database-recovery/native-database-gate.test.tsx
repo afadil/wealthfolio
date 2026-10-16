@@ -148,6 +148,36 @@ it("retries failed startup before allowing the portfolio to mount", async () => 
   expect(mocks.retry).toHaveBeenCalledOnce();
 });
 
+it("reports a failed retry once without repeating the startup error", async () => {
+  const error = "Invalid input: Operation not permitted (os error 1)";
+  mocks.status.mockResolvedValue({ ready: false, error, canRecover: false });
+  mocks.retry.mockRejectedValue(error);
+  mount();
+  await screen.findByText(error);
+  fireEvent.click(screen.getByRole("button", { name: copy.recovery_retry }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(copy.recovery_retry_failed);
+  expect(screen.getAllByText(error)).toHaveLength(1);
+});
+
+it("keeps the startup error collapsed until opened, then copies it", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  try {
+    mount();
+    const disclosure = (await screen.findByText(copy.recovery_details)).closest("details");
+    expect(disclosure).not.toHaveAttribute("open");
+    fireEvent.click(screen.getByText(copy.recovery_details));
+    expect(disclosure).toHaveAttribute("open");
+    fireEvent.click(screen.getByRole("button", { name: copy.recovery_copy_details }));
+    expect(
+      await screen.findByRole("button", { name: copy.recovery_details_copied }),
+    ).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith("Missing device key");
+  } finally {
+    Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
 it("observes an owned recovery after the webview reloads", async () => {
   mocks.status
     .mockResolvedValueOnce({

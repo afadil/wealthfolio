@@ -46,6 +46,13 @@ pub struct ActivityDto {
     pub account_id: String,
     pub account_name: Option<String>,
     pub notes: Option<String>,
+    /// The cash of the activity's account after this activity, in
+    /// `cash_balance_currency`. Absent for investment accounts and for cash
+    /// or credit-card accounts that hold securities.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balance: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balance_currency: Option<String>,
 }
 
 /// Output envelope for activities tool.
@@ -73,7 +80,7 @@ impl AgentTool for SearchActivities {
     }
 
     fn description(&self) -> &'static str {
-        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed."
+        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed. Activities of cash and credit-card accounts carry cashBalance: the account's cash in cashBalanceCurrency after that activity, useful for reconciling against a bank statement (absent for investment accounts and accounts holding securities)."
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -203,8 +210,8 @@ impl AgentTool for SearchActivities {
         };
 
         // Search activities
-        let response = env
-            .activity_service()
+        let activity_service = env.activity_service();
+        let mut response = activity_service
             .search_activities(
                 backend_page,
                 page_size,
@@ -218,6 +225,10 @@ impl AgentTool for SearchActivities {
                 None, // instrument_type_filter
                 None, // activity_id_filter
             )
+            .map_err(|e| AgentToolError::ExecutionFailed(e.to_string()))?;
+        activity_service
+            .attach_cash_balances(&mut response)
+            .await
             .map_err(|e| AgentToolError::ExecutionFailed(e.to_string()))?;
 
         let total_row_count = response.meta.total_row_count as usize;
@@ -233,6 +244,7 @@ impl AgentTool for SearchActivities {
                 let fee = a.fee.as_ref().and_then(|v| v.parse::<f64>().ok());
                 let fx_rate = a.fx_rate.as_ref().and_then(|v| v.parse::<f64>().ok());
                 let amount = a.amount.as_ref().and_then(|s| s.parse::<f64>().ok());
+                let cash_balance = a.cash_balance.as_ref().and_then(|s| s.parse::<f64>().ok());
 
                 ActivityDto {
                     id: a.id,
@@ -252,6 +264,8 @@ impl AgentTool for SearchActivities {
                     account_id: a.account_id.clone(),
                     account_name: Some(a.account_name),
                     notes: a.comment,
+                    cash_balance,
+                    cash_balance_currency: a.cash_balance_currency,
                 }
             })
             .collect();

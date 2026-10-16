@@ -57,9 +57,13 @@ test("cash-symbol transfer pairs survive a datagrid edit", async ({ page }) => {
   await page.getByTestId("edit-mode-toggle").click();
   const row = page.locator('[data-slot="grid-row"]');
   await expect(row).toHaveCount(1);
-  await row.locator('[data-column-id="comment"]').dblclick();
   const editor = page.locator("[data-grid-cell-editor] textarea");
-  await expect(editor).toBeVisible();
+  // Loading the page triggers a portfolio update whose refetch re-renders the
+  // grid; a double-click landing on that re-render does not open the editor.
+  await expect(async () => {
+    await row.locator('[data-column-id="comment"]').dblclick();
+    await expect(editor).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   await editor.fill("Cash symbol transfer edited");
   await page.keyboard.press("Tab");
   await expect(row.locator('[data-column-id="comment"]')).toContainText(

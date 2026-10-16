@@ -23,4 +23,25 @@ describe("Balance", () => {
 
     expect(screen.getByTestId("visible-balance-locale")).toHaveTextContent("de-DE");
   });
+
+  it("formats each currency in its own region", () => {
+    const { unmount } = render(
+      <FormattingProvider locale="US" currencyFormattingRegions={{ INR: "IN" }}>
+        <Balance targetValue={1234567.89} currency="INR" displayCurrency />
+      </FormattingProvider>,
+    );
+
+    expect(screen.getByTestId("visible-balance-locale")).toHaveTextContent("en-IN");
+    expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("₹12,34,567.89");
+    unmount();
+
+    render(
+      <FormattingProvider locale="US" currencyFormattingRegions={{ INR: "IN" }}>
+        <Balance targetValue={1234567.89} currency="USD" displayCurrency />
+      </FormattingProvider>,
+    );
+
+    expect(screen.getByTestId("visible-balance-locale")).toHaveTextContent("en-US");
+    expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("$1,234,567.89");
+  });
 });

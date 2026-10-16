@@ -63,6 +63,8 @@ export interface CashActivitySearchRequest {
   sortDir?: CashActivitySortDirection;
   offset?: number;
   limit?: number;
+  /** Ask for the cash balance after each row (filled for exactly one account). */
+  includeCashBalances?: boolean;
 }
 
 /**
@@ -100,6 +102,13 @@ export interface CashActivity extends Activity {
    * Absent only from rows produced by a backend that predates exclusions.
    */
   visibleSpendingAmount?: number;
+  /**
+   * The account's cash after this row, in `cashBalanceCurrency`: only when
+   * asked for and the search covers exactly one cash or credit-card account
+   * that holds no securities.
+   */
+  cashBalance?: string;
+  cashBalanceCurrency?: string;
 }
 
 /** A signed net in one currency. */

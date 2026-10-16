@@ -9,8 +9,9 @@ use wealthfolio_core::accounts::{
     account_supports_purpose, AccountPurpose, AccountRepositoryTrait,
 };
 use wealthfolio_core::activities::{
-    Activity, ActivityRepositoryTrait, TransferPairResolution, ACTIVITY_TYPE_TRANSFER_IN,
-    ACTIVITY_TYPE_TRANSFER_OUT,
+    application_order, running_cash_balances, shows_running_cash_balance, Activity,
+    ActivityCashBalance, ActivityRepositoryTrait, TransferPairResolution,
+    ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT,
 };
 use wealthfolio_core::taxonomies::TaxonomyServiceTrait;
 use wealthfolio_core::utils::time_utils::{activity_date_in_tz, parse_user_timezone_or_default};
@@ -221,6 +222,8 @@ impl CashActivityService {
                     net_amount,
                     net_amount_base: None,
                     visible_spending_amount,
+                    cash_balance: None,
+                    cash_balance_currency: None,
                 }
             })
             .collect();
@@ -420,6 +423,13 @@ impl CashActivityService {
         let transfer_context_acts: Vec<&Activity> = activities.iter().collect();
         let transfer_groups = within_spending_transfer_groups(&transfer_context_acts);
         activities.retain(|a| target_accounts.contains(&a.account_id));
+        // A row's balance counts every earlier row of the account, so it is
+        // taken here, before the filters below narrow the list.
+        let cash_balances = if req.include_cash_balances {
+            self.cash_balances_for(&target_accounts, &activities)?
+        } else {
+            None
+        };
 
         let allowed_types: Vec<String> = req
             .activity_types
@@ -582,11 +592,11 @@ impl CashActivityService {
 
         // Sort
         match req.sort_by {
+            // Same-instant rows (date-only imports) in the order they apply,
+            // so a row never sits above one applied after it.
             CashActivitySortField::Date => match req.sort_dir {
-                SortDirection::Desc => {
-                    activities.sort_by_key(|a| std::cmp::Reverse(a.activity_date))
-                }
-                SortDirection::Asc => activities.sort_by_key(|a| a.activity_date),
+                SortDirection::Desc => activities.sort_by(|a, b| application_order(b, a)),
+                SortDirection::Asc => activities.sort_by(application_order),
             },
             CashActivitySortField::Amount => {
                 activities.sort_by(|a, b| {
@@ -624,6 +634,7 @@ impl CashActivityService {
         let page: Vec<Activity> = activities.drain(offset..end).collect();
         // Drop the rest — we no longer need them.
         drop(activities);
+        let mut cash_balances = cash_balances.unwrap_or_default();
 
         // Batch-fetch assignments + event tags for the paginated slice.
         // (Always — clients use both for display.)
@@ -652,6 +663,7 @@ impl CashActivityService {
                 let cash_flow_bucket = cash_flow_bucket_for(&a, &account_types, &transfer_groups);
                 let transfer_link_status = transfer_link_status_for(&a, &transfer_link_resolution);
                 let net = net_amount(&a, &account_types);
+                let cash_balance = cash_balances.remove(&a.id);
                 let net_amount_base = base_currency
                     .and_then(|base| {
                         let account_currency =
@@ -669,6 +681,10 @@ impl CashActivityService {
                     net_amount: decimal_to_f64(net),
                     net_amount_base,
                     visible_spending_amount,
+                    cash_balance_currency: cash_balance
+                        .as_ref()
+                        .map(|balance| balance.currency.clone()),
+                    cash_balance: cash_balance.map(|balance| balance.balance.to_string()),
                 }
             })
             .collect();
@@ -679,6 +695,28 @@ impl CashActivityService {
             net,
             base_currency: base_currency.map(str::to_string),
         })
+    }
+
+    /// The balance after each row of the one account the search covers, when
+    /// it covers exactly one cash or credit-card account that holds no
+    /// securities.
+    fn cash_balances_for(
+        &self,
+        target_accounts: &HashSet<String>,
+        activities: &[Activity],
+    ) -> Result<Option<HashMap<String, ActivityCashBalance>>> {
+        let mut ids = target_accounts.iter();
+        let (Some(account_id), None) = (ids.next(), ids.next()) else {
+            return Ok(None);
+        };
+        let account = self
+            .account_repo
+            .get_by_id(account_id)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        if !shows_running_cash_balance(&account) {
+            return Ok(None);
+        }
+        Ok(running_cash_balances(&account, activities))
     }
 
     /// Fetch explicit activity ids without applying the normal status/date/limit
@@ -753,6 +791,8 @@ impl CashActivityService {
                     net_amount,
                     net_amount_base: None,
                     visible_spending_amount,
+                    cash_balance: None,
+                    cash_balance_currency: None,
                 }
             })
             .collect())
@@ -2585,6 +2625,150 @@ mod tests {
             .find(|i| i.activity.id == "a")
             .unwrap();
         assert_eq!(drafted.net_amount, 0.0);
+    }
+
+    fn dated(mut activity: Activity, date: &str, created_at: &str) -> Activity {
+        activity.activity_date = date.parse().unwrap();
+        activity.created_at = created_at.parse().unwrap();
+        activity
+    }
+
+    fn balances_request(
+        activity_types: Option<Vec<String>>,
+        offset: usize,
+        limit: usize,
+    ) -> CashActivitySearchRequest {
+        CashActivitySearchRequest {
+            activity_types,
+            offset,
+            limit,
+            include_cash_balances: true,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn search_balances_a_page_from_the_whole_history_before_filters() {
+        let created = "2026-04-01T00:00:00Z";
+        let (service, _, _) = make_service_with(vec![
+            dated(
+                cash_row("opening", "DEPOSIT", 1000, "USD"),
+                "2026-04-01T00:00:00Z",
+                created,
+            ),
+            dated(
+                cash_row("rent", "WITHDRAWAL", 100, "USD"),
+                "2026-04-02T00:00:00Z",
+                created,
+            ),
+            dated(
+                cash_row("coffee", "WITHDRAWAL", 50, "USD"),
+                "2026-04-03T00:00:00Z",
+                created,
+            ),
+            dated(
+                cash_row("lunch", "WITHDRAWAL", 25, "USD"),
+                "2026-04-04T00:00:00Z",
+                created,
+            ),
+        ]);
+
+        // Withdrawals only, second page of one: the opening deposit is filtered
+        // out and the newer lunch is on the first page, yet both count.
+        let response = service
+            .search(
+                balances_request(Some(vec!["WITHDRAWAL".to_string()]), 1, 1),
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.items.len(), 1);
+        let coffee = &response.items[0];
+        assert_eq!(coffee.activity.id, "coffee");
+        assert_eq!(coffee.cash_balance.as_deref(), Some("850"));
+        assert_eq!(coffee.cash_balance_currency.as_deref(), Some("USD"));
+    }
+
+    #[tokio::test]
+    async fn search_leaves_balances_out_unless_asked() {
+        let (service, _, _) = make_service_with(vec![cash_row("a", "DEPOSIT", 10, "USD")]);
+
+        let response = service
+            .search(
+                CashActivitySearchRequest {
+                    limit: 50,
+                    ..Default::default()
+                },
+                None,
+                "UTC",
+            )
+            .await
+            .unwrap();
+
+        assert!(response.items[0].cash_balance.is_none());
+        let json = serde_json::to_value(&response.items[0]).unwrap();
+        assert!(json.get("cashBalance").is_none());
+        assert!(json.get("cashBalanceCurrency").is_none());
+    }
+
+    #[tokio::test]
+    async fn search_leaves_balances_out_for_an_account_holding_securities() {
+        let mut trade = cash_row("trade", "BUY", 50, "USD");
+        trade.asset_id = Some("AAPL".to_string());
+        let (service, _, _) =
+            make_service_with(vec![cash_row("deposit", "DEPOSIT", 100, "USD"), trade]);
+
+        let response = service
+            .search(balances_request(None, 0, 50), None, "UTC")
+            .await
+            .unwrap();
+
+        assert!(response
+            .items
+            .iter()
+            .all(|item| item.cash_balance.is_none()));
+    }
+
+    #[tokio::test]
+    async fn search_lists_same_instant_rows_in_the_order_they_apply() {
+        let day = "2026-04-02T00:00:00Z";
+        let (service, _, _) = make_service_with(vec![
+            dated(
+                cash_row("gas", "WITHDRAWAL", 30, "USD"),
+                day,
+                "2026-04-05T00:00:03Z",
+            ),
+            dated(
+                cash_row("opening", "DEPOSIT", 100, "USD"),
+                day,
+                "2026-04-05T00:00:01Z",
+            ),
+            dated(
+                cash_row("coffee", "WITHDRAWAL", 5, "USD"),
+                day,
+                "2026-04-05T00:00:02Z",
+            ),
+        ]);
+
+        let response = service
+            .search(balances_request(None, 0, 50), None, "UTC")
+            .await
+            .unwrap();
+
+        let ids: Vec<&str> = response
+            .items
+            .iter()
+            .map(|item| item.activity.id.as_str())
+            .collect();
+        assert_eq!(ids, vec!["gas", "coffee", "opening"]);
+        let balances: Vec<Option<&str>> = response
+            .items
+            .iter()
+            .map(|item| item.cash_balance.as_deref())
+            .collect();
+        assert_eq!(balances, vec![Some("65"), Some("95"), Some("100")]);
     }
 
     /// A single currency already is the total, so converting it would only add

@@ -124,11 +124,14 @@ impl NativeProfiles {
         let (root, legacy) =
             crate::data_dir::profile_paths(root, identifier, std::env::var_os("WF_DATA_DIR"))?;
         let registry = if start_new {
-            ProfileRegistry::start_new(root, legacy, shared_secret_store(identifier))
+            ProfileRegistry::start_new(root, legacy.clone(), shared_secret_store(identifier))
         } else {
-            ProfileRegistry::open(root, legacy, shared_secret_store(identifier))
+            ProfileRegistry::open(root, legacy.clone(), shared_secret_store(identifier))
         }
         .map_err(|e| e.to_string())?;
+        // Mobile sandboxes can move while preserving profiles.json.
+        #[cfg(any(target_os = "ios", target_os = "android"))]
+        let registry = registry.with_legacy_database_path(legacy);
         for id in registry.pending_deletions().map_err(|e| e.to_string())? {
             if let Err(error) = registry.finish_delete(id) {
                 let (kind, io_kind, os_code) = match error {

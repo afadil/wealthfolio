@@ -267,6 +267,13 @@ export interface ActivityDetails {
   counterpartCurrency?: string | null;
   counterpartFxRate?: string | null;
   subRows?: ActivityDetails[];
+  /**
+   * The account's cash after this row, in `cashBalanceCurrency`: only when the
+   * search asked for balances and the account is a cash or credit-card
+   * account that holds no securities.
+   */
+  cashBalance?: string | null;
+  cashBalanceCurrency?: string | null;
 }
 
 export interface ActivitySearchResponse {
@@ -923,6 +930,8 @@ export interface Settings {
   font: string;
   language: string;
   formattingRegion: string;
+  /** Formatting regions for amounts in specific currencies, keyed by currency code. */
+  currencyFormattingRegions?: Record<string, string>;
   baseCurrency: string;
   defaultReturnMetric: "twr" | "irr" | "valueReturn";
   timezone: string;

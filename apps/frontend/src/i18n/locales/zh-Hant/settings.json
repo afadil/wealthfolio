@@ -323,12 +323,15 @@
   "backup_export_ready": "備份已匯出",
   "recovery_opening": "正在開啟投資組合…",
   "recovery_title": "無法開啟您的投資組合",
-  "recovery_description": "還原備份以復原投資組合。Wealthfolio 會將現有資料檔案保留在另一個資料夾中。",
+  "recovery_description": "如果裝置的安全儲存空間已鎖定，請先解鎖並重試，再考慮還原備份。如果重試後仍無法開啟，您可以還原備份；現有資料檔案將另行保留。",
   "recovery_unavailable": "請嘗試重新開啟投資組合。如果問題持續發生，請查看錯誤詳細資料。",
   "recovery_retry": "重試",
   "recovery_encrypted": "還原後的資料會在此裝置上加密。",
   "recovery_plain": "還原後的資料不會加密，與此裝置目前的設定一致。",
   "recovery_details": "錯誤詳細資訊",
+  "recovery_copy_details": "複製錯誤詳細資訊",
+  "recovery_details_copied": "錯誤詳細資訊已複製",
+  "recovery_retry_failed": "仍無法開啟您的投資組合。",
   "recovery_preview": "備份預覽",
   "recovery_counts": "帳戶：{{accounts}} · 交易紀錄：{{activities}}",
   "recovery_created": "備份建立時間：{{date}}",
@@ -1529,6 +1532,16 @@
       "romania": "羅馬尼亞",
       "bulgaria": "保加利亞"
     }
+  },
+  "currencyFormats": {
+    "title": "自訂貨幣格式",
+    "customCount_one": "{{count}} 個自訂格式",
+    "customCount_other": "{{count}} 個自訂格式",
+    "description": "依其他地區的慣例顯示特定貨幣的金額。其他貨幣沿用「地區與格式」。",
+    "currencyPlaceholder": "選擇貨幣",
+    "regionPlaceholder": "選擇地區",
+    "regionFor": "{{currency}} 的地區",
+    "remove": "移除 {{currency}} 的格式"
   },
   "appearance_navigation_title": "導覽",
   "appearance_navigation_description": "選取在大螢幕上的導覽方式。",

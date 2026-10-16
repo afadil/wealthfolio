@@ -12,6 +12,17 @@ describe("localized financial components", () => {
     expect(screen.getByText("+12.34p")).toBeInTheDocument();
   });
 
+  it("formats gain amounts in the currency's own region", () => {
+    render(
+      <FormattingProvider locale="US" uiLocale="en" currencyFormattingRegions={{ INR: "IN" }}>
+        <GainAmount value={1234567.89} currency="INR" />
+        <GainAmount value={1234567.89} currency="USD" />
+      </FormattingProvider>,
+    );
+    expect(screen.getByText("+₹12,34,567.89")).toBeInTheDocument();
+    expect(screen.getByText("+$1,234,567.89")).toBeInTheDocument();
+  });
+
   it("preserves locale percent spacing in the animated fallback", () => {
     const { container } = render(
       <FormattingProvider locale="FR" uiLocale="fr">

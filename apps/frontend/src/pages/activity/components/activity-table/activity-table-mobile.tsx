@@ -203,6 +203,10 @@ export const ActivityTableMobile = ({
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
+    const cashBalance =
+      activity.cashBalance != null && activity.cashBalanceCurrency
+        ? { balance: Number(activity.cashBalance), currency: activity.cashBalanceCurrency }
+        : undefined;
 
     // Compact View
     if (isCompactView) {
@@ -254,6 +258,16 @@ export const ActivityTableMobile = ({
                             </span>
                           </>
                         )}
+                      {cashBalance && (
+                        <span className="ml-auto flex shrink-0 items-center gap-1">
+                          {t("activity:table_balance")}
+                          <AmountDisplay
+                            value={cashBalance.balance}
+                            currency={cashBalance.currency}
+                            isHidden={isBalanceHidden}
+                          />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </>
@@ -442,6 +456,18 @@ export const ActivityTableMobile = ({
                   currency={activity.currency}
                   isHidden={isBalanceHidden}
                   className="font-semibold"
+                />
+              </div>
+            )}
+
+            {cashBalance && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{t("activity:table_balance")}</span>
+                <AmountDisplay
+                  value={cashBalance.balance}
+                  currency={cashBalance.currency}
+                  isHidden={isBalanceHidden}
+                  className="font-medium"
                 />
               </div>
             )}

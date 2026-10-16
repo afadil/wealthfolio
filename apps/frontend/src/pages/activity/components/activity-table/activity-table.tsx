@@ -59,6 +59,7 @@ import { Link } from "react-router-dom";
 import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { InfiniteScrollTrigger } from "@/components/infinite-scroll-trigger";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
 import { ActivityOperations } from "../activity-operations";
@@ -72,6 +73,7 @@ import { ActivityTypeBadge } from "../activity-type-badge";
 const ROW_HEIGHT = 89;
 /** Rows kept mounted past the viewport edge, so a fast scroll stays painted. */
 const OVERSCAN = 8;
+const ACTIVITY_TABLE_COLUMN_VISIBILITY_KEY = "activity-table-column-visibility";
 
 interface ActivityTableProps {
   activities: ActivityDetails[];
@@ -128,12 +130,21 @@ export const ActivityTable = ({
     [duplicateActivity],
   );
 
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
-    accountId: false,
-    accountCurrency: false,
-    assetName: false,
-    currency: false,
-  });
+  const [columnVisibility, setColumnVisibility] = usePersistentState<VisibilityState>(
+    ACTIVITY_TABLE_COLUMN_VISIBILITY_KEY,
+    {
+      accountId: false,
+      accountCurrency: false,
+      assetName: false,
+      currency: false,
+    },
+  );
+  // Rows carry a balance only when the search asked for them (one cash or
+  // credit-card account in date order), so their presence decides the column.
+  const showsCashBalance = React.useMemo(
+    () => activities.some((activity) => activity.cashBalance != null),
+    [activities],
+  );
   const symbolExchangeCountMap = React.useMemo(() => {
     const exchangesBySymbol = new Map<string, Set<string>>();
 
@@ -526,6 +537,41 @@ export const ActivityTable = ({
           );
         },
       },
+      ...(showsCashBalance
+        ? [
+            {
+              id: "cashBalance",
+              accessorKey: "cashBalance",
+              enableSorting: false,
+              enableHiding: true,
+              meta: {
+                label: t("activity:table_balance"),
+              },
+              header: ({ column }) => (
+                <DataTableColumnHeader
+                  className="justify-end text-right"
+                  column={column}
+                  title={t("activity:table_balance")}
+                />
+              ),
+              cell: ({ row }) => {
+                const { cashBalance, cashBalanceCurrency } = row.original;
+                if (cashBalance == null || !cashBalanceCurrency) {
+                  return <div className="pr-4 text-right">-</div>;
+                }
+                return (
+                  <div className="whitespace-nowrap pr-4 text-right">
+                    <AmountDisplay
+                      value={Number(cashBalance)}
+                      currency={cashBalanceCurrency}
+                      isHidden={isBalanceHidden}
+                    />
+                  </div>
+                );
+              },
+            } satisfies ColumnDef<ActivityDetails>,
+          ]
+        : []),
       {
         id: "account",
         accessorKey: "accountName",
@@ -648,6 +694,7 @@ export const ActivityTable = ({
       onLinkTransfer,
       onUnlinkTransfer,
       numberFormatting,
+      showsCashBalance,
       symbolExchangeCountMap,
       t,
     ],

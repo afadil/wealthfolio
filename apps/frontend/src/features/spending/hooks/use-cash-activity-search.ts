@@ -54,7 +54,6 @@ export function useCashActivitySearch(
   // `netAmountBase` is actually denominated in, so a cached page stays labelled
   // correctly even if the setting has since changed.
   const baseCurrency = query.data?.pages[0]?.baseCurrency ?? undefined;
-
   return {
     items,
     totalCount,

@@ -39,6 +39,8 @@ interface TransactionRowProps {
   appTimezone?: string;
   /** True when the loaded result set spans more than one account. */
   showAccount: boolean;
+  /** Adds the Balance cell: the list shows one account's running balance. */
+  showBalance?: boolean;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onAssignCategory: (activityId: string, taxonomyId: string, categoryId: string) => void;
@@ -72,6 +74,7 @@ function TransactionRowImpl({
   eventTypeColor,
   appTimezone,
   showAccount,
+  showBalance = false,
   isSelected,
   onToggleSelect,
   onAssignCategory,
@@ -265,6 +268,13 @@ function TransactionRowImpl({
         {sign}
         <PrivacyAmount value={Math.abs(safeAmount)} currency={a.currency} />
       </TableCell>
+      {showBalance && (
+        <TableCell className="text-muted-foreground hidden w-28 whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums sm:table-cell">
+          {a.cashBalance != null && a.cashBalanceCurrency && (
+            <PrivacyAmount value={Number(a.cashBalance)} currency={a.cashBalanceCurrency} />
+          )}
+        </TableCell>
+      )}
       <TableCell className="w-10 px-3 py-2" data-row-click-ignore>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

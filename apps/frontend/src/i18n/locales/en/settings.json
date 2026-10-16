@@ -1490,6 +1490,16 @@
       "bulgaria": "Bulgaria"
     }
   },
+  "currencyFormats": {
+    "title": "Customize currency formats",
+    "customCount_one": "{{count}} custom format",
+    "customCount_other": "{{count}} custom formats",
+    "description": "Format amounts in specific currencies with another region's conventions. Other currencies follow Region & formats.",
+    "currencyPlaceholder": "Select currency",
+    "regionPlaceholder": "Select region",
+    "regionFor": "Region for {{currency}}",
+    "remove": "Remove format for {{currency}}"
+  },
   "appearance_navigation_title": "Navigation",
   "appearance_navigation_description": "Choose how you navigate on large screens.",
   "addons_pin_to_navigation": "Pin {{name}} to navigation",
@@ -1533,9 +1543,12 @@
   "backup_export_ready": "Backup exported",
   "recovery_opening": "Opening your portfolio…",
   "recovery_title": "We couldn’t open your portfolio",
-  "recovery_description": "Restore a backup to recover your portfolio. Wealthfolio will keep your existing data files in a separate folder.",
+  "recovery_description": "If your device’s secure storage is locked, unlock it and try again before restoring a backup. If retrying still fails, you can restore a backup; your existing data files will be kept separately.",
   "recovery_unavailable": "Try opening your portfolio again. If the problem continues, check the error details.",
   "recovery_details": "Error details",
+  "recovery_copy_details": "Copy error details",
+  "recovery_details_copied": "Error details copied",
+  "recovery_retry_failed": "Still couldn’t open your portfolio.",
   "recovery_preview": "Backup preview",
   "recovery_counts": "Accounts: {{accounts}} · Activities: {{activities}}",
   "recovery_created": "Backup created: {{date}}",

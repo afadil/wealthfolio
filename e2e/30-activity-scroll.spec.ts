@@ -147,16 +147,18 @@ test("Spending preserves scroll during selection and mobile tab switching", asyn
   });
   expect(settings.ok()).toBeTruthy();
   await gotoAppPath(page, "/activities?tab=spending");
-  await expect(page.getByText("Scroll expense 1", { exact: true })).toBeVisible({
+  // Rows sharing a timestamp list newest-created first, so the last one is on top.
+  await expect(page.getByText("Scroll expense 30", { exact: true })).toBeVisible({
     timeout: 20_000,
   });
   const container = page.locator("[data-page-scroll-container]");
   await container.evaluate((element) => element.scrollTo({ top: 300, behavior: "instant" }));
   const offset = await container.evaluate((element) => element.scrollTop);
   expect(offset).toBe(300);
+  // The tenth row from the top, already in view, so checking it scrolls nothing.
   const row = page
     .getByRole("row")
-    .filter({ has: page.getByText("Scroll expense 10", { exact: true }) });
+    .filter({ has: page.getByText("Scroll expense 21", { exact: true }) });
   await row.getByRole("checkbox").check();
   await expect(row.getByRole("checkbox")).toBeChecked();
   // Selecting a row adds the bulk bar and remeasures rows; allow a few pixels

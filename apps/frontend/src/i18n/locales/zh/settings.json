@@ -323,12 +323,15 @@
   "backup_export_ready": "备份已导出",
   "recovery_opening": "正在打开投资组合…",
   "recovery_title": "无法打开您的投资组合",
-  "recovery_description": "恢复备份以找回投资组合。Wealthfolio 会将现有数据文件保存在单独的文件夹中。",
+  "recovery_description": "如果设备的安全存储已锁定，请先解锁并重试，再考虑恢复备份。如果重试后仍无法打开，您可以恢复备份；现有数据文件将单独保留。",
   "recovery_unavailable": "请尝试重新打开投资组合。如果问题仍然存在，请查看错误详情。",
   "recovery_retry": "重试",
   "recovery_encrypted": "恢复后的数据将在此设备上加密。",
   "recovery_plain": "恢复后的数据不会加密，与此设备的当前设置一致。",
   "recovery_details": "错误详情",
+  "recovery_copy_details": "复制错误详情",
+  "recovery_details_copied": "错误详情已复制",
+  "recovery_retry_failed": "仍无法打开您的投资组合。",
   "recovery_preview": "备份预览",
   "recovery_counts": "账户：{{accounts}} · 活动：{{activities}}",
   "recovery_created": "备份创建时间：{{date}}",
@@ -1511,6 +1514,16 @@
       "romania": "罗马尼亚",
       "bulgaria": "保加利亚"
     }
+  },
+  "currencyFormats": {
+    "title": "自定义货币格式",
+    "customCount_one": "{{count}} 个自定义格式",
+    "customCount_other": "{{count}} 个自定义格式",
+    "description": "按其他地区的惯例显示特定货币的金额。其他货币沿用“地区与格式”。",
+    "currencyPlaceholder": "选择货币",
+    "regionPlaceholder": "选择地区",
+    "regionFor": "{{currency}} 的地区",
+    "remove": "移除 {{currency}} 的格式"
   },
   "appearance_navigation_title": "导航",
   "appearance_navigation_description": "选择在大屏幕上的导航方式。",

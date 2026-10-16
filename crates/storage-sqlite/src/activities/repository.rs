@@ -484,15 +484,21 @@ impl ActivityRepository {
             if let Some(ref sort) = sort {
                 match sort.id.as_str() {
                     "date" => {
+                        // Same-instant rows (date-only imports) follow the
+                        // engine's application order (created_at, then id),
+                        // reversed for newest-first, so a row never appears
+                        // above one the engine applied after it.
                         if sort.desc {
                             query = query.order((
                                 activities::activity_date.desc(),
-                                activities::created_at.asc(),
+                                activities::created_at.desc(),
+                                activities::id.desc(),
                             ));
                         } else {
                             query = query.order((
                                 activities::activity_date.asc(),
                                 activities::created_at.asc(),
+                                activities::id.asc(),
                             ));
                         }
                     }
@@ -522,14 +528,16 @@ impl ActivityRepository {
                     _ => {
                         query = query.order((
                             activities::activity_date.desc(),
-                            activities::created_at.asc(),
+                            activities::created_at.desc(),
+                            activities::id.desc(),
                         ))
                     }
                 }
             } else {
                 query = query.order((
                     activities::activity_date.desc(),
-                    activities::created_at.asc(),
+                    activities::created_at.desc(),
+                    activities::id.desc(),
                 ));
             }
 
@@ -3736,6 +3744,73 @@ mod tests {
             .expect("search by subtype keyword");
         assert_eq!(subtype_match.data.len(), 1);
         assert_eq!(subtype_match.data[0].id, "broker-buy-override");
+    }
+
+    #[tokio::test]
+    async fn search_activities_orders_same_instant_rows_in_application_order() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer);
+
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account(&mut conn, "cash-account");
+            // Three date-only rows share an instant: the engine applies them by
+            // created_at, then id. A later row anchors the newest-first order.
+            diesel::sql_query(
+                "INSERT INTO activities
+                 (id, account_id, activity_type, status, activity_date, amount, currency,
+                  is_user_modified, needs_review, created_at, updated_at)
+                 VALUES
+                 ('first', 'cash-account', 'DEPOSIT', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '10', 'USD', 0, 0, '2026-03-05T10:00:00.100+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('second-b', 'cash-account', 'WITHDRAWAL', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '3', 'USD', 0, 0, '2026-03-05T10:00:00.200+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('second-a', 'cash-account', 'WITHDRAWAL', 'POSTED', '2026-03-02T00:00:00+00:00',
+                  '2', 'USD', 0, 0, '2026-03-05T10:00:00.200+00:00', '2026-03-05T10:00:00+00:00'),
+                 ('later', 'cash-account', 'DEPOSIT', 'POSTED', '2026-03-03T00:00:00+00:00',
+                  '1', 'USD', 0, 0, '2026-03-05T09:00:00+00:00', '2026-03-05T09:00:00+00:00')",
+            )
+            .execute(&mut conn)
+            .expect("insert same-instant activities");
+        }
+
+        let ids_for = |sort: Option<Sort>| -> Vec<String> {
+            repo.search_activities(
+                0,
+                10,
+                Some(vec!["cash-account".to_string()]),
+                None,
+                None,
+                sort,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("search activities")
+            .data
+            .into_iter()
+            .map(|activity| activity.id)
+            .collect()
+        };
+
+        let newest_first = vec!["later", "second-b", "second-a", "first"];
+        assert_eq!(
+            ids_for(Some(Sort {
+                id: "date".to_string(),
+                desc: true,
+            })),
+            newest_first
+        );
+        assert_eq!(ids_for(None), newest_first);
+        assert_eq!(
+            ids_for(Some(Sort {
+                id: "date".to_string(),
+                desc: false,
+            })),
+            vec!["first", "second-a", "second-b", "later"]
+        );
     }
 
     #[tokio::test]

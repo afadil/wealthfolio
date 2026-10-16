@@ -2070,7 +2070,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2404,7 +2404,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3735,7 +3735,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi 0.5.2",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4485,7 +4485,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6405,7 +6405,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6418,7 +6418,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6476,7 +6476,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7346,9 +7346,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "swift-rs"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e45c444e496845d3f2a351146bff59aae4975b2280238df1dfaa0c7d1846f38e"
+checksum = "cefd87076fd385308ee4aff597256c902f1fbb4d031de1558efc12f8ffefadd9"
 dependencies = [
  "base64 0.21.7",
  "serde",
@@ -7507,9 +7507,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tauri"
-version = "2.12.0"
+version = "2.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb20ef8e6f97d6fe03039666cd82861f09a38b56291fa2f0f9fe140023f61c1a"
+checksum = "c404ecf956ff241bf6b39dd688614724e1bf1f63255abb4fc46d1c40371672ea"
 dependencies = [
  "anyhow",
  "bytes",
@@ -7558,9 +7558,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-build"
-version = "2.7.0"
+version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b5ae674f48836f5dd2eeaf9e221c095bd3e78a8d0439c77ca93b48740a1b644"
+checksum = "2eea0b6302f82c574b21af6fc6ae6e86183b9280853c22621d0abf0936911ffc"
 dependencies = [
  "anyhow",
  "cargo_toml",
@@ -7579,11 +7579,11 @@ dependencies = [
 
 [[package]]
 name = "tauri-codegen"
-version = "2.7.0"
+version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3926b73ac01df7c14f19ff872cd56e67213a87acc0000ea37ddb300f3d11a3e3"
+checksum = "02f468f9a9bcd404f57e5c191d91024e3de953d4b610f78c2907e7110615cb1c"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "brotli 9.0.0",
  "ico",
  "json-patch",
@@ -7606,9 +7606,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-macros"
-version = "2.7.0"
+version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d21d0fa2c0529972ea6ecaf7404fcf40efac098eda0beb06ca682f41e33a6aa5"
+checksum = "131bffec939b20642380317f8403a33c8888489925e14bb965ceaff0d949b1cb"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -7855,9 +7855,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-runtime"
-version = "2.12.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e6d5ef76985b32ff012a43b58df205d25a285e400ca878afcacddc5d5f3238"
+checksum = "c2a57a2a9b8c8b7fc00d35b510fe808ded7f9f1b44fc1cdda6aee38632ea5413"
 dependencies = [
  "cookie",
  "dpi",
@@ -7880,9 +7880,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-runtime-wry"
-version = "2.12.0"
+version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa829eb69860cf1fb0bedb21d2d5f1effce3527d054a68ca1cd7355c654400a3"
+checksum = "7f9e7e0c9f80a5130773cfabb6df4dc924518fb1b2c923726966804634b57d22"
 dependencies = [
  "gtk",
  "http",
@@ -7906,9 +7906,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-utils"
-version = "2.10.0"
+version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dd257082deff79550de3409ed146104aeaf86fe38649615b04a304144939677"
+checksum = "2ff55a614843b9a3f010f211df637c94df2607175b8d0f6e0f4a7c19e18621ee"
 dependencies = [
  "anyhow",
  "brotli 9.0.0",
@@ -7935,7 +7935,7 @@ dependencies = [
  "serde_with",
  "swift-rs",
  "thiserror 2.0.18",
- "toml 1.1.2+spec-1.1.0",
+ "toml 0.9.12+spec-1.1.0",
  "url",
  "urlpattern",
  "uuid",
@@ -7963,7 +7963,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8193,10 +8193,12 @@ version = "0.9.12+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf92845e79fc2e2def6a5d828f0801e29a2f8acc037becc5ab08595c7d5e9863"
 dependencies = [
+ "indexmap 2.14.0",
  "serde_core",
  "serde_spanned 1.1.1",
  "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
+ "toml_writer",
  "winnow 0.7.15",
 ]
 
@@ -8914,7 +8916,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-agent-tools"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8932,7 +8934,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-ai"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8964,7 +8966,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-app"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "android-native-keyring-store",
  "anyhow",
@@ -9032,7 +9034,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-connect"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -9051,7 +9053,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-core"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -9104,7 +9106,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-device-sync"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -9131,7 +9133,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-http"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "rcgen",
  "reqwest 0.13.5",
@@ -9142,7 +9144,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-market-data"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9165,7 +9167,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-mcp"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -9190,7 +9192,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-portfolio-engine"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -9206,7 +9208,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-server"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -9260,7 +9262,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-spending"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9280,7 +9282,7 @@ dependencies = [
 
 [[package]]
 name = "wealthfolio-storage-sqlite"
-version = "3.9.2"
+version = "3.10.0"
 dependencies = [
  "anyhow",
  "async-trait",

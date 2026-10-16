@@ -1,6 +1,8 @@
 import { openUrlInBrowser } from "@/adapters";
 import { CloudBackupSummary } from "@/pages/settings/exports/cloud-backup-card";
 import { ExternalLink } from "@/components/external-link";
+import { BankIcon } from "@phosphor-icons/react/dist/csr/Bank";
+import { WalletIcon } from "@phosphor-icons/react/dist/csr/Wallet";
 import { DeviceSyncSection } from "@/features/devices-sync";
 import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
@@ -26,6 +28,7 @@ import {
   syncBrokerData,
 } from "../services/broker-service";
 import type { BrokerAccount, BrokerConnection } from "../types";
+import { BrokerageLogo } from "./brokerage-logo";
 import { PortalLink } from "./portal-link";
 import { SubscriptionPlans } from "./subscription-plans";
 
@@ -146,8 +149,6 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
 
   // Find the connection that matches this account's brokerage_authorization
   const connection = connections.find((c) => c.id === account.brokerage_authorization);
-  const logoUrl =
-    connection?.brokerage?.aws_s3_square_logo_url ?? connection?.brokerage?.aws_s3_logo_url;
 
   const lastSyncedText = lastSyncDate
     ? t("connect:accounts.dataAsOf", { date: formatDate(lastSyncDate, dateFormatting) })
@@ -157,16 +158,11 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
     <div className="bg-muted/30 rounded-lg border p-3">
       <div className="flex items-start gap-3">
         {/* Logo */}
-        <Avatar className="mt-0.5 h-9 w-9 shrink-0 rounded-lg">
-          <AvatarImage
-            src={logoUrl}
-            alt={account.institution_name || t("connect:accounts.brokerFallback")}
-            className="bg-white object-contain p-1"
-          />
-          <AvatarFallback className="rounded-lg text-sm font-semibold">
-            {(account.institution_name || account.name || "B").charAt(0)}
-          </AvatarFallback>
-        </Avatar>
+        <BrokerageLogo
+          brokerage={connection?.brokerage}
+          name={account.institution_name || account.name || "B"}
+          className="mt-0.5"
+        />
 
         {/* Main info - takes remaining space */}
         <div className="min-w-0 flex-1">
@@ -248,7 +244,7 @@ function BrokerConnectionsCard({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-              <Icons.Link className="text-muted-foreground h-4 w-4" />
+              <BankIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
             </div>
             <h3 className="text-base font-semibold">{t("connect:connections.title")}</h3>
           </div>
@@ -291,9 +287,6 @@ function BrokerConnectionsCard({
             </div>
           ) : (
             connections.map((connection) => {
-              const logoUrl =
-                connection.brokerage?.aws_s3_square_logo_url ??
-                connection.brokerage?.aws_s3_logo_url;
               const brokerageName =
                 connection.brokerage?.display_name ??
                 connection.brokerage?.name ??
@@ -305,16 +298,7 @@ function BrokerConnectionsCard({
                   key={connection.id}
                   className="bg-muted/30 flex items-center gap-3 rounded-lg border p-3"
                 >
-                  <Avatar className="h-9 w-9 shrink-0 rounded-lg">
-                    <AvatarImage
-                      src={logoUrl}
-                      alt={brokerageName}
-                      className="bg-white object-contain p-1"
-                    />
-                    <AvatarFallback className="rounded-lg text-sm font-semibold">
-                      {brokerageName.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <BrokerageLogo brokerage={connection.brokerage} name={brokerageName} />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {brokerageName}
                   </span>
@@ -538,7 +522,7 @@ export function ConnectedView() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                  <Icons.Wallet className="text-muted-foreground h-4 w-4" />
+                  <WalletIcon weight="duotone" className="text-muted-foreground h-4 w-4" />
                 </div>
                 <h3 className="text-base font-semibold">{t("connect:accounts.title")}</h3>
               </div>
