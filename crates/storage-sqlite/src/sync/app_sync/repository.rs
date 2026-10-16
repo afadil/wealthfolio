@@ -1272,6 +1272,16 @@ impl From<diesel::result::Error> for ReplayAttemptError {
     }
 }
 
+/// The table a replayed event of this entity writes, and the column that holds
+/// the event's entity ID. Taxonomy bundles write their categories outside the
+/// generic mapping; each category row names its bundle by `taxonomy_id`.
+fn replay_checked_table(entity: &SyncEntity) -> Option<(&'static str, &'static str)> {
+    match entity {
+        SyncEntity::CustomTaxonomy => Some(("taxonomy_categories", "taxonomy_id")),
+        _ => entity_storage_mapping(entity),
+    }
+}
+
 /// Applies the page's events in order, except the skipped ones, then checks
 /// foreign keys. Runs inside a savepoint, so an error rolls back this attempt.
 fn apply_replay_attempt_tx(
@@ -1281,7 +1291,8 @@ fn apply_replay_attempt_tx(
     skipped: &[bool],
     fk_check_tables: &[&str],
 ) -> std::result::Result<usize, ReplayAttemptError> {
-    let mut applied = 0usize;
+    // Events whose write this attempt applied; only they can own a bad row.
+    let mut wrote = vec![false; events.len()];
     for (index, (entity, entity_id, op, event_id, client_timestamp, seq, payload)) in
         events.iter().enumerate()
     {
@@ -1299,8 +1310,7 @@ fn apply_replay_attempt_tx(
             *seq,
             payload.clone(),
         ) {
-            Ok(true) => applied += 1,
-            Ok(false) => {}
+            Ok(applied) => wrote[index] = applied,
             Err(err) => {
                 let err = replay_apply_error(*entity, entity_id, *op, event_id, *seq, err);
                 return Err(ReplayAttemptError::Culprits(vec![(index, err.to_string())]));
@@ -1311,9 +1321,9 @@ fn apply_replay_attempt_tx(
     let violations = collect_foreign_key_violations_tx(conn, fk_check_tables.iter().copied())
         .map_err(ReplayAttemptError::Failed)?;
     if violations.is_empty() {
-        return Ok(applied);
+        return Ok(wrote.iter().filter(|wrote| **wrote).count());
     }
-    match foreign_key_culprits_tx(conn, &violations, events, skipped)
+    match foreign_key_culprits_tx(conn, &violations, events, &wrote)
         .map_err(ReplayAttemptError::Failed)?
     {
         Some(culprits) => Err(ReplayAttemptError::Culprits(culprits)),
@@ -1323,30 +1333,31 @@ fn apply_replay_attempt_tx(
     }
 }
 
-/// Maps each violating row to the last event in the page that created or
-/// updated it. Returns `None` when a violation has no such event, for example
-/// a row that was already orphaned before the batch.
+/// Maps each violating row to the last event in the page that wrote it in this
+/// attempt. An event that last-writer-wins skipped did not write the row, so it
+/// is never blamed. Returns `None` when a violation has no such event, for
+/// example a row that was already orphaned before the batch.
 fn foreign_key_culprits_tx(
     conn: &mut SqliteConnection,
     violations: &[ForeignKeyCheckRow],
     events: &[RemoteReplayEvent],
-    skipped: &[bool],
+    wrote: &[bool],
 ) -> Result<Option<Vec<(usize, String)>>> {
     let mut culprits: Vec<(usize, String)> = Vec::new();
     for violation in violations {
         let Some(rowid) = violation.rowid else {
             return Ok(None);
         };
-        let Some((_, pk_name)) = events
+        let Some((_, id_column)) = events
             .iter()
-            .filter_map(|(entity, ..)| entity_storage_mapping(entity))
+            .filter_map(|(entity, ..)| replay_checked_table(entity))
             .find(|(table, _)| *table == violation.table)
         else {
             return Ok(None);
         };
         let sql = format!(
             "SELECT CAST({} AS TEXT) AS id FROM {} WHERE rowid = {}",
-            quote_identifier(pk_name),
+            quote_identifier(id_column),
             quote_identifier(&violation.table),
             rowid
         );
@@ -1362,10 +1373,10 @@ fn foreign_key_culprits_tx(
             .enumerate()
             .rev()
             .find(|(index, (entity, entity_id, op, ..))| {
-                !skipped[*index]
+                wrote[*index]
                     && matches!(op, SyncOperation::Create | SyncOperation::Update)
                     && *entity_id == row.id
-                    && entity_storage_mapping(entity)
+                    && replay_checked_table(entity)
                         .is_some_and(|(table, _)| table == violation.table)
             })
             .map(|(index, _)| index);
@@ -3123,19 +3134,9 @@ impl AppSyncRepository {
                     .map_err(StorageError::from)?;
 
                 let result = (|| -> Result<usize> {
-                    // Taxonomy bundles write categories outside the generic mapping;
-                    // checking them keeps an orphan category from committing.
                     let mut fk_check_tables = Vec::new();
                     for (entity, ..) in &events {
-                        let secondary_table = match entity {
-                            SyncEntity::CustomTaxonomy => Some("taxonomy_categories"),
-                            _ => None,
-                        };
-                        let tables = entity_storage_mapping(entity)
-                            .map(|(table, _)| table)
-                            .into_iter()
-                            .chain(secondary_table);
-                        for table in tables {
+                        if let Some((table, _)) = replay_checked_table(entity) {
                             if !fk_check_tables.contains(&table) {
                                 fk_check_tables.push(table);
                             }
@@ -10823,7 +10824,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn replay_batch_rejects_orphan_taxonomy_categories() {
+    async fn replay_batch_dead_letters_orphan_taxonomy_categories() {
         let (pool, writer) = setup_db();
         let repo = AppSyncRepository::new(pool.clone(), writer);
         let orphan_bundle = || {
@@ -10854,40 +10855,130 @@ mod tests {
             assert!(!repo.has_applied_event(event_id).expect("applied"));
         };
 
-        repo.apply_remote_events_lww_batch(vec![(
-            SyncEntity::CustomTaxonomy,
-            "tax-orphan".to_string(),
-            SyncOperation::Create,
-            "evt-orphan-1".to_string(),
-            "2026-03-01T00:00:00Z".to_string(),
-            1,
-            orphan_bundle(),
-        )])
-        .await
-        .expect_err("an orphan category must not commit");
-        assert_nothing_persisted("evt-orphan-1");
-
-        repo.apply_remote_events_lww_batch(vec![
-            poison_event(2),
-            (
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![(
                 SyncEntity::CustomTaxonomy,
                 "tax-orphan".to_string(),
                 SyncOperation::Create,
-                "evt-orphan-3".to_string(),
+                "evt-orphan-1".to_string(),
                 "2026-03-01T00:00:00Z".to_string(),
-                3,
+                1,
                 orphan_bundle(),
-            ),
-        ])
-        .await
-        .expect_err("an orphan category must not commit after an isolated event");
-        assert_nothing_persisted("evt-orphan-3");
+            )])
+            .await
+            .expect("the orphan bundle is dead-lettered");
+        assert_eq!(applied, 0);
+        assert_nothing_persisted("evt-orphan-1");
 
         let applied = repo
-            .apply_remote_events_lww_batch(vec![platform_create_event("platform-after-orphan", 4)])
+            .apply_remote_events_lww_batch(vec![
+                poison_event(2),
+                (
+                    SyncEntity::CustomTaxonomy,
+                    "tax-orphan".to_string(),
+                    SyncOperation::Create,
+                    "evt-orphan-3".to_string(),
+                    "2026-03-01T00:00:00Z".to_string(),
+                    3,
+                    orphan_bundle(),
+                ),
+            ])
             .await
-            .expect("the writer stays usable after the failed batch");
-        assert_eq!(applied, 1);
-        assert_eq!(count_platform_rows(&pool, "platform-after-orphan"), 1);
+            .expect("the orphan bundle is dead-lettered after an isolated event");
+        assert_eq!(applied, 0);
+        assert_nothing_persisted("evt-orphan-3");
+    }
+
+    #[tokio::test]
+    async fn replay_batch_blames_only_the_event_that_wrote_the_row() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account_for_test(&mut conn, "acc-blame").expect("insert account");
+        }
+        let account_update =
+            |event_id: &str, timestamp: &str, seq: i64, name: &str, platform: &str| {
+                let mut payload = account_payload("acc-blame", platform, None);
+                payload["name"] = serde_json::json!(name);
+                if platform.is_empty() {
+                    payload["platform_id"] = serde_json::Value::Null;
+                }
+                (
+                    SyncEntity::Account,
+                    "acc-blame".to_string(),
+                    SyncOperation::Update,
+                    event_id.to_string(),
+                    timestamp.to_string(),
+                    seq,
+                    payload,
+                )
+            };
+
+        // The newer update points at a missing platform; the older one, which
+        // last-writer-wins skips while the newer one is applied, is valid.
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![
+                account_update(
+                    "evt-blame-newer",
+                    "2026-02-17T00:00:20Z",
+                    1,
+                    "Newer",
+                    "platform-missing-blame",
+                ),
+                account_update("evt-blame-older", "2026-02-17T00:00:10Z", 2, "Older", ""),
+            ])
+            .await
+            .expect("the batch isolates the invalid update");
+
+        assert_eq!(applied, 1, "only the valid update applies");
+        let mut conn = get_connection(&pool).expect("conn");
+        let name: String = accounts::table
+            .find("acc-blame")
+            .select(accounts::name)
+            .first(&mut conn)
+            .expect("account");
+        assert_eq!(name, "Older");
+        assert!(repo.has_applied_event("evt-blame-older").expect("applied"));
+        assert!(!repo.has_applied_event("evt-blame-newer").expect("applied"));
+    }
+
+    #[tokio::test]
+    async fn replay_batch_isolates_orphan_taxonomy_bundle() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![
+                account_create_event("acc-bundle-iso", "platform-bundle-iso", 1),
+                (
+                    SyncEntity::CustomTaxonomy,
+                    "tax-orphan-iso".to_string(),
+                    SyncOperation::Create,
+                    "evt-orphan-iso".to_string(),
+                    "2026-03-01T00:00:00Z".to_string(),
+                    2,
+                    custom_taxonomy_bundle(
+                        "tax-orphan-iso",
+                        &[("cat-child", Some("cat-missing"))],
+                        "2026-03-01T00:00:00Z",
+                    ),
+                ),
+                platform_create_event("platform-bundle-iso", 3),
+            ])
+            .await
+            .expect("the batch isolates the orphan bundle");
+
+        assert_eq!(applied, 2);
+        assert_eq!(count_account_rows(&pool, "acc-bundle-iso"), 1);
+        assert_eq!(count_platform_rows(&pool, "platform-bundle-iso"), 1);
+        let mut conn = get_connection(&pool).expect("conn");
+        let category_count: i64 = taxonomy_categories::table
+            .filter(taxonomy_categories::taxonomy_id.eq("tax-orphan-iso"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count categories");
+        assert_eq!(category_count, 0);
+        assert!(!repo.has_applied_event("evt-orphan-iso").expect("applied"));
     }
 }
