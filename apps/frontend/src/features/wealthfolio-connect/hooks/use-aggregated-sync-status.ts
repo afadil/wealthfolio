@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useWealthfolioConnect } from "../providers/wealthfolio-connect-provider";
+import { getLastBrokerSyncAt } from "../lib/connect-overview";
 import { hasBrokerSync, isSubscriptionStatusActive } from "../lib/plan-capabilities";
 import { useSyncStates } from "./use-sync-states";
 import type { AggregatedSyncStatus, BrokerSyncState } from "../types";
@@ -79,17 +80,10 @@ export function useAggregatedSyncStatus() {
     error,
   ]);
 
-  // Find the last successful sync time across all states
+  // When sync last ran. lastSuccessfulAt is the provider's data date, which can lag by days.
   const lastSyncTime = useMemo(() => {
-    if (!showBrokerSync || syncStates.length === 0) return null;
-
-    const successfulSyncs = syncStates
-      .filter((s) => s.lastSuccessfulAt)
-      .map((s) => new Date(s.lastSuccessfulAt!).getTime());
-
-    if (successfulSyncs.length === 0) return null;
-
-    return new Date(Math.max(...successfulSyncs)).toISOString();
+    if (!showBrokerSync) return null;
+    return getLastBrokerSyncAt(syncStates, [])?.toISOString() ?? null;
   }, [showBrokerSync, syncStates]);
 
   // Check if there are any warnings or errors

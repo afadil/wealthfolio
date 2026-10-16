@@ -1,6 +1,6 @@
 import {
   getMcpStatus,
-  isDesktop,
+  isTauri,
   logger,
   setMcpAuditEnabled,
   setMcpAutoStart,
@@ -19,7 +19,7 @@ export function useMcpServer() {
   const statusQuery = useQuery({
     queryKey: [QueryKeys.AGENT_MCP_STATUS],
     queryFn: getMcpStatus,
-    enabled: isDesktop,
+    enabled: isTauri,
   });
 
   const applyStatus = (status: McpServerStatus) => {

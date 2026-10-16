@@ -13,6 +13,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  useAmountFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
 import { memo, useMemo } from "react";
@@ -168,6 +169,7 @@ type AllocationContentProps = ToolCallMessagePartProps<
 const AllocationContent = memo(AllocationContentImpl);
 
 function AllocationContentImpl({ args, result, status }: AllocationContentProps) {
+  const amountFormatting = useAmountFormatting();
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
   const typedArgs = args as GetAssetAllocationArgs | undefined;
@@ -196,15 +198,9 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
 
   const formatter = useMemo(
     () => ({
-      format: (value: number) =>
-        formatting.formatDecimal(value, {
-          style: "currency",
-          currency,
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        }),
+      format: (value: number) => amountFormatting.formatRoundedAmount(value, currency),
     }),
-    [currency, formatting],
+    [currency, amountFormatting],
   );
 
   // Calculate total for percentages before any conditional return so hook order is stable.

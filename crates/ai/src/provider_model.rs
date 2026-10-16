@@ -608,6 +608,10 @@ pub struct FetchedModel {
     /// Optional display name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Capabilities from the provider's model metadata, or the provider's
+    /// defaults. `None` when neither says anything about the model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<ModelCapabilities>,
 }
 
 /// Response from model listing.

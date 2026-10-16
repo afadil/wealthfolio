@@ -14,7 +14,11 @@
     "noDevicesSyncing": "Nenhum dispositivo sincronizando ainda",
     "noDevicesDescription": "Configure a sincronização de dispositivos nas configurações para manter seus dados sincronizados entre dispositivos.",
     "noActivity": "Nenhuma atividade ainda",
-    "noActivityDescription": "As atualizações aparecerão aqui quando seus dados começarem a sincronizar."
+    "noActivityDescription": "As atualizações aparecerão aqui quando seus dados começarem a sincronizar.",
+    "showMore_one": "Mostrar mais {{count}}",
+    "showMore_many": "Mostrar mais {{count}}",
+    "showMore_other": "Mostrar mais {{count}}",
+    "showLess": "Mostrar menos"
   },
   "emptyState": {
     "optional": "Opcional",
@@ -71,7 +75,8 @@
     "noDataYet": "Nenhum dado ainda",
     "dataAsOf": "Dados em {{date}}",
     "emptyTitle": "Nenhuma conta sincronizada ainda",
-    "emptyDescription": "Conecte uma corretora para começar a sincronizar suas contas."
+    "emptyDescription": "Conecte uma corretora para começar a sincronizar suas contas.",
+    "needsSetup": "Requer configuração"
   },
   "connections": {
     "title": "Conexões de corretoras",
@@ -90,7 +95,13 @@
     "accountsSyncing_many": "{{count}} contas sincronizando",
     "partialSyncing_one": "{{syncing}} de {{total}} contas sincronizando · {{excluded}} conta excluída",
     "partialSyncing_other": "{{syncing}} de {{total}} contas sincronizando · {{excluded}} contas excluídas",
-    "partialSyncing_many": "{{syncing}} de {{total}} contas sincronizando · {{excluded}} contas excluídas"
+    "partialSyncing_many": "{{syncing}} de {{total}} contas sincronizando · {{excluded}} contas excluídas",
+    "accountCount_one": "{{count}} conta",
+    "accountCount_many": "{{count}} contas",
+    "accountCount_other": "{{count}} contas",
+    "excludedCount_one": "{{count}} excluída",
+    "excludedCount_many": "{{count}} excluídas",
+    "excludedCount_other": "{{count}} excluídas"
   },
   "sync": {
     "syncNow": "Sincronizar agora",
@@ -198,21 +209,36 @@
     "title": "A sincronização da corretora requer atenção",
     "description_one": "{{count}} conta precisa de uma nova tentativa ou revisão da corretora.",
     "description_other": "{{count}} contas precisam de uma nova tentativa ou revisão da corretora.",
-    "description_many": "{{count}} contas precisam de uma nova tentativa ou revisão da corretora."
+    "description_many": "{{count}} contas precisam de uma nova tentativa ou revisão da corretora.",
+    "heading": "Requer atenção",
+    "connectionLost": "Conexão perdida",
+    "accountsNotSyncing_one": "{{count}} conta sem sincronizar",
+    "accountsNotSyncing_many": "{{count}} contas sem sincronizar",
+    "accountsNotSyncing_other": "{{count}} contas sem sincronizar",
+    "syncFailed": "A última sincronização falhou"
   },
   "setup": {
     "newAccountsTitle": "Novas contas requerem configuração",
     "newAccountsDescription_one": "{{count}} conta precisa de uma configuração rápida antes de começarmos a sincronizar.",
     "newAccountsDescription_other": "{{count}} contas precisam de uma configuração rápida antes de começarmos a sincronizar.",
     "newAccountsDescription_many": "{{count}} contas precisam de uma configuração rápida antes de começarmos a sincronizar.",
-    "reviewAccounts": "Revisar contas"
+    "reviewAccounts": "Revisar contas",
+    "setUp": "Configurar"
   },
   "devices": {
     "thisDevice": "Este dispositivo",
     "activeNow": "Ativo agora",
     "lastSeen": "Visto pela última vez {{time}}",
     "online": "Online",
-    "never": "Nunca"
+    "never": "Nunca",
+    "showInactive_one": "Mostrar {{count}} dispositivo inativo",
+    "showInactive_many": "Mostrar {{count}} dispositivos inativos",
+    "showInactive_other": "Mostrar {{count}} dispositivos inativos",
+    "hideInactive": "Ocultar dispositivos inativos",
+    "platforms": {
+      "server": "Servidor",
+      "web": "Web"
+    }
   },
   "deviceStatus": {
     "syncError": "Erro de sincronização",

@@ -38,7 +38,7 @@ pub use recalculation::{recalculate_loan, LoanRecalculation, LoanRecalculationRe
 pub use setup::{
     apply_loan_setup, preview_loan_terms, LoanSchedule, LoanSchedulePreview, LoanSetup, LOAN_FIELDS,
 };
-pub use summary::LoanSummary;
+pub use summary::{LoanBalanceSource, LoanSummary};
 
 const MAX_PAYMENTS: usize = 2600;
 
@@ -523,6 +523,40 @@ pub fn loan_value(
     date: NaiveDate,
 ) -> Option<Decimal> {
     loan_balance(&loan_calculation(metadata?, quotes, payments, date)?)
+}
+
+/// A manual loan's unconfirmed principal, used only when it has no recorded balances.
+/// Undated legacy loans start on their stored creation date, never before it.
+/// A dormant schedule on a manually tracked loan does not drive this value.
+pub fn manual_loan_principal(
+    metadata: Option<&Value>,
+    as_of: NaiveDate,
+    created_date: NaiveDate,
+) -> Option<(NaiveDate, Decimal)> {
+    let metadata = metadata?;
+    if metadata.get(LOAN_PROJECTION_KEY).is_some()
+        && metadata.get(TRACKING_MODE_KEY).and_then(Value::as_str) != Some("manual")
+    {
+        return None;
+    }
+    let amount = metadata
+        .get(ORIGINAL_AMOUNT_KEY)
+        .or_else(|| metadata.get("purchase_price"))?;
+    let amount = amount
+        .as_f64()
+        .or_else(|| amount.as_str()?.parse().ok())
+        .filter(|amount| valid_amount(*amount) && money(*amount) > 0.0)?;
+    let stored_date = metadata
+        .get(ORIGINATION_DATE_KEY)
+        .or_else(|| metadata.get("purchase_date"));
+    let date = match stored_date {
+        Some(date) => date.as_str()?.parse::<NaiveDate>().ok()?,
+        None => created_date,
+    };
+    if date > as_of {
+        return None;
+    }
+    Decimal::from_f64_retain(amount).map(|amount| (date, amount.round_dp(2)))
 }
 
 #[cfg(test)]

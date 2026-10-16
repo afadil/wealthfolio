@@ -910,9 +910,6 @@ mod tests {
         fn get_base_currency(&self) -> wealthfolio_core::errors::Result<Option<String>> {
             unreachable!()
         }
-        async fn update_base_currency(&self, _: &str) -> wealthfolio_core::errors::Result<()> {
-            unreachable!()
-        }
         fn is_auto_update_check_enabled(&self) -> wealthfolio_core::errors::Result<bool> {
             unreachable!()
         }
@@ -949,9 +946,6 @@ mod tests {
             unreachable!()
         }
         fn get_base_currency(&self) -> wealthfolio_core::errors::Result<Option<String>> {
-            unreachable!()
-        }
-        async fn update_base_currency(&self, _: &str) -> wealthfolio_core::errors::Result<()> {
             unreachable!()
         }
         fn is_auto_update_check_enabled(&self) -> wealthfolio_core::errors::Result<bool> {

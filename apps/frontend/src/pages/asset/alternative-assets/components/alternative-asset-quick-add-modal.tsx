@@ -391,8 +391,9 @@ export function AlternativeAssetQuickAddModal({
     if (isLiability) {
       metadata.sub_type = formData.liabilityType ?? "mortgage";
       // An omitted balance is not a confirmed estimate. Anchor at the original
-      // principal; shared core derives today's balance without storing payments.
-      if (formData.automaticSchedule && formData.purchaseDate && !formData.currentValue.trim()) {
+      // principal. Scheduled loans derive today's balance without storing payments;
+      // manual loans retain that principal until another balance is recorded.
+      if (formData.purchaseDate && !formData.currentValue.trim()) {
         currentValue = formData.purchasePrice!;
         balanceQuoteDate = formData.purchaseDate;
       }

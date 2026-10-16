@@ -74,5 +74,8 @@
   "previous_period_income": "Revenus de la période précédente",
   "monthly": "Mensuel",
   "previous": "Précédent",
-  "cumulative": "Cumulé"
+  "cumulative": "Cumulé",
+  "unconverted_currencies_one": "Les revenus en {{currencies}} ne sont pas inclus dans les totaux, faute de taux de change vers {{baseCurrency}}.",
+  "unconverted_currencies_other": "Les revenus en {{currencies}} ne sont pas inclus dans les totaux, faute de taux de change vers {{baseCurrency}}.",
+  "unconverted_currencies_many": "Les revenus en {{currencies}} ne sont pas inclus dans les totaux, faute de taux de change vers {{baseCurrency}}."
 }

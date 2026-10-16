@@ -66,6 +66,7 @@ pub mod error;
 pub mod eval;
 #[cfg(feature = "test-utils")]
 pub mod live_evals;
+mod model_families;
 pub mod provider_model;
 pub mod provider_service;
 mod provider_urls;

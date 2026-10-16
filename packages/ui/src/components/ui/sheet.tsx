@@ -64,6 +64,8 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
         <SheetOverlay />
         <SheetPrimitive.Content
           ref={ref}
+          data-slot="sheet-content"
+          data-side={side}
           className={cn(sheetVariants({ side }), className)}
           style={{
             ...(needsSafeAreaTop && { paddingTop: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }),

@@ -16,11 +16,18 @@ import { useAccountScopeStore } from "@/lib/account-scope-store";
 import { QueryKeys } from "@/lib/query-keys";
 import type { IncomeSummary } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
-import { AmountDisplay, AnimatedToggleGroup, GainPercent, PrivacyAmount } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  AnimatedToggleGroup,
+  GainPercent,
+  PrivacyAmount,
+  useAmountFormatting,
+} from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
+import { UnconvertedCurrenciesNotice } from "./unconverted-currencies-notice";
 
 type IncomePeriod = "ALL" | "YTD" | "LAST_YEAR";
 
@@ -70,6 +77,7 @@ export default function IncomePage() {
   const { t } = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState<IncomePeriod>("ALL");
   const { isBalanceHidden } = useBalancePrivacy();
+  const amountFormatting = useAmountFormatting();
 
   const accountFilter = useAccountScopeStore((state) => state.scope);
   const setAccountScope = useAccountScopeStore((state) => state.setScope);
@@ -200,6 +208,10 @@ export default function IncomePage() {
     <>
       {filters}
       <div className="space-y-6">
+        <UnconvertedCurrenciesNotice
+          currencies={periodSummary.unconvertedCurrencies}
+          baseCurrency={currency}
+        />
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -256,7 +268,42 @@ export default function IncomePage() {
                     className="mx-auto aspect-square max-h-[62px]"
                   >
                     <PieChart>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                      <ChartTooltip
+                        cursor={false}
+                        content={
+                          <ChartTooltipContent
+                            hideLabel
+                            // Each slice is an amount in its own currency.
+                            formatter={(value, name, entry) => {
+                              const color =
+                                (entry.payload as { fill?: string } | undefined)?.fill ??
+                                entry.color;
+                              return (
+                                <>
+                                  <div
+                                    className="border-border bg-(--color-bg) h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                                    style={
+                                      {
+                                        "--color-bg": color,
+                                        "--color-border": color,
+                                      } as React.CSSProperties
+                                    }
+                                  />
+                                  <div className="flex flex-1 items-center justify-between gap-2 leading-none">
+                                    <span className="text-muted-foreground">{name}</span>
+                                    <span className="text-foreground font-mono font-medium tabular-nums">
+                                      {amountFormatting.formatDecimalAmount(
+                                        Number(value),
+                                        String(name),
+                                      )}
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            }}
+                          />
+                        }
+                      />
                       <Pie data={currencyData} dataKey="amount" nameKey="currency" paddingAngle={4}>
                         {currencyData.map((_entry, index) => (
                           <Cell key={`cell-${index}`} fill={`var(--chart-${index + 2})`} />

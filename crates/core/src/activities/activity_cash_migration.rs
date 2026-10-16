@@ -708,10 +708,6 @@ mod tests {
             Ok(None)
         }
 
-        async fn update_base_currency(&self, _new_base_currency: &str) -> Result<()> {
-            Ok(())
-        }
-
         fn is_auto_update_check_enabled(&self) -> Result<bool> {
             Ok(true)
         }

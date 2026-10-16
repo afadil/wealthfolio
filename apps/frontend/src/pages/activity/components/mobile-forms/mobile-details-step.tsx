@@ -354,8 +354,11 @@ export function MobileDetailsStep({
     setValue("assetMetadata" as any, undefined);
   };
 
-  // Filter destination accounts to exclude source account (for internal transfers)
-  const toAccountOptions = filteredAccounts.filter((acc) => acc.value !== accountId);
+  const toAccountOptions = filteredAccounts.filter(
+    (acc) => transferMode === "cash" || acc.value !== accountId,
+  );
+  const isSameAccountCashTransfer =
+    needsInternalCashTransferAmounts && !!accountId && accountId === toAccountId;
 
   useActivityCurrency(form, filteredAccounts, {
     isEditing,
@@ -758,6 +761,8 @@ export function MobileDetailsStep({
               />
             )}
 
+            {isSameAccountCashTransfer && <InternalTransferCurrencyFields />}
+
             {/* Date */}
             <FormField
               control={control}
@@ -877,7 +882,8 @@ export function MobileDetailsStep({
                       </span>
                       <span>·</span>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         {...register("contractMultiplier" as any, { valueAsNumber: true })}
                         readOnly={isEditing}
                         className="hover:border-input focus:border-input focus:bg-background focus:ring-ring h-5 w-14 rounded border border-transparent bg-transparent px-1 text-center text-xs tabular-nums focus:outline-none focus:ring-1"
@@ -1147,7 +1153,9 @@ export function MobileDetailsStep({
             showCurrency={!isTransfer || isExternal}
             showFxRate={!isTransfer || isExternal}
           >
-            {needsInternalCashTransferAmounts && <InternalTransferCurrencyFields />}
+            {needsInternalCashTransferAmounts && !isSameAccountCashTransfer && (
+              <InternalTransferCurrencyFields />
+            )}
             {/* Comment */}
             <FormField
               control={control}

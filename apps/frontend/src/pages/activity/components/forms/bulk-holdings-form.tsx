@@ -18,6 +18,7 @@ import {
   FormMessage,
   MoneyInput,
   QuantityInput,
+  useAmountFormatting,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { memo, useCallback, useMemo, useState } from "react";
@@ -76,6 +77,9 @@ const HoldingRow = memo(
   }) => {
     const { t } = useTranslation(["activity"]);
     const { control, setValue, getValues } = useFormContext<BulkHoldingsFormValues>();
+    const amountFormatting = useAmountFormatting();
+    // The holdings are recorded in the form's currency.
+    const currency = useWatch({ control, name: "currency" });
 
     // Use useWatch for specific fields instead of watch() in parent
     const ticker = useWatch({
@@ -221,13 +225,13 @@ const HoldingRow = memo(
     return (
       <div
         className={cn(
-          "border-border/50 hover:bg-muted/50 grid grid-cols-3 gap-x-2 gap-y-2 rounded-lg border-b px-3 py-3 transition-colors last:border-b-0 sm:grid-cols-12 sm:gap-3",
+          "border-border/50 hover:bg-muted/50 grid grid-cols-2 gap-x-2 gap-y-2 rounded-lg border-b px-3 py-3 transition-colors last:border-b-0 sm:grid-cols-12 sm:gap-3",
           isSelected && "bg-muted",
         )}
         onClick={handleRowClick}
       >
         {/* Ticker Input */}
-        <div className="col-span-3 sm:col-span-6">
+        <div className="col-span-2 sm:col-span-5">
           <div className="flex min-w-0 items-center gap-2">
             <TickerAvatar
               symbol={canonicalSymbol || ticker}
@@ -305,14 +309,14 @@ const HoldingRow = memo(
         </div>
 
         {/* Total Value */}
-        <div className="flex items-center justify-end sm:col-span-2">
+        <div className="col-span-2 flex items-center justify-end sm:col-span-3">
           <span
             className={cn(
               "text-sm font-medium",
               totalValue > 0 ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            ${totalValue.toFixed(2)}
+            {amountFormatting.formatAmount(totalValue, currency)}
           </span>
         </div>
 
@@ -461,10 +465,10 @@ export const BulkHoldingsForm = ({ onAccountChange, defaultAccount }: BulkHoldin
 
           {/* Table Header */}
           <div className="text-muted-foreground hidden gap-3 border-b pb-3 text-sm sm:grid sm:grid-cols-12">
-            <div className="col-span-6">{t("activity:tickers")}</div>
+            <div className="col-span-5">{t("activity:tickers")}</div>
             <div className="col-span-1 text-right">{t("activity:form.bulk_col_shares")}</div>
             <div className="col-span-2 text-right">{t("activity:form.bulk_col_average_cost")}</div>
-            <div className="col-span-2 whitespace-nowrap text-right">
+            <div className="col-span-3 whitespace-nowrap text-right">
               {t("activity:total_value")}
             </div>
             <div className="col-span-1 text-right"></div>

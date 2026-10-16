@@ -36,10 +36,12 @@ import type {
   MergedModel,
   MergedProvider,
   ModelCapabilityOverrides,
+  ModelCapabilityOverrideUpdate,
   ProviderTuning,
   ProviderTuningOverrides,
 } from "../types";
 import { ProviderIcon } from "./provider-icons";
+import { listedCapabilityOverride } from "./provider-settings-utils";
 
 interface ProviderSettingsCardProps {
   provider: MergedProvider;
@@ -51,7 +53,11 @@ interface ProviderSettingsCardProps {
   onCustomUrlChange?: (url: string) => void;
   /** @deprecated Use onSetFavoriteModels instead for multi-select */
   onSelectModel?: (modelId: string) => void;
-  onSetFavoriteModels?: (modelIds: string[]) => void;
+  /** `capabilityOverride` is saved in the same update as the favorites. */
+  onSetFavoriteModels?: (
+    modelIds: string[],
+    capabilityOverride?: ModelCapabilityOverrideUpdate,
+  ) => void;
   onSetCapabilityOverride?: (modelId: string, overrides: ModelCapabilityOverrides | null) => void;
   onToolsAllowlistChange?: (tools: string[] | null) => void;
   /**
@@ -281,10 +287,15 @@ export function ProviderSettingsCard({
     if (!onSetFavoriteModels) return;
 
     const currentFavorites = provider.favoriteModels || [];
-    const newFavorites = currentFavorites.includes(modelId)
-      ? currentFavorites.filter((id) => id !== modelId)
-      : [...currentFavorites, modelId];
-    onSetFavoriteModels(newFavorites);
+    if (currentFavorites.includes(modelId)) {
+      onSetFavoriteModels(currentFavorites.filter((id) => id !== modelId));
+      return;
+    }
+    // Chat only knows the model ID, so keep what the provider's list said.
+    onSetFavoriteModels(
+      [...currentFavorites, modelId],
+      listedCapabilityOverride(provider, fetchedModels, modelId),
+    );
   };
 
   const handleCapabilityChange = (
@@ -294,9 +305,13 @@ export function ProviderSettingsCard({
   ) => {
     if (!onSetCapabilityOverride) return;
 
+    // Save every capability, not just the changed one: a model with overrides
+    // is described by them alone, and the checkboxes show the effective values.
     const existingOverrides = provider.modelCapabilityOverrides[modelId] || {};
+    const current = provider.models.find((m) => m.id === modelId)?.capabilities;
     const newOverrides: ModelCapabilityOverrides = {
       ...existingOverrides,
+      ...(current && { tools: current.tools, thinking: current.thinking, vision: current.vision }),
       [capability]: value,
     };
     onSetCapabilityOverride(modelId, newOverrides);
@@ -575,6 +590,7 @@ export function ProviderSettingsCard({
                                         const isEnabled = provider.favoriteModels?.includes(
                                           model.id,
                                         );
+                                        const capabilities = model.capabilities;
                                         return (
                                           <CommandItem
                                             key={model.id}
@@ -587,7 +603,25 @@ export function ProviderSettingsCard({
                                             <span className="truncate">
                                               {model.name ?? model.id}
                                             </span>
-                                            {isEnabled && <Icons.Check className="h-4 w-4" />}
+                                            <div className="flex items-center gap-1">
+                                              {capabilities?.tools && (
+                                                <Badge
+                                                  variant="secondary"
+                                                  className="h-4 px-1 text-[9px]"
+                                                >
+                                                  T
+                                                </Badge>
+                                              )}
+                                              {capabilities?.vision && (
+                                                <Badge
+                                                  variant="secondary"
+                                                  className="h-4 px-1 text-[9px]"
+                                                >
+                                                  V
+                                                </Badge>
+                                              )}
+                                              {isEnabled && <Icons.Check className="h-4 w-4" />}
+                                            </div>
                                           </CommandItem>
                                         );
                                       })}
@@ -688,8 +722,10 @@ export function ProviderSettingsCard({
                         const model = enabledModels.find((m) => m.id === selectedModelForConfig);
                         if (!model) return null;
                         const isRecommended = "isCatalog" in model && model.isCatalog;
+                        // Effective capabilities (provider defaults plus overrides) when the
+                        // backend has merged them, else the overrides alone.
                         const capabilities =
-                          isRecommended && "capabilities" in model
+                          "isCatalog" in model
                             ? model.capabilities
                             : provider.modelCapabilityOverrides[model.id] || {};
 

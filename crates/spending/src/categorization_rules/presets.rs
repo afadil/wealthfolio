@@ -89,7 +89,9 @@ const PRESET_JSONS: &[(&str, &str)] = &[
     ("ca", include_str!("../../seeds/presets/ca.json")),
     ("gb", include_str!("../../seeds/presets/gb.json")),
     ("es", include_str!("../../seeds/presets/es.json")),
+    ("de", include_str!("../../seeds/presets/de.json")),
     ("fr", include_str!("../../seeds/presets/fr.json")),
+    ("nl", include_str!("../../seeds/presets/nl.json")),
     ("au", include_str!("../../seeds/presets/au.json")),
     ("nz", include_str!("../../seeds/presets/nz.json")),
     ("se", include_str!("../../seeds/presets/se.json")),
@@ -263,8 +265,100 @@ mod tests {
     }
 
     #[test]
+    fn dutch_merchants_match_specific_categories() {
+        for (notes, category) in [
+            ("BEA, Betaalpas ALBERT HEIJN 1234,PAS123", "groceries"),
+            ("Jumbo Utrecht", "groceries"),
+            ("NS GROEP IZ NS REIZIGERS", "transport_public"),
+            ("Q-Park Nederland", "transport_parking"),
+            ("Eneco Services", "housing_utilities"),
+            ("Gemeentelijke belastingen Amsterdam", "housing_utilities"),
+            ("Zilveren Kruis Zorgverzekeringen", "health_insurance"),
+            ("Ziggo Services BV", "bills_internet"),
+            ("Thuisbezorgd.nl", "food_delivery"),
+            ("Kosten OranjePakket", "fees_bank"),
+            ("Coolblue BV", "shopping_electronics"),
+            ("Basic-Fit Nederland", "health_fitness"),
+            ("NS-Utrecht Centraal 123 UTRECHT NLD", "transport_public"),
+            ("Rabobank Hypotheken", "housing_rent"),
+            ("BENU Apotheken", "health_pharmacy"),
+            ("AH to go Schiphol", "groceries"),
+        ] {
+            assert_eq!(
+                match_preset("nl", notes).as_deref(),
+                Some(category),
+                "{notes}"
+            );
+        }
+    }
+
+    #[test]
+    fn dutch_merchants_require_complete_names() {
+        for notes in [
+            "JUMBOREE",
+            "SPARTA ROTTERDAM",
+            "TRANSACTION 123",
+            "PICNICTAFEL",
+            "HUUR FIETS",
+            "GAMMASTRALING",
+            "Example BV SCHIPHOL RIJK",
+        ] {
+            assert_eq!(match_preset("nl", notes), None, "{notes}");
+        }
+    }
+
+    #[test]
+    fn german_merchants_match_specific_categories() {
+        for (notes, category) in [
+            ("VISA REWE Markt GmbH", "groceries"),
+            ("NETTO MARKEN-DISCOUNT", "groceries"),
+            ("PENNY.Markt GmbH", "groceries"),
+            ("DB Vertrieb GmbH", "transport_public"),
+            ("Stadtwerke Muenster GmbH", "housing_utilities"),
+            (
+                "ARD ZDF Deutschlandradio Beitragsservice",
+                "housing_utilities",
+            ),
+            ("Techniker Krankenkasse", "health_insurance"),
+            ("Telekom Deutschland GmbH", "bills_phone"),
+            ("Lieferando.de", "food_delivery"),
+            ("Entgelt fuer Kontofuehrung", "fees_bank"),
+            ("dm-drogerie markt", "health_pharmacy"),
+            ("Baeckerei Mueller", "food_coffee"),
+            ("Vodafone Kabel Deutschland GmbH", "bills_internet"),
+            ("EnBW mobility+ AG", "transport_gas"),
+            ("Burger King Flughafen Muenchen", "food_restaurants"),
+            ("H&M Flughafen Frankfurt", "shopping_clothing"),
+            ("Entgelt fuer Girocard", "fees_bank"),
+        ] {
+            assert_eq!(
+                match_preset("de", notes).as_deref(),
+                Some(category),
+                "{notes}"
+            );
+        }
+    }
+
+    #[test]
+    fn german_merchants_require_complete_names() {
+        for notes in [
+            "NETTOBETRAG",
+            "Netto 123,45 EUR",
+            "PENNYWISE",
+            "OTTO MUELLER",
+            "DEPOT WERTPAPIERE",
+            "ROLLER LEIHE",
+            "REWEB DESIGN",
+            "Kiosk Flughafen Hamburg",
+            "Entgelt fuer Stellplatz",
+        ] {
+            assert_eq!(match_preset("de", notes), None, "{notes}");
+        }
+    }
+
+    #[test]
     fn bundled_presets_have_unique_keys_and_valid_regexes() {
-        for preset_id in ["us", "ca", "gb", "es", "fr", "au", "nz", "se"] {
+        for preset_id in ["us", "ca", "gb", "es", "de", "fr", "nl", "au", "nz", "se"] {
             let preset = load_preset(preset_id).expect("preset should load");
             assert_eq!(preset.preset_id, preset_id);
             assert!(!preset.rules.is_empty(), "preset {preset_id} has no rules");

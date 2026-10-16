@@ -14,7 +14,7 @@ import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { DateRange } from "react-day-picker";
 
-import { createActivity, deleteActivity, updateActivity } from "@/adapters";
+import { createActivity, deleteActivity, saveActivities, updateActivity } from "@/adapters";
 import { localizeActivityTypeName } from "@/lib/activity-utils";
 import { generateId } from "@/lib/id";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -47,6 +47,7 @@ import { ActivityForm } from "@/pages/activity/components/activity-form";
 import { MobileActivityForm } from "@/pages/activity/components/mobile-forms/mobile-activity-form";
 import { TransferMatchDialog } from "@/pages/activity/components/transfer-match-dialog";
 import { attachTransferCounterpart } from "@/pages/activity/utils/transfer-counterpart";
+import { buildSameAccountFxDuplicate } from "@/pages/activity/utils/duplicate-fx-transfer";
 import { ActivityLoanPaymentSheet } from "@/pages/asset/alternative-assets/components/activity-loan-payment-sheet";
 import { getActivityRestrictionLevel } from "@/lib/activity-restrictions";
 import { ActivityType } from "@/lib/constants";
@@ -177,7 +178,7 @@ export interface SpendingTransactionsTabHandle {
   openAddForm: () => void;
 }
 
-function toActivityDetails(row: TransactionRowVM, account?: Account): Partial<ActivityDetails> {
+function toActivityDetails(row: TransactionRowVM, account?: Account): ActivityDetails {
   const activity = row.activity;
   const activityType = getEffectiveCashActivityType(activity);
   return {
@@ -382,7 +383,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
     /**
      * Mobile only. The card list hides its checkboxes until the user asks to
      * select, the way a phone list normally does — a checkbox on every row is a
-     * permanent cost for an occasional task. The table always shows them.
+     * permanent cost for an occasional task. The table has hover and keyboard
+     * focus, so it reveals each row's checkbox on those instead.
      */
     const [selectionMode, setSelectionMode] = useState(false);
 
@@ -492,6 +494,8 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
         maxAmount: amountRange.max ?? undefined,
         sortBy: "date",
         sortDir: "desc",
+        // Filled only when the search covers exactly one account.
+        includeCashBalances: true,
       };
     }, [
       debouncedSearch,
@@ -520,6 +524,9 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       fetchNextPage,
       refetch,
     } = useCashActivitySearch(searchRequest);
+    // Rows carry a balance only when the search covers one cash or
+    // credit-card account, so their presence decides the column.
+    const showBalance = useMemo(() => items.some((item) => item.cashBalance != null), [items]);
 
     const accountById = useMemo(() => {
       const m = new Map<string, Account>();
@@ -611,6 +618,14 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
 
     const { mutate: duplicateTransaction } = useMutation({
       mutationFn: async (row: TransactionRowVM) => {
+        const exchange = await buildSameAccountFxDuplicate(toActivityDetails(row));
+        if (exchange) {
+          const result = await saveActivities({ creates: exchange });
+          if (result.errors.length || result.created.length !== 2) {
+            throw new Error("Failed duplicating transfer pair.");
+          }
+          return result.created[0];
+        }
         const a = row.activity;
         const activityType = getEffectiveCashActivityType(a);
         const supportsBoundary =
@@ -1066,7 +1081,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
       <>
         {firstItemStart > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: firstItemStart }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: firstItemStart }}
+            />
           </TableRow>
         )}
         {virtualItems.map((virtualItem) => {
@@ -1082,6 +1101,7 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               selectionState={daySelectionState(item.group)}
               onToggleDay={handleToggleDay}
               isPartial={hasNextPage === true && item.isLastGroup}
+              showBalance={showBalance}
             />
           ) : (
             <TransactionRow
@@ -1090,12 +1110,17 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
               data-index={virtualItem.index}
               {...sharedRowProps(item.row)}
               showAccount={showAccount}
+              showBalance={showBalance}
             />
           );
         })}
         {totalSize - lastItemEnd > 0 && (
           <TableRow aria-hidden className="hover:bg-transparent">
-            <TableCell colSpan={6} className="p-0" style={{ height: totalSize - lastItemEnd }} />
+            <TableCell
+              colSpan={showBalance ? 7 : 6}
+              className="p-0"
+              style={{ height: totalSize - lastItemEnd }}
+            />
           </TableRow>
         )}
       </>
@@ -1223,10 +1248,18 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             {loadMoreTrigger && <div className="flex justify-center pt-1">{loadMoreTrigger}</div>}
           </div>
         ) : (
-          <div className="rounded-md border" style={{ overflowAnchor: "none" }}>
+          // Row checkboxes show on hover or focus until something is selected,
+          // then on every row; `data-selecting` is what switches them on.
+          <div
+            className="group/list rounded-md border"
+            data-selecting={selectedRowIds.size > 0 || undefined}
+            style={{ overflowAnchor: "none" }}
+          >
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted-foreground/5">
                 <TableRow>
+                  {/* Select-all stays visible: with the row boxes hidden at
+                      rest, it is what shows the list can be selected. */}
                   <TableHead className="w-10 px-3">
                     <Checkbox
                       checked={
@@ -1248,6 +1281,11 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
                     {t("spending:filters.category")}
                   </TableHead>
                   <TableHead className="w-28 px-3 text-right">{t("common:amount")}</TableHead>
+                  {showBalance && (
+                    <TableHead className="hidden w-28 px-3 text-right sm:table-cell">
+                      {t("activity:table_balance")}
+                    </TableHead>
+                  )}
                   <TableHead className="w-10 px-3" />
                 </TableRow>
               </TableHeader>

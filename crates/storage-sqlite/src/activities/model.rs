@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use wealthfolio_core::activities::{
-    Activity, ActivityStatus, ActivityUpdate, ActivityUpsert, NewActivity,
+    Activity, ActivityStatus, ActivityUpdate, ActivityUpsert, CashLedgerActivity, NewActivity,
 };
 
 fn normalize_subtype_for_storage(subtype: Option<String>) -> Option<String> {
@@ -56,6 +56,17 @@ fn parse_decimal_string_tolerant(value_str: &str, field_name: &str) -> Decimal {
                 Decimal::ZERO
             }
         },
+    }
+}
+
+/// A stored status; unknown values read as posted.
+fn parse_status(status: &str) -> ActivityStatus {
+    match status {
+        "POSTED" => ActivityStatus::Posted,
+        "PENDING" => ActivityStatus::Pending,
+        "DRAFT" => ActivityStatus::Draft,
+        "VOID" => ActivityStatus::Void,
+        _ => ActivityStatus::Posted,
     }
 }
 
@@ -349,6 +360,9 @@ impl From<ActivityDetailsDB> for wealthfolio_core::activities::ActivityDetails {
             import_run_id: db.import_run_id,
             is_user_modified: db.is_user_modified != 0,
             metadata: db.metadata.and_then(|s| serde_json::from_str(&s).ok()),
+            cash_balance: None,
+            cash_balance_currency: None,
+            cash_balance_scope: None,
         }
     }
 }
@@ -405,16 +419,68 @@ impl From<wealthfolio_core::activities::ImportTemplate> for ImportTemplateDB {
 
 // Conversion implementations
 
+/// The columns of an activity the cash ledger reads.
+#[derive(Queryable, Selectable, Debug)]
+#[diesel(table_name = crate::schema::activities)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct CashLedgerActivityDB {
+    pub id: String,
+    pub account_id: String,
+    pub asset_id: Option<String>,
+    pub activity_type: String,
+    pub activity_type_override: Option<String>,
+    pub subtype: Option<String>,
+    pub status: String,
+    pub activity_date: String,
+    pub created_at: String,
+    pub quantity: Option<String>,
+    pub unit_price: Option<String>,
+    pub amount: Option<String>,
+    pub fee: Option<String>,
+    pub tax: Option<String>,
+    pub currency: String,
+}
+
+/// Reads each field as `From<ActivityDB> for Activity` does.
+impl From<CashLedgerActivityDB> for CashLedgerActivity {
+    fn from(db: CashLedgerActivityDB) -> Self {
+        let decimal = |value: &Option<String>, field: &str| {
+            value
+                .as_ref()
+                .map(|value| parse_decimal_string_tolerant(value, field))
+        };
+        Self {
+            status: parse_status(&db.status),
+            activity_date: parse_db_datetime(&db.activity_date).unwrap_or_else(|| {
+                log::error!(
+                    "Failed to parse activity_date '{}', falling back to now",
+                    db.activity_date
+                );
+                Utc::now()
+            }),
+            created_at: parse_db_datetime(&db.created_at).unwrap_or_else(|| {
+                log::error!("Failed to parse created_at '{}'", db.created_at);
+                Utc::now()
+            }),
+            quantity: decimal(&db.quantity, "quantity"),
+            unit_price: decimal(&db.unit_price, "unit_price"),
+            amount: decimal(&db.amount, "amount"),
+            fee: decimal(&db.fee, "fee"),
+            tax: decimal(&db.tax, "tax"),
+            id: db.id,
+            account_id: db.account_id,
+            asset_id: db.asset_id,
+            activity_type: db.activity_type,
+            activity_type_override: db.activity_type_override,
+            subtype: db.subtype,
+            currency: db.currency,
+        }
+    }
+}
+
 impl From<ActivityDB> for Activity {
     fn from(db: ActivityDB) -> Self {
-        // Parse status string to ActivityStatus enum
-        let status = match db.status.as_str() {
-            "POSTED" => ActivityStatus::Posted,
-            "PENDING" => ActivityStatus::Pending,
-            "DRAFT" => ActivityStatus::Draft,
-            "VOID" => ActivityStatus::Void,
-            _ => ActivityStatus::Posted, // Default to Posted for unknown values
-        };
+        let status = parse_status(&db.status);
 
         // Parse metadata JSON if present
         let metadata = db

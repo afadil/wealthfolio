@@ -256,6 +256,8 @@ async fn full_roundtrip_with_scope_filtering_and_audit() {
     let tools = list["result"]["tools"].as_array().unwrap();
     assert_eq!(tools.len(), 1, "scope filtering failed: {tools:?}");
     assert_eq!(tools[0]["name"], "echo");
+    assert_eq!(tools[0]["title"], "Echo");
+    assert_eq!(tools[0]["annotations"]["readOnlyHint"], true);
 
     // tools/call success with structured content
     let call = rpc(

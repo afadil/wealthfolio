@@ -119,3 +119,31 @@ describe("PatCreateDialog scope dependencies", () => {
     expect(holdings).not.toBeDisabled();
   });
 });
+
+describe("PatCreateDialog client config", () => {
+  it("shows the Claude Code command for the new token, and Codex TOML on request", async () => {
+    render(
+      <PatCreateDialog
+        open
+        onOpenChange={vi.fn()}
+        onCreate={vi.fn().mockResolvedValue("wfp_secret")}
+        isCreating={false}
+        serverUrl="http://127.0.0.1:4321/mcp"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Claude" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create token" }));
+
+    expect(
+      await screen.findByText(
+        'claude mcp add --scope user --transport http wealthfolio http://127.0.0.1:4321/mcp --header "Authorization: Bearer wfp_secret"',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Codex / ChatGPT" }));
+    expect(screen.getByText(/\[mcp_servers\.wealthfolio\]/)).toHaveTextContent(
+      'http_headers = { Authorization = "Bearer wfp_secret" }',
+    );
+  });
+});

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   getPlatform as getPlatformApi,
-  isDesktop as isDesktopEnv,
+  isTauri,
   isWeb as isWebEnv,
   type PlatformCapabilities,
   type PlatformInfo,
@@ -46,7 +46,7 @@ export function usePlatform(): UsePlatformResult {
       return;
     }
 
-    if (isDesktopEnv) {
+    if (isTauri) {
       // We're in Tauri, get actual platform info
       getPlatformApi()
         .then((info) => {
@@ -71,7 +71,6 @@ export function usePlatform(): UsePlatformResult {
     }
   }, []);
 
-  const isTauri = isDesktopEnv;
   const isWeb = isWebEnv;
 
   return {
@@ -139,7 +138,7 @@ export async function getPlatform(): Promise<PlatformInfo> {
     return cachedPlatform;
   }
 
-  if (isDesktopEnv) {
+  if (isTauri) {
     try {
       const info = await getPlatformApi();
       cachedPlatform = info;

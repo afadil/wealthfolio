@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::NaiveDate;
 
-use super::{DailyAccountValuation, NegativeBalanceInfo};
+use super::{DailyAccountValuation, DailyCashBalance, NegativeBalanceInfo};
 use crate::errors::Result;
 
 /// Repository trait for managing daily account valuations.
@@ -25,6 +25,26 @@ pub trait ValuationRepositoryTrait: Send + Sync {
         start_date: Option<NaiveDate>,
         end_date: Option<NaiveDate>,
     ) -> Result<Vec<DailyAccountValuation>>;
+
+    /// Each day's cash from `get_historical_valuations`. Storage reads only
+    /// those columns; the default converts whole valuations.
+    fn get_daily_cash_balances(
+        &self,
+        account_id: &str,
+        start_date: Option<NaiveDate>,
+        end_date: Option<NaiveDate>,
+    ) -> Result<Vec<DailyCashBalance>> {
+        Ok(self
+            .get_historical_valuations(account_id, start_date, end_date)?
+            .into_iter()
+            .map(|valuation| DailyCashBalance {
+                valuation_date: valuation.valuation_date,
+                cash_balance: valuation.cash_balance,
+                account_currency: valuation.account_currency,
+                value_status: valuation.value_status,
+            })
+            .collect())
+    }
 
     /// Get historical valuations for multiple real accounts in one ordered read.
     fn get_historical_valuations_for_accounts(

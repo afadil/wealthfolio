@@ -147,10 +147,10 @@ export function AppSidebar({ navigation }: AppSidebarProps) {
             </div>
 
             <div className="flex shrink-0 flex-col p-2">
+              <ConnectNavItem collapsed={collapsed} />
               {navigation?.secondary?.map((item) => (
                 <NavItem key={item.title} item={item} collapsed={collapsed} />
               ))}
-              <ConnectNavItem collapsed={collapsed} />
               {isWeb && requiresAuth && (
                 <Button
                   type="button"

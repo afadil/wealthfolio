@@ -17,6 +17,7 @@ import { TransferMatchDialog } from "../transfer-match-dialog";
 import { isSameAccountCashFxConversion, nonCashTransferAssetKey } from "../transfer-link-utils";
 import { ActivityDeleteModal } from "../activity-delete-modal";
 import { useActivityMutations } from "../../hooks/use-activity-mutations";
+import { buildSameAccountFxDuplicate } from "../../utils/duplicate-fx-transfer";
 import { ActivityDataGridPagination } from "./activity-data-grid-pagination";
 import { ActivityDataGridToolbar } from "./activity-data-grid-toolbar";
 import {
@@ -29,6 +30,7 @@ import {
   PINNED_COLUMNS,
   TRACKED_FIELDS,
   valuesAreEqual,
+  withNewPairPartners,
 } from "./activity-utils";
 import { isPendingReview, toLocalTransaction, type LocalTransaction } from "./types";
 import { useActivityColumns } from "./use-activity-columns";
@@ -162,9 +164,57 @@ export function ActivityDataGrid({
 
   // Row operations
   const handleDuplicate = useCallback(
-    (activity: ActivityDetails) => {
+    async (activity: ActivityDetails) => {
+      if (
+        activity.sourceGroupId &&
+        localTransactions.some(
+          (row) =>
+            row.sourceGroupId === activity.sourceGroupId &&
+            (dirtyTransactionIds.has(row.id) || pendingDeleteIds.has(row.id)),
+        )
+      ) {
+        toast({ title: t("activity:datagrid.save_edits_first"), variant: "destructive" });
+        return;
+      }
       const now = new Date();
       const source = toLocalTransaction(activity);
+      try {
+        const exchange = await buildSameAccountFxDuplicate(activity);
+        if (exchange) {
+          const duplicates = exchange.map(
+            (leg): LocalTransaction => ({
+              ...source,
+              id: generateTempActivityId(),
+              idempotencyKey: leg.idempotencyKey,
+              sourceGroupId: leg.sourceGroupId,
+              activityType: leg.activityType,
+              date: leg.activityDate,
+              createdAt: now,
+              updatedAt: now,
+              isNew: true,
+              status: ActivityStatus.POSTED,
+              needsReview: false,
+              amount: leg.amount ?? null,
+              currency: leg.currency,
+              fee: leg.fee ?? null,
+              tax: leg.tax,
+              fxRate: leg.fxRate,
+              comment: leg.comment ?? undefined,
+              assetId: "",
+              assetSymbol: "CASH",
+              isExternal: false,
+              metadata: { flow: { is_external: false } },
+              _amountEdited: true,
+            }),
+          );
+          setLocalTransactions((prev) => [...duplicates, ...prev]);
+          markDirtyBatch(duplicates.map((row) => row.id));
+          return;
+        }
+      } catch {
+        toast({ title: t("activity:datagrid.duplicate_transfer_failed"), variant: "destructive" });
+        return;
+      }
       const duplicated: LocalTransaction = {
         ...source,
         id: generateTempActivityId(),
@@ -173,11 +223,19 @@ export function ActivityDataGrid({
         updatedAt: now,
         isNew: true,
         idempotencyKey: generateId("manual-duplicate"),
+        sourceGroupId: undefined,
       };
       setLocalTransactions((prev) => [duplicated, ...prev]);
       markDirtyBatch([duplicated.id]);
     },
-    [markDirtyBatch, setLocalTransactions],
+    [
+      markDirtyBatch,
+      setLocalTransactions,
+      localTransactions,
+      dirtyTransactionIds,
+      pendingDeleteIds,
+      t,
+    ],
   );
 
   const [pendingDeleteActivity, setPendingDeleteActivity] = useState<ActivityDetails | null>(null);
@@ -525,9 +583,14 @@ export function ActivityDataGrid({
   const onRowsDelete = useCallback(
     (rowsToDelete: LocalTransaction[]) => {
       if (rowsToDelete.length === 0) return;
-      markForDeletionBatch(rowsToDelete.map((row) => ({ id: row.id, isNew: !!row.isNew })));
+      markForDeletionBatch(
+        withNewPairPartners(rowsToDelete, localTransactions).map((row) => ({
+          id: row.id,
+          isNew: !!row.isNew,
+        })),
+      );
     },
-    [markForDeletionBatch],
+    [markForDeletionBatch, localTransactions],
   );
 
   // Initialize data grid

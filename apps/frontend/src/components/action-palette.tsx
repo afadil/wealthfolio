@@ -12,6 +12,7 @@ export interface ActionPaletteItem {
   onClick: () => void;
   testId?: string;
   variant?: "default" | "destructive";
+  disabled?: boolean;
 }
 
 export interface ActionPaletteGroup {
@@ -113,8 +114,10 @@ export function ActionPalette({
                       {itemIndex > 0 && <div className="bg-border/70 mx-3 h-px" />}
                       <button
                         data-testid={item.testId}
+                        disabled={item.disabled}
                         onClick={() => handleItemClick(item)}
                         className={cn(
+                          "disabled:pointer-events-none disabled:opacity-50",
                           "flex w-full items-center gap-4 rounded-xl px-3 py-3",
                           "transition-colors duration-150",
                           isDestructive

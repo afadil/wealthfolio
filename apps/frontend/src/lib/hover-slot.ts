@@ -11,3 +11,13 @@
  */
 export const HOVER_SLOT =
   "transition-opacity [@media(hover:hover)]:opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100";
+
+/**
+ * A row's selection checkbox: a hover slot until anything in the list is
+ * selected, then shown on every row so the selection can be read and extended
+ * without hunting for it.
+ *
+ * The list needs `group/list` and a `data-selecting` attribute while it has a
+ * selection.
+ */
+export const SELECTION_SLOT = `${HOVER_SLOT} group-data-[selecting]/list:opacity-100`;

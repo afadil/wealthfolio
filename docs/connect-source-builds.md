@@ -88,8 +88,10 @@ docker build -t wealthfolio-local:custom \
 
 An empty file is rejected. BuildKit secret changes do not invalidate cached
 layers; after changing hosts, use
-`docker buildx build --no-cache-filter backend` with the same arguments.
-Official CI supplies its override and refreshes this stage on every build.
+`docker buildx build --no-cache-filter backend,runtime` with the same arguments.
+Filtering only `backend` can keep the old server binary on a builder that keeps
+cache from earlier builds. Official CI supplies its override, refreshes the
+backend stage and starts each build on a fresh builder.
 
 ## Cloud backups
 

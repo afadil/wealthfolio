@@ -111,15 +111,17 @@ pub async fn delete_addon_secret(
         .map_err(|e| e.to_string())
 }
 
+// These read the keyring, which can wait on a slow Secret Service or an unlock
+// prompt. `async` keeps that off the UI thread, where sync commands run.
 #[tauri::command]
-pub fn get_profile_sync_identity(profile: ConnectAccess) -> Result<Option<String>, String> {
+pub async fn get_profile_sync_identity(profile: ConnectAccess) -> Result<Option<String>, String> {
     profile
         .secret_store
         .get_secret(wealthfolio_core::secrets::SYNC_IDENTITY_KEY)
         .map_err(|e| e.to_string())
 }
 #[tauri::command]
-pub fn update_profile_sync_identity(
+pub async fn update_profile_sync_identity(
     profile: ConnectAccess,
     identity: Option<String>,
 ) -> Result<(), String> {

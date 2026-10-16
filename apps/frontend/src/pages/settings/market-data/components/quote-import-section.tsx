@@ -7,8 +7,8 @@ import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { QuoteImportForm } from "./quote-import-form";
 import { QuoteImportHelpPopover } from "./quote-import-help-popover";
@@ -21,6 +21,25 @@ interface ImportQuotesSectionProps {
   quoteImport?: QuoteImportState & QuoteImportActions;
   currentStep?: number;
   onStepChange?: (step: number) => void;
+}
+
+function QuoteImportStep({ children }: { children: (isPresent: boolean) => ReactNode }) {
+  const isPresent = useIsPresent();
+
+  // AnimatePresence retains the outgoing step's last props. Presence still
+  // updates during exit, so disable its controls and keyboard interaction.
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+      className="p-4 sm:p-6"
+      inert={!isPresent}
+    >
+      {children(isPresent)}
+    </motion.div>
+  );
 }
 
 export function ImportQuotesSection({
@@ -77,13 +96,15 @@ export function ImportQuotesSection({
   };
 
   // Render the current step
-  const renderStep = () => {
+  const renderStep = (isPresent: boolean) => {
     switch (currentStep) {
       case 1:
+        // The form stays mounted and clickable while it animates out to the
+        // preview, so keep it locked once a preview exists.
         return (
           <QuoteImportForm
             file={file}
-            isValidating={isValidating}
+            isValidating={isValidating || preview !== null}
             error={error}
             onFileSelect={setFile}
             onValidate={validateFile}
@@ -135,7 +156,11 @@ export function ImportQuotesSection({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" onClick={handleStartOver}>
+                      <Button
+                        variant="outline"
+                        onClick={handleStartOver}
+                        disabled={!isPresent || isImporting}
+                      >
                         <Icons.ArrowLeft className="mr-2 h-4 w-4" />
                         {t("common:back")}
                       </Button>
@@ -146,7 +171,7 @@ export function ImportQuotesSection({
                             handleImportComplete();
                           }
                         }}
-                        disabled={preview.validRows === 0 || isImporting}
+                        disabled={!isPresent || preview.validRows === 0 || isImporting}
                       >
                         <Icons.Import className="mr-2 h-4 w-4" />
                         {t("settings:market_data_page.import_quotes_count", {
@@ -197,7 +222,12 @@ export function ImportQuotesSection({
           {showHeaderButtons && (
             <div className="flex items-center gap-2">
               <QuoteImportHelpPopover />
-              <Button variant="outline" size="sm" onClick={handleStartOver}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartOver}
+                disabled={isValidating || isImporting}
+              >
                 <Icons.Refresh className="mr-2 h-4 w-4" />
                 {t("settings:market_data_page.start_over")}
               </Button>
@@ -214,16 +244,7 @@ export function ImportQuotesSection({
         </CardHeader>
         <CardContent className="overflow-hidden p-0">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="p-4 sm:p-6"
-            >
-              {renderStep()}
-            </motion.div>
+            <QuoteImportStep key={currentStep}>{renderStep}</QuoteImportStep>
           </AnimatePresence>
         </CardContent>
       </Card>

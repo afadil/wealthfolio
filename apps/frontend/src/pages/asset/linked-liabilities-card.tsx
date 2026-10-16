@@ -74,11 +74,15 @@ export const LinkedLiabilitiesCard: React.FC<LinkedLiabilitiesCardProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-destructive text-sm font-medium">
-                    <AmountDisplay
-                      value={-Math.abs(parseFloat(liability.marketValue))}
-                      currency={liability.currency}
-                      isHidden={isBalanceHidden}
-                    />
+                    {liability.loan?.balanceSource === null ? (
+                      t("asset:loanOverview.unavailable")
+                    ) : (
+                      <AmountDisplay
+                        value={-Math.abs(parseFloat(liability.marketValue))}
+                        currency={liability.currency}
+                        isHidden={isBalanceHidden}
+                      />
+                    )}
                   </span>
                   <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />
                 </div>
@@ -175,11 +179,15 @@ export const LinkedLiabilitiesSection: React.FC<LinkedLiabilitiesSectionProps> =
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-destructive text-sm font-medium">
-                  <AmountDisplay
-                    value={-Math.abs(parseFloat(liability.marketValue))}
-                    currency={liability.currency}
-                    isHidden={isBalanceHidden}
-                  />
+                  {liability.loan?.balanceSource === null ? (
+                    t("asset:loanOverview.unavailable")
+                  ) : (
+                    <AmountDisplay
+                      value={-Math.abs(parseFloat(liability.marketValue))}
+                      currency={liability.currency}
+                      isHidden={isBalanceHidden}
+                    />
+                  )}
                 </span>
                 <Icons.ChevronRight className="text-muted-foreground h-4 w-4" />
               </div>

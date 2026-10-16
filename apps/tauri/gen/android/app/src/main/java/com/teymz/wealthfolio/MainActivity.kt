@@ -1,12 +1,10 @@
 package com.teymz.wealthfolio
 
+import android.content.res.Configuration
 import android.os.Bundle
-import android.content.Context
 import androidx.activity.enableEdgeToEdge
 
 class MainActivity : TauriActivity() {
-  private external fun initializeSecretStoreContext(context: Context)
-
   override fun onPause() {
     window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
     super.onPause()
@@ -18,9 +16,14 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    System.loadLibrary("wealthfolio_app_lib")
-    initializeSecretStoreContext(applicationContext)
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    // The manifest handles uiMode changes without recreating the activity, so
+    // re-apply edge-to-edge to give the system bar icons the new light/dark mode.
+    enableEdgeToEdge()
   }
 }

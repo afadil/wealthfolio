@@ -17,8 +17,8 @@ interface SelectionToolbarProps {
 
 /**
  * The mobile card list's selection control: a `Select` affordance at rest, and
- * a select-all plus `Cancel` once selection is on. The table shows checkboxes
- * permanently instead, so this has no desktop counterpart.
+ * a select-all plus `Cancel` once selection is on. The table reveals its
+ * checkboxes on row hover or focus instead, so this has no desktop counterpart.
  */
 export function SelectionToolbar({
   rowCount,

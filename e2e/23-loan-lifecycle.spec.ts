@@ -17,8 +17,10 @@ async function netWorthAt(page: Page, date: string) {
   expect(historyResponse.ok()).toBeTruthy();
   const history = await historyResponse.json();
   return {
+    assets: Number(worth.assets.total),
     liabilities: Number(worth.liabilities.total),
     netWorth: Number(worth.netWorth),
+    historyAssets: Number(history.at(-1)?.totalAssets ?? 0),
     historyLiabilities: Number(history.at(-1)?.totalLiabilities ?? 0),
     historyNetWorth: Number(history.at(-1)?.netWorth ?? 0),
   };
@@ -116,16 +118,21 @@ test("loan lifecycle matches the independent fixture in the page and net worth",
     expect(calculation.payoffDate).toBe(expected.expected.payoffDate);
     const before = baseline.get(expected.asOf)!;
     const after = await netWorthAt(page, expected.asOf);
+    // Other specs' holdings can still be revalued while this one runs (late
+    // quotes or FX). Net worth must move by the loan alone once their asset
+    // change is taken out.
     expect(after.liabilities - before.liabilities).toBeCloseTo(expected.expected.balance, 2);
-    expect(after.netWorth - before.netWorth).toBeCloseTo(expected.expected.netWorth, 2);
+    expect(after.netWorth - before.netWorth - (after.assets - before.assets)).toBeCloseTo(
+      expected.expected.netWorth,
+      2,
+    );
     expect(after.historyLiabilities - before.historyLiabilities).toBeCloseTo(
       expected.expected.balance,
       2,
     );
-    expect(after.historyNetWorth - before.historyNetWorth).toBeCloseTo(
-      expected.expected.netWorth,
-      2,
-    );
+    expect(
+      after.historyNetWorth - before.historyNetWorth - (after.historyAssets - before.historyAssets),
+    ).toBeCloseTo(expected.expected.netWorth, 2);
   };
   const history = async () => {
     await page.goto(`${BASE_URL}/holdings/${assetId}?tab=history&events=only`);
@@ -667,6 +674,7 @@ test("loan terms are previewed and checked by the backend", async ({ page }) => 
   });
   // Holdings carries what the card shows, from the calculation that values the loan.
   expect((await named("Setup loan")).loan).toEqual({
+    balanceSource: "schedule",
     scheduled: true,
     originalAmount: 1200,
     annualRate: 0,
@@ -685,7 +693,7 @@ test("loan terms are previewed and checked by the backend", async ({ page }) => 
   const sheet = page.getByRole("dialog");
   await page.goto(`${BASE_URL}/holdings?tab=assets`);
   await page.locator('button.h-9.w-9[aria-haspopup="dialog"]').click();
-  await page.getByRole("button", { name: "Add Asset", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add Asset", exact: true }).click();
   await sheet.getByRole("button", { name: /Liability.*Loans/ }).click();
   await sheet.getByRole("button", { name: "Continue", exact: true }).click();
   await sheet.getByPlaceholder("Home Mortgage, Car Loan...").fill("Previewed loan");
