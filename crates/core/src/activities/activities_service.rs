@@ -5017,14 +5017,19 @@ impl ActivityServiceTrait for ActivityService {
             return Ok(());
         }
         // Each posted row's day as the engine dates it: its instant in the
-        // configured timezone.
+        // configured timezone. Only rows stored with a timezone: older rows
+        // without one (a bare date, SQLite's own timestamp shape) are read as
+        // UTC by the engine but as local time by a list, so their closing cash
+        // could belong to another day than the one they show.
         let timezone = self.configured_timezone();
         let row_days: Vec<(String, String, NaiveDate)> = response
             .data
             .iter()
             .filter(|row| row.status == ActivityStatus::Posted)
             .filter_map(|row| {
-                let instant = Self::parse_activity_timestamp_utc(&row.date)?;
+                let instant = DateTime::parse_from_rfc3339(&row.date)
+                    .ok()?
+                    .with_timezone(&Utc);
                 Some((
                     row.id.clone(),
                     row.account_id.clone(),
