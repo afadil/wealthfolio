@@ -8,8 +8,20 @@ vi.mock("@/hooks/use-balance-privacy", () => ({
 }));
 
 vi.mock("@number-flow/react", () => ({
-  default: ({ locales, format }: { locales?: string; format?: Intl.NumberFormatOptions }) => (
-    <span data-testid="visible-balance-locale" data-fraction-digits={format?.maximumFractionDigits}>
+  default: ({
+    value,
+    locales,
+    format,
+  }: {
+    value: number;
+    locales?: string;
+    format?: Intl.NumberFormatOptions;
+  }) => (
+    <span
+      data-testid="visible-balance-locale"
+      data-fraction-digits={format?.maximumFractionDigits}
+      data-formatted-value={new Intl.NumberFormat(locales, format).format(value)}
+    >
       {locales}
     </span>
   ),
@@ -73,4 +85,25 @@ describe("Balance", () => {
     );
     expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent("KWD 1.235");
   });
+
+  it.each([
+    { currency: "JPY", value: -0.4, expected: "¥0" },
+    { currency: "JPY", value: 0.4, expected: "¥0" },
+    { currency: "USD", value: -0.004, expected: "$0.00" },
+    { currency: "JPY", value: -0.5, expected: "-¥1" },
+  ])(
+    "rounds $value $currency consistently without negative zero",
+    ({ currency, value, expected }) => {
+      render(
+        <FormattingProvider locale="US">
+          <Balance targetValue={value} currency={currency} displayCurrency />
+        </FormattingProvider>,
+      );
+      expect(screen.getByTestId("visible-balance-locale")).toHaveAttribute(
+        "data-formatted-value",
+        expected,
+      );
+      expect(screen.getByTestId("portfolio-balance-value")).toHaveTextContent(expected);
+    },
+  );
 });
