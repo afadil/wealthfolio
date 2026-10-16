@@ -133,6 +133,8 @@ const AccountSummarySkeleton = () => (
   </div>
 );
 
+// Keep account cards free of backdrop filters: WebKitGTK 2.54.1 can hang
+// as their count grows (https://bugs.webkit.org/show_bug.cgi?id=327701).
 const AccountSummaryComponent = React.memo(
   ({
     item,
@@ -174,7 +176,7 @@ const AccountSummaryComponent = React.memo(
       }
 
       return (
-        <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4">
+        <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
           {skeletonContent}
         </div>
       );
@@ -357,7 +359,7 @@ const AccountSummaryComponent = React.memo(
       return (
         <Link
           to={`/accounts/${accountId}`}
-          className="border-border/40 bg-card/90 shadow-xs flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
+          className="border-border/40 bg-card/90 shadow-xs flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-all duration-150 hover:shadow-md md:px-5 md:py-4"
         >
           {content}
         </Link>
@@ -365,7 +367,7 @@ const AccountSummaryComponent = React.memo(
     }
 
     return (
-      <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4">
+      <div className="border-border/40 bg-card/90 shadow-xs flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 md:px-5 md:py-4">
         {content}
       </div>
     );
@@ -527,7 +529,7 @@ export const AccountsSummary = React.memo(
         return Array.from({ length: 4 }).map((_, index) => (
           <div
             key={`skeleton-${index}`}
-            className="border-border/40 bg-card/90 shadow-xs rounded-xl border px-4 py-3 backdrop-blur-xl md:px-5 md:py-4"
+            className="border-border/40 bg-card/90 shadow-xs rounded-xl border px-4 py-3 md:px-5 md:py-4"
           >
             <AccountSummarySkeleton />
           </div>
@@ -661,7 +663,7 @@ export const AccountsSummary = React.memo(
               return (
                 <div
                   key={group.accountName}
-                  className="border-border/40 bg-card/90 shadow-xs overflow-hidden rounded-xl border backdrop-blur-xl transition-shadow duration-150 hover:shadow-md"
+                  className="border-border/40 bg-card/90 shadow-xs overflow-hidden rounded-xl border transition-shadow duration-150 hover:shadow-md"
                 >
                   <div className="cursor-pointer">
                     <AccountSummaryComponent
