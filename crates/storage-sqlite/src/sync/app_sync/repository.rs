@@ -1237,12 +1237,147 @@ where
         return Ok(());
     }
 
-    Err(Error::Database(DatabaseError::ForeignKeyViolation(
-        format!(
-            "Replay batch foreign key check failed: {}",
-            foreign_key_violation_details(&rows)
-        ),
+    Err(foreign_key_violation_error(&rows))
+}
+
+fn foreign_key_violation_error(rows: &[ForeignKeyCheckRow]) -> Error {
+    Error::Database(DatabaseError::ForeignKeyViolation(format!(
+        "Replay batch foreign key check failed: {}",
+        foreign_key_violation_details(rows)
     )))
+}
+
+type RemoteReplayEvent = (
+    SyncEntity,
+    String,
+    SyncOperation,
+    String,
+    String,
+    i64,
+    serde_json::Value,
+);
+
+/// Why one replay attempt of a batch stopped.
+enum ReplayAttemptError {
+    /// Events that broke the attempt, by index, with the error to log. The
+    /// batch drops them and replays the rest of the page from the start.
+    Culprits(Vec<(usize, String)>),
+    /// A failure no event in the page explains. The whole batch fails.
+    Failed(Error),
+}
+
+impl From<diesel::result::Error> for ReplayAttemptError {
+    fn from(err: diesel::result::Error) -> Self {
+        Self::Failed(StorageError::from(err).into())
+    }
+}
+
+/// Applies the page's events in order, except the skipped ones, then checks
+/// foreign keys. Runs inside a savepoint, so an error rolls back this attempt.
+fn apply_replay_attempt_tx(
+    conn: &mut SqliteConnection,
+    pending: &BrokerActivityPatchQueue,
+    events: &[RemoteReplayEvent],
+    skipped: &[bool],
+    fk_check_tables: &[&str],
+) -> std::result::Result<usize, ReplayAttemptError> {
+    let mut applied = 0usize;
+    for (index, (entity, entity_id, op, event_id, client_timestamp, seq, payload)) in
+        events.iter().enumerate()
+    {
+        if skipped[index] {
+            continue;
+        }
+        match apply_remote_event_lww_tx(
+            conn,
+            pending,
+            *entity,
+            entity_id.clone(),
+            *op,
+            event_id.clone(),
+            client_timestamp.clone(),
+            *seq,
+            payload.clone(),
+        ) {
+            Ok(true) => applied += 1,
+            Ok(false) => {}
+            Err(err) => {
+                let err = replay_apply_error(*entity, entity_id, *op, event_id, *seq, err);
+                return Err(ReplayAttemptError::Culprits(vec![(index, err.to_string())]));
+            }
+        }
+    }
+
+    let violations = collect_foreign_key_violations_tx(conn, fk_check_tables.iter().copied())
+        .map_err(ReplayAttemptError::Failed)?;
+    if violations.is_empty() {
+        return Ok(applied);
+    }
+    match foreign_key_culprits_tx(conn, &violations, events, skipped)
+        .map_err(ReplayAttemptError::Failed)?
+    {
+        Some(culprits) => Err(ReplayAttemptError::Culprits(culprits)),
+        None => Err(ReplayAttemptError::Failed(foreign_key_violation_error(
+            &violations,
+        ))),
+    }
+}
+
+/// Maps each violating row to the last event in the page that created or
+/// updated it. Returns `None` when a violation has no such event, for example
+/// a row that was already orphaned before the batch.
+fn foreign_key_culprits_tx(
+    conn: &mut SqliteConnection,
+    violations: &[ForeignKeyCheckRow],
+    events: &[RemoteReplayEvent],
+    skipped: &[bool],
+) -> Result<Option<Vec<(usize, String)>>> {
+    let mut culprits: Vec<(usize, String)> = Vec::new();
+    for violation in violations {
+        let Some(rowid) = violation.rowid else {
+            return Ok(None);
+        };
+        let Some((_, pk_name)) = events
+            .iter()
+            .filter_map(|(entity, ..)| entity_storage_mapping(entity))
+            .find(|(table, _)| *table == violation.table)
+        else {
+            return Ok(None);
+        };
+        let sql = format!(
+            "SELECT CAST({} AS TEXT) AS id FROM {} WHERE rowid = {}",
+            quote_identifier(pk_name),
+            quote_identifier(&violation.table),
+            rowid
+        );
+        let Some(row) = diesel::sql_query(sql)
+            .get_result::<TextIdRow>(conn)
+            .optional()
+            .map_err(StorageError::from)?
+        else {
+            return Ok(None);
+        };
+        let culprit = events
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(index, (entity, entity_id, op, ..))| {
+                !skipped[*index]
+                    && matches!(op, SyncOperation::Create | SyncOperation::Update)
+                    && *entity_id == row.id
+                    && entity_storage_mapping(entity)
+                        .is_some_and(|(table, _)| table == violation.table)
+            })
+            .map(|(index, _)| index);
+        let Some(index) = culprit else {
+            return Ok(None);
+        };
+        if !culprits.iter().any(|(existing, _)| *existing == index) {
+            let err = foreign_key_violation_error(std::slice::from_ref(violation));
+            culprits.push((index, err.to_string()));
+        }
+    }
+    Ok(Some(culprits))
 }
 
 fn portfolio_account_foreign_key_message_tx(
@@ -1619,15 +1754,12 @@ fn should_apply_against_metadata(
     event_id: &str,
 ) -> Result<bool> {
     let previous_op = enum_from_db::<SyncOperation>(&meta.last_op)?;
-    // Pure last-writer-wins entities: a delete is just another write to a key
-    // that can be legitimately re-used, NOT a permanent tombstone. Every op
-    // (create/update/delete) competes on timestamp+event_id. The delete-wins /
+    // Entities whose IDs come from natural keys: a delete is just another write
+    // to a key that can be legitimately re-used, NOT a permanent tombstone. Every
+    // op (create/update/delete) competes on timestamp+event_id. The delete-wins /
     // tombstone branches below would otherwise let a stale delete clobber a newer
     // value and permanently swallow any later re-create of a deleted key.
-    if matches!(
-        entity,
-        SyncEntity::SpendingPresetRuleDeletion | SyncEntity::AddonStorage | SyncEntity::AssetLogo
-    ) {
+    if entity.reuses_entity_ids() {
         Ok(should_apply_lww(
             &meta.last_client_timestamp,
             &meta.last_event_id,
@@ -1731,6 +1863,20 @@ fn tombstone_spending_children_for_removed_categories(
             .load::<TextIdRow>(conn)
             .map_err(StorageError::from)?;
         for row in rows {
+            // Never lower a newer watermark: under last-writer-wins a removal
+            // stamped earlier (another device's clock) would let a delayed write
+            // through here that the device which removed the category rejects.
+            let entity_db = enum_to_db(&entity)?;
+            if let Some(meta) = load_entity_metadata_tx(conn, &entity_db, &row.id)? {
+                if !should_apply_lww(
+                    &meta.last_client_timestamp,
+                    &meta.last_event_id,
+                    client_timestamp,
+                    event_id,
+                ) {
+                    continue;
+                }
+            }
             upsert_entity_metadata_tx(
                 conn,
                 entity,
@@ -2977,37 +3123,69 @@ impl AppSyncRepository {
                     .map_err(StorageError::from)?;
 
                 let result = (|| -> Result<usize> {
+                    // Taxonomy bundles write categories outside the generic mapping;
+                    // checking them keeps an orphan category from committing.
                     let mut fk_check_tables = Vec::new();
                     for (entity, ..) in &events {
-                        if let Some((table, _)) = entity_storage_mapping(entity) {
+                        let secondary_table = match entity {
+                            SyncEntity::CustomTaxonomy => Some("taxonomy_categories"),
+                            _ => None,
+                        };
+                        let tables = entity_storage_mapping(entity)
+                            .map(|(table, _)| table)
+                            .into_iter()
+                            .chain(secondary_table);
+                        for table in tables {
                             if !fk_check_tables.contains(&table) {
                                 fk_check_tables.push(table);
                             }
                         }
                     }
 
-                    let mut applied = 0usize;
-                    for (entity, entity_id, op, event_id, client_timestamp, seq, payload) in events
-                    {
-                        if apply_remote_event_lww_tx(
-                            conn,
-                            &sync_state.broker_activity_patches,
-                            entity,
-                            entity_id.clone(),
-                            op,
-                            event_id.clone(),
-                            client_timestamp.clone(),
-                            seq,
-                            payload,
-                        )
-                        .map_err(|err| {
-                            replay_apply_error(entity, &entity_id, op, &event_id, seq, err)
-                        })? {
-                            applied += 1;
+                    // An event that fails, or that wrote a row failing the FK check,
+                    // is dead-lettered and the rest of the page is replayed from the
+                    // start, still in order: replaying it out of order could let a
+                    // cascade miss rows it would otherwise remove. Each retry skips
+                    // at least one more event, so the loop ends.
+                    let pending = &sync_state.broker_activity_patches;
+                    let mut skipped = vec![false; events.len()];
+                    loop {
+                        // A rolled-back attempt must not leave patches it queued.
+                        let pending_before = pending.snapshot();
+                        let attempt = conn.transaction(|conn| {
+                            apply_replay_attempt_tx(
+                                conn,
+                                pending,
+                                &events,
+                                &skipped,
+                                &fk_check_tables,
+                            )
+                        });
+                        match attempt {
+                            Ok(applied) => return Ok(applied),
+                            Err(ReplayAttemptError::Culprits(culprits)) => {
+                                pending.restore(pending_before);
+                                for (index, error) in culprits {
+                                    let (entity, entity_id, op, event_id, _, seq, _) =
+                                        &events[index];
+                                    log::error!(
+                                        "[DeviceSync] Dead-lettering replay event due to apply error: entity={:?} entity_id={} op={:?} event_id={} seq={} error={}",
+                                        entity,
+                                        entity_id,
+                                        op,
+                                        event_id,
+                                        seq,
+                                        error
+                                    );
+                                    skipped[index] = true;
+                                }
+                            }
+                            Err(ReplayAttemptError::Failed(err)) => {
+                                pending.restore(pending_before);
+                                return Err(err);
+                            }
                         }
                     }
-                    ensure_no_foreign_key_violations_tx(conn, fk_check_tables.iter().copied())?;
-                    Ok(applied)
                 })();
 
                 let _ = diesel::sql_query("PRAGMA defer_foreign_keys = OFF").execute(conn);
@@ -4911,11 +5089,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn replay_batch_foreign_key_error_includes_fk_check_table() {
+    async fn replay_batch_dead_letters_event_with_missing_foreign_key() {
         let (pool, writer) = setup_db();
-        let repo = AppSyncRepository::new(pool, writer);
+        let repo = AppSyncRepository::new(pool.clone(), writer);
 
-        let err = repo
+        let applied = repo
             .apply_remote_events_lww_batch(vec![(
                 SyncEntity::SpendingActivityEvent,
                 "missing-activity-in-batch".to_string(),
@@ -4931,7 +5109,53 @@ mod tests {
                 }),
             )])
             .await
-            .expect_err("missing FK should fail");
+            .expect("the violating event is dead-lettered inside the batch");
+
+        assert_eq!(applied, 0);
+        assert!(!repo
+            .has_applied_event("evt-missing-spending-activity-event-batch")
+            .expect("applied"));
+        let mut conn = get_connection(&pool).expect("conn");
+        let row_count: i64 = crate::schema::spending_activity_events::table
+            .filter(
+                crate::schema::spending_activity_events::activity_id
+                    .eq("missing-activity-in-batch"),
+            )
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count rows");
+        assert_eq!(row_count, 0);
+    }
+
+    #[tokio::test]
+    async fn replay_batch_foreign_key_error_includes_fk_check_table() {
+        // A violation no event in the page wrote (here a pre-existing orphan)
+        // cannot be isolated, so the batch still fails with the table details.
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            conn.batch_execute(
+                "PRAGMA foreign_keys = OFF;
+                 INSERT INTO spending_activity_events (activity_id, event_id, created_at, updated_at)
+                 VALUES ('orphan-activity', 'orphan-event', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+                 PRAGMA foreign_keys = ON;",
+            )
+            .expect("insert pre-existing orphan");
+        }
+
+        let err = repo
+            .apply_remote_events_lww_batch(vec![(
+                SyncEntity::SpendingActivityEvent,
+                "other-activity".to_string(),
+                SyncOperation::Delete,
+                "evt-delete-other-spending-activity-event".to_string(),
+                "2026-02-01T00:00:00Z".to_string(),
+                1,
+                serde_json::json!({ "activity_id": "other-activity" }),
+            )])
+            .await
+            .expect_err("an unattributable FK violation should fail the batch");
 
         let message = err.to_string();
         assert!(
@@ -10070,5 +10294,600 @@ mod tests {
         .get_result(&mut conn)
         .expect("count snapshots");
         assert_eq!(row.c, 0);
+    }
+
+    type ReplayBatchEvent = (
+        SyncEntity,
+        String,
+        SyncOperation,
+        String,
+        String,
+        i64,
+        serde_json::Value,
+    );
+
+    fn insert_cash_activity_for_test(
+        conn: &mut SqliteConnection,
+        activity_id: &str,
+        account_id: &str,
+    ) -> Result<()> {
+        let sql = format!(
+            "INSERT INTO activities \
+             (id, account_id, asset_id, activity_type, activity_type_override, source_type, subtype, \
+              status, activity_date, settlement_date, quantity, unit_price, amount, fee, currency, \
+              fx_rate, notes, metadata, source_system, source_record_id, source_group_id, \
+              idempotency_key, import_run_id, is_user_modified, needs_review, created_at, updated_at) \
+             VALUES ('{}', '{}', NULL, 'WITHDRAWAL', NULL, NULL, NULL, 'POSTED', \
+                     '2026-01-01T00:00:00Z', NULL, NULL, NULL, '25', '0', 'USD', NULL, NULL, \
+                     NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, \
+                     '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            escape_sqlite_str(activity_id),
+            escape_sqlite_str(account_id)
+        );
+        diesel::sql_query(sql)
+            .execute(conn)
+            .map_err(StorageError::from)?;
+        Ok(())
+    }
+
+    fn custom_taxonomy_bundle(
+        taxonomy_id: &str,
+        categories: &[(&str, Option<&str>)],
+        updated_at: &str,
+    ) -> serde_json::Value {
+        let categories = categories
+            .iter()
+            .enumerate()
+            .map(|(index, (category_id, parent_id))| {
+                serde_json::json!({
+                    "id": category_id,
+                    "taxonomyId": taxonomy_id,
+                    "parentId": parent_id,
+                    "name": category_id,
+                    "key": category_id,
+                    "color": "#123456",
+                    "description": null,
+                    "sortOrder": index,
+                    "createdAt": "2026-03-01T00:00:00+00:00",
+                    "updatedAt": updated_at
+                })
+            })
+            .collect::<Vec<_>>();
+        serde_json::json!({
+            "taxonomy": {
+                "id": taxonomy_id,
+                "name": taxonomy_id,
+                "color": "#654321",
+                "description": null,
+                "isSystem": 0,
+                "isSingleSelect": 1,
+                "sortOrder": 50,
+                "createdAt": "2026-03-01T00:00:00+00:00",
+                "updatedAt": updated_at
+            },
+            "categories": categories
+        })
+    }
+
+    fn assignment_payload(
+        assignment_id: &str,
+        activity_id: &str,
+        taxonomy_id: &str,
+        category_id: &str,
+        updated_at: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "id": assignment_id,
+            "activityId": activity_id,
+            "taxonomyId": taxonomy_id,
+            "categoryId": category_id,
+            "weight": 10000,
+            "source": "manual",
+            "createdAt": "2026-03-01T00:00:00Z",
+            "updatedAt": updated_at
+        })
+    }
+
+    fn account_payload(
+        account_id: &str,
+        platform_id: &str,
+        provider_account_id: Option<&str>,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "id": account_id,
+            "name": "Isolation Account",
+            "account_type": "cash",
+            "group": serde_json::Value::Null,
+            "currency": "USD",
+            "is_default": false,
+            "is_active": true,
+            "platform_id": platform_id,
+            "account_number": serde_json::Value::Null,
+            "meta": serde_json::Value::Null,
+            "provider": provider_account_id.map(|_| "SNAPTRADE"),
+            "provider_account_id": provider_account_id,
+            "is_archived": false,
+            "tracking_mode": "portfolio"
+        })
+    }
+
+    fn account_create_event(account_id: &str, platform_id: &str, seq: i64) -> ReplayBatchEvent {
+        (
+            SyncEntity::Account,
+            account_id.to_string(),
+            SyncOperation::Create,
+            format!("evt-account-{account_id}"),
+            "2026-02-17T00:00:00Z".to_string(),
+            seq,
+            account_payload(account_id, platform_id, None),
+        )
+    }
+
+    fn platform_create_event(platform_id: &str, seq: i64) -> ReplayBatchEvent {
+        (
+            SyncEntity::Platform,
+            platform_id.to_string(),
+            SyncOperation::Create,
+            format!("evt-platform-{platform_id}"),
+            "2026-02-17T00:00:01Z".to_string(),
+            seq,
+            serde_json::json!({
+                "id": platform_id,
+                "name": "Isolation Platform",
+                "url": "https://isolation.example",
+                "external_id": serde_json::Value::Null,
+                "kind": "BROKERAGE",
+                "website_url": serde_json::Value::Null,
+                "logo_url": serde_json::Value::Null
+            }),
+        )
+    }
+
+    /// An event whose apply fails on its own: the payload id does not match the
+    /// entity id.
+    fn poison_event(seq: i64) -> ReplayBatchEvent {
+        (
+            SyncEntity::Account,
+            "acc-poison".to_string(),
+            SyncOperation::Create,
+            format!("evt-poison-{seq}"),
+            "2026-02-17T00:00:02Z".to_string(),
+            seq,
+            account_payload("acc-not-poison", "platform-unused", None),
+        )
+    }
+
+    #[tokio::test]
+    async fn category_removal_keeps_newer_child_metadata() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_account_for_test(&mut conn, "acc-cascade").expect("insert account");
+            insert_cash_activity_for_test(&mut conn, "act-cascade", "acc-cascade")
+                .expect("insert activity");
+        }
+
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-cascade".to_string(),
+                SyncOperation::Create,
+                "evt-tax-cascade-10".to_string(),
+                "2026-03-01T00:00:10Z".to_string(),
+                1,
+                custom_taxonomy_bundle(
+                    "tax-cascade",
+                    &[("cat-keep", None), ("cat-drop", None)],
+                    "2026-03-01T00:00:10Z",
+                ),
+            )
+            .await
+            .expect("create taxonomy"));
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityTaxonomyAssignment,
+                "ata-cascade".to_string(),
+                SyncOperation::Create,
+                "evt-ata-cascade-30".to_string(),
+                "2026-03-01T00:00:30Z".to_string(),
+                2,
+                assignment_payload(
+                    "ata-cascade",
+                    "act-cascade",
+                    "tax-cascade",
+                    "cat-drop",
+                    "2026-03-01T00:00:30Z",
+                ),
+            )
+            .await
+            .expect("assign category"));
+
+        // A device whose clock is behind removes the category: its event is
+        // older than the assignment's last write.
+        assert!(repo
+            .apply_remote_event_lww(
+                SyncEntity::CustomTaxonomy,
+                "tax-cascade".to_string(),
+                SyncOperation::Update,
+                "evt-tax-cascade-20".to_string(),
+                "2026-03-01T00:00:20Z".to_string(),
+                3,
+                custom_taxonomy_bundle(
+                    "tax-cascade",
+                    &[("cat-keep", None)],
+                    "2026-03-01T00:00:20Z"
+                ),
+            )
+            .await
+            .expect("remove category"));
+
+        let metadata = repo
+            .get_entity_metadata(SyncEntity::ActivityTaxonomyAssignment, "ata-cascade")
+            .expect("load metadata")
+            .expect("assignment metadata");
+        assert_eq!(
+            metadata.last_client_timestamp, "2026-03-01T00:00:30Z",
+            "an older category removal must not lower the assignment's watermark"
+        );
+        assert_eq!(metadata.last_op, SyncOperation::Create);
+
+        // The device that removed the category locally keeps the t=30 watermark,
+        // so a delayed write from t=25 must be rejected here as well.
+        let delayed_applied = repo
+            .apply_remote_event_lww(
+                SyncEntity::ActivityTaxonomyAssignment,
+                "ata-cascade".to_string(),
+                SyncOperation::Update,
+                "evt-ata-cascade-25".to_string(),
+                "2026-03-01T00:00:25Z".to_string(),
+                4,
+                assignment_payload(
+                    "ata-cascade",
+                    "act-cascade",
+                    "tax-cascade",
+                    "cat-keep",
+                    "2026-03-01T00:00:25Z",
+                ),
+            )
+            .await
+            .expect("apply delayed write");
+        assert!(!delayed_applied);
+    }
+
+    #[tokio::test]
+    async fn replay_batch_skips_failing_event_and_keeps_out_of_order_events() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![
+                account_create_event("acc-iso-error", "platform-iso-error", 10),
+                poison_event(11),
+                platform_create_event("platform-iso-error", 12),
+            ])
+            .await
+            .expect("the batch isolates the failing event");
+
+        assert_eq!(applied, 2);
+        assert_eq!(count_account_rows(&pool, "acc-iso-error"), 1);
+        assert_eq!(count_platform_rows(&pool, "platform-iso-error"), 1);
+        assert!(!repo.has_applied_event("evt-poison-11").expect("applied"));
+        assert!(repo
+            .get_entity_metadata(SyncEntity::Account, "acc-poison")
+            .expect("metadata")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn replay_batch_skips_foreign_key_violation_and_keeps_out_of_order_events() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            insert_portfolio_for_test(&mut conn, "pf-iso", "Isolation").expect("portfolio");
+        }
+
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![
+                account_create_event("acc-iso-fk", "platform-iso-fk", 20),
+                (
+                    SyncEntity::PortfolioAccount,
+                    "pfm_pf-iso_acc-missing".to_string(),
+                    SyncOperation::Create,
+                    "evt-pfm-missing".to_string(),
+                    "2026-02-17T00:00:00Z".to_string(),
+                    21,
+                    serde_json::json!({
+                        "id": "pfm_pf-iso_acc-missing",
+                        "portfolio_id": "pf-iso",
+                        "account_id": "acc-missing",
+                        "sort_order": 0,
+                        "created_at": "2026-02-17T00:00:00Z"
+                    }),
+                ),
+                platform_create_event("platform-iso-fk", 22),
+            ])
+            .await
+            .expect("the batch isolates the foreign key violation");
+
+        assert_eq!(applied, 2);
+        assert_eq!(count_account_rows(&pool, "acc-iso-fk"), 1);
+        assert_eq!(count_platform_rows(&pool, "platform-iso-fk"), 1);
+        let mut conn = get_connection(&pool).expect("conn");
+        let membership_count: i64 = crate::schema::portfolio_accounts::table
+            .filter(crate::schema::portfolio_accounts::id.eq("pfm_pf-iso_acc-missing"))
+            .select(count_star())
+            .first(&mut conn)
+            .expect("count memberships");
+        assert_eq!(membership_count, 0);
+        assert!(!repo.has_applied_event("evt-pfm-missing").expect("applied"));
+        assert!(repo
+            .get_entity_metadata(SyncEntity::PortfolioAccount, "pfm_pf-iso_acc-missing")
+            .expect("metadata")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn replay_batch_isolation_keeps_event_order() {
+        // Codex round 2: a retried child must not outlive a later category removal.
+        async fn replay(with_poison: bool) -> (i64, Option<SyncEntityMetadata>, Vec<String>) {
+            let (pool, writer) = setup_db();
+            let repo = AppSyncRepository::new(pool.clone(), writer);
+            {
+                let mut conn = get_connection(&pool).expect("conn");
+                insert_account_for_test(&mut conn, "acc-order").expect("insert account");
+                insert_cash_activity_for_test(&mut conn, "act-order", "acc-order")
+                    .expect("insert activity");
+            }
+
+            let mut events = Vec::new();
+            if with_poison {
+                events.push(poison_event(1));
+            }
+            events.push((
+                SyncEntity::ActivityTaxonomyAssignment,
+                "ata-order".to_string(),
+                SyncOperation::Create,
+                "evt-ata-order-10".to_string(),
+                "2026-03-01T00:00:10Z".to_string(),
+                2,
+                assignment_payload(
+                    "ata-order",
+                    "act-order",
+                    "tax-order",
+                    "cat-c",
+                    "2026-03-01T00:00:10Z",
+                ),
+            ));
+            for (seq, timestamp, categories) in [
+                (3, "2026-03-01T00:00:05Z", vec![("cat-c", None)]),
+                (4, "2026-03-01T00:00:20Z", vec![("cat-other", None)]),
+                (
+                    5,
+                    "2026-03-01T00:00:40Z",
+                    vec![("cat-other", None), ("cat-c", None)],
+                ),
+            ] {
+                events.push((
+                    SyncEntity::CustomTaxonomy,
+                    "tax-order".to_string(),
+                    if seq == 3 {
+                        SyncOperation::Create
+                    } else {
+                        SyncOperation::Update
+                    },
+                    format!("evt-tax-order-{seq}"),
+                    timestamp.to_string(),
+                    seq,
+                    custom_taxonomy_bundle("tax-order", &categories, timestamp),
+                ));
+            }
+
+            repo.apply_remote_events_lww_batch(events)
+                .await
+                .expect("apply ordered batch");
+
+            let mut conn = get_connection(&pool).expect("conn");
+            let assignment_count: i64 = crate::schema::activity_taxonomy_assignments::table
+                .filter(crate::schema::activity_taxonomy_assignments::activity_id.eq("act-order"))
+                .select(count_star())
+                .first(&mut conn)
+                .expect("count assignments");
+            let metadata = repo
+                .get_entity_metadata(SyncEntity::ActivityTaxonomyAssignment, "ata-order")
+                .expect("metadata");
+            let categories: Vec<String> = taxonomy_categories::table
+                .filter(taxonomy_categories::taxonomy_id.eq("tax-order"))
+                .select(taxonomy_categories::id)
+                .order(taxonomy_categories::id.asc())
+                .load(&mut conn)
+                .expect("categories");
+            (assignment_count, metadata, categories)
+        }
+
+        let clean = replay(false).await;
+        let poisoned = replay(true).await;
+        assert_eq!(clean.0, 0, "the category removal cascades the assignment");
+        assert_eq!(poisoned.0, clean.0);
+        assert_eq!(
+            poisoned.1.map(|m| (m.last_op, m.last_client_timestamp)),
+            clean.1.map(|m| (m.last_op, m.last_client_timestamp))
+        );
+        assert_eq!(poisoned.2, clean.2);
+    }
+
+    #[tokio::test]
+    async fn replay_batch_rollback_discards_patches_queued_by_failed_attempt() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer.clone());
+        {
+            let mut conn = get_connection(&pool).expect("conn");
+            diesel::sql_query(
+                "INSERT INTO accounts \
+                 (id, name, account_type, `group`, currency, is_default, is_active, created_at, updated_at, \
+                  platform_id, account_number, meta, provider, provider_account_id, is_archived, tracking_mode) \
+                 VALUES ('acc-broker-iso', 'Broker Account', 'cash', NULL, 'USD', 0, 1, \
+                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL, NULL, 'SNAPTRADE', \
+                         'provider-iso-1', 0, 'portfolio')",
+            )
+            .execute(&mut conn)
+            .expect("insert broker account");
+            diesel::sql_query(
+                "INSERT INTO activities \
+                 (id, account_id, asset_id, activity_type, activity_type_override, source_type, subtype, \
+                  status, activity_date, settlement_date, quantity, unit_price, amount, fee, currency, \
+                  fx_rate, notes, metadata, source_system, source_record_id, source_group_id, \
+                  idempotency_key, import_run_id, is_user_modified, needs_review, created_at, updated_at) \
+                 VALUES ('act-broker-iso', 'acc-broker-iso', NULL, 'BUY', NULL, NULL, NULL, \
+                         'POSTED', '2026-01-01T00:00:00Z', NULL, '10', '5', '50', '1', 'USD', \
+                         NULL, 'Broker note', NULL, 'SNAPTRADE', 'record-iso-1', NULL, NULL, \
+                         NULL, 0, 1, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            )
+            .execute(&mut conn)
+            .expect("insert broker activity");
+        }
+        let identity = broker_activity_identity(
+            Some("SNAPTRADE"),
+            Some("provider-iso-1"),
+            Some("record-iso-1"),
+        )
+        .expect("broker identity");
+        let patch_entity_id = broker_activity_user_patch_entity_id(&identity);
+
+        // The account update moves the account to another provider id and points
+        // at a missing platform, so it is the attempt's FK culprit. While it is
+        // applied, the patch finds no target and is queued.
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![
+                (
+                    SyncEntity::Account,
+                    "acc-broker-iso".to_string(),
+                    SyncOperation::Update,
+                    "evt-broker-iso-account".to_string(),
+                    "2026-02-01T00:00:00Z".to_string(),
+                    1,
+                    account_payload(
+                        "acc-broker-iso",
+                        "platform-missing-iso",
+                        Some("provider-iso-2"),
+                    ),
+                ),
+                (
+                    SyncEntity::BrokerActivityUserPatch,
+                    patch_entity_id,
+                    SyncOperation::Update,
+                    "evt-broker-iso-patch".to_string(),
+                    "2026-02-01T00:00:01Z".to_string(),
+                    2,
+                    serde_json::json!({
+                        "sourceSystem": "SNAPTRADE",
+                        "providerAccountId": "provider-iso-1",
+                        "sourceRecordId": "record-iso-1",
+                        "overlay": {
+                            "notes": "Synced note",
+                            "activityTypeOverride": null,
+                            "subtype": null,
+                            "needsReview": false
+                        }
+                    }),
+                ),
+            ])
+            .await
+            .expect("the batch isolates the account update");
+        assert_eq!(applied, 1, "the patch applies once the culprit is skipped");
+
+        let mut conn = get_connection(&pool).expect("conn");
+        let notes: Option<String> = activities::table
+            .find("act-broker-iso")
+            .select(activities::notes)
+            .first(&mut conn)
+            .expect("activity");
+        assert_eq!(notes.as_deref(), Some("Synced note"));
+        drop(conn);
+
+        let sync_state = writer.sync_state();
+        let reapplied = writer
+            .exec(move |conn| {
+                crate::sync::broker_activity_patch::apply_pending_broker_activity_user_patches_tx(
+                    conn,
+                    &sync_state.broker_activity_patches,
+                )
+            })
+            .await
+            .expect("flush pending patches");
+        assert_eq!(
+            reapplied, 0,
+            "a patch queued by a rolled-back attempt must not stay pending"
+        );
+    }
+
+    #[tokio::test]
+    async fn replay_batch_rejects_orphan_taxonomy_categories() {
+        let (pool, writer) = setup_db();
+        let repo = AppSyncRepository::new(pool.clone(), writer);
+        let orphan_bundle = || {
+            custom_taxonomy_bundle(
+                "tax-orphan",
+                &[("cat-child", Some("cat-missing"))],
+                "2026-03-01T00:00:00Z",
+            )
+        };
+        let assert_nothing_persisted = |event_id: &str| {
+            let mut conn = get_connection(&pool).expect("conn");
+            let taxonomy_count: i64 = taxonomies::table
+                .filter(taxonomies::id.eq("tax-orphan"))
+                .select(count_star())
+                .first(&mut conn)
+                .expect("count taxonomies");
+            assert_eq!(taxonomy_count, 0);
+            let category_count: i64 = taxonomy_categories::table
+                .filter(taxonomy_categories::taxonomy_id.eq("tax-orphan"))
+                .select(count_star())
+                .first(&mut conn)
+                .expect("count categories");
+            assert_eq!(category_count, 0);
+            assert!(repo
+                .get_entity_metadata(SyncEntity::CustomTaxonomy, "tax-orphan")
+                .expect("metadata")
+                .is_none());
+            assert!(!repo.has_applied_event(event_id).expect("applied"));
+        };
+
+        repo.apply_remote_events_lww_batch(vec![(
+            SyncEntity::CustomTaxonomy,
+            "tax-orphan".to_string(),
+            SyncOperation::Create,
+            "evt-orphan-1".to_string(),
+            "2026-03-01T00:00:00Z".to_string(),
+            1,
+            orphan_bundle(),
+        )])
+        .await
+        .expect_err("an orphan category must not commit");
+        assert_nothing_persisted("evt-orphan-1");
+
+        repo.apply_remote_events_lww_batch(vec![
+            poison_event(2),
+            (
+                SyncEntity::CustomTaxonomy,
+                "tax-orphan".to_string(),
+                SyncOperation::Create,
+                "evt-orphan-3".to_string(),
+                "2026-03-01T00:00:00Z".to_string(),
+                3,
+                orphan_bundle(),
+            ),
+        ])
+        .await
+        .expect_err("an orphan category must not commit after an isolated event");
+        assert_nothing_persisted("evt-orphan-3");
+
+        let applied = repo
+            .apply_remote_events_lww_batch(vec![platform_create_event("platform-after-orphan", 4)])
+            .await
+            .expect("the writer stays usable after the failed batch");
+        assert_eq!(applied, 1);
+        assert_eq!(count_platform_rows(&pool, "platform-after-orphan"), 1);
     }
 }
