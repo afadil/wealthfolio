@@ -1,5 +1,6 @@
 use super::activities_constants::{ACTIVITY_TYPE_TRANSFER_IN, ACTIVITY_TYPE_TRANSFER_OUT};
 use super::activities_model::*;
+use super::cash_balances::CashLedgerActivity;
 use crate::limits::ContributionActivity;
 use crate::Result;
 use async_trait::async_trait;
@@ -59,6 +60,19 @@ pub trait ActivityRepositoryTrait: Send + Sync {
         Ok(activities)
     }
     fn get_activities_by_account_ids(&self, account_ids: &[String]) -> Result<Vec<Activity>>;
+    /// The ledger's fields of the activities `get_activities_by_account_ids`
+    /// returns. Storage reads only those columns; the default converts whole
+    /// activities.
+    fn get_cash_ledger_activities(
+        &self,
+        account_ids: &[String],
+    ) -> Result<Vec<CashLedgerActivity>> {
+        Ok(self
+            .get_activities_by_account_ids(account_ids)?
+            .iter()
+            .map(CashLedgerActivity::from)
+            .collect())
+    }
     fn get_activities_by_account_ids_in_date_range(
         &self,
         account_ids: &[String],
@@ -401,8 +415,10 @@ pub trait ActivityServiceTrait: Send + Sync {
             activity_id_filter,
         )
     }
-    /// Fills each row's cash balance, for rows of cash or credit-card accounts
-    /// that hold no securities. The default leaves the rows without balances.
+    /// Fills each row's cash balance: the cash after the row for cash or
+    /// credit-card accounts that hold no securities, the cash at the end of
+    /// the row's day for other accounts whose holdings come from activities.
+    /// The default leaves the rows without balances.
     async fn attach_cash_balances(&self, _response: &mut ActivitySearchResponse) -> Result<()> {
         Ok(())
     }

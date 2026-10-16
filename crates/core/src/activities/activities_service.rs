@@ -52,7 +52,10 @@ use crate::activities::activities_constants::{
 };
 use crate::activities::activities_errors::ActivityError;
 use crate::activities::activities_model::*;
-use crate::activities::cash_balances::{running_cash_balances, shows_running_cash_balance};
+use crate::activities::cash_balances::{
+    running_cash_balances, shows_cash_balance, shows_running_cash_balance, ActivityCashBalance,
+    CashLedgerActivity,
+};
 use crate::activities::csv_parser::{self, ParseConfig, ParsedCsvResult};
 use crate::activities::idempotency::{compute_activity_idempotency_key, compute_idempotency_key};
 use crate::activities::{
@@ -76,9 +79,12 @@ use crate::fx::currency::{
 };
 use crate::fx::FxServiceTrait;
 use crate::portfolio::economic_events::{ActivityCashInputs, ActivityEconomicsResolver};
+use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait, ValuationStatus};
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
-use crate::utils::time_utils::{calendar_day_instant, parse_user_timezone_or_default};
+use crate::utils::time_utils::{
+    activity_date_in_tz, calendar_day_instant, parse_user_timezone_or_default,
+};
 use crate::Result;
 use log::warn;
 
@@ -184,6 +190,7 @@ pub struct ActivityService {
     fx_service: Arc<dyn FxServiceTrait>,
     quote_service: Arc<dyn QuoteServiceTrait>,
     import_run_repository: Option<Arc<dyn ImportRunRepositoryTrait>>,
+    valuation_repository: Option<Arc<dyn ValuationRepositoryTrait>>,
     event_sink: Arc<dyn DomainEventSink>,
     timezone: Arc<RwLock<String>>,
 }
@@ -1199,6 +1206,7 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: None,
+            valuation_repository: None,
             event_sink: Arc::new(NoOpDomainEventSink),
             timezone: Arc::new(RwLock::new("UTC".to_string())),
         }
@@ -1220,6 +1228,7 @@ impl ActivityService {
             fx_service,
             quote_service,
             import_run_repository: Some(import_run_repository),
+            valuation_repository: None,
             event_sink: Arc::new(NoOpDomainEventSink),
             timezone: Arc::new(RwLock::new("UTC".to_string())),
         }
@@ -1327,6 +1336,15 @@ impl ActivityService {
 
     pub fn with_timezone(mut self, timezone: Arc<RwLock<String>>) -> Self {
         self.timezone = timezone;
+        self
+    }
+
+    /// Sets the valuations a search's end-of-day cash balances come from.
+    pub fn with_valuation_repository(
+        mut self,
+        valuation_repository: Arc<dyn ValuationRepositoryTrait>,
+    ) -> Self {
+        self.valuation_repository = Some(valuation_repository);
         self
     }
 
@@ -4998,38 +5016,107 @@ impl ActivityServiceTrait for ActivityService {
         if account_ids.is_empty() {
             return Ok(());
         }
+        // Each posted row's day as the engine dates it: its instant in the
+        // configured timezone. Only rows stored with a timezone: older rows
+        // without one (a bare date, SQLite's own timestamp shape) are read as
+        // UTC by the engine but as local time by a list, so their closing cash
+        // could belong to another day than the one they show.
+        let timezone = self.configured_timezone();
+        let row_days: Vec<(String, String, NaiveDate)> = response
+            .data
+            .iter()
+            .filter(|row| row.status == ActivityStatus::Posted)
+            .filter_map(|row| {
+                let instant = DateTime::parse_from_rfc3339(&row.date)
+                    .ok()?
+                    .with_timezone(&Utc);
+                Some((
+                    row.id.clone(),
+                    row.account_id.clone(),
+                    activity_date_in_tz(instant, timezone),
+                ))
+            })
+            .collect();
         let activity_repository = Arc::clone(&self.activity_repository);
         let account_service = Arc::clone(&self.account_service);
+        let valuation_repository = self.valuation_repository.clone();
         let mut balances = crate::portfolio::coordinator::blocking(move || {
-            let accounts: Vec<Account> = account_service
+            let (running, mut day_end): (Vec<Account>, Vec<Account>) = account_service
                 .get_accounts_by_ids(&account_ids)?
                 .into_iter()
-                .filter(shows_running_cash_balance)
-                .collect();
-            if accounts.is_empty() {
-                return Ok(HashMap::new());
+                .filter(shows_cash_balance)
+                .partition(shows_running_cash_balance);
+            let mut balances: HashMap<String, (ActivityCashBalance, CashBalanceScope)> =
+                HashMap::new();
+
+            // Cash and credit-card accounts: the cash after each row, from one
+            // read of their whole histories.
+            if !running.is_empty() {
+                let ids: Vec<String> = running.iter().map(|account| account.id.clone()).collect();
+                let mut histories: HashMap<String, Vec<CashLedgerActivity>> = HashMap::new();
+                for activity in activity_repository.get_cash_ledger_activities(&ids)? {
+                    histories
+                        .entry(activity.account_id.clone())
+                        .or_default()
+                        .push(activity);
+                }
+                for account in running {
+                    let history = histories.remove(&account.id).unwrap_or_default();
+                    match running_cash_balances(&account, &history) {
+                        Some(rows) => balances.extend(
+                            rows.into_iter()
+                                .map(|(id, balance)| (id, (balance, CashBalanceScope::Row))),
+                        ),
+                        // Its history holds securities, whose cash only the
+                        // engine books: fall back to the engine's day-end cash.
+                        None => day_end.push(account),
+                    }
+                }
             }
-            let eligible: Vec<String> = accounts.iter().map(|account| account.id.clone()).collect();
-            // One read for every eligible account's history, split per account.
-            let mut histories: HashMap<String, Vec<Activity>> = HashMap::new();
-            for activity in activity_repository.get_activities_by_account_ids(&eligible)? {
-                histories
-                    .entry(activity.account_id.clone())
-                    .or_default()
-                    .push(activity);
-            }
-            let mut balances = HashMap::new();
-            for account in &accounts {
-                let history = histories.remove(&account.id).unwrap_or_default();
-                balances.extend(running_cash_balances(account, &history).unwrap_or_default());
+
+            // Other accounts: the cash at the end of each row's day, read from
+            // the engine's valuations for the days the page spans. A day the
+            // engine could not complete gets none: its cash may leave out a
+            // currency it could not convert.
+            let Some(valuations) = valuation_repository else {
+                return Ok(balances);
+            };
+            for account in &day_end {
+                let days: Vec<(&String, NaiveDate)> = row_days
+                    .iter()
+                    .filter(|(_, account_id, _)| *account_id == account.id)
+                    .map(|(id, _, day)| (id, *day))
+                    .collect();
+                let (Some(first), Some(last)) = (
+                    days.iter().map(|(_, day)| *day).min(),
+                    days.iter().map(|(_, day)| *day).max(),
+                ) else {
+                    continue;
+                };
+                let by_day: HashMap<NaiveDate, DailyCashBalance> = valuations
+                    .get_daily_cash_balances(&account.id, Some(first), Some(last))?
+                    .into_iter()
+                    .filter(|cash| cash.value_status != ValuationStatus::Unavailable)
+                    .map(|cash| (cash.valuation_date, cash))
+                    .collect();
+                for (id, day) in days {
+                    if let Some(cash) = by_day.get(&day) {
+                        let balance = ActivityCashBalance {
+                            currency: cash.account_currency.clone(),
+                            balance: cash.cash_balance,
+                        };
+                        balances.insert(id.clone(), (balance, CashBalanceScope::Day));
+                    }
+                }
             }
             Ok(balances)
         })
         .await?;
         for row in &mut response.data {
-            if let Some(balance) = balances.remove(&row.id) {
+            if let Some((balance, scope)) = balances.remove(&row.id) {
                 row.cash_balance = Some(balance.balance.to_string());
                 row.cash_balance_currency = Some(balance.currency);
+                row.cash_balance_scope = Some(scope);
             }
         }
         Ok(())

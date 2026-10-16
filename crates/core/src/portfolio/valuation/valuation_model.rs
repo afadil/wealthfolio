@@ -509,6 +509,18 @@ pub struct NegativeBalanceInfo {
     pub account_currency: String,
 }
 
+/// A day's cash from an account's valuation, without the rest of the row.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DailyCashBalance {
+    pub valuation_date: NaiveDate,
+    /// In `account_currency`.
+    pub cash_balance: Decimal,
+    pub account_currency: String,
+    /// `Unavailable` when the engine could not complete the day, which
+    /// includes cash it could not convert and so left out of `cash_balance`.
+    pub value_status: ValuationStatus,
+}
+
 /// Domain model for daily account valuation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]

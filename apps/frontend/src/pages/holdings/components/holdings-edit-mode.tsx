@@ -3,7 +3,7 @@ import {
   DatePickerInput,
   MoneyInput,
   QuantityInput,
-  useNumberFormatting,
+  useAmountFormatting,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -86,7 +86,7 @@ export const HoldingsEditMode = ({
   onClose,
   existingSnapshotDate,
 }: HoldingsEditModeProps) => {
-  const formatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
@@ -522,7 +522,7 @@ export const HoldingsEditMode = ({
                               totalValue > 0 ? "text-foreground" : "text-muted-foreground",
                             )}
                           >
-                            {formatting.formatDecimal(totalValue, {
+                            {amountFormatting.formatDecimalAmount(totalValue, holding.currency, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}

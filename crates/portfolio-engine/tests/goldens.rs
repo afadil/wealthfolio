@@ -31,6 +31,9 @@ fn kernel_goldens() {
             snapshot_path => goldens_dir(),
             prepend_module_to_snapshot => false,
             omit_expression => true,
+            // Key order must not depend on serde_json's `preserve_order`,
+            // which a dependency may enable for the whole build.
+            sort_maps => true,
         }, {
             insta::assert_yaml_snapshot!(scenario.id.clone(), output);
         });

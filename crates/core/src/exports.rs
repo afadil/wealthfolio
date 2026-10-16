@@ -616,20 +616,22 @@ mod tests {
         let mut balanced = row("checking-row");
         balanced.cash_balance = Some("954.90".to_string());
         balanced.cash_balance_currency = Some("USD".to_string());
+        balanced.cash_balance_scope = Some(crate::activities::CashBalanceScope::Row);
 
         let csv = records_to_csv(&[plain.clone(), balanced]).unwrap();
 
         let lines: Vec<&str> = csv.lines().collect();
-        assert!(lines[0].ends_with(",\"cashBalance\",\"cashBalanceCurrency\""));
-        assert!(lines[1].ends_with(",\"\",\"\""));
-        assert!(lines[2].ends_with(",\"954.90\",\"USD\""));
+        let columns = ",\"cashBalance\",\"cashBalanceCurrency\",\"cashBalanceScope\"";
+        assert!(lines[0].ends_with(columns));
+        assert!(lines[1].ends_with(",\"\",\"\",\"\""));
+        assert!(lines[2].ends_with(",\"954.90\",\"USD\",\"ROW\""));
 
         // An export where no row has a balance keeps the same columns.
         let csv = records_to_csv(&[plain]).unwrap();
 
         let lines: Vec<&str> = csv.lines().collect();
-        assert!(lines[0].ends_with(",\"cashBalance\",\"cashBalanceCurrency\""));
-        assert!(lines[1].ends_with(",\"\",\"\""));
+        assert!(lines[0].ends_with(columns));
+        assert!(lines[1].ends_with(",\"\",\"\",\"\""));
     }
 
     #[test]

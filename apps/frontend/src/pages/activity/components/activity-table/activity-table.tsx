@@ -141,8 +141,13 @@ export const ActivityTable = ({
   );
   // Rows carry a balance only when the search asked for them (one cash or
   // credit-card account in date order), so their presence decides the column.
+  // End-of-day balances wait for the day-grouped list; this column shows the
+  // balance after each row.
   const showsCashBalance = React.useMemo(
-    () => activities.some((activity) => activity.cashBalance != null),
+    () =>
+      activities.some(
+        (activity) => activity.cashBalance != null && activity.cashBalanceScope !== "DAY",
+      ),
     [activities],
   );
   const symbolExchangeCountMap = React.useMemo(() => {
@@ -555,8 +560,8 @@ export const ActivityTable = ({
                 />
               ),
               cell: ({ row }) => {
-                const { cashBalance, cashBalanceCurrency } = row.original;
-                if (cashBalance == null || !cashBalanceCurrency) {
+                const { cashBalance, cashBalanceCurrency, cashBalanceScope } = row.original;
+                if (cashBalance == null || !cashBalanceCurrency || cashBalanceScope === "DAY") {
                   return <div className="pr-4 text-right">-</div>;
                 }
                 return (

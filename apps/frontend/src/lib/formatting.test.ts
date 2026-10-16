@@ -578,6 +578,52 @@ describe("en-IN formatting", () => {
 });
 
 describe("per-currency formatting regions", () => {
+  it("formats symbol-free amounts with the requested decimal precision", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN", JPY: "JP" });
+    const fixedTwo = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+
+    expect(formatting.formatDecimalAmount(1234567.89, "INR", fixedTwo)).toBe("12,34,567.89");
+    expect(formatting.formatDecimalAmount(1234567.89, "USD", fixedTwo)).toBe("1,234,567.89");
+    // Precision belongs to the display, even for currencies with other minor units.
+    expect(formatting.formatDecimalAmount(1234.5, "JPY", fixedTwo)).toBe("1,234.50");
+    expect(formatting.formatDecimalAmount(1234.5, "BHD", fixedTwo)).toBe("1,234.50");
+    expect(formatting.formatDecimalAmount(-1234567.89, "INR", { maximumFractionDigits: 0 })).toBe(
+      "-12,34,568",
+    );
+    expect(formatting.formatDecimalAmount(1234567.8912, "INR")).toBe("12,34,567.891");
+    expect(formatting.formatDecimalAmount("2500", "USD")).toBe("2,500");
+    expect(formatting.formatDecimalAmount(1234.5, "GBp")).toBe("1,234.5");
+  });
+
+  it("shares cached decimal formatters across currencies in the same region", () => {
+    const formatting = createAmountFormatting("US", undefined, { INR: "IN", NPR: "IN" });
+    const OriginalNumberFormat = Intl.NumberFormat;
+    const constructor = vi.spyOn(Intl, "NumberFormat").mockImplementation(function (...args) {
+      return new OriginalNumberFormat(...args);
+    });
+    try {
+      formatting.formatDecimalAmount(1234.5, "INR");
+      formatting.formatDecimalAmount(1234.5, "INR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      formatting.formatDecimalAmount(1234.5, "INR", { maximumFractionDigits: 0 });
+      expect(constructor).not.toHaveBeenCalled();
+
+      formatting.formatDecimalAmount(1234.5, "INR", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 4,
+      });
+      formatting.formatDecimalAmount(1234.5, "NPR", {
+        maximumFractionDigits: 4,
+        minimumFractionDigits: 1,
+      });
+      expect(constructor).toHaveBeenCalledTimes(1);
+    } finally {
+      constructor.mockRestore();
+    }
+  });
+
   it("formats each overridden currency in its own region", () => {
     const formatting = createAmountFormatting("US", undefined, { INR: "IN" });
 
@@ -621,6 +667,9 @@ describe("per-currency formatting regions", () => {
         global.formatCompactAmount(1234567.89, "USD"),
       );
       expect(formatting.formatCurrencySymbol("USD")).toBe(global.formatCurrencySymbol("USD"));
+      expect(formatting.formatDecimalAmount(1234567.89, "EUR")).toBe(
+        global.formatDecimalAmount(1234567.89, "EUR"),
+      );
       expect(formatting.currencyLocale("EUR")).toBe("de-DE");
     }
   });

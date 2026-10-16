@@ -85,6 +85,11 @@ export type NumberDisplayOptions = Pick<
   | "useGrouping"
 >;
 
+export type DecimalAmountOptions = Pick<
+  NumberDisplayOptions,
+  "minimumFractionDigits" | "maximumFractionDigits"
+>;
+
 export type DateDisplayOptions = Pick<
   Intl.DateTimeFormatOptions,
   | "dateStyle"
@@ -190,6 +195,12 @@ export interface FormattingApi {
     displayCurrency?: boolean,
   ) => string;
   formatRoundedAmount: (value: number | string | null | undefined, currency: string) => string;
+  /** Format a decimal in the currency's locale, without a currency symbol. */
+  formatDecimalAmount: (
+    value: number | string,
+    currency: string,
+    options?: DecimalAmountOptions,
+  ) => string;
   formatCurrencySymbol: (currency: string) => string;
   currencyFractionDigits: (currency: string) => number;
   /** The locale amounts in `currency` are formatted with. */
@@ -218,6 +229,7 @@ export type AmountFormatting = Pick<
   | "formatCompactAmount"
   | "formatPrice"
   | "formatRoundedAmount"
+  | "formatDecimalAmount"
   | "formatCurrencySymbol"
   | "currencyFractionDigits"
   | "currencyLocale"
@@ -746,8 +758,9 @@ function createLocaleAmountFormatting(
   const roundedCurrencyFormatters = new Map<string, Intl.NumberFormat>();
   const currencySymbols = new Map<string, string>();
   const currencyFractionDigitsCache = new Map<string, number>();
-  const amountDecimalFormatters = new Map<number, Pick<Intl.NumberFormat, "format">>([
-    [2, amountFormatter],
+  const amountDecimalFormatters = new Map<string, Pick<Intl.NumberFormat, "format">>([
+    ["2:2", amountFormatter],
+    [":0", roundedDecimalFormatter],
   ]);
   const compactFormatters = new Map<string, Intl.NumberFormat>();
   const priceDecimalFormatters = new Map<number, Intl.NumberFormat>();
@@ -768,14 +781,16 @@ function createLocaleAmountFormatting(
       return 2;
     }
   };
-  const amountDecimalFormatter = (fractionDigits: number) => {
-    let formatter = amountDecimalFormatters.get(fractionDigits);
+  const amountDecimalFormatter = (options: DecimalAmountOptions = {}) => {
+    const { minimumFractionDigits, maximumFractionDigits } = options;
+    if (minimumFractionDigits === undefined && maximumFractionDigits === undefined) {
+      return decimalFormatter;
+    }
+    const key = `${minimumFractionDigits ?? ""}:${maximumFractionDigits ?? ""}`;
+    let formatter = amountDecimalFormatters.get(key);
     if (!formatter) {
-      formatter = new Intl.NumberFormat(resolvedLocale, {
-        minimumFractionDigits: fractionDigits,
-        maximumFractionDigits: fractionDigits,
-      });
-      amountDecimalFormatters.set(fractionDigits, formatter);
+      formatter = new Intl.NumberFormat(resolvedLocale, options);
+      amountDecimalFormatters.set(key, formatter);
     }
     return formatter;
   };
@@ -821,7 +836,12 @@ function createLocaleAmountFormatting(
     const zeroThreshold = 0.5 * 10 ** -fractionDigits;
     const displayed = Math.abs(amount) < zeroThreshold ? 0 : amount;
     try {
-      if (!displayCurrency) return amountDecimalFormatter(fractionDigits).format(displayed);
+      if (!displayCurrency) {
+        return amountDecimalFormatter({
+          minimumFractionDigits: fractionDigits,
+          maximumFractionDigits: fractionDigits,
+        }).format(displayed);
+      }
       let formatter = currencyFormatters.get(normalizedCurrency);
       if (!formatter) {
         formatter = new Intl.NumberFormat(resolvedLocale, {
@@ -841,6 +861,9 @@ function createLocaleAmountFormatting(
 
   return {
     formatAmount,
+    formatDecimalAmount(value, _currency, options) {
+      return amountDecimalFormatter(options).format(value as number);
+    },
     formatRoundedAmount(value, currency) {
       const amount = numeric(value);
       if (amount == null) return "-";
@@ -992,6 +1015,8 @@ export function createAmountFormatting(
       forCurrency(currency).formatPrice(value, currency, displayCurrency),
     formatRoundedAmount: (value, currency) =>
       forCurrency(currency).formatRoundedAmount(value, currency),
+    formatDecimalAmount: (value, currency, options) =>
+      forCurrency(currency).formatDecimalAmount(value, currency, options),
     formatCurrencySymbol: (currency) => forCurrency(currency).formatCurrencySymbol(currency),
     currencyFractionDigits: (currency) => forCurrency(currency).currencyFractionDigits(currency),
     currencyLocale: (currency) => forCurrency(currency).currencyLocale(currency),

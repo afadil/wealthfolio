@@ -191,7 +191,11 @@ vi.mock("./transaction-row", async () => {
   const React = await import("react");
   const TransactionRow = React.forwardRef(
     (
-      props: { row: { activity: { id: string } }; onEdit: (row: unknown) => void },
+      props: {
+        row: { activity: { id: string } };
+        onEdit: (row: unknown) => void;
+        onToggleSelect: (id: string) => void;
+      },
       _ref: unknown,
     ) => (
       <tr>
@@ -202,6 +206,13 @@ vi.mock("./transaction-row", async () => {
             onClick={() => props.onEdit(props.row)}
           >
             edit
+          </button>
+          <button
+            type="button"
+            data-testid={`select-${props.row.activity.id}`}
+            onClick={() => props.onToggleSelect(props.row.activity.id)}
+          >
+            select
           </button>
         </td>
       </tr>
@@ -381,5 +392,26 @@ describe("SpendingTransactionsTab transfer edit", () => {
     ) as Record<string, unknown>;
     expect(activityForm.counterpartAccountId).toBeUndefined();
     expect(activityForm.sourceGroupId).toBe("group-1");
+  });
+});
+
+describe("SpendingTransactionsTab selection", () => {
+  beforeEach(() => {
+    mocks.useMutation.mockReset().mockReturnValue(mocks.mutation);
+  });
+
+  // Row checkboxes hide until hovered; this attribute is what keeps them all
+  // on screen while a selection exists.
+  it("marks the table as selecting while any row is selected", async () => {
+    const { container } = render(<SpendingTransactionsTab />);
+    const select = await screen.findByTestId("select-out-1");
+    const list = container.querySelector(".group\\/list");
+    expect(list).not.toHaveAttribute("data-selecting");
+
+    select.click();
+    await waitFor(() => expect(list).toHaveAttribute("data-selecting"));
+
+    select.click();
+    await waitFor(() => expect(list).not.toHaveAttribute("data-selecting"));
   });
 });

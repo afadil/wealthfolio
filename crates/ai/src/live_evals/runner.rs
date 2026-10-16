@@ -17,7 +17,7 @@ use std::{future::Future, sync::Arc, time::Duration};
 
 use chrono::NaiveDateTime;
 use futures::StreamExt;
-use rig::{client::AgentClientExt, completion::Prompt};
+use rig::{operation::Completion, AgentBuilder, DynModel};
 use serde::Deserialize;
 use serde_json::Value;
 use wealthfolio_core::{
@@ -28,7 +28,7 @@ use wealthfolio_core::{
 
 use crate::chat::provider_clients::{
     create_anthropic_client, create_gemini_client, create_groq_client, create_ollama_client,
-    create_openai_client, create_openrouter_client,
+    create_openai_client, create_openrouter_client, redact_secret,
 };
 use crate::chat::{ChatConfig, ChatService};
 use crate::env::test_env::{
@@ -302,44 +302,33 @@ async fn judge_response(
     let model = rubric.judge_model.as_deref().unwrap_or(&cfg.model);
     let prompt = build_judge_prompt(&rubric.rubric, &case.prompt, assistant_response);
 
-    let response = match cfg.provider.as_str() {
+    let secret = api_key.clone();
+    let judge: DynModel<Completion> = match cfg.provider.as_str() {
         "anthropic" => create_anthropic_client(api_key, &cfg.provider, provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .completion(model)
+            .into(),
         "gemini" | "google" => create_gemini_client(api_key, &cfg.provider, provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .completion(model)
+            .into(),
         "groq" => create_groq_client(api_key, &cfg.provider, provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .completion(model)
+            .into(),
         "ollama" => create_ollama_client(provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .native_completion(model)
+            .into(),
         "openrouter" => create_openrouter_client(api_key, &cfg.provider, provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .completion(model)
+            .into(),
         _ => create_openai_client(api_key, &cfg.provider, provider_url)?
-            .agent(model)
-            .build()
-            .prompt(&prompt)
-            .await
-            .map_err(|e| AiError::Provider(e.to_string()))?,
+            .chat(model)
+            .into(),
     };
+    let response = AgentBuilder::new(judge)
+        .build()
+        .prompt(prompt.as_str())
+        .await
+        .map_err(|e| AiError::Provider(redact_secret(e.to_string(), secret.as_deref())))?
+        .output();
 
     parse_judge_verdict(&response)
 }

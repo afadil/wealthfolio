@@ -392,17 +392,26 @@ impl TaxonomyServiceTrait for MockTaxonomyService {
 #[derive(Default)]
 pub struct MockActivityService {
     pub activities: Vec<ActivityDetails>,
-    /// Balance and currency `attach_cash_balances` fills in, by activity id.
-    pub cash_balances: std::collections::HashMap<String, (String, String)>,
+    /// Balance, currency and scope `attach_cash_balances` fills in, by
+    /// activity id.
+    pub cash_balances: std::collections::HashMap<
+        String,
+        (
+            String,
+            String,
+            wealthfolio_core::activities::CashBalanceScope,
+        ),
+    >,
 }
 
 #[async_trait]
 impl ActivityServiceTrait for MockActivityService {
     async fn attach_cash_balances(&self, response: &mut ActivitySearchResponse) -> CoreResult<()> {
         for row in &mut response.data {
-            if let Some((balance, currency)) = self.cash_balances.get(&row.id) {
+            if let Some((balance, currency, scope)) = self.cash_balances.get(&row.id) {
                 row.cash_balance = Some(balance.clone());
                 row.cash_balance_currency = Some(currency.clone());
+                row.cash_balance_scope = Some(*scope);
             }
         }
         Ok(())
@@ -904,10 +913,6 @@ impl SettingsServiceTrait for MockSettingsService {
 
     fn get_base_currency(&self) -> CoreResult<Option<String>> {
         Ok(Some("USD".to_string()))
-    }
-
-    async fn update_base_currency(&self, _new_base_currency: &str) -> CoreResult<()> {
-        Ok(())
     }
 
     fn is_auto_update_check_enabled(&self) -> CoreResult<bool> {

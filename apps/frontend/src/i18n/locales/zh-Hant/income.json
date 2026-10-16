@@ -73,5 +73,7 @@
   "previous_period_income": "上一期收入",
   "monthly": "每月",
   "previous": "上一期",
-  "cumulative": "累計"
+  "cumulative": "累計",
+  "unconverted_currencies_one": "由於沒有換算為 {{baseCurrency}} 的匯率，{{currencies}} 收入未計入合計。",
+  "unconverted_currencies_other": "由於沒有換算為 {{baseCurrency}} 的匯率，{{currencies}} 收入未計入合計。"
 }

@@ -203,8 +203,12 @@ export const ActivityTableMobile = ({
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
+    // The balance after this row; end-of-day balances wait for the
+    // day-grouped list.
     const cashBalance =
-      activity.cashBalance != null && activity.cashBalanceCurrency
+      activity.cashBalance != null &&
+      activity.cashBalanceCurrency &&
+      activity.cashBalanceScope !== "DAY"
         ? { balance: Number(activity.cashBalance), currency: activity.cashBalanceCurrency }
         : undefined;
 

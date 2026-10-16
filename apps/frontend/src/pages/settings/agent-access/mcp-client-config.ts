@@ -4,118 +4,192 @@ const clientHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
   ...(isWeb && selectedProfileId() ? { "X-WF-Profile-Id": selectedProfileId() } : {}),
 });
-// Ready-to-paste MCP client configuration snippets. Shared by the connect-client
+// Ready-to-paste MCP client setup snippets. Shared by the connect-client
 // card (token placeholder) and the token-created dialog (real token), so both
-// render identical configs for each known agent.
+// render identical snippets for each known agent.
 
 /** Placeholder used when no real token is available (the connect card). */
 export const TOKEN_PLACEHOLDER = "YOUR_TOKEN";
 
+/** Environment variable the token-free snippets (.mcp.json, Codex) read. */
+export const TOKEN_ENV_VAR = "WEALTHFOLIO_TOKEN";
+
 /**
- * The config shape most MCP clients share (Claude Desktop, Claude Code,
- * Cursor, Windsurf, Cline). Used as the single "Copy config" default; the
- * help popover documents the few clients that differ (VS Code, Jan).
+ * The single "Copy config" default: the Claude Code command, which also
+ * configures the Claude Desktop Code tab. The Claude Desktop chat tab only
+ * loads command (stdio) servers, so it has no preset.
  */
-export const STANDARD_PRESET_ID = "claude-desktop";
+export const DEFAULT_PRESET_ID = "claude-code";
 
 export interface ClientPreset {
   id: string;
   label: string;
-  /** Where the user pastes this config (file path or UI location). */
+  /** Where the user pastes or runs the snippet (file path or UI location). */
   location?: string;
-  build: (url: string, token: string) => unknown;
+  /** What `build` returns: a JSON config, a shell command, or TOML. */
+  format: "json" | "command" | "toml";
+  build: (url: string, token: string) => string;
 }
 
-/** Shape shared by Claude Desktop, Claude Code, Cursor, Windsurf, Cline, … */
-const mcpServers = (url: string, token: string) => ({
-  mcpServers: {
-    wealthfolio: {
-      type: "http",
-      url,
-      headers: clientHeaders(token),
+const json = (value: unknown) => JSON.stringify(value, null, 2);
+
+/** Shape shared by Claude Code (.mcp.json), Cursor, Windsurf, Cline, … */
+const mcpServers = (url: string, headers: Record<string, string | undefined>) =>
+  json({
+    mcpServers: {
+      wealthfolio: {
+        type: "http",
+        url,
+        headers,
+      },
     },
-  },
-});
+  });
+
+/** TOML key, quoted only when it is not a bare key. */
+const tomlKey = (key: string) => (/^[A-Za-z0-9_-]+$/.test(key) ? key : JSON.stringify(key));
+
+/** Inline TOML table. JSON string escapes are valid TOML basic strings. */
+const tomlInlineTable = (entries: Record<string, string | undefined>) =>
+  `{ ${Object.entries(entries)
+    .map(([key, value]) => `${tomlKey(key)} = ${JSON.stringify(value)}`)
+    .join(", ")} }`;
 
 export const CLIENT_PRESETS: ClientPreset[] = [
   {
-    id: "claude-desktop",
-    label: "Claude Desktop",
-    location: "claude_desktop_config.json (Settings → Developer → Edit Config)",
-    build: mcpServers,
+    id: "claude-code",
+    label: "Claude Code / Claude Desktop (Code tab)",
+    location: "Run in a terminal; adds the server for all your projects (~/.claude.json)",
+    format: "command",
+    build: (url, token) =>
+      [
+        `claude mcp add --scope user --transport http wealthfolio ${url}`,
+        ...Object.entries(clientHeaders(token)).map(
+          ([name, value]) => `--header "${name}: ${value}"`,
+        ),
+      ].join(" "),
   },
   {
-    id: "claude-code",
-    label: "Claude Code",
-    location: ".mcp.json in your project root",
-    build: mcpServers,
+    id: "claude-code-project",
+    label: "Claude Code (project)",
+    location: `.mcp.json in your project root; reads the token from ${TOKEN_ENV_VAR}`,
+    format: "json",
+    build: (url) => mcpServers(url, clientHeaders(`\${${TOKEN_ENV_VAR}}`)),
+  },
+  {
+    id: "codex",
+    label: "Codex / ChatGPT desktop",
+    location: "~/.codex/config.toml (Codex CLI, IDE extension and ChatGPT desktop app)",
+    format: "toml",
+    build: (url, token) =>
+      [
+        "[mcp_servers.wealthfolio]",
+        `url = ${JSON.stringify(url)}`,
+        `http_headers = ${tomlInlineTable(clientHeaders(token))}`,
+        "tool_timeout_sec = 120",
+      ].join("\n"),
   },
   {
     id: "cursor",
     label: "Cursor",
     location: "~/.cursor/mcp.json (or .cursor/mcp.json in a project)",
-    build: mcpServers,
+    format: "json",
+    build: (url, token) => mcpServers(url, clientHeaders(token)),
   },
   {
     id: "windsurf",
     label: "Windsurf",
     location: "~/.codeium/windsurf/mcp_config.json",
-    build: mcpServers,
+    format: "json",
+    build: (url, token) => mcpServers(url, clientHeaders(token)),
   },
   {
     id: "cline",
     label: "Cline",
     location: "Cline → MCP Servers → Configure (cline_mcp_settings.json)",
-    build: mcpServers,
+    format: "json",
+    build: (url, token) => mcpServers(url, clientHeaders(token)),
+  },
+  {
+    id: "lmstudio",
+    label: "LM Studio",
+    location: "Program → Install → Edit mcp.json",
+    format: "json",
+    // LM Studio follows Cursor's notation without a transport type.
+    build: (url, token) =>
+      json({ mcpServers: { wealthfolio: { url, headers: clientHeaders(token) } } }),
+  },
+  {
+    id: "opencode",
+    label: "OpenCode",
+    location: "opencode.json in a project, or ~/.config/opencode/opencode.json",
+    format: "json",
+    build: (url, token) =>
+      json({
+        mcp: {
+          wealthfolio: {
+            type: "remote",
+            url,
+            // A bearer token, not OAuth: stop OpenCode from starting an OAuth flow.
+            oauth: false,
+            headers: clientHeaders(token),
+          },
+        },
+      }),
   },
   {
     id: "vscode",
     label: "VS Code",
     location: ".vscode/mcp.json",
-    build: (url, token) => ({
-      servers: {
-        wealthfolio: {
-          type: "http",
-          url,
-          headers: clientHeaders(token),
+    format: "json",
+    build: (url, token) =>
+      json({
+        servers: {
+          wealthfolio: {
+            type: "http",
+            url,
+            headers: clientHeaders(token),
+          },
         },
-      },
-    }),
+      }),
   },
   {
     id: "jan",
     label: "Jan",
     location: "Settings → MCP Servers → Add",
-    build: (url, token) => ({
-      Wealthfolio: {
-        active: true,
-        args: [],
-        command: "",
-        env: {},
-        headers: clientHeaders(token),
-        type: "http",
-        url,
-      },
-    }),
+    format: "json",
+    build: (url, token) =>
+      json({
+        Wealthfolio: {
+          active: true,
+          args: [],
+          command: "",
+          env: {},
+          headers: clientHeaders(token),
+          type: "http",
+          url,
+        },
+      }),
   },
   {
     id: "generic",
     label: "Generic HTTP",
     location: "Any client that speaks Streamable HTTP",
-    build: (url, token) => ({
-      url,
-      headers: clientHeaders(token),
-    }),
+    format: "json",
+    build: (url, token) =>
+      json({
+        url,
+        headers: clientHeaders(token),
+      }),
   },
 ];
 
 /**
- * Serialized config JSON for a preset. When `token` is omitted, a
- * `YOUR_TOKEN` placeholder is used so the snippet stays valid JSON the user
- * fills in after creating a token. Returns "" when the URL is missing.
+ * Setup snippet for a preset. When `token` is omitted, a `YOUR_TOKEN`
+ * placeholder is used so the snippet stays valid for the user to fill in
+ * after creating a token. Returns "" when the URL is missing.
  */
 export function buildClientConfig(presetId: string, url: string, token?: string): string {
   const preset = CLIENT_PRESETS.find((entry) => entry.id === presetId) ?? CLIENT_PRESETS[0];
   if (!url) return "";
-  return JSON.stringify(preset.build(url, token || TOKEN_PLACEHOLDER), null, 2);
+  return preset.build(url, token || TOKEN_PLACEHOLDER);
 }

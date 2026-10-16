@@ -268,8 +268,10 @@ pub struct SyncSessionStatus {
     pub is_configured: bool,
 }
 
+// Async so the keyring read runs off the UI thread: a slow or locked keyring
+// would otherwise freeze the window.
 #[tauri::command]
-pub fn get_sync_session_status(state: ConnectAccess) -> Result<SyncSessionStatus, String> {
+pub async fn get_sync_session_status(state: ConnectAccess) -> Result<SyncSessionStatus, String> {
     let context = state.context()?;
     Ok(SyncSessionStatus {
         is_configured: context.connect_service().is_session_configured()?,

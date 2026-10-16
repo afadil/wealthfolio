@@ -1,6 +1,7 @@
 import { memo, type Ref } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SELECTION_SLOT } from "@/lib/hover-slot";
 import { Checkbox, PrivacyAmount, TableCell, TableRow, useDateFormatting } from "@wealthfolio/ui";
 
 import type { TransactionDayGroup } from "../lib/transactions-helpers";
@@ -78,7 +79,7 @@ function TransactionDayHeaderImpl({
     <TableRow
       ref={ref as Ref<HTMLTableRowElement>}
       data-index={dataIndex}
-      className="bg-muted/40 hover:bg-muted/40"
+      className="group/row bg-muted/40 hover:bg-muted/40"
     >
       <TableCell className="relative px-3 py-1.5">
         <Checkbox
@@ -89,6 +90,7 @@ function TransactionDayHeaderImpl({
               ? t("spending:txTab.deselectDay", { date: label })
               : t("spending:txTab.selectDay", { date: label })
           }
+          className={SELECTION_SLOT}
         />
       </TableCell>
       <TableCell colSpan={3} className="px-3 py-1.5">

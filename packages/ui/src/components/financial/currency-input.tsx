@@ -40,7 +40,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
       value,
       onChange,
       className,
-      placeholder = "Select account currency",
+      placeholder,
       displayMode = "auto",
       valueDisplay = "label",
       autoFocusSearch = false,
@@ -53,6 +53,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
     ref,
   ) => {
     const { t } = useTranslation();
+    const placeholderText = placeholder ?? t("ui:currency.placeholder", "Select currency");
     const isControlled = openProp !== undefined;
     const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
     const open = isControlled ? openProp : uncontrolledOpen;
@@ -79,7 +80,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
         : valueDisplay === "code-label"
           ? `${selectedCurrency.value} - ${selectedCurrency.label}`
           : selectedCurrency.label
-      : value || placeholder;
+      : value || placeholderText;
 
     const handleSelect = (currencyValue: string) => {
       onChange(currencyValue);
@@ -121,7 +122,7 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
           : valueDisplay === "label"
             ? selectedCurrency.label
             : `${selectedCurrency.value} - ${selectedCurrency.label}`
-        : value || placeholder;
+        : value || placeholderText;
 
       return (
         <>
@@ -150,14 +151,12 @@ export const CurrencyInput = forwardRef<HTMLButtonElement, CurrencyInputProps>(
             >
               <SheetHeader className="border-border border-b px-6 pb-4 pt-6">
                 <SheetTitle>{t("ui:currency.selectTitle", "Select Currency")}</SheetTitle>
-                <SheetDescription>
-                  {t("ui:currency.selectDescription", "Choose your activity currency")}
-                </SheetDescription>
+                <SheetDescription>{t("ui:currency.selectDescription", "Choose a currency")}</SheetDescription>
               </SheetHeader>
 
               <div className="flex h-[calc(85vh-7rem)] flex-col">
                 <div className="border-border border-b px-6 py-4">
-                  <h3 className="text-foreground mb-3 text-sm font-semibold">Popular</h3>
+                  <h3 className="text-foreground mb-3 text-sm font-semibold">{t("ui:currency.popular", "Popular")}</h3>
                   <div className="grid grid-cols-3 gap-2">
                     {popularCurrencies.map((curr) => (
                       <button

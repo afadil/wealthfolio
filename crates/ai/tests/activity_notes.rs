@@ -7,7 +7,7 @@ use wealthfolio_agent_tools::{
     AgentToolCatalog,
 };
 use wealthfolio_ai::env::test_env::{MockActivityService, MockEnvironment};
-use wealthfolio_core::activities::ActivityDetails;
+use wealthfolio_core::activities::{ActivityDetails, CashBalanceScope};
 
 fn activity_with_notes(notes: Option<&str>) -> ActivityDetails {
     serde_json::from_value(serde_json::json!({
@@ -84,7 +84,11 @@ async fn search_activities_returns_each_row_cash_balance() {
         activities: vec![balanced, unbalanced],
         cash_balances: [(
             "activity-1".to_string(),
-            ("954.90".to_string(), "EUR".to_string()),
+            (
+                "954.90".to_string(),
+                "EUR".to_string(),
+                CashBalanceScope::Day,
+            ),
         )]
         .into(),
     });
@@ -108,7 +112,9 @@ async fn search_activities_returns_each_row_cash_balance() {
     let activities = result.content["activities"].as_array().unwrap();
     assert_eq!(activities[0]["cashBalance"], serde_json::json!(954.9));
     assert_eq!(activities[0]["cashBalanceCurrency"], "EUR");
-    // Rows without a balance leave both fields out.
+    assert_eq!(activities[0]["cashBalanceScope"], "DAY");
+    // Rows without a balance leave the fields out.
     assert!(activities[1].get("cashBalance").is_none());
     assert!(activities[1].get("cashBalanceCurrency").is_none());
+    assert!(activities[1].get("cashBalanceScope").is_none());
 }

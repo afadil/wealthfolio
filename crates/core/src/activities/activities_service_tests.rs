@@ -16,11 +16,16 @@ pub(crate) mod tests {
     use crate::errors::{DatabaseError, Error, Result};
     use crate::events::{DomainEvent, MockDomainEventSink};
     use crate::fx::{ExchangeRate, FxServiceTrait, NewExchangeRate};
+    use crate::portfolio::economic_events::BasisStatus;
+    use crate::portfolio::valuation::{
+        DailyAccountValuation, ExternalFlowSource, ValuationRepositoryTrait, ValuationStatus,
+    };
     use crate::quotes::service::ProviderInfo;
     use crate::quotes::{
         LatestQuotePair, LatestQuoteSnapshot, Quote, QuoteImport, QuoteServiceTrait,
         QuoteSyncState, ResolvedQuote, SymbolSearchResult, SymbolSyncPlan, SyncMode, SyncResult,
     };
+    use crate::test_support::in_memory::InMemoryValuationRepository;
     use async_trait::async_trait;
     use chrono::{DateTime, NaiveDate, Utc};
     use rust_decimal::Decimal;
@@ -16585,6 +16590,7 @@ pub(crate) mod tests {
             metadata: None,
             cash_balance: None,
             cash_balance_currency: None,
+            cash_balance_scope: None,
         }
     }
 
@@ -16683,17 +16689,245 @@ pub(crate) mod tests {
         assert_eq!(balance_of(&response, "funding"), None);
     }
 
+    fn scope_of(response: &ActivitySearchResponse, id: &str) -> Option<CashBalanceScope> {
+        response
+            .data
+            .iter()
+            .find(|row| row.id == id)
+            .expect("row on the page")
+            .cash_balance_scope
+    }
+
+    fn page_row_on(id: &str, account_id: &str, date: &str) -> ActivityDetails {
+        ActivityDetails {
+            date: date.to_string(),
+            ..page_row(id, account_id)
+        }
+    }
+
+    /// A day's valuation carrying only the cash the balances read.
+    fn day_valuation(account_id: &str, day: &str, cash: Decimal) -> DailyAccountValuation {
+        let valuation_date: NaiveDate = day.parse().unwrap();
+        DailyAccountValuation {
+            id: format!("{account_id}_{valuation_date}"),
+            account_id: account_id.to_string(),
+            valuation_date,
+            account_currency: "USD".to_string(),
+            base_currency: "USD".to_string(),
+            fx_rate_to_base: dec!(1),
+            cash_balance: cash,
+            investment_market_value: Decimal::ZERO,
+            total_value: cash,
+            cost_basis: Decimal::ZERO,
+            book_basis: Decimal::ZERO,
+            net_contribution: Decimal::ZERO,
+            cash_balance_base: cash,
+            investment_market_value_base: Decimal::ZERO,
+            total_value_base: cash,
+            cost_basis_base: Decimal::ZERO,
+            book_basis_base: Decimal::ZERO,
+            net_contribution_base: Decimal::ZERO,
+            external_inflow_base: Decimal::ZERO,
+            external_outflow_base: Decimal::ZERO,
+            external_flow_source: ExternalFlowSource::Unknown,
+            performance_eligible_value_base: cash,
+            value_status: ValuationStatus::Complete,
+            basis_status: BasisStatus::NotApplicable,
+            calculated_at: Utc::now(),
+        }
+    }
+
+    async fn with_valuations(
+        service: ActivityService,
+        valuations: Vec<DailyAccountValuation>,
+    ) -> ActivityService {
+        let repository = Arc::new(InMemoryValuationRepository::default());
+        for valuation in valuations {
+            repository
+                .replace_valuations_for_account(
+                    &valuation.account_id.clone(),
+                    Some(valuation.valuation_date),
+                    &[valuation],
+                )
+                .await
+                .expect("store valuation");
+        }
+        service.with_valuation_repository(repository)
+    }
+
     #[tokio::test]
-    async fn attach_cash_balances_skips_a_cash_account_holding_securities() {
-        let mut trade = create_stored_activity("trade", "checking", Some("asset-aapl"));
-        trade.activity_date = "2026-04-02T00:00:00Z".parse().unwrap();
+    async fn attach_cash_balances_marks_running_balances_as_row_balances() {
         let service = cash_balance_service(
             vec![cash_account("checking", "CASH")],
-            vec![
-                cash_row("deposit", "checking", "DEPOSIT", 1, dec!(100)),
-                trade,
-            ],
+            vec![cash_row("opening", "checking", "DEPOSIT", 1, dec!(100))],
         );
+        let mut response = page(vec![page_row("opening", "checking")]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(scope_of(&response, "opening"), Some(CashBalanceScope::Row));
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_gives_other_accounts_their_day_end_cash() {
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                day_valuation("brokerage", "2026-04-02", dec!(750)),
+            ],
+        )
+        .await;
+        let mut draft = page_row_on("draft", "brokerage", "2026-04-02T16:00:00Z");
+        draft.status = ActivityStatus::Draft;
+        let mut response = page(vec![
+            page_row_on("future", "brokerage", "2026-04-03T10:00:00Z"),
+            draft,
+            page_row_on("dividend", "brokerage", "2026-04-02T15:00:00Z"),
+            page_row_on("buy", "brokerage", "2026-04-02T10:00:00Z"),
+            page_row_on("deposit", "brokerage", "2026-04-01T10:00:00Z"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        // Every posted row of a day carries that day's closing cash.
+        for id in ["dividend", "buy"] {
+            assert_eq!(
+                balance_of(&response, id),
+                Some(("750".to_string(), "USD".to_string()))
+            );
+            assert_eq!(scope_of(&response, id), Some(CashBalanceScope::Day));
+        }
+        assert_eq!(
+            balance_of(&response, "deposit"),
+            Some(("900".to_string(), "USD".to_string()))
+        );
+        // A draft is not in the engine; a day without a valuation has none.
+        assert_eq!(balance_of(&response, "draft"), None);
+        assert_eq!(balance_of(&response, "future"), None);
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_dates_rows_in_the_configured_timezone() {
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                day_valuation("brokerage", "2026-04-02", dec!(750)),
+            ],
+        )
+        .await
+        .with_timezone(Arc::new(std::sync::RwLock::new(
+            "America/Toronto".to_string(),
+        )));
+        // 02:00 UTC on April 2 is still April 1 in Toronto.
+        let mut response = page(vec![page_row_on(
+            "late",
+            "brokerage",
+            "2026-04-02T02:00:00Z",
+        )]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(
+            balance_of(&response, "late"),
+            Some(("900".to_string(), "USD".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_leaves_an_unavailable_day_without_a_balance() {
+        // A USD account holding CAD with no CAD->USD rate: the engine leaves
+        // the CAD out of the day's cash and marks the day unavailable.
+        let unavailable = DailyAccountValuation {
+            value_status: ValuationStatus::Unavailable,
+            ..day_valuation("brokerage", "2026-04-02", dec!(0))
+        };
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                unavailable,
+            ],
+        )
+        .await;
+        let mut response = page(vec![
+            page_row_on("unconverted", "brokerage", "2026-04-02T10:00:00Z"),
+            page_row_on("deposit", "brokerage", "2026-04-01T10:00:00Z"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(balance_of(&response, "unconverted"), None);
+        assert_eq!(scope_of(&response, "unconverted"), None);
+        assert_eq!(
+            balance_of(&response, "deposit"),
+            Some(("900".to_string(), "USD".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_skips_rows_stored_without_a_timezone() {
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                day_valuation("brokerage", "2026-04-02", dec!(750)),
+            ],
+        )
+        .await
+        .with_timezone(Arc::new(std::sync::RwLock::new(
+            "America/Toronto".to_string(),
+        )));
+        // Older rows store SQLite's own timestamp shape or a bare date: the
+        // engine reads them as UTC, a list as local time, so the day of their
+        // closing cash and the day they show can differ.
+        let mut response = page(vec![
+            page_row_on("sqlite-shape", "brokerage", "2026-04-02 10:00:00.250"),
+            page_row_on("bare-date", "brokerage", "2026-04-02"),
+            page_row_on("zoned", "brokerage", "2026-04-02T14:00:00Z"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(balance_of(&response, "sqlite-shape"), None);
+        assert_eq!(balance_of(&response, "bare-date"), None);
+        assert_eq!(
+            balance_of(&response, "zoned"),
+            Some(("750".to_string(), "USD".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_gives_a_cash_account_holding_securities_its_day_end_cash() {
+        let mut trade = create_stored_activity("trade", "checking", Some("asset-aapl"));
+        trade.activity_date = "2026-04-02T00:00:00Z".parse().unwrap();
+        let service = with_valuations(
+            cash_balance_service(
+                vec![cash_account("checking", "CASH")],
+                vec![
+                    cash_row("deposit", "checking", "DEPOSIT", 1, dec!(100)),
+                    trade,
+                ],
+            ),
+            vec![day_valuation("checking", "2026-04-01", dec!(100))],
+        )
+        .await;
 
         let mut response = page(vec![page_row("deposit", "checking")]);
         service
@@ -16701,7 +16935,30 @@ pub(crate) mod tests {
             .await
             .expect("attach balances");
 
-        assert_eq!(balance_of(&response, "deposit"), None);
+        assert_eq!(
+            balance_of(&response, "deposit"),
+            Some(("100".to_string(), "USD".to_string()))
+        );
+        assert_eq!(scope_of(&response, "deposit"), Some(CashBalanceScope::Day));
+    }
+
+    #[tokio::test]
+    async fn attach_cash_balances_skips_holdings_tracked_accounts() {
+        let mut manual = cash_account("manual", "SECURITIES");
+        manual.tracking_mode = crate::accounts::TrackingMode::Holdings;
+        let service = with_valuations(
+            cash_balance_service(vec![manual], vec![]),
+            vec![day_valuation("manual", "2026-04-01", dec!(500))],
+        )
+        .await;
+
+        let mut response = page(vec![page_row("snapshot-day", "manual")]);
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(balance_of(&response, "snapshot-day"), None);
     }
 
     #[test]
@@ -16714,10 +16971,14 @@ pub(crate) mod tests {
             Some(&serde_json::Value::Null)
         );
 
+        assert_eq!(json.get("cashBalanceScope"), Some(&serde_json::Value::Null));
+
         row.cash_balance = Some("70".to_string());
         row.cash_balance_currency = Some("USD".to_string());
+        row.cash_balance_scope = Some(CashBalanceScope::Day);
         let json = serde_json::to_value(&row).expect("serialize row");
         assert_eq!(json["cashBalance"], "70");
         assert_eq!(json["cashBalanceCurrency"], "USD");
+        assert_eq!(json["cashBalanceScope"], "DAY");
     }
 }

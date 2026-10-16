@@ -11,14 +11,16 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 
 use super::{
-    is_cash_symbol, Activity, DefaultActivityCompiler, NewActivity,
-    ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_SELL,
+    effective_activity_type, is_cash_symbol, is_securities_transfer, Activity, ActivityStatus,
+    DefaultActivityCompiler, NewActivity, ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_TYPE_BUY,
+    ACTIVITY_TYPE_SELL,
 };
 use crate::accounts::{account_types, Account, TrackingMode};
-use crate::portfolio::economic_events::ActivityEconomicsResolver;
+use crate::portfolio::economic_events::{ActivityCashInputs, ActivityEconomicsResolver};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActivityCashBalance {
@@ -26,6 +28,74 @@ pub struct ActivityCashBalance {
     pub currency: String,
     /// The account's cash in that currency after the row.
     pub balance: Decimal,
+}
+
+/// The fields of an activity the ledger reads, so storage can load an
+/// account's history without whole activities.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CashLedgerActivity {
+    pub id: String,
+    pub account_id: String,
+    pub asset_id: Option<String>,
+    pub activity_type: String,
+    pub activity_type_override: Option<String>,
+    pub subtype: Option<String>,
+    pub status: ActivityStatus,
+    pub activity_date: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub quantity: Option<Decimal>,
+    pub unit_price: Option<Decimal>,
+    pub amount: Option<Decimal>,
+    pub fee: Option<Decimal>,
+    pub tax: Option<Decimal>,
+    pub currency: String,
+}
+
+impl CashLedgerActivity {
+    fn effective_type(&self) -> &str {
+        effective_activity_type(&self.activity_type, self.activity_type_override.as_deref())
+    }
+
+    /// The resolver's inputs, built from these fields alone: a new input
+    /// fails to compile here until the ledger reads it too.
+    fn cash_inputs(&self) -> ActivityCashInputs<'_> {
+        ActivityCashInputs {
+            activity_type: self.effective_type(),
+            currency: &self.currency,
+            is_security_transfer: is_securities_transfer(
+                self.effective_type(),
+                self.asset_id.as_deref(),
+            ),
+            quantity: self.quantity,
+            unit_price: self.unit_price,
+            amount: self.amount,
+            fee: self.fee,
+            tax: self.tax,
+            unit_multiplier: Decimal::ONE,
+        }
+    }
+}
+
+impl From<&Activity> for CashLedgerActivity {
+    fn from(activity: &Activity) -> Self {
+        Self {
+            id: activity.id.clone(),
+            account_id: activity.account_id.clone(),
+            asset_id: activity.asset_id.clone(),
+            activity_type: activity.activity_type.clone(),
+            activity_type_override: activity.activity_type_override.clone(),
+            subtype: activity.subtype.clone(),
+            status: activity.status.clone(),
+            activity_date: activity.activity_date,
+            created_at: activity.created_at,
+            quantity: activity.quantity,
+            unit_price: activity.unit_price,
+            amount: activity.amount,
+            fee: activity.fee,
+            tax: activity.tax,
+            currency: activity.currency.clone(),
+        }
+    }
 }
 
 /// The order the engine applies an account's activities in: by timestamp,
@@ -38,12 +108,18 @@ pub fn application_order(a: &Activity, b: &Activity) -> Ordering {
         .then_with(|| a.id.cmp(&b.id))
 }
 
+/// Accounts whose cash comes from their activities: all but holdings-tracked
+/// ones, whose holdings are entered rather than derived.
+pub fn shows_cash_balance(account: &Account) -> bool {
+    account.tracking_mode != TrackingMode::Holdings
+}
+
 /// Cash and credit-card accounts whose cash comes from their activities.
 pub fn shows_running_cash_balance(account: &Account) -> bool {
     matches!(
         account.account_type.as_str(),
         account_types::CASH | account_types::CREDIT_CARD
-    ) && account.tracking_mode != TrackingMode::Holdings
+    ) && shows_cash_balance(account)
 }
 
 /// The balance after each of `account`'s posted activities, by activity id, or
@@ -51,16 +127,24 @@ pub fn shows_running_cash_balance(account: &Account) -> bool {
 /// move no cash and get no balance.
 pub fn running_cash_balances(
     account: &Account,
-    activities: &[Activity],
+    activities: &[CashLedgerActivity],
 ) -> Option<HashMap<String, ActivityCashBalance>> {
-    let mut ordered: Vec<&Activity> = activities
+    let mut ordered: Vec<&CashLedgerActivity> = activities
         .iter()
-        .filter(|activity| activity.account_id == account.id && activity.is_posted())
+        .filter(|activity| {
+            activity.account_id == account.id && activity.status == ActivityStatus::Posted
+        })
         .collect();
     if ordered.iter().any(|activity| holds_security(activity)) {
         return None;
     }
-    ordered.sort_by(|a, b| application_order(a, b));
+    // Application order, as `application_order` sorts whole activities.
+    ordered.sort_by(|a, b| {
+        a.activity_date
+            .cmp(&b.activity_date)
+            .then_with(|| a.created_at.cmp(&b.created_at))
+            .then_with(|| a.id.cmp(&b.id))
+    });
 
     let is_credit_card = account.account_type == account_types::CREDIT_CARD;
     let mut cash: HashMap<String, Decimal> = HashMap::new();
@@ -69,9 +153,8 @@ pub fn running_cash_balances(
         // A row the engine books no cash for (a split, an adjustment, a
         // missing amount) adds zero; a row with no currency books in the
         // account's, as the engine assumes.
-        let amount = ActivityEconomicsResolver::resolve_cash_with_account_context(
-            activity,
-            Decimal::ONE,
+        let amount = ActivityEconomicsResolver::resolve_cash_inputs_with_account_context(
+            activity.cash_inputs(),
             is_credit_card,
         )
         .signed_cash_effect
@@ -98,7 +181,7 @@ pub fn running_cash_balances(
 /// (which reduces a holding: against a cash symbol the engine rejects it),
 /// or a row the compiler expands into income and a purchase (DRIP, dividend
 /// in kind, staking reward), with or without an asset.
-fn holds_security(activity: &Activity) -> bool {
+fn holds_security(activity: &CashLedgerActivity) -> bool {
     let activity_type = activity.effective_type();
     let subtype =
         NewActivity::canonicalize_subtype_for_activity(activity_type, activity.subtype.as_deref());
@@ -109,7 +192,7 @@ fn holds_security(activity: &Activity) -> bool {
             .as_deref()
             .map(str::trim)
             .is_some_and(|asset_id| !asset_id.is_empty() && !is_cash_symbol(asset_id))
-        || DefaultActivityCompiler::expands(activity)
+        || DefaultActivityCompiler::expands(activity_type, activity.subtype.as_deref())
 }
 
 #[cfg(test)]
@@ -124,6 +207,11 @@ mod tests {
     use wealthfolio_portfolio_engine::Engine;
 
     use super::*;
+
+    /// What storage hands the ledger: the ledger's fields of each activity.
+    fn ledger(activities: &[Activity]) -> Vec<CashLedgerActivity> {
+        activities.iter().map(CashLedgerActivity::from).collect()
+    }
     use crate::activities::{
         ActivityStatus, ACTIVITY_SUBTYPE_BONUS, ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND,
         ACTIVITY_SUBTYPE_DRIP, ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION,
@@ -305,7 +393,7 @@ mod tests {
         let mut salary = activity("d", ACTIVITY_TYPE_DEPOSIT, "2026-04-03T09:00:00Z", dec!(50));
         salary.created_at = at("2026-04-01T00:00:00Z");
 
-        let balances = running_cash_balances(&account, &[salary, rent, coffee, opening])
+        let balances = running_cash_balances(&account, &ledger(&[salary, rent, coffee, opening]))
             .expect("a cash-only history");
 
         assert_eq!(balances["a"], balance("USD", dec!(100)));
@@ -339,7 +427,7 @@ mod tests {
         draft.status = ActivityStatus::Draft;
         let fee = activity("fee", ACTIVITY_TYPE_FEE, "2026-04-04T00:00:00Z", dec!(2));
 
-        let balances = running_cash_balances(&account, &[deposit, pending, draft, fee])
+        let balances = running_cash_balances(&account, &ledger(&[deposit, pending, draft, fee]))
             .expect("a cash-only history");
 
         assert!(!balances.contains_key("pending"));
@@ -369,7 +457,7 @@ mod tests {
             dec!(100),
         );
 
-        let balances = running_cash_balances(&account, &[charge, interest, payment])
+        let balances = running_cash_balances(&account, &ledger(&[charge, interest, payment]))
             .expect("a cash-only history");
 
         assert_eq!(balances["charge"], balance("USD", dec!(-120)));
@@ -395,7 +483,7 @@ mod tests {
         );
 
         let balances =
-            running_cash_balances(&account, &[home, abroad]).expect("a cash-only history");
+            running_cash_balances(&account, &ledger(&[home, abroad])).expect("a cash-only history");
 
         assert_eq!(balances["home"], balance("CAD", dec!(-40)));
         assert_eq!(balances["abroad"], balance("USD", dec!(-9.59)));
@@ -418,7 +506,8 @@ mod tests {
         );
         other.account_id = "someone-else".to_string();
 
-        let balances = running_cash_balances(&account, &[own, other]).expect("a cash-only history");
+        let balances =
+            running_cash_balances(&account, &ledger(&[own, other])).expect("a cash-only history");
 
         assert_eq!(balances.len(), 1);
         assert_eq!(balances["own"], balance("USD", dec!(10)));
@@ -484,7 +573,8 @@ mod tests {
             draft,
         ];
 
-        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
+        let balances =
+            running_cash_balances(&account, &ledger(&activities)).expect("a cash-only history");
 
         assert_eq!(balances["transfer-out"], balance("USD", dec!(645.98)));
         assert_eq!(balances["euros"], balance("EUR", dec!(80)));
@@ -534,7 +624,8 @@ mod tests {
         payment.currency = "CAD".to_string();
         let activities = vec![groceries, refund, interest, abroad, payment];
 
-        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
+        let balances =
+            running_cash_balances(&account, &ledger(&activities)).expect("a cash-only history");
 
         assert_eq!(
             closing_cash(&balances, &activities),
@@ -571,7 +662,7 @@ mod tests {
         let cash_symbol_trade = security_row("conversion", ACTIVITY_TYPE_BUY, "$CASH-EUR");
         for row in [drip, option_sale, cash_symbol_trade] {
             assert!(
-                running_cash_balances(&account, &[deposit.clone(), row]).is_none(),
+                running_cash_balances(&account, &ledger(&[deposit.clone(), row])).is_none(),
                 "a security row withholds the balances"
             );
         }
@@ -579,7 +670,7 @@ mod tests {
         // A draft trade moves no cash, so the account still has balances.
         let mut draft = security_row("draft", ACTIVITY_TYPE_BUY, "AAPL");
         draft.status = ActivityStatus::Draft;
-        assert!(running_cash_balances(&account, &[deposit, draft]).is_some());
+        assert!(running_cash_balances(&account, &ledger(&[deposit, draft])).is_some());
     }
 
     #[test]
@@ -612,8 +703,11 @@ mod tests {
             (ACTIVITY_TYPE_DIVIDEND, "RETURN_OF_CAPITAL"),
         ] {
             assert!(
-                running_cash_balances(&account, &[deposit.clone(), income(activity_type, subtype)])
-                    .is_none(),
+                running_cash_balances(
+                    &account,
+                    &ledger(&[deposit.clone(), income(activity_type, subtype)])
+                )
+                .is_none(),
                 "{subtype} withholds the balances"
             );
         }
@@ -622,7 +716,8 @@ mod tests {
         let mut dividend = income(ACTIVITY_TYPE_DIVIDEND, "");
         dividend.subtype = None;
         let activities = vec![deposit, dividend];
-        let balances = running_cash_balances(&account, &activities).expect("a cash-only history");
+        let balances =
+            running_cash_balances(&account, &ledger(&activities)).expect("a cash-only history");
         assert_eq!(
             closing_cash(&balances, &activities),
             engine_cash(&account, &activities)
@@ -699,7 +794,8 @@ mod tests {
                             let activities = vec![deposit, row];
 
                             checked += 1;
-                            let Some(balances) = running_cash_balances(&account, &activities)
+                            let Some(balances) =
+                                running_cash_balances(&account, &ledger(&activities))
                             else {
                                 continue;
                             };

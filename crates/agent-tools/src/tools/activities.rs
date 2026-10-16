@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use wealthfolio_core::activities::Sort;
+use wealthfolio_core::activities::{CashBalanceScope, Sort};
 
 use crate::constants::{DEFAULT_PAGE_SIZE, MAX_ACTIVITIES_ROWS};
 use crate::env::AgentEnvironment;
@@ -46,13 +46,15 @@ pub struct ActivityDto {
     pub account_id: String,
     pub account_name: Option<String>,
     pub notes: Option<String>,
-    /// The cash of the activity's account after this activity, in
-    /// `cash_balance_currency`. Absent for investment accounts and for cash
-    /// or credit-card accounts that hold securities.
+    /// The cash of the activity's account in `cash_balance_currency`, as
+    /// `cash_balance_scope` says: after this activity (`ROW`) or at the end of
+    /// its day (`DAY`). Absent for holdings-tracked accounts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash_balance: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash_balance_currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cash_balance_scope: Option<CashBalanceScope>,
 }
 
 /// Output envelope for activities tool.
@@ -80,7 +82,7 @@ impl AgentTool for SearchActivities {
     }
 
     fn description(&self) -> &'static str {
-        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed. Activities of cash and credit-card accounts carry cashBalance: the account's cash in cashBalanceCurrency after that activity, useful for reconciling against a bank statement (absent for investment accounts and accounts holding securities)."
+        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed. Activities carry cashBalance, the account's cash in cashBalanceCurrency: with cashBalanceScope ROW (cash and credit-card accounts), the cash right after that activity, useful for reconciling against a bank statement; with DAY (other accounts), the cash at the end of the activity's day in the account currency, the same on every activity of that day. Absent for holdings-tracked accounts and for days whose value could not be computed (such as cash in a currency with no exchange rate): treat it as unknown, not zero."
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -266,6 +268,7 @@ impl AgentTool for SearchActivities {
                     notes: a.comment,
                     cash_balance,
                     cash_balance_currency: a.cash_balance_currency,
+                    cash_balance_scope: a.cash_balance_scope,
                 }
             })
             .collect();

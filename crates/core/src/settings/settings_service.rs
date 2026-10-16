@@ -148,8 +148,6 @@ pub trait SettingsServiceTrait: Send + Sync {
 
     fn get_base_currency(&self) -> Result<Option<String>>;
 
-    async fn update_base_currency(&self, new_base_currency: &str) -> Result<()>;
-
     fn is_auto_update_check_enabled(&self) -> Result<bool>;
 
     fn is_sync_enabled(&self) -> Result<bool>;
@@ -190,13 +188,6 @@ impl SettingsServiceTrait for SettingsService {
         let current_base_currency = self.get_base_currency()?;
         let mut normalized_settings = new_settings.clone();
 
-        if let Some(ref new_base_currency_val) = normalized_settings.base_currency {
-            if current_base_currency.as_deref() != Some(new_base_currency_val.as_str()) {
-                self.update_base_currency(new_base_currency_val.as_str())
-                    .await?;
-            }
-        }
-
         if let Some(ref timezone_raw) = normalized_settings.timezone {
             normalized_settings.timezone = Some(canonicalize_timezone(timezone_raw)?);
         }
@@ -211,6 +202,16 @@ impl SettingsServiceTrait for SettingsService {
             normalized_settings.language = Some(validate_ui_language(language)?);
         }
 
+        // Validate the whole update first: a rejected update must not change the
+        // base currency, which the repository writes in the same transaction as
+        // the other settings.
+        if let Some(ref new_base_currency_val) = normalized_settings.base_currency {
+            if current_base_currency.as_deref() != Some(new_base_currency_val.as_str()) {
+                self.register_base_currency_pairs(new_base_currency_val.as_str())
+                    .await?;
+            }
+        }
+
         self.settings_repository
             .update_settings(&normalized_settings)
             .await?;
@@ -223,36 +224,6 @@ impl SettingsServiceTrait for SettingsService {
             Err(Error::Database(DatabaseError::NotFound(_))) => Ok(None),
             Err(e) => Err(e),
         }
-    }
-
-    async fn update_base_currency(&self, new_base_currency: &str) -> Result<()> {
-        let all_currencies = self
-            .settings_repository
-            .get_distinct_currencies_excluding_base(new_base_currency)?;
-
-        debug!(
-            "Registering currency pairs for currencies: {:?}",
-            all_currencies
-        );
-
-        for currency_code in all_currencies {
-            let registration_result = self
-                .fx_service
-                .register_currency_pair(currency_code.as_str(), new_base_currency)
-                .await;
-
-            if let Err(e) = registration_result {
-                error!(
-                    "Failed to register currency pair {}{}: {}. Skipping.",
-                    new_base_currency, currency_code, e
-                );
-            }
-        }
-
-        self.settings_repository
-            .update_setting("base_currency", new_base_currency)
-            .await?;
-        Ok(())
     }
 
     fn is_auto_update_check_enabled(&self) -> Result<bool> {
@@ -296,6 +267,32 @@ impl SettingsService {
             settings_repository,
             fx_service,
         }
+    }
+
+    async fn register_base_currency_pairs(&self, new_base_currency: &str) -> Result<()> {
+        let all_currencies = self
+            .settings_repository
+            .get_distinct_currencies_excluding_base(new_base_currency)?;
+
+        debug!(
+            "Registering currency pairs for currencies: {:?}",
+            all_currencies
+        );
+
+        for currency_code in all_currencies {
+            let registration_result = self
+                .fx_service
+                .register_currency_pair(currency_code.as_str(), new_base_currency)
+                .await;
+
+            if let Err(e) = registration_result {
+                error!(
+                    "Failed to register currency pair {}{}: {}. Skipping.",
+                    new_base_currency, currency_code, e
+                );
+            }
+        }
+        Ok(())
     }
 }
 

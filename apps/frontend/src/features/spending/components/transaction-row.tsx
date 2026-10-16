@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Account } from "@/lib/types";
 import { AccountType } from "@/lib/constants";
 import { TruncatedText } from "@/components/truncated-text";
-import { HOVER_SLOT } from "@/lib/hover-slot";
+import { HOVER_SLOT, SELECTION_SLOT } from "@/lib/hover-slot";
 import { isRowBodyClick } from "@/lib/row-click";
 import { cn } from "@/lib/utils";
 import {
@@ -131,6 +131,7 @@ function TransactionRowImpl({
           checked={isSelected}
           onCheckedChange={() => onToggleSelect(a.id)}
           aria-label={rowAriaLabel}
+          className={SELECTION_SLOT}
         />
       </TableCell>
       <TableCell className="text-muted-foreground hidden w-20 whitespace-nowrap px-3 py-2 text-xs tabular-nums md:table-cell">
