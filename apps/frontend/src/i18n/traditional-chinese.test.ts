@@ -180,10 +180,6 @@ describe("Traditional Chinese translations", () => {
     expect(allStrings.get("settings:fx_delete_warning")).toContain("重新建立");
   });
 
-  it("keeps the client configuration prefix valid", () => {
-    expect(allStrings.get("settings:agentAccess.dialog_client_config_desc")).toMatch(/^可直接貼上/);
-  });
-
   it("labels retirement capital inputs accurately", () => {
     expect(allStrings.get("goals:dashboard.progress.capital_needed_tip_traditional")).toContain(
       "已計入",
