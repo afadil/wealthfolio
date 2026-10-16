@@ -137,7 +137,10 @@ fn malformed_or_wrong_key_files_fail_without_panics_or_replacement() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("secrets.json");
         fs::write(&path, &raw).unwrap();
-        assert!(build_secret_store(path.clone(), Some(KEY), Some(&[8; 32])).is_ok());
+        // This reaches the vault report, which another test captures; see `captured_logs`.
+        captured_logs(|| {
+            assert!(build_secret_store(path.clone(), Some(KEY), Some(&[8; 32])).is_ok());
+        });
         let store = FileSecretStore::new_from_bytes(path.clone(), Some(KEY)).unwrap();
         assert!(store.get_secret("fixture").is_err());
         assert!(store.set_secret("new", "value").is_err());
@@ -415,6 +418,10 @@ fn existing_optional_key_api_remains_compatible() {
     }
 }
 
+/// Tracing caches whether a log call is enabled when it first fires, from the subscriber
+/// of the thread that fires it. Fired first with no subscriber, it stays disabled for
+/// every thread until the next subscriber is created, so a capture already running on
+/// another thread records nothing. Every test that reaches a captured log call runs here.
 fn captured_logs(run: impl FnOnce()) -> String {
     #[derive(Clone, Default)]
     struct Buffer(std::sync::Arc<Mutex<Vec<u8>>>);
