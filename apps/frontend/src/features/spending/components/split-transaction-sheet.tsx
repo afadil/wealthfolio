@@ -19,11 +19,11 @@ import {
 } from "@wealthfolio/ui";
 
 import {
-  canDistributeSplitCents,
-  centsToAmount,
-  distributeEvenlyCents,
-  distributeRemainingCents,
-  toCents,
+  canDistributeSplitUnits,
+  distributeEvenlyUnits,
+  distributeRemainingUnits,
+  splitUnitsToAmount,
+  toSplitUnits,
 } from "../lib/split-utils";
 import type { TransactionRowVM } from "../lib/transactions-helpers";
 import type { NewActivitySplit } from "../types/cash-activity";
@@ -92,9 +92,9 @@ function splitLineColor(category: TaxonomyCategory | undefined, index: number) {
   return category?.color || fallbackLineColor(index);
 }
 
-function linePercentage(lineCents: number, totalCents: number) {
-  if (totalCents <= 0) return 0;
-  return Math.round((Math.max(lineCents, 0) / totalCents) * 100);
+function linePercentage(lineUnits: number, totalUnits: number) {
+  if (totalUnits <= 0) return 0;
+  return Math.round((Math.max(lineUnits, 0) / totalUnits) * 100);
 }
 
 export function SplitTransactionSheet({
@@ -111,10 +111,13 @@ export function SplitTransactionSheet({
   const isMobile = useIsMobileViewport();
   const activity = row?.activity ?? null;
   const taxonomyId = taxonomyForBucket(activity?.cashFlowBucket);
-  const totalCents = toCents(activity?.amount);
-  const totalAmount = Math.abs(totalCents) / 100;
   const currency = activity?.currency || "USD";
   const currencySymbol = formatting.formatCurrencySymbol(currency);
+  // Splits are summed in the currency's fraction digits, but never fewer than two,
+  // so a total with cents in a currency without minor units can still be split.
+  const splitDecimals = Math.max(2, formatting.currencyFractionDigits(currency));
+  const totalUnits = toSplitUnits(activity?.amount, splitDecimals);
+  const totalAmount = splitUnitsToAmount(Math.abs(totalUnits), splitDecimals);
 
   const [lines, setLines] = useState<SplitLineState[]>([]);
   const [expandedNoteLineIds, setExpandedNoteLineIds] = useState<Set<string>>(new Set());
@@ -145,49 +148,51 @@ export function SplitTransactionSheet({
     setLines([makeLine(taxonomyId, "", totalAmount)]);
   }, [open, row, taxonomyId, totalAmount]);
 
-  const assignedCents = useMemo(
-    () => lines.reduce((sum, line) => sum + toCents(line.amount), 0),
-    [lines],
+  const assignedUnits = useMemo(
+    () => lines.reduce((sum, line) => sum + toSplitUnits(line.amount, splitDecimals), 0),
+    [lines, splitDecimals],
   );
-  const totalAbsCents = Math.abs(totalCents);
-  const remainingCents = totalAbsCents - assignedCents;
+  const totalAbsUnits = Math.abs(totalUnits);
+  const remainingUnits = totalAbsUnits - assignedUnits;
   const emptyAmountIndexes = lines
     .map((line, index) => ({ line, index }))
-    .filter(({ line }) => toCents(line.amount) <= 0)
+    .filter(({ line }) => toSplitUnits(line.amount, splitDecimals) <= 0)
     .map(({ index }) => index);
-  const hasInvalidLine = lines.some((line) => !line.categoryId || toCents(line.amount) <= 0);
+  const hasInvalidLine = lines.some(
+    (line) => !line.categoryId || toSplitUnits(line.amount, splitDecimals) <= 0,
+  );
   const canSave =
-    !!activity && !!taxonomyId && lines.length > 0 && !hasInvalidLine && remainingCents === 0;
-  const canDistribute = canDistributeSplitCents(
-    totalAbsCents,
-    assignedCents,
+    !!activity && !!taxonomyId && lines.length > 0 && !hasInvalidLine && remainingUnits === 0;
+  const canDistribute = canDistributeSplitUnits(
+    totalAbsUnits,
+    assignedUnits,
     emptyAmountIndexes.length,
     lines.length,
   );
   const allocationSegments = useMemo(() => {
     const lineSegments = lines
       .map((line, index) => {
-        const amountCents = Math.max(toCents(line.amount), 0);
+        const amountUnits = Math.max(toSplitUnits(line.amount, splitDecimals), 0);
         const category = categories.get(line.categoryId);
         return {
           id: line.id,
-          amountCents,
+          amountUnits,
           color: splitLineColor(category, index),
         };
       })
-      .filter((segment) => segment.amountCents > 0);
-    const remainingPositiveCents = Math.max(remainingCents, 0);
-    return remainingPositiveCents > 0
+      .filter((segment) => segment.amountUnits > 0);
+    const remainingPositiveUnits = Math.max(remainingUnits, 0);
+    return remainingPositiveUnits > 0
       ? [
           ...lineSegments,
           {
             id: "remaining",
-            amountCents: remainingPositiveCents,
+            amountUnits: remainingPositiveUnits,
             color: "var(--muted)",
           },
         ]
       : lineSegments;
-  }, [categories, lines, remainingCents]);
+  }, [categories, lines, remainingUnits, splitDecimals]);
   const hasExistingSplits = (row?.splitCount ?? 0) > 0;
 
   const updateLine = (id: string, patch: Partial<SplitLineState>) => {
@@ -216,24 +221,29 @@ export function SplitTransactionSheet({
 
   const handleDistribute = () => {
     if (!canDistribute) return;
-    if (remainingCents > 0) {
-      const amounts = distributeRemainingCents(
-        totalAbsCents,
-        assignedCents,
+    if (remainingUnits > 0) {
+      const amounts = distributeRemainingUnits(
+        totalAbsUnits,
+        assignedUnits,
         emptyAmountIndexes.length,
       );
       setLines((current) =>
         current.map((line, index) => {
           const emptyIndex = emptyAmountIndexes.indexOf(index);
-          return emptyIndex >= 0 ? { ...line, amount: centsToAmount(amounts[emptyIndex]) } : line;
+          return emptyIndex >= 0
+            ? { ...line, amount: splitUnitsToAmount(amounts[emptyIndex], splitDecimals) }
+            : line;
         }),
       );
       return;
     }
 
-    const amounts = distributeEvenlyCents(totalAbsCents, lines.length);
+    const amounts = distributeEvenlyUnits(totalAbsUnits, lines.length);
     setLines((current) =>
-      current.map((line, index) => ({ ...line, amount: centsToAmount(amounts[index]) })),
+      current.map((line, index) => ({
+        ...line,
+        amount: splitUnitsToAmount(amounts[index], splitDecimals),
+      })),
     );
   };
 
@@ -244,7 +254,7 @@ export function SplitTransactionSheet({
       lines.map((line, index) => ({
         taxonomyId,
         categoryId: line.categoryId,
-        amount: (line.amount ?? 0).toFixed(2),
+        amount: (line.amount ?? 0).toFixed(splitDecimals),
         note: line.note.trim() || null,
         sortOrder: index,
       })),
@@ -277,24 +287,31 @@ export function SplitTransactionSheet({
 
         <div className={cn("min-h-0 flex-1 overflow-y-auto", isMobile ? "px-4" : "px-1")}>
           <div className="space-y-4 py-4">
-            {/* Splits are summed in cents, so these keep cents even for currencies without them. */}
+            {/* Splits are summed in at least cents, so these keep cents even for currencies without them. */}
             <div className="bg-muted/50 flex items-center justify-between rounded-2xl px-4 py-4">
               <span className="text-muted-foreground text-sm">
                 {t("spending:split.remainingOf", {
-                  amount: formatting.formatPrice(centsToAmount(totalAbsCents), currency),
+                  amount: formatting.formatPrice(
+                    splitUnitsToAmount(totalAbsUnits, splitDecimals),
+                    currency,
+                  ),
                 })}
               </span>
               <span
                 className={cn(
                   "font-mono text-lg font-semibold tabular-nums",
-                  remainingCents === 0
+                  remainingUnits === 0
                     ? "text-success"
-                    : remainingCents < 0
+                    : remainingUnits < 0
                       ? "text-destructive"
                       : "text-foreground",
                 )}
               >
-                {formatting.formatPrice(centsToAmount(remainingCents), currency, false)}{" "}
+                {formatting.formatPrice(
+                  splitUnitsToAmount(remainingUnits, splitDecimals),
+                  currency,
+                  false,
+                )}{" "}
                 {activity?.currency}
               </span>
             </div>
@@ -307,7 +324,7 @@ export function SplitTransactionSheet({
                     className={cn(index > 0 && "ml-1")}
                     style={{
                       flexBasis: 0,
-                      flexGrow: segment.amountCents,
+                      flexGrow: segment.amountUnits,
                       backgroundColor: segment.color,
                     }}
                     aria-hidden="true"
@@ -324,7 +341,7 @@ export function SplitTransactionSheet({
               const category = categories.get(line.categoryId);
               const label = categoryLabel(category, categories);
               const color = splitLineColor(category, index);
-              const amountCents = toCents(line.amount);
+              const amountUnits = toSplitUnits(line.amount, splitDecimals);
               const showNoteInput = line.note.trim().length > 0 || expandedNoteLineIds.has(line.id);
               return (
                 <div key={line.id} className="py-2.5">
@@ -382,7 +399,7 @@ export function SplitTransactionSheet({
                     </div>
 
                     <span className="bg-muted/60 text-muted-foreground inline-flex h-8 items-center rounded-md px-2 text-xs font-medium tabular-nums">
-                      {linePercentage(amountCents, totalAbsCents)}%
+                      {linePercentage(amountUnits, totalAbsUnits)}%
                     </span>
                     <div className="relative w-24">
                       <span className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs">
@@ -390,6 +407,7 @@ export function SplitTransactionSheet({
                       </span>
                       <MoneyInput
                         value={line.amount ?? 0}
+                        maxDecimalPlaces={splitDecimals}
                         onValueChange={(value: number | undefined) =>
                           updateLine(line.id, { amount: value ?? undefined })
                         }
