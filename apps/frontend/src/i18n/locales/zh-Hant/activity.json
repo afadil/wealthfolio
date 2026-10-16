@@ -244,8 +244,6 @@
   "table_fee": "手續費",
   "table_total": "總計",
   "table_balance": "餘額",
-  "table_day_end_balance": "日終餘額",
-  "table_day_end_balance_short": "日終",
   "table_account": "帳戶",
   "table_currency": "幣別",
   "table_comment": "備註",

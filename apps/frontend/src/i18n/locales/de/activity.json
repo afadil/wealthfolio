@@ -153,8 +153,6 @@
   "table_fee": "Gebühr",
   "table_total": "Gesamt",
   "table_balance": "Saldo",
-  "table_day_end_balance": "Tagesendsaldo",
-  "table_day_end_balance_short": "Tagesende",
   "table_account": "Konto",
   "table_currency": "Währung",
   "table_comment": "Kommentar",

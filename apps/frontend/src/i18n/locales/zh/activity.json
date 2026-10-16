@@ -243,8 +243,6 @@
   "table_fee": "费用",
   "table_total": "总计",
   "table_balance": "余额",
-  "table_day_end_balance": "日终余额",
-  "table_day_end_balance_short": "日终",
   "table_account": "账户",
   "table_currency": "货币",
   "table_comment": "备注",
