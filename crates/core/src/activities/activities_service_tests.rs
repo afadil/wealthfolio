@@ -16879,6 +16879,41 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn attach_cash_balances_skips_rows_stored_without_a_timezone() {
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                day_valuation("brokerage", "2026-04-02", dec!(750)),
+            ],
+        )
+        .await
+        .with_timezone(Arc::new(std::sync::RwLock::new(
+            "America/Toronto".to_string(),
+        )));
+        // Older rows store SQLite's own timestamp shape or a bare date: the
+        // engine reads them as UTC, a list as local time, so the day of their
+        // closing cash and the day they show can differ.
+        let mut response = page(vec![
+            page_row_on("sqlite-shape", "brokerage", "2026-04-02 10:00:00.250"),
+            page_row_on("bare-date", "brokerage", "2026-04-02"),
+            page_row_on("zoned", "brokerage", "2026-04-02T14:00:00Z"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(balance_of(&response, "sqlite-shape"), None);
+        assert_eq!(balance_of(&response, "bare-date"), None);
+        assert_eq!(
+            balance_of(&response, "zoned"),
+            Some(("750".to_string(), "USD".to_string()))
+        );
+    }
+
+    #[tokio::test]
     async fn attach_cash_balances_gives_a_cash_account_holding_securities_its_day_end_cash() {
         let mut trade = create_stored_activity("trade", "checking", Some("asset-aapl"));
         trade.activity_date = "2026-04-02T00:00:00Z".parse().unwrap();
