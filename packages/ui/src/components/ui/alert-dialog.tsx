@@ -27,7 +27,7 @@ function AlertDialogOverlay({ className, ...props }: AlertDialogOverlayProps) {
       data-slot="alert-dialog-overlay"
       className={cn(
         // The popup's duration: Base UI removes both when the popup's animation ends.
-        "data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-50 bg-black/80 duration-200",
+        "supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 fixed inset-0 isolate z-50 bg-black/10 duration-100",
         className,
       )}
       {...props}
@@ -46,7 +46,7 @@ function AlertDialogContent({ className, ...props }: AlertDialogContentProps) {
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         className={cn(
-          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-env(safe-area-inset-bottom,0px)-2rem)] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto border p-6 shadow-lg duration-200 max-sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)] max-sm:left-4 max-sm:right-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl sm:rounded-lg [&>*]:min-w-0",
+          "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-env(safe-area-inset-bottom,0px)-2rem)] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto border p-6 shadow-lg outline-none duration-100 max-sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)] max-sm:left-4 max-sm:right-4 max-sm:top-auto max-sm:w-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-3xl max-sm:shadow-2xl sm:rounded-lg [&>*]:min-w-0",
           className,
         )}
         {...props}
@@ -56,12 +56,19 @@ function AlertDialogContent({ className, ...props }: AlertDialogContentProps) {
 }
 
 function AlertDialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />;
+  return (
+    <div
+      data-slot="alert-dialog-header"
+      className={cn("flex flex-col space-y-2 text-center sm:text-left", className)}
+      {...props}
+    />
+  );
 }
 
 function AlertDialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
+      data-slot="alert-dialog-footer"
       className={cn(
         "flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2 max-sm:[&_button]:h-auto max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-0 max-sm:[&_button]:max-w-full max-sm:[&_button]:shrink max-sm:[&_button]:whitespace-normal",
         className,
@@ -76,7 +83,13 @@ interface AlertDialogTitleProps extends Omit<AlertDialogPrimitive.Title.Props, "
 }
 
 function AlertDialogTitle({ className, ...props }: AlertDialogTitleProps) {
-  return <AlertDialogPrimitive.Title className={cn("text-lg font-semibold", className)} {...props} />;
+  return (
+    <AlertDialogPrimitive.Title
+      data-slot="alert-dialog-title"
+      className={cn("text-lg font-semibold", className)}
+      {...props}
+    />
+  );
 }
 
 interface AlertDialogDescriptionProps extends Omit<AlertDialogPrimitive.Description.Props, "className"> {
@@ -84,7 +97,13 @@ interface AlertDialogDescriptionProps extends Omit<AlertDialogPrimitive.Descript
 }
 
 function AlertDialogDescription({ className, ...props }: AlertDialogDescriptionProps) {
-  return <AlertDialogPrimitive.Description className={cn("text-muted-foreground text-sm", className)} {...props} />;
+  return (
+    <AlertDialogPrimitive.Description
+      data-slot="alert-dialog-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  );
 }
 
 interface AlertDialogCloseProps extends Omit<AlertDialogPrimitive.Close.Props, "className"> {
@@ -95,23 +114,24 @@ interface AlertDialogCloseProps extends Omit<AlertDialogPrimitive.Close.Props, "
  * Confirms and closes the dialog. To keep it open, for example while the
  * action is pending, call `event.preventBaseUIHandler()` in `onClick`.
  */
-interface AlertDialogActionProps extends AlertDialogCloseProps, Pick<VariantProps<typeof buttonVariants>, "variant"> {}
+interface AlertDialogButtonProps
+  extends AlertDialogCloseProps, Pick<VariantProps<typeof buttonVariants>, "variant" | "size"> {}
 
-function AlertDialogAction({ className, variant, ...props }: AlertDialogActionProps) {
+function AlertDialogAction({ className, variant, size, ...props }: AlertDialogButtonProps) {
   return (
     <AlertDialogPrimitive.Close
       data-slot="alert-dialog-action"
-      className={cn(buttonVariants({ variant }), className)}
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );
 }
 
-function AlertDialogCancel({ className, ...props }: AlertDialogCloseProps) {
+function AlertDialogCancel({ className, variant = "outline", size, ...props }: AlertDialogButtonProps) {
   return (
     <AlertDialogPrimitive.Close
       data-slot="alert-dialog-cancel"
-      className={cn(buttonVariants({ variant: "outline" }), "mt-0", className)}
+      className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     />
   );
