@@ -34,7 +34,7 @@ function SheetOverlay({ className, ...props }: SheetOverlayProps) {
       data-slot="sheet-overlay"
       className={cn(
         // Transitions on Base UI's starting and ending styles, which it holds until removal.
-        "data-starting-style:opacity-0 data-ending-style:opacity-0 fixed inset-0 z-50 bg-black/80 transition-opacity duration-150",
+        "data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs fixed inset-0 isolate z-50 bg-black/10 transition-opacity duration-150",
         className,
       )}
       {...props}
@@ -93,6 +93,7 @@ function SheetContent({
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close
+            data-slot="sheet-close"
             className="focus-visible:outline-solid focus-visible:outline-ring bg-muted absolute right-4 cursor-pointer rounded-full p-2 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none"
             style={{ top: needsSafeAreaTop ? "calc(env(safe-area-inset-top, 0px) + 1rem)" : "1rem" }}
           >
@@ -106,11 +107,17 @@ function SheetContent({
 }
 
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("flex flex-col space-y-2 text-left", className)} {...props} />;
+  return <div data-slot="sheet-header" className={cn("flex flex-col space-y-2 text-left", className)} {...props} />;
 }
 
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />;
+  return (
+    <div
+      data-slot="sheet-footer"
+      className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+      {...props}
+    />
+  );
 }
 
 interface SheetTitleProps extends Omit<SheetPrimitive.Title.Props, "className"> {
@@ -118,7 +125,13 @@ interface SheetTitleProps extends Omit<SheetPrimitive.Title.Props, "className"> 
 }
 
 function SheetTitle({ className, ...props }: SheetTitleProps) {
-  return <SheetPrimitive.Title className={cn("text-foreground text-lg font-semibold", className)} {...props} />;
+  return (
+    <SheetPrimitive.Title
+      data-slot="sheet-title"
+      className={cn("text-foreground text-lg font-semibold", className)}
+      {...props}
+    />
+  );
 }
 
 interface SheetDescriptionProps extends Omit<SheetPrimitive.Description.Props, "className"> {
@@ -126,7 +139,13 @@ interface SheetDescriptionProps extends Omit<SheetPrimitive.Description.Props, "
 }
 
 function SheetDescription({ className, ...props }: SheetDescriptionProps) {
-  return <SheetPrimitive.Description className={cn("text-muted-foreground text-sm", className)} {...props} />;
+  return (
+    <SheetPrimitive.Description
+      data-slot="sheet-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  );
 }
 
 export {

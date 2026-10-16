@@ -125,6 +125,10 @@ and this project adheres to
   white text. `AlertDialogAction` takes `variant`, so a dialog's destructive
   confirm is `<AlertDialogAction variant="destructive">` rather than
   `bg-destructive` overrides.
+- Dialog, AlertDialog and Sheet backdrops are shadcn's light overlay: 10% black
+  with a light blur instead of 50–80% black. `AlertDialogAction` and
+  `AlertDialogCancel` take `size` as well as `variant`; `AlertDialogAction`
+  still closes the dialog (shadcn's does not).
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
