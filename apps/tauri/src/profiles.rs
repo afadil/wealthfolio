@@ -523,8 +523,18 @@ pub async fn delete_profile(
     .map_err(|e| e.to_string())?
 }
 
+// Profile checks hold the registry while they read the keyring, which can wait
+// on an unlock prompt. Sync commands run on the UI thread, so wait elsewhere.
 #[tauri::command]
-pub fn get_profile_state(handle: AppHandle) -> Result<ProfileState, String> {
+pub async fn get_profile_state<R: tauri::Runtime>(
+    handle: AppHandle<R>,
+) -> Result<ProfileState, String> {
+    tauri::async_runtime::spawn_blocking(move || profile_state(&handle))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn profile_state<R: tauri::Runtime>(handle: &AppHandle<R>) -> Result<ProfileState, String> {
     if let Some(profiles) = handle.try_state::<NativeProfiles>() {
         return profiles.state();
     }
@@ -1044,6 +1054,115 @@ mod sync_state_tests {
             2,
             "reopening must reuse the original state"
         );
+    }
+
+    #[test]
+    fn profile_state_waits_for_a_keyring_prompt_off_the_ipc_thread() {
+        use std::{sync::mpsc, time::Duration};
+        use tauri::test::{mock_builder, mock_context, noop_assets};
+
+        /// A keyring whose next read, once armed, waits like an unlock prompt
+        /// until it is answered or times out.
+        #[derive(Default)]
+        struct PromptingSecrets {
+            secrets: Secrets,
+            prompt: Mutex<Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>>,
+            timed_out: AtomicBool,
+        }
+
+        impl SecretStore for PromptingSecrets {
+            fn get_secret(&self, key: &str) -> wealthfolio_core::Result<Option<String>> {
+                let prompt = self.prompt.lock().unwrap().take();
+                if let Some((opened, answer)) = prompt {
+                    opened.send(()).unwrap();
+                    if answer.recv_timeout(Duration::from_secs(10)).is_err() {
+                        self.timed_out.store(true, Ordering::SeqCst);
+                    }
+                }
+                self.secrets.get_secret(key)
+            }
+            fn set_secret(&self, key: &str, value: &str) -> wealthfolio_core::Result<()> {
+                self.secrets.set_secret(key, value)
+            }
+            fn delete_secret(&self, key: &str) -> wealthfolio_core::Result<()> {
+                self.secrets.delete_secret(key)
+            }
+        }
+
+        let store = Arc::new(PromptingSecrets::default());
+        let directory = tempfile::tempdir().unwrap();
+        let registry = Arc::new(
+            ProfileRegistry::open(
+                directory.path().to_path_buf(),
+                directory.path().join("app.db"),
+                store.clone(),
+            )
+            .unwrap(),
+        );
+        let id = registry.default_id().unwrap();
+        // Once a profile has had a password, verifying it reads the keyring.
+        registry.set_password(id, None, Some("password")).unwrap();
+        registry.set_password(id, Some("password"), None).unwrap();
+        let app = mock_builder()
+            .manage(NativeProfiles {
+                registry: registry.clone(),
+                active: Mutex::new(None),
+                lifecycle: tokio::sync::Mutex::new(HashMap::new()),
+                starting: AtomicBool::new(true),
+                lock_epoch: AtomicU64::new(0),
+            })
+            .invoke_handler(tauri::generate_handler![get_profile_state])
+            .build(mock_context(noop_assets()))
+            .unwrap();
+        let window = tauri::WebviewWindowBuilder::new(&app, NATIVE_OWNER, Default::default())
+            .build()
+            .unwrap();
+
+        // Startup verifies the only profile on a blocking thread, which holds the
+        // registry while the keyring prompts.
+        let (opened, prompt_open) = mpsc::channel();
+        let (answer, answered) = mpsc::channel();
+        *store.prompt.lock().unwrap() = Some((opened, answered));
+        let verify = std::thread::spawn(move || registry.verify(id, None));
+        prompt_open.recv().unwrap();
+
+        // Sync commands run on the thread that delivers IPC (the UI thread on
+        // desktop), so this call returns only once the command has finished.
+        let (respond, response) = mpsc::channel();
+        window.clone().on_message(
+            tauri::webview::InvokeRequest {
+                cmd: "get_profile_state".into(),
+                callback: tauri::ipc::CallbackFn(0),
+                error: tauri::ipc::CallbackFn(1),
+                url: if cfg!(windows) {
+                    "http://tauri.localhost"
+                } else {
+                    "tauri://localhost"
+                }
+                .parse()
+                .unwrap(),
+                body: tauri::ipc::InvokeBody::Json(serde_json::json!({})),
+                headers: Default::default(),
+                invoke_key: tauri::test::INVOKE_KEY.into(),
+            },
+            Box::new(move |_, _, result, _, _| respond.send(result).unwrap()),
+        );
+        assert!(
+            !store.timed_out.load(Ordering::SeqCst),
+            "get_profile_state waited for the keyring prompt on the IPC thread"
+        );
+
+        answer.send(()).unwrap();
+        let tauri::ipc::InvokeResponse::Ok(state) =
+            response.recv_timeout(Duration::from_secs(10)).unwrap()
+        else {
+            panic!("get_profile_state failed");
+        };
+        let state: serde_json::Value = state.deserialize().unwrap();
+        assert_eq!(state["profiles"].as_array().map(Vec::len), Some(1));
+        assert_eq!(state["profiles"][0]["id"], id.to_string());
+        assert_eq!(state["starting"], true);
+        assert!(!verify.join().unwrap().unwrap());
     }
 
     #[cfg(desktop)]
