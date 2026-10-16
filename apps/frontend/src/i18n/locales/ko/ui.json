@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "통화 선택",
-    "selectDescription": "활동에 사용할 통화를 선택하세요",
+    "selectDescription": "통화를 선택하세요",
+    "placeholder": "통화 선택",
+    "popular": "인기",
     "more": "더 보기",
     "search": "통화 검색...",
     "searchAll": "모든 통화 검색...",

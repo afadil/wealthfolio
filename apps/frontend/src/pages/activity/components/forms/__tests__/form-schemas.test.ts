@@ -803,7 +803,7 @@ describe("Form Schemas Validation", () => {
         }
       });
 
-      it("fails when source and destination accounts are the same", () => {
+      it("fails when source and destination accounts and currencies are the same", () => {
         const sameAccount = {
           isExternal: false,
           fromAccountId: "acc-123",
@@ -812,13 +812,16 @@ describe("Form Schemas Validation", () => {
           transferMode: "cash",
           amount: 1000,
           currency: "USD",
+          sourceCurrency: "USD",
+          destinationCurrency: "USD",
         };
 
         const result = transferFormSchema.safeParse(sameAccount);
         expect(result.success).toBe(false);
         if (!result.success) {
           const refinementError = result.error.issues.find(
-            (issue) => issue.path.includes("toAccountId") && issue.message.includes("different"),
+            (issue) =>
+              issue.path.includes("destinationCurrency") && issue.message.includes("different"),
           );
           expect(refinementError).toBeDefined();
         }

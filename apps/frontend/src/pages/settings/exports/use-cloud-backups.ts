@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   cloudBackupAction,
-  isDesktop,
+  isTauri,
   type CloudBackupStatus,
   type CloudBackupCaptureStatus,
 } from "@/adapters";
@@ -14,7 +14,7 @@ export function useCloudBackups() {
   const { isConnected, isEnabled, isInitializing, user } = useWealthfolioConnect();
   const profile = useProfile()?.profile;
   const { isMobile, loading } = usePlatform();
-  const supported = !isDesktop || !loading;
+  const supported = !isTauri || !loading;
   const available = isEnabled && isConnected && supported;
   const identity = `${profile?.id ?? "legacy"}:${user?.id ?? "signed-out"}`;
   const status = useQuery({
@@ -53,7 +53,7 @@ export function useCloudBackups() {
     promotionAvailable: isEnabled && supported && !isInitializing,
     identity,
     profile,
-    isMobile: isDesktop && isMobile,
+    isMobile: isTauri && isMobile,
     status: {
       refetch: status.refetch,
       isPending: status.isPending,

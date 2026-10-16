@@ -2,6 +2,7 @@ use crate::activities::{
     Activity, ActivityRepositoryTrait, NewActivity, ACTIVITY_SUBTYPE_NOTIONAL_DISTRIBUTION,
     ACTIVITY_SUBTYPE_OPTION_EXPIRY, ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL, ACTIVITY_TYPE_ADJUSTMENT,
     ACTIVITY_TYPE_BUY, ACTIVITY_TYPE_DIVIDEND, ACTIVITY_TYPE_INTEREST, ACTIVITY_TYPE_SELL,
+    ACTIVITY_TYPE_TRANSFER_IN,
 };
 use crate::assets::{
     Asset, AssetClassificationService, AssetKind, AssetServiceTrait, InstrumentType,
@@ -823,6 +824,10 @@ impl HoldingsService {
                             && activity.subtype.as_deref().is_some_and(|subtype| {
                                 subtype.eq_ignore_ascii_case(ACTIVITY_SUBTYPE_OPTION_EXPIRY)
                             });
+                        // Units a transfer delivers into a short cover it and realize; a
+                        // transfer out moves lots at their cost and realizes nothing
+                        // (engine rules R2.4).
+                        let is_transfer_in = activity_type == ACTIVITY_TYPE_TRANSFER_IN;
                         // A return of capital realizes what exceeds the cost basis as
                         // a capital gain, and in base its currency move (engine rules R7.4).
                         let is_return_of_capital = (activity_type == ACTIVITY_TYPE_ADJUSTMENT
@@ -831,7 +836,7 @@ impl HoldingsService {
                                 NewActivity::canonicalize_subtype(Some(subtype)).as_deref()
                                     == Some(ACTIVITY_SUBTYPE_RETURN_OF_CAPITAL)
                             });
-                        is_trade || is_option_expiry || is_return_of_capital
+                        is_trade || is_option_expiry || is_transfer_in || is_return_of_capital
                     })
                     .map(|activity| activity.id)
                     .collect(),
@@ -3863,6 +3868,73 @@ mod tests {
         assert_eq!(holding.realized_gain.as_ref().unwrap().base, dec!(-100));
         assert_eq!(holding.realized_gain_pct, Some(dec!(-1)));
         assert_eq!(holding.total_gain.as_ref().unwrap().base, dec!(-100));
+    }
+
+    #[tokio::test]
+    async fn closed_short_realized_gain_includes_transfer_in_cover_disposal() {
+        let account_id = "acc-1";
+        let asset_id = "AAPL";
+        let mut position = test_position(account_id, asset_id);
+        position.quantity = Decimal::ZERO;
+        position.average_cost = Decimal::ZERO;
+        position.total_cost_basis = Decimal::ZERO;
+
+        let snapshot = AccountStateSnapshot {
+            account_id: account_id.to_string(),
+            currency: "USD".to_string(),
+            positions: HashMap::from([(asset_id.to_string(), position)]),
+            ..Default::default()
+        };
+
+        // A short of 10 sold at 150, covered by 10 units transferred in at
+        // their cost of 100: the engine realizes 500 on the transfer.
+        let mut cover_disposal = test_lot_disposal(
+            account_id,
+            asset_id,
+            dec!(-1500),
+            dec!(-1500),
+            dec!(500),
+            dec!(500),
+        );
+        cover_disposal.id = "cover-disposal".to_string();
+        cover_disposal.disposal_activity_id = "transfer-in-1".to_string();
+
+        let transfer_in_activity = test_income_activity(
+            "transfer-in-1",
+            account_id,
+            Some(asset_id),
+            ACTIVITY_TYPE_TRANSFER_IN,
+            Decimal::ZERO,
+            "USD",
+            NaiveDate::from_ymd_opt(2025, 2, 3).unwrap(),
+        );
+
+        let mut service = test_service(
+            snapshot,
+            vec![test_asset(asset_id, "AAPL", InstrumentType::Equity)],
+            HashMap::from([(asset_id.to_string(), Decimal::ZERO)]),
+        )
+        .with_lot_repository(Arc::new(
+            MockLotRepository::new(Vec::new()).with_disposals(vec![cover_disposal]),
+        ));
+        service.activity_repository = Some(Arc::new(MockActivityRepository::new(vec![
+            transfer_in_activity,
+        ])));
+
+        let holdings = service
+            .get_holdings_with_options(account_id, "USD", true)
+            .await
+            .unwrap();
+
+        assert_eq!(holdings.len(), 1);
+        let holding = &holdings[0];
+        assert!(holding.is_closed);
+        assert_eq!(holding.realized_gain.as_ref().unwrap().local, dec!(500));
+        assert_eq!(holding.realized_gain.as_ref().unwrap().base, dec!(500));
+        assert_eq!(holding.realized_gain_pct, Some(dec!(0.33333333)));
+        assert_eq!(holding.return_basis.as_ref().unwrap().local, dec!(-1500));
+        assert_eq!(holding.total_gain.as_ref().unwrap().base, dec!(500));
+        assert_eq!(holding.total_gain_pct, Some(dec!(0.33333333)));
     }
 
     #[tokio::test]

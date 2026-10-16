@@ -6,6 +6,7 @@ mod activities_model;
 mod activities_service;
 mod activities_traits;
 mod activity_cash_migration;
+mod cash_balances;
 mod compiler;
 mod csv_parser;
 mod idempotency;
@@ -30,20 +31,24 @@ pub use activities_model::{
     ActivityFinalCashMigrationWriteResult, ActivityImport, ActivitySearchResponse,
     ActivitySearchResponseMeta, ActivityStatus, ActivityType, ActivityUpdate,
     ActivityUpdatePreview, ActivityUpsert, AssetResolutionInput, BrokerActivityProfileConfig,
-    BrokerProfileScope, BrokerSyncProfileData, BulkUpsertResult, FieldMappingValue,
-    ImportActivitiesResult, ImportActivitiesSummary, ImportAssetCandidate, ImportAssetPreviewItem,
-    ImportAssetPreviewStatus, ImportMapping, ImportMappingData, ImportTemplate, ImportTemplateData,
-    ImportTemplateScope, IncomeData, InternalTransferPairRequest, InternalTransferPairResponse,
-    LinkedTransfer, NewActivity, PrepareActivitiesResult, PreviewedActivityUpdate,
-    SaveBrokerSyncProfileRulesRequest, Sort, SuppressedActivity, TemplateKind,
-    TransferMatchCandidate, TransferMatchCandidateRequest, UnlinkedTransfer, UnlinkedTransfers,
-    UnlinkedTransfersRequest,
+    BrokerProfileScope, BrokerSyncProfileData, BulkUpsertResult, CashBalanceScope,
+    FieldMappingValue, ImportActivitiesResult, ImportActivitiesSummary, ImportAssetCandidate,
+    ImportAssetPreviewItem, ImportAssetPreviewStatus, ImportMapping, ImportMappingData,
+    ImportTemplate, ImportTemplateData, ImportTemplateScope, IncomeData,
+    InternalTransferPairRequest, InternalTransferPairResponse, LinkedTransfer, NewActivity,
+    PrepareActivitiesResult, PreviewedActivityUpdate, SaveBrokerSyncProfileRulesRequest, Sort,
+    SuppressedActivity, TemplateKind, TransferMatchCandidate, TransferMatchCandidateRequest,
+    UnlinkedTransfer, UnlinkedTransfers, UnlinkedTransfersRequest,
 };
 pub use activities_service::ActivityService;
 pub use activities_traits::{ActivityRepositoryTrait, ActivityServiceTrait};
 pub use activity_cash_migration::{
     get_final_cash_migration_status, rebuild_pending_final_cash_accounts,
     record_final_cash_rebuild_attempt, run_final_cash_migration, ActivityFinalCashMigrationStatus,
+};
+pub use cash_balances::{
+    application_order, running_cash_balances, shows_cash_balance, shows_running_cash_balance,
+    ActivityCashBalance, CashLedgerActivity,
 };
 pub use compiler::{ActivityCompiler, DefaultActivityCompiler};
 pub use csv_parser::{parse_csv, ParseConfig, ParseError, ParsedCsvResult};

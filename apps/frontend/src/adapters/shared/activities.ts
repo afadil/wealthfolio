@@ -41,6 +41,11 @@ interface ActivitySort {
   desc?: boolean;
 }
 
+interface ActivitySearchOptions {
+  /** Ask for the cash balance after each row (one cash or credit-card account). */
+  includeCashBalances?: boolean;
+}
+
 function normalizeStringArray(input?: string | string[]): string[] | undefined {
   if (!input) return undefined;
   if (Array.isArray(input)) {
@@ -82,6 +87,7 @@ export const searchActivities = async (
   filters: ActivityFilters,
   searchKeyword: string,
   sort?: ActivitySort,
+  options?: ActivitySearchOptions,
 ): Promise<ActivitySearchResponse> => {
   const accountIdFilter = normalizeStringArray(filters?.accountIds);
   const activityTypeFilter = normalizeStringArray(filters?.activityTypes);
@@ -109,6 +115,7 @@ export const searchActivities = async (
       dateTo,
       instrumentTypeFilter,
       activityIdFilter,
+      ...(options?.includeCashBalances ? { includeCashBalances: true } : {}),
     });
   } catch (err) {
     logger.error("Error fetching activities.");

@@ -736,6 +736,7 @@
     "balance_correction_description": "Replace the outstanding balance from a specific date without changing earlier history.",
     "extra_repayment": "Extra Repayment",
     "extra_repayment_description": "Record an additional principal repayment and update future projections.",
+    "balance_replaces_confirmation": "This replaces your recorded balance of {{amount}} on {{date}}. Deleting it later will not restore the previous balance.",
     "repayment_before_confirmation": "Your recorded balance of {{amount}} on {{date}} takes priority from that date, so this repayment won’t lower the balance after it. If that statement doesn’t include this repayment, edit or delete it on the Schedule tab.",
     "confirm_extra_repayment": "Record Repayment",
     "close_loan": "Close Loan",

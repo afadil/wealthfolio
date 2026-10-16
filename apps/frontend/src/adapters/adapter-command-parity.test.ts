@@ -307,6 +307,20 @@ describe("cloud backup action transport", () => {
   });
 });
 
+describe("cloud backup capture transport", () => {
+  it("sends the manual flag as a JSON body", async () => {
+    const mock = stubFetch();
+    await invoke("cloud_backup_capture", { manual: true });
+    const { url, method, body } = lastCall(mock);
+    expect(url).toBe("/api/v1/cloud-backups/capture");
+    expect(method).toBe("POST");
+    expect(JSON.parse(body as string)).toEqual({ manual: true });
+    expect(new Headers(mock.mock.calls[0][1]!.headers).get("Content-Type")).toBe(
+      "application/json",
+    );
+  });
+});
+
 describe("scope-based routing — get_holdings", () => {
   it("all → POST /holdings/query", async () => {
     const mock = stubFetch();

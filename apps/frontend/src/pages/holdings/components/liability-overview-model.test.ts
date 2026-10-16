@@ -100,3 +100,19 @@ describe("liability summary", () => {
     expect(summary.monthly).toBeCloseTo((1589.49 * 26) / 12, 6);
   });
 });
+
+it("keeps a missing balance actionable without marking the loan paid off", () => {
+  const model = liabilityCardModel(holding({ ...autoLoan, balanceSource: null }, {}, "0"), today);
+  expect(model).toMatchObject({
+    balanceAvailable: false,
+    status: "update_balance",
+    paidShare: null,
+  });
+  expect(liabilitySummary([model]).paidDown).toBe(0);
+  expect(liabilitySummary([model]).overall).toBeNull();
+  const zero = liabilityCardModel(
+    holding({ ...autoLoan, balanceSource: "recorded" }, {}, "0"),
+    today,
+  );
+  expect(zero).toMatchObject({ balanceAvailable: true, status: "paid_off", paidShare: 1 });
+});

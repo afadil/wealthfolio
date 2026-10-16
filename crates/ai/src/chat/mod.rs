@@ -13,6 +13,7 @@
 mod attachments;
 mod history;
 pub(crate) mod provider_clients;
+mod request_params;
 mod streaming;
 mod working_context;
 

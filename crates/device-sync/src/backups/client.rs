@@ -34,6 +34,30 @@ impl BackupPolicy {
             .to_std()
             .unwrap_or_default())
     }
+    /// A due backup is the ordinary scheduled (or first) one, even when the user asked
+    /// for it. Only an early backup is sent as `manual`, which the cloud caps per day.
+    pub fn capture_plan(&self, manual: bool) -> ApiResult<CapturePlan> {
+        let delay = self.delay_until_due()?;
+        Ok(if delay.is_zero() {
+            CapturePlan::Due(if self.last_backup_at.is_some() {
+                "scheduled"
+            } else {
+                "setup"
+            })
+        } else if manual {
+            CapturePlan::Early
+        } else {
+            CapturePlan::Wait(delay)
+        })
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CapturePlan {
+    Wait(std::time::Duration),
+    /// A due backup, sent with this trigger: `scheduled`, or `setup` before the first.
+    Due(&'static str),
+    /// An early backup the user asked for, sent as `manual`.
+    Early,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

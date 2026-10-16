@@ -56,6 +56,22 @@ describe("transfer link utils", () => {
     ).toBe(false);
   });
 
+  it.each([
+    ["GBP", "GBX"],
+    ["GBP", "GBp"],
+    ["ZAR", "ZAc"],
+    ["ILS", "ILA"],
+    ["USD", "USX"],
+    ["KWD", "KWF"],
+  ])("rejects a same-account pair in %s and its minor unit %s", (major, minor) => {
+    expect(
+      isSameAccountCashFxConversion(
+        transfer({ activityType: ActivityType.TRANSFER_OUT, currency: major }),
+        transfer({ activityType: ActivityType.TRANSFER_IN, currency: minor }),
+      ),
+    ).toBe(false);
+  });
+
   it("rejects same-account security transfers", () => {
     expect(
       isSameAccountCashFxConversion(

@@ -6,7 +6,6 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use super::facts::RawFxConversion;
 use super::policy::{CostBasisMethod, Policy};
 use super::scalar::{AccountId, ActivityId, AssetId, Currency};
 
@@ -222,9 +221,6 @@ pub struct Activity {
     pub source_group_id: Option<String>,
     /// `metadata.flow.is_external` when present.
     pub external_transfer: Option<bool>,
-    /// The import linker's record of a same-account cash FX conversion.
-    #[serde(default)]
-    pub fx_conversion: Option<RawFxConversion>,
     /// Transfer of a non-cash asset (cash placeholders count as cash).
     pub is_security_transfer: bool,
     /// Provenance used to rank competing split rows (`resolve_surfaces`).
@@ -241,7 +237,7 @@ pub struct TransferPair {
     pub out_account: AccountId,
     pub in_account: AccountId,
     pub security: bool,
-    /// A same-account cash FX conversion the import linker recorded as
+    /// A same-account cash FX conversion whose legs are both explicitly
     /// internal: the money only changes currency, so neither leg moves net
     /// contribution.
     #[serde(default)]

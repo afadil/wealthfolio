@@ -1,15 +1,20 @@
 import { ExternalLink } from "@/components/external-link";
 import { useConnectUrl } from "@/features/wealthfolio-connect/hooks/use-connect-url";
+import { parseConnectPagePlacement } from "@/features/wealthfolio-connect/lib/connect-url";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConnectFeatures } from "./connect-features";
 import { ConnectFlowDiagram } from "./connect-flow-diagram";
 
 export function ConnectEmptyState() {
   const { t } = useTranslation();
-  const connectLink = useConnectUrl("connect_empty_state");
+  const [searchParams] = useSearchParams();
+  // Credit the in-app link that opened this page, if any.
+  const connectLink = useConnectUrl(
+    parseConnectPagePlacement(searchParams.get("placement")) ?? "connect_empty_state",
+  );
 
   return (
     <div className="flex min-h-[calc(100vh-12rem)] flex-col items-center justify-center px-4 py-6">

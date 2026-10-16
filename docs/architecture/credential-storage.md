@@ -43,10 +43,11 @@ Sources: [native store](../../apps/tauri/src/secret_store.rs),
 
 ### Android lifecycle and backup
 
-The Android backend crate implements encryption and credential persistence. Our
-JNI bridge only supplies the Java VM and application context before Tauri
-starts; it does not implement a custom credential store. Its JNI types match the
-backend's initialization API.
+The Android backend crate implements encryption and credential persistence; we
+do not implement a custom credential store. The crate reads the Java VM and
+application context from `ndk-context`, which tao initializes in the activity's
+`onCreate` before Tauri starts. The app must not initialize `ndk-context`
+itself: a second initialization aborts the process at launch.
 
 The crate stores ciphertext in `shared_prefs/keyring-default.xml`. Its
 encryption key remains in Android Keystore and cannot be carried to another

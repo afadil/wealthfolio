@@ -14,7 +14,10 @@
     "noDevicesSyncing": "同期中のデバイスはありません",
     "noDevicesDescription": "設定でデバイス同期を有効にすると、複数のデバイス間でデータを同期できます。",
     "noActivity": "更新はまだありません",
-    "noActivityDescription": "データの同期が始まると、ここに更新内容が表示されます。"
+    "noActivityDescription": "データの同期が始まると、ここに更新内容が表示されます。",
+    "showMore_one": "さらに{{count}}件を表示",
+    "showMore_other": "さらに{{count}}件を表示",
+    "showLess": "表示を減らす"
   },
   "emptyState": {
     "optional": "任意",
@@ -71,7 +74,8 @@
     "noDataYet": "データがありません",
     "dataAsOf": "{{date}}時点のデータ",
     "emptyTitle": "同期済みの口座はまだありません",
-    "emptyDescription": "証券会社を連携すると、口座の同期を開始できます。"
+    "emptyDescription": "証券会社を連携すると、口座の同期を開始できます。",
+    "needsSetup": "要設定"
   },
   "connections": {
     "title": "証券会社の連携",
@@ -88,7 +92,11 @@
     "accountsSyncing_one": "{{count}}件の口座を同期中",
     "accountsSyncing_other": "{{count}}件の口座を同期中",
     "partialSyncing_one": "{{total}}件中{{syncing}}件の口座を同期中 · {{excluded}}件を除外",
-    "partialSyncing_other": "{{total}}件中{{syncing}}件の口座を同期中 · {{excluded}}件を除外"
+    "partialSyncing_other": "{{total}}件中{{syncing}}件の口座を同期中 · {{excluded}}件を除外",
+    "accountCount_one": "{{count}}件の口座",
+    "accountCount_other": "{{count}}件の口座",
+    "excludedCount_one": "{{count}}件を除外",
+    "excludedCount_other": "{{count}}件を除外"
   },
   "sync": {
     "syncNow": "今すぐ同期",
@@ -180,20 +188,33 @@
   "attention": {
     "title": "証券会社の同期に対応が必要です",
     "description_one": "{{count}}件の口座で再試行または証券会社側の確認が必要です。",
-    "description_other": "{{count}}件の口座で再試行または証券会社側の確認が必要です。"
+    "description_other": "{{count}}件の口座で再試行または証券会社側の確認が必要です。",
+    "heading": "対応が必要",
+    "connectionLost": "接続が切れました",
+    "accountsNotSyncing_one": "{{count}}件の口座が同期されていません",
+    "accountsNotSyncing_other": "{{count}}件の口座が同期されていません",
+    "syncFailed": "前回の同期に失敗しました"
   },
   "setup": {
     "newAccountsTitle": "新しい口座の設定が必要です",
     "newAccountsDescription_one": "同期を開始する前に、{{count}}件の口座で簡単な設定が必要です。",
     "newAccountsDescription_other": "同期を開始する前に、{{count}}件の口座で簡単な設定が必要です。",
-    "reviewAccounts": "口座を確認"
+    "reviewAccounts": "口座を確認",
+    "setUp": "設定"
   },
   "devices": {
     "thisDevice": "このデバイス",
     "activeNow": "現在利用中",
     "lastSeen": "最終接続 {{time}}",
     "online": "オンライン",
-    "never": "なし"
+    "never": "なし",
+    "showInactive_one": "非アクティブなデバイス{{count}}台を表示",
+    "showInactive_other": "非アクティブなデバイス{{count}}台を表示",
+    "hideInactive": "非アクティブなデバイスを隠す",
+    "platforms": {
+      "server": "サーバー",
+      "web": "Web"
+    }
   },
   "deviceStatus": {
     "syncError": "同期エラー",

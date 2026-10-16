@@ -1,5 +1,6 @@
-import { getPlatforms, useWealthfolioConnect } from "@/features/wealthfolio-connect";
-import { isSubscriptionStatusActive } from "@/features/wealthfolio-connect/lib/plan-capabilities";
+import { getPlatforms } from "@/features/wealthfolio-connect";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
 import { useAccounts } from "@/hooks/use-accounts";
 import { QueryKeys } from "@/lib/query-keys";
 import type { Account, Platform } from "@/lib/types";
@@ -27,23 +28,7 @@ type FilterType = "all" | "active" | "archived" | "hidden";
 const SettingsAccountsPage = () => {
   const { t } = useTranslation();
   const { accounts, isLoading } = useAccounts({ filterActive: false, includeArchived: true });
-  const {
-    isEnabled,
-    isConnected,
-    isInitializing,
-    isLoadingUserInfo,
-    isSessionUnavailable,
-    userInfo,
-    error: connectError,
-  } = useWealthfolioConnect();
-  const showConnectLink =
-    isEnabled &&
-    !isInitializing &&
-    !isLoadingUserInfo &&
-    !isSessionUnavailable &&
-    !connectError &&
-    (!isConnected ||
-      (!!userInfo && !isSubscriptionStatusActive(userInfo.team?.subscription_status)));
+  const showConnectLink = useShowConnectAccountLink();
 
   const { data: platforms } = useQuery<Platform[], Error>({
     queryKey: [QueryKeys.PLATFORMS],
@@ -275,7 +260,9 @@ const SettingsAccountsPage = () => {
               </Button>
               {showConnectLink && (
                 <Button variant="link" asChild>
-                  <Link to="/connect">{t("settings:accounts_connect_account")}</Link>
+                  <Link to={connectPagePath("settings_accounts")}>
+                    {t("settings:accounts_connect_account")}
+                  </Link>
                 </Button>
               )}
             </EmptyPlaceholder>

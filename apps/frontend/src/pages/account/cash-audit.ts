@@ -202,23 +202,29 @@ function compareDateKeys(a: string | null, b: string | null) {
   return a.localeCompare(b);
 }
 
+// Building a formatter costs far more than formatting with one, and lists
+// key every row, so each timezone's formatter is built once.
+const dateKeyFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function dateKeyFormatter(timezone: string): Intl.DateTimeFormat {
+  let formatter = dateKeyFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    dateKeyFormatters.set(timezone, formatter);
+  }
+  return formatter;
+}
+
 function formatDateInTimezone(date: Date, timezone?: string) {
   try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone?.trim() || "UTC",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    return partsToDateKey(formatter.formatToParts(date));
+    return partsToDateKey(dateKeyFormatter(timezone?.trim() || "UTC").formatToParts(date));
   } catch {
-    const fallbackFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "UTC",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    return partsToDateKey(fallbackFormatter.formatToParts(date));
+    return partsToDateKey(dateKeyFormatter("UTC").formatToParts(date));
   }
 }
 

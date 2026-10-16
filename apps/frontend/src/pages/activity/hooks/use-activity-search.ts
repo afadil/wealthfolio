@@ -25,6 +25,8 @@ interface BaseOptions {
   searchQuery: string;
   sorting: SortingState;
   pageSize?: number;
+  /** Ask for the cash balance after each row (one cash or credit-card account). */
+  includeCashBalances?: boolean;
 }
 
 export interface UseActivitySearchInfiniteOptions extends BaseOptions {
@@ -80,7 +82,13 @@ export function useActivitySearch(
   options: UseActivitySearchPaginatedOptions,
 ): UseActivitySearchPaginatedResult;
 export function useActivitySearch(options: UseActivitySearchOptions): UseActivitySearchResult {
-  const { filters, searchQuery, sorting, pageSize = DEFAULT_PAGE_SIZE } = options;
+  const {
+    filters,
+    searchQuery,
+    sorting,
+    pageSize = DEFAULT_PAGE_SIZE,
+    includeCashBalances = false,
+  } = options;
   const mode = options.mode ?? "infinite";
   const pageIndex = "pageIndex" in options ? options.pageIndex : 0;
   const hasClosedAccountScope = filters.accountIds?.length === 0;
@@ -135,12 +143,15 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
       hasClosedAccountScope,
       primarySort,
       pageSize,
+      includeCashBalances,
     ],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       if (hasClosedAccountScope) return EMPTY_RESPONSE;
       const page = typeof pageParam === "number" ? pageParam : 0;
-      return searchActivities(page, pageSize, normalizedFilters, searchQuery, primarySort);
+      return searchActivities(page, pageSize, normalizedFilters, searchQuery, primarySort, {
+        includeCashBalances,
+      });
     },
     getNextPageParam: (lastPage, allPages) => {
       const fetched = allPages.reduce((acc, page) => acc + page.data.length, 0);
@@ -160,10 +171,13 @@ export function useActivitySearch(options: UseActivitySearchOptions): UseActivit
       primarySort,
       pageIndex,
       pageSize,
+      includeCashBalances,
     ],
     queryFn: async () => {
       if (hasClosedAccountScope) return EMPTY_RESPONSE;
-      return searchActivities(pageIndex, pageSize, normalizedFilters, searchQuery, primarySort);
+      return searchActivities(pageIndex, pageSize, normalizedFilters, searchQuery, primarySort, {
+        includeCashBalances,
+      });
     },
     enabled: mode === "paginated",
   });

@@ -159,7 +159,11 @@ function LiabilitySummaryStats({
   const numbers = useNumberFormatting();
   const { isBalanceHidden } = useBalancePrivacy();
   const currency = cards[0]?.holding.currency;
-  if (!currency || cards.some(({ holding }) => holding.currency !== currency)) return null;
+  if (
+    !currency ||
+    cards.some(({ holding, model }) => holding.currency !== currency || !model.balanceAvailable)
+  )
+    return null;
   const summary = liabilitySummary(cards.map(({ model }) => model));
   const money = (value: number) =>
     isBalanceHidden ? "••••" : amounts.formatCompactAmount(value, currency);
@@ -216,13 +220,20 @@ function LiabilityCard({
         t("holdings:liability_cards.debt_free", {
           date: dates.formatCalendarDate(payoff, { month: "short", year: "numeric" }),
         })
-      : t("holdings:liability_cards.updated", {
-          date: dates.formatCalendarDate(holding.valuationDate.slice(0, 10), {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          }),
-        }),
+      : !model.balanceAvailable
+        ? t("asset:loanOverview.unavailable")
+        : t(
+            holding.loan?.balanceSource === "original"
+              ? "holdings:liability_cards.original_balance"
+              : "holdings:liability_cards.updated",
+            {
+              date: dates.formatCalendarDate(holding.valuationDate.slice(0, 10), {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              }),
+            },
+          ),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -313,7 +324,9 @@ function LiabilityCard({
 
         <div className="mt-2.5 flex items-end justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold tabular-nums">{money(model.balance)}</div>
+            <div className="text-sm font-semibold tabular-nums">
+              {model.balanceAvailable ? money(model.balance) : t("asset:loanOverview.unavailable")}
+            </div>
             <div className="text-muted-foreground mt-0.5 text-[10px]">
               {model.original != null
                 ? t("holdings:liability_cards.owed_of", { amount: money(model.original) })

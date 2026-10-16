@@ -456,6 +456,15 @@ fn attribution_for(activity: &Activity, account: &AccountFacts, action: &Action)
     }
 }
 
+/// A CREDIT crosses the portfolio boundary when its row says so
+/// (`metadata.flow.is_external`); unmarked rows fall back to the subtype,
+/// where only BONUS is new money. Matches 3.9.1's flow classifier.
+fn credit_is_external(activity: &Activity) -> bool {
+    activity
+        .external_transfer
+        .unwrap_or(activity.subtype == Some(Subtype::Bonus))
+}
+
 fn contribution_for(activity: &Activity, facts: &CanonicalFacts) -> Contribution {
     use ActivityKind::*;
     if facts
@@ -467,7 +476,7 @@ fn contribution_for(activity: &Activity, facts: &CanonicalFacts) -> Contribution
     }
     match activity.kind {
         Deposit | Withdrawal => Contribution::CashGross,
-        Credit if activity.subtype == Some(Subtype::Bonus) => Contribution::CashGross,
+        Credit if credit_is_external(activity) => Contribution::CashGross,
         TransferIn if activity.is_security_transfer => Contribution::SecurityIn,
         TransferOut if activity.is_security_transfer => Contribution::SecurityOut,
         TransferIn | TransferOut => Contribution::CashGross,
@@ -492,7 +501,7 @@ fn flow_for(
             boundary: Boundary::External,
             value: FlowValue::Cash(gross_abs),
         },
-        Credit if activity.subtype == Some(Subtype::Bonus) => Flow {
+        Credit if credit_is_external(activity) => Flow {
             boundary: Boundary::External,
             value: FlowValue::Cash(gross_abs),
         },
@@ -568,7 +577,6 @@ mod tests {
             fx_rate: None,
             source_group_id: None,
             external_transfer: None,
-            fx_conversion: None,
             source_system: None,
             is_user_modified: false,
             created_at: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
@@ -597,6 +605,7 @@ mod tests {
                 kind: "INVESTMENT".into(),
                 instrument_type: Some("EQUITY".into()),
                 contract_multiplier: None,
+                alternative: false,
             }],
             activities,
             quotes: vec![],
@@ -751,5 +760,37 @@ mod tests {
             ledger.diagnostics[0].code,
             DiagnosticCode::UnknownTransferBoundary
         );
+    }
+
+    #[test]
+    fn credit_honors_explicit_external_flag() {
+        let cases = [
+            ("CASH", None, Some(true), true),
+            ("CASH", Some("REFUND"), Some(true), true),
+            ("CASH", Some("REBATE"), Some(true), true),
+            ("CASH", Some("REIMBURSEMENT"), Some(true), true),
+            ("CASH", Some("BONUS"), None, true),
+            ("CASH", Some("BONUS"), Some(false), false),
+            ("CASH", Some("ADJUSTMENT"), None, false),
+            ("SECURITIES", Some("REFUND"), None, false),
+            ("SECURITIES", Some("REBATE"), None, false),
+        ];
+        for (account_type, subtype, external, expected) in cases {
+            let mut credit = raw("credit", "a1", "CREDIT", "2025-03-01T10:00:00Z");
+            credit.amount = Some(dec!(100));
+            credit.subtype = subtype.map(str::to_owned);
+            credit.external_transfer = external;
+            let ledger = ledger(vec![credit], account_type);
+            let event = &ledger.events[0];
+            let case = format!("{account_type} {subtype:?} external={external:?}");
+            if expected {
+                assert_eq!(event.contribution, Contribution::CashGross, "{case}");
+                assert_eq!(event.flow.boundary, Boundary::External, "{case}");
+                assert_eq!(event.flow.value, FlowValue::Cash(dec!(100)), "{case}");
+            } else {
+                assert_eq!(event.contribution, Contribution::None, "{case}");
+                assert_eq!(event.flow, Flow::NONE, "{case}");
+            }
+        }
     }
 }

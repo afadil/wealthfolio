@@ -5,7 +5,7 @@ import type { RunEnv } from "../types";
 import { RunEnvs } from "../types";
 
 // Platform constants
-export { isDesktop, isWeb, logger } from "./core";
+export { isTauri, isWeb, logger } from "./core";
 
 // Re-export types and constants from shared types
 export { RunEnvs } from "../types";

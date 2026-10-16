@@ -7,6 +7,8 @@ import {
 } from "@/features/spending/components/spending-transactions-tab";
 import { useSpendingSettings } from "@/features/spending/hooks/use-spending-settings";
 import { SyncButton } from "@/features/wealthfolio-connect/components/sync-button";
+import { useShowConnectAccountLink } from "@/features/wealthfolio-connect/hooks/use-show-connect-account-link";
+import { connectPagePath } from "@/features/wealthfolio-connect/lib/connect-url";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { usePortfolios } from "@/hooks/use-portfolios";
 import { useIsCompactTableViewport, useIsMobileViewport } from "@/hooks/use-platform";
@@ -115,6 +117,7 @@ const ActivityPage = () => {
     duplicateActivity: handleDuplicate,
   } = useActivityActionDialogs();
   const navigate = useNavigate();
+  const showConnectAccountLink = useShowConnectAccountLink();
   const [searchParams, setSearchParams] = useSearchParams();
   const activityUrlFilterKey = searchParams.toString();
   const activityUrlFilters = useMemo(
@@ -594,10 +597,20 @@ const ActivityPage = () => {
             testId: "add-personal-asset-action",
             onClick: () => setShowAlternativeAssetModal(true),
           },
+          ...(showConnectAccountLink
+            ? [
+                {
+                  icon: Icons.CloudSync2,
+                  label: t("activity:page.connect_account"),
+                  testId: "connect-account-action",
+                  onClick: () => navigate(connectPagePath("activities_menu")),
+                },
+              ]
+            : []),
         ],
       },
     ],
-    [handleEdit, navigate, t],
+    [handleEdit, navigate, showConnectAccountLink, t],
   );
 
   const investmentActions = (
@@ -785,6 +798,7 @@ const ActivityPage = () => {
           onUnlinkTransfer={handleUnlinkTransfer}
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
+          showConnectAccountLink={showConnectAccountLink}
           onClearFilters={clearInvestmentsFilters}
           onLoadMore={infiniteSearch.fetchNextPage}
           hasNextPage={infiniteSearch.hasNextPage}
@@ -821,6 +835,7 @@ const ActivityPage = () => {
           onUnlinkTransfer={handleUnlinkTransfer}
           filtersActive={investmentsFiltersActive}
           onAdd={() => handleEdit(undefined)}
+          showConnectAccountLink={showConnectAccountLink}
           onClearFilters={clearInvestmentsFilters}
           onLoadMore={infiniteSearch.fetchNextPage}
           hasNextPage={infiniteSearch.hasNextPage}

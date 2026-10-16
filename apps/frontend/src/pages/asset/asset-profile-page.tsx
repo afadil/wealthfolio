@@ -970,8 +970,8 @@ export const AssetProfilePage = () => {
         assetId={assetId}
         currency={quote?.currency ?? profile?.currency ?? baseCurrency}
         isManualDataSource={isManualPricingMode}
-        onSaveQuote={(q: Quote) => saveQuoteMutation.mutate(q)}
-        onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+        onSaveQuote={(q: Quote) => saveQuoteMutation.mutateAsync(q)}
+        onDeleteQuote={(id: string) => deleteQuoteMutation.mutateAsync(id)}
         onChangeDataSource={(isManual) => {
           if (profile) {
             updateQuoteModeMutation.mutate({
@@ -1244,8 +1244,8 @@ export const AssetProfilePage = () => {
               assetId={assetId}
               currency={profile?.currency ?? baseCurrency}
               isManualDataSource={isManualPricingMode}
-              onSaveQuote={(quote: Quote) => saveQuoteMutation.mutate(quote)}
-              onDeleteQuote={(id: string) => deleteQuoteMutation.mutate(id)}
+              onSaveQuote={(quote: Quote) => saveQuoteMutation.mutateAsync(quote)}
+              onDeleteQuote={(id: string) => deleteQuoteMutation.mutateAsync(id)}
               onChangeDataSource={(isManual) => {
                 updateQuoteModeMutation.mutate({
                   assetId: assetId,

@@ -161,3 +161,37 @@ fn oversized_extra_payment_caps_principal_but_preserves_accrued_interest() {
     assert_eq!(final_row.payment, 5.81);
     assert_eq!(final_row.principal, 0.0);
 }
+
+#[test]
+fn manual_principal_is_dated_validated_and_does_not_enable_a_schedule() {
+    let today = "2026-10-12".parse().unwrap();
+    let origin = "2022-06-05".parse().unwrap();
+    for metadata in [
+        json!({"original_amount":"100", "origination_date":"2022-06-05"}),
+        json!({"purchase_price":100, "purchase_date":"2022-06-05"}),
+        json!({"original_amount":"100", "origination_date":"2022-06-05", "loan_projection":{}, "tracking_mode":"manual"}),
+    ] {
+        assert_eq!(
+            manual_loan_principal(Some(&metadata), today, today),
+            Some((origin, Decimal::new(100, 0)))
+        );
+        assert!(
+            manual_loan_principal(Some(&metadata), origin.pred_opt().unwrap(), today).is_none()
+        );
+    }
+    let undated = json!({"original_amount":"100"});
+    assert_eq!(
+        manual_loan_principal(Some(&undated), today, origin),
+        Some((origin, Decimal::new(100, 0)))
+    );
+    assert!(manual_loan_principal(Some(&undated), origin.pred_opt().unwrap(), origin).is_none());
+    for metadata in [
+        json!({}),
+        json!({"original_amount":"NaN"}),
+        json!({"original_amount":"-100"}),
+        json!({"original_amount":"100", "origination_date":"invalid"}),
+        json!({"original_amount":"100", "loan_projection":{}}),
+    ] {
+        assert!(manual_loan_principal(Some(&metadata), today, today).is_none());
+    }
+}

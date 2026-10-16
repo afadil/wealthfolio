@@ -28,6 +28,7 @@ pub async fn search_activities(
     date_to: Option<String>,           // Optional end date filter (YYYY-MM-DD, inclusive)
     instrument_type_filter: Option<Vec<String>>, // Optional instrument_type filter
     activity_id_filter: Option<Vec<String>>, // Optional exact activity-id filter
+    include_cash_balances: Option<bool>, // Cash balance after each row, for one cash account
     state: ProfileAccess,
 ) -> Result<ActivitySearchResponse, String> {
     let context = state.context()?;
@@ -48,7 +49,8 @@ pub async fn search_activities(
         local_date_range_utc_bounds(date_from_parsed, date_to_parsed, tz)
             .map_err(|e| e.to_string())?;
 
-    Ok(context.activity_service().search_activities_in_utc_range(
+    let activity_service = context.activity_service();
+    let mut response = activity_service.search_activities_in_utc_range(
         page,
         page_size,
         account_id_filter,
@@ -60,7 +62,11 @@ pub async fn search_activities(
         date_to_utc_exclusive,
         instrument_type_filter,
         activity_id_filter,
-    )?)
+    )?;
+    if include_cash_balances.unwrap_or(false) {
+        activity_service.attach_cash_balances(&mut response).await?;
+    }
+    Ok(response)
 }
 
 #[tauri::command]

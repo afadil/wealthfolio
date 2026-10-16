@@ -1050,6 +1050,8 @@ export interface IncomeSummary {
   currency: string;
   monthlyAverage: number;
   yoyGrowth: number | null;
+  /** Currencies with no exchange rate to `currency`, left out of the converted totals. */
+  unconvertedCurrencies: string[];
 }
 
 export interface DateRange {

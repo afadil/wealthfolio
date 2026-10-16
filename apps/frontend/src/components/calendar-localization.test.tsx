@@ -5,6 +5,19 @@ import { describe, expect, it, vi } from "vitest";
 import { MonthSwitcher } from "../features/spending/components/month-switcher";
 
 describe("calendar localization policy", () => {
+  it.each([
+    ["RO", "vineri, 10 iulie 2026"],
+    ["BG", "петък, 10 юли 2026"],
+  ])("uses regional day labels for %s", (region, label) => {
+    render(
+      <FormattingProvider locale={region} uiLocale="en">
+        <Calendar mode="single" defaultMonth={new Date(2026, 6, 1)} />
+      </FormattingProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+  });
+
   it("formats month choices with the formatting locale", () => {
     render(
       <FormattingProvider locale="ja-JP" uiLocale="en">

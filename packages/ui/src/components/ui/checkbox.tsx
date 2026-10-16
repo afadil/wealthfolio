@@ -11,13 +11,20 @@ const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "border-primary ring-offset-background focus-visible:ring-ring data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground peer h-4 w-4 shrink-0 cursor-pointer rounded-sm border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      // The unchecked border is muted rather than `primary`, so a column of
+      // boxes stays quiet, but it keeps the 3:1 contrast a control needs.
+      "border-muted-foreground bg-background ring-offset-background focus-visible:ring-ring hover:border-foreground data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground peer h-4 w-4 shrink-0 cursor-pointer rounded-[4px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
       className,
     )}
     {...props}
   >
     <CheckboxPrimitive.Indicator className={cn("flex items-center justify-center text-current")}>
-      <Icons.Check className="h-4 w-4" />
+      {/* A partial selection draws a dash: a tick there reads as "all". */}
+      {props.checked === "indeterminate" ? (
+        <Icons.Minus className="h-3 w-3" strokeWidth={3} />
+      ) : (
+        <Icons.Check className="h-3 w-3" strokeWidth={3} />
+      )}
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));

@@ -1,8 +1,16 @@
 import { act, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import copy from "@/i18n/locales/en/settings.json";
 import SettingsLayout from "./settings-layout";
+
+const mocks = vi.hoisted(() => ({ platform: { isTauri: true, isMobile: false } }));
+// The real usePlatform asks Tauri for platform info, which jsdom lacks.
+vi.mock("@/hooks/use-platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/use-platform")>()),
+  usePlatform: () => mocks.platform,
+}));
 
 const initialWidth = window.innerWidth;
 let mounts = 0;
@@ -28,6 +36,10 @@ function renderAt(path: string, width: number) {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  mocks.platform = { isTauri: true, isMobile: false };
+});
 
 afterEach(() => {
   window.innerWidth = initialWidth;
@@ -62,5 +74,22 @@ describe("SettingsLayout", () => {
 
     expect(screen.queryByTestId("settings-page")).not.toBeInTheDocument();
     expect(mounts).toBe(0);
+  });
+
+  // The MCP server ships with the desktop app and the web server, not the phone apps.
+  it.each([
+    ["the desktop app", 1280, true, false, true],
+    ["the web app on a phone", 390, false, true, true],
+    ["the phone app", 390, true, true, false],
+  ])("lists AI Agent Access in %s", (_, width, isTauri, isMobile, listed) => {
+    mocks.platform = { isTauri, isMobile };
+    renderAt("/settings", width);
+
+    expect(screen.getByText(copy.nav.items.ai_providers)).toBeInTheDocument();
+    if (listed) {
+      expect(screen.getByText(copy.nav.items.agent_access)).toBeInTheDocument();
+    } else {
+      expect(screen.queryByText(copy.nav.items.agent_access)).not.toBeInTheDocument();
+    }
   });
 });
