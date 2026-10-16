@@ -83,7 +83,7 @@ use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait, Va
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::utils::time_utils::{
-    activity_date_in_tz, calendar_day_instant, parse_stored_instant, parse_user_timezone_or_default,
+    activity_date_in_tz, calendar_day_instant, parse_user_timezone_or_default,
 };
 use crate::Result;
 use log::warn;
@@ -5024,7 +5024,7 @@ impl ActivityServiceTrait for ActivityService {
             .iter()
             .filter(|row| row.status == ActivityStatus::Posted)
             .filter_map(|row| {
-                let instant = parse_stored_instant(&row.date)?;
+                let instant = Self::parse_activity_timestamp_utc(&row.date)?;
                 Some((
                     row.id.clone(),
                     row.account_id.clone(),
