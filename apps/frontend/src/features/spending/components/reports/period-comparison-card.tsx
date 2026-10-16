@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -50,11 +49,11 @@ export function PeriodComparisonCard({
     const p = prior?.current;
     const cIn = c?.income ?? 0;
     const cOut = c?.outflow ?? 0;
-    const cNet = amountDifference(cIn, cOut);
+    const cNet = cIn - cOut;
     const cRate = cIn > 0 ? cNet / cIn : 0;
     const pIn = p?.income ?? 0;
     const pOut = p?.outflow ?? 0;
-    const pNet = amountDifference(pIn, pOut);
+    const pNet = pIn - pOut;
     const pRate = pIn > 0 ? pNet / pIn : 0;
     return [
       {
@@ -124,7 +123,7 @@ function ComparisonMetric({ row, currency }: { row: MetricRow; currency: string 
   const { isBalanceHidden } = useBalancePrivacy();
   const { currentValue, priorValue, goodOnIncrease, label } = row;
   const isRate = row.key === "rate";
-  const delta = amountDifference(currentValue, priorValue);
+  const delta = currentValue - priorValue;
   const pct = priorValue !== 0 ? delta / Math.abs(priorValue) : null;
 
   const trendingUp = delta > 0;

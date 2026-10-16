@@ -1,4 +1,3 @@
-import { amountDifference, sumAmounts } from "@/lib/amount-math";
 import { profilePreferenceKey } from "@/hooks/use-persistent-state";
 import { usesLegacyPreferences } from "@/features/profiles/session";
 import { formatOptionSubtitle, parseOccSymbol } from "@/lib/occ-symbol";
@@ -90,8 +89,8 @@ const getDisposedCostBasis = (holding: Holding): MonetaryValue | null => {
   }
 
   return {
-    local: amountDifference(holding.returnBasis.local, holding.costBasis?.local ?? 0),
-    base: amountDifference(holding.returnBasis.base, holding.costBasis?.base ?? 0),
+    local: holding.returnBasis.local - (holding.costBasis?.local ?? 0),
+    base: holding.returnBasis.base - (holding.costBasis?.base ?? 0),
   };
 };
 
@@ -102,8 +101,8 @@ const getClosingCashFlow = (holding: Holding): MonetaryValue | null => {
   }
 
   return {
-    local: sumAmounts([costBasis.local, holding.realizedGain.local]),
-    base: sumAmounts([costBasis.base, holding.realizedGain.base]),
+    local: costBasis.local + holding.realizedGain.local,
+    base: costBasis.base + holding.realizedGain.base,
   };
 };
 

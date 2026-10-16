@@ -1,5 +1,4 @@
 import type { Holding } from "@/lib/types";
-import { amountDifference } from "./amount-math";
 
 export type HoldingPerformanceMetric =
   | "unrealizedGain"
@@ -34,7 +33,7 @@ export function getBaseHoldingPerformancePercent(
 
   if (metric === "realizedGain") {
     if (holding.realizedGain == null || holding.returnBasis == null) return null;
-    const disposedBasis = amountDifference(holding.returnBasis.base, holding.costBasis?.base ?? 0);
+    const disposedBasis = holding.returnBasis.base - (holding.costBasis?.base ?? 0);
     return percentFromBasis(holding.realizedGain.base, disposedBasis);
   }
 

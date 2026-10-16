@@ -5,7 +5,6 @@
  * It reads period state + per-category descriptors and emits a structured
  * model. Components render the fragments — they don't decide content.
  */
-import { amountDifference } from "@/lib/amount-math";
 
 import {
   MIN_DRIVER_CONCENTRATION,
@@ -86,7 +85,7 @@ export function buildHeadline(input: BuildHeadlineInput): HeadlineModel {
   }
 
   // valid_comparison from here on.
-  const netDelta = amountDifference(currentTotal, priorTotal);
+  const netDelta = currentTotal - priorTotal;
   const direction: HeadlineFragmentTone = netDelta >= 0 ? "up" : "down";
 
   // Total Δ% has its own noise guard (we use the same base threshold as

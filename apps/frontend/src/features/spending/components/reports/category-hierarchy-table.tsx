@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { memo, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -94,8 +93,6 @@ export function CategoryHierarchyTable({
     }
     return t;
   }, [tree]);
-
-  const totalDelta = amountDifference(totals.spent, totals.priorSpent);
 
   const groups = useMemo(
     () =>
@@ -315,14 +312,14 @@ export function CategoryHierarchyTable({
             <td
               className={cn(
                 "px-3 py-2.5 text-right text-xs tabular-nums",
-                totals.priorSpent === 0 || totalDelta === 0
+                totals.priorSpent === 0 || totals.spent - totals.priorSpent === 0
                   ? "text-muted-foreground/70"
-                  : totalDelta > 0
+                  : totals.spent - totals.priorSpent > 0
                     ? "text-destructive"
                     : "text-success",
               )}
             >
-              {formatDelta(totalDelta, totals.priorSpent, numberFormatting)}
+              {formatDelta(totals.spent - totals.priorSpent, totals.priorSpent, numberFormatting)}
             </td>
           </tr>
         </tfoot>
@@ -383,7 +380,7 @@ const GroupRow = memo(function GroupRow({
 }) {
   const numberFormatting = useNumberFormatting();
   const hasChildren = group.children.length > 0;
-  const delta = amountDifference(group.spent, group.priorSpent);
+  const delta = group.spent - group.priorSpent;
   const sharePct = totalSpent > 0 ? (group.spent / totalSpent) * 100 : 0;
   const accent = group.color ?? "var(--muted-foreground)";
 
@@ -480,7 +477,7 @@ const ParentRow = memo(function ParentRow({
   const { t } = useTranslation();
   const numberFormatting = useNumberFormatting();
   const hasChildren = node.children.length > 0;
-  const delta = amountDifference(node.spent, node.priorSpent);
+  const delta = node.spent - node.priorSpent;
   const accent = node.color ?? "var(--muted-foreground)";
   const tintBg = node.color ? `${node.color}1F` : "var(--muted)";
   const clickable = !!onCategoryClick;
@@ -657,7 +654,7 @@ const MobileGroupRow = memo(function MobileGroupRow({
   const { t } = useTranslation();
   const hasChildren = group.children.length > 0;
   const hasBudget = group.budgeted > 0;
-  const delta = amountDifference(group.spent, group.priorSpent);
+  const delta = group.spent - group.priorSpent;
   const accent = group.color ?? "var(--muted-foreground)";
 
   // Empty group — single-line card.
@@ -757,7 +754,7 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
   const numberFormatting = useNumberFormatting();
   const hasChildren = node.children.length > 0;
   const hasBudget = node.budgeted > 0;
-  const delta = amountDifference(node.spent, node.priorSpent);
+  const delta = node.spent - node.priorSpent;
   const accent = node.color ?? "var(--muted-foreground)";
   const tintBg = node.color ? `${node.color}1F` : "var(--muted)";
   const clickable = !!onCategoryClick;

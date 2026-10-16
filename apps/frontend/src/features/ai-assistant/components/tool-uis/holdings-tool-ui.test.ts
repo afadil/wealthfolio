@@ -7,35 +7,6 @@ import {
 } from "./holdings-tool-semantics";
 
 describe("calculateBasePortfolioPerformance", () => {
-  it("keeps cancelling gains and returns neutral", () => {
-    const performance = calculateBasePortfolioPerformance(
-      [0.1, 0.2, -0.3].map((gain) => ({
-        returnBasisBase: 1,
-        totalGainBase: gain,
-        totalReturnBase: gain,
-      })),
-    );
-
-    expect(performance).toEqual({
-      totalPnl: 0,
-      totalPnlPct: 0,
-      totalReturn: 0,
-      totalReturnPct: 0,
-    });
-  });
-
-  it.each([1e-8, -1e-8])("preserves a real %s gain beside cancelling amounts", (gain) => {
-    const performance = calculateBasePortfolioPerformance(
-      [20_000_000, gain, -20_000_000].map((value) => ({
-        returnBasisBase: 1,
-        totalGainBase: value,
-        totalReturnBase: value,
-      })),
-    );
-    expect(performance.totalPnl).toBe(gain);
-    expect(performance.totalReturn).toBe(gain);
-  });
-
   it("uses gross exposure when long and short bases offset", () => {
     const performance = calculateBasePortfolioPerformance([
       { returnBasisBase: 100, totalGainBase: 10, totalReturnBase: 12 },
@@ -104,13 +75,6 @@ describe("calculateBasePortfolioPerformance", () => {
 });
 
 describe("calculateDailyPortfolioPerformance", () => {
-  it("keeps cancelling daily changes neutral", () => {
-    const performance = calculateDailyPortfolioPerformance(
-      [0.1, 0.2, -0.3].map((dayChangePct) => ({ marketValueBase: 1, dayChangePct })),
-    );
-    expect(performance).toEqual({ changeAmount: 0, changePct: 0 });
-  });
-
   it("uses gross exposure for long and short holdings", () => {
     const performance = calculateDailyPortfolioPerformance([
       { marketValueBase: 100, dayChangePct: 0.1 },

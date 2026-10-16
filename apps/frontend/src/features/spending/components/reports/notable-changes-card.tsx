@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -187,7 +186,7 @@ function computeChanges(
     const cur = cMap.get(id) ?? 0;
     const pri = pMap.get(id) ?? 0;
     if (cur === 0 && pri === 0) continue;
-    const delta = amountDifference(cur, pri);
+    const delta = cur - pri;
     if (delta === 0) continue;
 
     // Significance gate: drop changes that are negligible against the period total.

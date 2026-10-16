@@ -3,22 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { buildHeadline } from "./headline";
 
 describe("buildHeadline", () => {
-  it("does not describe floating-point residue as a spending change", () => {
-    const headline = buildHeadline({
-      periodState: { kind: "valid_comparison" },
-      movers: [],
-      currentTotal: 3 * 10.1,
-      priorTotal: 30.3,
-      priorLabel: "last month",
-      metaLabel: "",
-      t: (key) => key,
-    });
-
-    expect(headline.summary?.delta).toBe(0);
-    expect(headline.summary?.pct).toBe(0);
-    expect(headline.fragments).toContainEqual({ type: "amount", value: 0, tone: "neutral" });
-  });
-
   it("uses translated copy for empty periods", () => {
     const t = vi.fn((key: string) =>
       key === "spending:whatChanged.headlineNoActivity"

@@ -40,9 +40,7 @@ export function GainAmount({
   const useCurrencyStyle = displayCurrency && validCurrency;
   // Match formatAmount: quote units keep two decimals, currencies use their minor units.
   const fractionDigits = !displayDecimal ? 0 : quoteUnit ? 2 : amountFormatting.currencyFractionDigits(currency);
-  // Keep nonzero gains visible when the currency's normal precision would round them to zero.
-  const useSmallValuePrecision = displayDecimal && value !== 0 && Math.abs(value) < 0.5 * 10 ** -fractionDigits;
-  const displayValue = useSmallValuePrecision ? value : normalizeDisplayAmount(value, fractionDigits);
+  const displayValue = normalizeDisplayAmount(value, fractionDigits);
 
   // Dynamic import for NumberFlow to avoid SSR issues
   const [NumberFlow, setNumberFlow] = React.useState<typeof import("@number-flow/react").default | null>(null);
@@ -56,9 +54,8 @@ export function GainAmount({
   const formatOptions: Format = {
     ...(useCurrencyStyle ? { currency, currencyDisplay: "narrowSymbol" as const } : {}),
     style: useCurrencyStyle ? "currency" : "decimal",
-    ...(useSmallValuePrecision
-      ? { maximumSignificantDigits: 2 }
-      : { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }),
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
     signDisplay: showSign ? "exceptZero" : "never",
   };
   const suffix = displayCurrency && quoteUnit ? quoteUnit.symbol : "";
