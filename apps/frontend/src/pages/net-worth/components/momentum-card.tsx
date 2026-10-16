@@ -25,9 +25,6 @@ export function MomentumCard({ momentum, currency, periodLabel }: MomentumCardPr
   const { t } = useTranslation();
   const dateFormatting = useDateFormatting();
 
-  const barFormatter = new Intl.NumberFormat(amountFormatting.currencyLocale(currency), {
-    maximumFractionDigits: 0,
-  });
   const { currentChange, beatBy, bars } = momentum;
   const changeSign = Math.abs(currentChange) < 0.005 ? "" : currentChange > 0 ? "+" : "-";
 
@@ -77,7 +74,7 @@ export function MomentumCard({ momentum, currency, periodLabel }: MomentumCardPr
             )}
             <div className="flex h-full items-stretch gap-1">
               {bars.map((bar) => {
-                const title = `${monthLabel(bar.month, dateFormatting)}: ${bar.value >= 0 ? "+" : ""}${barFormatter.format(bar.value)}`;
+                const title = `${monthLabel(bar.month, dateFormatting)}: ${bar.value >= 0 ? "+" : ""}${amountFormatting.formatDecimalAmount(bar.value, currency, { maximumFractionDigits: 0 })}`;
                 return (
                   <div key={bar.month} className="flex flex-1 flex-col" title={title}>
                     {/* above-zero zone */}

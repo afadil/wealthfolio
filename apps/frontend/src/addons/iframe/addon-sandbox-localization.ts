@@ -1,9 +1,11 @@
+import type { CurrencyFormattingRegions } from "@wealthfolio/ui";
+
 export interface AddonLocalizationSnapshot {
   locale: string;
   uiLocale?: string;
   timezone?: string;
   /** Formatting regions for amounts in specific currencies, keyed by currency code. */
-  currencyFormattingRegions?: Record<string, string>;
+  currencyFormattingRegions?: CurrencyFormattingRegions;
 }
 
 type AddonLocalizationListener = (snapshot: AddonLocalizationSnapshot) => void;
@@ -26,12 +28,14 @@ export function isSameAddonLocalization(
   left: AddonLocalizationSnapshot,
   right: AddonLocalizationSnapshot,
 ): boolean {
+  const leftRegions = left.currencyFormattingRegions ?? {};
+  const rightRegions = right.currencyFormattingRegions ?? {};
   return (
     left.locale === right.locale &&
     left.uiLocale === right.uiLocale &&
     left.timezone === right.timezone &&
-    JSON.stringify(left.currencyFormattingRegions ?? {}) ===
-      JSON.stringify(right.currencyFormattingRegions ?? {})
+    Object.keys(leftRegions).length === Object.keys(rightRegions).length &&
+    Object.entries(leftRegions).every(([currency, region]) => rightRegions[currency] === region)
   );
 }
 

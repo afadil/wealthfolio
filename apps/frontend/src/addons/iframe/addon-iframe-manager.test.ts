@@ -169,7 +169,7 @@ describe("AddonIframeManager", () => {
       locale: "ko-KR",
       uiLocale: "fr",
       timezone: "Asia/Seoul",
-      currencyFormattingRegions: { INR: "IN" },
+      currencyFormattingRegions: { INR: "IN", USD: "DE" },
     };
     postMessage.mockClear();
     setAddonLocalizationSnapshot(withCurrencyFormats);
@@ -178,13 +178,23 @@ describe("AddonIframeManager", () => {
       "*",
     );
 
-    // Settings refetches build a new map with the same entries.
+    // Settings refetches may rebuild the same map in a different insertion order.
     postMessage.mockClear();
     setAddonLocalizationSnapshot({
       ...withCurrencyFormats,
-      currencyFormattingRegions: { INR: "IN" },
+      currencyFormattingRegions: { USD: "DE", INR: "IN" },
     });
     expect(postMessage).not.toHaveBeenCalled();
+
+    const changedCurrencyFormats = {
+      ...withCurrencyFormats,
+      currencyFormattingRegions: { USD: "US", INR: "IN" },
+    };
+    setAddonLocalizationSnapshot(changedCurrencyFormats);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ localization: changedCurrencyFormats, type: "localizationUpdate" }),
+      "*",
+    );
 
     await manager.stopAllAddons();
     await cancelled;

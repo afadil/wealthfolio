@@ -287,9 +287,10 @@ export default function IncomePage() {
                                   <div className="flex flex-1 items-center justify-between gap-2 leading-none">
                                     <span className="text-muted-foreground">{name}</span>
                                     <span className="text-foreground font-mono font-medium tabular-nums">
-                                      {new Intl.NumberFormat(
-                                        amountFormatting.currencyLocale(String(name)),
-                                      ).format(Number(value))}
+                                      {amountFormatting.formatDecimalAmount(
+                                        Number(value),
+                                        String(name),
+                                      )}
                                     </span>
                                   </div>
                                 </>

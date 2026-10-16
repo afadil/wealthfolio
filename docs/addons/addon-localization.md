@@ -45,10 +45,13 @@ Highlights of the API:
 
 - `useAmountFormatting()` — `formatAmount`, `formatPrice`,
   `formatCompactAmount`, `formatRoundedAmount`, `formatCurrencySymbol`,
-  `currencyFractionDigits`, and `currencyLocale` (hosts newer than 3.10.0).
-  These follow the user's per-currency formats, so an amount in a currency with
-  its own format uses that region instead of the global one. When you format an
-  amount yourself, use `currencyLocale(currency)` as its locale.
+  `currencyFractionDigits`, `currencyLocale`, and `formatDecimalAmount` (hosts
+  newer than 3.10.0). These follow the user's per-currency formats, so an amount
+  in a currency with its own format uses that region instead of the global one.
+  When you format a decimal amount without a symbol, use
+  `formatDecimalAmount(value, currency, options)`; its optional
+  `minimumFractionDigits` and `maximumFractionDigits` control precision. For
+  other custom formats, use `currencyLocale(currency)` as the locale.
 - `useNumberFormatting()` — `formatPercent`, `formatQuantity`, `formatDecimal`,
   `decimalSeparator`, `groupSeparator`, and locale-aware `parseNumber` for
   inputs
