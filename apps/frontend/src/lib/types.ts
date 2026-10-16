@@ -1062,6 +1062,8 @@ export interface IncomeSummary {
   currency: string;
   monthlyAverage: number;
   yoyGrowth: number | null; // Changed from optional to nullable
+  /** Currencies with no exchange rate to `currency`, left out of the converted totals. */
+  unconvertedCurrencies: string[];
 }
 
 // Define custom DateRange type matching react-day-picker's

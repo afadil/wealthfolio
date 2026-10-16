@@ -1,4 +1,5 @@
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
+import { UnconvertedCurrenciesNotice } from "@/pages/income/unconverted-currencies-notice";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { makeAssistantToolUI } from "@assistant-ui/react";
 import {
@@ -47,6 +48,7 @@ interface GetIncomeOutput {
   topAssets: TopAssetDto[];
   byMonth: Record<string, number>;
   period: string;
+  unconvertedCurrencies: string[];
 }
 
 // ============================================================================
@@ -119,6 +121,11 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
 
   const period = (candidate.period as string | undefined) ?? "YTD";
 
+  const unconvertedCurrencies =
+    (candidate.unconvertedCurrencies as string[] | undefined) ??
+    (candidate.unconverted_currencies as string[] | undefined) ??
+    [];
+
   return {
     totalIncome,
     currency,
@@ -128,6 +135,7 @@ function normalizeResult(result: unknown): GetIncomeOutput | null {
     topAssets,
     byMonth,
     period,
+    unconvertedCurrencies,
   };
 }
 
@@ -202,7 +210,7 @@ type IncomeContentProps = ToolCallMessagePartProps<GetIncomeArgs, GetIncomeOutpu
 
 const IncomeContent = memo(IncomeContentImpl);
 
-function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
+export function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
   const amountFormatting = useAmountFormatting();
   const formatting = useNumberFormatting();
   const { t } = useTranslation();
@@ -314,8 +322,11 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
     );
   }
 
-  // Empty state
-  if (isComplete && (!parsed || parsed.totalIncome === 0)) {
+  // Empty state; income without an exchange rate isn't counted, so it is not empty
+  if (
+    isComplete &&
+    (!parsed || (parsed.totalIncome === 0 && parsed.unconvertedCurrencies.length === 0))
+  ) {
     return (
       <Card className="bg-muted/40 border-primary/10 w-full">
         <CardContent className="py-4">
@@ -363,6 +374,10 @@ function IncomeContentImpl({ args, result, status }: IncomeContentProps) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <UnconvertedCurrenciesNotice
+          currencies={parsed.unconvertedCurrencies}
+          baseCurrency={currency}
+        />
         {/* Stat cards */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-background/60 rounded-lg border p-3">

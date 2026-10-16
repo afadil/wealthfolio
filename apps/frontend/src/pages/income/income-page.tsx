@@ -27,6 +27,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart } from "recharts";
 import { IncomeHistoryChart } from "./income-history-chart";
+import { UnconvertedCurrenciesNotice } from "./unconverted-currencies-notice";
 
 type IncomePeriod = "ALL" | "YTD" | "LAST_YEAR";
 
@@ -207,6 +208,10 @@ export default function IncomePage() {
     <>
       {filters}
       <div className="space-y-6">
+        <UnconvertedCurrenciesNotice
+          currencies={periodSummary.unconvertedCurrencies}
+          baseCurrency={currency}
+        />
         <div className="grid gap-6 md:grid-cols-3">
           <Card className="border-yellow-500/10 bg-yellow-500/10">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

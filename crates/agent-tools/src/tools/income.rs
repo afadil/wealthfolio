@@ -47,6 +47,11 @@ pub struct GetIncomeOutput {
     pub by_month: HashMap<String, f64>,
     /// Period label (YTD, LAST_YEAR, ALL).
     pub period: String,
+    /// Currencies with income but no exchange rate to the base currency, in
+    /// this period or the one `yoy_growth` compares against. That income is
+    /// left out of the totals and the growth.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unconverted_currencies: Vec<String>,
 }
 
 /// Tool to fetch income summaries (dividends, interest, other income).
@@ -59,7 +64,7 @@ impl AgentTool for GetIncome {
     }
 
     fn description(&self) -> &'static str {
-        "Fetch income summary including dividends, interest, and other income. Returns total income, monthly average, year-over-year growth, breakdown by type, and top income-generating assets."
+        "Fetch income summary including dividends, interest, and other income. Returns total income, monthly average, year-over-year growth, breakdown by type, and top income-generating assets. unconvertedCurrencies lists currencies with no exchange rate to the base currency; their income is left out of the totals and growth, so say they are incomplete."
     }
 
     fn input_schema(&self) -> serde_json::Value {
@@ -158,6 +163,7 @@ impl AgentTool for GetIncome {
             top_assets,
             by_month,
             period: summary.period.clone(),
+            unconverted_currencies: summary.unconverted_currencies.iter().cloned().collect(),
         };
         Ok(AgentToolResult {
             content: serde_json::to_value(output)?,
