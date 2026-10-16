@@ -4,6 +4,7 @@
  * Pulled out of category-hierarchy-table.tsx so the orchestrator stays focused
  * on render / state and these pure transforms become unit-testable.
  */
+import { amountDifference } from "@/lib/amount-math";
 import type { TaxonomyCategory } from "@/lib/types";
 import type { FormattingApi } from "@wealthfolio/ui";
 
@@ -161,7 +162,8 @@ export function buildTree({
       ? (a: NodeRow, b: NodeRow) => compareNames(a.name, b.name)
       : sort === "delta"
         ? (a: NodeRow, b: NodeRow) =>
-            Math.abs(b.spent - b.priorSpent) - Math.abs(a.spent - a.priorSpent)
+            Math.abs(amountDifference(b.spent, b.priorSpent)) -
+            Math.abs(amountDifference(a.spent, a.priorSpent))
         : (a: NodeRow, b: NodeRow) => b.spent - a.spent;
 
   const tree = Array.from(rolledUp.values())

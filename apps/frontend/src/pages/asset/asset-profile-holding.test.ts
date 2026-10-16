@@ -42,6 +42,15 @@ const closed = (overrides: Partial<Holding> = {}): Holding =>
   });
 
 describe("getAssetProfileHolding", () => {
+  it("keeps cancelling lifecycle gains at zero in both currencies", () => {
+    const holdings = [0.1, 0.2, -0.3].map((gain) =>
+      position({ totalGain: { local: gain, base: gain } }),
+    );
+    const result = getAssetProfileHolding(holdings, "asset-1");
+    expect(result?.totalGain).toEqual({ local: 0, base: 0 });
+    expect(result?.totalGainPct).toBe(0);
+  });
+
   it.each([true, false])(
     "retains pre-transfer income regardless of row order (%s)",
     (closedFirst) => {

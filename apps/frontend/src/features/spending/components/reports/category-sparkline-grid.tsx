@@ -1,3 +1,4 @@
+import { amountDifference } from "@/lib/amount-math";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -267,7 +268,7 @@ function finalizeRows(
     if (total <= 0) continue;
     const series = e.perBucket.map((value, i) => ({ label: labels[i] ?? "", value }));
     const prior = priorByTop.get(id) ?? 0;
-    const deltaPct = prior > 0 ? ((total - prior) / prior) * 100 : null;
+    const deltaPct = prior > 0 ? (amountDifference(total, prior) / prior) * 100 : null;
     rows.push({ id, name: e.name, color: e.color, icon: e.icon, series, total, deltaPct });
   }
   return rows.sort((a, b) => b.total - a.total).slice(0, topN);

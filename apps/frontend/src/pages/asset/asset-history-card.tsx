@@ -1,3 +1,4 @@
+import { amountDifference } from "@/lib/amount-math";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 import { searchActivities } from "@/adapters";
 import HistoryChart, {
@@ -150,8 +151,10 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
     if (selectedIntervalCode === "ALL") {
       if (typeof startValue === "number" && typeof endValue === "number") {
         return {
-          ganAmount: endValue - startValue,
-          percentage: isValidStartValue ? (endValue - startValue) / startValue : null,
+          ganAmount: amountDifference(endValue, startValue),
+          percentage: isValidStartValue
+            ? amountDifference(endValue, startValue) / startValue
+            : null,
           calculatedAt: lastFilteredDate,
         };
       }
@@ -167,10 +170,12 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
 
     return {
       ganAmount:
-        typeof startValue === "number" && typeof endValue === "number" ? endValue - startValue : 0,
+        typeof startValue === "number" && typeof endValue === "number"
+          ? amountDifference(endValue, startValue)
+          : 0,
       percentage:
         isValidStartValue && typeof endValue === "number"
-          ? (endValue - startValue) / startValue
+          ? amountDifference(endValue, startValue) / startValue
           : null,
       calculatedAt: lastFilteredDate,
     };

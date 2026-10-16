@@ -1,3 +1,4 @@
+import { amountDifference } from "@/lib/amount-math";
 import { AmountDisplay } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -24,7 +25,7 @@ export function HoldingsSummaryBar({
 }: HoldingsSummaryBarProps) {
   const { t } = useTranslation();
   const { isBalanceHidden } = useBalancePrivacy();
-  const netWorth = totalAssets - totalLiabilities;
+  const netWorth = amountDifference(totalAssets, totalLiabilities);
 
   return (
     <div

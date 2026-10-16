@@ -1,3 +1,4 @@
+import { amountDifference } from "@/lib/amount-math";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -260,18 +261,18 @@ export function BudgetLineChartCard({
     );
   }
 
-  const remaining = Math.max(0, target - spent);
-  const overBy = spent - target;
+  const remaining = Math.max(0, amountDifference(target, spent));
+  const overBy = amountDifference(spent, target);
   const isOver = overBy > 0;
   const forecastReliable = isCurrentMonth && (haveHistory || dayOfMonth >= 7);
-  const forecastDelta = forecast - target;
+  const forecastDelta = amountDifference(forecast, target);
   const willOverspend = forecastReliable && forecastDelta > 0;
 
   const historicalPaceAtToday = historicalPace?.pctByDay[dayOfMonth];
   const paceAtToday =
     target *
     (historicalPaceAtToday !== undefined ? historicalPaceAtToday : dayOfMonth / daysInMonth);
-  const gapVsPace = spent - paceAtToday;
+  const gapVsPace = amountDifference(spent, paceAtToday);
   const aheadOfPace = gapVsPace < 0;
 
   const status: Status = isOver ? "over" : isCurrentMonth && !aheadOfPace ? "warn" : "ok";
