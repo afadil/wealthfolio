@@ -12,6 +12,7 @@ const { summary } = vi.hoisted(() => ({
     currency: "USD",
     monthlyAverage: 100,
     yoyGrowth: null,
+    unconvertedCurrencies: [],
     byMonth: {},
     byType: {},
     byAsset: {},
