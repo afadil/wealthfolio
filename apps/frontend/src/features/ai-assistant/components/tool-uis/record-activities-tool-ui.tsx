@@ -41,6 +41,7 @@ import {
 } from "./record-activities-tool-utils";
 import {
   createActivityAmountFormatter,
+  createActivityPriceFormatter,
   createActivityQuantityFormatter,
   estimateDraftAmount,
   formatActivityAmount,
@@ -155,6 +156,10 @@ function RecordActivitiesToolUIContentImpl({
   );
   const amountFormatter = useMemo(
     () => createActivityAmountFormatter(amountFormatting),
+    [amountFormatting],
+  );
+  const priceFormatter = useMemo(
+    () => createActivityPriceFormatter(amountFormatting),
     [amountFormatting],
   );
   const quantityFormatter = useMemo(
@@ -358,7 +363,7 @@ function RecordActivitiesToolUIContentImpl({
                     <TableCell className="py-2 text-end tabular-nums">
                       {formatActivityAmount(
                         row.draft.unitPrice,
-                        amountFormatter,
+                        priceFormatter,
                         isBalanceHidden,
                         row.draft.currency,
                       )}
