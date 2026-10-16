@@ -780,6 +780,7 @@
     "balance_correction_description": "이전 기록을 변경하지 않고 지정한 날짜부터 미상환 잔액을 수정합니다.",
     "extra_repayment": "추가 상환",
     "extra_repayment_description": "추가 원금 상환을 기록하고 향후 예상값을 업데이트합니다.",
+    "balance_replaces_confirmation": "{{date}}에 기록된 잔액 {{amount}}을 대체합니다. 나중에 삭제해도 이전 잔액은 복원되지 않습니다.",
     "repayment_before_confirmation": "{{date}}에 기록한 잔액 {{amount}}이(가) 그날부터 우선하므로 이 추가 상환으로 이후 잔액이 줄지 않습니다. 해당 명세서에 이 상환이 포함되지 않았다면 상환 일정 탭에서 수정하거나 삭제하세요.",
     "confirm_extra_repayment": "상환 기록",
     "close_loan": "대출 종결",

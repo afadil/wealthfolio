@@ -250,6 +250,7 @@
     "manual": "Manuel",
     "manual_hint": "solde mis à jour à la main",
     "debt_free": "Sans dette en {{date}}",
+    "original_balance": "Solde initial {{date}}",
     "updated": "Mis à jour {{date}}",
     "status_paid_off": "Remboursé",
     "status_renewal_due": "Renouvellement dû",

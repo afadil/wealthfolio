@@ -17,6 +17,8 @@ interface QuoteHistoryToolbarProps {
   dirtyCount: number;
   deletedCount: number;
   isManualDataSource: boolean;
+  /** Disables Add, e.g. while a mobile quote is open */
+  isAddDisabled?: boolean;
   onAddRow: () => void;
   onDeleteSelected: () => void;
   onSave: () => void;
@@ -30,6 +32,7 @@ export function QuoteHistoryToolbar({
   dirtyCount,
   deletedCount,
   isManualDataSource,
+  isAddDisabled = false,
   onAddRow,
   onDeleteSelected,
   onSave,
@@ -45,13 +48,17 @@ export function QuoteHistoryToolbar({
       <div className="flex items-center gap-2">
         {isManualDataSource && (
           <>
-            <Button variant="default" size="sm" onClick={onAddRow}>
+            <Button variant="default" size="sm" onClick={onAddRow} disabled={isAddDisabled}>
               <Icons.Plus className="mr-1.5 h-4 w-4" />
               {t("asset:quoteToolbar.add")}
             </Button>
 
             <Button asChild variant="outline" size="sm">
-              <Link to="/settings/market-data/import" className="flex items-center gap-1.5">
+              <Link
+                to="/settings/market-data/import"
+                className="flex items-center gap-1.5"
+                aria-label={t("asset:quoteToolbar.import")}
+              >
                 <Icons.Import className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("asset:quoteToolbar.import")}</span>
               </Link>

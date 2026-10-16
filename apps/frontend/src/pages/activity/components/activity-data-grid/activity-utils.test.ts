@@ -13,6 +13,7 @@ import {
   TRACKED_FIELDS,
   validateTransactionsForSave,
   valuesAreEqual,
+  withNewPairPartners,
 } from "./activity-utils";
 import type { LocalTransaction } from "./types";
 
@@ -56,6 +57,57 @@ const createMockTransaction = (overrides: Partial<LocalTransaction> = {}): Local
 });
 
 describe("activity-utils", () => {
+  it("preserves both amounts and the new group when saving duplicated FX cash legs", () => {
+    const transactions = [
+      createMockTransaction({
+        id: "out-copy",
+        activityType: ActivityType.TRANSFER_OUT,
+        amount: "100",
+        currency: "USD",
+      }),
+      createMockTransaction({
+        id: "in-copy",
+        activityType: ActivityType.TRANSFER_IN,
+        amount: "92.12345678",
+        currency: "EUR",
+      }),
+    ].map((row) => ({
+      ...row,
+      isNew: true,
+      assetId: "",
+      assetSymbol: "CASH",
+      isExternal: false,
+      sourceGroupId: "new-pair",
+      idempotencyKey: row.id,
+      _amountEdited: true,
+    }));
+    const payload = buildSavePayload(
+      transactions,
+      new Set(transactions.map((row) => row.id)),
+      new Set(),
+      (row) => row.currency,
+      new Map(),
+      new Map(),
+      "USD",
+    );
+    expect(payload.creates).toHaveLength(2);
+    expect(payload.creates[0]).toMatchObject({
+      sourceGroupId: "new-pair",
+      idempotencyKey: "out-copy",
+      amount: "100",
+      currency: "USD",
+    });
+    expect(payload.creates[1]).toMatchObject({
+      sourceGroupId: "new-pair",
+      idempotencyKey: "in-copy",
+      amount: "92.12345678",
+      currency: "EUR",
+    });
+    expect(
+      payload.creates.every((row) => JSON.parse(row.metadata!).flow.is_external === false),
+    ).toBe(true);
+  });
+
   it("routes paired cash account/currency edits through the pair editor, including paste/clear", () => {
     const previous = createMockTransaction({
       activityType: ActivityType.TRANSFER_OUT,
@@ -69,9 +121,10 @@ describe("activity-utils", () => {
       expect(requiresTransferPairEditor(previous, { ...previous, ...patch })).toBe(true);
     }
     expect(requiresTransferPairEditor(previous, { ...previous, amount: "5" })).toBe(false);
+    const sameAccount = { ...previous, counterpartAccountId: previous.accountId };
+    expect(requiresTransferPairEditor(sameAccount, { ...sameAccount, currency: "HKD" })).toBe(true);
     for (const patch of [
       { sourceGroupId: undefined },
-      { counterpartAccountId: previous.accountId },
       { assetSymbol: "AAPL", assetId: "AAPL" },
       { isNew: true },
     ]) {
@@ -1546,6 +1599,75 @@ describe("activity-utils", () => {
       expect(result.errors).toEqual(
         expect.arrayContaining([expect.objectContaining({ field: "unitPrice" })]),
       );
+    });
+
+    describe("duplicated transfer pairs", () => {
+      const leg = (overrides: Partial<LocalTransaction>) =>
+        createMockTransaction({
+          isNew: true,
+          sourceGroupId: "wf-transfer-copy",
+          accountId: "account-1",
+          assetId: "",
+          assetSymbol: "CASH",
+          quantity: null,
+          unitPrice: null,
+          fee: null,
+          ...overrides,
+        });
+      const out = leg({
+        id: "out-copy",
+        activityType: ActivityType.TRANSFER_OUT,
+        amount: "100",
+        currency: "USD",
+      });
+      const incoming = leg({
+        id: "in-copy",
+        activityType: ActivityType.TRANSFER_IN,
+        amount: "92",
+        currency: "EUR",
+      });
+      const pairErrors = (rows: LocalTransaction[]) =>
+        validateTransactionsForSave(rows, new Set(rows.map((row) => row.id))).errors.filter(
+          (error) => error.message.startsWith("A transfer pair needs both legs"),
+        );
+
+      it("accepts both legs of a same-account pair in two currencies", () => {
+        expect(pairErrors([out, incoming])).toEqual([]);
+      });
+
+      it("accepts a pair whose copy moved to another account", () => {
+        expect(pairErrors([out, { ...incoming, accountId: "account-2", currency: "USD" }])).toEqual(
+          [],
+        );
+      });
+
+      it.each<[string, LocalTransaction[]]>([
+        ["an orphan leg", [out]],
+        ["one currency in one account", [out, { ...incoming, currency: "usd" }]],
+        ["two outgoing legs", [out, { ...incoming, activityType: ActivityType.TRANSFER_OUT }]],
+        [
+          "a minor unit of the other leg's currency",
+          [
+            { ...out, currency: "GBP" },
+            { ...incoming, currency: "GBX" },
+          ],
+        ],
+      ])("rejects %s", (_case, rows) => {
+        expect(pairErrors(rows).map((error) => error.transactionId)).toEqual(
+          rows.map((row) => row.id),
+        );
+      });
+
+      it("deletes the other new leg with a selected one, and leaves saved rows alone", () => {
+        const saved = { ...out, id: "saved-out", isNew: false, sourceGroupId: "saved-group" };
+        const other = createMockTransaction({ id: "other", isNew: true });
+        expect(
+          withNewPairPartners([out], [out, incoming, saved, other]).map((row) => row.id),
+        ).toEqual(["out-copy", "in-copy"]);
+        expect(withNewPairPartners([saved], [out, incoming, saved]).map((row) => row.id)).toEqual([
+          "saved-out",
+        ]);
+      });
     });
   });
 

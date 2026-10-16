@@ -85,7 +85,7 @@ All adapters export the same interface:
 ```typescript
 // Core exports
 export const RUN_ENV: RunEnv; // "desktop" | "web"
-export const isDesktop: boolean;
+export const isTauri: boolean; // every Tauri build, including iOS/Android
 export const isWeb: boolean;
 export const logger: Logger;
 
@@ -131,10 +131,10 @@ export const getAccounts = async (): Promise<Account[]> => {
 };
 
 // Check environment when needed
-import { isDesktop } from "@/adapters";
+import { isTauri } from "@/adapters";
 
-if (isDesktop) {
-  // Desktop-specific code (e.g., file dialogs)
+if (isTauri) {
+  // Tauri-specific code (e.g., file dialogs)
   const { open } = await import("@tauri-apps/plugin-dialog");
   // ...
 }
@@ -145,7 +145,7 @@ if (isDesktop) {
 1. **Dead Code Elimination**: Web builds don't include Tauri code and vice versa
 2. **No Runtime Checks**: Environment is determined at compile time
 3. **Type Safety**: Full TypeScript support with unified types
-4. **Cleaner Code**: No `if (isDesktop)` scattered throughout the codebase
+4. **Cleaner Code**: No `if (isTauri)` scattered throughout the codebase
 5. **Smaller Bundles**: Each build only includes the code it needs
 
 ## Adding New Commands
@@ -190,18 +190,22 @@ export const myNewCommand = async (data: MyData): Promise<Result> => {
 };
 ```
 
-## Desktop-Only Features
+## Tauri-Only Features
 
-Some features only work on desktop (e.g., file system dialogs). These should:
+Some features only work in Tauri builds (e.g., file system dialogs). These
+should:
 
-1. Check `isDesktop` before calling
+1. Check `isTauri` before calling
 2. Use dynamic imports for Tauri plugins
 3. Provide graceful fallbacks for web
 
-```typescript
-import { isDesktop } from "@/adapters";
+`isTauri` is also true on iOS and Android. When the operating system matters,
+use `usePlatform()` or `getPlatform()` from `@/hooks/use-platform`.
 
-if (isDesktop) {
+```typescript
+import { isTauri } from "@/adapters";
+
+if (isTauri) {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const filePath = await open({
     filters: [{ name: "CSV", extensions: ["csv"] }],

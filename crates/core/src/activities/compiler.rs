@@ -41,39 +41,52 @@ impl ActivityCompiler for DefaultActivityCompiler {
             return Ok(vec![]);
         }
 
-        // Use effective_type() to respect user overrides
-        let activity_type = activity.effective_type();
-        let subtype = NewActivity::canonicalize_subtype_for_activity(
-            activity_type,
-            activity.subtype.as_deref(),
-        );
-
-        match (activity_type, subtype.as_deref()) {
+        // The effective type respects a user's override.
+        match Self::composite(activity.effective_type(), activity.subtype.as_deref()) {
             // DRIP: Dividend + Buy
-            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DRIP)) => {
-                Ok(self.compile_drip(activity))
-            }
-
+            Some(Composite::Drip) => Ok(self.compile_drip(activity)),
             // Staking Reward: Interest + Buy
-            (ACTIVITY_TYPE_INTEREST, Some(ACTIVITY_SUBTYPE_STAKING_REWARD)) => {
-                Ok(self.compile_staking_reward(activity))
-            }
-
+            Some(Composite::StakingReward) => Ok(self.compile_staking_reward(activity)),
             // Dividend in Kind: Dividend + Buy
-            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND)) => {
-                Ok(self.compile_dividend_in_kind(activity))
-            }
-
+            Some(Composite::DividendInKind) => Ok(self.compile_dividend_in_kind(activity)),
             // Default: Pass through unchanged
-            _ => Ok(vec![activity.clone()]),
+            None => Ok(vec![activity.clone()]),
         }
     }
+}
+
+/// The stored rows `compile` expands into income plus a purchase.
+#[derive(Clone, Copy)]
+enum Composite {
+    Drip,
+    StakingReward,
+    DividendInKind,
 }
 
 impl DefaultActivityCompiler {
     /// Create a new compiler instance
     pub fn new() -> Self {
         Self
+    }
+
+    /// Whether `compile` expands a posted activity of this effective type
+    /// and stored subtype into income and a purchase.
+    pub fn expands(activity_type: &str, subtype: Option<&str>) -> bool {
+        Self::composite(activity_type, subtype).is_some()
+    }
+
+    fn composite(activity_type: &str, subtype: Option<&str>) -> Option<Composite> {
+        let subtype = NewActivity::canonicalize_subtype_for_activity(activity_type, subtype);
+        match (activity_type, subtype.as_deref()) {
+            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DRIP)) => Some(Composite::Drip),
+            (ACTIVITY_TYPE_INTEREST, Some(ACTIVITY_SUBTYPE_STAKING_REWARD)) => {
+                Some(Composite::StakingReward)
+            }
+            (ACTIVITY_TYPE_DIVIDEND, Some(ACTIVITY_SUBTYPE_DIVIDEND_IN_KIND)) => {
+                Some(Composite::DividendInKind)
+            }
+            _ => None,
+        }
     }
 
     /// DRIP: One stored row → DIVIDEND + BUY

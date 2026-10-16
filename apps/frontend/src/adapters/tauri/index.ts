@@ -5,7 +5,7 @@ import type { RunEnv } from "../types";
 import { RunEnvs } from "../types";
 
 // Platform constants from core
-export { isDesktop, isWeb, logger } from "./core";
+export { isTauri, isWeb, logger } from "./core";
 
 /**
  * Runtime environment identifier - always "desktop" for Tauri builds

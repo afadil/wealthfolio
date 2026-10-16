@@ -678,7 +678,10 @@ function ImportWizardContent() {
         onBack={isMobile ? handleCancelClick : undefined}
         actions={
           <div className="flex items-center gap-2">
-            <ImportHelpPopover defaultTab={isHoldingsMode ? "holdings" : "activities"} />
+            <ImportHelpPopover
+              defaultTab={isHoldingsMode ? "holdings" : "activities"}
+              transactionImport={isTransactionImport}
+            />
             {!isMobile && (
               <Button
                 variant="ghost"

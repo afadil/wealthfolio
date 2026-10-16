@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
   Skeleton,
+  useAmountFormatting,
   useDateFormatting,
   useNumberFormatting,
 } from "@wealthfolio/ui";
@@ -129,6 +130,7 @@ type PerformanceToolUIContentProps = ToolCallMessagePartProps<
 >;
 
 function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolUIContentProps) {
+  const amountFormatting = useAmountFormatting();
   const numberFormatting = useNumberFormatting();
   const dateFormatting = useDateFormatting();
 
@@ -151,17 +153,12 @@ function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolU
       formatCurrency: (value: number) =>
         isBalanceHidden
           ? "\u2022\u2022\u2022\u2022\u2022"
-          : numberFormatting.formatDecimal(value, {
-              style: "currency",
-              currency,
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            }),
+          : amountFormatting.formatRoundedAmount(value, currency),
       formatPercent: (value: number) => numberFormatting.formatPercent(value),
       formatPercentSigned: (value: number) =>
         numberFormatting.formatPercent(value, { signDisplay: "exceptZero" }),
     };
-  }, [parsed?.currency, isBalanceHidden, baseCurrency, numberFormatting]);
+  }, [parsed?.currency, isBalanceHidden, baseCurrency, amountFormatting, numberFormatting]);
 
   // Format date range
   const periodLabel = useMemo(() => {

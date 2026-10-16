@@ -135,6 +135,20 @@
       }
     },
     {
+      "name": "bonus explicitly marked internal stays inside the boundary",
+      "accountType": "SECURITIES",
+      "activityType": "CREDIT",
+      "subtype": "BONUS",
+      "isExternal": false,
+      "amount": "100.00",
+      "expected": {
+        "cashDelta": "100.00",
+        "netContributionDelta": "0.00",
+        "gainDelta": "100.00",
+        "externalFlow": false
+      }
+    },
+    {
       "name": "securities refund defaults to an internal correction",
       "accountType": "SECURITIES",
       "activityType": "CREDIT",

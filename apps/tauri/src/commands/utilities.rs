@@ -263,8 +263,8 @@ async fn build_data_export_content(
             format_records(&records, format).map_err(|e| e.to_string())
         }
         ExportDataType::Activities => {
-            let records = state
-                .activity_service()
+            let activity_service = state.activity_service();
+            let mut response = activity_service
                 .search_activities(
                     0,
                     EXPORT_ACTIVITY_PAGE_SIZE,
@@ -281,9 +281,13 @@ async fn build_data_export_content(
                     None,
                     None,
                 )
-                .map_err(|e| format!("Failed to load activities for export: {}", e))?
-                .data;
-            format_records(&records, format).map_err(|e| e.to_string())
+                .map_err(|e| format!("Failed to load activities for export: {}", e))?;
+            // Rows of cash and credit-card accounts carry their running balance.
+            activity_service
+                .attach_cash_balances(&mut response)
+                .await
+                .map_err(|e| format!("Failed to load activity balances for export: {}", e))?;
+            format_records(&response.data, format).map_err(|e| e.to_string())
         }
         ExportDataType::Holdings => {
             let base_currency = state.get_base_currency();

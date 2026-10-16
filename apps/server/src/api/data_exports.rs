@@ -38,26 +38,28 @@ async fn build_data_export_content(
             Ok(format_records(&records, format)?)
         }
         ExportDataType::Activities => {
-            let records = state
+            let mut response = state.activity_service.search_activities(
+                0,
+                EXPORT_ACTIVITY_PAGE_SIZE,
+                None,
+                None,
+                None,
+                Some(Sort {
+                    id: "date".to_string(),
+                    desc: true,
+                }),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )?;
+            // Rows of cash and credit-card accounts carry their running balance.
+            state
                 .activity_service
-                .search_activities(
-                    0,
-                    EXPORT_ACTIVITY_PAGE_SIZE,
-                    None,
-                    None,
-                    None,
-                    Some(Sort {
-                        id: "date".to_string(),
-                        desc: true,
-                    }),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )?
-                .data;
-            Ok(format_records(&records, format)?)
+                .attach_cash_balances(&mut response)
+                .await?;
+            Ok(format_records(&response.data, format)?)
         }
         ExportDataType::Holdings => {
             let base = state

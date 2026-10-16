@@ -287,6 +287,8 @@ describe("localized financial input paste", () => {
   });
 
   it.each([
+    ["de-AT", "EUR"],
+    ["de-AT", "USD"],
     ["pl-PL", "PLN"],
     ["sv-SE", "SEK"],
     ["da-DK", "DKK"],

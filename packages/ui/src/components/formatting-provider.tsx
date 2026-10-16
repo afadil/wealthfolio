@@ -5,6 +5,7 @@ import {
   createDateFormatting,
   createNumberFormatting,
   type AmountFormatting,
+  type CurrencyFormattingRegions,
   type DateFormatting,
   type NumberFormatting,
   resolveFormattingLocale,
@@ -26,10 +27,18 @@ const AmountFormattingContext = React.createContext(DEFAULT_AMOUNT_FORMATTING);
 const NumberFormattingContext = React.createContext(DEFAULT_NUMBER_FORMATTING);
 const DateFormattingContext = React.createContext(DEFAULT_DATE_FORMATTING);
 
-function FormattingRuntime({ settings, children }: { settings: LocalizationSettings; children: React.ReactNode }) {
+function FormattingRuntime({
+  settings,
+  currencyRegions,
+  children,
+}: {
+  settings: LocalizationSettings;
+  currencyRegions: CurrencyFormattingRegions;
+  children: React.ReactNode;
+}) {
   const amountFormatting = React.useMemo<AmountFormatting>(
-    () => createAmountFormatting(settings.locale),
-    [settings.locale],
+    () => createAmountFormatting(settings.locale, undefined, currencyRegions),
+    [settings.locale, currencyRegions],
   );
   const numberFormatting = React.useMemo<NumberFormatting>(
     () => createNumberFormatting(settings.locale),
@@ -62,11 +71,14 @@ export function FormattingProvider({
   locale,
   uiLocale = "en",
   timezone,
+  currencyFormattingRegions,
   children,
 }: {
   locale: string;
   uiLocale?: string;
   timezone?: string;
+  /** Regions for amounts in specific currencies; others follow `locale`. */
+  currencyFormattingRegions?: CurrencyFormattingRegions;
   children: React.ReactNode;
 }) {
   const resolvedLocale = resolveFormattingLocale(locale);
@@ -75,10 +87,19 @@ export function FormattingProvider({
     () => ({ locale: resolvedLocale, uiLocale, timezone }),
     [resolvedLocale, uiLocale, timezone],
   );
+  // Every settings update replaces the settings object; rebuild formatters only
+  // when the overrides themselves change.
+  const currencyRegionsKey = JSON.stringify(currencyFormattingRegions ?? {});
+  const currencyRegions = React.useMemo<CurrencyFormattingRegions>(
+    () => JSON.parse(currencyRegionsKey),
+    [currencyRegionsKey],
+  );
   return (
     <I18nProvider locale={interfaceLocale}>
       <LocalizationSettingsContext.Provider value={settings}>
-        <FormattingRuntime settings={settings}>{children}</FormattingRuntime>
+        <FormattingRuntime settings={settings} currencyRegions={currencyRegions}>
+          {children}
+        </FormattingRuntime>
       </LocalizationSettingsContext.Provider>
     </I18nProvider>
   );

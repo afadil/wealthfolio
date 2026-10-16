@@ -1,7 +1,7 @@
 use crate::activities::IncomeData;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +35,11 @@ pub struct IncomeSummary {
     pub currency: String,
     pub monthly_average: Decimal,
     pub yoy_growth: Option<Decimal>,
+    /// Currencies with income but no exchange rate to `currency`, in this
+    /// period or in the previous one `yoy_growth` compares against. That
+    /// income is left out of every converted total; `by_currency` still
+    /// counts this period's.
+    pub unconverted_currencies: BTreeSet<String>,
 }
 
 impl IncomeSummary {
@@ -50,6 +55,7 @@ impl IncomeSummary {
             currency,
             monthly_average: Decimal::ZERO,
             yoy_growth: None,
+            unconverted_currencies: BTreeSet::new(),
         }
     }
 
@@ -96,6 +102,16 @@ impl IncomeSummary {
                 }
             });
         self.total_income += &converted_amount;
+    }
+
+    /// Counts income that has no exchange rate to `currency`: only in its own
+    /// currency, so the converted totals leave it out.
+    pub fn add_unconverted_income(&mut self, data: &IncomeData) {
+        *self
+            .by_currency
+            .entry(data.currency.clone())
+            .or_insert_with(|| Decimal::ZERO) += &data.amount;
+        self.unconverted_currencies.insert(data.currency.clone());
     }
 
     pub fn calculate_monthly_average(&mut self, num_months: Option<u32>) {

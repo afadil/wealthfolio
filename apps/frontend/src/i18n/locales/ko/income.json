@@ -73,5 +73,7 @@
   "previous_period_income": "이전 기간 소득",
   "monthly": "월별",
   "previous": "이전",
-  "cumulative": "누적"
+  "cumulative": "누적",
+  "unconverted_currencies_one": "{{baseCurrency}}(으)로 환산할 환율이 없어 {{currencies}} 소득은 합계에서 제외되었습니다.",
+  "unconverted_currencies_other": "{{baseCurrency}}(으)로 환산할 환율이 없어 {{currencies}} 소득은 합계에서 제외되었습니다."
 }

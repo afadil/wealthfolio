@@ -34,6 +34,9 @@ and this project adheres to
   [Addon Localization guide](../../docs/addons/addon-localization.md).
 - Optional `status` and `needsReview` fields on `ActivityCreate` and
   `ActivityUpdate`.
+- `IncomeSummary.unconvertedCurrencies`, the currencies whose income has no
+  exchange rate to the summary's currency. Requires a Wealthfolio release that
+  ships it (unreleased at the time of writing).
 
 ### Changed
 
@@ -41,6 +44,9 @@ and this project adheres to
   the current asset, or pass an empty object to clear the asset association.
 - Host-provided `@wealthfolio/addon-sdk` and `@wealthfolio/ui` dependency ranges
   are now `^3.8.0`.
+- `IncomeSummary` totals and breakdowns leave out income that has no exchange
+  rate to the summary's currency, instead of counting it as if it were already
+  in that currency. `byCurrency` still includes it.
 
 ## [3.7.0] - 2026-08-10
 

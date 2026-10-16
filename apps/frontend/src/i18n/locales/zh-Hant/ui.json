@@ -5,7 +5,9 @@
   },
   "currency": {
     "selectTitle": "選取幣別",
-    "selectDescription": "選取這筆交易的幣別",
+    "selectDescription": "請選取幣別",
+    "placeholder": "選取幣別",
+    "popular": "常用",
     "more": "更多",
     "search": "搜尋幣別…",
     "searchAll": "搜尋所有幣別…",

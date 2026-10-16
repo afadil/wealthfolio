@@ -161,18 +161,18 @@ const entered = (value?: string) => {
 
 /**
  * A new loan as entered. The backend checks it, derives the schedule and solves
- * the payment; a manual loan keeps only its amounts, as before.
+ * the payment; a manual loan keeps its amounts and origination date.
  */
 export function quickAddLoanSetup(input: QuickAddLoanInput): LoanSetup {
   const amounts = {
     originalAmount: entered(input.purchasePrice),
     interestRate: entered(input.interestRate),
+    originationDate: input.purchaseDate ? formatDateISO(input.purchaseDate) : undefined,
   };
   if (input.automaticSchedule === false) return amounts;
   const months = (entered(input.loanTerm) ?? 0) * 12 + (entered(input.loanTermMonths) ?? 0);
   return {
     ...amounts,
-    originationDate: input.purchaseDate ? formatDateISO(input.purchaseDate) : undefined,
     schedule: {
       frequency: input.paymentFrequency ?? "monthly",
       interestMethod: input.interestMethod ?? "nominal_periodic",

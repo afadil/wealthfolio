@@ -249,6 +249,7 @@
     "manual": "Manuell",
     "manual_hint": "Saldo von Hand gepflegt",
     "debt_free": "Schuldenfrei {{date}}",
+    "original_balance": "Ursprünglicher Saldo {{date}}",
     "updated": "Aktualisiert {{date}}",
     "status_paid_off": "Getilgt",
     "status_renewal_due": "Verlängerung fällig",

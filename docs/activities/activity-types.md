@@ -193,9 +193,11 @@ cash FX conversion within the same account is a narrow exception:
 - Account-level `net_contribution` and `net_contribution_base` do not change.
 - No external portfolio flow or TWR cash-flow event is created.
 
-This exception uses Wealthfolio's qualified FX-pair recognition. Same-account
-transfers or transfers that merely share a group identifier are not
-automatically contribution-neutral.
+The pair is recognized when its two cash legs are in the same account, in
+different currencies, linked by one group identifier, and both explicitly
+internal (`flow.is_external: false`). The transfer form, the transfer link and
+the import linker record pairs that way. Legs that merely share a group
+identifier, without that mark, are not contribution-neutral.
 
 #### TRANSFER_IN
 
@@ -316,6 +318,11 @@ described above.
 | `REBATE`  | No change        | Reduced trading cost, not new capital       |
 | `REFUND`  | No change        | Reversal of existing fee, not new capital   |
 | (default) | No change        | Internal adjustment                         |
+
+`metadata.flow.is_external` overrides the subtype: `true` adds the gross amount
+to net contribution as an external flow (for example a refund or reimbursement
+paid from outside the portfolio), and `false` keeps any credit internal, `BONUS`
+included.
 
 ---
 
@@ -588,12 +595,12 @@ Activities support a `metadata` JSON field for additional context:
 
 ### Key Metadata Fields
 
-| Field                  | Type    | Used By         | Description                                   |
-| ---------------------- | ------- | --------------- | --------------------------------------------- |
-| `flow.is_external`     | boolean | TRANSFER_IN/OUT | Marks transfer as crossing portfolio boundary |
-| `split_ratio`          | string  | SPLIT           | Human-readable split ratio (e.g., "2:1")      |
-| `source.broker`        | string  | All             | Original broker name                          |
-| `source.original_type` | string  | All             | Raw activity type from provider               |
+| Field                  | Type    | Used By                 | Description                                       |
+| ---------------------- | ------- | ----------------------- | ------------------------------------------------- |
+| `flow.is_external`     | boolean | TRANSFER_IN/OUT, CREDIT | Marks the flow as crossing the portfolio boundary |
+| `split_ratio`          | string  | SPLIT                   | Human-readable split ratio (e.g., "2:1")          |
+| `source.broker`        | string  | All                     | Original broker name                              |
+| `source.original_type` | string  | All                     | Raw activity type from provider                   |
 
 ---
 

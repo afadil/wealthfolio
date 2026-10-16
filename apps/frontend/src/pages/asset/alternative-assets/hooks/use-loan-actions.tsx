@@ -337,6 +337,7 @@ export function useLoanActions(
             mode="balance_correction"
             currentBalance={currentBalance}
             currency={holding.currency}
+            confirmations={confirmedLoanBalances(quoteHistory, today)}
             onSubmit={(date, amount) => handleBalanceEvent("balance_correction", date, amount)}
           />
           <LoanBalanceEventDialog

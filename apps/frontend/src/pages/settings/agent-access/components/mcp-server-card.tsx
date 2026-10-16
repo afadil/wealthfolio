@@ -15,52 +15,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/compone
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { buildClientConfig, STANDARD_PRESET_ID, TOKEN_PLACEHOLDER } from "../mcp-client-config";
+import { buildClientConfig, DEFAULT_PRESET_ID, TOKEN_PLACEHOLDER } from "../mcp-client-config";
 import { useMcpServer } from "../hooks/use-mcp-server";
+import { ClientSetup, CopyIconButton } from "./client-setup";
 
-/** Icon button that copies `value` and briefly shows a check. */
-function CopyIconButton({ value, label }: { value: string; label: string }) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      toast({
-        title: t("settings:agentAccess.copy_failed_title"),
-        description: t("settings:agentAccess.copy_failed_generic", { label: label.toLowerCase() }),
-        variant: "destructive",
-      });
-      console.error("Failed to copy to clipboard:", error);
-    }
-  };
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-7 w-7 shrink-0"
-      onClick={() => void handleCopy()}
-    >
-      {copied ? (
-        <Icons.Check className="text-success h-3.5 w-3.5" />
-      ) : (
-        <Icons.Copy className="h-3.5 w-3.5" />
-      )}
-      <span className="sr-only">{t("settings:agentAccess.copy_aria", { label })}</span>
-    </Button>
-  );
-}
-
-/** Labeled button that copies the standard client config JSON (token placeholder). */
+/** Labeled button that copies the default client setup (token placeholder). */
 function CopyConfigButton({ serverUrl }: { serverUrl: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(buildClientConfig(STANDARD_PRESET_ID, serverUrl));
+      await navigator.clipboard.writeText(buildClientConfig(DEFAULT_PRESET_ID, serverUrl));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       toast({
@@ -88,7 +53,7 @@ function CopyConfigButton({ serverUrl }: { serverUrl: string }) {
   );
 }
 
-/** Help popover: how to connect, the standard config, and the clients that differ. */
+/** Help popover: how to connect, then a client picker with its setup snippet. */
 function ConnectHelp({ serverUrl }: { serverUrl: string }) {
   const { t } = useTranslation();
   return (
@@ -99,8 +64,11 @@ function ConnectHelp({ serverUrl }: { serverUrl: string }) {
           <span className="sr-only">{t("settings:agentAccess.help_aria")}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="max-h-[70vh] w-96 space-y-3 overflow-auto text-sm">
-        <div className="space-y-1">
+      <PopoverContent
+        align="end"
+        className="max-h-[80vh] w-[28rem] max-w-[calc(100vw-2rem)] space-y-4 overflow-y-auto text-sm"
+      >
+        <div className="space-y-1.5">
           <p className="font-medium">{t("settings:agentAccess.help_title")}</p>
           <ol className="text-muted-foreground list-decimal space-y-1 pl-4 text-xs">
             <li>{t("settings:agentAccess.help_step_enable")}</li>
@@ -112,42 +80,7 @@ function ConnectHelp({ serverUrl }: { serverUrl: string }) {
             </li>
           </ol>
         </div>
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium">{t("settings:agentAccess.help_standard_config")}</p>
-          <pre className="bg-muted text-muted-foreground overflow-auto rounded-md p-2 font-mono text-[11px] leading-snug">
-            {buildClientConfig(STANDARD_PRESET_ID, serverUrl)}
-          </pre>
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium">{t("settings:agentAccess.help_vscode")}</p>
-          <pre className="bg-muted text-muted-foreground overflow-auto rounded-md p-2 font-mono text-[11px] leading-snug">
-            {buildClientConfig("vscode", serverUrl)}
-          </pre>
-        </div>
-        <p className="text-muted-foreground text-xs">
-          {t("settings:agentAccess.help_http_prefix")}{" "}
-          <span className="font-mono">Authorization: Bearer {TOKEN_PLACEHOLDER}</span>{" "}
-          {t("settings:agentAccess.help_http_suffix")}
-        </p>
-        <div className="space-y-1">
-          <p className="text-xs font-medium">{t("settings:agentAccess.help_locations_title")}</p>
-          <ul className="text-muted-foreground space-y-0.5 text-xs">
-            <li>{t("settings:agentAccess.help_location_claude_desktop")}</li>
-            <li>
-              Cursor — <span className="font-mono">~/.cursor/mcp.json</span>
-            </li>
-            <li>
-              VS Code — <span className="font-mono">.vscode/mcp.json</span>
-            </li>
-            <li>
-              Windsurf — <span className="font-mono">~/.codeium/windsurf/mcp_config.json</span>
-            </li>
-            <li>
-              Claude Code — <span className="font-mono">.mcp.json</span>{" "}
-              {t("settings:agentAccess.mcp_in_project")}
-            </li>
-          </ul>
-        </div>
+        <ClientSetup serverUrl={serverUrl} />
       </PopoverContent>
     </Popover>
   );

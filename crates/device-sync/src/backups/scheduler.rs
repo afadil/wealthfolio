@@ -15,6 +15,8 @@ pub struct BackupScheduler {
     paused: AtomicBool,
     generation: AtomicU64,
     status: Mutex<CaptureStatus>,
+    /// The current attempt is an early backup the user asked for (see `early`).
+    early: AtomicBool,
 }
 
 /// Ephemeral, profile-local capture health. Never contains errors, secrets or portfolio data.
@@ -110,7 +112,24 @@ impl BackupScheduler {
             status.retry_at = None;
         }
     }
+    /// A backup the user asked for is early until the policy shows it is due (`due`).
+    /// An early attempt's outcome goes to its caller; the schedule's health and retry time
+    /// only reflect backups that were due. The mark lasts until this attempt's `finished`,
+    /// which a competing check never reaches.
+    pub fn early(&self, generation: u64) {
+        if self.is_current(generation) {
+            self.early.store(true, Ordering::SeqCst);
+        }
+    }
+    /// The policy shows the attempt is due: it reports like any scheduled backup.
+    pub fn due(&self, generation: u64) {
+        if self.is_current(generation) {
+            self.early.store(false, Ordering::SeqCst);
+        }
+    }
     pub fn finished(&self, generation: u64, failed: bool) {
+        let early = self.early.swap(false, Ordering::SeqCst);
+        let failed = failed && !early;
         let mut status = self
             .status
             .lock()
@@ -133,7 +152,7 @@ impl BackupScheduler {
             .status
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if self.is_current(generation) {
+        if self.is_current(generation) && !self.early.load(Ordering::SeqCst) {
             status.state = CaptureState::Failed;
             status.retry_at = None;
         }
@@ -268,6 +287,49 @@ impl BackupScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn an_early_backup_reports_to_its_caller_and_leaves_the_schedule_healthy() {
+        let scheduler = BackupScheduler::default();
+        let generation = scheduler.generation();
+        let attempt = |early: bool, due: bool, failed: bool| {
+            scheduler.checking(generation);
+            if early {
+                scheduler.early(generation);
+            }
+            // A due check that wakes now finds the export slot busy; it must not clear the mark.
+            scheduler.checking(generation);
+            if due {
+                scheduler.due(generation);
+            }
+            scheduler.started(generation);
+            if failed {
+                scheduler.blocked(generation);
+            }
+            scheduler.finished(generation, failed);
+            scheduler.status()
+        };
+        // A scheduled failure marks the schedule.
+        assert_eq!(attempt(false, false, true).state, CaptureState::Failed);
+        // An early failure, including one before the policy is read, does not.
+        let status = attempt(true, false, true);
+        assert_eq!(status.state, CaptureState::Idle);
+        assert!(status.retry_at.is_none());
+        // A requested backup that turns out to be due reports like a scheduled one.
+        assert_eq!(attempt(true, true, true).state, CaptureState::Failed);
+        // A successful early backup clears its mark for the next attempt.
+        assert_eq!(attempt(true, false, false).state, CaptureState::Idle);
+        assert_eq!(attempt(false, false, true).state, CaptureState::Failed);
+        // An early attempt dropped mid-flight leaves the schedule healthy too.
+        scheduler.checking(generation);
+        scheduler.early(generation);
+        scheduler.started(generation);
+        let dropped = scheduler.until_changed(generation, std::future::pending::<()>());
+        assert!(tokio::time::timeout(Duration::from_millis(10), dropped)
+            .await
+            .is_err());
+        assert_eq!(scheduler.status().state, CaptureState::Idle);
+    }
 
     #[tokio::test(start_paused = true)]
     async fn a_woken_blocked_check_retries_a_later_transient_failure_before_capture_starts() {

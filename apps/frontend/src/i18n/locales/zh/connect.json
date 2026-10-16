@@ -14,7 +14,10 @@
     "noDevicesSyncing": "尚无设备在同步",
     "noDevicesDescription": "在设置中配置设备同步,以在各设备间保持数据同步。",
     "noActivity": "暂无活动",
-    "noActivityDescription": "数据开始同步后,更新将显示在此处。"
+    "noActivityDescription": "数据开始同步后,更新将显示在此处。",
+    "showMore_one": "再显示 {{count}} 个",
+    "showMore_other": "再显示 {{count}} 个",
+    "showLess": "收起"
   },
   "emptyState": {
     "optional": "可选",
@@ -71,7 +74,8 @@
     "noDataYet": "暂无数据",
     "dataAsOf": "数据截至 {{date}}",
     "emptyTitle": "尚未同步任何账户",
-    "emptyDescription": "连接一家券商以开始同步您的账户。"
+    "emptyDescription": "连接一家券商以开始同步您的账户。",
+    "needsSetup": "需要设置"
   },
   "connections": {
     "title": "券商连接",
@@ -88,7 +92,11 @@
     "accountsSyncing_one": "{{count}} 个账户正在同步",
     "accountsSyncing_other": "{{count}} 个账户正在同步",
     "partialSyncing_one": "{{total}} 个账户中有 {{syncing}} 个正在同步 · {{excluded}} 个账户已排除",
-    "partialSyncing_other": "{{total}} 个账户中有 {{syncing}} 个正在同步 · {{excluded}} 个账户已排除"
+    "partialSyncing_other": "{{total}} 个账户中有 {{syncing}} 个正在同步 · {{excluded}} 个账户已排除",
+    "accountCount_one": "{{count}} 个账户",
+    "accountCount_other": "{{count}} 个账户",
+    "excludedCount_one": "已排除 {{count}} 个",
+    "excludedCount_other": "已排除 {{count}} 个"
   },
   "sync": {
     "syncNow": "立即同步",
@@ -180,20 +188,33 @@
   "attention": {
     "title": "券商同步需要关注",
     "description_one": "{{count}} 个账户需要重试或券商审核。",
-    "description_other": "{{count}} 个账户需要重试或券商审核。"
+    "description_other": "{{count}} 个账户需要重试或券商审核。",
+    "heading": "需要处理",
+    "connectionLost": "连接已断开",
+    "accountsNotSyncing_one": "{{count}} 个账户未同步",
+    "accountsNotSyncing_other": "{{count}} 个账户未同步",
+    "syncFailed": "上次同步失败"
   },
   "setup": {
     "newAccountsTitle": "新账户需要设置",
     "newAccountsDescription_one": "{{count}} 个账户在开始同步前需要快速设置。",
     "newAccountsDescription_other": "{{count}} 个账户在开始同步前需要快速设置。",
-    "reviewAccounts": "审核账户"
+    "reviewAccounts": "审核账户",
+    "setUp": "设置"
   },
   "devices": {
     "thisDevice": "此设备",
     "activeNow": "当前活跃",
     "lastSeen": "上次活跃 {{time}}",
     "online": "在线",
-    "never": "从未"
+    "never": "从未",
+    "showInactive_one": "显示 {{count}} 台不活跃的设备",
+    "showInactive_other": "显示 {{count}} 台不活跃的设备",
+    "hideInactive": "隐藏不活跃的设备",
+    "platforms": {
+      "server": "服务器",
+      "web": "网页"
+    }
   },
   "deviceStatus": {
     "syncError": "同步错误",

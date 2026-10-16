@@ -250,6 +250,7 @@
     "manual": "Manuale",
     "manual_hint": "saldo aggiornato a mano",
     "debt_free": "Senza debiti a {{date}}",
+    "original_balance": "Saldo iniziale {{date}}",
     "updated": "Aggiornato {{date}}",
     "status_paid_off": "Estinto",
     "status_renewal_due": "Rinnovo scaduto",

@@ -10,7 +10,7 @@ vi.mock("@/features/profiles/session", () => ({
   usesLegacyPreferences: () => true,
 }));
 vi.mock("@/adapters", () => ({
-  isDesktop: false,
+  isTauri: false,
   logger: { error: vi.fn() },
   isAutoUpdateCheckEnabled: vi.fn(),
   checkForUpdates: vi.fn().mockResolvedValue({ latestVersion: "4.0.0" }),

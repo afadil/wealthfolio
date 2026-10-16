@@ -64,13 +64,14 @@ jobs:
           load: true
           tags: wealthfolio-smoke:ci
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=docker-${{ matrix.arch }}
-          # PRs don't export: their cache is readable only by the same PR, the
-          # backend stage never reuses it, and the export takes ~3 min and
-          # ~1.6 GB of the repo's shared cache budget.
-          cache-to:
-            ${{ github.event_name != 'pull_request' && format('type=gha,mode=max,scope=docker-{0}',
-            matrix.arch) || '' }}
+          # Third-party Rust dependencies exported by cache-warm.yml. Read before
+          # any registry login, so PRs (including forks') import it anonymously.
+          # Release tags skip it: every ref shares that cache tag, so published
+          # images compile their dependencies here.
+          cache-from:
+            ${{ !startsWith(github.ref, 'refs/tags/') &&
+            format('type=registry,ref=ghcr.io/{0}/wealthfolio-build-cache:deps-{1}',
+            github.repository_owner, matrix.arch) || '' }}
           # Secret values do not invalidate Docker's cache; compile current destinations.
           no-cache-filters: backend
           secrets: |

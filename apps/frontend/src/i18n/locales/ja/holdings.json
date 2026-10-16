@@ -249,6 +249,7 @@
     "manual": "手動",
     "manual_hint": "残高を手動で更新",
     "debt_free": "{{date}}に完済",
+    "original_balance": "当初残高 {{date}}",
     "updated": "{{date}}更新",
     "status_paid_off": "完済",
     "status_renewal_due": "更新期限",
