@@ -566,6 +566,33 @@ mod tests {
     }
 
     #[test]
+    fn models_dropped_from_the_catalog_keep_their_catalog_capabilities() {
+        // Saved before the settings screen wrote every key: only the key the
+        // user changed. Tools and vision came from the catalog entry.
+        let service = ProviderService::new(env_with_overrides(serde_json::json!({
+            "claude-sonnet-4-6": { "thinking": true }
+        })));
+        let caps = |provider: &str, model: &str| {
+            let c = service.get_model_capabilities(provider, model);
+            (c.tools, c.thinking, c.vision)
+        };
+        assert_eq!(
+            [
+                caps("anthropic", "claude-sonnet-4-6"),
+                // Unconfigured: the old entry, where the provider's defaults
+                // would assume more (thinking) or less (Groq's tools).
+                caps("anthropic", "claude-opus-4-7"),
+                caps("groq", "moonshotai/kimi-k2-instruct-0905"),
+            ],
+            [
+                (true, true, true),
+                (true, false, true),
+                (true, false, false)
+            ]
+        );
+    }
+
+    #[test]
     fn test_catalog_default_models_are_cataloged() {
         let catalog = &*PROVIDER_CATALOG;
 
