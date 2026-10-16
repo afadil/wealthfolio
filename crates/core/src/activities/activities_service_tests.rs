@@ -16845,6 +16845,40 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn attach_cash_balances_leaves_an_unavailable_day_without_a_balance() {
+        // A USD account holding CAD with no CAD->USD rate: the engine leaves
+        // the CAD out of the day's cash and marks the day unavailable.
+        let unavailable = DailyAccountValuation {
+            value_status: ValuationStatus::Unavailable,
+            ..day_valuation("brokerage", "2026-04-02", dec!(0))
+        };
+        let service = with_valuations(
+            cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),
+            vec![
+                day_valuation("brokerage", "2026-04-01", dec!(900)),
+                unavailable,
+            ],
+        )
+        .await;
+        let mut response = page(vec![
+            page_row_on("unconverted", "brokerage", "2026-04-02T10:00:00Z"),
+            page_row_on("deposit", "brokerage", "2026-04-01T10:00:00Z"),
+        ]);
+
+        service
+            .attach_cash_balances(&mut response)
+            .await
+            .expect("attach balances");
+
+        assert_eq!(balance_of(&response, "unconverted"), None);
+        assert_eq!(scope_of(&response, "unconverted"), None);
+        assert_eq!(
+            balance_of(&response, "deposit"),
+            Some(("900".to_string(), "USD".to_string()))
+        );
+    }
+
+    #[tokio::test]
     async fn attach_cash_balances_dates_stored_timestamps_as_the_activity_reader_does() {
         let service = with_valuations(
             cash_balance_service(vec![cash_account("brokerage", "SECURITIES")], vec![]),

@@ -41,6 +41,7 @@ pub trait ValuationRepositoryTrait: Send + Sync {
                 valuation_date: valuation.valuation_date,
                 cash_balance: valuation.cash_balance,
                 account_currency: valuation.account_currency,
+                value_status: valuation.value_status,
             })
             .collect())
     }

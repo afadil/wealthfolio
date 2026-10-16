@@ -516,6 +516,9 @@ pub struct DailyCashBalance {
     /// In `account_currency`.
     pub cash_balance: Decimal,
     pub account_currency: String,
+    /// `Unavailable` when the engine could not complete the day, which
+    /// includes cash it could not convert and so left out of `cash_balance`.
+    pub value_status: ValuationStatus,
 }
 
 /// Domain model for daily account valuation
