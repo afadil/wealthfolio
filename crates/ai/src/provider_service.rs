@@ -8,7 +8,7 @@ use wealthfolio_core::errors::{Result, ValidationError};
 use wealthfolio_core::secrets::SecretStore;
 use wealthfolio_core::settings::SettingsRepositoryTrait;
 
-use crate::model_families::{default_capabilities, non_catalog_capabilities};
+use crate::model_families::{former_catalog_capabilities, non_catalog_capabilities};
 use crate::provider_model::{
     default_priority, AiProviderCatalog, AiProviderSettings, AiProvidersResponse, FetchedModel,
     ListModelsResponse, MergedModel, MergedProvider, ModelCapabilities, ModelCapabilityOverrides,
@@ -637,7 +637,7 @@ fn parse_fetched_models(
             resp.data
                 .into_iter()
                 .map(|m| {
-                    let mut capabilities = default_capabilities(provider_id, &m.id);
+                    let mut capabilities = non_catalog_capabilities(provider_id, &m.id, false);
                     if let Some(reported) = &m.capabilities {
                         if let Some(vision) = supported(reported, "image_input") {
                             capabilities.vision = vision;
@@ -717,7 +717,7 @@ fn parse_fetched_models(
                         .strip_prefix("models/")
                         .unwrap_or(&m.name)
                         .to_string();
-                    let mut capabilities = default_capabilities(provider_id, &id);
+                    let mut capabilities = non_catalog_capabilities(provider_id, &id, false);
                     let generates_content = m.supported_generation_methods.is_empty()
                         || m.supported_generation_methods
                             .iter()
@@ -798,9 +798,13 @@ fn parse_fetched_models(
                 .into_iter()
                 .map(|m| {
                     // The list carries no capability metadata; only OpenAI's
-                    // own models have useful defaults.
-                    let capabilities =
-                        (provider_id == "openai").then(|| default_capabilities(provider_id, &m.id));
+                    // own models, and the ones the catalog used to list, have
+                    // useful defaults.
+                    let capabilities = if provider_id == "openai" {
+                        Some(non_catalog_capabilities(provider_id, &m.id, false))
+                    } else {
+                        former_catalog_capabilities(provider_id, &m.id)
+                    };
                     FetchedModel {
                         id: m.id.clone(),
                         name: Some(m.id),
@@ -837,7 +841,7 @@ mod tests {
             { "id": "claude-text-only", "capabilities": {
                 "image_input": { "supported": false }, "thinking": { "supported": false }
             } },
-            { "id": "claude-sonnet-4-6" }
+            { "id": "claude-opus-4-8" }
         ] })
         .to_string();
         let models = parse_fetched_models("anthropic", &body).unwrap();
@@ -846,7 +850,7 @@ mod tests {
             caps(&models, "claude-text-only"),
             Some((true, false, false))
         );
-        assert_eq!(caps(&models, "claude-sonnet-4-6"), Some((true, true, true)));
+        assert_eq!(caps(&models, "claude-opus-4-8"), Some((true, true, true)));
         assert_eq!(models[0].name.as_deref(), Some("Claude Opus 5.5"));
     }
 
@@ -982,6 +986,53 @@ mod tests {
         };
         assert_eq!(caps("claude-opus-4-8"), (true, true, true));
         assert_eq!(caps("claude-partly-set"), (true, false, false));
+    }
+
+    #[test]
+    fn models_dropped_from_the_catalog_show_their_catalog_capabilities() {
+        let settings = json!({ "schemaVersion": 2, "providers": { "anthropic": {
+            "favoriteModels": ["claude-sonnet-4-6"],
+            "modelCapabilityOverrides": { "claude-sonnet-4-6": { "thinking": true } }
+        } } });
+        let service = AiProviderService::new(
+            Arc::new(StoredSettings(settings.to_string())),
+            Arc::new(crate::env::test_env::MockSecretStore::default()),
+            include_str!("ai_providers.json"),
+        )
+        .unwrap();
+        let providers = service.get_ai_providers().unwrap().providers;
+        let anthropic = providers.iter().find(|p| p.id == "anthropic").unwrap();
+        let saved = &anthropic
+            .models
+            .iter()
+            .find(|m| m.id == "claude-sonnet-4-6")
+            .unwrap()
+            .capabilities;
+        let listed = parse_fetched_models("openai", r#"{"data":[{"id":"gpt-5.4-nano"}]}"#)
+            .unwrap()
+            .remove(0)
+            .capabilities
+            .unwrap();
+        assert_eq!(
+            [
+                (saved.tools, saved.thinking, saved.vision),
+                (listed.tools, listed.thinking, listed.vision),
+            ],
+            [(true, true, true), (true, false, false)]
+        );
+        // Groq lists carry no capabilities; only the former entry has some.
+        let groq = parse_fetched_models(
+            "groq",
+            r#"{"data":[{"id":"moonshotai/kimi-k2-instruct-0905"},{"id":"llama-3.3-70b-versatile"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            [
+                caps(&groq, "moonshotai/kimi-k2-instruct-0905"),
+                caps(&groq, "llama-3.3-70b-versatile"),
+            ],
+            [Some((true, false, false)), None]
+        );
     }
 
     #[test]

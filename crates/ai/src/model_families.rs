@@ -68,19 +68,49 @@ pub(crate) fn is_openai_reasoning_model(model_id: &str) -> bool {
 }
 
 /// Capabilities of a model the catalog doesn't list, before the user's
-/// overrides apply. A model the user configured is described by its overrides
-/// alone, with unset keys off, as before providers had defaults; the settings
-/// screen saves every key when the user changes one.
+/// overrides apply. A model the catalog used to list keeps what it gave it.
+/// Otherwise a model the user configured is described by its overrides alone,
+/// with unset keys off, as before providers had defaults; the settings screen
+/// saves every key when the user changes one.
 pub(crate) fn non_catalog_capabilities(
     provider_id: &str,
     model_id: &str,
     configured: bool,
 ) -> ModelCapabilities {
-    if configured {
+    if let Some(capabilities) = former_catalog_capabilities(provider_id, model_id) {
+        capabilities
+    } else if configured {
         no_capabilities()
     } else {
         default_capabilities(provider_id, model_id)
     }
+}
+
+/// Models the catalog listed before it moved to Claude 5.5, GPT-6 and
+/// Gemini 3.8, with the capabilities it gave them. Users still have them
+/// selected, and overrides saved back then hold only the keys the user
+/// changed, so the rest still come from here.
+pub(crate) fn former_catalog_capabilities(
+    provider_id: &str,
+    model_id: &str,
+) -> Option<ModelCapabilities> {
+    let (tools, thinking, vision) = match (provider_id, model_id) {
+        ("anthropic", "claude-sonnet-4-6" | "claude-opus-4-7") => (true, false, true),
+        ("openai", "gpt-5.4") => (true, true, true),
+        ("openai", "gpt-5.4-mini") => (true, false, true),
+        ("openai", "gpt-5.4-nano") => (true, false, false),
+        ("google", "gemini-3-flash-preview" | "gemini-2.5-flash" | "gemini-2.5-pro") => {
+            (true, true, true)
+        }
+        ("groq", "moonshotai/kimi-k2-instruct-0905") => (true, false, false),
+        _ => return None,
+    };
+    Some(ModelCapabilities {
+        tools,
+        thinking,
+        vision,
+        streaming: true,
+    })
 }
 
 fn no_capabilities() -> ModelCapabilities {
@@ -97,7 +127,7 @@ fn no_capabilities() -> ModelCapabilities {
 /// here, so a newly released model keeps its tools without a manual override.
 /// Providers that mix many vendors (Groq, OpenRouter, Ollama) start with
 /// everything off.
-pub(crate) fn default_capabilities(provider_id: &str, model_id: &str) -> ModelCapabilities {
+fn default_capabilities(provider_id: &str, model_id: &str) -> ModelCapabilities {
     match provider_id {
         // Every Claude model the API still serves takes tools and images and
         // can think (adaptive on 4.6+, a budget before that). Other IDs on a
