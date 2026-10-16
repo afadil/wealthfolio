@@ -79,7 +79,7 @@ use crate::fx::currency::{
 };
 use crate::fx::FxServiceTrait;
 use crate::portfolio::economic_events::{ActivityCashInputs, ActivityEconomicsResolver};
-use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait};
+use crate::portfolio::valuation::{DailyCashBalance, ValuationRepositoryTrait, ValuationStatus};
 use crate::quotes::constants::DATA_SOURCE_MANUAL;
 use crate::quotes::{Quote, QuoteServiceTrait};
 use crate::utils::time_utils::{
@@ -5070,7 +5070,9 @@ impl ActivityServiceTrait for ActivityService {
             }
 
             // Other accounts: the cash at the end of each row's day, read from
-            // the engine's valuations for the days the page spans.
+            // the engine's valuations for the days the page spans. A day the
+            // engine could not complete gets none: its cash may leave out a
+            // currency it could not convert.
             let Some(valuations) = valuation_repository else {
                 return Ok(balances);
             };
@@ -5089,6 +5091,7 @@ impl ActivityServiceTrait for ActivityService {
                 let by_day: HashMap<NaiveDate, DailyCashBalance> = valuations
                     .get_daily_cash_balances(&account.id, Some(first), Some(last))?
                     .into_iter()
+                    .filter(|cash| cash.value_status != ValuationStatus::Unavailable)
                     .map(|cash| (cash.valuation_date, cash))
                     .collect();
                 for (id, day) in days {

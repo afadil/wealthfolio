@@ -82,7 +82,7 @@ impl AgentTool for SearchActivities {
     }
 
     fn description(&self) -> &'static str {
-        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed. Activities carry cashBalance, the account's cash in cashBalanceCurrency: with cashBalanceScope ROW (cash and credit-card accounts), the cash right after that activity, useful for reconciling against a bank statement; with DAY (other accounts), the cash at the end of the activity's day in the account currency, the same on every activity of that day. Absent for holdings-tracked accounts."
+        "Search and get investment activities (transactions) such as buys, sells, dividends, deposits, and withdrawals. Supports filtering, date ranges, and pagination. Returns paginated results with totalPages so you can request more pages if needed. Activities carry cashBalance, the account's cash in cashBalanceCurrency: with cashBalanceScope ROW (cash and credit-card accounts), the cash right after that activity, useful for reconciling against a bank statement; with DAY (other accounts), the cash at the end of the activity's day in the account currency, the same on every activity of that day. Absent for holdings-tracked accounts and for days whose value could not be computed (such as cash in a currency with no exchange rate): treat it as unknown, not zero."
     }
 
     fn input_schema(&self) -> serde_json::Value {

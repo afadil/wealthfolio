@@ -17,6 +17,7 @@ use crate::schema::daily_account_valuation::dsl::*;
 use wealthfolio_core::errors::Result;
 use wealthfolio_core::portfolio::valuation::{
     DailyAccountValuation, DailyCashBalance, NegativeBalanceInfo, ValuationRepositoryTrait,
+    ValuationStatus,
 };
 
 pub struct ValuationRepository {
@@ -125,7 +126,7 @@ impl ValuationRepositoryTrait for ValuationRepository {
 
         let mut query = daily_account_valuation::table
             .filter(account_id.eq(input_account_id))
-            .select((valuation_date, cash_balance, account_currency))
+            .select((valuation_date, cash_balance, account_currency, value_status))
             .order(valuation_date.asc())
             .into_boxed();
         if let Some(start_date_val) = start_date_opt {
@@ -136,15 +137,16 @@ impl ValuationRepositoryTrait for ValuationRepository {
         }
 
         let rows = query
-            .load::<(NaiveDate, String, String)>(&mut conn)
+            .load::<(NaiveDate, String, String, String)>(&mut conn)
             .map_err(StorageError::from)?;
         // Parsed as `From<DailyAccountValuationDB>` does.
         Ok(rows
             .into_iter()
-            .map(|(date, cash, currency)| DailyCashBalance {
+            .map(|(date, cash, currency, status)| DailyCashBalance {
                 valuation_date: date,
                 cash_balance: cash.parse::<rust_decimal::Decimal>().unwrap_or_default(),
                 account_currency: currency,
+                value_status: ValuationStatus::from_code(&status),
             })
             .collect())
     }
@@ -484,7 +486,10 @@ mod tests {
                 &[
                     valuation("brokerage", 1, 900, 900),
                     valuation("brokerage", 2, -1250, 300),
-                    valuation("brokerage", 3, 750, 1200),
+                    DailyAccountValuation {
+                        value_status: ValuationStatus::Unavailable,
+                        ..valuation("brokerage", 3, 750, 1200)
+                    },
                     valuation("brokerage", 4, 0, 1100),
                 ],
             )
@@ -503,10 +508,12 @@ mod tests {
                 valuation_date: valuation.valuation_date,
                 cash_balance: valuation.cash_balance,
                 account_currency: valuation.account_currency,
+                value_status: valuation.value_status,
             })
             .collect();
 
         assert_eq!(narrow.len(), 3);
+        assert_eq!(narrow[1].value_status, ValuationStatus::Unavailable);
         assert_eq!(narrow, whole);
     }
 
