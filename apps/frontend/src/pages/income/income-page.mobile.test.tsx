@@ -116,6 +116,7 @@ describe("IncomePage mobile account scope", () => {
           byAsset: {},
           byCurrency: {},
           byAccount: {},
+          unconvertedCurrencies: [],
         },
       ]),
     );

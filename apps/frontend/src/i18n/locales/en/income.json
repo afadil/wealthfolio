@@ -73,5 +73,7 @@
   "previous_period_income": "Previous Period Income",
   "monthly": "Monthly",
   "previous": "Previous",
-  "cumulative": "Cumulative"
+  "cumulative": "Cumulative",
+  "unconverted_currencies_one": "Income in {{currencies}} is left out of the totals because there is no exchange rate to {{baseCurrency}}.",
+  "unconverted_currencies_other": "Income in {{currencies}} is left out of the totals because there are no exchange rates to {{baseCurrency}}."
 }
