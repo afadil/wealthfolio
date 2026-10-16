@@ -1782,7 +1782,7 @@ impl ActivityRepositoryTrait for ActivityRepository {
                 } else {
                     format!("acct_{}", mapping.account_id)
                 };
-                let template_id = if let Some(link) =
+                let (template_id, template_existed) = if let Some(link) =
                     existing_link.filter(|l| l.template_id == account_local_id)
                 {
                     // Update the existing account-local template in place
@@ -1796,10 +1796,18 @@ impl ActivityRepositoryTrait for ActivityRepository {
                     ))
                     .execute(tx.conn())
                     .map_err(StorageError::from)?;
-                    link.template_id
+                    (link.template_id, true)
                 } else {
                     // Linked template is shared/system or no link — create a new account-local one
                     let new_id = account_local_id;
+                    // The account may have been linked elsewhere after its template was created.
+                    let template_existed = import_templates::table
+                        .find(&new_id)
+                        .select(import_templates::id)
+                        .first::<String>(tx.conn())
+                        .optional()
+                        .map_err(StorageError::from)?
+                        .is_some();
                     let template_db = ImportTemplateDB {
                         id: new_id.clone(),
                         name: mapping.name.clone(),
@@ -1818,8 +1826,20 @@ impl ActivityRepositoryTrait for ActivityRepository {
                         .set(&template_db)
                         .execute(tx.conn())
                         .map_err(StorageError::from)?;
-                    new_id
+                    (new_id, template_existed)
                 };
+
+                // Sync the stored template ahead of the link: the link's template_id is a
+                // foreign key, so the template has to exist on the receiving device first.
+                let template_db = import_templates::table
+                    .find(&template_id)
+                    .first::<ImportTemplateDB>(tx.conn())
+                    .map_err(StorageError::from)?;
+                if template_existed {
+                    tx.update(&template_db)?;
+                } else {
+                    tx.insert(&template_db)?;
+                }
 
                 // Upsert the account → template link
                 let link_db = ImportAccountTemplateDB {
@@ -3174,11 +3194,13 @@ mod tests {
     use crate::fx::FxRepository;
     use crate::limits::ContributionLimitRepository;
     use crate::schema::{spending_activity_splits, sync_outbox};
+    use crate::sync::app_sync::AppSyncRepository;
     use rust_decimal::Decimal;
     use tempfile::tempdir;
     use wealthfolio_core::activities::{import_type, ActivityStatus, ActivityUpsert};
     use wealthfolio_core::fx::FxService;
     use wealthfolio_core::limits::{ContributionLimitService, ContributionLimitServiceTrait};
+    use wealthfolio_core::sync::{SyncEntity, SyncOperation};
 
     fn setup_db() -> (Arc<Pool<ConnectionManager<SqliteConnection>>>, WriteHandle) {
         std::env::set_var("CONNECT_API_URL", "http://test.local");
@@ -5213,6 +5235,242 @@ mod tests {
             .first(&mut conn)
             .expect("template_id after relink");
         assert_eq!(template_id_after, "tmpl-b");
+    }
+
+    fn csv_import_mapping(account_id: &str, name: &str, config: &str) -> ImportMapping {
+        let now = Utc::now().naive_utc();
+        ImportMapping {
+            account_id: account_id.to_string(),
+            context_kind: import_type::ACTIVITY.to_string(),
+            source_system: String::new(),
+            template_id: None,
+            name: name.to_string(),
+            config: config.to_string(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    fn pending_outbox_ops(
+        pool: &Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        writer: &WriteHandle,
+    ) -> Vec<(SyncEntity, String, SyncOperation)> {
+        AppSyncRepository::new(pool.clone(), writer.clone())
+            .list_pending_outbox(100)
+            .expect("list outbox")
+            .into_iter()
+            .map(|event| (event.entity, event.entity_id, event.op))
+            .collect()
+    }
+
+    type RemoteEvent = (
+        SyncEntity,
+        String,
+        SyncOperation,
+        String,
+        String,
+        i64,
+        serde_json::Value,
+    );
+
+    /// A device's pending outbox as another device pulls it, in push order.
+    fn outbox_as_remote_events(
+        pool: &Arc<Pool<ConnectionManager<SqliteConnection>>>,
+        writer: &WriteHandle,
+    ) -> Vec<RemoteEvent> {
+        AppSyncRepository::new(pool.clone(), writer.clone())
+            .list_pending_outbox(100)
+            .expect("list outbox")
+            .into_iter()
+            .zip(1_i64..)
+            .map(|(event, seq)| {
+                (
+                    event.entity,
+                    event.entity_id,
+                    event.op,
+                    event.event_id,
+                    event.client_timestamp,
+                    seq,
+                    serde_json::from_str(&event.payload).expect("outbox payload json"),
+                )
+            })
+            .collect()
+    }
+
+    fn link_row_id(conn: &mut SqliteConnection, account_id: &str) -> String {
+        import_account_templates::table
+            .filter(import_account_templates::account_id.eq(account_id))
+            .filter(import_account_templates::context_kind.eq(import_type::ACTIVITY))
+            .select(import_account_templates::id)
+            .first(conn)
+            .expect("link row")
+    }
+
+    /// The account-local template must travel with its link: the link's template_id is a
+    /// foreign key, so a link that arrives without its template fails on the other device.
+    #[tokio::test]
+    async fn save_import_mapping_syncs_template_before_link() {
+        let (pool, writer) = setup_db();
+        let repo = ActivityRepository::new(pool.clone(), writer.clone());
+        let mut conn = get_connection(&pool).expect("conn");
+        insert_account(&mut conn, "acc-map");
+
+        repo.save_import_mapping(&csv_import_mapping(
+            "acc-map",
+            "Broker CSV",
+            r#"{"fieldMappings":{"date":"Trade Date"}}"#,
+        ))
+        .await
+        .expect("save mapping");
+
+        let link_id = link_row_id(&mut conn, "acc-map");
+        assert_eq!(
+            pending_outbox_ops(&pool, &writer),
+            vec![
+                (
+                    SyncEntity::ImportTemplate,
+                    "acct_acc-map".to_string(),
+                    SyncOperation::Create
+                ),
+                (
+                    SyncEntity::ActivityImportProfile,
+                    link_id,
+                    SyncOperation::Update
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn saved_import_mapping_arrives_on_another_device() {
+        let (pool_a, writer_a) = setup_db();
+        let repo_a = ActivityRepository::new(pool_a.clone(), writer_a.clone());
+        insert_account(&mut get_connection(&pool_a).expect("conn"), "acc-map");
+        repo_a
+            .save_import_mapping(&csv_import_mapping(
+                "acc-map",
+                "Broker CSV",
+                r#"{"fieldMappings":{"date":"Trade Date"}}"#,
+            ))
+            .await
+            .expect("save mapping");
+
+        let events = outbox_as_remote_events(&pool_a, &writer_a);
+
+        // A pull page applies as one batch.
+        let (pool_b, writer_b) = setup_db();
+        insert_account(&mut get_connection(&pool_b).expect("conn"), "acc-map");
+        let applied = AppSyncRepository::new(pool_b.clone(), writer_b.clone())
+            .apply_remote_events_lww_batch(events.clone())
+            .await
+            .expect("apply batch");
+        assert_eq!(applied, 2);
+
+        // When a batch fails, events apply one at a time in pull order, with foreign keys
+        // checked per event, so the template has to come before the link.
+        let (pool_c, writer_c) = setup_db();
+        insert_account(&mut get_connection(&pool_c).expect("conn"), "acc-map");
+        let sync_c = AppSyncRepository::new(pool_c.clone(), writer_c.clone());
+        for (entity, entity_id, op, event_id, client_timestamp, seq, payload) in events {
+            let applied = sync_c
+                .apply_remote_event_lww(
+                    entity,
+                    entity_id,
+                    op,
+                    event_id,
+                    client_timestamp,
+                    seq,
+                    payload,
+                )
+                .await
+                .expect("apply event");
+            assert!(applied);
+        }
+
+        for (pool, writer) in [(pool_b, writer_b), (pool_c, writer_c)] {
+            let mapping = ActivityRepository::new(pool, writer)
+                .get_import_mapping("acc-map", import_type::ACTIVITY)
+                .expect("read mapping")
+                .expect("mapping arrived");
+            assert_eq!(mapping.template_id.as_deref(), Some("acct_acc-map"));
+            assert_eq!(mapping.name, "Broker CSV");
+            assert_eq!(mapping.config, r#"{"fieldMappings":{"date":"Trade Date"}}"#);
+        }
+    }
+
+    /// Editing a mapping must update the same template row. A delete plus re-create would be
+    /// rejected on other devices, which ignore writes to an entity they saw deleted.
+    #[tokio::test]
+    async fn updating_import_mapping_keeps_template_id() {
+        let (pool_a, writer_a) = setup_db();
+        let repo_a = ActivityRepository::new(pool_a.clone(), writer_a.clone());
+        let mut conn = get_connection(&pool_a).expect("conn");
+        insert_account(&mut conn, "acc-map");
+        insert_template(&mut conn, "tmpl-shared");
+
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "First", r#"{"v":1}"#))
+            .await
+            .expect("first save");
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "Second", r#"{"v":2}"#))
+            .await
+            .expect("second save");
+        // Pointing the account at a shared template and saving again reuses the
+        // account-local template instead of creating another one.
+        repo_a
+            .link_account_template("acc-map", "tmpl-shared", import_type::ACTIVITY)
+            .await
+            .expect("link shared template");
+        repo_a
+            .save_import_mapping(&csv_import_mapping("acc-map", "Third", r#"{"v":3}"#))
+            .await
+            .expect("third save");
+
+        let link_id = link_row_id(&mut conn, "acc-map");
+        let template = |op| (SyncEntity::ImportTemplate, "acct_acc-map".to_string(), op);
+        let link = || {
+            (
+                SyncEntity::ActivityImportProfile,
+                link_id.clone(),
+                SyncOperation::Update,
+            )
+        };
+        assert_eq!(
+            pending_outbox_ops(&pool_a, &writer_a),
+            vec![
+                template(SyncOperation::Create),
+                link(),
+                template(SyncOperation::Update),
+                link(),
+                link(),
+                template(SyncOperation::Update),
+                link(),
+            ]
+        );
+        let account_templates: i64 = import_templates::table
+            .filter(import_templates::id.like("acct_acc-map%"))
+            .count()
+            .get_result(&mut conn)
+            .expect("count account templates");
+        assert_eq!(account_templates, 1);
+
+        let (pool_b, writer_b) = setup_db();
+        let mut conn_b = get_connection(&pool_b).expect("conn");
+        insert_account(&mut conn_b, "acc-map");
+        insert_template(&mut conn_b, "tmpl-shared");
+        AppSyncRepository::new(pool_b.clone(), writer_b.clone())
+            .apply_remote_events_lww_batch(outbox_as_remote_events(&pool_a, &writer_a))
+            .await
+            .expect("apply batch");
+
+        let mapping = ActivityRepository::new(pool_b.clone(), writer_b)
+            .get_import_mapping("acc-map", import_type::ACTIVITY)
+            .expect("read mapping")
+            .expect("mapping arrived");
+        assert_eq!(mapping.template_id.as_deref(), Some("acct_acc-map"));
+        assert_eq!(mapping.name, "Third");
+        assert_eq!(mapping.config, r#"{"v":3}"#);
     }
 
     #[tokio::test]
