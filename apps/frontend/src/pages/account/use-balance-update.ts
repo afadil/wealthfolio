@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { createActivity } from "@/adapters";
+import { DECIMAL_PRECISION } from "@/lib/constants";
 import { ActivityCreate, AccountValuation } from "@/lib/types";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
@@ -25,11 +26,11 @@ export const useBalanceUpdate = (account?: AccountValuation | null) => {
 
     const currentBalance = account.cashBalance || 0;
     const difference = newBalance - currentBalance;
+    const amount = parseFloat(Math.abs(difference).toFixed(DECIMAL_PRECISION));
 
-    if (difference === 0) return;
+    if (amount === 0) return;
 
     const activityType = difference > 0 ? "DEPOSIT" : "WITHDRAWAL";
-    const amount = parseFloat(Math.abs(difference).toFixed(2));
 
     // Don't set assetId - backend generates CASH:{currency} for cash activities
     const newActivity: ActivityCreate = {
