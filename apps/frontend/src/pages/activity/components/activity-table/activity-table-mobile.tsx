@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 
 import { TickerAvatar } from "@/components/ticker-avatar";
 import {
@@ -38,7 +38,6 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import { useVirtualScrollContainer } from "@/hooks/use-virtual-scroll-container";
 import { ActivityOperations } from "../activity-operations";
 import { ActivityTypeBadge } from "../activity-type-badge";
-import { shownCashBalanceIds } from "./cash-balance";
 
 /**
  * Starting heights for virtualized cards. The detailed card grows with the
@@ -98,10 +97,6 @@ export const ActivityTableMobile = ({
   const { t } = useTranslation();
   const { settings } = useSettingsContext();
   const appTimezone = settings?.timezone?.trim() || undefined;
-  const shownBalanceIds = useMemo(
-    () => shownCashBalanceIds(activities, appTimezone, hasNextPage),
-    [activities, appTimezone, hasNextPage],
-  );
 
   // Embedded lists can share an already-scrolled page rather than their own box.
   const { listRef, scrollElement, scrollMargin } = useVirtualScrollContainer();
@@ -208,22 +203,13 @@ export const ActivityTableMobile = ({
       : null;
     const formattedDate = formatDateTime(activity.date, dateFormatting, appTimezone);
     const displayValue = calculateActivityValue(activity);
+    // The balance after this row; end-of-day balances wait for the
+    // day-grouped list.
     const cashBalance =
       activity.cashBalance != null &&
       activity.cashBalanceCurrency &&
-      shownBalanceIds.has(activity.id)
-        ? {
-            balance: Number(activity.cashBalance),
-            currency: activity.cashBalanceCurrency,
-            label:
-              activity.cashBalanceScope === "DAY"
-                ? t("activity:table_day_end_balance")
-                : t("activity:table_balance"),
-            shortLabel:
-              activity.cashBalanceScope === "DAY"
-                ? t("activity:table_day_end_balance_short")
-                : t("activity:table_balance"),
-          }
+      activity.cashBalanceScope !== "DAY"
+        ? { balance: Number(activity.cashBalance), currency: activity.cashBalanceCurrency }
         : undefined;
 
     // Compact View
@@ -259,8 +245,8 @@ export const ActivityTableMobile = ({
                         ? `${activityTypeLabel} · ${optionSubtitle}`
                         : activityTypeLabel}
                     </p>
-                    <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
-                      <span className="whitespace-nowrap">{formattedDate.date}</span>
+                    <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
+                      <span>{formattedDate.date}</span>
                       {!isCash &&
                         !(isIncomeActivity(activity.activityType) && !isAssetBackedIncome) &&
                         !isSplitActivity(activity.activityType) &&
@@ -278,7 +264,7 @@ export const ActivityTableMobile = ({
                         )}
                       {cashBalance && (
                         <span className="ml-auto flex shrink-0 items-center gap-1">
-                          {cashBalance.shortLabel}
+                          {t("activity:table_balance")}
                           <AmountDisplay
                             value={cashBalance.balance}
                             currency={cashBalance.currency}
@@ -480,7 +466,7 @@ export const ActivityTableMobile = ({
 
             {cashBalance && (
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{cashBalance.label}</span>
+                <span className="text-muted-foreground">{t("activity:table_balance")}</span>
                 <AmountDisplay
                   value={cashBalance.balance}
                   currency={cashBalance.currency}

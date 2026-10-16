@@ -505,18 +505,17 @@ describe("AccountPage", () => {
     },
   );
 
-  it("asks for day-end balances on an investment account's activities", () => {
+  it("does not ask for running balances on an investment or holdings-mode account", () => {
     mockAccountPage([createAccount()]);
-    render(<AccountPage />);
+    const { unmount } = render(<AccountPage />);
     fireEvent.click(screen.getByRole("button", { name: "Activities" }));
 
     expect(mockUseActivitySearch.mock.calls.at(-1)?.[0]).toMatchObject({
       filters: { accountIds: ["account-1"] },
-      includeCashBalances: true,
+      includeCashBalances: false,
     });
-  });
+    unmount();
 
-  it("does not ask for balances on a holdings-mode account", () => {
     mockAccountPage([
       { ...createAccount(), accountType: AccountType.CASH, trackingMode: "HOLDINGS" },
     ]);
