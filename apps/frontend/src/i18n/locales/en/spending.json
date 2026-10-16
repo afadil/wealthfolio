@@ -719,12 +719,7 @@
     "noIncome": "No income in selected accounts for this period.",
     "spent": "Spent",
     "saved": "Saved",
-    "incomeSaving": "Income & saving",
-    "nonSpendingCashflow": "Non-spending cashflow for {{period}}.",
-    "moneyIn": "Money in",
-    "incomeSources": "Income sources",
     "setAside": "Set aside",
-    "savingDestinations": "Saving destinations",
     "sortSpent": "spent",
     "sortChange": "change",
     "sortName": "name",
@@ -743,6 +738,48 @@
     "openTransactions": "Open transactions →",
     "moreCount_one": "+{{count}} more",
     "moreCount_other": "+{{count}} more"
+  },
+  "moneyFlow": {
+    "title": "Money flow",
+    "subtitle": "Where your money came from and where it went for {{period}}.",
+    "focusSubtitle": "Every category for {{period}}.",
+    "focusSubcategoriesSubtitle": "Every subcategory for {{period}}.",
+    "back": "All flows",
+    "backTo": "Back to {{name}}",
+    "chartLabel": "Money flow chart. Use the arrow keys to move between flows.",
+    "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
+    "shareOfIncome": "{{pct}} of income",
+    "shareOfTotal": "{{pct}} of total",
+    "clickTransactions": "Click to see transactions",
+    "clickCategories": "Click to see every category",
+    "clickSubcategories": "Click to see subcategories",
+    "action": {
+      "categories": "Show every category",
+      "subcategories": "Show subcategories",
+      "transactions": "View transactions"
+    },
+    "node": {
+      "total": "Total",
+      "shortfall": "Shortfall",
+      "refunds": "Net refunds",
+      "surplus": "Left over",
+      "uncategorizedIncome": "Uncategorized income",
+      "netSpending": "Net spending"
+    },
+    "hint": {
+      "total": "Money in, plus net refunds and any shortfall. It always equals money out.",
+      "totalOut": "Everything spent and set aside, before any refunds.",
+      "shortfall": "Spending and saving beyond what came in.",
+      "refunds": "Categories where refunds were larger than spending.",
+      "saved": "Moved to savings and investment accounts.",
+      "surplus": "Came in but wasn't spent or set aside.",
+      "uncategorized": "Spending that doesn't have a category yet.",
+      "net": "What this category cost after refunds.",
+      "direct": "Assigned to the category itself, not to a subcategory."
+    },
+    "groupRefunds": "Before subtracting {{amount}} in net refunds.",
+    "categoryRefunds": "Before subtracting {{refunds}} in net refunds. Net spending: {{net}}."
   },
   "budgetChart": {
     "overBudget": "Over budget",

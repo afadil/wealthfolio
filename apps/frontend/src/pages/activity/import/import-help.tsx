@@ -19,7 +19,7 @@ import { downloadSampleCsv, downloadSampleHoldingsCsv } from "./utils/sample-csv
 // Activities Help Content
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ActivitiesHelpContent() {
+function ActivitiesHelpContent({ transactionImport }: { transactionImport: boolean }) {
   const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -60,11 +60,15 @@ function ActivitiesHelpContent() {
         <div>
           <p className="text-sm font-semibold">{t("activity:import.help.requiredFields")}</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            {t("activity:import.help.activitiesRequiredFields")}
+            {transactionImport
+              ? t("activity:import.help.transactionsRequiredFields")
+              : t("activity:import.help.activitiesRequiredFields")}
           </p>
           <p className="mt-2 text-sm font-semibold">{t("activity:import.help.optionalFields")}</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            {t("activity:import.help.activitiesOptionalFields")}
+            {transactionImport
+              ? t("activity:import.help.transactionsOptionalFields")
+              : t("activity:import.help.activitiesOptionalFields")}
           </p>
         </div>
 
@@ -333,9 +337,13 @@ function HoldingsHelpContent() {
 
 interface ImportHelpPopoverProps {
   defaultTab?: "activities" | "holdings";
+  transactionImport?: boolean;
 }
 
-export function ImportHelpPopover({ defaultTab = "activities" }: ImportHelpPopoverProps) {
+export function ImportHelpPopover({
+  defaultTab = "activities",
+  transactionImport = false,
+}: ImportHelpPopoverProps) {
   const { isMobile } = usePlatform();
   const { t } = useTranslation();
 
@@ -346,7 +354,7 @@ export function ImportHelpPopover({ defaultTab = "activities" }: ImportHelpPopov
         <TabsTrigger value="holdings">{t("activity:import.help.tabHoldings")}</TabsTrigger>
       </TabsList>
       <TabsContent value="activities" className="m-0">
-        <ActivitiesHelpContent />
+        <ActivitiesHelpContent transactionImport={transactionImport} />
       </TabsContent>
       <TabsContent value="holdings" className="m-0">
         <HoldingsHelpContent />

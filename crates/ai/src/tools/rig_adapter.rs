@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use rig::completion::ToolDefinition;
+use rig::message::ToolName;
 use rig::tool::{DynamicTool, ToolExecutionError, ToolOutput};
 use wealthfolio_agent_tools::{AgentEnvironment, AgentTool};
 
@@ -23,11 +24,11 @@ impl RigAgentTool {
 
 impl RigAgentTool {
     pub fn definition(&self) -> ToolDefinition {
-        ToolDefinition {
-            name: self.tool.name().to_string(),
-            description: self.tool.description().to_string(),
-            parameters: self.tool.input_schema(),
-        }
+        ToolDefinition::new(
+            ToolName::new(self.tool.name()).expect("catalog tool names are not empty"),
+            self.tool.description(),
+            self.tool.input_schema(),
+        )
     }
 
     pub async fn call(
@@ -51,7 +52,7 @@ impl RigAgentTool {
             definition.name,
             definition.description,
             definition.parameters,
-            move |_context, args| {
+            move |args| {
                 let adapter = adapter.clone();
                 Box::pin(async move { adapter.call(args).await.map(ToolOutput::json) })
             },

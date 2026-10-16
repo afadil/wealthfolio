@@ -13,6 +13,7 @@ const adapterMocks = vi.hoisted(() => ({
   linkTransferActivities: vi.fn(),
   saveActivities: vi.fn(),
   unlinkTransferActivities: vi.fn(),
+  getTransferPairForActivity: vi.fn(),
   logger: { error: vi.fn() },
 }));
 
@@ -46,6 +47,106 @@ describe("useActivityMutations", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it.each([ActivityType.TRANSFER_OUT, ActivityType.TRANSFER_IN])(
+    "duplicates a whole same-account FX pair from %s",
+    async (activityType) => {
+      const transferOut = {
+        id: "out",
+        accountId: "a",
+        activityType: ActivityType.TRANSFER_OUT,
+        amount: "100",
+        currency: "USD",
+        notes: "Sent",
+      };
+      const transferIn = {
+        id: "in",
+        accountId: "a",
+        activityType: ActivityType.TRANSFER_IN,
+        amount: "92.12345678",
+        currency: "EUR",
+        notes: "Received",
+      };
+      adapterMocks.getTransferPairForActivity.mockResolvedValue({ transferOut, transferIn });
+      adapterMocks.saveActivities.mockResolvedValue({
+        created: [transferOut, transferIn],
+        errors: [],
+      });
+      const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+      await act(async () => {
+        await result.current.duplicateActivityMutation.mutateAsync({
+          id: activityType === ActivityType.TRANSFER_OUT ? "out" : "in",
+          activityType,
+          accountId: "a",
+          sourceGroupId: "old-group",
+          metadata: { flow: { is_external: false } },
+          date: new Date(),
+          amount: "100",
+          currency: "USD",
+          quantity: null,
+          unitPrice: null,
+          fee: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          assetId: "",
+          assetSymbol: "CASH",
+          accountName: "Account",
+          accountCurrency: "USD",
+          needsReview: false,
+        } as ActivityDetails);
+      });
+      const creates = adapterMocks.saveActivities.mock.calls[0][0].creates;
+      expect(creates).toHaveLength(2);
+      expect(creates[0]).toMatchObject({ amount: "100", currency: "USD", comment: "Sent" });
+      expect(creates[1]).toMatchObject({
+        amount: "92.12345678",
+        currency: "EUR",
+        comment: "Received",
+      });
+      expect(creates[0].sourceGroupId).toBe(creates[1].sourceGroupId);
+      expect(creates[0].sourceGroupId).not.toBe("old-group");
+      expect(creates[0].idempotencyKey).not.toBe(creates[1].idempotencyKey);
+      expect(creates[0].activityDate).toEqual(creates[1].activityDate);
+      expect(adapterMocks.createActivity).not.toHaveBeenCalled();
+    },
+  );
+
+  it("duplicates a single leg, without its group, when the group resolves to no pair", async () => {
+    adapterMocks.getTransferPairForActivity.mockResolvedValue(null);
+    const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.duplicateActivityMutation.mutateAsync({
+        id: "out",
+        accountId: "acc-1",
+        activityType: ActivityType.TRANSFER_OUT,
+        sourceGroupId: "missing",
+        amount: "100",
+        currency: "USD",
+      } as ActivityDetails);
+    });
+    expect(adapterMocks.saveActivities).not.toHaveBeenCalled();
+    expect(adapterMocks.createActivity).toHaveBeenCalledTimes(1);
+    expect(adapterMocks.createActivity.mock.calls[0][0]).not.toHaveProperty("sourceGroupId");
+  });
+
+  it("never duplicates just one leg when the lookup returns another pair", async () => {
+    adapterMocks.getTransferPairForActivity.mockResolvedValue({
+      transferOut: { id: "other-out" },
+      transferIn: { id: "other-in" },
+    });
+    const { result } = renderHook(() => useActivityMutations(), { wrapper: createWrapper() });
+    await act(async () => {
+      await expect(
+        result.current.duplicateActivityMutation.mutateAsync({
+          id: "out",
+          activityType: ActivityType.TRANSFER_OUT,
+          sourceGroupId: "missing",
+        } as ActivityDetails),
+      ).rejects.toThrow("unresolved");
+    });
+    expect(adapterMocks.createActivity).not.toHaveBeenCalled();
+    expect(adapterMocks.saveActivities).not.toHaveBeenCalled();
   });
 
   it.each(["Original notes\nSecond line", "", undefined])(

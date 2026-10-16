@@ -256,6 +256,12 @@ function TransactionCardImpl({
                 </button>
               }
             />
+            {a.cashBalance != null && a.cashBalanceCurrency && (
+              <span className="shrink-0 tabular-nums">
+                {t("activity:table_balance")}{" "}
+                <PrivacyAmount value={Number(a.cashBalance)} currency={a.cashBalanceCurrency} />
+              </span>
+            )}
           </div>
         </div>
 

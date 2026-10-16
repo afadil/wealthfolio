@@ -154,12 +154,16 @@ export function AssetDetailsSheet({
     defaultValues: getDefaultDetailsFormValues(assetKind, assetName, assetMetadata, assetNotes),
   });
 
-  // Reset form when asset changes or sheet opens
+  // Load the saved values when the sheet opens or shows another asset. Callers
+  // rebuild `asset` on every render, and background portfolio updates re-render
+  // them, so resetting on the object itself would discard unsaved edits.
+  const assetId = asset?.id;
   useEffect(() => {
     if (open && asset) {
       form.reset(getDefaultDetailsFormValues(asset.kind, asset.name, asset.metadata, asset.notes));
     }
-  }, [open, asset, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, assetId, form]);
 
   // Build linkable assets options for liability linking
   // NOTE: This must be called before any early returns to maintain hook order

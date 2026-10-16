@@ -787,6 +787,7 @@
     "balance_correction_description": "Substitui o saldo em dívida a partir de uma data específica sem alterar o histórico anterior.",
     "extra_repayment": "Amortização adicional",
     "extra_repayment_description": "Regista uma amortização adicional de capital e atualiza as projeções futuras.",
+    "balance_replaces_confirmation": "Isto substitui o saldo registado de {{amount}} em {{date}}. Eliminá-lo mais tarde não restaurará o saldo anterior.",
     "repayment_before_confirmation": "Seu saldo registrado de {{amount}} em {{date}} tem prioridade a partir dessa data, então este pagamento não reduzirá o saldo posterior. Se esse extrato não incluir este pagamento, edite-o ou exclua-o na aba Cronograma.",
     "confirm_extra_repayment": "Registar amortização",
     "close_loan": "Encerrar empréstimo",

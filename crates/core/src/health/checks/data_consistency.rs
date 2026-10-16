@@ -1306,8 +1306,12 @@ fn unknown_transfer_issue_query(
 }
 
 fn activity_route_from_query(query: &serde_json::Map<String, serde_json::Value>) -> String {
-    let params = query
-        .iter()
+    // Sort by key: serde_json keeps insertion order when a dependency enables
+    // its `preserve_order` feature, and the route must not depend on that.
+    let mut entries = query.iter().collect::<Vec<_>>();
+    entries.sort_by_key(|(key, _)| *key);
+    let params = entries
+        .into_iter()
         .filter_map(|(key, value)| {
             let value = value.as_str()?;
             Some(format!(

@@ -246,6 +246,7 @@
     "manual": "Manual",
     "manual_hint": "balance updated by hand",
     "debt_free": "Debt-free {{date}}",
+    "original_balance": "Original balance {{date}}",
     "updated": "Updated {{date}}",
     "status_paid_off": "Paid off",
     "status_renewal_due": "Renewal due",

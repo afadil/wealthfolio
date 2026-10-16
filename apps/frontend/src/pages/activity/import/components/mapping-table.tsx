@@ -74,7 +74,8 @@ export function MappingTable({
   return (
     <div
       className={cn(
-        "border-border bg-card h-full w-full overflow-auto rounded-md border shadow-sm",
+        // `isolate` stops WebKitGTK painting rows over this scrollbar inside a scrolling parent
+        "border-border bg-card isolate h-full w-full overflow-auto rounded-md border shadow-sm",
         className,
       )}
     >

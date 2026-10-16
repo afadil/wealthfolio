@@ -3,7 +3,7 @@ import type { Format } from "@number-flow/react";
 import { useBalancePrivacy } from "../../hooks/use-balance-privacy";
 import { getQuoteUnitCurrency } from "../../lib/currencies";
 import { cn } from "../../lib/utils";
-import { useLocalizationSettings, useNumberFormatting } from "../formatting-provider";
+import { useAmountFormatting } from "../formatting-provider";
 
 const isValidCurrencyCode = (code: string) => /^[A-Za-z]{3}$/.test(code);
 
@@ -33,8 +33,7 @@ export function GainAmount({
   ...props
 }: GainAmountProps) {
   const { isBalanceHidden } = useBalancePrivacy();
-  const { locale } = useLocalizationSettings();
-  const { formatDecimal } = useNumberFormatting();
+  const locale = useAmountFormatting().currencyLocale(currency);
   const quoteUnit = getQuoteUnitCurrency(currency);
   const validCurrency = !quoteUnit && isValidCurrencyCode(currency);
   const useCurrencyStyle = displayCurrency && validCurrency;
@@ -85,7 +84,7 @@ export function GainAmount({
         ) : (
           // Fallback when NumberFlow is not loaded
           <span>
-            {formatDecimal(displayValue, formatOptions)}
+            {new Intl.NumberFormat(locale, formatOptions).format(displayValue)}
             {suffix}
           </span>
         )}

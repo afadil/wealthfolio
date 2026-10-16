@@ -7,6 +7,7 @@ import { useIsMobileViewport } from "@/hooks/use-platform";
 import type { TaxonomyCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { DIRECT_ROW_ID } from "../../lib/category-drilldown";
 import { CategoryIcon } from "../category-chips";
 import type { BudgetCategoryRow, BudgetGroupRow } from "../../types/budget";
 import type { CategoryBreakdownRow } from "../../types/report";
@@ -78,8 +79,9 @@ export function CategoryHierarchyTable({
         taxonomyCategories,
         sort,
         compareNames,
+        directLabel: tr("spending:categorySheet.direct"),
       }),
-    [breakdown, priorBreakdown, budgetRows, taxonomyCategories, sort, compareNames],
+    [breakdown, priorBreakdown, budgetRows, taxonomyCategories, sort, compareNames, tr],
   );
 
   const totals = useMemo(() => {
@@ -579,9 +581,8 @@ const ChildRow = memo(function ChildRow({
   onCategoryClick?: (categoryId: string) => void;
   indented?: boolean;
 }) {
-  const numberFormatting = useNumberFormatting();
-  const delta = node.spent - node.priorSpent;
-  const clickable = !!onCategoryClick;
+  // Direct spending has no transactions of its own apart from the parent's.
+  const clickable = !!onCategoryClick && node.id !== DIRECT_ROW_ID;
   return (
     <tr
       className={cn(
@@ -603,18 +604,8 @@ const ChildRow = memo(function ChildRow({
         <PrivacyAmount value={node.spent} currency={currency} />
       </td>
       <td className="px-3 py-1.5"></td>
-      <td
-        className={cn(
-          "px-3 py-1.5 text-right text-xs tabular-nums",
-          delta === 0 || node.priorSpent === 0
-            ? "text-muted-foreground/60"
-            : delta > 0
-              ? "text-destructive"
-              : "text-success",
-        )}
-      >
-        {formatDelta(delta, node.priorSpent, numberFormatting)}
-      </td>
+      {/* The insight has no prior-period amount per subcategory: the change is unknown, not new. */}
+      <td className="text-muted-foreground/60 px-3 py-1.5 text-right text-xs tabular-nums">—</td>
     </tr>
   );
 });
@@ -860,8 +851,7 @@ function MobileSubcategoryRow({
   parentColor: string;
   onCategoryClick?: (categoryId: string) => void;
 }) {
-  const delta = node.spent - node.priorSpent;
-  const clickable = !!onCategoryClick;
+  const clickable = !!onCategoryClick && node.id !== DIRECT_ROW_ID;
   return (
     <li
       className={cn(
@@ -874,8 +864,8 @@ function MobileSubcategoryRow({
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: parentColor, opacity: 0.6 }}
       />
+      {/* No change pill: the insight has no prior-period amount per subcategory. */}
       <span className="text-muted-foreground/90 flex-1 truncate">{node.name}</span>
-      <DeltaPill delta={delta} priorSpent={node.priorSpent} />
       <span className="text-muted-foreground/90 shrink-0 text-xs tabular-nums">
         <PrivacyAmount value={node.spent} currency={currency} />
       </span>

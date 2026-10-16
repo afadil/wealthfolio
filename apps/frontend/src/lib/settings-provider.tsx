@@ -2,10 +2,11 @@ import { StartupScreen } from "@/components/startup-screen";
 import { useProfile } from "@/features/profiles/profile-context";
 import { Button } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
-import { isDesktop, logger } from "@/adapters";
+import { isTauri, logger } from "@/adapters";
 import { setAddonLocalizationSnapshot } from "@/addons/iframe/addon-sandbox-localization";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
+import { getPlatform } from "@/hooks/use-platform";
 import { useSettings } from "@/hooks/use-settings";
 import { useSettingsMutation } from "@/hooks/use-settings-mutation";
 import i18n, { LANGUAGE_STORAGE_KEY } from "@/i18n/i18n";
@@ -22,6 +23,7 @@ interface ExtendedSettingsContextType extends SettingsContextType {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -63,6 +65,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         | "font"
         | "language"
         | "formattingRegion"
+        | "currencyFormattingRegions"
         | "baseCurrency"
         | "defaultReturnMetric"
         | "timezone"
@@ -130,14 +133,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const uiLocale = settings ? settings.language : DEFAULT_LOCALE;
   const resolvedFormattingLocale = resolveFormattingLocale(formattingRegion);
   const formattingTimezone = settings?.timezone || undefined;
+  const currencyFormattingRegions = settings?.currencyFormattingRegions;
 
   useEffect(() => {
     setAddonLocalizationSnapshot({
       locale: resolvedFormattingLocale,
       uiLocale,
       timezone: formattingTimezone,
+      currencyFormattingRegions,
     });
-  }, [resolvedFormattingLocale, uiLocale, formattingTimezone]);
+  }, [resolvedFormattingLocale, uiLocale, formattingTimezone, currencyFormattingRegions]);
 
   if (settings && !formattingRegion) {
     throw new Error("Loaded settings are missing the required formatting region");
@@ -176,6 +181,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         locale={formattingRegion}
         uiLocale={uiLocale}
         timezone={formattingTimezone}
+        currencyFormattingRegions={settings?.currencyFormattingRegions}
       >
         {children}
       </FormattingProvider>
@@ -222,6 +228,16 @@ function cleanupSystemThemeListeners() {
     mediaQueryUnsubscribe = null;
   }
   mediaQueryList = null;
+}
+
+// Only desktop windows follow the OS theme; tao's iOS and Android windows
+// always report light.
+async function getDesktopWindow() {
+  if (!isTauri) return null;
+  const platform = await getPlatform();
+  if (!platform.is_desktop) return null;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  return getCurrentWindow();
 }
 
 // Helper function to apply settings to the document
@@ -276,31 +292,28 @@ const applySettingsToDocument = async (newSettings: Settings) => {
       }
     }
 
-    // On desktop, also sync with Tauri window theme + listen to OS changes
-    if (isDesktop) {
-      (async () => {
-        try {
-          const { getCurrentWindow } = await import("@tauri-apps/api/window");
-          if (application !== appearanceGeneration) return;
-          const currentWindow = getCurrentWindow();
-          await currentWindow.setTheme(null);
-          const current = await currentWindow.theme();
-          if (application !== appearanceGeneration) return;
-          if (current === "dark" || current === "light") {
-            applyResolvedTheme(current);
-          }
-          const unlisten = await currentWindow.onThemeChanged(({ payload }) => {
-            if (application !== appearanceGeneration) return;
-            const next = payload === "dark" ? "dark" : "light";
-            applyResolvedTheme(next);
-          });
-          if (application !== appearanceGeneration) unlisten();
-          else tauriThemeUnlisten = unlisten;
-        } catch {
-          logger.error("Error setting window theme.");
+    // On desktop, also sync with the window theme + listen to OS changes
+    (async () => {
+      try {
+        const currentWindow = await getDesktopWindow();
+        if (!currentWindow || application !== appearanceGeneration) return;
+        await currentWindow.setTheme(null);
+        const current = await currentWindow.theme();
+        if (application !== appearanceGeneration) return;
+        if (current === "dark" || current === "light") {
+          applyResolvedTheme(current);
         }
-      })();
-    }
+        const unlisten = await currentWindow.onThemeChanged(({ payload }) => {
+          if (application !== appearanceGeneration) return;
+          const next = payload === "dark" ? "dark" : "light";
+          applyResolvedTheme(next);
+        });
+        if (application !== appearanceGeneration) unlisten();
+        else tauriThemeUnlisten = unlisten;
+      } catch {
+        logger.error("Error setting window theme.");
+      }
+    })();
 
     applyResolvedTheme(initial);
     return;
@@ -310,16 +323,14 @@ const applySettingsToDocument = async (newSettings: Settings) => {
   const explicit = newSettings.theme === "dark" ? "dark" : "light";
   applyResolvedTheme(explicit);
 
-  // Only call Tauri window APIs when running the desktop app for explicit modes
-  if (isDesktop) {
-    (async () => {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const currentWindow = getCurrentWindow();
-        await currentWindow.setTheme(explicit);
-      } catch {
-        logger.error("Error setting window theme.");
-      }
-    })();
-  }
+  // On desktop, match the window theme to the explicit mode
+  (async () => {
+    try {
+      const currentWindow = await getDesktopWindow();
+      if (!currentWindow || application !== appearanceGeneration) return;
+      await currentWindow.setTheme(explicit);
+    } catch {
+      logger.error("Error setting window theme.");
+    }
+  })();
 };

@@ -780,6 +780,7 @@
     "balance_correction_description": "自指定日期起更正未償餘額，而不修改先前紀錄。",
     "extra_repayment": "額外還款",
     "extra_repayment_description": "記錄額外本金還款並更新未來預測。",
+    "balance_replaces_confirmation": "這將取代 {{date}} 記錄的餘額 {{amount}}。之後刪除此記錄不會恢復先前的餘額。",
     "repayment_before_confirmation": "您在 {{date}} 記錄的餘額 {{amount}} 自該日起優先，因此這筆額外還款不會降低之後的餘額。若該對帳單未包含此還款，請在「還款計畫」分頁中編輯或刪除它。",
     "confirm_extra_repayment": "記錄還款",
     "close_loan": "結清貸款",

@@ -27,7 +27,9 @@ fn transport_err_from_sync(e: wealthfolio_device_sync::DeviceSyncError) -> Trans
         retry_class: e.retry_class(),
         error_code: e.error_code().map(|s| s.to_string()),
         details: match &e {
-            wealthfolio_device_sync::DeviceSyncError::Api { details, .. } => details.clone(),
+            wealthfolio_device_sync::DeviceSyncError::Api { details, .. } => {
+                details.as_deref().cloned()
+            }
             _ => None,
         },
     }

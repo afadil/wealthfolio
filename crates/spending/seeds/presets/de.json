@@ -1,0 +1,281 @@
+{
+  "presetId": "de",
+  "presetVersion": "2026-10.1",
+  "name": "Germany",
+  "description": "Rules for common German household transactions, including supermarkets, Deutsche Bahn and local transport, energy and broadcasting fees, insurers, health insurance, telecom, shopping, and bank fees.",
+  "language": "de-DE",
+  "rules": [
+    {
+      "key": "de.groceries.major_chains",
+      "name": "Groceries — supermarkets",
+      "pattern": "(?i)\\brewe\\b|\\bedeka\\b|netto marken|netto sagt danke|netto filiale|penny[. -]?markt|\\bkaufland\\b|\\blidl\\b|\\baldi\\b|\\bglobus\\b|\\btegut\\b|\\bmarktkauf\\b|\\bhit markt\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 80
+    },
+    {
+      "key": "de.groceries.organic",
+      "name": "Groceries — organic",
+      "pattern": "(?i)\\balnatura\\b|\\bdenns\\b|bio company|\\bbasic bio\\b|\\bvollcorner\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 80
+    },
+    {
+      "key": "de.drugstores",
+      "name": "Drugstores and pharmacies",
+      "pattern": "(?i)\\bdm[- ]drogerie|\\bdm fil|\\brossmann\\b|\\bm(?:ü|ue|u)ller drogerie|\\bapotheke\\b|\\bdocmorris\\b|\\bshop apotheke\\b",
+      "matchType": "regex",
+      "categoryKey": "health_pharmacy",
+      "priority": 76
+    },
+    {
+      "key": "de.bakeries",
+      "name": "Bakeries and coffee",
+      "pattern": "(?i)b(?:ä|ae|a)ckerei|\\bbackwerk\\b|\\bback-?factory\\b|\\bstarbucks\\b|\\bcoffee fellows\\b|\\btchibo\\b",
+      "matchType": "regex",
+      "categoryKey": "food_coffee",
+      "priority": 72
+    },
+    {
+      "key": "de.delivery",
+      "name": "Food delivery",
+      "pattern": "(?i)\\blieferando\\b|uber ?eats|\\bwolt\\b",
+      "matchType": "regex",
+      "categoryKey": "food_delivery",
+      "priority": 82
+    },
+    {
+      "key": "de.restaurants",
+      "name": "Restaurants and fast food",
+      "pattern": "(?i)\\bimbiss\\b|gastst(?:ä|ae|a)tte|\\bd(?:ö|oe|o)ner\\b|mcdonald|burger king|\\bkfc\\b|\\bvapiano\\b|\\bl'osteria\\b",
+      "matchType": "regex",
+      "categoryKey": "food_restaurants",
+      "priority": 70
+    },
+    {
+      "key": "de.public_transit",
+      "name": "Public transport",
+      "pattern": "(?i)\\bdb vertrieb\\b|deutsche bahn|\\bdb fernverkehr\\b|\\bdb regio\\b|bahn\\.de|\\bbvg\\b|\\bhvv\\b|\\bmvg\\b|\\bvbb\\b|\\brmv\\b|\\bvrr\\b|\\bkvb\\b|deutschlandticket|\\bflixbus\\b|\\bflixtrain\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_public",
+      "priority": 80
+    },
+    {
+      "key": "de.rideshare_mobility",
+      "name": "Taxi and shared mobility",
+      "pattern": "(?i)\\buber\\b|free ?now|\\bbolt\\.eu\\b|\\btier\\b mobility|share now|\\bmiles mobility\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_rideshare",
+      "priority": 78
+    },
+    {
+      "key": "de.fuel",
+      "name": "Fuel",
+      "pattern": "(?i)\\baral\\b|\\bjet\\b tankstelle|\\bstar tankstelle\\b|\\besso\\b|\\bshell\\b|totalenergies|\\bavia\\b|\\bhem tankstelle\\b|\\bagip\\b|\\bionity\\b|\\benbw mobility\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_gas",
+      "priority": 83
+    },
+    {
+      "key": "de.parking",
+      "name": "Parking",
+      "pattern": "(?i)\\bcontipark\\b|\\bapcoa\\b|\\bparkhaus\\b|\\bparkster\\b|easypark",
+      "matchType": "regex",
+      "categoryKey": "transport_parking",
+      "priority": 78
+    },
+    {
+      "key": "de.car",
+      "name": "Car costs",
+      "pattern": "(?i)\\badac\\b|\\bt(?:ü|ue|u)v\\b|\\bdekra\\b|\\bvulco\\b|\\bpit-?stop\\b|\\batu\\b|autowerkstatt",
+      "matchType": "regex",
+      "categoryKey": "transport_maintenance",
+      "priority": 70
+    },
+    {
+      "key": "de.travel",
+      "name": "Travel",
+      "pattern": "(?i)\\blufthansa\\b|\\beurowings\\b|\\bcondor\\b|\\btui\\b|\\bholidaycheck\\b|\\bfewo-direkt\\b",
+      "matchType": "regex",
+      "categoryKey": "travel",
+      "priority": 72
+    },
+    {
+      "key": "de.rent",
+      "name": "Rent",
+      "pattern": "(?i)\\bmiete\\b|\\bkaltmiete\\b|\\bwarmmiete\\b|\\bvonovia\\b|deutsche wohnen|\\bleg wohnen\\b|\\bhausverwaltung\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_rent",
+      "priority": 85
+    },
+    {
+      "key": "de.mortgage",
+      "name": "Mortgage",
+      "pattern": "(?i)\\bbaufinanzierung\\b|\\bhypothek|\\bdarlehen\\b.*\\bimmobilie",
+      "matchType": "regex",
+      "categoryKey": "housing_rent",
+      "priority": 84
+    },
+    {
+      "key": "de.energy",
+      "name": "Energy",
+      "pattern": "(?i)\\bstadtwerke\\b|\\be\\.on\\b|\\beon energie\\b|\\brwe\\b|\\benbw\\b|\\bvattenfall\\b|\\byello\\b|\\blichtblick\\b|\\bnaturstrom\\b|\\bpolarstern\\b|\\bostrom\\b|\\btibber\\b|\\bgasag\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 82
+    },
+    {
+      "key": "de.water_broadcast",
+      "name": "Water and broadcasting fee",
+      "pattern": "(?i)\\bwasserwerk|\\bberliner wasserbetriebe\\b|rundfunkbeitrag|\\bbeitragsservice\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 80
+    },
+    {
+      "key": "de.insurance",
+      "name": "Insurance",
+      "pattern": "(?i)\\ballianz\\b|huk-?coburg|\\bhuk24\\b|\\bergo\\b|\\baxa\\b|\\bgenerali\\b|\\bdevk\\b|\\bwgv\\b|\\bcosmosdirekt\\b|\\bdebeka\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_insurance",
+      "priority": 72
+    },
+    {
+      "key": "de.health_insurance",
+      "name": "Health insurance",
+      "pattern": "(?i)techniker krankenkasse|\\baok\\b|\\bbarmer\\b|\\bdak-gesundheit\\b|\\bkkh\\b|\\bbkk\\b|krankenkasse|krankenversicherung",
+      "matchType": "regex",
+      "categoryKey": "health_insurance",
+      "priority": 84
+    },
+    {
+      "key": "de.phone",
+      "name": "Phone",
+      "pattern": "(?i)\\btelekom\\b|\\bvodafone\\b|\\bo2\\b|telef[oó]nica|\\bcongstar\\b|\\b1&1\\b|\\bfreenet\\b|\\bfraenk\\b|aldi talk|\\bblau\\.de\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_phone",
+      "priority": 82
+    },
+    {
+      "key": "de.internet",
+      "name": "Internet and TV",
+      "pattern": "(?i)vodafone kabel|\\bp[ÿy]ur\\b|\\bnetcologne\\b|\\bm-net\\b|\\bdeutsche glasfaser\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_internet",
+      "priority": 83
+    },
+    {
+      "key": "de.streaming",
+      "name": "Streaming",
+      "pattern": "(?i)\\bnetflix\\b|\\bspotify\\b|\\bdazn\\b|\\bjoyn\\b|rtl\\+|\\bwaipu\\b|disney ?\\+|\\bwow\\b tv",
+      "matchType": "regex",
+      "categoryKey": "entertainment_streaming",
+      "priority": 80
+    },
+    {
+      "key": "de.gym",
+      "name": "Gym and sports",
+      "pattern": "(?i)\\bmcfit\\b|\\bfitx\\b|clever ?fit|urban sports|\\bfitness first\\b|\\bjohn reed\\b|\\bschwimmbad\\b|\\bkletterhalle\\b|\\bboulderhalle\\b",
+      "matchType": "regex",
+      "categoryKey": "health_fitness",
+      "priority": 76
+    },
+    {
+      "key": "de.medical",
+      "name": "Medical",
+      "pattern": "(?i)\\bzahnarzt|\\barztpraxis\\b|\\bpraxis dr\\b|\\bkrankenhaus\\b|\\bklinikum\\b|\\bphysiotherapie\\b",
+      "matchType": "regex",
+      "categoryKey": "health_medical",
+      "priority": 74
+    },
+    {
+      "key": "de.opticians",
+      "name": "Opticians",
+      "pattern": "(?i)\\bfielmann\\b|apollo[- ]optik|\\boptiker\\b",
+      "matchType": "regex",
+      "categoryKey": "health_vision",
+      "priority": 76
+    },
+    {
+      "key": "de.hair_beauty",
+      "name": "Hairdressers and beauty",
+      "pattern": "(?i)\\bfriseur|\\bbarbershop\\b|\\bkosmetikstudio\\b",
+      "matchType": "regex",
+      "categoryKey": "personal",
+      "priority": 70
+    },
+    {
+      "key": "de.clothing",
+      "name": "Clothing",
+      "pattern": "(?i)\\bzalando\\b|about ?you|\\bc&a\\b|\\bh&m\\b|peek ?& ?cloppenburg|\\bdeichmann\\b|\\bprimark\\b|\\bkik\\b|\\btk maxx\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_clothing",
+      "priority": 70
+    },
+    {
+      "key": "de.electronics",
+      "name": "Electronics",
+      "pattern": "(?i)media ?markt|\\bsaturn\\b|\\bcyberport\\b|notebooksbilliger|\\balternate\\b|\\bconrad electronic\\b|\\bthomann\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_electronics",
+      "priority": 72
+    },
+    {
+      "key": "de.home_diy",
+      "name": "Home and DIY",
+      "pattern": "(?i)\\bikea\\b|\\bobi\\b|\\bhornbach\\b|\\bbauhaus\\b|\\btoom\\b|\\bhagebau\\b|\\bxxxlutz\\b|\\bh(?:ö|oe|o)ffner\\b|\\bporta m(?:ö|oe|o)bel\\b|\\bjysk\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_home",
+      "priority": 70
+    },
+    {
+      "key": "de.online_shopping",
+      "name": "Online shopping",
+      "pattern": "(?i)otto\\.de|otto versand|amazon\\.de",
+      "matchType": "regex",
+      "categoryKey": "shopping_online",
+      "priority": 66
+    },
+    {
+      "key": "de.books",
+      "name": "Books",
+      "pattern": "(?i)\\bthalia\\b|\\bhugendubel\\b|\\bbuchhandlung\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping",
+      "priority": 60
+    },
+    {
+      "key": "de.entertainment",
+      "name": "Cinemas and tickets",
+      "pattern": "(?i)\\bcinemaxx\\b|\\bcineplex\\b|\\buci kino\\b|\\beventim\\b|\\bkino\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_movies",
+      "priority": 72
+    },
+    {
+      "key": "de.education",
+      "name": "Education",
+      "pattern": "(?i)\\bvolkshochschule\\b|\\bvhs\\b|\\bstudiengeb(?:ü|ue|u)hr|\\bsemesterbeitrag\\b",
+      "matchType": "regex",
+      "categoryKey": "education",
+      "priority": 74
+    },
+    {
+      "key": "de.charities",
+      "name": "Charities",
+      "pattern": "(?i)\\bspende\\b|rotes kreuz|(?:ä|ae|a)rzte ohne grenzen|\\bunicef\\b|\\bmisereor\\b|\\bbrot f(?:ü|ue|u)r die welt\\b",
+      "matchType": "regex",
+      "categoryKey": "gifts",
+      "priority": 72
+    },
+    {
+      "key": "de.bank_fees",
+      "name": "Bank fees",
+      "pattern": "(?i)kontof(?:ü|ue|u)hrung|\\bkontoentgelt\\b|\\bentgelt f(?:ü|ue|u)r (?:konto|karte|girocard|kreditkarte|debitkarte)|\\bkartengeb(?:ü|ue|u)hr\\b",
+      "matchType": "regex",
+      "categoryKey": "fees_bank",
+      "priority": 85
+    }
+  ]
+}

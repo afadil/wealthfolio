@@ -6,11 +6,12 @@ use super::models::{
     AccountUniversalActivity, BrokerAccount, BrokerBrokerage, BrokerConnection,
     BrokerHoldingsResponse, HoldingsBalance, HoldingsDiff, HoldingsOptionPosition,
     HoldingsPosition, PaginatedUniversalActivity, SyncAccountsResponse, SyncConnectionsResponse,
+    RAW_TYPE_META_KEY,
 };
 use crate::broker_ingest::BrokerSyncState;
 use crate::broker_ingest::{ImportRun, ImportRunMode, ImportRunStatus, ImportRunSummary};
 use crate::platform::Platform;
-use wealthfolio_core::accounts::Account;
+use wealthfolio_core::accounts::{account_types, Account};
 use wealthfolio_core::errors::Result;
 
 /// Account tracking modes accepted by Wealthfolio Connect account-scoped endpoints.
@@ -25,6 +26,41 @@ impl BrokerTrackingMode {
         match self {
             Self::Holdings => "holdings",
             Self::Transactions => "transactions",
+        }
+    }
+}
+
+/// Local account classification and the original provider label, used for diagnostics only.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BrokerAccountContext {
+    pub account_type: Option<String>,
+    pub raw_type: Option<String>,
+}
+
+impl BrokerAccountContext {
+    pub fn from_account(account: &Account) -> Self {
+        // Broker sync has always stored the provider label under `raw_type`.
+        let raw_type = account
+            .meta
+            .as_deref()
+            .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+            .and_then(|meta| {
+                meta.get(RAW_TYPE_META_KEY)
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(String::from)
+            });
+        let account_type = match account.account_type.as_str() {
+            account_types::SECURITIES
+            | account_types::CASH
+            | account_types::CREDIT_CARD
+            | account_types::CRYPTOCURRENCY => Some(account.account_type.clone()),
+            _ => None,
+        };
+        Self {
+            account_type,
+            raw_type,
         }
     }
 }
@@ -53,10 +89,12 @@ pub trait BrokerApiClient: Send + Sync {
     /// * `end_date` - Optional end date filter (YYYY-MM-DD)
     /// * `offset` - Pagination offset
     /// * `limit` - Maximum number of results per page
+    #[allow(clippy::too_many_arguments)]
     async fn get_account_activities(
         &self,
         account_id: &str,
         tracking_mode: BrokerTrackingMode,
+        account_context: &BrokerAccountContext,
         start_date: Option<&str>,
         end_date: Option<&str>,
         offset: Option<i64>,
@@ -182,4 +220,52 @@ pub trait BrokerSyncServiceTrait: Send + Sync {
         positions: Vec<HoldingsPosition>,
         option_positions: Vec<HoldingsOptionPosition>,
     ) -> Result<(HoldingsDiff, usize, Vec<String>)>;
+}
+
+#[cfg(test)]
+mod account_context_tests {
+    use super::*;
+
+    #[test]
+    fn account_context_uses_local_type_and_provider_label() {
+        // Metadata as broker sync writes it: the API's canonical type plus the provider label.
+        let account = Account {
+            account_type: "CASH".into(),
+            meta: BrokerAccount {
+                account_type: Some("SECURITIES".into()),
+                raw_type: Some("TFSA".into()),
+                ..BrokerAccount::default()
+            }
+            .to_meta_json(),
+            ..Account::default()
+        };
+        let context = BrokerAccountContext::from_account(&account);
+        assert_eq!(context.account_type.as_deref(), Some("CASH"));
+        assert_eq!(context.raw_type.as_deref(), Some("TFSA"));
+    }
+
+    #[test]
+    fn account_context_trims_raw_type_and_omits_missing_or_malformed_metadata() {
+        for (meta, expected) in [
+            (Some(r#"{"raw_type":" RRSP "}"#), Some("RRSP")),
+            (Some(r#"{"raw_type":"  "}"#), None),
+            (Some(r#"{"raw_type":4}"#), None),
+            // The API's canonical type is not a provider label.
+            (
+                Some(r#"{"broker_account_type":"SECURITIES","raw_type":null}"#),
+                None,
+            ),
+            (Some("invalid json"), None),
+            (None, None),
+        ] {
+            let account = Account {
+                account_type: "unknown".into(),
+                meta: meta.map(str::to_owned),
+                ..Account::default()
+            };
+            let context = BrokerAccountContext::from_account(&account);
+            assert_eq!(context.raw_type.as_deref(), expected);
+            assert!(context.account_type.is_none());
+        }
+    }
 }

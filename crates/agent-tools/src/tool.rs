@@ -71,6 +71,14 @@ pub trait AgentTool: Send + Sync {
     /// Access classification (read/draft/write/suggest).
     fn access_level(&self) -> AgentToolAccess;
 
+    /// Whether a `Write` tool only adds data and never changes or removes
+    /// data that already exists. MCP clients see the opposite as
+    /// `destructiveHint`. Defaults to false, so a new write tool is labelled
+    /// destructive until it states otherwise. Ignored for other access levels.
+    fn is_additive(&self) -> bool {
+        false
+    }
+
     /// Redact `args` for audit logging. Default is identity; tools whose
     /// arguments can carry bulk user data (e.g. CSV content) override this.
     fn sanitize_args_for_audit(&self, args: &serde_json::Value) -> serde_json::Value {

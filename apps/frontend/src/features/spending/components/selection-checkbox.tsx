@@ -14,7 +14,7 @@ export function SelectionCheckbox({ className, ...props }: ComponentProps<typeof
   return (
     <Checkbox
       className={cn(
-        "border-muted-foreground/40 relative h-[22px] w-[22px] rounded-full border-[1.5px]",
+        "relative h-[22px] w-[22px] rounded-full border-[1.5px]",
         "before:absolute before:-inset-[11px] before:content-['']",
         className,
       )}

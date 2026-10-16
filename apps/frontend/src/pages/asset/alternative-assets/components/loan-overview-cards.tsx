@@ -192,7 +192,9 @@ export function LoanFactsCard({
   const securedDebt =
     property &&
     linkedLoans.length &&
-    linkedLoans.every((loan) => loan.currency === property.currency)
+    linkedLoans.every(
+      (loan) => loan.currency === property.currency && loan.loan?.balanceSource !== null,
+    )
       ? linkedLoans.reduce((sum, loan) => sum + Math.abs(Number(loan.marketValue)), 0)
       : null;
   return (

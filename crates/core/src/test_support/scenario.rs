@@ -173,6 +173,10 @@ pub struct AssetSpec {
     pub contract_multiplier: Option<Dec>,
     #[serde(default = "default_quote_mode")]
     pub quote_mode: String,
+    /// The engine harness's alternative-asset fact; it must be what core
+    /// derives from `kind`, so both harnesses read a fixture the same way.
+    #[serde(default)]
+    pub alternative: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -432,6 +436,18 @@ impl Scenario {
         let asset_ids: HashSet<&str> = self.assets.iter().map(|a| a.id.as_str()).collect();
         if asset_ids.len() != self.assets.len() {
             return Err("duplicate asset id".to_string());
+        }
+        for asset in &self.assets {
+            let kind: AssetKind = parse_enum(&asset.kind, "kind");
+            if asset.alternative != kind.is_alternative() {
+                return Err(format!(
+                    "asset {:?}: alternative is {} but core derives {} from kind {:?}",
+                    asset.id,
+                    asset.alternative,
+                    kind.is_alternative(),
+                    asset.kind
+                ));
+            }
         }
 
         let mut activity_ids = HashSet::new();

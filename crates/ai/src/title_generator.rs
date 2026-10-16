@@ -5,16 +5,14 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use reqwest::Client as HttpClient;
-use rig::{
-    client::{AgentClientExt, Nothing},
-    completion::Prompt,
-    providers::{anthropic, gemini, groq, ollama, openai, openrouter},
-};
+use rig::{operation::Completion, AgentBuilder, DynModel};
 
+use crate::chat::provider_clients::{
+    create_anthropic_client, create_gemini_client, create_groq_client, create_ollama_client,
+    create_openai_client, create_openrouter_client, redact_secret,
+};
 use crate::env::AiEnvironment;
 use crate::error::AiError;
-use crate::provider_urls::ensure_openai_v1_base_url;
 use crate::providers::ProviderService;
 use std::sync::Arc;
 
@@ -108,120 +106,39 @@ Title:",
             truncate_to_title(user_message, 200)
         );
 
-        let response = match provider_id {
-            "anthropic" => {
-                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let mut builder = anthropic::Client::<HttpClient>::builder()
-                    .api_key(&key)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    builder = builder.base_url(&url);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .max_tokens(self.config.max_tokens as u64)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
-            "gemini" | "google" => {
-                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let mut builder = gemini::Client::<HttpClient>::builder()
-                    .api_key(&key)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    builder = builder.base_url(&url);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
-            "groq" => {
-                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let mut builder = groq::Client::<HttpClient>::builder()
-                    .api_key(&key)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    let normalized = ensure_openai_v1_base_url(&url);
-                    builder = builder.base_url(&normalized);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
-            "ollama" => {
-                let mut builder = ollama::Client::<HttpClient>::builder()
-                    .api_key(Nothing)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    builder = builder.base_url(&url);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
-            "openrouter" => {
-                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let mut builder = openrouter::Client::<HttpClient>::builder()
-                    .api_key(&key)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    let normalized = ensure_openai_v1_base_url(&url);
-                    builder = builder.base_url(&normalized);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
-            _ => {
-                // Default to OpenAI-compatible
-                let key = api_key.ok_or_else(|| AiError::MissingApiKey(provider_id.to_string()))?;
-                let mut builder = openai::CompletionsClient::<HttpClient>::builder()
-                    .api_key(&key)
-                    .http_client(wealthfolio_http::client());
-                if let Some(url) = provider_url {
-                    let normalized = ensure_openai_v1_base_url(&url);
-                    builder = builder.base_url(&normalized);
-                }
-                let client = builder
-                    .build()
-                    .map_err(|e| AiError::Provider(e.to_string()))?;
-                client
-                    .agent(model_id)
-                    .build()
-                    .prompt(&prompt)
-                    .await
-                    .map_err(|e| AiError::Provider(e.to_string()))?
-            }
+        let secret = api_key.clone();
+        let model: DynModel<Completion> = match provider_id {
+            "anthropic" => create_anthropic_client(api_key, provider_id, provider_url)?
+                .completion(model_id)
+                .into(),
+            "gemini" | "google" => create_gemini_client(api_key, provider_id, provider_url)?
+                .completion(model_id)
+                .into(),
+            "groq" => create_groq_client(api_key, provider_id, provider_url)?
+                .completion(model_id)
+                .into(),
+            "ollama" => create_ollama_client(provider_url)?
+                .native_completion(model_id)
+                .into(),
+            "openrouter" => create_openrouter_client(api_key, provider_id, provider_url)?
+                .completion(model_id)
+                .into(),
+            // Default to OpenAI-compatible Chat Completions: titles call no tools.
+            _ => create_openai_client(api_key, provider_id, provider_url)?
+                .chat(model_id)
+                .into(),
         };
+        let mut builder = AgentBuilder::new(model);
+        if provider_id == "anthropic" {
+            // Anthropic requires max_tokens.
+            builder = builder.max_tokens(self.config.max_tokens as u64);
+        }
+        let response = builder
+            .build()
+            .prompt(prompt.as_str())
+            .await
+            .map_err(|e| AiError::Provider(redact_secret(e.to_string(), secret.as_deref())))?
+            .output();
 
         // Clean up the response (providers sometimes wrap titles in markdown/quotes).
         let title = clean_generated_title(&response);

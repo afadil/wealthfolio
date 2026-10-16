@@ -3,7 +3,7 @@ import type { Account } from "@/lib/types";
 import type { newAccountSchema } from "@/lib/schemas";
 import type z from "zod";
 
-import { invoke, logger, isDesktop } from "./platform";
+import { invoke, logger, isTauri } from "./platform";
 
 type NewAccount = z.infer<typeof newAccountSchema>;
 
@@ -28,7 +28,7 @@ export const createAccount = async (account: NewAccount): Promise<Account> => {
 export const updateAccount = async (account: NewAccount): Promise<Account> => {
   try {
     // Platform-aware: desktop strips currency (immutable after creation)
-    const payload = isDesktop
+    const payload = isTauri
       ? (() => {
           const { currency: _, ...rest } = account;
           return rest;

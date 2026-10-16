@@ -877,6 +877,38 @@ mod tests {
         ));
     }
     #[test]
+    fn manual_capture_runs_early_but_a_due_capture_stays_scheduled() {
+        use client::CapturePlan;
+        let now = chrono::Utc::now();
+        let mut policy: client::BackupPolicy = serde_json::from_value(serde_json::json!({
+            "userId": "test", "enabled": true, "sourceId": "test", "revision": 1,
+            "teamId": null, "nextDueAt": (now + chrono::Duration::hours(1)).to_rfc3339(),
+            "lastBackupAt": (now - chrono::Duration::hours(23)).to_rfc3339(),
+            "uploadEntitled": true
+        }))
+        .unwrap();
+        assert!(
+            matches!(policy.capture_plan(false).unwrap(), CapturePlan::Wait(delay) if !delay.is_zero())
+        );
+        assert_eq!(policy.capture_plan(true).unwrap(), CapturePlan::Early);
+        policy.next_due_at = Some((now - chrono::Duration::minutes(1)).to_rfc3339());
+        assert_eq!(
+            policy.capture_plan(false).unwrap(),
+            CapturePlan::Due("scheduled")
+        );
+        assert_eq!(
+            policy.capture_plan(true).unwrap(),
+            CapturePlan::Due("scheduled")
+        );
+        policy.last_backup_at = None;
+        assert_eq!(
+            policy.capture_plan(true).unwrap(),
+            CapturePlan::Due("setup")
+        );
+        policy.next_due_at = None;
+        assert!(policy.capture_plan(true).is_err());
+    }
+    #[test]
     fn backup_timer_uses_cloud_due_time_and_one_day_after_publication() {
         let now = chrono::Utc::now();
         let mut policy: client::BackupPolicy = serde_json::from_value(serde_json::json!({

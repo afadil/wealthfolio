@@ -1,0 +1,289 @@
+{
+  "presetId": "nl",
+  "presetVersion": "2026-10.1",
+  "name": "Netherlands",
+  "description": "Rules for common Dutch household transactions, including supermarkets, public transport, energy, water and municipal taxes, insurers, health insurance, telecom, shopping, and bank fees.",
+  "language": "nl-NL",
+  "rules": [
+    {
+      "key": "nl.groceries.major_chains",
+      "name": "Groceries — supermarkets",
+      "pattern": "(?i)albert ?heijn|\\bah to go\\b|\\bjumbo\\b|\\blidl\\b|\\baldi\\b|\\bplus supermarkt\\b|\\bdirk van den broek\\b|\\bdekamarkt\\b|\\bvomar\\b|\\bhoogvliet\\b|\\bcoop supermarkt\\b|\\bspar\\b|\\bpoiesz\\b|\\bjan linders\\b|\\bnettorama\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 80
+    },
+    {
+      "key": "nl.groceries.online_organic",
+      "name": "Groceries — online and organic",
+      "pattern": "(?i)\\bpicnic\\b|\\bcrisp\\b|\\bekoplaza\\b|\\bmarqt\\b|\\bamazing oriental\\b",
+      "matchType": "regex",
+      "categoryKey": "groceries",
+      "priority": 80
+    },
+    {
+      "key": "nl.drugstores",
+      "name": "Drugstores",
+      "pattern": "(?i)\\bkruidvat\\b|\\betos\\b|\\bda drogist\\b|\\btrekpleister\\b|holland ?& ?barrett|\\bapothe(ek|ken)\\b",
+      "matchType": "regex",
+      "categoryKey": "health_pharmacy",
+      "priority": 76
+    },
+    {
+      "key": "nl.delivery",
+      "name": "Food delivery",
+      "pattern": "(?i)thuisbezorgd|uber ?eats|deliveroo|\\bwolt\\b",
+      "matchType": "regex",
+      "categoryKey": "food_delivery",
+      "priority": 82
+    },
+    {
+      "key": "nl.fastfood",
+      "name": "Fast food",
+      "pattern": "(?i)\\bfebo\\b|mcdonald|burger king|\\bkfc\\b|new york pizza|domino'?s|\\bsubway\\b",
+      "matchType": "regex",
+      "categoryKey": "food_restaurants",
+      "priority": 75
+    },
+    {
+      "key": "nl.coffee_bakery",
+      "name": "Coffee and bakeries",
+      "pattern": "(?i)\\bstarbucks\\b|\\bbakkerij\\b|bagels ?& ?beans|anne ?& ?max|douwe egberts|\\bkoffie\\b",
+      "matchType": "regex",
+      "categoryKey": "food_coffee",
+      "priority": 72
+    },
+    {
+      "key": "nl.public_transit",
+      "name": "Public transport",
+      "pattern": "(?i)\\bns (groep|reizigers|international)\\b|\\bns-|ov-?chipkaart|\\btranslink\\b|\\bgvb\\b|\\bret rotterdam\\b|\\bhtm\\b|\\barriva\\b|\\bconnexxion\\b|\\bqbuzz\\b|\\bebs\\b|\\bkeolis\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_public",
+      "priority": 80
+    },
+    {
+      "key": "nl.rideshare_mobility",
+      "name": "Taxi and shared mobility",
+      "pattern": "(?i)\\buber\\b|\\bbolt\\.eu\\b|\\bfelyx\\b|\\bgo sharing\\b|\\bswapfiets\\b|\\bgreenwheels\\b|\\bmywheels\\b|\\bsnappcar\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_rideshare",
+      "priority": 78
+    },
+    {
+      "key": "nl.fuel_charging",
+      "name": "Fuel and charging",
+      "pattern": "(?i)\\btango\\b|\\btinq\\b|\\bfastned\\b|\\ballego\\b|shell recharge|\\besso\\b|\\bshell\\b|totalenergies|\\bargos\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_gas",
+      "priority": 78
+    },
+    {
+      "key": "nl.parking",
+      "name": "Parking",
+      "pattern": "(?i)\\bq-park\\b|\\byellowbrick\\b|\\bparkmobile\\b|\\beasypark\\b|\\bparkeren\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_parking",
+      "priority": 78
+    },
+    {
+      "key": "nl.car",
+      "name": "Car costs",
+      "pattern": "(?i)\\banwb\\b|\\bapk\\b|kwik-?fit|\\bwasstraat\\b",
+      "matchType": "regex",
+      "categoryKey": "transport_maintenance",
+      "priority": 70
+    },
+    {
+      "key": "nl.travel",
+      "name": "Travel",
+      "pattern": "(?i)\\bklm\\b|\\btransavia\\b|\\bcorendon\\b|\\bsunweb\\b|\\bcheaptickets\\b",
+      "matchType": "regex",
+      "categoryKey": "travel",
+      "priority": 72
+    },
+    {
+      "key": "nl.rent_housing_associations",
+      "name": "Rent — housing associations",
+      "pattern": "(?i)\\bymere\\b|eigen haard|\\bde key\\b|\\brochdale\\b|\\bstadgenoot\\b|\\bvesteda\\b|\\bhuurpenningen\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_rent",
+      "priority": 85
+    },
+    {
+      "key": "nl.mortgage",
+      "name": "Mortgage",
+      "pattern": "(?i)\\bhypothe(ek|ken)\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_rent",
+      "priority": 84
+    },
+    {
+      "key": "nl.energy",
+      "name": "Energy",
+      "pattern": "(?i)\\beneco\\b|\\bessent\\b|\\bvattenfall\\b|\\bgreenchoice\\b|budget ?energie|\\bvandebron\\b|\\bengie\\b|\\boxxio\\b|frank energie|\\bpure energie\\b|\\bdelta energie\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 82
+    },
+    {
+      "key": "nl.water",
+      "name": "Water",
+      "pattern": "(?i)\\bwaternet\\b|\\bvitens\\b|\\bpwn\\b|\\bevides\\b|brabant water|\\bdunea\\b|\\bwml\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 82
+    },
+    {
+      "key": "nl.municipal_taxes",
+      "name": "Municipal and water board taxes",
+      "pattern": "(?i)gemeente(lijke )?belasting|\\bwaterschap\\b|\\bbghu\\b|\\bsvhw\\b|\\bbsgw\\b|\\bgbt\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_utilities",
+      "priority": 80
+    },
+    {
+      "key": "nl.insurance",
+      "name": "Insurance",
+      "pattern": "(?i)centraal beheer|\\binterpolis\\b|nationale-?nederlanden|\\bunive\\b|\\bohra\\b|\\bfbto\\b|\\basr\\b|\\bachmea\\b|\\binshared\\b",
+      "matchType": "regex",
+      "categoryKey": "housing_insurance",
+      "priority": 72
+    },
+    {
+      "key": "nl.health_insurance",
+      "name": "Health insurance",
+      "pattern": "(?i)zilveren kruis|\\bcz groep\\b|\\bvgz\\b|\\bmenzis\\b|\\bonvz\\b|\\bzekur\\b|\\bdsw\\b|\\bditzo\\b|\\banderzorg\\b|zorgverzeker",
+      "matchType": "regex",
+      "categoryKey": "health_insurance",
+      "priority": 84
+    },
+    {
+      "key": "nl.phone",
+      "name": "Phone",
+      "pattern": "(?i)\\bkpn\\b|\\bodido\\b|t-mobile|\\bvodafone\\b|\\bsimyo\\b|\\blebara\\b|\\byoufone\\b|hollandsnieuwe|\\btele2\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_phone",
+      "priority": 82
+    },
+    {
+      "key": "nl.internet",
+      "name": "Internet and TV",
+      "pattern": "(?i)\\bziggo\\b|delta fiber|\\bcaiway\\b|\\bglaspoort\\b",
+      "matchType": "regex",
+      "categoryKey": "bills_internet",
+      "priority": 82
+    },
+    {
+      "key": "nl.streaming",
+      "name": "Streaming",
+      "pattern": "(?i)\\bnetflix\\b|\\bspotify\\b|\\bvideoland\\b|npo plus|disney ?\\+|\\bhbo max\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_streaming",
+      "priority": 80
+    },
+    {
+      "key": "nl.gym",
+      "name": "Gym and sports",
+      "pattern": "(?i)basic-?fit|\\bsportcity\\b|\\btrainmore\\b|fit for free|david lloyd|\\bsportschool\\b|\\bklimhal\\b|\\bzwembad\\b",
+      "matchType": "regex",
+      "categoryKey": "health_fitness",
+      "priority": 76
+    },
+    {
+      "key": "nl.medical",
+      "name": "Medical",
+      "pattern": "(?i)\\bhuisarts|\\btandarts|\\bziekenhuis\\b|\\bfysio|\\bumc\\b",
+      "matchType": "regex",
+      "categoryKey": "health_medical",
+      "priority": 74
+    },
+    {
+      "key": "nl.opticians",
+      "name": "Opticians",
+      "pattern": "(?i)pearle|hans anders|\\bspecsavers\\b|\\bopticien\\b",
+      "matchType": "regex",
+      "categoryKey": "health_vision",
+      "priority": 76
+    },
+    {
+      "key": "nl.hair_beauty",
+      "name": "Hairdressers and beauty",
+      "pattern": "(?i)\\bkapper|\\bkapsalon|\\bbarbier\\b|\\bici paris\\b",
+      "matchType": "regex",
+      "categoryKey": "personal",
+      "priority": 70
+    },
+    {
+      "key": "nl.clothing",
+      "name": "Clothing",
+      "pattern": "(?i)we fashion|\\bzeeman\\b|\\bhunkem[oö]ller\\b|\\bscotch ?& ?soda\\b|sissy-?boy|\\bvan haren\\b|\\bomoda\\b|\\bbristol schoenen\\b|\\bprimark\\b|\\bzalando\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_clothing",
+      "priority": 70
+    },
+    {
+      "key": "nl.electronics",
+      "name": "Electronics",
+      "pattern": "(?i)\\bcoolblue\\b|media ?markt|\\bbcc\\b|\\bmegekko\\b|\\bazerty\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_electronics",
+      "priority": 72
+    },
+    {
+      "key": "nl.home_diy",
+      "name": "Home and DIY",
+      "pattern": "(?i)\\bikea\\b|\\bgamma\\b|\\bkarwei\\b|\\bpraxis (bouwmarkt|doe-het-zelf)|\\bhema\\b|\\bblokker\\b|\\bkwantum\\b|leen bakker|\\bintratuin\\b|\\bxenos\\b|\\baction\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_home",
+      "priority": 70
+    },
+    {
+      "key": "nl.online_shopping",
+      "name": "Online shopping",
+      "pattern": "(?i)bol\\.?com|\\bwehkamp\\b|\\bamazon\\.nl\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping_online",
+      "priority": 66
+    },
+    {
+      "key": "nl.books",
+      "name": "Books",
+      "pattern": "(?i)\\bbruna\\b|\\bak boekhandel\\b|\\bboekhandel\\b",
+      "matchType": "regex",
+      "categoryKey": "shopping",
+      "priority": 60
+    },
+    {
+      "key": "nl.entertainment",
+      "name": "Cinemas, museums and tickets",
+      "pattern": "(?i)\\bpath[eé]\\b|\\bkinepolis\\b|\\bvue\\b cinema|\\bmuseumkaart\\b|\\brijksmuseum\\b|\\bticketswap\\b|\\bpaylogic\\b|\\bfilmhuis\\b",
+      "matchType": "regex",
+      "categoryKey": "entertainment_movies",
+      "priority": 72
+    },
+    {
+      "key": "nl.education",
+      "name": "Education",
+      "pattern": "(?i)\\bduo\\b|\\bcollegegeld\\b",
+      "matchType": "regex",
+      "categoryKey": "education",
+      "priority": 74
+    },
+    {
+      "key": "nl.charities",
+      "name": "Charities",
+      "pattern": "(?i)\\bkwf\\b|rode kruis|artsen zonder grenzen|\\bhartstichting\\b|\\bunicef\\b|\\bwnf\\b",
+      "matchType": "regex",
+      "categoryKey": "gifts",
+      "priority": 72
+    },
+    {
+      "key": "nl.bank_fees",
+      "name": "Bank fees",
+      "pattern": "(?i)kosten oranjepakket|kosten betaalpakket|kosten basispakket|\\bbetaalpakket\\b",
+      "matchType": "regex",
+      "categoryKey": "fees_bank",
+      "priority": 85
+    }
+  ]
+}

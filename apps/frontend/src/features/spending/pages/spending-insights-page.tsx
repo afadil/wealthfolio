@@ -13,9 +13,9 @@ import {
   Page,
   PageContent,
   PageHeader,
+  useAmountFormatting,
   useDateFormatting,
   useIsMobile,
-  useNumberFormatting,
 } from "@wealthfolio/ui";
 import { usePersistentState } from "@/hooks/use-persistent-state";
 
@@ -752,7 +752,7 @@ function ForeignCurrencyBanner({
   nativeTotals: Record<string, number>;
   asOf: string; // RFC3339
 }) {
-  const numberFormatting = useNumberFormatting();
+  const amountFormatting = useAmountFormatting();
   const dateFormatting = useDateFormatting();
 
   const { t } = useTranslation();
@@ -761,16 +761,9 @@ function ForeignCurrencyBanner({
     if (isBalanceHidden) return "••••";
     const v = nativeTotals[ccy];
     if (v == null) return ccy;
-    try {
-      return numberFormatting.formatDecimal(Math.abs(v), {
-        style: "currency",
-        currency: ccy,
-        maximumFractionDigits: 0,
-      });
-    } catch {
-      // Unknown ISO code → fall back to bare magnitude + code.
-      return `${Math.abs(v).toFixed(0)} ${ccy}`;
-    }
+    // Intl rejects malformed codes → fall back to bare magnitude + code.
+    if (!/^[A-Za-z]{3}$/.test(ccy)) return `${Math.abs(v).toFixed(0)} ${ccy}`;
+    return amountFormatting.formatRoundedAmount(Math.abs(v), ccy);
   };
   const asOfDate = dateFormatting.formatDate(asOf, {
     year: "numeric",

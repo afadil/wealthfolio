@@ -835,6 +835,20 @@ body.qr-scan-active > .qr-overlay {
     overflow-x: hidden;
   }
 
+  /* Centred dialogs and side sheets size themselves with max-w-* utilities.
+     Those are layered, so the unlayered max-width rules above would replace
+     them and stretch the surface to the full window width; revert-layer
+     restores the utility value. Below sm, alert dialogs span the screen
+     between inset margins instead. */
+  @media (width >= 640px) {
+    [data-slot="dialog-content"],
+    [role="alertdialog"],
+    [data-slot="sheet-content"][data-side="left"],
+    [data-slot="sheet-content"][data-side="right"] {
+      max-width: revert-layer;
+    }
+  }
+
   /* assistant-ui thread needs native overflow behavior for sticky footer + viewport */
   .aui-root,
   .aui-root .flex,
