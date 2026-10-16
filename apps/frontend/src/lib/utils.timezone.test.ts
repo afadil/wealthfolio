@@ -55,6 +55,16 @@ describe("timezone formatting", () => {
     expect(formatted.date).toBe(expectedDate);
   });
 
+  it("keeps resolving a timezone the same way when asked again", () => {
+    const fallbackTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(resolveDisplayTimezone(" Asia/Tokyo ")).toBe("Asia/Tokyo");
+      expect(resolveDisplayTimezone("Mars/Phobos")).toBe(fallbackTimezone);
+      expect(resolveDisplayTimezone("")).toBe(fallbackTimezone);
+    }
+  });
+
   it("formats date picker dates without UTC day shift", () => {
     const originalTimezone = process.env.TZ;
     process.env.TZ = "Europe/Helsinki";

@@ -357,20 +357,30 @@ export const formatDateTime = (
   };
 };
 
-export function resolveDisplayTimezone(timezone?: string | null): string {
-  const fallback = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const candidate = timezone?.trim();
-  if (!candidate) {
-    return fallback;
-  }
+/**
+ * Whether each timezone name passed validation. A list formats every row's
+ * date, and building a formatter to check the same name each time costs more
+ * than the formatting itself.
+ */
+const timezoneValidity = new Map<string, boolean>();
 
-  try {
-    // Validate timezone string before passing it to formatters.
-    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
-    return candidate;
-  } catch {
-    return fallback;
+export function resolveDisplayTimezone(timezone?: string | null): string {
+  const candidate = timezone?.trim();
+  if (candidate) {
+    let isValid = timezoneValidity.get(candidate);
+    if (isValid === undefined) {
+      try {
+        // Validate timezone string before passing it to formatters.
+        new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+        isValid = true;
+      } catch {
+        isValid = false;
+      }
+      timezoneValidity.set(candidate, isValid);
+    }
+    if (isValid) return candidate;
   }
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /**
