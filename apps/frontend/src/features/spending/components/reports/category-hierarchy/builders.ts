@@ -7,6 +7,7 @@
 import type { TaxonomyCategory } from "@/lib/types";
 import type { FormattingApi } from "@wealthfolio/ui";
 
+import { DIRECT_ROW_ID } from "../../../lib/category-drilldown";
 import type { BudgetCategoryRow, BudgetGroupRow } from "../../../types/budget";
 import type { CategoryBreakdownRow } from "../../../types/report";
 
@@ -40,6 +41,8 @@ export interface GroupNode {
 }
 
 const OTHER_GROUP_ID = "__other__";
+/** Amounts under a cent are FX/rounding noise, not rows worth showing. */
+const CENT = 0.005;
 
 export function buildTree({
   breakdown,
@@ -48,6 +51,7 @@ export function buildTree({
   taxonomyCategories,
   sort,
   compareNames,
+  directLabel,
 }: {
   breakdown: CategoryBreakdownRow[];
   priorBreakdown: CategoryBreakdownRow[];
@@ -55,6 +59,8 @@ export function buildTree({
   taxonomyCategories: TaxonomyCategory[];
   sort: CategorySort;
   compareNames: (a: string, b: string) => number;
+  /** Names the row for spending assigned to a parent itself, beside its subcategories. */
+  directLabel: string;
 }): NodeRow[] {
   const meta = new Map(taxonomyCategories.map((c) => [c.id, c]));
   const allocationByCat = new Map(budgetRows.map((a) => [a.categoryId, a.target || 0]));
@@ -119,10 +125,11 @@ export function buildTree({
       const parent = ensureRolled(node.parentId);
       parent.spent += node.spent;
       parent.priorSpent += node.priorSpent;
-      if (node.spent > 0 || node.priorSpent > 0 || node.budgeted > 0) {
+      // A subcategory whose refunds outweigh its spending stays negative, so
+      // the rows still add up to their parent.
+      if (Math.abs(node.spent) > CENT || node.priorSpent > 0 || node.budgeted > 0) {
         parent.children.push({
           ...node,
-          spent: Math.max(0, node.spent),
           priorSpent: Math.max(0, node.priorSpent),
           children: [],
         });
@@ -131,6 +138,20 @@ export function buildTree({
   }
 
   for (const node of rolledUp.values()) {
+    const direct = nodes.get(node.id)?.spent ?? 0;
+    if (node.children.length > 0 && Math.abs(direct) > CENT) {
+      node.children.push({
+        id: DIRECT_ROW_ID,
+        name: directLabel,
+        color: node.color,
+        icon: null,
+        parentId: node.id,
+        spent: direct,
+        priorSpent: 0,
+        budgeted: 0,
+        children: [],
+      });
+    }
     node.spent = Math.max(0, node.spent);
     node.priorSpent = Math.max(0, node.priorSpent);
   }
@@ -143,9 +164,11 @@ export function buildTree({
             Math.abs(b.spent - b.priorSpent) - Math.abs(a.spent - a.priorSpent)
         : (a: NodeRow, b: NodeRow) => b.spent - a.spent;
 
-  return Array.from(rolledUp.values())
+  const tree = Array.from(rolledUp.values())
     .filter((n) => n.spent > 0 || n.priorSpent > 0 || n.budgeted > 0)
     .sort(compare);
+  for (const node of tree) node.children.sort(compare);
+  return tree;
 }
 
 export function buildGroupWeights({

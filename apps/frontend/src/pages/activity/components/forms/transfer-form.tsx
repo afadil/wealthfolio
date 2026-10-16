@@ -1,6 +1,7 @@
 import { useSettings } from "@/hooks/use-settings";
 import { isSecuritiesTransfer } from "@/lib/activity-utils";
 import { ActivityType, isLiabilityAccountType, QuoteMode } from "@/lib/constants";
+import { normalizeCurrency } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   FormControl,
@@ -238,11 +239,11 @@ export const createTransferFormSchema = (t?: TFunction) =>
         path: ["toAccountId"],
       },
     )
-    // Internal transfer: accounts must be different
+    // Same-account transfers are cash exchanges, never securities movements.
     .refine(
       (data) => {
         if (!data.isExternal) {
-          return data.fromAccountId !== data.toAccountId;
+          return data.fromAccountId !== data.toAccountId || data.transferMode === "cash";
         }
         return true;
       },
@@ -253,6 +254,22 @@ export const createTransferFormSchema = (t?: TFunction) =>
           "Source and destination accounts must be different.",
         ),
         path: ["toAccountId"],
+      },
+    )
+    .refine(
+      (data) =>
+        data.isExternal ||
+        !data.fromAccountId ||
+        data.fromAccountId !== data.toAccountId ||
+        data.transferMode !== "cash" ||
+        normalizeCurrency(data.sourceCurrency) !== normalizeCurrency(data.destinationCurrency),
+      {
+        message: msg(
+          t,
+          "activity:form.err_same_account_currencies",
+          "Choose different currencies for a same-account transfer.",
+        ),
+        path: ["destinationCurrency"],
       },
     )
     .refine(
@@ -479,6 +496,8 @@ export function TransferForm({
     [accounts, toAccountId],
   );
   const isInternalCashTransfer = !isExternal && isCashMode;
+  const isSameAccountCashTransfer =
+    isInternalCashTransfer && !!fromAccountId && fromAccountId === toAccountId;
   const isCreditCardPayment =
     isInternalCashTransfer && isLiabilityAccountType(destinationAccount?.accountType);
   const effectiveSourceCurrency = sourceCurrency || accountCurrency || currency || baseCurrency;
@@ -674,8 +693,9 @@ export function TransferForm({
         : t("activity:form.button_add_transfer");
   };
 
-  // Filter destination accounts to exclude source account (for internal transfers)
-  const toAccountOptions = destinationAccountOptions.filter((acc) => acc.value !== fromAccountId);
+  const toAccountOptions = destinationAccountOptions.filter(
+    (acc) => isCashMode || acc.value !== fromAccountId,
+  );
 
   const handleSubmit = createValidatedSubmit(form, async (data) => {
     // Ensure symbolQuoteCcy is set — manual/custom symbols leave it undefined
@@ -782,6 +802,7 @@ export function TransferForm({
             isCashMode ? t("activity:form.section_amount") : t("activity:form.section_securities")
           }
         >
+          {isSameAccountCashTransfer && <InternalTransferCurrencyFields />}
           {/* Securities mode: Symbol and Quantity at top */}
           {!isCashMode && (
             <>
@@ -951,7 +972,9 @@ export function TransferForm({
           showCurrency={isExternal}
           showFxRate={isExternal}
         >
-          {isInternalCashTransfer && <InternalTransferCurrencyFields />}
+          {isInternalCashTransfer && !isSameAccountCashTransfer && (
+            <InternalTransferCurrencyFields />
+          )}
           <NotesInput
             name="comment"
             label={t("activity:form.label_notes")}

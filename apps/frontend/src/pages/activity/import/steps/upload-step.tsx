@@ -196,7 +196,8 @@ function CsvPreviewTabs({
         </CardHeader>
         <CardContent className="p-0">
           <TabsContent value="parsed" className="m-0 border-0 p-0">
-            <div className="max-h-[300px] overflow-auto border-t">
+            {/* `isolate` stops WebKitGTK painting the sticky header over this scrollbar inside a scrolling parent */}
+            <div className="isolate max-h-[300px] overflow-auto border-t">
               <CsvPreviewTable headers={headers} rows={rows} maxRows={50} />
             </div>
           </TabsContent>

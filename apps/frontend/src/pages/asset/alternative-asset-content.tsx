@@ -36,6 +36,7 @@ import {
   AlternativeAssetQuickAddModal,
   AssetDetailsSheet,
   type AssetDetailsSheetAsset,
+  toLinkedLiability,
   UpdateValuationModal,
   ValueHistoryDataGrid,
 } from "./alternative-assets";
@@ -185,7 +186,10 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
 
   // Calculate net equity for linkable assets
   const netEquity = useMemo(() => {
-    if (linkedLiabilities.length === 0) {
+    if (
+      linkedLiabilities.length === 0 ||
+      linkedLiabilities.some((loan) => loan.loan?.balanceSource === null)
+    ) {
       return null;
     }
     const liabilityTotal = linkedLiabilities.reduce((sum, liability) => {
@@ -265,7 +269,9 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
             {/* Right: Detail card */}
             <AlternativeAssetDetailCard
               holding={holding}
-              netEquity={isLinkableAsset ? (netEquity ?? marketValue) : null}
+              netEquity={
+                isLinkableAsset ? (linkedLiabilities.length ? netEquity : marketValue) : null
+              }
               hasLinkedLiabilities={linkedLiabilities.length > 0}
               linkedLiabilities={isLinkableAsset ? linkedLiabilities : []}
               className="col-span-1"
@@ -816,16 +822,8 @@ export function useAlternativeAssetActions({
         onSave={handleEditSave}
         linkedAssetName={linkedAssetName}
         linkableAssets={linkableAssets.map((a) => ({ id: a.id, name: a.name }))}
-        linkedLiabilities={linkedLiabilities.map((l) => ({
-          id: l.id,
-          name: l.name,
-          balance: l.marketValue,
-        }))}
-        availableMortgages={availableMortgages.map((m) => ({
-          id: m.id,
-          name: m.name,
-          balance: m.marketValue,
-        }))}
+        linkedLiabilities={linkedLiabilities.map(toLinkedLiability)}
+        availableMortgages={availableMortgages.map(toLinkedLiability)}
         onLinkMortgage={handleLinkMortgage}
         onUnlinkMortgage={handleUnlinkMortgage}
         isSaving={updateMetadataMutation.isPending}

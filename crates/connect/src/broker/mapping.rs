@@ -19,6 +19,30 @@ use wealthfolio_core::fx::currency::{get_normalization_rule, normalize_amount, r
 /// Minimum confidence score to consider a mapping reliable
 const CONFIDENCE_THRESHOLD: f64 = 0.7;
 
+/// Converts a provider JSON number to `Decimal` without `Decimal::from_f64`
+/// drift.
+///
+/// `from_f64` rounds the binary value one digit at a time, so from about 4.2
+/// million it turns cent amounts like 4196049.73 into 4196049.730000001. A
+/// number with at most 15 significant digits survives the f64 round trip, so
+/// its shortest display string is exactly what the provider sent. Zero, longer
+/// strings (float noise such as 0.30000000000000004) and values outside
+/// `Decimal`'s range or scale keep the `from_f64` result.
+pub(crate) fn decimal_from_f64(value: f64) -> Option<Decimal> {
+    if !value.is_finite() {
+        return None;
+    }
+    let shortest = value.to_string();
+    let digits: String = shortest.chars().filter(char::is_ascii_digit).collect();
+    let significant_digits = digits.trim_start_matches('0').trim_end_matches('0').len();
+    if (1..=15).contains(&significant_digits) {
+        if let Ok(decimal) = Decimal::from_str_exact(&shortest) {
+            return Some(decimal);
+        }
+    }
+    Decimal::from_f64(value)
+}
+
 fn normalize_activity_token(value: &str) -> String {
     value
         .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
@@ -573,12 +597,12 @@ pub fn map_broker_activity(
         .or(activity.settlement_date.clone())
         .unwrap_or_else(|| chrono::Utc::now().to_rfc3339());
 
-    let quantity = activity.units.and_then(Decimal::from_f64).map(|d| d.abs());
-    let unit_price = activity.price.and_then(Decimal::from_f64).map(|d| d.abs());
-    let fee = activity.fee.and_then(Decimal::from_f64).map(|d| d.abs());
+    let quantity = activity.units.and_then(decimal_from_f64).map(|d| d.abs());
+    let unit_price = activity.price.and_then(decimal_from_f64).map(|d| d.abs());
+    let fee = activity.fee.and_then(decimal_from_f64).map(|d| d.abs());
     // Preserve provider provenance: preparation derives a missing total only
     // after resolving the asset's multiplier and quote currency.
-    let amount = activity.amount.and_then(Decimal::from_f64).map(|d| d.abs());
+    let amount = activity.amount.and_then(decimal_from_f64).map(|d| d.abs());
     let is_trade = matches!(
         activity_type.as_str(),
         activities::ACTIVITY_TYPE_BUY | activities::ACTIVITY_TYPE_SELL
@@ -595,7 +619,7 @@ pub fn map_broker_activity(
         // but surface the ambiguity for user review.
         needs_review_flag = true;
     }
-    let fx_rate = activity.fx_rate.and_then(Decimal::from_f64);
+    let fx_rate = activity.fx_rate.and_then(decimal_from_f64);
 
     // Normalize minor currency units (e.g., GBp -> GBP) and convert amounts
     let (unit_price, quantity, fee, amount, currency_code) =
@@ -689,6 +713,51 @@ mod tests {
 
     fn map_test_activity(activity: &AccountUniversalActivity) -> NewActivity {
         map_broker_activity(activity, "acct-1", Some("USD"), Some("USD")).unwrap()
+    }
+
+    #[test]
+    fn decimal_from_f64_returns_the_number_the_provider_sent() {
+        assert_eq!(decimal_from_f64(4196049.73), Some(decimal("4196049.73")));
+        assert_eq!(decimal_from_f64(-4196049.73), Some(decimal("-4196049.73")));
+        assert_eq!(
+            decimal_from_f64(0.000123456789),
+            Some(decimal("0.000123456789"))
+        );
+        assert_eq!(
+            decimal_from_f64(123456.123456789),
+            Some(decimal("123456.123456789"))
+        );
+        assert_eq!(decimal_from_f64(f64::NAN), None);
+        assert_eq!(decimal_from_f64(f64::INFINITY), None);
+        assert_eq!(decimal_from_f64(f64::NEG_INFINITY), None);
+    }
+
+    #[test]
+    fn decimal_from_f64_otherwise_keeps_the_from_f64_result() {
+        let cases = [
+            // Already exact under from_f64: same value and scale.
+            12.34,
+            99.76,
+            0.00000001,
+            1e20,
+            // Zero keeps from_f64's sign.
+            0.0,
+            -0.0,
+            // More than 15 significant digits: float noise is still rounded away.
+            0.1 + 0.2,
+            1234.5600000000002,
+            // Beyond Decimal's 28 decimal places or its range.
+            1e-29,
+            1.2345678901234567e-20,
+            1e29,
+        ];
+        for value in cases {
+            assert_eq!(
+                decimal_from_f64(value).map(|d| d.to_string()),
+                Decimal::from_f64(value).map(|d| d.to_string()),
+                "{value}"
+            );
+        }
     }
 
     #[test]
@@ -994,6 +1063,20 @@ mod tests {
         let mapped = map_test_activity(&activity);
 
         assert_eq!(mapped.amount.unwrap().round_dp(2), decimal("12.34"));
+    }
+
+    #[test]
+    fn test_map_broker_activity_keeps_large_cent_amount_exact() {
+        let activity = AccountUniversalActivity {
+            id: Some("act-large-deposit".to_string()),
+            activity_type: Some("DEPOSIT".to_string()),
+            amount: Some(4196049.73),
+            ..Default::default()
+        };
+
+        let mapped = map_test_activity(&activity);
+
+        assert_eq!(mapped.amount, Some(decimal("4196049.73")));
     }
 
     #[test]

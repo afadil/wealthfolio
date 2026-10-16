@@ -1,4 +1,5 @@
 import { ActivityType } from "@/lib/constants";
+import { normalizeCurrency } from "@/lib/utils";
 
 export interface TransferLinkActivityLike {
   accountId: string;
@@ -53,6 +54,8 @@ export function isSameAccountCashFxConversion(
     !nonCashTransferAssetKey(second) &&
     hasPositiveCashAmount(first) &&
     hasPositiveCashAmount(second) &&
-    first.currency.trim().toUpperCase() !== second.currency.trim().toUpperCase()
+    // Core stores a minor unit (GBX, ZAc) as its major currency, so GBX and
+    // GBP are one currency here as they are once saved.
+    normalizeCurrency(first.currency) !== normalizeCurrency(second.currency)
   );
 }

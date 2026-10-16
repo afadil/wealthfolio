@@ -595,6 +595,7 @@ impl QuoteServiceTrait for MockMarketDataRepository {
 }
 
 struct MockFxService {
+    dated_rates: HashMap<NaiveDate, Decimal>,
     #[allow(dead_code)]
     base_currency: String,
 }
@@ -603,6 +604,7 @@ impl MockFxService {
     fn new(base_currency: &str) -> Self {
         Self {
             base_currency: base_currency.to_string(),
+            dated_rates: HashMap::new(),
         }
     }
 }
@@ -657,13 +659,12 @@ impl FxServiceTrait for MockFxService {
         amount: Decimal,
         from_currency: &str,
         to_currency: &str,
-        _date: NaiveDate,
+        date: NaiveDate,
     ) -> Result<Decimal> {
         if from_currency == to_currency {
             return Ok(amount);
         }
-        // For testing, use 1:1 conversion
-        Ok(amount)
+        Ok(amount * self.dated_rates.get(&date).copied().unwrap_or(dec!(1)))
     }
 
     fn get_latest_exchange_rates(&self) -> Result<Vec<ExchangeRate>> {
@@ -944,6 +945,24 @@ fn create_net_worth_service_with_valuations(
     quotes: Vec<Quote>,
     valuations: Vec<DailyAccountValuation>,
 ) -> NetWorthService {
+    create_net_worth_service_with_fx(
+        accounts,
+        assets,
+        snapshots,
+        quotes,
+        valuations,
+        Arc::new(MockFxService::new("USD")),
+    )
+}
+
+fn create_net_worth_service_with_fx(
+    accounts: Vec<Account>,
+    assets: Vec<Asset>,
+    snapshots: Vec<AccountStateSnapshot>,
+    quotes: Vec<Quote>,
+    valuations: Vec<DailyAccountValuation>,
+    fx_service: Arc<dyn FxServiceTrait>,
+) -> NetWorthService {
     let base_currency = Arc::new(RwLock::new("USD".to_string()));
     let effective_accounts = if accounts.is_empty() && !valuations.is_empty() {
         valuations
@@ -961,7 +980,6 @@ fn create_net_worth_service_with_valuations(
     let snapshot_repo = Arc::new(MockSnapshotRepository::new(snapshots));
     let market_data_repo = Arc::new(MockMarketDataRepository::new(quotes));
     let valuation_repo = Arc::new(MockValuationRepository::new(valuations));
-    let fx_service = Arc::new(MockFxService::new("USD"));
 
     let snapshot_service = Arc::new(SnapshotService::new(
         Arc::new(RwLock::new("UTC".to_string())),
@@ -2831,4 +2849,273 @@ async fn tagged_loan_payments_count_in_net_worth_and_its_history() {
     let history = service.get_net_worth_history(start, end).unwrap();
     assert_eq!(current.liabilities.total, dec!(700));
     assert_eq!(history.last().unwrap().total_liabilities, dec!(700));
+}
+
+#[tokio::test]
+async fn manual_mortgage_with_a_recorded_balance_does_not_backfill_original_principal() {
+    let origin = NaiveDate::from_ymd_opt(2016, 1, 1).unwrap();
+    let confirmation = NaiveDate::from_ymd_opt(2026, 10, 13).unwrap();
+    let before_confirmation = confirmation.pred_opt().unwrap();
+    for balance in [dec!(150000), Decimal::ZERO] {
+        let mut mortgage = create_test_asset("LIAB-mortgage", AssetKind::Liability, "USD");
+        mortgage.metadata = Some(json!({
+            "original_amount":"300000", "origination_date":origin.to_string(),
+            "tracking_mode":"manual"
+        }));
+        let property = create_test_asset("PROP-home", AssetKind::Property, "USD");
+        let service = create_net_worth_service(
+            vec![],
+            vec![mortgage, property],
+            vec![],
+            vec![
+                create_test_quote("PROP-home", dec!(500000), origin, "USD"),
+                create_test_quote("LIAB-mortgage", balance, confirmation, "USD"),
+            ],
+        );
+        for date in [origin, before_confirmation] {
+            assert_eq!(
+                service.get_net_worth(date).await.unwrap().liabilities.total,
+                Decimal::ZERO,
+                "a later recorded balance must not invent debt before it"
+            );
+        }
+        let earlier = service
+            .get_net_worth_history(origin, before_confirmation)
+            .unwrap();
+        assert!(!earlier.is_empty());
+        assert!(earlier
+            .iter()
+            .all(|point| point.total_liabilities.is_zero()));
+        let history = service.get_net_worth_history(origin, confirmation).unwrap();
+        assert_eq!(history.first().unwrap().net_worth, dec!(500000));
+        assert_eq!(history.last().unwrap().net_worth, dec!(500000) - balance);
+        for point in history {
+            let expected = if point.date < confirmation {
+                Decimal::ZERO
+            } else {
+                balance
+            };
+            assert_eq!(point.total_liabilities, expected);
+            assert_eq!(
+                service
+                    .get_net_worth(point.date)
+                    .await
+                    .unwrap()
+                    .liabilities
+                    .total,
+                expected
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn manual_loan_principal_matches_net_worth_history_and_dated_quotes() {
+    let origin = NaiveDate::from_ymd_opt(2022, 6, 5).unwrap();
+    let confirmation = origin + chrono::Days::new(10);
+    let end = origin + chrono::Days::new(20);
+    for recorded in [None, Some(dec!(25)), Some(dec!(0))] {
+        let mut asset = create_test_asset("LIAB-manual", AssetKind::Liability, "USD");
+        asset.metadata = Some(
+            json!({"original_amount":"100", "origination_date":origin.to_string(), "tracking_mode":"manual"}),
+        );
+        let quotes = recorded
+            .map(|value| vec![create_test_quote("LIAB-manual", value, confirmation, "USD")])
+            .unwrap_or_default();
+        let service = create_net_worth_service(vec![], vec![asset], vec![], quotes);
+        assert_eq!(
+            service
+                .get_net_worth(origin.pred_opt().unwrap())
+                .await
+                .unwrap()
+                .liabilities
+                .total,
+            dec!(0)
+        );
+        let history = service.get_net_worth_history(origin, end).unwrap();
+        assert_eq!(
+            history.first().unwrap().date,
+            if recorded.is_some() {
+                confirmation
+            } else {
+                origin
+            }
+        );
+        assert_eq!(
+            history.first().unwrap().total_liabilities,
+            recorded.unwrap_or(dec!(100))
+        );
+        assert_eq!(
+            history.last().unwrap().date,
+            if recorded.is_some() {
+                confirmation
+            } else {
+                end
+            }
+        );
+        assert_eq!(
+            history.last().unwrap().total_liabilities,
+            recorded.unwrap_or(dec!(100))
+        );
+        for point in history {
+            assert_eq!(
+                service
+                    .get_net_worth(point.date)
+                    .await
+                    .unwrap()
+                    .liabilities
+                    .total,
+                point.total_liabilities
+            );
+        }
+        let after_origin = origin + chrono::Days::new(2);
+        let before_confirmation = service
+            .get_net_worth_history(after_origin, after_origin)
+            .unwrap();
+        if recorded.is_some() {
+            assert!(before_confirmation.is_empty());
+        } else {
+            assert_eq!(
+                before_confirmation.last().unwrap().total_liabilities,
+                dec!(100)
+            );
+        }
+        assert_eq!(
+            service
+                .get_net_worth(after_origin)
+                .await
+                .unwrap()
+                .liabilities
+                .total,
+            if recorded.is_some() {
+                Decimal::ZERO
+            } else {
+                dec!(100)
+            }
+        );
+    }
+}
+
+#[tokio::test]
+async fn undated_manual_principal_keeps_its_creation_anchor_as_today_advances() {
+    let _clock = crate::utils::clock::freeze("2026-10-13T12:00:00Z".parse().unwrap());
+    let created = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
+    let mut asset = create_test_asset("LIAB-undated", AssetKind::Liability, "USD");
+    asset.created_at = created.and_hms_opt(12, 0, 0).unwrap();
+    asset.metadata = Some(json!({"original_amount":"9000", "tracking_mode":"manual"}));
+    let property = create_test_asset("PROP-home", AssetKind::Property, "USD");
+    let service = create_net_worth_service(
+        vec![],
+        vec![asset, property],
+        vec![],
+        vec![create_test_quote("PROP-home", dec!(10000), created, "USD")],
+    );
+    assert_eq!(
+        service
+            .get_net_worth(created.pred_opt().unwrap())
+            .await
+            .unwrap()
+            .liabilities
+            .total,
+        dec!(0)
+    );
+    for now in ["2026-10-13T12:00:00Z", "2026-10-14T12:00:00Z"] {
+        let instant: chrono::DateTime<Utc> = now.parse().unwrap();
+        crate::utils::clock::set_frozen(instant);
+        let today = instant.date_naive();
+        let history = service.get_net_worth_history(created, today).unwrap();
+        assert_eq!(history.first().unwrap().date, created);
+        assert_eq!(history.last().unwrap().date, today);
+        for point in history {
+            assert_eq!(point.total_liabilities, dec!(9000));
+            assert_eq!(point.net_worth, dec!(1000));
+        }
+        // A range beginning after creation must retain debt on its first point,
+        // rather than introducing the same drop again on each new current day.
+        let yesterday = today.pred_opt().unwrap();
+        let recent = service.get_net_worth_history(yesterday, today).unwrap();
+        assert_eq!(recent.first().unwrap().date, yesterday);
+        assert_eq!(recent.first().unwrap().total_liabilities, dec!(9000));
+        assert_eq!(
+            recent.last().unwrap().net_worth,
+            recent.first().unwrap().net_worth
+        );
+        for date in [created, yesterday, today] {
+            assert_eq!(
+                service.get_net_worth(date).await.unwrap().liabilities.total,
+                dec!(9000)
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn manual_principal_history_revalues_foreign_currency_on_each_date() {
+    let origin = NaiveDate::from_ymd_opt(2022, 6, 5).unwrap();
+    let end = origin + chrono::Days::new(20);
+    let mut asset = create_test_asset("LIAB-cad", AssetKind::Liability, "CAD");
+    asset.metadata = Some(json!({"original_amount":"100", "origination_date":origin.to_string()}));
+    let mut fx = MockFxService::new("USD");
+    fx.dated_rates = [(origin, dec!(0.75)), (end, dec!(0.80))]
+        .into_iter()
+        .collect();
+    let service =
+        create_net_worth_service_with_fx(vec![], vec![asset], vec![], vec![], vec![], Arc::new(fx));
+    let history = service.get_net_worth_history(origin, end).unwrap();
+    assert_eq!(history.first().unwrap().total_liabilities, dec!(75));
+    assert_eq!(history.last().unwrap().total_liabilities, dec!(80));
+    for point in history {
+        assert_eq!(
+            service
+                .get_net_worth(point.date)
+                .await
+                .unwrap()
+                .liabilities
+                .total,
+            point.total_liabilities
+        );
+    }
+}
+
+#[tokio::test]
+async fn undated_manual_principal_uses_the_settings_timezone() {
+    let _clock = crate::utils::clock::freeze("2026-10-13T01:00:00Z".parse().unwrap());
+    let created = NaiveDate::from_ymd_opt(2026, 10, 2).unwrap();
+    let mut asset = create_test_asset("LIAB-undated", AssetKind::Liability, "USD");
+    asset.created_at = "2026-10-03T01:00:00Z"
+        .parse::<chrono::DateTime<Utc>>()
+        .unwrap()
+        .naive_utc();
+    asset.metadata = Some(json!({"original_amount":"100"}));
+    let service = create_net_worth_service(vec![], vec![asset], vec![], vec![]).with_loan_payments(
+        Arc::new(TaggedPayments(HashMap::new())),
+        Arc::new(RwLock::new("America/Toronto".into())),
+    );
+    assert_eq!(
+        service
+            .get_net_worth(created.pred_opt().unwrap())
+            .await
+            .unwrap()
+            .liabilities
+            .total,
+        dec!(0)
+    );
+    assert_eq!(
+        service
+            .get_net_worth(created)
+            .await
+            .unwrap()
+            .liabilities
+            .total,
+        dec!(100)
+    );
+    assert_eq!(
+        service
+            .get_net_worth_history(created, created)
+            .unwrap()
+            .last()
+            .unwrap()
+            .total_liabilities,
+        dec!(100)
+    );
 }

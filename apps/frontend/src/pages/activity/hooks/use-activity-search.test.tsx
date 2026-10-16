@@ -94,7 +94,48 @@ describe("useActivitySearch", () => {
       expect.objectContaining({ accountIds: undefined }),
       "",
       { id: "date", desc: true },
+      { includeCashBalances: false },
     );
+  });
+
+  it("asks every page for cash balances and keeps them on the rows", async () => {
+    adapterMocks.searchActivities
+      .mockResolvedValueOnce({
+        data: [{ id: "coffee", cashBalance: "50", cashBalanceCurrency: "USD" }],
+        meta: { totalRowCount: 2 },
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "rent", cashBalance: "70", cashBalanceCurrency: "USD" }],
+        meta: { totalRowCount: 2 },
+      });
+
+    const { result } = renderHook(
+      () =>
+        useActivitySearch({
+          filters: { accountIds: ["checking"], activityTypes: [] },
+          searchQuery: "",
+          sorting: [],
+          pageSize: 1,
+          includeCashBalances: true,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true));
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+    expect(adapterMocks.searchActivities).toHaveBeenLastCalledWith(
+      1,
+      1,
+      expect.objectContaining({ accountIds: ["checking"] }),
+      "",
+      { id: "date", desc: true },
+      { includeCashBalances: true },
+    );
+    expect(result.current.data.map((row) => row.cashBalance)).toEqual(["50", "70"]);
   });
 
   it("exposes a next-page error without discarding the first page", async () => {

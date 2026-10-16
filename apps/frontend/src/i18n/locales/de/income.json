@@ -73,5 +73,7 @@
   "of_total": "des Gesamtwerts",
   "no_dividend_income": "Keine Dividendeneinkünfte in dieser Periode",
   "year_over_year_growth": "Wachstum zum Vorjahr",
-  "cumulative_since_inception": "Kumuliert seit Beginn"
+  "cumulative_since_inception": "Kumuliert seit Beginn",
+  "unconverted_currencies_one": "Einkommen in {{currencies}} ist in den Summen nicht enthalten, da kein Wechselkurs zu {{baseCurrency}} vorhanden ist.",
+  "unconverted_currencies_other": "Einkommen in {{currencies}} ist in den Summen nicht enthalten, da keine Wechselkurse zu {{baseCurrency}} vorhanden sind."
 }

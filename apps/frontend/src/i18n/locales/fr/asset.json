@@ -787,6 +787,7 @@
     "balance_correction_description": "Remplace le capital restant dû à une date donnée sans modifier l’historique antérieur.",
     "extra_repayment": "Remboursement supplémentaire",
     "extra_repayment_description": "Enregistre un remboursement supplémentaire du capital et actualise les projections futures.",
+    "balance_replaces_confirmation": "Cela remplace votre solde enregistré de {{amount}} au {{date}}. Le supprimer plus tard ne rétablira pas le solde précédent.",
     "repayment_before_confirmation": "Votre solde enregistré de {{amount}} au {{date}} est prioritaire à partir de cette date ; ce remboursement ne réduira donc pas le solde ensuite. Si ce relevé n’inclut pas ce remboursement, modifiez-le ou supprimez-le dans l’onglet Échéancier.",
     "confirm_extra_repayment": "Enregistrer le remboursement",
     "close_loan": "Clôturer le prêt",

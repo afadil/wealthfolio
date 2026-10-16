@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 
 use rust_decimal::Decimal;
 
@@ -232,50 +231,10 @@ pub fn is_same_account_cash_fx_conversion(transfer_in: &Activity, transfer_out: 
             .eq_ignore_ascii_case(transfer_out.currency.trim())
 }
 
-fn has_imported_fx_pair_metadata(
-    activity: &Activity,
-    source_currency: &str,
-    destination_currency: &str,
-    source_amount: Decimal,
-    destination_amount: Decimal,
-) -> bool {
-    let Some(metadata) = activity.metadata.as_ref() else {
-        return false;
-    };
-    if metadata
-        .pointer("/flow/is_external")
-        .and_then(serde_json::Value::as_bool)
-        != Some(false)
-    {
-        return false;
-    }
-
-    let Some(fx) = metadata.get("fx") else {
-        return false;
-    };
-    let metadata_amount_matches = |key: &str, expected: Decimal| {
-        fx.get(key)
-            .and_then(serde_json::Value::as_str)
-            .and_then(|value| Decimal::from_str(value).ok())
-            .is_some_and(|value| value == expected)
-    };
-
-    fx.get("rateSource").and_then(serde_json::Value::as_str) == Some("implied_from_import")
-        && fx
-            .get("sourceCurrency")
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|currency| currency.eq_ignore_ascii_case(source_currency))
-        && fx
-            .get("destinationCurrency")
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|currency| currency.eq_ignore_ascii_case(destination_currency))
-        && metadata_amount_matches("sourceAmount", source_amount)
-        && metadata_amount_matches("destinationAmount", destination_amount)
-}
-
-/// Returns true only for a complete same-account cash FX pair carrying the
-/// internal-flow metadata written by the import linker. Structural pairing
-/// alone is deliberately insufficient for contribution-neutral accounting.
+/// A complete same-account cash FX pair whose legs are both explicitly
+/// internal (`flow.is_external: false`). The pair form, the transfer link and
+/// the import linker all record that, whatever the legs' source. Unmarked
+/// structural pairs keep their legacy contribution behaviour.
 pub fn is_contribution_neutral_same_account_cash_fx_conversion(
     transfer_in: &Activity,
     transfer_out: &Activity,
@@ -304,22 +263,9 @@ pub fn is_contribution_neutral_same_account_cash_fx_conversion(
         return false;
     }
 
-    let Some(source_amount) = transfer_out.amount.map(|amount| amount.abs()) else {
-        return false;
-    };
-    let Some(destination_amount) = transfer_in.amount.map(|amount| amount.abs()) else {
-        return false;
-    };
-
-    [transfer_in, transfer_out].iter().all(|activity| {
-        has_imported_fx_pair_metadata(
-            activity,
-            &transfer_out.currency,
-            &transfer_in.currency,
-            source_amount,
-            destination_amount,
-        )
-    })
+    [transfer_in, transfer_out]
+        .iter()
+        .all(|activity| activity.explicit_external_transfer() == Some(false))
 }
 
 fn build_transfer_pair(group_id: &str, activities: &[Activity]) -> Result<TransferPair, String> {
@@ -557,6 +503,220 @@ mod tests {
             &transfer_in,
             &transfer_out
         ));
+    }
+
+    fn with_flow(mut activity: Activity, is_external: Option<bool>) -> Activity {
+        activity.metadata =
+            is_external.map(|value| serde_json::json!({ "flow": { "is_external": value } }));
+        activity
+    }
+
+    #[test]
+    fn same_account_fx_is_neutral_when_both_legs_are_explicitly_internal_from_any_source() {
+        for (out_source, in_source) in [
+            (Some("MANUAL"), Some("MANUAL")),
+            (Some("CSV"), Some("CSV")),
+            (Some("SNAPTRADE"), None),
+        ] {
+            let mut outgoing = with_flow(
+                activity("out", ACTIVITY_TYPE_TRANSFER_OUT, "a1", Some("g1"), "USD"),
+                Some(false),
+            );
+            outgoing.source_system = out_source.map(str::to_string);
+            let mut incoming = with_flow(
+                activity("in", ACTIVITY_TYPE_TRANSFER_IN, "a1", Some("g1"), "EUR"),
+                Some(false),
+            );
+            incoming.source_system = in_source.map(str::to_string);
+            assert!(is_contribution_neutral_same_account_cash_fx_conversion(
+                &incoming, &outgoing
+            ));
+
+            for patch in 0..4 {
+                let mut changed = incoming.clone();
+                match patch {
+                    0 => changed = with_flow(changed, None),
+                    1 => changed = with_flow(changed, Some(true)),
+                    2 => changed.source_group_id = Some("different".into()),
+                    _ => changed.account_id = "another".into(),
+                }
+                assert!(!is_contribution_neutral_same_account_cash_fx_conversion(
+                    &changed, &outgoing
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn imported_fx_pair_stays_neutral_after_an_amount_edit() {
+        let metadata = serde_json::json!({
+            "flow": { "is_external": false },
+            "fx": {
+                "sourceCurrency": "USD",
+                "destinationCurrency": "CAD",
+                "sourceAmount": "24.33",
+                "destinationAmount": "32.93",
+                "rateSource": "implied_from_import"
+            }
+        });
+        let mut transfer_out = activity("out", ACTIVITY_TYPE_TRANSFER_OUT, "a1", Some("g1"), "USD");
+        transfer_out.amount = Some(Decimal::new(2500, 2));
+        transfer_out.metadata = Some(metadata.clone());
+        let mut transfer_in = activity("in", ACTIVITY_TYPE_TRANSFER_IN, "a1", Some("g1"), "CAD");
+        transfer_in.amount = Some(Decimal::new(3293, 2));
+        transfer_in.metadata = Some(metadata);
+
+        assert!(is_contribution_neutral_same_account_cash_fx_conversion(
+            &transfer_in,
+            &transfer_out
+        ));
+    }
+
+    /// Core's rule and the engine's pairing must agree on every combination of
+    /// account, currency, source, flow flags and import FX record.
+    #[test]
+    fn neutral_same_account_fx_rule_agrees_with_the_engine() {
+        use chrono::NaiveDate;
+        use wealthfolio_portfolio_engine::model::{Currency, Policy, RawAccount, RawFacts};
+
+        use crate::portfolio::coordinator::raw_activity;
+
+        let sources = [Some("MANUAL"), Some("CSV"), Some("SNAPTRADE"), None];
+        let flags = [None, Some(false), Some(true)];
+        let fx_records = [
+            None,
+            Some(("100", "92")),
+            // An amount edited after import no longer matches the record.
+            Some(("100", "90")),
+        ];
+        let mut compared = 0;
+        for (in_account, in_currency) in
+            [("a1", "EUR"), ("a1", "USD"), ("a2", "EUR"), ("a2", "USD")]
+        {
+            for out_source in sources {
+                for in_source in sources {
+                    for out_flag in flags {
+                        for in_flag in flags {
+                            for fx_record in fx_records {
+                                let leg =
+                                    |id: &str,
+                                     activity_type: &str,
+                                     account: &str,
+                                     currency: &str,
+                                     amount,
+                                     source: Option<&str>,
+                                     flag: Option<bool>| {
+                                        let mut leg = activity(
+                                            id,
+                                            activity_type,
+                                            account,
+                                            Some("g1"),
+                                            currency,
+                                        );
+                                        leg.amount = Some(amount);
+                                        leg.source_system = source.map(str::to_string);
+                                        let mut metadata = serde_json::Map::new();
+                                        if let Some(flag) = flag {
+                                            metadata.insert(
+                                                "flow".into(),
+                                                serde_json::json!({ "is_external": flag }),
+                                            );
+                                        }
+                                        if let Some((sent, received)) = fx_record {
+                                            metadata.insert(
+                                                "fx".into(),
+                                                serde_json::json!({
+                                                    "sourceCurrency": "USD",
+                                                    "destinationCurrency": "EUR",
+                                                    "sourceAmount": sent,
+                                                    "destinationAmount": received,
+                                                    "rateSource": "implied_from_import"
+                                                }),
+                                            );
+                                        }
+                                        leg.metadata = (!metadata.is_empty())
+                                            .then_some(serde_json::Value::Object(metadata));
+                                        leg
+                                    };
+                                let outgoing = leg(
+                                    "out",
+                                    ACTIVITY_TYPE_TRANSFER_OUT,
+                                    "a1",
+                                    "USD",
+                                    Decimal::new(100, 0),
+                                    out_source,
+                                    out_flag,
+                                );
+                                let incoming = leg(
+                                    "in",
+                                    ACTIVITY_TYPE_TRANSFER_IN,
+                                    in_account,
+                                    in_currency,
+                                    Decimal::new(92, 0),
+                                    in_source,
+                                    in_flag,
+                                );
+
+                                let raw = RawFacts {
+                                    policy: Policy::new(
+                                        Currency::parse("USD").expect("currency"),
+                                        chrono_tz::UTC,
+                                        NaiveDate::from_ymd_opt(2026, 4, 30).expect("as-of date"),
+                                    ),
+                                    accounts: ["a1", "a2"]
+                                        .into_iter()
+                                        .map(|id| RawAccount {
+                                            id: id.into(),
+                                            currency: "USD".into(),
+                                            account_type: "SECURITIES".into(),
+                                            tracking_mode: "TRANSACTIONS".into(),
+                                            is_archived: false,
+                                            cost_basis_method: None,
+                                        })
+                                        .collect(),
+                                    assets: Vec::new(),
+                                    activities: [&outgoing, &incoming]
+                                        .into_iter()
+                                        .map(raw_activity)
+                                        .collect(),
+                                    quotes: Vec::new(),
+                                    fx_rates: Vec::new(),
+                                    observed_snapshots: Vec::new(),
+                                };
+                                let normalized = wealthfolio_portfolio_engine::normalize(raw)
+                                    .expect("normalize");
+                                // A same-currency pair inside one account is invalid, so
+                                // the engine resolves no pair for it.
+                                let engine = normalized
+                                    .facts
+                                    .transfer_pairs()
+                                    .iter()
+                                    .find(|pair| pair.group_id == "g1")
+                                    .is_some_and(|pair| pair.contribution_neutral);
+
+                                let core = is_contribution_neutral_same_account_cash_fx_conversion(
+                                    &incoming, &outgoing,
+                                );
+                                let case = format!(
+                                "in {in_account}/{in_currency}, sources {out_source:?}/{in_source:?}, flags {out_flag:?}/{in_flag:?}, fx {fx_record:?}"
+                            );
+                                assert_eq!(core, engine, "{case}");
+                                assert_eq!(
+                                    core,
+                                    in_account == "a1"
+                                        && in_currency == "EUR"
+                                        && out_flag == Some(false)
+                                        && in_flag == Some(false),
+                                    "{case}"
+                                );
+                                compared += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(compared, 4 * 4 * 4 * 3 * 3 * 3);
     }
 
     #[test]

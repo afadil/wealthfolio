@@ -87,7 +87,11 @@ pub struct ResolvedActivityCash {
 
 impl ActivityEconomicsResolver {
     pub fn resolve_cash(activity: &Activity, unit_multiplier: Decimal) -> ResolvedActivityCash {
-        Self::resolve_cash_inputs(ActivityCashInputs {
+        Self::resolve_cash_inputs(Self::cash_inputs(activity, unit_multiplier))
+    }
+
+    fn cash_inputs(activity: &Activity, unit_multiplier: Decimal) -> ActivityCashInputs<'_> {
+        ActivityCashInputs {
             activity_type: activity.effective_type(),
             currency: &activity.currency,
             is_security_transfer: Self::is_security_transfer(activity),
@@ -97,7 +101,7 @@ impl ActivityEconomicsResolver {
             fee: activity.fee,
             tax: activity.tax,
             unit_multiplier,
-        })
+        }
     }
 
     /// Resolves the one direction exception that depends on account context.
@@ -107,8 +111,20 @@ impl ActivityEconomicsResolver {
         unit_multiplier: Decimal,
         is_credit_card_account: bool,
     ) -> ResolvedActivityCash {
-        let mut resolved = Self::resolve_cash(activity, unit_multiplier);
-        if is_credit_card_account && activity.effective_type() == ACTIVITY_TYPE_INTEREST {
+        Self::resolve_cash_inputs_with_account_context(
+            Self::cash_inputs(activity, unit_multiplier),
+            is_credit_card_account,
+        )
+    }
+
+    /// [`Self::resolve_cash_with_account_context`] for inputs read without a
+    /// whole activity.
+    pub fn resolve_cash_inputs_with_account_context(
+        inputs: ActivityCashInputs<'_>,
+        is_credit_card_account: bool,
+    ) -> ResolvedActivityCash {
+        let mut resolved = Self::resolve_cash_inputs(inputs);
+        if is_credit_card_account && inputs.activity_type == ACTIVITY_TYPE_INTEREST {
             resolved.signed_cash_effect = resolved.final_amount.map(|amount| -amount.abs());
             resolved.signed_gross_effect = resolved.gross_amount.map(|amount| -amount.abs());
         }

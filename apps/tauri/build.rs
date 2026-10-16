@@ -4,7 +4,10 @@ fn read_connect_api_url_from_dotenv() -> Option<String> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").ok()?;
     let dotenv_path = PathBuf::from(manifest_dir).join("../../.env");
 
-    println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    // Cargo treats a missing rerun-if-changed path as always stale.
+    if dotenv_path.exists() {
+        println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    }
 
     let content = fs::read_to_string(dotenv_path).ok()?;
     for raw_line in content.lines() {
@@ -38,7 +41,10 @@ fn read_env_value_from_dotenv(key: &str) -> Option<String> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").ok()?;
     let dotenv_path = PathBuf::from(manifest_dir).join("../../.env");
 
-    println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    // Cargo treats a missing rerun-if-changed path as always stale.
+    if dotenv_path.exists() {
+        println!("cargo:rerun-if-changed={}", dotenv_path.display());
+    }
 
     let content = fs::read_to_string(dotenv_path).ok()?;
     for raw_line in content.lines() {

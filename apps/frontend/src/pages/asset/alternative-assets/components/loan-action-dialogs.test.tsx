@@ -113,3 +113,29 @@ describe("recalculating the schedule", () => {
     expect(adapters.recalculate).not.toHaveBeenCalled();
   });
 });
+
+describe("balance correction replacement", () => {
+  it("warns only for a balance on the selected day, including a recorded zero", () => {
+    const quote = (date: string) =>
+      ({ id: date, timestamp: `${date}T12:00:00Z`, close: 0 }) as Quote;
+    const { rerender } = render(
+      <LoanBalanceEventDialog
+        {...props}
+        mode="balance_correction"
+        confirmations={[quote("2020-01-01")]}
+      />,
+    );
+    expect(screen.queryByText(/This replaces/)).not.toBeInTheDocument();
+    rerender(
+      <LoanBalanceEventDialog
+        {...props}
+        mode="balance_correction"
+        confirmations={[quote(formatDateISO(new Date()))]}
+      />,
+    );
+    expect(screen.getByText(/This replaces/)).toHaveTextContent(
+      "Deleting it later will not restore the previous balance",
+    );
+    expect(screen.getByText(/This replaces/)).toHaveTextContent("0.00");
+  });
+});

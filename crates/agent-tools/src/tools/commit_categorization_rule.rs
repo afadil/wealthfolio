@@ -133,6 +133,10 @@ impl AgentTool for CommitCategorizationRule {
         AgentToolAccess::Write
     }
 
+    fn is_additive(&self) -> bool {
+        true
+    }
+
     fn sanitize_args_for_audit(&self, args: &serde_json::Value) -> serde_json::Value {
         if args.get("rule").is_some() {
             serde_json::json!({ "rule": "[redacted]" })

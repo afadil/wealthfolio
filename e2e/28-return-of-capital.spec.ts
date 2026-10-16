@@ -17,7 +17,22 @@ test("a closed asset counts return of capital once in total return", async ({ pa
   });
   expect(accountResponse.ok(), await accountResponse.text()).toBeTruthy();
   const accountId = ((await accountResponse.json()) as { id: string }).id;
-  let assetId = "";
+  // The asset page totals every account that held the security, so use one no
+  // other spec trades (shared AAPL brought in their dividends).
+  const symbol = `ROC${Date.now().toString(36).toUpperCase()}`;
+  const assetResponse = await page.request.post(`${BASE_URL}/api/v1/assets`, {
+    data: {
+      kind: "INVESTMENT",
+      name: `Return of capital ${symbol}`,
+      displayCode: symbol,
+      instrumentSymbol: symbol,
+      instrumentType: "EQUITY",
+      quoteMode: "MANUAL",
+      quoteCcy: "USD",
+    },
+  });
+  expect(assetResponse.ok(), await assetResponse.text()).toBeTruthy();
+  const assetId = ((await assetResponse.json()) as { id: string }).id;
   for (const activity of [
     { activityType: "BUY", activityDate: "2024-01-02", quantity: 10, unitPrice: 10 },
     {
@@ -34,12 +49,11 @@ test("a closed asset counts return of capital once in total return", async ({ pa
         currency: "USD",
         fee: 0,
         needsReview: false,
-        asset: { symbol: "AAPL", exchangeMic: "XNAS", kind: "INVESTMENT", quoteCcy: "USD" },
+        asset: { id: assetId },
         ...activity,
       },
     });
     expect(response.ok(), await response.text()).toBeTruthy();
-    assetId = ((await response.json()) as { assetId: string }).assetId;
   }
 
   await expect
@@ -55,7 +69,7 @@ test("a closed asset counts return of capital once in total return", async ({ pa
           income?: { local: string };
           totalReturn?: { local: string };
         }>;
-        const closed = holdings.find((holding) => holding.instrument?.symbol === "AAPL");
+        const closed = holdings.find((holding) => holding.instrument?.symbol === symbol);
         return (
           closed && {
             closed: closed.isClosed,

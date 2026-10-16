@@ -1,6 +1,6 @@
 import { profilePreferenceKey } from "@/hooks/use-persistent-state";
 import {
-  isDesktop,
+  isTauri,
   logger,
   isAutoUpdateCheckEnabled,
   checkForUpdates,
@@ -36,7 +36,7 @@ export function useCheckUpdateOnStartup() {
 
   // Listen for menu-triggered update available events (desktop only)
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!isTauri) return;
 
     let unlisten: (() => void) | undefined;
 
@@ -135,7 +135,7 @@ export function useInstallUpdate() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isDesktop) return;
+    if (!isTauri) return;
 
     let unlisten: (() => void) | undefined;
 

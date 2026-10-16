@@ -88,6 +88,15 @@ describe("TransactionDayHeader", () => {
     expect(screen.getByText("Net").parentElement).toHaveTextContent("-$64.97");
   });
 
+  it("draws a dash, not a tick, when only part of the day is selected", () => {
+    renderHeader(group([{ id: "a" }, { id: "b" }]), { selectionState: "indeterminate" });
+
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).toHaveAttribute("data-state", "indeterminate");
+    expect(checkbox.querySelector(".lucide-minus")).not.toBeNull();
+    expect(checkbox.querySelector(".lucide-check")).toBeNull();
+  });
+
   it("omits the net when the day mixes currencies", () => {
     renderHeader(group([{ id: "a" }, { id: "b", currency: "EUR", netAmount: -30 }]));
 

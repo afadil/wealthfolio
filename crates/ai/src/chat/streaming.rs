@@ -12,21 +12,22 @@
 use futures::StreamExt;
 use log::{debug, error};
 use rig::{
-    agent::{Agent, MultiTurnStreamItem},
-    client::AgentClientExt,
+    agent::MultiTurnStreamItem,
     completion::Message,
     message::{
-        AssistantContent, Text, ToolCall as RigToolCall, ToolChoice, ToolResultContent, UserContent,
+        AssistantContent, AssistantMessage, Text, ToolCall as RigToolCall, ToolChoice,
+        ToolResultContent, UserContent,
     },
-    providers::groq::{GroqAdditionalParameters, ReasoningFormat},
-    streaming::{StreamedAssistantContent, StreamedUserContent},
+    streaming::{Item, Part, StreamEvent},
     tool::DynamicTool,
+    Agent, AgentBuilder,
 };
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 
 use crate::env::AiEnvironment;
 use crate::error::AiError;
+use crate::provider_urls::is_openai_platform_url;
 use crate::providers::ProviderService;
 use crate::title_generator::{TitleGenerator, TitleGeneratorConfig, TitleGeneratorTrait};
 use crate::tools::ToolSet;
@@ -38,10 +39,14 @@ use crate::types::{
 use super::history::build_user_prompt;
 use super::provider_clients::{
     create_anthropic_client, create_gemini_client, create_groq_client, create_ollama_client,
-    create_openai_client, create_openrouter_client, remap_provider_error,
+    create_openai_client, create_openrouter_client, redact_secret, remap_provider_error,
     validate_ollama_model_if_possible,
 };
 use super::redact_tool_arguments_for_persistence;
+use super::request_params::{
+    anthropic_thinking_params, effective_temperature, gemini_thinking_params,
+    openai_responses_params,
+};
 use super::working_context::{user_time_context, ChatWorkingContext};
 
 // ============================================================================
@@ -94,6 +99,7 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Get provider settings and model capabilities
     let provider_service = ProviderService::new(env.clone());
     let api_key = provider_service.get_api_key(&provider_id)?;
+    let provider_secret = api_key.clone();
     let provider_url = provider_service.get_provider_url(&provider_id);
     let mut capabilities = provider_service.get_model_capabilities(&provider_id, &model_id);
 
@@ -220,19 +226,12 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         .map(|msg| {
             if msg.role.eq_ignore_ascii_case("user") {
                 Message::User {
-                    content: vec![UserContent::Text(Text {
-                        additional_params: None,
-                        text: msg.content.clone(),
-                    })],
+                    content: vec![UserContent::Text(Text::new(msg.content.clone()))],
                 }
             } else {
-                Message::Assistant {
-                    id: None,
-                    content: vec![AssistantContent::Text(Text {
-                        additional_params: None,
-                        text: msg.content.clone(),
-                    })],
-                }
+                Message::Assistant(AssistantMessage::new(vec![AssistantContent::Text(
+                    Text::new(msg.content.clone()),
+                )]))
             }
         })
         .collect();
@@ -264,12 +263,18 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     // Drives temperature, max_tokens, and provider-specific extra_options for
     // every builder path below.
     let resolved_tuning = provider_service.get_resolved_tuning(&provider_id);
+    let temperature = effective_temperature(
+        &provider_id,
+        &model_id,
+        capabilities.thinking,
+        resolved_tuning.temperature,
+    );
 
     // Merge catalog's extra_options with per-call thinking params. The thinking
-    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking.budget_tokens`,
-    // Gemini's `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`,
-    // OpenAI's `reasoning_effort`) that can't live in the JSON catalog because
-    // they're dynamic per-capability. Catalog holds the rest
+    // params are PROVIDER-SPECIFIC shapes (Anthropic's `thinking`, Gemini's
+    // `thinkingConfig`, Groq's `reasoning_format`, Ollama's `think`, OpenAI's
+    // `reasoning`) that can't live in the JSON catalog because they depend on
+    // the model and the thinking toggle. Catalog holds the rest
     // (Ollama's `num_ctx`/`repeat_penalty`, Gemini's `safetySettings`).
     fn merge_json_into(dest: &mut serde_json::Value, src: serde_json::Value) {
         match (dest, src) {
@@ -306,10 +311,10 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Helper macro to build agent WITH tools and stream
     macro_rules! build_with_tools_and_stream {
-        ($client:expr, $thinking_params:expr) => {
-            build_with_tools_and_stream!($client, $thinking_params, None::<u64>)
+        ($model:expr, $thinking_params:expr) => {
+            build_with_tools_and_stream!($model, $thinking_params, None::<u64>)
         };
-        ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
+        ($model:expr, $thinking_params:expr, $max_tokens:expr) => {{
             let tool_set = ToolSet::new(env.clone(), env.base_currency());
 
             // Build filtered tool list based on provider allowlist
@@ -339,8 +344,7 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
             // come from the shared agent-tools catalog above (via RigAgentTool).
             // Only import_csv still implements rig's Tool trait directly.
 
-            let mut builder = $client
-                .agent(&model_id)
+            let mut builder = AgentBuilder::new($model)
                 .preamble(&preamble)
                 .dynamic_tools(allowed_tools)
                 .tool_choice(ToolChoice::Auto);
@@ -349,10 +353,9 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
                 builder = builder.tool(tool_set.import_csv);
             }
 
-            // Temperature from resolved tuning. Providers that shouldn't set
-            // temperature (e.g. Anthropic, per their own guidance) simply omit
-            // it from the catalog.
-            if let Some(temp) = resolved_tuning.temperature {
+            // Temperature from resolved tuning, dropped for models that
+            // reject sampling parameters.
+            if let Some(temp) = temperature {
                 builder = builder.temperature(temp);
             }
 
@@ -373,7 +376,16 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
             let agent = builder.build();
             stream_agent_response(
-                agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
+                agent,
+                prompt,
+                history,
+                tx,
+                repo,
+                thread_id,
+                run_id,
+                message_id,
+                title_ctx,
+                provider_secret,
             )
             .await
             .map_err(|e| remap_provider_error(&provider_id, &model_id, e))
@@ -382,13 +394,13 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
     // Helper macro to build agent WITHOUT tools and stream
     macro_rules! build_without_tools_and_stream {
-        ($client:expr, $thinking_params:expr) => {
-            build_without_tools_and_stream!($client, $thinking_params, None::<u64>)
+        ($model:expr, $thinking_params:expr) => {
+            build_without_tools_and_stream!($model, $thinking_params, None::<u64>)
         };
-        ($client:expr, $thinking_params:expr, $max_tokens:expr) => {{
-            let mut builder = $client.agent(&model_id).preamble(&preamble);
+        ($model:expr, $thinking_params:expr, $max_tokens:expr) => {{
+            let mut builder = AgentBuilder::new($model).preamble(&preamble);
 
-            if let Some(temp) = resolved_tuning.temperature {
+            if let Some(temp) = temperature {
                 builder = builder.temperature(temp);
             }
 
@@ -405,7 +417,16 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
 
             let agent = builder.build();
             stream_agent_response(
-                agent, prompt, history, tx, repo, thread_id, run_id, message_id, title_ctx,
+                agent,
+                prompt,
+                history,
+                tx,
+                repo,
+                thread_id,
+                run_id,
+                message_id,
+                title_ctx,
+                provider_secret,
             )
             .await
             .map_err(|e| remap_provider_error(&provider_id, &model_id, e))
@@ -413,12 +434,10 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
     }
 
     // Provider-specific reasoning params using rig-core native types where available:
-    // - Groq: GroqAdditionalParameters with reasoning_format OR include_reasoning (mutually exclusive!)
+    // - Groq: reasoning_format OR include_reasoning (mutually exclusive!)
     //   Note: gpt-oss models don't support reasoning_format - they include reasoning by default
     // - Ollama: Raw JSON with think: true/false
-    // - Gemini: GenerationConfig with ThinkingConfig
-    // - Anthropic: Raw JSON (no native rig-core struct)
-    // - OpenAI: Raw JSON (Reasoning struct is for responses_api only)
+    // - Gemini, Anthropic, OpenAI: per-model shapes from `request_params`
     let is_groq_gpt_oss = model_id.contains("gpt-oss");
 
     // Groq params: reasoning_format and include_reasoning are MUTUALLY EXCLUSIVE
@@ -431,12 +450,8 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None
     } else if capabilities.thinking {
         // Use reasoning_format only (not include_reasoning) - they're mutually exclusive
-        serde_json::to_value(GroqAdditionalParameters {
-            reasoning_format: Some(ReasoningFormat::Hidden), // Model reasons but output hidden with tools
-            include_reasoning: None,
-            extra: None,
-        })
-        .ok()
+        // Model reasons but output hidden with tools
+        Some(serde_json::json!({ "reasoning_format": "hidden" }))
     } else {
         // Non-reasoning models don't support reasoning params at all
         None
@@ -447,12 +462,8 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None
     } else if capabilities.thinking {
         // Use reasoning_format only (not include_reasoning) - they're mutually exclusive
-        serde_json::to_value(GroqAdditionalParameters {
-            reasoning_format: Some(ReasoningFormat::Parsed), // Reasoning exposed in response
-            include_reasoning: None,
-            extra: None,
-        })
-        .ok()
+        // Reasoning exposed in response
+        Some(serde_json::json!({ "reasoning_format": "parsed" }))
     } else {
         // Non-reasoning models don't support reasoning params at all
         None
@@ -465,22 +476,17 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         "think": capabilities.thinking,
     }));
 
-    // Anthropic: extended thinking with budget_tokens
-    // Only enable thinking when capabilities.thinking is true
-    let anthropic_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
-        Some(serde_json::json!({
-            "thinking": {
-                "type": "enabled",
-                "budget_tokens": 8000
-            }
-        }))
-    } else {
-        None
-    };
+    // Anthropic: adaptive thinking or a budget, by model generation.
+    let anthropic_thinking_params = anthropic_thinking_params(&model_id, capabilities.thinking);
 
-    // OpenAI: reasoning_effort for o1/o3 models
-    // NOTE: Reasoning with tool calls causes "reasoning item without required following item" errors
-    // in multi-turn conversations. Only enable reasoning when NOT using tools.
+    // OpenAI: the Responses API carries reasoning between tool calls, so
+    // reasoning stays on with tools.
+    let uses_openai_platform = is_openai_platform_url(provider_url.as_deref());
+    let openai_params = openai_responses_params(&model_id, capabilities.thinking);
+
+    // OpenAI-compatible custom endpoints (Chat Completions): reasoning with tool
+    // calls causes "reasoning item without required following item" errors in
+    // multi-turn conversations. Only enable reasoning when NOT using tools.
     // See: https://community.openai.com/t/error-badrequesterror-400-item-of-type-reasoning-was-provided-without-its-required-following-item/1303809
     let openai_thinking_params_no_tools: Option<serde_json::Value> = if capabilities.thinking {
         Some(serde_json::json!({
@@ -490,89 +496,121 @@ pub(super) async fn spawn_chat_stream<E: AiEnvironment + 'static>(
         None // Don't send reasoning_effort when thinking disabled
     };
 
-    // Gemini: Only pass thinking_config to avoid sending unsupported fields.
-    // The full GenerationConfig struct includes fields (temperature, maxOutputTokens)
-    // that may not be accepted by all Gemini API versions/models.
-    let gemini_thinking_params: Option<serde_json::Value> = if capabilities.thinking {
-        // Enable thinking with a reasonable budget.
-        // Must be nested inside generationConfig to match rig's AdditionalParameters struct
-        // which deserializes "generationConfig" into GenerationConfig (has thinkingConfig field).
-        Some(serde_json::json!({
-            "generationConfig": {
-                "thinkingConfig": {
-                    "thinkingBudget": 8192,
-                    "includeThoughts": true
-                }
-            }
-        }))
-    } else {
-        // Don't send thinking_config at all when disabled - simpler and avoids API issues
-        None
-    };
+    // Gemini: a thinking level on Gemini 3, a budget on 2.5.
+    let gemini_thinking_params = gemini_thinking_params(&model_id, capabilities.thinking);
 
     // Route to provider with tool support check
     if capabilities.tools {
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, anthropic_thinking_params.clone())
+                build_with_tools_and_stream!(
+                    client.completion(&model_id),
+                    anthropic_thinking_params.clone()
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, gemini_thinking_params.clone())
+                build_with_tools_and_stream!(
+                    client.completion(&model_id),
+                    gemini_thinking_params.clone()
+                )
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, groq_reasoning_params_with_tools.clone())
+                build_with_tools_and_stream!(
+                    client.completion(&model_id),
+                    groq_reasoning_params_with_tools.clone()
+                )
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_with_tools_and_stream!(client, ollama_thinking_params.clone())
+                build_with_tools_and_stream!(
+                    client.native_completion(&model_id),
+                    ollama_thinking_params.clone()
+                )
+            }
+            "openai" if uses_openai_platform => {
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
+                build_with_tools_and_stream!(
+                    client.responses(&model_id),
+                    Some(openai_params.clone())
+                )
             }
             "openai" => {
-                // Don't pass reasoning params with tools - causes multi-turn errors
+                // OpenAI-compatible custom endpoint on Chat Completions. Don't
+                // pass reasoning params with tools - Chat Completions rejects
+                // reasoning items in multi-turn tool calls.
                 let client = create_openai_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+                build_with_tools_and_stream!(client.chat(&model_id), None::<serde_json::Value>)
             }
             "openrouter" => {
                 let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+                build_with_tools_and_stream!(
+                    client.completion(&model_id),
+                    None::<serde_json::Value>
+                )
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id, provider_url)?;
-                build_with_tools_and_stream!(client, None::<serde_json::Value>)
+                build_with_tools_and_stream!(client.chat(&model_id), None::<serde_json::Value>)
             }
         }
     } else {
         match provider_id.as_str() {
             "anthropic" => {
                 let client = create_anthropic_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, anthropic_thinking_params.clone())
+                build_without_tools_and_stream!(
+                    client.completion(&model_id),
+                    anthropic_thinking_params.clone()
+                )
             }
             "gemini" | "google" => {
                 let client = create_gemini_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, gemini_thinking_params.clone())
+                build_without_tools_and_stream!(
+                    client.completion(&model_id),
+                    gemini_thinking_params.clone()
+                )
             }
             "groq" => {
                 let client = create_groq_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, groq_reasoning_params_no_tools.clone())
+                build_without_tools_and_stream!(
+                    client.completion(&model_id),
+                    groq_reasoning_params_no_tools.clone()
+                )
             }
             "ollama" => {
                 let client = create_ollama_client(provider_url)?;
-                build_without_tools_and_stream!(client, ollama_thinking_params.clone())
+                build_without_tools_and_stream!(
+                    client.native_completion(&model_id),
+                    ollama_thinking_params.clone()
+                )
+            }
+            "openai" if uses_openai_platform => {
+                let client = create_openai_client(api_key, &provider_id, provider_url)?;
+                build_without_tools_and_stream!(
+                    client.responses(&model_id),
+                    Some(openai_params.clone())
+                )
             }
             "openai" => {
                 // Reasoning params OK without tools
                 let client = create_openai_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, openai_thinking_params_no_tools.clone())
+                build_without_tools_and_stream!(
+                    client.chat(&model_id),
+                    openai_thinking_params_no_tools.clone()
+                )
             }
             "openrouter" => {
                 let client = create_openrouter_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, None::<serde_json::Value>)
+                build_without_tools_and_stream!(
+                    client.completion(&model_id),
+                    None::<serde_json::Value>
+                )
             }
             _ => {
                 let client = create_openai_client(api_key, &provider_id, provider_url)?;
-                build_without_tools_and_stream!(client, None::<serde_json::Value>)
+                build_without_tools_and_stream!(client.chat(&model_id), None::<serde_json::Value>)
             }
         }
     }
@@ -693,6 +731,7 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
     run_id: String,
     message_id: String,
     title_ctx: TitleContext<E>,
+    provider_secret: Option<String>,
 ) -> Result<(), AiError> {
     // Attach a per-run hook that deduplicates repeated tool calls, caps the
     // total tool-call count, and aborts stuck text-token loops. Cheap to clone
@@ -702,12 +741,11 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
     // Start multi-turn streaming (up to 6 tool rounds). The hook provides the
     // finer-grained guards inside those turns.
     let mut stream = agent
-        .runner(prompt)
+        .prompt(prompt)
         .history(history)
         .add_hook(hook.clone())
         .max_turns(7)
-        .stream()
-        .await;
+        .stream();
 
     // Generate/refine title concurrently so it can update the UI during streaming.
     let should_attempt_title = title_ctx.is_new_thread
@@ -785,6 +823,9 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
         let mut accumulated_text = String::new();
         let mut accumulated_reasoning = String::new();
         let mut reasoning_parts: HashMap<String, usize> = HashMap::new();
+        // Stream parts are numbered per model call, so reasoning is keyed by
+        // the call as well.
+        let mut model_turn = 0usize;
 
         // Parser for <think> tags (fallback for models that don't use native thinking API)
         let mut think_parser = ThinkTagParser::default();
@@ -792,9 +833,10 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
         while let Some(chunk) = stream.next().await {
             match chunk {
                 // Text streaming - parse for <think> tags as fallback
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Text(
-                    Text { text, .. },
-                ))) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(Item::Event(StreamEvent::Text {
+                    text,
+                    ..
+                }))) => {
                     if !text.is_empty() {
                         // Parse <think> tags and emit ordered segments (models should not think if disabled via API)
                         for segment in think_parser.process(&text) {
@@ -842,19 +884,26 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                 }
 
                 // A completed native reasoning block replaces its earlier deltas.
-                Ok(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::Reasoning { reasoning, id },
-                )) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(Item::Event(StreamEvent::End {
+                    part,
+                    content: AssistantContent::Reasoning(reasoning),
+                }))) => {
                     flush_pending_content(
                         &mut content_parts,
                         &mut accumulated_reasoning,
                         &mut accumulated_text,
                     );
+                    // Redacted reasoning carries provider-opaque data, not text.
+                    let text = if reasoning.redacted {
+                        String::new()
+                    } else {
+                        reasoning.text
+                    };
                     let delta = update_native_reasoning(
                         &mut content_parts,
                         &mut reasoning_parts,
-                        id,
-                        reasoning.display_text(),
+                        reasoning_key(model_turn, part),
+                        text,
                         true,
                     );
                     if !delta.is_empty() {
@@ -868,9 +917,9 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                         .map_err(|e| AiError::Internal(e.to_string()))?;
                     }
                 }
-                Ok(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::ReasoningDelta { reasoning, id, .. },
-                )) => {
+                Ok(MultiTurnStreamItem::StreamAssistantItem(Item::Event(
+                    StreamEvent::Reasoning { part, text },
+                ))) => {
                     flush_pending_content(
                         &mut content_parts,
                         &mut accumulated_reasoning,
@@ -879,8 +928,8 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                     let delta = update_native_reasoning(
                         &mut content_parts,
                         &mut reasoning_parts,
-                        id,
-                        reasoning,
+                        reasoning_key(model_turn, part),
+                        text,
                         false,
                     );
                     if !delta.is_empty() {
@@ -895,13 +944,10 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                     }
                 }
 
-                // Tool call
-                Ok(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::ToolCall {
-                        tool_call: RigToolCall { id, function, .. },
-                        ..
-                    },
-                )) => {
+                // Tool call, reported once the model turn commits.
+                Ok(MultiTurnStreamItem::ToolCall {
+                    tool_call: RigToolCall { id, function, .. },
+                }) => {
                     // Flush accumulated reasoning and text BEFORE the tool call to preserve order
                     if !accumulated_reasoning.is_empty() {
                         content_parts.push(ChatMessagePart::Reasoning {
@@ -914,14 +960,13 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                         });
                     }
 
-                    let args: serde_json::Value =
-                        serde_json::from_str(&function.arguments.to_string()).unwrap_or_default();
-                    let persisted_args =
-                        redact_tool_arguments_for_persistence(&function.name, &args);
+                    let name = function.name.to_string();
+                    let args = serde_json::Value::Object(function.arguments);
+                    let persisted_args = redact_tool_arguments_for_persistence(&name, &args);
 
                     content_parts.push(ChatMessagePart::ToolCall {
                         tool_call_id: id.to_string(),
-                        name: function.name.clone(),
+                        name: name.clone(),
                         arguments: persisted_args,
                     });
 
@@ -931,7 +976,7 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                         &message_id,
                         ToolCall {
                             id: id.to_string(),
-                            name: function.name.clone(),
+                            name,
                             arguments: args,
                         },
                     ))
@@ -939,26 +984,11 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                     .map_err(|e| AiError::Internal(e.to_string()))?;
                 }
 
-                // Tool call delta (provider-native)
-                Ok(MultiTurnStreamItem::StreamAssistantItem(
-                    StreamedAssistantContent::ToolCallDelta { .. },
-                )) => {
-                    // Tool call deltas are handled by providers that stream tool args incrementally.
-                    // We currently rely on full ToolCall items for execution.
-                }
-
-                // Provider-specific final payload
-                Ok(MultiTurnStreamItem::StreamAssistantItem(StreamedAssistantContent::Final(
-                    _,
-                ))) => {
-                    // No-op: FinalResponse is handled separately; some providers emit a final payload here.
-                }
+                // A model call finished; the next one numbers its parts afresh.
+                Ok(MultiTurnStreamItem::CompletionCall(_)) => model_turn += 1,
 
                 // Tool result
-                Ok(MultiTurnStreamItem::StreamUserItem(StreamedUserContent::ToolResult {
-                    tool_result,
-                    ..
-                })) => {
+                Ok(MultiTurnStreamItem::ToolResult { tool_result }) => {
                     let content_to_string = |content: ToolResultContent| -> String {
                         match content {
                             ToolResultContent::Text(Text { text, .. }) => text,
@@ -1007,7 +1037,7 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                 // may not stream text deltas for tool-calling responses, and Ollama/DeepSeek may
                 // send reasoning natively without streaming text deltas)
                 Ok(MultiTurnStreamItem::FinalResponse(final_response)) => {
-                    let response_text = final_response.output;
+                    let response_text = final_response.output();
                     // Use trim() to handle cases where only whitespace was accumulated
                     if !has_final_turn_text(&content_parts, &accumulated_text)
                         && !response_text.trim().is_empty()
@@ -1030,17 +1060,18 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                 // Errors
                 Err(error) if hook.is_asset_selection_pause(&error) => break,
                 Err(error) => {
-                    error!("Stream error: {}", error);
+                    let message = redact_secret(error.to_string(), provider_secret.as_deref());
+                    error!("Stream error: {}", message);
                     tx.send(AiStreamEvent::error(
                         &thread_id,
                         &run_id,
                         Some(&message_id),
                         "STREAM_ERROR",
-                        &error.to_string(),
+                        &message,
                     ))
                     .await
                     .map_err(|e| AiError::Internal(e.to_string()))?;
-                    return Err(AiError::Provider(error.to_string()));
+                    return Err(AiError::Provider(message));
                 }
             }
         }
@@ -1158,6 +1189,10 @@ fn flush_pending_content(
 
 /// Return only the new appendable text for the UI; persist the authoritative
 /// completion even if a provider revises previously streamed reasoning.
+fn reasoning_key(model_turn: usize, part: Part) -> String {
+    format!("{model_turn}:{}", part.index())
+}
+
 fn update_native_reasoning(
     parts: &mut Vec<ChatMessagePart>,
     indices: &mut HashMap<String, usize>,
@@ -1244,10 +1279,12 @@ mod tests {
             ProviderService::new(env.clone()).get_provider_url("openai"),
             Some(title_url)
         );
-        let agent = create_openai_client(Some("fixture-key".into()), "openai", Some(chat_url))
-            .unwrap()
-            .agent("fixture")
-            .build();
+        let agent = AgentBuilder::new(
+            create_openai_client(Some("fixture-key".into()), "openai", Some(chat_url))
+                .unwrap()
+                .chat("fixture"),
+        )
+        .build();
         let title_ctx = TitleContext {
             env: env.clone(),
             current_title: Some("Initial title".into()),
@@ -1270,6 +1307,7 @@ mod tests {
                 "run".into(),
                 "message".into(),
                 title_ctx,
+                None,
             )
             .await
             .unwrap();

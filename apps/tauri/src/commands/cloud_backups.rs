@@ -6,7 +6,7 @@ use crate::{
 use std::{path::Path, sync::Arc};
 use tauri::Manager;
 use wealthfolio_device_sync::backups::client::{
-    BackupClient, BackupOperation, BackupPoint, BackupSource,
+    BackupClient, BackupOperation, BackupPoint, BackupSource, CapturePlan,
 };
 use wealthfolio_storage_sqlite::db;
 
@@ -46,8 +46,11 @@ pub async fn cloud_backup_action(
     Ok(result)
 }
 #[tauri::command]
-pub async fn cloud_backup_capture(runtime: ProfileAccess) -> Result<Option<BackupPoint>, String> {
-    let result = check_and_capture(&runtime.0).await?;
+pub async fn cloud_backup_capture(
+    runtime: ProfileAccess,
+    manual: Option<bool>,
+) -> Result<Option<BackupPoint>, String> {
+    let result = check_and_capture(&runtime.0, manual.unwrap_or(false)).await?;
     if result.0.is_some() {
         runtime.backup_scheduler.request_check();
     }
@@ -73,17 +76,22 @@ async fn capture_token(
 
 async fn check_and_capture(
     runtime: &Arc<crate::database::DatabaseRuntime>,
+    manual: bool,
 ) -> Result<(Option<BackupPoint>, Option<std::time::Duration>), String> {
     // Single-flight admission is distinct from lifecycle locks. A competing
     // automatic/manual check observes the active capture instead of failing it.
     let Ok(_permit) = runtime.backup_export_slot.clone().try_acquire_owned() else {
-        return Ok((None, Some(std::time::Duration::from_secs(30 * 60))));
+        // A busy slot is a local check; retry soon rather than after the failure fallback.
+        return Ok((None, Some(std::time::Duration::from_secs(60))));
     };
     let generation = runtime.backup_scheduler.generation();
     runtime.backup_scheduler.checking(generation);
+    if manual {
+        runtime.backup_scheduler.early(generation);
+    }
     let result = runtime
         .backup_scheduler
-        .until_changed(generation, capture_in_phases(runtime, generation))
+        .until_changed(generation, capture_in_phases(runtime, generation, manual))
         .await
         .unwrap_or(Ok((None, None)));
     runtime
@@ -95,6 +103,7 @@ async fn check_and_capture(
 async fn capture_in_phases(
     runtime: &Arc<crate::database::DatabaseRuntime>,
     generation: u64,
+    manual: bool,
 ) -> Result<(Option<BackupPoint>, Option<std::time::Duration>), String> {
     if runtime.backup_scheduler.is_paused() {
         return Ok((None, None));
@@ -125,10 +134,14 @@ async fn capture_in_phases(
         BackupSource::Ready(policy) => policy,
         wait => return Ok((None, wait.wait_delay())),
     };
-    let delay = policy.delay_until_due().map_err(|e| e.to_string())?;
-    if !delay.is_zero() {
-        return Ok((None, Some(delay)));
-    }
+    let trigger = match policy.capture_plan(manual).map_err(|e| e.to_string())? {
+        CapturePlan::Wait(delay) => return Ok((None, Some(delay))),
+        CapturePlan::Due(trigger) => {
+            runtime.backup_scheduler.due(generation);
+            trigger
+        }
+        CapturePlan::Early => "manual",
+    };
     if runtime.backup_scheduler.is_paused() {
         return Ok((None, None));
     }
@@ -175,11 +188,7 @@ async fn capture_in_phases(
     let encoded = BackupClient::encode_capture(
         material,
         image,
-        if policy.last_backup_at.is_some() {
-            "scheduled"
-        } else {
-            "setup"
-        },
+        trigger,
         wealthfolio_device_sync::backups::client::BackupMetadata {
             device_name: Some(crate::context::get_device_display_name()),
             profile_name: runtime
@@ -252,7 +261,7 @@ pub(crate) fn start_scheduler(
                 let Some(runtime) = runtime.filter(|runtime| runtime.profile_id == profile_id) else {
                     return Ok(None);
                 };
-                let result = check_and_capture(&runtime).await.map(|(_, next)| next);
+                let result = check_and_capture(&runtime, false).await.map(|(_, next)| next);
                 if result.is_err() {
                     log::warn!("Cloud backup attempt failed; check the last successful backup in settings");
                 }

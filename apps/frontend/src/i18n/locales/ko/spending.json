@@ -711,12 +711,7 @@
     "noIncome": "이 기간에 선택한 계좌에 수입이 없습니다.",
     "spent": "지출",
     "saved": "저축",
-    "incomeSaving": "수입 및 저축",
-    "nonSpendingCashflow": "{{period}}의 비지출 현금 흐름입니다.",
-    "moneyIn": "들어온 돈",
-    "incomeSources": "수입원",
     "setAside": "따로 모은 금액",
-    "savingDestinations": "저축 목적지",
     "sortSpent": "지출액",
     "sortChange": "변동",
     "sortName": "이름",
@@ -735,6 +730,48 @@
     "openTransactions": "거래 내역 열기 →",
     "moreCount_other": "+{{count}} 더보기",
     "vsRange": "{{from}} – {{to}} 대비"
+  },
+  "moneyFlow": {
+    "title": "돈의 흐름",
+    "subtitle": "{{period}} 동안 돈이 어디서 들어와 어디로 나갔는지 보여줍니다.",
+    "focusSubtitle": "{{period}}의 모든 카테고리입니다.",
+    "focusSubcategoriesSubtitle": "{{period}}의 모든 하위 카테고리입니다.",
+    "back": "전체 흐름",
+    "backTo": "{{name}}(으)로 돌아가기",
+    "chartLabel": "돈의 흐름 차트. 화살표 키로 항목 사이를 이동할 수 있습니다.",
+    "nodeAria": "{{name}}, {{amount}}",
+    "nodeActionAria": "{{name}}, {{amount}}. {{action}}",
+    "shareOfIncome": "수입의 {{pct}}",
+    "shareOfTotal": "합계의 {{pct}}",
+    "clickTransactions": "클릭하여 거래 내역 보기",
+    "clickCategories": "클릭하여 모든 카테고리 보기",
+    "clickSubcategories": "클릭하여 하위 카테고리 보기",
+    "action": {
+      "categories": "모든 카테고리 보기",
+      "subcategories": "하위 카테고리 보기",
+      "transactions": "거래 내역 보기"
+    },
+    "node": {
+      "total": "합계",
+      "shortfall": "부족분",
+      "refunds": "순 환불",
+      "surplus": "남은 금액",
+      "uncategorizedIncome": "미분류 수입",
+      "netSpending": "순 지출"
+    },
+    "hint": {
+      "total": "들어온 돈에 순 환불과 부족분을 더한 합계입니다. 항상 나간 돈과 같습니다.",
+      "totalOut": "환불 전의 지출과 따로 모은 금액 합계입니다.",
+      "shortfall": "들어온 돈을 넘어선 지출과 저축입니다.",
+      "refunds": "환불이 지출보다 많았던 카테고리입니다.",
+      "saved": "저축 및 투자 계좌로 옮긴 금액입니다.",
+      "surplus": "들어왔지만 쓰거나 따로 모으지 않은 금액입니다.",
+      "uncategorized": "아직 카테고리가 없는 지출입니다.",
+      "net": "환불 후 이 카테고리에 든 금액입니다.",
+      "direct": "하위 카테고리가 아닌 카테고리 자체에 지정된 금액입니다."
+    },
+    "groupRefunds": "순 환불 {{amount}} 차감 전 금액입니다.",
+    "categoryRefunds": "순 환불 {{refunds}} 차감 전 금액입니다. 순 지출: {{net}}."
   },
   "budgetChart": {
     "overBudget": "예산 초과",

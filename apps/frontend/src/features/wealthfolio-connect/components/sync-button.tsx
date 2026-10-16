@@ -49,13 +49,21 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
   const isRunning = status === "running" || isSyncing;
   const colorClass = statusColors[status];
 
+  // Without a completed sync time (e.g. every latest attempt failed), name the
+  // current state rather than claiming it never synced.
   const tooltipContent = lastSyncTime
     ? t("connect:status.lastSynced", {
         time: formatDistanceToNow(new Date(lastSyncTime), localizationSettings, {
           addSuffix: true,
         }),
       })
-    : t("connect:status.neverSynced");
+    : isRunning
+      ? t("connect:status.syncingEllipsis")
+      : status === "failed"
+        ? t("connect:status.failed")
+        : status === "needs_review"
+          ? t("connect:status.needsReview")
+          : t("connect:status.neverSynced");
 
   return (
     <Tooltip>

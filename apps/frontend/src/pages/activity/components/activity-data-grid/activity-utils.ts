@@ -19,6 +19,7 @@ import type {
   TransactionUpdateParams,
 } from "./types";
 import { generateTempActivityId } from "./use-activity-grid-state";
+import { isSameAccountCashFxConversion } from "../transfer-link-utils";
 import { calculateIncomeFinalAmount, calculateTradeFinalAmount } from "@/lib/activity-final-amount";
 
 export function isPairedInternalCashTransfer(transaction: LocalTransaction): boolean {
@@ -27,7 +28,6 @@ export function isPairedInternalCashTransfer(transaction: LocalTransaction): boo
     transaction.sourceGroupId &&
     transaction.counterpartActivityId &&
     transaction.counterpartAccountId &&
-    transaction.counterpartAccountId !== transaction.accountId &&
     transaction.isExternal !== true &&
     (transaction.activityType === ActivityType.TRANSFER_IN ||
       transaction.activityType === ActivityType.TRANSFER_OUT) &&
@@ -666,6 +666,7 @@ export function buildSavePayload(
 
     if (isNew) {
       const createPayload: ActivityCreatePayload = {
+        sourceGroupId: transaction.sourceGroupId,
         ...basePayload,
         amount: sendsAmount ? basePayload.amount : undefined,
         ...(attestsCustomTotal && { needsReview: false }),
@@ -936,6 +937,24 @@ function validateTransaction(transaction: LocalTransaction): TransactionValidati
 }
 
 /**
+ * A duplicated transfer pair is two new rows sharing a group: deleting either
+ * deletes both, as deleting one leg of a saved pair does.
+ */
+export function withNewPairPartners(
+  rows: LocalTransaction[],
+  localTransactions: LocalTransaction[],
+): LocalTransaction[] {
+  const ids = new Set(rows.map((row) => row.id));
+  const groups = new Set(
+    rows.filter((row) => row.isNew && row.sourceGroupId).map((row) => row.sourceGroupId),
+  );
+  const partners = localTransactions.filter(
+    (row) => row.isNew && row.sourceGroupId && groups.has(row.sourceGroupId) && !ids.has(row.id),
+  );
+  return [...rows, ...partners];
+}
+
+/**
  * Validates all dirty transactions before save
  */
 export function validateTransactionsForSave(
@@ -951,6 +970,35 @@ export function validateTransactionsForSave(
   for (const transaction of dirtyTransactions) {
     const transactionErrors = validateTransaction(transaction);
     errors.push(...transactionErrors);
+  }
+
+  // A duplicated transfer pair is saved as two new rows sharing a group. Edits
+  // or a partial delete must not store an orphan leg, or a same-account pair
+  // in one currency.
+  const newGroups = new Map<string, LocalTransaction[]>();
+  for (const transaction of dirtyTransactions) {
+    if (!transaction.isNew || !transaction.sourceGroupId) continue;
+    newGroups.set(transaction.sourceGroupId, [
+      ...(newGroups.get(transaction.sourceGroupId) ?? []),
+      transaction,
+    ]);
+  }
+  for (const legs of newGroups.values()) {
+    const [first, second] = legs;
+    const isPair =
+      legs.length === 2 &&
+      [first.activityType, second.activityType].sort().join() ===
+        [ActivityType.TRANSFER_IN, ActivityType.TRANSFER_OUT].join() &&
+      (first.accountId !== second.accountId || isSameAccountCashFxConversion(first, second));
+    if (!isPair) {
+      for (const leg of legs) {
+        errors.push({
+          transactionId: leg.id,
+          field: "activityType",
+          message: "A transfer pair needs both legs, in two currencies when they share an account",
+        });
+      }
+    }
   }
 
   return {

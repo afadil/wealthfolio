@@ -4,13 +4,16 @@ import { Separator } from "@wealthfolio/ui/components/ui/separator";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useIsCompactTableViewport } from "@/hooks/use-platform";
+import { useIsCompactTableViewport, usePlatform } from "@/hooks/use-platform";
 import { SidebarNav } from "./sidebar-nav";
 
 export default function SettingsLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isTauri, isMobile } = usePlatform();
+  // The embedded MCP server only ships in the desktop build & web server, not on iOS/Android app.
+  const hasMcpServer = !(isTauri && isMobile);
 
   const sections = useMemo(
     () => [
@@ -104,12 +107,16 @@ export default function SettingsLayout() {
             subtitle: t("settings:nav.subtitles.ai_providers"),
             icon: <Icons.SparklesOutline className="size-5" />,
           },
-          {
-            title: t("settings:nav.items.agent_access"),
-            href: "agent-access",
-            subtitle: t("settings:nav.subtitles.agent_access"),
-            icon: <Icons.Brain className="size-5" />,
-          },
+          ...(hasMcpServer
+            ? [
+                {
+                  title: t("settings:nav.items.agent_access"),
+                  href: "agent-access",
+                  subtitle: t("settings:nav.subtitles.agent_access"),
+                  icon: <Icons.Brain className="size-5" />,
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -135,7 +142,7 @@ export default function SettingsLayout() {
         ],
       },
     ],
-    [t],
+    [t, hasMcpServer],
   );
 
   // Check if we're on the main settings page (mobile) or a specific setting page
@@ -159,43 +166,38 @@ export default function SettingsLayout() {
             </div>
           </div>
           <div className="space-y-6 p-3 pb-[var(--mobile-nav-total-offset)]">
-            {sections.map((section) => {
-              const mobileItems = section.items.filter((item) => item.href !== "agent-access");
-              if (mobileItems.length === 0) return null;
-
-              return (
-                <div key={section.title} className="space-y-3">
-                  <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
-                    {section.title}
-                  </div>
-                  <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
-                    {mobileItems.map((item) => (
-                      <button
-                        key={item.href}
-                        onClick={() => navigate(item.href)}
-                        className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
-                        aria-label={item.title}
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <div className="text-muted-foreground shrink-0">{item.icon}</div>
-                          <div className="min-w-0">
-                            <div className="text-foreground truncate text-base font-medium">
-                              {item.title}
-                            </div>
-                            {item?.subtitle && (
-                              <div className="text-muted-foreground truncate text-sm">
-                                {item.subtitle}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
+            {sections.map((section) => (
+              <div key={section.title} className="space-y-3">
+                <div className="text-muted-foreground px-2 text-xs font-semibold uppercase tracking-widest">
+                  {section.title}
                 </div>
-              );
-            })}
+                <div className="divide-border bg-card divide-y overflow-hidden rounded-2xl border shadow-sm">
+                  {section.items.map((item) => (
+                    <button
+                      key={item.href}
+                      onClick={() => navigate(item.href)}
+                      className="hover:bg-muted/40 flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition-colors active:opacity-90"
+                      aria-label={item.title}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="text-muted-foreground shrink-0">{item.icon}</div>
+                        <div className="min-w-0">
+                          <div className="text-foreground truncate text-base font-medium">
+                            {item.title}
+                          </div>
+                          {item?.subtitle && (
+                            <div className="text-muted-foreground truncate text-sm">
+                              {item.subtitle}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Icons.ChevronRight className="text-muted-foreground h-4 w-4 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </ApplicationShell>

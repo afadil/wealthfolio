@@ -284,7 +284,7 @@ interface LoanBalanceEventDialogProps {
   mode: "balance_correction" | "extra_repayment";
   currentBalance: number;
   currency: string;
-  /** Recorded balances, oldest first; a later one overrides a repayment. */
+  /** Recorded balances, oldest first; corrections replace the same day's balance. */
   confirmations?: Quote[];
   /** The "Paid from" account an extra repayment is withdrawn from. */
   paidFrom?: string;
@@ -322,6 +322,12 @@ export function LoanBalanceEventDialog({
     !isCorrection && !dateInvalid
       ? confirmations.find((quote) => quote.timestamp.slice(0, 10) >= formatDateISO(date))
       : undefined;
+  const replacedBalance =
+    isCorrection && !dateInvalid
+      ? confirmations.find((quote) => quote.timestamp.slice(0, 10) === formatDateISO(date))
+      : undefined;
+
+  const warnedBalance = replacedBalance ?? overridingBalance;
 
   useEffect(() => {
     if (!open) return;
@@ -402,18 +408,23 @@ export function LoanBalanceEventDialog({
               {t("asset:loanPayments.recorded_as_withdrawal", { account: paidFrom })}
             </p>
           )}
-          {overridingBalance && (
+          {warnedBalance && (
             <Alert variant="warning">
               <Icons.AlertTriangle className="h-4 w-4" />
               <AlertDescription className="text-sm">
-                {t("asset:loanActions.repayment_before_confirmation", {
-                  amount: formatAmount(Math.abs(overridingBalance.close), currency),
-                  date: dates.formatCalendarDate(overridingBalance.timestamp.slice(0, 10), {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  }),
-                })}
+                {t(
+                  replacedBalance
+                    ? "asset:loanActions.balance_replaces_confirmation"
+                    : "asset:loanActions.repayment_before_confirmation",
+                  {
+                    amount: formatAmount(Math.abs(warnedBalance.close), currency),
+                    date: dates.formatCalendarDate(warnedBalance.timestamp.slice(0, 10), {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  },
+                )}
               </AlertDescription>
             </Alert>
           )}

@@ -14,7 +14,10 @@
     "noDevicesSyncing": "No devices syncing yet",
     "noDevicesDescription": "Set up device sync in settings to keep your data in sync across devices.",
     "noActivity": "No activity yet",
-    "noActivityDescription": "Updates will appear here once your data starts syncing."
+    "noActivityDescription": "Updates will appear here once your data starts syncing.",
+    "showMore_one": "Show {{count}} more",
+    "showMore_other": "Show {{count}} more",
+    "showLess": "Show less"
   },
   "emptyState": {
     "optional": "Optional",
@@ -71,7 +74,8 @@
     "noDataYet": "No data yet",
     "dataAsOf": "Data as of {{date}}",
     "emptyTitle": "No accounts synced yet",
-    "emptyDescription": "Connect a broker to start syncing your accounts."
+    "emptyDescription": "Connect a broker to start syncing your accounts.",
+    "needsSetup": "Needs Setup"
   },
   "connections": {
     "title": "Broker connections",
@@ -88,7 +92,11 @@
     "accountsSyncing_one": "{{count}} account syncing",
     "accountsSyncing_other": "{{count}} accounts syncing",
     "partialSyncing_one": "{{syncing}} of {{total}} accounts syncing · {{excluded}} account excluded",
-    "partialSyncing_other": "{{syncing}} of {{total}} accounts syncing · {{excluded}} accounts excluded"
+    "partialSyncing_other": "{{syncing}} of {{total}} accounts syncing · {{excluded}} accounts excluded",
+    "accountCount_one": "{{count}} account",
+    "accountCount_other": "{{count}} accounts",
+    "excludedCount_one": "{{count}} excluded",
+    "excludedCount_other": "{{count}} excluded"
   },
   "sync": {
     "syncNow": "Sync Now",
@@ -182,20 +190,33 @@
   "attention": {
     "title": "Broker sync needs attention",
     "description_one": "{{count}} account needs a retry or broker review.",
-    "description_other": "{{count}} accounts need a retry or broker review."
+    "description_other": "{{count}} accounts need a retry or broker review.",
+    "heading": "Needs attention",
+    "connectionLost": "Connection lost",
+    "accountsNotSyncing_one": "{{count}} account not syncing",
+    "accountsNotSyncing_other": "{{count}} accounts not syncing",
+    "syncFailed": "Last sync failed"
   },
   "setup": {
     "newAccountsTitle": "New accounts need setup",
     "newAccountsDescription_one": "{{count}} account needs a quick setup before we can start syncing.",
     "newAccountsDescription_other": "{{count}} accounts need a quick setup before we can start syncing.",
-    "reviewAccounts": "Review accounts"
+    "reviewAccounts": "Review accounts",
+    "setUp": "Set up"
   },
   "devices": {
     "thisDevice": "This device",
     "activeNow": "Active now",
     "lastSeen": "Last seen {{time}}",
     "online": "Online",
-    "never": "Never"
+    "never": "Never",
+    "showInactive_one": "Show {{count}} inactive device",
+    "showInactive_other": "Show {{count}} inactive devices",
+    "hideInactive": "Hide inactive devices",
+    "platforms": {
+      "server": "Server",
+      "web": "Web"
+    }
   },
   "deviceStatus": {
     "syncError": "Sync error",

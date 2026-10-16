@@ -2,8 +2,9 @@ import * as z from "zod";
 import type { LoanSetup } from "@/adapters/shared/alternative-assets";
 import { readActiveLoanProjection, LOAN_RENEWAL_MATURITY_METADATA_KEY } from "../lib/loan-events";
 import { calculateAmortizationMonths, calculateLoanPaymentDate } from "../lib/loan-calculator";
-import { AlternativeAssetKind } from "@/lib/types";
+import { AlternativeAssetKind, type AlternativeAssetHolding } from "@/lib/types";
 import { parseLocalDate } from "@/lib/utils";
+import type { LinkedLiability } from "./asset-details-sheet";
 
 // Property types
 export const PROPERTY_TYPES = [
@@ -399,6 +400,15 @@ export function formValuesToMetadata(values: AssetDetailsFormValues): Record<str
   }
 
   return metadata;
+}
+
+/** A liability as the details sheet lists it; an unavailable balance is left out, not shown as zero. */
+export function toLinkedLiability(holding: AlternativeAssetHolding): LinkedLiability {
+  return {
+    id: holding.id,
+    name: holding.name,
+    balance: holding.loan?.balanceSource === null ? undefined : holding.marketValue,
+  };
 }
 
 // Helper to format date to ISO string (YYYY-MM-DD)
