@@ -466,7 +466,9 @@ import { createRoot } from "react-dom/client";
 import { useAmountFormatting } from "@wealthfolio/ui";
 
 function AmountProbe() {
-  const text = useAmountFormatting().formatAmount(1234567.89, "INR");
+  const { formatAmount, formatDecimalAmount } = useAmountFormatting();
+  const text = formatAmount(1234567.89, "INR") + " | " +
+    formatDecimalAmount(1234567.89, "INR", { maximumFractionDigits: 0 });
   React.useEffect(() => {
     const init = new URLSearchParams(window.name);
     parent.postMessage({
@@ -550,5 +552,5 @@ test("formats addon amounts with the host's per-currency formats", async ({ base
     });
   }, FORMATTING_ADDON_CODE);
 
-  expect(formatted).toEqual(["₹12,34,567.89", "₹1,234,567.89"]);
+  expect(formatted).toEqual(["₹12,34,567.89 | 12,34,568", "₹1,234,567.89 | 1,234,568"]);
 });

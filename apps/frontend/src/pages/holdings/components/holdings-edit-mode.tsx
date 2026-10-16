@@ -522,10 +522,10 @@ export const HoldingsEditMode = ({
                               totalValue > 0 ? "text-foreground" : "text-muted-foreground",
                             )}
                           >
-                            {new Intl.NumberFormat(
-                              amountFormatting.currencyLocale(holding.currency),
-                              { minimumFractionDigits: 2, maximumFractionDigits: 2 },
-                            ).format(totalValue)}
+                            {amountFormatting.formatDecimalAmount(totalValue, holding.currency, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         </div>
 

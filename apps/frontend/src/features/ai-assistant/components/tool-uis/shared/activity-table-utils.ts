@@ -84,23 +84,14 @@ interface AmountFormatter {
 }
 
 export function createActivityAmountFormatter(
-  formatting: Pick<FormattingApi, "currencyLocale">,
+  formatting: Pick<FormattingApi, "formatDecimalAmount">,
 ): AmountFormatter {
-  // Each currency may have its own format, so keep one formatter per locale.
-  const formatters = new Map<string, Intl.NumberFormat>();
   return {
-    format: (value, currency) => {
-      const locale = formatting.currencyLocale(currency);
-      let formatter = formatters.get(locale);
-      if (!formatter) {
-        formatter = new Intl.NumberFormat(locale, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        });
-        formatters.set(locale, formatter);
-      }
-      return formatter.format(value);
-    },
+    format: (value, currency) =>
+      formatting.formatDecimalAmount(value, currency, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
   };
 }
 
