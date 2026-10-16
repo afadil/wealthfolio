@@ -1,5 +1,4 @@
 import type { Holding, MonetaryValue } from "@/lib/types";
-import { amountDifference, sumAmounts } from "@/lib/amount-math";
 
 // Holdings lists keep open and closed positions separate. The asset overview
 // shows the current position with lifetime metrics across both lifecycle rows.
@@ -16,10 +15,13 @@ export function getAssetProfileHolding(holdings: Holding[], assetId: string): Ho
   ): MonetaryValue | null => {
     const values = positions.flatMap((holding) => (holding[field] ? [holding[field]] : []));
     if (values.length === 0) return null;
-    return {
-      local: sumAmounts(values.map((value) => Number(value.local))),
-      base: sumAmounts(values.map((value) => Number(value.base))),
-    };
+    return values.reduce(
+      (total, value) => ({
+        local: total.local + Number(value.local),
+        base: total.base + Number(value.base),
+      }),
+      { local: 0, base: 0 },
+    );
   };
   const percentage = (value: MonetaryValue | null, basis: number): number | null => {
     if (value == null) return null;
@@ -37,10 +39,7 @@ export function getAssetProfileHolding(holdings: Holding[], assetId: string): Ho
     ...current,
     income,
     realizedGain,
-    realizedGainPct: percentage(
-      realizedGain,
-      amountDifference(basis, Number(current.costBasis?.local ?? 0)),
-    ),
+    realizedGainPct: percentage(realizedGain, basis - Number(current.costBasis?.local ?? 0)),
     totalGain,
     totalGainPct: percentage(totalGain, basis),
     totalReturn,

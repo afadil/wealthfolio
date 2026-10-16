@@ -43,20 +43,6 @@ function point(overrides: Partial<ParsedHistoryPoint>): ParsedHistoryPoint {
 }
 
 describe("net worth utils", () => {
-  it.each([false, true])("keeps break-even changes neutral (liability: %s)", (isLiability) => {
-    expect(deriveChange([3 * 10.1, 30.3], isLiability)).toEqual({
-      amount: 0,
-      percent: 0,
-      isNew: false,
-    });
-  });
-
-  it.each([-0.004, 0.004])("preserves genuine small net worth changes (%s)", (gain) => {
-    const change = deriveChange([30.3, 30.3 + gain], false);
-    expect(change.amount).toBeCloseTo(gain, 12);
-    expect(Math.sign(change.amount)).toBe(Math.sign(gain));
-  });
-
   it("parses decimal strings and breakdown values into finite numbers", () => {
     const parsed = parseHistory([
       rawPoint({

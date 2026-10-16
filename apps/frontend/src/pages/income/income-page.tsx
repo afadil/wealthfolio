@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { getIncomeSummary } from "@/adapters";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -197,8 +196,7 @@ export default function IncomePage() {
 
   const monthlyAverageChange =
     previousMonthlyAverage > 0
-      ? amountDifference(currentMonthlyAverageNumber, previousMonthlyAverage) /
-        previousMonthlyAverage
+      ? (currentMonthlyAverageNumber - previousMonthlyAverage) / previousMonthlyAverage
       : 0;
 
   const currencyData = Object.entries(byCurrency).map(([currency, amount]) => ({

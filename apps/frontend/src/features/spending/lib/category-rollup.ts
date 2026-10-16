@@ -9,7 +9,6 @@
  * for missing meta and no guard against cyclic `parentId`. Centralizing here
  * eliminates the drift surface called out in the comprehensive review.
  */
-import { amountDifference } from "@/lib/amount-math";
 
 /** Minimal shape needed for rollup — accepts `TaxonomyCategory` or any
  *  `{ id, parentId }` value carried in a `Map`. */
@@ -231,7 +230,7 @@ export function buildWhereItWentRows(params: {
     .map(([id, e]) => {
       const meta = categoriesMeta.get(id);
       const priorAmt = priorAmounts.get(id) ?? 0;
-      const delta = amountDifference(e.amount, priorAmt);
+      const delta = e.amount - priorAmt;
       const deltaPct = priorAmt > 0 ? (delta / priorAmt) * 100 : null;
       return {
         id,

@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { parseLocalDate } from "@/lib/utils";
 import { formatZonedDateKey } from "@/features/spending/lib/timezone";
 import { getContributionLimit, getSnapshots, searchActivities } from "@/adapters";
@@ -588,7 +587,7 @@ const AccountPage = () => {
   const frontendGainLossAmount = performancePeriodPnl(accountPerformance);
   const frontendSummaryReturn = performanceSummaryReturn(accountPerformance);
   const allTimeReturnAmount = metricsValuation
-    ? amountDifference(metricsValuation.totalValue, metricsValuation.netContribution)
+    ? metricsValuation.totalValue - metricsValuation.netContribution
     : null;
   const allTimeSimpleReturn = simpleReturnFromNetContribution(
     allTimeReturnAmount,

@@ -1,4 +1,3 @@
-import { amountDifference } from "@/lib/amount-math";
 import { useCallback, useEffect, useMemo, useRef, useState, type FC } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -592,7 +591,7 @@ export default function SpendingTabContent() {
   const totalSpending = report?.current.outflow ?? 0;
   const totalSaved = report?.current.saved ?? 0;
   const priorSpending = priorReport?.current.outflow ?? 0;
-  const delta = amountDifference(totalSpending, priorSpending);
+  const delta = totalSpending - priorSpending;
   // `deltaPct` is a RATIO (0.2 == 20%) used for thresholds; convert to
   // percentage on render. `displayDeltaPct` is the same ratio but null'd out
   // when prior is too small to make the percentage meaningful — that gating
