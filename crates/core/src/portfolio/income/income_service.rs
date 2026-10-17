@@ -62,11 +62,13 @@ impl IncomeService {
         )
     }
 
-    fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Decimal {
+    /// `None` when the previous period has no income to compare with,
+    /// including when all of it was left out for lack of an exchange rate.
+    fn calculate_yoy_growth(current: Decimal, previous: Decimal) -> Option<Decimal> {
         if previous > Decimal::zero() {
-            (current - previous) / previous
+            Some((current - previous) / previous)
         } else {
-            Decimal::zero()
+            None
         }
     }
 }
@@ -216,8 +218,8 @@ impl IncomeServiceTrait for IncomeService {
             two_years_ago_summary.total_income,
         );
 
-        ytd_summary.yoy_growth = Some(ytd_yoy_growth);
-        last_year_summary.yoy_growth = Some(last_year_yoy_growth);
+        ytd_summary.yoy_growth = ytd_yoy_growth;
+        last_year_summary.yoy_growth = last_year_yoy_growth;
 
         // Two years ago YoY growth can't be calculated without activity from three years ago
         two_years_ago_summary.yoy_growth = None;
