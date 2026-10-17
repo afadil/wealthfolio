@@ -37,7 +37,7 @@ pub trait NetWorthServiceTrait: Send + Sync {
     ///
     /// # Returns
     /// A vector of `NetWorthHistoryPoint` ordered by date ascending.
-    fn get_net_worth_history(
+    async fn get_net_worth_history(
         &self,
         start_date: NaiveDate,
         end_date: NaiveDate,
