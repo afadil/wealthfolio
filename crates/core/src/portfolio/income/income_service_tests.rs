@@ -262,6 +262,45 @@ fn summary<'a>(summaries: &'a [IncomeSummary], period: &str) -> &'a IncomeSummar
 }
 
 #[test]
+fn growth_is_left_out_when_the_year_before_has_no_income() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+
+    let fx_service = FxService::new(Arc::new(InMemoryFxRepository::new(Vec::new())));
+    fx_service.initialize().unwrap();
+
+    let service = IncomeService::new(
+        Arc::new(fx_service),
+        Arc::new(MockActivityRepository {
+            income: Mutex::new(vec![
+                income("2025-05-15", "DIVIDEND", "SAP", "USD", dec!(110), "acc"),
+                income(
+                    "2026-03-15",
+                    "INTEREST",
+                    "CASH:USD",
+                    "USD",
+                    dec!(2500),
+                    "acc",
+                ),
+            ]),
+            first_activity_date: Utc.with_ymd_and_hms(2025, 5, 2, 0, 0, 0).unwrap(),
+        }),
+        Arc::new(RwLock::new("USD".to_string())),
+    );
+
+    let summaries = service.get_income_summary(None).unwrap();
+
+    // 2,500 this year against 110 last year.
+    assert_eq!(
+        summary(&summaries, "YTD").yoy_growth,
+        Some(((dec!(2500) - dec!(110)) / dec!(110)).round_dp(DISPLAY_DECIMAL_PRECISION))
+    );
+    // No income in 2024, so last year's growth would read as 0%.
+    assert_eq!(summary(&summaries, "LAST_YEAR").yoy_growth, None);
+    assert_eq!(summary(&summaries, "TWO_YEARS_AGO").yoy_growth, None);
+    assert_eq!(summary(&summaries, "ALL").yoy_growth, None);
+}
+
+#[test]
 fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
     let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
 
@@ -360,6 +399,8 @@ fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
         last_year.unconverted_currencies,
         currencies(&["GBP", "JPY"])
     );
+    // 2024's only income, in GBP, was left out: nothing to compare with.
+    assert_eq!(last_year.yoy_growth, None);
 
     let two_years_ago = summary(&summaries, "TWO_YEARS_AGO");
     assert_eq!(two_years_ago.total_income, dec!(0));

@@ -220,6 +220,8 @@ and this project adheres to
 - `IncomeSummary` totals and breakdowns leave out income that has no exchange
   rate to the summary's currency, instead of counting it as if it were already
   in that currency. `byCurrency` still includes it.
+- `IncomeSummary.yoyGrowth` is `null` for `YTD` and `LAST_YEAR` when the year
+  before has no income to compare with, instead of `0`.
 
 ### Deprecated
 
