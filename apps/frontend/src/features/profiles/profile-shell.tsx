@@ -218,6 +218,8 @@ export function ProfileShell({ children }: { children: ReactNode }) {
             setSelected(next.profiles[0]);
             setMode("choose");
           }
+          // Startup tried to open the only profile; say why it didn't.
+          if (next.autoOpenError) setError(next.autoOpenError);
         }
       } catch (e) {
         if (!cancelled && requestEpoch === epoch.current) {

@@ -56,6 +56,8 @@ export interface ProfileState {
   session: ProfileSession | null;
   starting: boolean;
   startupError?: string | null;
+  /** Why the only profile did not open at startup, until the next unlock. */
+  autoOpenError?: string | null;
 }
 export async function profileCommand<T>(
   command: string,

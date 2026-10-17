@@ -27,6 +27,8 @@ pub struct NativeProfiles {
     // Serializes transitions and retains sync state while profiles are locked.
     lifecycle: tokio::sync::Mutex<HashMap<Uuid, Arc<ProfileSyncState>>>,
     starting: AtomicBool,
+    // Why the only profile did not open at startup, kept until the next unlock.
+    auto_open_error: Mutex<Option<String>>,
     lock_epoch: AtomicU64,
 }
 
@@ -38,6 +40,7 @@ pub struct ProfileState {
     pub session: Option<ProfileSession>,
     pub starting: bool,
     pub startup_error: Option<String>,
+    pub auto_open_error: Option<String>,
 }
 
 /// Construct each reopened runtime with the state retained by the profile lifecycle.
@@ -152,6 +155,7 @@ impl NativeProfiles {
             active: Mutex::new(None),
             lifecycle: tokio::sync::Mutex::new(HashMap::new()),
             starting: AtomicBool::new(true),
+            auto_open_error: Mutex::new(None),
             lock_epoch: AtomicU64::new(0),
         })
     }
@@ -193,7 +197,11 @@ impl NativeProfiles {
                 match self.unlock(handle, list[0].id, None).await {
                     Ok(_) => return Ok(self.try_context()),
                     Err(error) if error.starts_with("PROFILE_LOCKED") => return Ok(None),
-                    Err(error) => return Err(error),
+                    // Store it before startup ends so the chooser can show it.
+                    Err(error) => {
+                        log::error!("Failed to open the profile: {error}");
+                        *self.auto_open_error()? = Some(error);
+                    }
                 }
             }
             Ok(None)
@@ -235,7 +243,14 @@ impl NativeProfiles {
             session,
             starting: self.starting.load(Ordering::SeqCst),
             startup_error: None,
+            auto_open_error: self.auto_open_error()?.clone(),
         })
+    }
+
+    fn auto_open_error(&self) -> Result<std::sync::MutexGuard<'_, Option<String>>, String> {
+        self.auto_open_error
+            .lock()
+            .map_err(|_| "Profile startup status is unavailable.".into())
     }
 
     pub async fn unlock(
@@ -246,6 +261,7 @@ impl NativeProfiles {
     ) -> Result<ProfileSession, String> {
         let epoch = self.lock_epoch.load(Ordering::SeqCst);
         let mut profile_sync_states = self.lifecycle.lock().await;
+        *self.auto_open_error()? = None;
         let registry = self.registry.clone();
         let protected = tauri::async_runtime::spawn_blocking(move || {
             let proof = proof.map(Zeroizing::new);
@@ -547,6 +563,7 @@ fn profile_state<R: tauri::Runtime>(handle: &AppHandle<R>) -> Result<ProfileStat
         session: None,
         starting: error.is_none(),
         startup_error: error,
+        auto_open_error: None,
     })
 }
 
@@ -880,6 +897,7 @@ mod sync_state_tests {
             active: Mutex::new(Some(runtime.clone())),
             lifecycle: tokio::sync::Mutex::new(HashMap::new()),
             starting: AtomicBool::new(false),
+            auto_open_error: Mutex::new(None),
             lock_epoch: AtomicU64::new(0),
         };
         (directory, profiles, runtime, session.scope_id)
@@ -1197,6 +1215,7 @@ mod sync_state_tests {
                 active: Mutex::new(None),
                 lifecycle: tokio::sync::Mutex::new(HashMap::new()),
                 starting: AtomicBool::new(true),
+                auto_open_error: Mutex::new(None),
                 lock_epoch: AtomicU64::new(0),
             })
             .invoke_handler(tauri::generate_handler![get_profile_state])
@@ -1251,6 +1270,20 @@ mod sync_state_tests {
         assert_eq!(state["profiles"][0]["id"], id.to_string());
         assert_eq!(state["starting"], true);
         assert!(!verify.join().unwrap().unwrap());
+    }
+
+    #[test]
+    fn profile_state_reports_why_the_only_profile_did_not_open() {
+        let (_directory, profiles, _runtime, _scope) = connect_profile();
+        let failure =
+            ProfileError::Unavailable("The profile credential store could not be accessed.".into())
+                .to_string();
+        *profiles.auto_open_error().unwrap() = Some(failure.clone());
+
+        // The chooser shows this; only a registry failure opens startup recovery.
+        let state = serde_json::to_value(profiles.state().unwrap()).unwrap();
+        assert_eq!(state["autoOpenError"], failure);
+        assert!(state["startupError"].is_null());
     }
 
     #[cfg(desktop)]
