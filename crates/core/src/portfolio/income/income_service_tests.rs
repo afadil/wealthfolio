@@ -422,3 +422,68 @@ fn income_converts_at_the_rate_on_the_day_it_was_received() {
         assert_eq!(summary.by_month.get("2025-05"), Some(&dec!(213)));
     }
 }
+
+#[test]
+fn income_counts_toward_its_month_in_the_users_timezone() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+
+    let fx_service = FxService::new(Arc::new(InMemoryFxRepository::new(Vec::new())));
+    fx_service.initialize().unwrap();
+
+    let service = IncomeService::new_with_timezone(
+        Arc::new(fx_service),
+        Arc::new(MockActivityRepository {
+            income: Mutex::new(vec![
+                // 08:30 on 1 January 2026 in Tokyo is still 2025 in UTC.
+                IncomeData {
+                    activity_date: Utc.with_ymd_and_hms(2025, 12, 31, 23, 30, 0).unwrap(),
+                    ..income("2025-12-31", "DIVIDEND", "SAP", "USD", dec!(100), "acc-usd")
+                },
+                // 08:30 on 1 March 2026 in Tokyo.
+                IncomeData {
+                    activity_date: Utc.with_ymd_and_hms(2026, 2, 28, 23, 30, 0).unwrap(),
+                    ..income(
+                        "2026-02-28",
+                        "DIVIDEND",
+                        "ASML",
+                        "USD",
+                        dec!(100),
+                        "acc-usd",
+                    )
+                },
+            ]),
+            first_activity_date: Utc.with_ymd_and_hms(2025, 12, 31, 23, 30, 0).unwrap(),
+        }),
+        Arc::new(RwLock::new("USD".to_string())),
+        Arc::new(RwLock::new("Asia/Tokyo".to_string())),
+    );
+
+    let summaries = service.get_income_summary(None).unwrap();
+
+    // The activity list shows these on 1 January and 1 March, so the income
+    // page counts them there too.
+    let months = |by_month: &HashMap<String, Decimal>| {
+        let mut months: Vec<_> = by_month
+            .iter()
+            .map(|(month, income)| (month.clone(), *income))
+            .collect();
+        months.sort();
+        months
+    };
+    let expected = vec![
+        ("2026-01".to_string(), dec!(100)),
+        ("2026-03".to_string(), dec!(100)),
+    ];
+    for period in ["ALL", "YTD"] {
+        let summary = summary(&summaries, period);
+        assert_eq!(summary.total_income, dec!(200));
+        assert_eq!(months(&summary.by_month), expected);
+        assert_eq!(months(&summary.by_account["acc-usd"].by_month), expected);
+    }
+    // Five months from January to June 2026, not six from December 2025.
+    assert_eq!(summary(&summaries, "ALL").monthly_average, dec!(40));
+
+    let last_year = summary(&summaries, "LAST_YEAR");
+    assert_eq!(last_year.total_income, dec!(0));
+    assert!(last_year.by_month.is_empty());
+}

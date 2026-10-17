@@ -123,6 +123,8 @@ impl IncomeServiceTrait for IncomeService {
                 }
             }
         };
+        // Months count in the user's timezone, as the income below does.
+        let oldest_date = activity_date_in_tz(oldest_date, timezone);
         let mut months_since_first_transaction: i32 =
             (current_date.year() - oldest_date.year()) * 12;
         months_since_first_transaction = months_since_first_transaction
@@ -145,8 +147,10 @@ impl IncomeServiceTrait for IncomeService {
         let mut two_years_ago_summary = IncomeSummary::new("TWO_YEARS_AGO", base_currency.clone());
 
         for activity in activities {
-            // Income counts toward the month and year of its UTC date.
-            let date = activity.activity_date.date_naive();
+            // Income counts toward the month and year of the day it was
+            // received in the user's timezone, the date the activity list
+            // shows, not its UTC date.
+            let date = activity_date_in_tz(activity.activity_date, timezone);
             let month = date.format("%Y-%m").to_string();
 
             // Income converts at the rate on the day it was received, as the
@@ -156,7 +160,7 @@ impl IncomeServiceTrait for IncomeService {
                 activity.amount,
                 &activity.currency,
                 &base_currency,
-                activity_date_in_tz(activity.activity_date, timezone),
+                date,
             ) {
                 Ok(amount) => Some(amount),
                 Err(e) => {
