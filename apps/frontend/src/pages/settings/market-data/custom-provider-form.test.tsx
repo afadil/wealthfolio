@@ -139,6 +139,53 @@ describe("CustomProviderForm", () => {
     );
   });
 
+  it("saves a non-JSON form body when the body type is form", async () => {
+    const user = userEvent.setup();
+
+    render(<CustomProviderForm open onOpenChange={vi.fn()} />);
+    fillLatestSource("https://example.test/api/quote");
+    await user.selectOptions(screen.getByLabelText(/http method/i), "POST");
+    await user.selectOptions(screen.getByLabelText(/body type/i), "form");
+    setInputValue(screen.getByLabelText(/request body/i), "symbol={SYMBOL}");
+
+    const payload = await submittedPayload();
+    expect(payload.sources[0]).toEqual(
+      expect.objectContaining({ method: "POST", body: "symbol={SYMBOL}", bodyType: "form" }),
+    );
+  });
+
+  it("still requires valid JSON for a JSON body", async () => {
+    const user = userEvent.setup();
+
+    render(<CustomProviderForm open onOpenChange={vi.fn()} />);
+    fillLatestSource("https://example.test/api/quote");
+    await user.selectOptions(screen.getByLabelText(/http method/i), "POST");
+    setInputValue(screen.getByLabelText(/request body/i), "symbol={SYMBOL}");
+
+    const createButton = screen.getByRole("button", { name: /create provider/i });
+    fireEvent.submit(createButton.closest("form")!);
+
+    expect(await screen.findByText(/must be valid json/i)).toBeInTheDocument();
+    expect(createProvider).not.toHaveBeenCalled();
+  });
+
+  it("passes the body type to the source tester", async () => {
+    const user = userEvent.setup();
+
+    render(<CustomProviderForm open onOpenChange={vi.fn()} />);
+    setInputValue(screen.getByLabelText(/url template/i), "https://example.test/api/quote");
+    await user.selectOptions(screen.getByLabelText(/http method/i), "POST");
+    await user.selectOptions(screen.getByLabelText(/body type/i), "form");
+    setInputValue(screen.getByLabelText(/request body/i), "symbol={SYMBOL}");
+    setInputValue(screen.getByPlaceholderText("e.g. AAPL"), "JKH.N0000");
+    await user.click(screen.getByRole("button", { name: /^fetch$/i }));
+
+    expect(testSource).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "symbol={SYMBOL}", bodyType: "form" }),
+      expect.any(Object),
+    );
+  });
+
   it("resets POST state when applying a quick-start template", async () => {
     const user = userEvent.setup();
 

@@ -61,8 +61,10 @@ const sourceSchema = z.object({
   headers: z.string().optional(),
   /** HTTP method: "GET" or "POST" */
   method: z.enum(["GET", "POST"]).default("GET"),
-  /** Request body for POST requests (JSON string) */
+  /** Request body for POST requests */
   body: z.string().optional(),
+  /** Encoding of `body` */
+  bodyType: z.enum(["json", "form"]).default("json"),
   openPath: z.string().optional(),
   highPath: z.string().optional(),
   lowPath: z.string().optional(),
@@ -121,6 +123,7 @@ function emptySource(dateTimezoneDefault = ""): SourceFormValues {
     headers: "",
     method: "GET",
     body: "",
+    bodyType: "json",
     openPath: "",
     highPath: "",
     lowPath: "",
@@ -147,6 +150,7 @@ function sourceDefaults(
         headers: source.headers ?? "",
         method: source.method ?? "GET",
         body: source.body ?? "",
+        bodyType: source.bodyType ?? "json",
         openPath: source.openPath ?? "",
         highPath: source.highPath ?? "",
         lowPath: source.lowPath ?? "",
@@ -209,7 +213,7 @@ function validateSource(
         "body",
         t("settings:market_data_page.validation_body_required"),
       );
-    } else {
+    } else if (source.bodyType !== "form") {
       try {
         JSON.parse(body);
       } catch {
@@ -476,6 +480,7 @@ function CustomProviderFormContent({
         headers: src.headers || undefined,
         method: src.method ?? "GET",
         body: src.body || undefined,
+        bodyType: src.bodyType ?? "json",
         openPath: src.openPath || undefined,
         highPath: src.highPath || undefined,
         lowPath: src.lowPath || undefined,

@@ -173,6 +173,7 @@ export function useSourceRuntime({
     const pricePathCurrent = form.getValues(`${prefix}.pricePath`);
     const method = form.getValues(`${prefix}.method`) ?? "GET";
     const body = form.getValues(`${prefix}.body`);
+    const bodyType = form.getValues(`${prefix}.bodyType`) ?? "json";
 
     setTestResult(null);
     setFetchError(null);
@@ -191,6 +192,7 @@ export function useSourceRuntime({
         headers: headers || undefined,
         method,
         body: body || undefined,
+        bodyType,
         isin: inputsState.isin || undefined,
         mic: inputsState.mic || undefined,
       },
@@ -280,6 +282,7 @@ export function useSourceRuntime({
             headers: values?.headers || undefined,
             method: values?.method ?? "GET",
             body: values?.body || undefined,
+            bodyType: values?.bodyType ?? "json",
             isin: inputsState.isin || undefined,
             mic: inputsState.mic || undefined,
             openPath: values?.openPath || undefined,
@@ -382,6 +385,7 @@ export function useSourceRuntime({
       form.setValue(`${prefix}.headers`, t.headers ?? "");
       form.setValue(`${prefix}.method`, "GET");
       form.setValue(`${prefix}.body`, "");
+      form.setValue(`${prefix}.bodyType`, "json");
       form.setValue(`${prefix}.currencyPath`, t.currencyPath ?? "");
       form.setValue(`${prefix}.locale`, "");
       form.setValue(`${prefix}.factor`, undefined);

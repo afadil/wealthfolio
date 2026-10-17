@@ -27,6 +27,29 @@ impl HttpMethod {
     }
 }
 
+/// Encoding of a POST request body.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum BodyType {
+    #[default]
+    Json,
+    /// `application/x-www-form-urlencoded`
+    Form,
+}
+
+impl BodyType {
+    fn content_type(self) -> &'static str {
+        match self {
+            BodyType::Json => "application/json",
+            BodyType::Form => "application/x-www-form-urlencoded",
+        }
+    }
+
+    fn is_json(&self) -> bool {
+        matches!(self, BodyType::Json)
+    }
+}
+
 /// Fully expanded request data shared by custom-provider testing and runtime fetching.
 pub(crate) struct PreparedCustomProviderRequest {
     pub(crate) url: String,
@@ -115,6 +138,20 @@ pub fn expand_template(
     template: &str,
     ctx: &TemplateContext<'_>,
 ) -> Result<String, TemplateExpansionError> {
+    expand_template_with(template, ctx, |value| value.to_string())
+}
+
+/// Percent-encode a value for an `application/x-www-form-urlencoded` body.
+fn form_encode(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// Expand placeholders, passing every substituted value through `escape`.
+fn expand_template_with(
+    template: &str,
+    ctx: &TemplateContext<'_>,
+    escape: impl Fn(&str) -> String,
+) -> Result<String, TemplateExpansionError> {
     for captures in DATE_TEMPLATE_RE.captures_iter(template) {
         let variable = &captures[1];
         let format = &captures[2];
@@ -131,18 +168,18 @@ pub fn expand_template(
 
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
     let mut out = template
-        .replace("{SYMBOL}", ctx.symbol)
-        .replace("{currency}", &ctx.currency.to_lowercase())
-        .replace("{CURRENCY}", &ctx.currency.to_uppercase())
-        .replace("{TODAY}", &today)
-        .replace("{FROM}", ctx.from.unwrap_or(&today))
-        .replace("{TO}", ctx.to.unwrap_or(&today));
+        .replace("{SYMBOL}", &escape(ctx.symbol))
+        .replace("{currency}", &escape(&ctx.currency.to_lowercase()))
+        .replace("{CURRENCY}", &escape(&ctx.currency.to_uppercase()))
+        .replace("{TODAY}", &escape(&today))
+        .replace("{FROM}", &escape(ctx.from.unwrap_or(&today)))
+        .replace("{TO}", &escape(ctx.to.unwrap_or(&today)));
 
     if out.contains("{ISIN}") {
-        out = out.replace("{ISIN}", ctx.isin.unwrap_or(ctx.symbol));
+        out = out.replace("{ISIN}", &escape(ctx.isin.unwrap_or(ctx.symbol)));
     }
     if out.contains("{MIC}") {
-        out = out.replace("{MIC}", ctx.mic.unwrap_or(""));
+        out = out.replace("{MIC}", &escape(ctx.mic.unwrap_or("")));
     }
     // Formatted date templates:
     //   {DATE:format}                 - current instant (all valid Chrono directives)
@@ -158,7 +195,7 @@ pub fn expand_template(
                 let format = &caps[2];
                 // DATE uses the current instant directly so time components work.
                 if var == "DATE" {
-                    return chrono::Utc::now().format(format).to_string();
+                    return escape(&chrono::Utc::now().format(format).to_string());
                 }
                 let date_str = match var {
                     "FROM" => ctx.from.unwrap_or(&today),
@@ -166,15 +203,17 @@ pub fn expand_template(
                     _ => &today, // TODAY
                 };
                 // Parse the ISO date and reformat; fall back to the raw string.
-                match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                    Ok(parsed) => parsed
-                        .and_hms_opt(0, 0, 0)
-                        .expect("midnight is always valid")
-                        .and_utc()
-                        .format(format)
-                        .to_string(),
-                    Err(_) => date_str.to_string(),
-                }
+                escape(
+                    &match chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                        Ok(parsed) => parsed
+                            .and_hms_opt(0, 0, 0)
+                            .expect("midnight is always valid")
+                            .and_utc()
+                            .format(format)
+                            .to_string(),
+                        Err(_) => date_str.to_string(),
+                    },
+                )
             })
             .to_string();
     }
@@ -253,14 +292,17 @@ pub fn build_browser_like_headers(format: &str, url: &str) -> reqwest::header::H
 
 /// Expand templates and prepare a custom-provider HTTP request.
 ///
-/// User headers override defaults. POST requests receive a JSON content type only
-/// when the user did not configure one explicitly.
+/// User headers override defaults. POST requests receive a content type matching
+/// `body_type` only when the user did not configure one explicitly. Form bodies
+/// have their placeholder values percent-encoded.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn prepare_custom_provider_request<E>(
     method: &HttpMethod,
     format: &str,
     url_template: &str,
     headers_json: Option<&str>,
     body_template: Option<&str>,
+    body_type: BodyType,
     ctx: &TemplateContext<'_>,
     resolve_header_value: impl Fn(&str) -> Result<String, E>,
 ) -> Result<PreparedCustomProviderRequest, PrepareRequestError<E>> {
@@ -270,7 +312,7 @@ pub(crate) fn prepare_custom_provider_request<E>(
     if matches!(method, HttpMethod::Post) {
         headers.insert(
             reqwest::header::CONTENT_TYPE,
-            reqwest::header::HeaderValue::from_static("application/json"),
+            reqwest::header::HeaderValue::from_static(body_type.content_type()),
         );
     }
 
@@ -298,7 +340,10 @@ pub(crate) fn prepare_custom_provider_request<E>(
         method: method.clone(),
         headers,
         body: body_template
-            .map(|body| expand_template(body, ctx))
+            .map(|body| match body_type {
+                BodyType::Json => expand_template(body, ctx),
+                BodyType::Form => expand_template_with(body, ctx, form_encode),
+            })
             .transpose()
             .map_err(PrepareRequestError::Template)?,
     })
@@ -340,9 +385,12 @@ pub struct CustomProviderSource {
     /// HTTP method: "GET" or "POST"
     #[serde(default)]
     pub method: HttpMethod,
-    /// Request body for POST requests (JSON string)
+    /// Request body for POST requests
     #[serde(default)]
     pub body: Option<String>,
+    /// Encoding of `body`; absent in sources saved before form bodies existed.
+    #[serde(default)]
+    pub body_type: BodyType,
     #[serde(default)]
     pub open_path: Option<String>,
     pub high_path: Option<String>,
@@ -415,9 +463,12 @@ pub struct NewCustomProviderSource {
     /// HTTP method: "GET" or "POST"
     #[serde(default)]
     pub method: HttpMethod,
-    /// Request body for POST requests (JSON string)
+    /// Request body for POST requests
     #[serde(default)]
     pub body: Option<String>,
+    /// Encoding of `body`; absent in sources saved before form bodies existed.
+    #[serde(default, skip_serializing_if = "BodyType::is_json")]
+    pub body_type: BodyType,
     #[serde(default)]
     pub open_path: Option<String>,
     pub high_path: Option<String>,
@@ -444,9 +495,12 @@ pub struct TestSourceRequest {
     /// HTTP method: "GET" or "POST"
     #[serde(default)]
     pub method: HttpMethod,
-    /// Request body for POST requests (JSON string)
+    /// Request body for POST requests
     #[serde(default)]
     pub body: Option<String>,
+    /// Encoding of `body`; absent in sources saved before form bodies existed.
+    #[serde(default)]
+    pub body_type: BodyType,
     /// Symbol to substitute in template variables
     pub symbol: String,
     /// ISIN to substitute in template variables.
@@ -642,6 +696,7 @@ mod tests {
             "https://example.test/quotes",
             None,
             Some(r#"{"from":"{FROM:%Q}"}"#),
+            BodyType::Json,
             &ctx(None, None),
             |value| Ok::<_, ()>(value.to_string()),
         );
@@ -684,6 +739,7 @@ mod tests {
             "https://example.test/quotes",
             None,
             Some(r#"{"symbol":"{SYMBOL}","isin":"{ISIN}","mic":"{MIC}","currency":"{CURRENCY}","from":"{FROM}","to":"{TO}"}"#),
+            BodyType::Json,
             &context,
             |value| Ok::<_, ()>(value.to_string()),
         )
@@ -720,6 +776,7 @@ mod tests {
                 "https://example.test/quotes/{SYMBOL}",
                 headers,
                 None,
+                BodyType::Json,
                 &ctx(None, None),
                 |value| Ok::<_, ()>(value.to_string()),
             )
@@ -737,5 +794,93 @@ mod tests {
                 "application/vnd.test+json"
             );
         }
+    }
+
+    fn prepare_form(
+        headers: Option<&str>,
+        body: &str,
+        symbol: &str,
+    ) -> (reqwest::header::HeaderMap, String) {
+        let context = TemplateContext {
+            symbol,
+            currency: "usd",
+            isin: None,
+            mic: None,
+            from: Some("2024-01-01"),
+            to: Some("2024-06-30"),
+        };
+        let prepared = prepare_custom_provider_request(
+            &HttpMethod::Post,
+            "json",
+            "https://example.test/quotes",
+            headers,
+            Some(body),
+            BodyType::Form,
+            &context,
+            |value| Ok::<_, ()>(value.to_string()),
+        )
+        .unwrap();
+        let request = prepared
+            .request_builder(&reqwest::Client::new())
+            .build()
+            .unwrap();
+        let body = request
+            .body()
+            .and_then(|body| body.as_bytes())
+            .map(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+            .unwrap();
+        (request.headers().clone(), body)
+    }
+
+    #[test]
+    fn form_body_defaults_to_urlencoded_content_type_and_expands_placeholders() {
+        let (headers, body) =
+            prepare_form(None, "symbol={SYMBOL}&from={FROM:%d/%m/%Y}", "JKH.N0000");
+
+        assert_eq!(
+            headers.get(reqwest::header::CONTENT_TYPE).unwrap(),
+            "application/x-www-form-urlencoded"
+        );
+        assert_eq!(body, "symbol=JKH.N0000&from=01%2F01%2F2024");
+    }
+
+    #[test]
+    fn form_body_percent_encodes_placeholder_values_only() {
+        let (_, body) = prepare_form(None, "symbol={SYMBOL}&kind=a b", "A&B=C D");
+
+        assert_eq!(body, "symbol=A%26B%3DC+D&kind=a b");
+    }
+
+    #[test]
+    fn form_body_keeps_explicit_content_type_header() {
+        let (headers, _) = prepare_form(
+            Some(r#"{"Content-Type":"application/x-www-form-urlencoded; charset=utf-8"}"#),
+            "symbol={SYMBOL}",
+            "AAPL",
+        );
+
+        assert_eq!(
+            headers.get(reqwest::header::CONTENT_TYPE).unwrap(),
+            "application/x-www-form-urlencoded; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn body_type_defaults_to_json_and_json_is_not_serialized() {
+        let source: NewCustomProviderSource = serde_json::from_str(
+            r#"{"kind":"latest","format":"json","url":"u","pricePath":"$.p","method":"POST","body":"{}"}"#,
+        )
+        .unwrap();
+        assert_eq!(source.body_type, BodyType::Json);
+        assert!(!serde_json::to_string(&source).unwrap().contains("bodyType"));
+
+        let form: NewCustomProviderSource = serde_json::from_str(
+            r#"{"kind":"latest","format":"json","url":"u","pricePath":"$.p","method":"POST","body":"a=b","bodyType":"form"}"#,
+        )
+        .unwrap();
+        assert_eq!(form.body_type, BodyType::Form);
+        assert!(serde_json::to_string(&form)
+            .unwrap()
+            .contains(r#""bodyType":"form""#));
     }
 }

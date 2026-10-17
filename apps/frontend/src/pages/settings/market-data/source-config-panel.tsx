@@ -315,6 +315,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
   const lowPath = form.watch(`${prefix}.lowPath`);
   const volumePath = form.watch(`${prefix}.volumePath`);
   const method = form.watch(`${prefix}.method`) ?? "GET";
+  const bodyType = form.watch(`${prefix}.bodyType`) ?? "json";
 
   // POST is only supported for the JSON API source type. Switching to any other
   // format falls back to GET so stale POST config can't linger and trip the
@@ -323,6 +324,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
     if (format !== "json" && method === "POST") {
       form.setValue(`${prefix}.method`, "GET");
       form.setValue(`${prefix}.body`, "");
+      form.setValue(`${prefix}.bodyType`, "json");
     }
   }, [format, method, prefix, form]);
 
@@ -530,6 +532,7 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                         onChange={(e) => {
                           field.onChange(e.target.value as "GET" | "POST");
                           form.setValue(`${prefix}.body`, "");
+                          form.setValue(`${prefix}.bodyType`, "json");
                         }}
                       >
                         <option value="GET">GET</option>
@@ -541,6 +544,35 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                 )}
               />
 
+              {/* POST body type (only shown when method is POST) */}
+              {method === "POST" && (
+                <FormField
+                  control={form.control}
+                  name={`${prefix}.bodyType`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                        {t("settings:market_data_page.body_type")}
+                      </FormLabel>
+                      <FormControl>
+                        <select
+                          className="bg-background border-input ring-offset-background focus-visible:ring-ring flex h-9 w-[180px] rounded-md border px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          {...field}
+                        >
+                          <option value="json">
+                            {t("settings:market_data_page.body_type_json")}
+                          </option>
+                          <option value="form">
+                            {t("settings:market_data_page.body_type_form")}
+                          </option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               {/* POST Body (only shown when method is POST) */}
               {method === "POST" && (
                 <FormField
@@ -549,12 +581,18 @@ export function SourceConfigPanel({ form, prefix, runtime, onUrlChange }: Source
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-                        {t("settings:market_data_page.request_body_json")}
+                        {bodyType === "form"
+                          ? t("settings:market_data_page.request_body_form")
+                          : t("settings:market_data_page.request_body_json")}
                       </FormLabel>
                       <FormControl>
                         <Textarea
                           rows={4}
-                          placeholder='{"symbol": "{SYMBOL}", "fields": ["close", "volume"]}'
+                          placeholder={
+                            bodyType === "form"
+                              ? "symbol={SYMBOL}"
+                              : '{"symbol": "{SYMBOL}", "fields": ["close", "volume"]}'
+                          }
                           className="font-mono text-xs"
                           {...field}
                         />

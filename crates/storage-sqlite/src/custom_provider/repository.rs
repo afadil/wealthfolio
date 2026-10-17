@@ -81,6 +81,7 @@ fn to_domain_sources(
             headers: s.headers,
             method: s.method,
             body: s.body,
+            body_type: s.body_type,
             open_path: s.open_path,
             high_path: s.high_path,
             low_path: s.low_path,

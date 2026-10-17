@@ -150,6 +150,7 @@ impl CustomProviderService {
             &payload.url,
             payload.headers.as_deref(),
             payload.body.as_deref(),
+            payload.body_type,
             &tctx,
             |value| {
                 if let Some(key) = value.strip_prefix("__SECRET__") {

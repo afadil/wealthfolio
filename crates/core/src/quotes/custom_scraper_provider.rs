@@ -290,6 +290,7 @@ impl CustomScraperProvider {
             &source.url,
             source.headers.as_deref(),
             source.body.as_deref(),
+            source.body_type,
             &tctx,
             |value| self.resolve_secret(value),
         )
@@ -1245,6 +1246,7 @@ mod tests {
             headers: None,
             method: HttpMethod::Get,
             body: None,
+            body_type: Default::default(),
             open_path: None,
             high_path: None,
             low_path: None,
@@ -1631,6 +1633,7 @@ mod tests {
             headers: None,
             method: HttpMethod::Get,
             body: None,
+            body_type: Default::default(),
             open_path: None,
             high_path: None,
             low_path: None,

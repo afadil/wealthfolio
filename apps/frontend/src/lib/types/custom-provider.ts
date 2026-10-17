@@ -14,8 +14,10 @@ export interface CustomProviderSource {
   headers?: string;
   /** HTTP method: "GET" or "POST" */
   method?: "GET" | "POST";
-  /** Request body for POST requests (JSON string) */
+  /** Request body for POST requests */
   body?: string;
+  /** Encoding of `body`; absent means "json" */
+  bodyType?: "json" | "form";
   openPath?: string;
   highPath?: string;
   lowPath?: string;
@@ -67,8 +69,10 @@ export interface NewCustomProviderSource {
   headers?: string;
   /** HTTP method: "GET" or "POST" */
   method?: "GET" | "POST";
-  /** Request body for POST requests (JSON string) */
+  /** Request body for POST requests */
   body?: string;
+  /** Encoding of `body`; absent means "json" */
+  bodyType?: "json" | "form";
   openPath?: string;
   highPath?: string;
   lowPath?: string;
@@ -90,8 +94,10 @@ export interface TestSourceRequest {
   headers?: string;
   /** HTTP method: "GET" or "POST" */
   method?: "GET" | "POST";
-  /** Request body for POST requests (JSON string) */
+  /** Request body for POST requests */
   body?: string;
+  /** Encoding of `body`; absent means "json" */
+  bodyType?: "json" | "form";
   symbol: string;
   isin?: string;
   mic?: string;
