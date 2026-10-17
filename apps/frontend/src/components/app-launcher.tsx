@@ -28,8 +28,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  DialogDescription,
-  DialogTitle,
   Icons,
   Sheet,
   SheetContent,
@@ -786,12 +784,10 @@ export function AppLauncher() {
     <CommandDialog
       open={open}
       onOpenChange={setOpen}
+      title={t("common:component.command_palette")}
+      description={t("common:component.command_palette_description")}
       contentClassName="w-[calc(100%_-_2rem)] max-w-[720px] rounded-[28px] [&>button]:top-6 [&_[cmdk-item]]:rounded-xl [&_[data-cmdk-input-wrapper]]:h-16 [&_[data-cmdk-input-wrapper]]:px-5"
     >
-      <DialogTitle className="sr-only">{t("common:component.command_palette")}</DialogTitle>
-      <DialogDescription className="sr-only">
-        {t("common:component.command_palette_description")}
-      </DialogDescription>
       {commandContent}
     </CommandDialog>
   );

@@ -141,6 +141,11 @@ and this project adheres to
   `bg-destructive` override keeps a matching arrow. The bubble's last child is
   now the arrow: use `flex flex-col gap-*` instead of `space-y-*` on
   `TooltipContent`, or the last line gains a bottom margin.
+- `CommandDialog` takes `title` and `description`, rendered for screen readers
+  only (defaults "Command Palette" and "Search for a command to run..."), and
+  `showCloseButton` (default `true`). Pass your own title through `title` rather
+  than rendering a `DialogTitle` inside it. Icons in a `CommandItem` keep a
+  `size-*` class they set; others are still 16 px.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
