@@ -127,6 +127,7 @@
   "tools": {
     "calling": "{{toolName}} 호출 중...",
     "cancelled": "{{toolName}} 취소됨",
+    "notUsed": "사용되지 않은 도구: {{toolName}}",
     "used": "사용된 도구: {{toolName}}"
   },
   "accounts": {

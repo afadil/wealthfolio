@@ -92,6 +92,8 @@ struct HookState {
     pause_for_asset_selection: bool,
     /// Set once the turn reached a limit; every later model call must answer.
     at_limit: bool,
+    /// The current model call is one that must answer.
+    answering: bool,
 }
 
 #[derive(Default, Clone)]
@@ -217,7 +219,8 @@ impl AgentHook for WealthfolioStreamHook {
         }
         let at_limit = self.state.lock().is_ok_and(|mut state| {
             state.at_limit |= event.turn >= MAX_MODEL_CALLS;
-            state.at_limit
+            state.answering = state.at_limit;
+            state.answering
         });
         if at_limit {
             warn!(
@@ -338,10 +341,10 @@ impl AgentHook for WealthfolioStreamHook {
         _event: &InvalidToolCallContext,
     ) -> impl std::future::Future<Output = Option<InvalidToolCallAction>> + Send {
         // A tool call on the answering call ends the turn with what it has;
-        // otherwise the run's own policy decides.
-        let action = self
-            .reached_limit()
-            .then(|| InvalidToolCallAction::stop(LIMIT_STOP));
+        // otherwise the run's own policy decides. A batch that reaches the cap
+        // is not answering yet: stopping it would drop its results.
+        let answering = self.state.lock().is_ok_and(|state| state.answering);
+        let action = answering.then(|| InvalidToolCallAction::stop(LIMIT_STOP));
         async move { action }
     }
 

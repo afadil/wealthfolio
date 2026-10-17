@@ -127,6 +127,7 @@
   "tools": {
     "calling": "{{toolName}} wird aufgerufen...",
     "cancelled": "{{toolName}} abgebrochen",
+    "notUsed": "Tool nicht verwendet: {{toolName}}",
     "used": "Verwendetes Tool: {{toolName}}"
   },
   "accounts": {

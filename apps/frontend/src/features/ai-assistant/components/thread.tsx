@@ -15,7 +15,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { ComposerAddAttachment, ComposerAttachments, UserMessageAttachments } from "./attachment";
 import { MarkdownText } from "./markdown-text";
-import { ToolFallback } from "./tool-fallback";
+import { ToolCallPart } from "./tool-fallback";
 import { TooltipIconButton } from "./tooltip-icon-button";
 
 import { cn } from "@/lib/utils";
@@ -323,7 +323,7 @@ const AssistantMessage: FC = () => {
               </ToolRenderErrorBoundary>
             ),
             tools: {
-              Fallback: ToolFallback,
+              Override: ToolCallPart,
             },
           }}
         />
