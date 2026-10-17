@@ -253,7 +253,7 @@ export function NetWorthContent() {
                             className="flex items-center justify-between gap-2"
                           >
                             <span className="truncate">{asset.name ?? asset.assetId}</span>
-                            <span className="text-muted-foreground shrink-0">
+                            <span className="text-background/70 shrink-0">
                               {t("insights:networth.days_ago", { count: asset.daysStale })}
                             </span>
                           </li>

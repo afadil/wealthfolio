@@ -478,7 +478,7 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
                       <TooltipContent side="top" align="center">
                         <div className="text-center">
                           <div className="font-medium">{asset.symbol}</div>
-                          <div className="text-muted-foreground text-xs">
+                          <div className="text-background/70 text-xs">
                             {formatValue(asset.income)} (
                             {formatting.formatPercent(asset.percentage / 100)})
                           </div>

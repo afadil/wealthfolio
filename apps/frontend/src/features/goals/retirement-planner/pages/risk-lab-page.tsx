@@ -178,12 +178,12 @@ function InlineAmountTooltip({
       <TooltipContent className="max-w-xs text-xs">
         <div className="text-2xs font-semibold uppercase tracking-wider">{label}</div>
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
-          <span className="text-muted-foreground">{t("goals:risk_lab.results.base_plan")}</span>
+          <span className="text-background/70">{t("goals:risk_lab.results.base_plan")}</span>
           <span className="text-right">{fmt(baseline, currency, formatting)}</span>
-          <span className="text-muted-foreground">{t("goals:risk_lab.results.stress_test")}</span>
+          <span className="text-background/70">{t("goals:risk_lab.results.stress_test")}</span>
           <span className="text-right">{fmt(stressed, currency, formatting)}</span>
-          <span className="text-muted-foreground">{t("goals:risk_lab.results.change")}</span>
-          <span className={cn("text-right", delta < 0 ? "text-destructive" : "text-amber-600")}>
+          <span className="text-background/70">{t("goals:risk_lab.results.change")}</span>
+          <span className="text-right">
             {delta > 0 ? "+" : delta < 0 ? "-" : ""}
             {fmt(Math.abs(delta), currency, formatting)}
           </span>
@@ -1412,37 +1412,28 @@ function DecisionHeatmap({
                           {localizedBackendLabel(t, matrix.columnLabel)}
                         </div>
                         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
-                          <span className="text-muted-foreground">
+                          <span className="text-background/70">
                             {localizedBackendLabel(t, matrix.rowLabel)}
                           </span>
                           <span className="text-right">
                             {formatRow(rowValue, matrix.rowLabels[row] ?? "")}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-background/70">
                             {localizedBackendLabel(t, matrix.columnLabel)}
                           </span>
                           <span className="text-right">
                             {formatColumn(columnValue, matrix.columnLabels[column] ?? "")}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-background/70">
                             {t("goals:risk_lab.results.money_left_at_end")}
                           </span>
                           <span className="text-right">
                             {fmt(cell.portfolioAtHorizon, currency, amountFormatting)}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-background/70">
                             {t("goals:risk_lab.results.change_vs_base_plan")}
                           </span>
-                          <span
-                            className={cn(
-                              "text-right",
-                              cell.portfolioAtHorizon > range.baselinePortfolio
-                                ? "text-success"
-                                : cell.portfolioAtHorizon < range.baselinePortfolio
-                                  ? "text-muted-foreground"
-                                  : "",
-                            )}
-                          >
+                          <span className="text-right">
                             {cell.portfolioAtHorizon >= range.baselinePortfolio ? "+" : "-"}
                             {fmt(
                               Math.abs(cell.portfolioAtHorizon - range.baselinePortfolio),
@@ -1450,11 +1441,11 @@ function DecisionHeatmap({
                               amountFormatting,
                             )}
                           </span>
-                          <span className="text-muted-foreground">{ageMetricLabel}</span>
+                          <span className="text-background/70">{ageMetricLabel}</span>
                           <span className="text-right">
                             {cell.fiAge ?? t("goals:risk_lab.results.not_reached")}
                           </span>
-                          <span className="text-muted-foreground">
+                          <span className="text-background/70">
                             {t("goals:risk_lab.results.shortfall_at_retirement")}
                           </span>
                           <span className="text-right">

@@ -87,7 +87,7 @@ export function HealthStatusIndicator() {
         <TooltipContent side="bottom">
           <div className="space-y-1">
             <p className="font-medium">{t("common:component.health_issues")}</p>
-            <p className="text-muted-foreground text-xs">{summaryText}</p>
+            <p className="text-background/70 text-xs">{summaryText}</p>
           </div>
         </TooltipContent>
       </Tooltip>

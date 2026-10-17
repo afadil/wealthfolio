@@ -623,13 +623,13 @@ export default function DashboardPage({
                           <div className="font-semibold">
                             {t("goals:dashboard.value_mode.todays_value")}
                           </div>
-                          <p className="text-muted-foreground mt-1">
+                          <p className="text-background/70 mt-1">
                             {t("goals:dashboard.value_mode.todays_value_tip")}
                           </p>
                           <div className="mt-3 font-semibold">
                             {t("goals:dashboard.value_mode.nominal")}
                           </div>
-                          <p className="text-muted-foreground mt-1">
+                          <p className="text-background/70 mt-1">
                             {t("goals:dashboard.value_mode.nominal_tip")}
                           </p>
                         </TooltipContent>

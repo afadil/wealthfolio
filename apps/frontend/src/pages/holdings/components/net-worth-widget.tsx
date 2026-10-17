@@ -258,7 +258,7 @@ export const NetWorthWidget = ({
                     )}
                   </p>
                   {netWorthData && netWorthData.staleAssets.length > 0 && (
-                    <p className="text-muted-foreground mt-1 text-xs">
+                    <p className="text-background/70 mt-1 text-xs">
                       {t("holdings:assets_need_valuations", {
                         count: netWorthData.staleAssets.length,
                       })}
