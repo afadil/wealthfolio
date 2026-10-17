@@ -202,13 +202,11 @@ export function CompactAllocationStrip({
                 {!isEmpty && (
                   <TooltipContent side="top" align="center">
                     <div className="text-center">
-                      <span className="text-muted-foreground text-2xs uppercase">
-                        {category.name}
-                      </span>
+                      <span className="text-background/70 text-2xs uppercase">{category.name}</span>
                       <div className="font-medium">
                         {formatting.formatPercent(category.percent / 100)}
                       </div>
-                      <div className="text-muted-foreground text-xs">
+                      <div className="text-background/70 text-xs">
                         <PrivacyAmount value={category.value} currency={baseCurrency} />
                       </div>
                     </div>

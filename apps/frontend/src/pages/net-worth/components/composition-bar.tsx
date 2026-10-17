@@ -44,7 +44,7 @@ export function CompositionBar({ data, className }: { data: ParsedNetWorth; clas
             />
             <TooltipContent side="bottom" className="text-xs">
               <span className="font-medium">{item.name}</span>
-              <span className="text-muted-foreground ml-2">{item.percentage.toFixed(1)}%</span>
+              <span className="text-background/70 ml-2">{item.percentage.toFixed(1)}%</span>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

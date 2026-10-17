@@ -277,7 +277,7 @@ const ErrorCell = ({
             <Icons.AlertCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
           </div>
         </TooltipTrigger>
-        <TooltipContent className="bg-destructive text-destructive-foreground dark:border-destructive max-w-[400px] space-y-2 border-none p-3 shadow-lg">
+        <TooltipContent className="bg-destructive text-destructive-foreground dark:border-destructive flex max-w-[400px] flex-col gap-2 border-none p-3 shadow-lg">
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {errorMessages.map((error, index) => (
               <li key={index}>{error}</li>

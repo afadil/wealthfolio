@@ -394,12 +394,12 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
                   </TooltipTrigger>
                   <TooltipContent side="top" align="center">
                     <div className="text-center">
-                      <span className="text-muted-foreground text-2xs uppercase">
+                      <span className="text-background/70 text-2xs uppercase">
                         {category.categoryName}
                       </span>
                       <div className="font-medium">{formatting.formatPercent(percent)}</div>
                       {!isBalanceHidden && (
-                        <div className="text-muted-foreground text-xs">
+                        <div className="text-background/70 text-xs">
                           {formatValue(category.value)}
                         </div>
                       )}

@@ -134,6 +134,13 @@ and this project adheres to
   line up; pass `alignItemWithTrigger={false}` to open below it.
   `DropdownMenuItem variant="destructive"` highlights on the pale red status
   surface. `PopoverHeader`, `PopoverTitle` and `PopoverDescription` are added.
+- `TooltipContent` is shadcn's dark bubble: `--foreground` fill, `--background`
+  text, 12 px text, an arrow and a 20rem maximum width. Muted text inside a
+  tooltip needs `text-background/70` rather than `text-muted-foreground`, which
+  is unreadable on the dark fill. The arrow takes the bubble's colour, so a
+  `bg-destructive` override keeps a matching arrow. The bubble's last child is
+  now the arrow: use `flex flex-col gap-*` instead of `space-y-*` on
+  `TooltipContent`, or the last line gains a bottom margin.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
