@@ -3192,13 +3192,14 @@ impl ActivityRepositoryTrait for ActivityRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{create_pool, get_connection, init, run_migrations, write_actor::spawn_writer};
+    use crate::db::{
+        create_pool, get_connection, init, run_migrations, write_actor::spawn_writer, TestDir,
+    };
     use crate::fx::FxRepository;
     use crate::limits::ContributionLimitRepository;
     use crate::schema::{spending_activity_splits, sync_outbox};
     use crate::sync::app_sync::AppSyncRepository;
     use rust_decimal::Decimal;
-    use tempfile::tempdir;
     use wealthfolio_core::activities::{import_type, ActivityStatus, ActivityUpsert};
     use wealthfolio_core::fx::FxService;
     use wealthfolio_core::limits::{ContributionLimitService, ContributionLimitServiceTrait};
@@ -3207,10 +3208,10 @@ mod tests {
     fn setup_db() -> (
         Arc<Pool<ConnectionManager<SqliteConnection>>>,
         WriteHandle,
-        tempfile::TempDir,
+        TestDir,
     ) {
         std::env::set_var("CONNECT_API_URL", "http://test.local");
-        let dir = tempdir().expect("tempdir");
+        let dir = TestDir::new();
         let app_data = dir.path().to_string_lossy().to_string();
         let db_path = init(&app_data).expect("init db");
         run_migrations(&db_path).expect("migrate db");
