@@ -666,6 +666,146 @@ async fn the_tool_call_cap_makes_the_next_model_call_answer() {
     assert_eq!(saved_answer(&env, &events), "One account.");
 }
 
+/// The tool results saved for the turn, as `(tool_call_id, success, error)`.
+fn saved_tool_results(
+    env: &MockEnvironment,
+    events: &[AiStreamEvent],
+) -> Vec<(String, bool, Option<String>)> {
+    env.chat_repository()
+        .get_messages_by_thread(&thread_id(events))
+        .unwrap()
+        .into_iter()
+        .flat_map(|message| message.content.parts)
+        .filter_map(|part| match part {
+            crate::types::ChatMessagePart::ToolResult {
+                tool_call_id,
+                success,
+                error,
+                ..
+            } => Some((tool_call_id, success, error)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn streamed_tool_ids(events: &[AiStreamEvent]) -> (Vec<String>, Vec<String>) {
+    let calls = events
+        .iter()
+        .filter_map(|event| match event {
+            AiStreamEvent::ToolCall { tool_call, .. } => Some(tool_call.id.clone()),
+            _ => None,
+        })
+        .collect();
+    let results = events
+        .iter()
+        .filter_map(|event| match event {
+            AiStreamEvent::ToolResult { result, .. } => Some(result.tool_call_id.clone()),
+            _ => None,
+        })
+        .collect();
+    (calls, results)
+}
+
+#[tokio::test]
+async fn a_malformed_call_after_the_tool_call_cap_keeps_the_batch_results() {
+    let ids: Vec<String> = (0..20).map(|n| format!("toolu_{n}")).collect();
+    let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let mut blocks = parallel_tool_use_blocks(&ids, "get_accounts");
+    // A 21st call whose arguments are not a JSON object.
+    blocks.extend([
+        json!({"type":"content_block_start","index":20,"content_block":{"type":"tool_use","id":"toolu_bad","name":"get_accounts","input":{}}}),
+        json!({"type":"content_block_delta","index":20,"delta":{"type":"input_json_delta","partial_json":"[1]"}}),
+        json!({"type":"content_block_stop","index":20}),
+    ]);
+    let usage = json!({"input_tokens":1,"output_tokens":1});
+    let (url, server) = serve(vec![
+        (200, anthropic_reply("tool_use", blocks, usage, 1)),
+        anthropic_answer("One account."),
+    ]);
+    let env = environment("anthropic", &url);
+    let service = ChatService::new(env.clone(), ChatConfig::default());
+
+    let events = send(
+        &service,
+        "anthropic",
+        "claude-sonnet-5-5",
+        "Check everything",
+        None,
+    )
+    .await;
+    done_usage(&events);
+    let requests = server.await.unwrap();
+
+    // Every call shown to the user gets its result, live and once saved.
+    let (calls, results) = streamed_tool_ids(&events);
+    assert!(calls.len() >= 20, "{calls:?}");
+    assert_eq!(calls, results);
+    let saved: Vec<String> = saved_tool_results(&env, &events)
+        .into_iter()
+        .map(|(id, ..)| id)
+        .collect();
+    assert_eq!(saved, calls);
+    assert_eq!(requests.len(), 2);
+    assert!(is_answering_call(&requests[1]), "{}", requests[1]);
+    assert_eq!(saved_answer(&env, &events), "One account.");
+}
+
+#[tokio::test]
+async fn a_skipped_tool_call_is_not_reported_as_successful() {
+    let ids: Vec<String> = (0..21).map(|n| format!("toolu_{n}")).collect();
+    let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let usage = json!({"input_tokens":1,"output_tokens":1});
+    let (url, server) = serve(vec![
+        (
+            200,
+            anthropic_reply(
+                "tool_use",
+                parallel_tool_use_blocks(&ids, "get_accounts"),
+                usage,
+                1,
+            ),
+        ),
+        anthropic_answer("One account."),
+    ]);
+    let env = environment("anthropic", &url);
+    let service = ChatService::new(env.clone(), ChatConfig::default());
+
+    let events = send(
+        &service,
+        "anthropic",
+        "claude-sonnet-5-5",
+        "Check everything",
+        None,
+    )
+    .await;
+    done_usage(&events);
+    server.await.unwrap();
+
+    // The first two identical calls run; the rest are skipped as duplicates,
+    // and the 21st also as over the cap.
+    let saved = saved_tool_results(&env, &events);
+    assert_eq!(saved.len(), 21);
+    for (index, (id, success, error)) in saved.iter().enumerate() {
+        if index < 2 {
+            assert!(*success && error.is_none(), "{id}: {error:?}");
+        } else {
+            assert!(!success, "{id} was skipped");
+            assert!(error.as_deref().is_some_and(|e| !e.is_empty()), "{id}");
+        }
+    }
+    let streamed: Vec<bool> = events
+        .iter()
+        .filter_map(|event| match event {
+            AiStreamEvent::ToolResult { result, .. } => {
+                Some(result.success && result.error.is_none())
+            }
+            _ => None,
+        })
+        .collect();
+    let saved_success: Vec<bool> = saved.iter().map(|(_, success, _)| *success).collect();
+    assert_eq!(streamed, saved_success);
+}
+
 #[tokio::test]
 async fn ollama_answers_at_the_limit_without_tools() {
     let mut replies: Vec<(u16, String)> = (1..MAX_MODEL_CALLS)

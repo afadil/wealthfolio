@@ -128,6 +128,7 @@
   "tools": {
     "calling": "Chiamata di {{toolName}} in corso...",
     "cancelled": "{{toolName}} annullato",
+    "notUsed": "Strumento non utilizzato: {{toolName}}",
     "used": "Strumento utilizzato: {{toolName}}"
   },
   "accounts": {

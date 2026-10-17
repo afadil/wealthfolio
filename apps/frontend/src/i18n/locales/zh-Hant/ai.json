@@ -127,6 +127,7 @@
   "tools": {
     "calling": "正在呼叫 {{toolName}}…",
     "cancelled": "已取消 {{toolName}}",
+    "notUsed": "未使用工具：{{toolName}}",
     "used": "已使用工具：{{toolName}}"
   },
   "accounts": {

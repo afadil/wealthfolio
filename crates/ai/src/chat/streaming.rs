@@ -1063,15 +1063,19 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                         .collect::<Vec<_>>()
                         .join("\n");
 
+                    // A failed, refused or skipped call: its content says why.
+                    let success = !tool_result.is_error;
+                    let error = (!success).then(|| result_text.clone());
+
                     // Parse result as JSON for structured data
                     let data: serde_json::Value = serde_json::from_str(&result_text)
                         .unwrap_or(serde_json::json!(result_text));
                     content_parts.push(ChatMessagePart::ToolResult {
                         tool_call_id: tool_result.call.to_string(),
-                        success: true,
+                        success,
                         data: data.clone(),
                         meta: std::collections::HashMap::new(),
-                        error: None,
+                        error: error.clone(),
                     });
 
                     tx.send(AiStreamEvent::tool_result(
@@ -1080,10 +1084,10 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                         &message_id,
                         ToolResultData {
                             tool_call_id: tool_result.call.to_string(),
-                            success: true,
+                            success,
                             data,
                             meta: std::collections::HashMap::new(),
-                            error: None,
+                            error,
                         },
                     ))
                     .await
