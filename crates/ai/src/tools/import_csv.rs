@@ -977,9 +977,10 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
         content: &[u8],
         config: &ParseConfig,
         field_mappings: &HashMap<String, FieldMappingValue>,
+        is_transaction_account: bool,
     ) -> Option<usize> {
         if field_mappings.is_empty() {
-            return None;
+            return self.first_row_header(content, config, is_transaction_account);
         }
         let hits_at = |content: &[u8], skip: usize| {
             let config = ParseConfig {
@@ -1014,6 +1015,35 @@ impl<E: AiEnvironment> ImportCsvTool<E> {
             }
         }
         best.map(|(skip, _)| skip)
+    }
+
+    /// Without a mapping, a skip whose row the app's auto-detection reads
+    /// fewer than two fields from usually skipped the header itself: returns
+    /// 0 when the first row reads more.
+    fn first_row_header(
+        &self,
+        content: &[u8],
+        config: &ParseConfig,
+        is_transaction_account: bool,
+    ) -> Option<usize> {
+        if config.top_skip() == 0 {
+            return None;
+        }
+        let fields_at = |skip: usize| {
+            let config = ParseConfig {
+                skip_top_rows: Some(skip),
+                ..config.clone()
+            };
+            self.env
+                .activity_service()
+                .parse_csv(content, &config)
+                .ok()
+                .map_or(0, |parsed| {
+                    auto_detect_field_mapping_values(&parsed.headers, is_transaction_account).len()
+                })
+        };
+        let chosen = fields_at(config.top_skip());
+        (chosen < 2 && fields_at(0) > chosen).then_some(0)
     }
 }
 
@@ -1217,6 +1247,7 @@ impl<E: AiEnvironment + 'static> Tool for ImportCsvTool<E> {
             csv_content,
             &effective_parse_config,
             &requested_field_mappings,
+            is_transaction_account,
         ) {
             debug!(
                 "import_csv: header row found at skipTopRows={} (requested {:?})",
@@ -1817,6 +1848,127 @@ mod tests {
         assert_eq!(result.detected_headers[0], "Trade Date");
         assert_eq!(result.total_rows, 2);
         assert_eq!(result.mapping_confidence, MappingConfidence::High);
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_finds_the_header_without_field_mappings() {
+        // The header is the first row, but the model asks to skip one row and
+        // leaves the mapping to the app.
+        let tool = ImportCsvTool::new(
+            Arc::new(MockEnvironment::new()),
+            "USD".to_string(),
+            vec![csv_attachment(
+                "Date,Symbol,Quantity,Price,Amount\n\
+                 2024-01-15,AAPL,10,150,1500\n\
+                 2024-01-16,MSFT,5,300,1500\n",
+            )],
+        );
+        let result = tool
+            .call(ImportCsvArgs {
+                attachment_name: ATTACHMENT_NAME.to_string(),
+                skip_top_rows: Some(1),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.parse_config.skip_top_rows, Some(0));
+        assert_eq!(result.detected_headers[0], "Date");
+        assert_eq!(result.total_rows, 2);
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_header_search_ignores_skipped_bottom_rows() {
+        // A footer table the model skips scores more auto-detected fields
+        // than the real header, but it is not part of the import.
+        let tool = ImportCsvTool::new(
+            Arc::new(MockEnvironment::new()),
+            "USD".to_string(),
+            vec![csv_attachment(
+                "Date,Amount\n\
+                 2024-01-15,100\n\
+                 2024-01-16,200\n\
+                 Account,Total,Fees\n\
+                 Brokerage,300,5\n",
+            )],
+        );
+        let result = tool
+            .call(ImportCsvArgs {
+                attachment_name: ATTACHMENT_NAME.to_string(),
+                skip_top_rows: Some(0),
+                skip_bottom_rows: Some(2),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.parse_config.skip_top_rows, Some(0));
+        assert_eq!(result.detected_headers[0], "Date");
+        assert_eq!(result.total_rows, 2);
+    }
+
+    async fn call_without_mappings(
+        csv: &str,
+        skip_top: usize,
+        skip_bottom: usize,
+    ) -> ImportCsvMappingOutput {
+        ImportCsvTool::new(
+            Arc::new(MockEnvironment::new()),
+            "USD".to_string(),
+            vec![csv_attachment(csv)],
+        )
+        .call(ImportCsvArgs {
+            attachment_name: ATTACHMENT_NAME.to_string(),
+            skip_top_rows: Some(skip_top),
+            skip_bottom_rows: Some(skip_bottom),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_keeps_a_header_row_over_a_preamble_summary() {
+        // The summary above the header auto-detects more fields, but the
+        // requested row is already a header.
+        let result = call_without_mappings(
+            "Account,Total,Fees\nBrokerage,300,5\nDate,Amount\n2024-01-15,100\n",
+            2,
+            0,
+        )
+        .await;
+
+        assert_eq!(result.parse_config.skip_top_rows, Some(2));
+        assert_eq!(result.detected_headers[0], "Date");
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_finds_a_first_row_header_despite_a_merchant_column() {
+        // "Anytime Fitness" reads as a date column to auto-detection, but one
+        // field does not make the transaction a header.
+        let result = call_without_mappings(
+            "Date,Merchant,Amount\n2024-01-15,Anytime Fitness,12.50\n2024-01-16,Grocer,20.00\n",
+            1,
+            0,
+        )
+        .await;
+
+        assert_eq!(result.parse_config.skip_top_rows, Some(0));
+        assert_eq!(result.total_rows, 2);
+    }
+
+    #[tokio::test]
+    async fn test_import_csv_finds_a_first_row_header_above_a_skipped_footer() {
+        let result = call_without_mappings(
+            "Date,Amount\n2024-01-15,100\n2024-01-16,200\n,,\n,,\n\
+             Date,Symbol,Quantity,Price,Amount\n2024-01-31,AAPL,1,10,10\n",
+            1,
+            2,
+        )
+        .await;
+
+        assert_eq!(result.parse_config.skip_top_rows, Some(0));
+        assert_eq!(result.detected_headers, ["Date", "Amount"]);
     }
 
     #[tokio::test]

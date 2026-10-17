@@ -39,19 +39,20 @@ function countFields(line: string, delimiter: string): number {
 
 /**
  * Whether pasted text is a table: at least two non-empty records that all split
- * into the same number of fields on one delimiter. With comma or semicolon, a
- * two-field table also needs a digit in every row after the header, so a few
- * lines of prose with one comma each stay text.
+ * into the same number of fields on one delimiter. With comma or semicolon, the
+ * first record must also read as a header (no digits) and every later row hold
+ * a digit, so prose and instructions such as "Buy 10, AAPL" stay text.
  */
 export function isPastedCsvTable(text: string): boolean {
   const lines = splitRecords(text);
   if (lines.length < 2) return false;
-  const rowsHaveDigits = lines.slice(1).every((line) => /\d/.test(line));
+  const looksLikeHeaderAndRows =
+    !/\d/.test(lines[0]) && lines.slice(1).every((line) => /\d/.test(line));
 
   return ["\t", ",", ";"].some((delimiter) => {
-    const minFields = delimiter === "\t" || rowsHaveDigits ? 2 : 3;
+    if (delimiter !== "\t" && !looksLikeHeaderAndRows) return false;
     const fields = countFields(lines[0], delimiter);
-    return fields >= minFields && lines.every((line) => countFields(line, delimiter) === fields);
+    return fields >= 2 && lines.every((line) => countFields(line, delimiter) === fields);
   });
 }
 

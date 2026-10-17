@@ -39,6 +39,14 @@ describe("isPastedCsvTable", () => {
       false,
     );
   });
+
+  it("leaves instructions with numbers and commas as text", () => {
+    expect(isPastedCsvTable("Buy 10, AAPL\nSell 5, MSFT")).toBe(false);
+    expect(isPastedCsvTable("Buy 10 AAPL, at market, today\nSell 5 MSFT, at limit, Friday")).toBe(
+      false,
+    );
+    expect(isPastedCsvTable("Hi, Sam, Alex\nThanks, for, everything")).toBe(false);
+  });
 });
 
 describe("pastedCsvFileName", () => {

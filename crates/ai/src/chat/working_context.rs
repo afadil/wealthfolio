@@ -214,8 +214,19 @@ impl ChatWorkingContext {
     }
 }
 
+/// Parse settings `import_csv` takes, as top-level arguments.
+const IMPORT_CSV_PARSE_ARGS: [&str; 7] = [
+    "delimiter",
+    "skipTopRows",
+    "skipBottomRows",
+    "dateFormat",
+    "decimalSeparator",
+    "thousandsSeparator",
+    "defaultCurrency",
+];
+
 /// The `import_csv` arguments a re-import needs: the non-empty mapping tables
-/// and the parse settings that are set.
+/// and the parse settings that are set, in the shape the tool accepts.
 fn applied_import_mapping(data: &serde_json::Value) -> Option<serde_json::Value> {
     let applied = data.get("appliedMapping")?;
     let mut mapping = serde_json::Map::new();
@@ -232,17 +243,11 @@ fn applied_import_mapping(data: &serde_json::Value) -> Option<serde_json::Value>
             mapping.insert(key.to_string(), table.clone());
         }
     }
-    if let Some(parse_config) = data
-        .get("parseConfig")
-        .and_then(serde_json::Value::as_object)
-    {
-        let set: serde_json::Map<String, serde_json::Value> = parse_config
-            .iter()
-            .filter(|(_, value)| !value.is_null())
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect();
-        if !set.is_empty() {
-            mapping.insert("parseConfig".to_string(), serde_json::Value::Object(set));
+    if let Some(parse_config) = data.get("parseConfig") {
+        for key in IMPORT_CSV_PARSE_ARGS {
+            if let Some(value) = parse_config.get(key).filter(|value| !value.is_null()) {
+                mapping.insert(key.to_string(), value.clone());
+            }
         }
     }
     Some(serde_json::Value::Object(mapping))
@@ -391,11 +396,40 @@ mod tests {
         assert!(rendered.contains(r#""attachmentName":"activities.csv""#));
         assert!(rendered.contains(r#""detectedHeaders":["Date","Symbol"]"#));
         assert!(rendered.contains(
-            r#""mapping":{"fieldMappings":{"date":"Date","symbol":"Symbol"},"activityMappings":{"BUY":["Kopen"]},"symbolMappings":{"Cloudflare":"NET"},"parseConfig":{"skipTopRows":3,"skipBottomRows":1}}"#
+            r#""mapping":{"fieldMappings":{"date":"Date","symbol":"Symbol"},"activityMappings":{"BUY":["Kopen"]},"symbolMappings":{"Cloudflare":"NET"},"skipTopRows":3,"skipBottomRows":1}"#
         ));
         assert!(rendered.contains("`import_csv` can still read a listed CSV by name"));
         assert!(rendered.contains(r#""status":"preparedNotImported""#));
         assert!(!rendered.contains("2025-01-01,AAPL"));
+    }
+
+    #[test]
+    fn the_import_mapping_in_context_is_accepted_by_import_csv() {
+        let data = serde_json::json!({
+            "appliedMapping": {
+                "fieldMappings": { "date": "Date" },
+                "activityMappings": {},
+            },
+            "parseConfig": {
+                "delimiter": ";",
+                "skipTopRows": 3,
+                "dateFormat": "%d.%m.%Y",
+                "hasHeaderRow": true,
+                "quoteChar": null
+            }
+        });
+        let mut mapping = applied_import_mapping(&data).unwrap();
+        mapping["attachmentName"] = serde_json::json!("activities.csv");
+
+        let args: crate::tools::import_csv::ImportCsvArgs =
+            serde_json::from_value(mapping.clone()).unwrap();
+
+        assert_eq!(args.delimiter.as_deref(), Some(";"));
+        assert_eq!(args.skip_top_rows, Some(3));
+        assert_eq!(args.date_format.as_deref(), Some("%d.%m.%Y"));
+        // Settings import_csv does not take stay out.
+        assert!(mapping.get("hasHeaderRow").is_none());
+        assert!(mapping.get("parseConfig").is_none());
     }
 
     #[test]

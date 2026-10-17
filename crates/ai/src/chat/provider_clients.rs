@@ -1467,7 +1467,9 @@ pub(crate) mod transport_tests {
         assert!(chats[2].contains(r#"\"attachmentName\":\"trades.csv\""#));
         // The mapping a re-import needs, including the corrected header row.
         assert!(chats[2].contains(r#"\"activityMappings\":{"#));
-        assert!(chats[2].contains(r#"\"parseConfig\":{\"skipTopRows\":2"#));
+        // Parse settings sit at the top level, as `import_csv` takes them.
+        assert!(chats[2].contains(r#"\"skipTopRows\":2"#));
+        assert!(!chats[2].contains(r#"\"parseConfig\""#));
     }
 
     #[tokio::test]
