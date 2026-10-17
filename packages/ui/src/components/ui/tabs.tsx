@@ -1,4 +1,5 @@
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
+import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "motion/react";
 import * as React from "react";
 
@@ -6,29 +7,47 @@ import { cn } from "../../lib/utils";
 
 const TabsIndicatorContext = React.createContext<string | undefined>(undefined);
 
-function Tabs(props: TabsPrimitive.Root.Props) {
+interface TabsProps extends Omit<TabsPrimitive.Root.Props, "className"> {
+  className?: string;
+}
+
+// Callers own the layout between the list and the panels (TabsContent keeps its mt-2).
+function Tabs({ className, ...props }: TabsProps) {
   const indicatorId = React.useId();
   return (
     <TabsIndicatorContext.Provider value={indicatorId}>
-      <TabsPrimitive.Root data-slot="tabs" {...props} />
+      <TabsPrimitive.Root data-slot="tabs" className={cn("group/tabs", className)} {...props} />
     </TabsIndicatorContext.Provider>
   );
 }
 
-interface TabsListProps extends Omit<TabsPrimitive.List.Props, "className"> {
+const tabsListVariants = cva(
+  "group/tabs-list text-muted-foreground group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=horizontal]/tabs:h-10 inline-flex items-center justify-center rounded-md p-1 data-[variant=line]:rounded-none",
+  {
+    variants: {
+      variant: {
+        default: "bg-muted",
+        line: "gap-1 bg-transparent",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+);
+
+interface TabsListProps extends Omit<TabsPrimitive.List.Props, "className">, VariantProps<typeof tabsListVariants> {
   className?: string;
 }
 
 // Arrow keys activate the tab they move to.
-function TabsList({ className, activateOnFocus = true, ...props }: TabsListProps) {
+function TabsList({ className, variant = "default", activateOnFocus = true, ...props }: TabsListProps) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
+      data-variant={variant}
       activateOnFocus={activateOnFocus}
-      className={cn(
-        "bg-muted text-muted-foreground inline-flex h-10 items-center justify-center rounded-md p-1",
-        className,
-      )}
+      className={cn(tabsListVariants({ variant }), className)}
       {...props}
     />
   );
@@ -45,8 +64,10 @@ function TabsTrigger({ className, children, ...props }: TabsTriggerProps) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "focus-visible:outline-solid focus-visible:outline-ring text-muted-foreground data-active:text-foreground relative inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        "isolate overflow-hidden",
+        "focus-visible:outline-solid focus-visible:outline-ring text-muted-foreground data-active:text-foreground hover:text-foreground relative inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        // The line variant underlines the active tab instead of drawing the pill.
+        "after:bg-foreground group-data-[variant=line]/tabs-list:data-active:after:opacity-100 group-data-[orientation=horizontal]/tabs:after:-bottom-1.25 after:absolute after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:w-0.5",
+        "isolate overflow-hidden group-data-[variant=line]/tabs-list:overflow-visible",
         className,
       )}
       render={(tabProps, state) => (
@@ -55,7 +76,7 @@ function TabsTrigger({ className, children, ...props }: TabsTriggerProps) {
             <motion.span
               layout
               layoutId={layoutId}
-              className="bg-background ring-border/40 pointer-events-none absolute inset-0 z-0 shadow-sm ring-1"
+              className="bg-background ring-border/40 pointer-events-none absolute inset-0 z-0 shadow-sm ring-1 group-data-[variant=line]/tabs-list:hidden"
               style={{ borderRadius: "inherit" }}
               transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.6 }}
             />
@@ -85,4 +106,4 @@ function TabsContent({ className, ...props }: TabsContentProps) {
   );
 }
 
-export { Tabs, TabsContent, TabsList, TabsTrigger };
+export { Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants };
