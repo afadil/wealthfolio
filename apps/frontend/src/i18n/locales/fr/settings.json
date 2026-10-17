@@ -47,6 +47,7 @@
   "nav_about_subtitle": "À propos de Wealthfolio",
   "general_page_description": "Gérer les paramètres et préférences généraux de l'application.",
   "currency_select_error": "Veuillez sélectionner une devise de base.",
+  "currency_code_error": "Saisissez un code de devise valide à 3 lettres, par exemple USD.",
   "currency_title": "Devise de base",
   "currency_description": "Sélectionnez la devise de base de votre portefeuille.",
   "currency_save_button": "Enregistrer la devise",

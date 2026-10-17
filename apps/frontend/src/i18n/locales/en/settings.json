@@ -47,6 +47,7 @@
   "nav_about_subtitle": "About Wealthfolio",
   "general_page_description": "Manage the general application settings and preferences.",
   "currency_select_error": "Please select a base currency.",
+  "currency_code_error": "Enter a valid 3-letter currency code, such as USD.",
   "currency_title": "Base Currency",
   "currency_description": "Select your portfolio base currency.",
   "currency_save_button": "Save Currency",

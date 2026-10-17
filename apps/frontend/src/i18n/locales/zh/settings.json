@@ -47,6 +47,7 @@
   "nav_about_subtitle": "关于 Wealthfolio",
   "general_page_description": "管理常规应用设置和偏好。",
   "currency_select_error": "请选择一个基础货币。",
+  "currency_code_error": "请输入有效的 3 位货币代码，例如 USD。",
   "currency_title": "基础货币",
   "currency_description": "选择您投资组合的基础货币。",
   "currency_save_button": "保存货币",

@@ -16,6 +16,7 @@
   "nav_addons_subtitle": "Wealthfolio um Funktionen erweitern",
   "general_page_description": "Allgemeine Anwendungseinstellungen und Präferenzen verwalten.",
   "currency_select_error": "Bitte wählen Sie eine Basiswährung.",
+  "currency_code_error": "Geben Sie einen gültigen dreistelligen Währungscode ein, z. B. USD.",
   "currency_title": "Basiswährung",
   "currency_description": "Wählen Sie die Basiswährung Ihres Portfolios.",
   "currency_save_button": "Währung speichern",
