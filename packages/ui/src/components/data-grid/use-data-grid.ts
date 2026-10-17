@@ -129,7 +129,11 @@ interface UseDataGridProps<TData> extends Omit<
   TableOptions<TData>,
   "pageCount" | "getCoreRowModel"
 > {
-  onDataChange?: (data: TData[]) => void;
+  /** Also receives the cells the edit wrote, keyed by the row's index in `data`. */
+  onDataChange?: (
+    data: TData[],
+    writtenCells?: ReadonlyMap<number, readonly Omit<UpdateCell, "rowIndex">[]>,
+  ) => void;
   onRowAdd?: (
     event?: React.MouseEvent<HTMLDivElement>,
   ) => Partial<CellPosition> | Promise<Partial<CellPosition> | null> | null;
@@ -420,7 +424,7 @@ function useDataGrid<TData>({
         }
       }
 
-      propsRef.current.onDataChange?.(newData);
+      propsRef.current.onDataChange?.(newData, rowUpdatesMap);
     },
     [propsRef, columnIdToAccessorKey],
   );

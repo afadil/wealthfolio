@@ -385,6 +385,38 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
     // For existing activities, assetId is preserved from the original data
     updated = { ...updated, assetSymbol: upper };
 
+    // A new symbol (pasted, filled or cleared) is another asset than the one picked,
+    // so drop the pick's name, kind, quote currency and provider, and the quote mode:
+    // a manual mode lets the server create the symbol without a quote currency. The
+    // exchange stays, for matching an asset held there. A search pick sets these
+    // again right after (handleSymbolSelect).
+    if (upper !== (transaction.assetSymbol ?? "").trim().toUpperCase()) {
+      updated = {
+        ...updated,
+        assetQuoteMode: undefined,
+        pendingAssetName: undefined,
+        pendingAssetKind: undefined,
+        pendingQuoteCcy: undefined,
+        pendingProviderId: undefined,
+        pendingProviderSymbol: undefined,
+      };
+      // A new row also drops the picked id and instrument type; a type the user
+      // set stays. A saved row keeps both: the server prices an update with the
+      // asset id it gets before it resolves the new symbol, and the type decides
+      // whether it accepts that symbol.
+      if (transaction.isNew === true) {
+        updated = { ...updated, pendingAssetId: undefined };
+        if (transaction._instrumentTypeFromPick) {
+          updated = {
+            ...updated,
+            instrumentType: undefined,
+            pendingInstrumentType: undefined,
+            _instrumentTypeFromPick: undefined,
+          };
+        }
+      }
+    }
+
     // Auto-fill currency only if not already set (e.g., by handleSymbolSelect
     // which sets the correct currency from search result / quote resolution).
     // This avoids overriding minor currencies like GBp with the account's GBP.
@@ -488,7 +520,12 @@ export function applyTransactionUpdate(params: TransactionUpdateParams): LocalTr
   } else if (field === "instrumentType") {
     // Instrument type (EQUITY, OPTION, BOND, etc.) — also set pendingInstrumentType for save payload
     const instrumentType = typeof value === "string" && value ? value : undefined;
-    updated = { ...updated, instrumentType, pendingInstrumentType: instrumentType };
+    updated = {
+      ...updated,
+      instrumentType,
+      pendingInstrumentType: instrumentType,
+      _instrumentTypeFromPick: undefined,
+    };
   }
 
   if (FINAL_AMOUNT_INPUT_FIELDS.has(field)) {
