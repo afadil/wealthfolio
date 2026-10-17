@@ -146,6 +146,19 @@ and this project adheres to
   `showCloseButton` (default `true`). Pass your own title through `title` rather
   than rendering a `DialogTitle` inside it. Icons in a `CommandItem` keep a
   `size-*` class they set; others are still 16 px.
+- Controls follow shadcn's Base UI sources on Wealthfolio's look. `Button` has a
+  transparent 1 px border (outline and filled buttons share one box, so buttons
+  are 2 px wider), nudges down 1 px while pressed, and keeps its hover fill
+  while it opens a menu or an expanded section (`aria-expanded`). `Checkbox`,
+  `RadioGroupItem` and `Switch` have a larger invisible hit area, and a label
+  with `peer-data-disabled:` now dims next to a disabled radio. `Input` is Base
+  UI's `Input`, so it works inside a Base UI `Field`. `Textarea` is a function
+  component with `data-slot="textarea"`. `Switch` exposes `size` as a
+  `data-size` attribute. `ToggleGroup` takes `spacing` (gap in spacing steps,
+  default 1; 0 joins the items) and `orientation`. `TabsList` takes
+  `variant="line"` (an underline instead of the pill), tabs support
+  `orientation="vertical"`, and `tabsListVariants` is exported. Fields, select
+  triggers, toggles and switches show `aria-invalid`.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve

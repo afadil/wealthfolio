@@ -6,23 +6,50 @@ import { type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 import { toggleVariants } from "./toggle";
 
-const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariants>>({
+interface ToggleGroupOptions {
+  spacing?: number;
+  orientation?: "horizontal" | "vertical";
+}
+
+const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariants> & ToggleGroupOptions>({
   size: "default",
   variant: "default",
+  spacing: 1,
+  orientation: "horizontal",
 });
 
-interface ToggleGroupProps extends Omit<ToggleGroupPrimitive.Props, "className">, VariantProps<typeof toggleVariants> {
+interface ToggleGroupProps
+  extends Omit<ToggleGroupPrimitive.Props, "className">, VariantProps<typeof toggleVariants>, ToggleGroupOptions {
   className?: string;
 }
 
-function ToggleGroup({ className, variant, size, children, ...props }: ToggleGroupProps) {
+// `spacing` is the gap in spacing steps (default 1, 4 px); 0 joins the items into one segmented control.
+function ToggleGroup({
+  className,
+  variant,
+  size,
+  spacing = 1,
+  orientation = "horizontal",
+  children,
+  ...props
+}: ToggleGroupProps) {
   return (
     <ToggleGroupPrimitive
       data-slot="toggle-group"
-      className={cn("flex items-center justify-center gap-1", className)}
+      data-variant={variant}
+      data-size={size}
+      data-spacing={spacing}
+      orientation={orientation}
+      style={{ "--gap": spacing } as React.CSSProperties}
+      className={cn(
+        "group/toggle-group flex items-center justify-center gap-[--spacing(var(--gap))] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch data-[spacing=0]:data-[variant=outline]:rounded-md",
+        className,
+      )}
       {...props}
     >
-      <ToggleGroupContext.Provider value={{ variant, size }}>{children}</ToggleGroupContext.Provider>
+      <ToggleGroupContext.Provider value={{ variant, size, spacing, orientation }}>
+        {children}
+      </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive>
   );
 }
@@ -37,7 +64,11 @@ function ToggleGroupItem({ className, children, variant, size, ...props }: Toggl
   return (
     <TogglePrimitive
       data-slot="toggle-group-item"
+      data-variant={context.variant || variant}
+      data-size={context.size || size}
+      data-spacing={context.spacing}
       className={cn(
+        "shrink-0 focus:z-10 focus-visible:z-10 group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:shadow-none group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:first:rounded-l-md group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:first:rounded-t-md group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:last:rounded-r-md group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:last:rounded-b-md",
         toggleVariants({
           variant: context.variant || variant,
           size: context.size || size,
