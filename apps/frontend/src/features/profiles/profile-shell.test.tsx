@@ -905,6 +905,41 @@ it("uses native startup and lock events without polling", async () => {
   expect(screen.getByRole("heading", { name: "Who's using Wealthfolio?" })).toBeInTheDocument();
 });
 
+it("says why startup could not open the only profile", async () => {
+  mocks.isWeb = false;
+  const failure = "PROFILE_UNAVAILABLE: The profile credential store could not be accessed.";
+  mocks.command.mockResolvedValueOnce({ profiles: [profile], session: null, starting: true });
+  mount();
+  await act(async () => {});
+  mocks.command.mockResolvedValue({
+    profiles: [profile],
+    session: null,
+    starting: false,
+    autoOpenError: failure,
+  });
+  await act(async () => mocks.ready());
+  expect(screen.getByRole("heading", { name: "Who's using Wealthfolio?" })).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "We couldn’t access your saved sign-in details. Unlock your device and try again.",
+  );
+  expect(screen.queryByText("We couldn’t open Wealthfolio")).not.toBeInTheDocument();
+  const pending = deferred<void>();
+  mocks.command.mockImplementation((command) =>
+    command === "unlock_profile"
+      ? pending.promise
+      : Promise.resolve({ profiles: [profile], session: null, starting: false }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Personal" }));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(mocks.command).toHaveBeenCalledWith("unlock_profile", { profileId: "a", proof: null }),
+  );
+  await act(async () => pending.reject(new Error(failure)));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "We couldn’t access your saved sign-in details. Unlock your device and try again.",
+  );
+});
+
 const profileStateReads = () =>
   mocks.command.mock.calls.filter(([command]) => command === "get_profile_state").length;
 
