@@ -996,6 +996,7 @@ async fn initialize_profile_state(
     // Create the AI environment and chat service using the new wealthfolio-ai crate
     let ai_environment = Arc::new(ServerAiEnvironment::new(
         base_currency.clone(),
+        timezone.clone(),
         account_service.clone(),
         activity_service.clone(),
         holdings_service.clone(),
