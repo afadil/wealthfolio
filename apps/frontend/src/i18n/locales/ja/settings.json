@@ -47,6 +47,7 @@
   "nav_about_subtitle": "Wealthfolioについて",
   "general_page_description": "アプリケーションの一般設定と各種オプションを管理します。",
   "currency_select_error": "基準通貨を選択してください。",
+  "currency_code_error": "USD などの有効な3文字の通貨コードを入力してください。",
   "currency_title": "基準通貨",
   "currency_description": "ポートフォリオの基準通貨を選択します。",
   "currency_save_button": "通貨を保存",
