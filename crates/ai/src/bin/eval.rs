@@ -30,8 +30,8 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use wealthfolio_ai::live_evals::report::{
-    case_usage, compare, totals, CaseDelta, CaseRecord, RunResults, TrialRecord, UsageTotals,
-    RESULTS_SCHEMA_VERSION,
+    case_usage, compare, totals, write_results, CaseDelta, CaseRecord, RunResults, TrialRecord,
+    UsageTotals, RESULTS_SCHEMA_VERSION,
 };
 use wealthfolio_ai::live_evals::runner::{run_case, RunnerConfig};
 use wealthfolio_ai::live_evals::schema::{load_all_suites, Severity};
@@ -187,8 +187,12 @@ async fn run() -> ExitCode {
         cases: records,
     };
     print_totals(&results);
-    if let Err(e) = write_results(&results_path, &results) {
-        eprintln!("Failed to write {}: {e}", results_path.display());
+    match write_results(&results_path, &results) {
+        Ok(()) => println!("    results written to {}", results_path.display()),
+        Err(e) => {
+            eprintln!("Failed to write {}: {e}", results_path.display());
+            return ExitCode::from(2);
+        }
     }
 
     if results.cases.iter().any(CaseRecord::is_blocking) {
@@ -213,15 +217,6 @@ fn default_results_path(cfg: &RunnerConfig, started_at: chrono::DateTime<chrono:
         "{}-{model}{thinking}.json",
         started_at.format("%Y%m%dT%H%M%SZ")
     ))
-}
-
-fn write_results(path: &Path, results: &RunResults) -> std::io::Result<()> {
-    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, serde_json::to_string_pretty(results)?)?;
-    println!("    results written to {}", path.display());
-    Ok(())
 }
 
 fn print_case(record: &CaseRecord, description: &str) {
@@ -353,6 +348,12 @@ fn print_totals(results: &RunResults) {
         duration(u.wall_ms),
         duration(results.wall_ms)
     );
+    if u.retried_trials > 0 {
+        println!(
+            "    {} trial(s) retried after a transport error; their chat time counts every attempt",
+            u.retried_trials
+        );
+    }
 }
 
 fn compare_files(before_path: &Path, after_path: &Path) -> ExitCode {

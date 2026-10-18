@@ -155,6 +155,8 @@ pub struct UsageTotals {
     pub model_calls: u64,
     pub tool_calls: u64,
     pub wall_ms: u64,
+    /// Trials that needed a retry after a transport error.
+    pub retried_trials: u64,
 }
 
 impl UsageTotals {
@@ -172,7 +174,16 @@ impl UsageTotals {
         }
         self.tool_calls += trial.tool_calls.len() as u64;
         self.wall_ms += trial.wall_ms;
+        self.retried_trials += u64::from(trial.attempts > 1);
     }
+}
+
+/// Write the results file, creating its directory.
+pub fn write_results(path: &std::path::Path, results: &RunResults) -> std::io::Result<()> {
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, serde_json::to_string_pretty(results)?)
 }
 
 pub fn case_usage(case: &CaseRecord) -> UsageTotals {
@@ -377,6 +388,7 @@ mod tests {
                 model_calls: 24,
                 tool_calls: 12,
                 wall_ms: 12_000,
+                retried_trials: 0,
             }
         );
     }
@@ -421,6 +433,21 @@ mod tests {
         // Diffs +1/3, −1/3, +1/3, 0.
         assert!((c.mean_rate_diff - 1.0 / 12.0).abs() < 1e-12);
         assert!(c.rate_diff_std_err.is_some());
+    }
+
+    #[test]
+    fn writes_results_into_a_new_directory_and_reports_an_unwritable_path() {
+        let dir = std::env::temp_dir().join(format!("wf-eval-results-{}", std::process::id()));
+        let results = run(vec![case("a", Severity::P0, &[true])]);
+        let path = dir.join("nested/run.json");
+        write_results(&path, &results).unwrap();
+        let back: RunResults =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(back.cases[0].id, "a");
+
+        // A file where the directory should be.
+        assert!(write_results(&path.join("run.json"), &results).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
