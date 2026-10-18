@@ -188,6 +188,11 @@ and this project adheres to
   `EmptyTitle`, `EmptyDescription`, then `EmptyContent` for actions.
   `<EmptyPlaceholder.Icon name="Wallet" />` becomes
   `<EmptyMedia variant="icon"><Icons.Wallet /></EmptyMedia>`.
+- `Combobox` and its parts (`ComboboxInput`, `ComboboxContent`, `ComboboxList`,
+  `ComboboxItem`, `ComboboxChips` and the rest) from shadcn, on Base UI's
+  combobox. `SearchableSelect` keeps its props and is built on it: typing
+  filters on the option labels, and arrow keys and Enter pick an option.
+- **Breaking:** `Autocomplete` is removed; use `Combobox`.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve
