@@ -5,7 +5,15 @@ import { AssistantRuntimeProvider, useThreadRuntime } from "@assistant-ui/react"
 import { cn } from "@/lib/utils";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { EmptyPlaceholder, buttonVariants } from "@wealthfolio/ui";
+import {
+  buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import {
   Sheet,
   SheetContent,
@@ -154,16 +162,21 @@ function NoProvidersEmptyState({ className }: { className?: string }) {
   const { t } = useTranslation();
   return (
     <div className={cn("flex h-full w-full items-center justify-center", className)}>
-      <EmptyPlaceholder
-        icon={<Icons.Sparkles className="text-muted-foreground h-10 w-10" />}
-        title={t("ai:empty.noProviderTitle")}
-        description={t("ai:empty.noProviderDescription")}
-      >
-        <Link to="/settings/ai-providers" className={buttonVariants()}>
-          <Icons.Settings className="mr-2 h-4 w-4" />
-          {t("ai:empty.configureProviders")}
-        </Link>
-      </EmptyPlaceholder>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            {<Icons.Sparkles className="text-muted-foreground size-10" />}
+          </EmptyMedia>
+          <EmptyTitle>{t("ai:empty.noProviderTitle")}</EmptyTitle>
+          <EmptyDescription>{t("ai:empty.noProviderDescription")}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Link to="/settings/ai-providers" className={buttonVariants()}>
+            <Icons.Settings className="mr-2 h-4 w-4" />
+            {t("ai:empty.configureProviders")}
+          </Link>
+        </EmptyContent>
+      </Empty>
     </div>
   );
 }

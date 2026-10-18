@@ -6,7 +6,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wealthfolio/ui/components/ui/chart";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
@@ -133,12 +139,13 @@ export default function IncomePage() {
     return (
       <>
         {filters}
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center pt-12"
-          icon={<Icons.DollarSign className="h-10 w-10" />}
-          title={t("income:no_income_data")}
-          description={t("income:no_income_data_desc")}
-        />
+        <Empty className="mx-auto flex max-w-[420px] items-center justify-center pt-12">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">{<Icons.DollarSign className="size-10" />}</EmptyMedia>
+            <EmptyTitle>{t("income:no_income_data")}</EmptyTitle>
+            <EmptyDescription>{t("income:no_income_data_desc")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </>
     );
   }
@@ -428,12 +435,15 @@ export default function IncomePage() {
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
-                <EmptyPlaceholder
-                  className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center"
-                  icon={<Icons.DollarSign className="h-10 w-10" />}
-                  title={t("income:no_dividend_income_recorded")}
-                  description={t("income:no_dividend_sources_desc")}
-                />
+                <Empty className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      {<Icons.DollarSign className="size-10" />}
+                    </EmptyMedia>
+                    <EmptyTitle>{t("income:no_dividend_income_recorded")}</EmptyTitle>
+                    <EmptyDescription>{t("income:no_dividend_sources_desc")}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               ) : (
                 <div className="space-y-6">
                   {/* Horizontal Bar Chart - Separated Bars */}

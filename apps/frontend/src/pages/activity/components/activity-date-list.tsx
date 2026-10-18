@@ -19,12 +19,16 @@ import type { CashAuditReviewTarget } from "@/pages/account/cash-audit";
 import {
   Button,
   Card,
-  EmptyPlaceholder,
   Icons,
   useAmountFormatting,
   useDateFormatting,
   type FormattingApi,
   buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -89,13 +93,15 @@ export function ActivityDateList({
     return (
       <div className="space-y-3">
         {cashAuditTarget ? <CashAuditCallout cashAuditTarget={cashAuditTarget} /> : null}
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>{t("activity:date_list.no_activities")}</EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {t("activity:date_list.no_activities_desc")}
-          </EmptyPlaceholder.Description>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:date_list.no_activities")}</EmptyTitle>
+            <EmptyDescription>{t("activity:date_list.no_activities_desc")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
@@ -140,12 +146,14 @@ export function ActivityDateList({
       ) : null}
 
       {filteredLedgerRows.length === 0 ? (
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>
-            {t("activity:date_list.no_matching_activities")}
-          </EmptyPlaceholder.Title>
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:date_list.no_matching_activities")}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : null}
 
       {filteredLedgerRows.map((row) => (

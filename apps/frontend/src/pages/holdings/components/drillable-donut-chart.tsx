@@ -8,8 +8,10 @@ import {
   CardHeader,
   CardTitle,
   DonutChart,
-  EmptyPlaceholder,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -168,10 +170,13 @@ export function DrillableDonutChart({
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder
-            description={t("holdings:no_typed_data_available", { type: title.toLowerCase() })}
-            className="max-h-[160px]"
-          />
+          <Empty className="max-h-[160px]">
+            <EmptyHeader>
+              <EmptyDescription>
+                {t("holdings:no_typed_data_available", { type: title.toLowerCase() })}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </CardContent>
     </Card>

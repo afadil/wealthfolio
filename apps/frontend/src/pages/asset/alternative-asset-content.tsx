@@ -10,12 +10,16 @@ import type { AlternativeAssetHolding, Asset, DateRange, Quote, TimePeriod } fro
 import { AlternativeAssetKind } from "@/lib/types";
 import {
   AmountDisplay,
-  EmptyPlaceholder,
   Icons,
   IntervalSelector,
   useDateFormatting,
   useNumberFormatting,
   Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -257,11 +261,17 @@ export const AlternativeAssetContent: React.FC<AlternativeAssetContentProps> = (
                   </>
                 ) : (
                   <div className="flex h-[200px] items-center justify-center">
-                    <EmptyPlaceholder
-                      icon={<Icons.Activity className="text-muted-foreground h-8 w-8" />}
-                      title={t("asset:altContent.no_valuation_data")}
-                      description={t("asset:altContent.no_valuation_description")}
-                    />
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          {<Icons.Activity className="text-muted-foreground size-8" />}
+                        </EmptyMedia>
+                        <EmptyTitle>{t("asset:altContent.no_valuation_data")}</EmptyTitle>
+                        <EmptyDescription>
+                          {t("asset:altContent.no_valuation_description")}
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   </div>
                 )}
               </CardContent>

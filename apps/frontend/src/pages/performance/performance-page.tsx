@@ -65,7 +65,13 @@ import {
   useNumberFormatting,
   type FormattingApi,
 } from "@wealthfolio/ui";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { isSameDay, subDays, subMonths } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -920,12 +926,13 @@ function PerformanceContent({
       )}
 
       {!chartData?.length && !isLoading && !hasErrors && (
-        <EmptyPlaceholder
-          className="mx-auto flex max-w-[420px] items-center justify-center"
-          icon={<Icons.BarChart className="h-10 w-10" />}
-          title={t("performance:empty.title")}
-          description={t("performance:empty.description")}
-        />
+        <Empty className="mx-auto flex max-w-[420px] items-center justify-center">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
+            <EmptyTitle>{t("performance:empty.title")}</EmptyTitle>
+            <EmptyDescription>{t("performance:empty.description")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
 
       {/* Modern horizontal loader with improved UX */}

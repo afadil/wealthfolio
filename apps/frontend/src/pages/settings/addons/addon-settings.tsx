@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   DeleteConfirm,
-  EmptyPlaceholder,
   Icons,
   Popover,
   PopoverContent,
@@ -22,6 +21,12 @@ import {
   TooltipContent,
   TooltipTrigger,
   Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -316,28 +321,32 @@ export default function AddonSettingsPage() {
                 </span>
               </div>
             ) : installedAddons.length === 0 ? (
-              <EmptyPlaceholder>
-                <EmptyPlaceholder.Icon name="Package" />
-                <EmptyPlaceholder.Title>{t("settings:addons_empty_title")}</EmptyPlaceholder.Title>
-                <EmptyPlaceholder.Description>
-                  {t("settings:addons_empty_description")}
-                </EmptyPlaceholder.Description>
-                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
-                  <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
-                    <Icons.Store className="mr-2 h-4 w-4" />
-                    {t("settings:addons_browse_button")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleLoadAddon}
-                    disabled={isLoading}
-                    className="w-full sm:w-auto"
-                  >
-                    <Icons.Plus className="mr-2 h-4 w-4" />
-                    {t("settings:addons_install_from_file")}
-                  </Button>
-                </div>
-              </EmptyPlaceholder>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Icons.Package />
+                  </EmptyMedia>
+                  <EmptyTitle>{t("settings:addons_empty_title")}</EmptyTitle>
+                  <EmptyDescription>{t("settings:addons_empty_description")}</EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:gap-3">
+                    <Button onClick={() => setActiveTab("store")} className="w-full sm:w-auto">
+                      <Icons.Store className="mr-2 h-4 w-4" />
+                      {t("settings:addons_browse_button")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleLoadAddon}
+                      disabled={isLoading}
+                      className="w-full sm:w-auto"
+                    >
+                      <Icons.Plus className="mr-2 h-4 w-4" />
+                      {t("settings:addons_install_from_file")}
+                    </Button>
+                  </div>
+                </EmptyContent>
+              </Empty>
             ) : (
               <div className="space-y-3">
                 {installedAddons.map((addon) => {

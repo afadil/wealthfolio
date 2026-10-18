@@ -13,7 +13,13 @@ import {
 } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -399,11 +405,13 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           </div>
         </CardHeader>
         <CardContent className="flex h-[500px] items-center justify-center">
-          <EmptyPlaceholder
-            icon={<Icons.BarChart className="h-10 w-10" />}
-            title={t("holdings:no_holdings_data")}
-            description={t("holdings:no_holdings_data_desc")}
-          />
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
+              <EmptyTitle>{t("holdings:no_holdings_data")}</EmptyTitle>
+              <EmptyDescription>{t("holdings:no_holdings_data_desc")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </CardContent>
       </Card>
     );

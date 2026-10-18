@@ -183,6 +183,11 @@ and this project adheres to
   `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
   close button), with a primary progress bar instead of a red-to-yellow
   gradient.
+- **Breaking:** `EmptyPlaceholder` is removed in favour of shadcn's `Empty`:
+  `Empty` > `EmptyHeader` > `EmptyMedia variant="icon"` (the muted icon circle),
+  `EmptyTitle`, `EmptyDescription`, then `EmptyContent` for actions.
+  `<EmptyPlaceholder.Icon name="Wallet" />` becomes
+  `<EmptyMedia variant="icon"><Icons.Wallet /></EmptyMedia>`.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve

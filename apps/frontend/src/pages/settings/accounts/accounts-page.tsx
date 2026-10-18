@@ -7,13 +7,18 @@ import type { Account, Platform } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import {
   Button,
-  EmptyPlaceholder,
   Icons,
   Separator,
   Skeleton,
   ToggleGroup,
   ToggleGroupItem,
   buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { useMemo, useState } from "react";
@@ -249,25 +254,29 @@ const SettingsAccountsPage = () => {
         {/* Account Lists */}
         <div className="space-y-8">
           {accounts.length === 0 ? (
-            <EmptyPlaceholder>
-              <EmptyPlaceholder.Icon name="Wallet" />
-              <EmptyPlaceholder.Title>{t("settings:accounts_empty_title")}</EmptyPlaceholder.Title>
-              <EmptyPlaceholder.Description>
-                {t("settings:accounts_empty_description")}
-              </EmptyPlaceholder.Description>
-              <Button data-testid="add-account-empty-button" onClick={() => handleAddAccount()}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                {t("settings:accounts_add_first")}
-              </Button>
-              {showConnectLink && (
-                <Link
-                  to={connectPagePath("settings_accounts")}
-                  className={buttonVariants({ variant: "link" })}
-                >
-                  {t("settings:accounts_connect_account")}
-                </Link>
-              )}
-            </EmptyPlaceholder>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Icons.Wallet />
+                </EmptyMedia>
+                <EmptyTitle>{t("settings:accounts_empty_title")}</EmptyTitle>
+                <EmptyDescription>{t("settings:accounts_empty_description")}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button data-testid="add-account-empty-button" onClick={() => handleAddAccount()}>
+                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  {t("settings:accounts_add_first")}
+                </Button>
+                {showConnectLink && (
+                  <Link
+                    to={connectPagePath("settings_accounts")}
+                    className={buttonVariants({ variant: "link" })}
+                  >
+                    {t("settings:accounts_connect_account")}
+                  </Link>
+                )}
+              </EmptyContent>
+            </Empty>
           ) : filteredAccounts.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">
               {t("settings:accounts.no_search_results")}
