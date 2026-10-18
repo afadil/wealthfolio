@@ -578,7 +578,7 @@ export function EventFormDialog({
             )}
 
             {replacedTagCount > 0 && (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <div className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground rounded-md border px-3 py-2 text-xs">
                 {t("spending:eventForm.replaceTagsWarning", { count: replacedTagCount })}
               </div>
             )}
@@ -704,7 +704,7 @@ function SuggestedTransactions({
                       {c.notes || c.activityType}
                     </span>
                     {c.eventId && checked && (
-                      <span className="text-2xs shrink-0 rounded border border-amber-500/30 bg-amber-500/15 px-1 py-px uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      <span className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground shrink-0 rounded border px-1 py-px uppercase tracking-wide">
                         {t("spending:eventForm.willReplaceTag")}
                       </span>
                     )}

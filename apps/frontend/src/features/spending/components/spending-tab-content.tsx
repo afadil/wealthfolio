@@ -942,7 +942,7 @@ export default function SpendingTabContent() {
   return (
     <div className="flex min-h-screen flex-col">
       {dataErrored && (
-        <div className="mx-4 mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 md:mx-6 lg:mx-8 dark:text-amber-300">
+        <div className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground mx-4 mt-2 flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-xs md:mx-6 lg:mx-8">
           <span>
             <span className="font-semibold">{t("spending:tabContent.loadError")}</span>{" "}
             {t("spending:insightsPage.showingZeros")}

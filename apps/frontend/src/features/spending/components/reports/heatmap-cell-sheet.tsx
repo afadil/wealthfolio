@@ -256,7 +256,7 @@ export function HeatmapCellSheet({
                                 )}
                               </span>
                               {isOutlier && (
-                                <span className="text-2xs rounded-full bg-amber-100/80 px-1.5 py-px font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                <span className="text-2xs bg-warning-subtle text-warning-subtle-foreground rounded-full px-1.5 py-px font-semibold uppercase tracking-wide">
                                   {t("spending:heatmapSheet.outlier")}
                                 </span>
                               )}
