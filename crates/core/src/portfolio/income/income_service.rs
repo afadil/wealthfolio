@@ -228,7 +228,7 @@ impl IncomeServiceTrait for IncomeService {
             .unconverted_currencies
             .extend(two_years_ago_summary.unconverted_currencies.iter().cloned());
 
-        // Round the calculated values before returning
+        // Round monetary values before returning, not the ratios formatted as percentages.
         let summaries = vec![
             total_summary,
             ytd_summary,
@@ -242,10 +242,6 @@ impl IncomeServiceTrait for IncomeService {
                 summary.total_income = summary.total_income.round_dp(DISPLAY_DECIMAL_PRECISION);
                 summary.monthly_average =
                     summary.monthly_average.round_dp(DISPLAY_DECIMAL_PRECISION);
-                if let Some(growth) = summary.yoy_growth {
-                    summary.yoy_growth = Some(growth.round_dp(DISPLAY_DECIMAL_PRECISION));
-                }
-
                 for val in summary.by_month.values_mut() {
                     *val = val.round_dp(DISPLAY_DECIMAL_PRECISION);
                 }

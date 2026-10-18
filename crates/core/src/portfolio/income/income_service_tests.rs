@@ -260,6 +260,39 @@ fn summary<'a>(summaries: &'a [IncomeSummary], period: &str) -> &'a IncomeSummar
 }
 
 #[test]
+fn income_growth_preserves_hundredth_percent_precision() {
+    let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
+    let fx = Arc::new(FxService::new(Arc::new(InMemoryFxRepository::new(vec![]))));
+    fx.initialize().unwrap();
+    for (previous, current, percent) in [
+        (dec!(100), dec!(112.34), dec!(12.34)),
+        (dec!(100), dec!(87.66), dec!(-12.34)),
+        (dec!(110), dec!(2500), dec!(2172.73)),
+    ] {
+        let service = IncomeService::new(
+            fx.clone(),
+            Arc::new(MockActivityRepository {
+                income: Mutex::new(vec![
+                    income("2025-03", "INTEREST", "CASH:USD", "USD", previous, "a"),
+                    income("2026-03", "INTEREST", "CASH:USD", "USD", current, "a"),
+                ]),
+                first_activity_date: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
+            }),
+            Arc::new(RwLock::new("USD".into())),
+        );
+        let summaries = service.get_income_summary(None).unwrap();
+        let ytd = summary(&summaries, "YTD");
+        assert_eq!(ytd.total_income, current);
+        assert_eq!(summary(&summaries, "LAST_YEAR").total_income, previous);
+        assert_eq!(summary(&summaries, "ALL").total_income, previous + current);
+        assert_eq!(
+            (ytd.yoy_growth.expect("positive comparison") * dec!(100)).round_dp(2),
+            percent
+        );
+    }
+}
+
+#[test]
 fn income_without_an_exchange_rate_is_left_out_of_converted_totals() {
     let _clock = clock::freeze(Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap());
 
