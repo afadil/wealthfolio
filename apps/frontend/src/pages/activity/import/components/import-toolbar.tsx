@@ -115,7 +115,7 @@ export function ImportToolbar({
             size="sm"
             onClick={onForceImport}
             title={t("activity:import.reviewToolbar.importAnywayTooltip")}
-            className="h-8 border-amber-500/50 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+            className="border-warning/50 text-warning-subtle-foreground hover:bg-warning-subtle h-8"
           >
             <Icons.ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
             {t("activity:import.reviewToolbar.importAnyway")}
@@ -339,7 +339,7 @@ export function ImportContextMenu({
           {t("activity:import.reviewToolbar.unskipSelected")}
         </DropdownMenuItem>
         {onForceImport && (
-          <DropdownMenuItem onClick={onForceImport} className="text-amber-700 dark:text-amber-400">
+          <DropdownMenuItem onClick={onForceImport} className="text-warning-subtle-foreground">
             <Icons.ShieldAlert className="mr-2 h-4 w-4" />
             {t("activity:import.reviewToolbar.importAnywayMenu")}
           </DropdownMenuItem>

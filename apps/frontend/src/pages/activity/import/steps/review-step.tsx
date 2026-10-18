@@ -469,7 +469,7 @@ export function ReviewStep() {
             {filterStats.warnings > 0 && (
               <Badge
                 variant="outline"
-                className="cursor-pointer border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+                className="border-warning/50 text-warning-subtle-foreground hover:bg-warning-subtle cursor-pointer"
                 onClick={() => setStatusFilter(new Set(["warning"]))}
               >
                 {t("activity:import.review.warningsBadge", { count: filterStats.warnings })}
@@ -478,7 +478,7 @@ export function ReviewStep() {
             {filterStats.duplicates > 0 && (
               <Badge
                 variant="outline"
-                className="cursor-pointer border-yellow-500/50 text-yellow-700 hover:bg-yellow-500/10 dark:text-yellow-400"
+                className="border-warning/50 text-warning-subtle-foreground hover:bg-warning-subtle cursor-pointer"
                 onClick={() => setStatusFilter(new Set(["duplicate"]))}
               >
                 {t("activity:import.review.duplicatesBadge", { count: filterStats.duplicates })}

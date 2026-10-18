@@ -96,7 +96,7 @@ export function MappingTable({
                       "border-border whitespace-nowrap border-r p-2 transition-colors last:border-r-0",
                       requiredFields.includes(field)
                         ? !checkFieldMapped(field)
-                          ? "bg-amber-50 dark:bg-amber-950/20"
+                          ? "bg-warning-subtle"
                           : ""
                         : "",
                     )}

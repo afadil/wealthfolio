@@ -34,7 +34,7 @@ const MAPPING_TRIGGER_CLASS = "h-8 rounded-md text-xs font-normal";
 
 // Dashed style for unmapped/empty mapping triggers — orange dashed border to signal action needed
 const MAPPING_TRIGGER_UNMAPPED_CLASS =
-  "h-8 rounded-md text-xs font-normal !border-dashed !border-orange-300 !text-orange-500 !bg-transparent !shadow-none hover:!bg-orange-50 dark:!border-orange-400 dark:!text-orange-400 dark:hover:!bg-orange-950";
+  "h-8 rounded-md text-xs font-normal !border-dashed !border-warning !text-warning !bg-transparent !shadow-none hover:!bg-warning-subtle";
 
 export function MappingHeaderCell({
   field,
@@ -68,9 +68,7 @@ export function MappingHeaderCell({
       <div className="flex items-center gap-2 pb-0 pt-2">
         <span className="font-bold">
           {field}
-          {isRequired && !isMapped && (
-            <span className="ml-1 text-amber-600 dark:text-amber-400">*</span>
-          )}
+          {isRequired && !isMapped && <span className="text-warning ml-1">*</span>}
         </span>
       </div>
       {isEditing ? (

@@ -109,7 +109,7 @@ function NeedsFixingRow({
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
-            <span className="text-2xs rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+            <span className="text-2xs bg-warning-subtle text-warning-subtle-foreground rounded px-1.5 py-0.5 font-semibold">
               {count}×
             </span>
           </div>
@@ -117,12 +117,12 @@ function NeedsFixingRow({
             <span className="text-muted-foreground text-2xs truncate">{symbolName}</span>
           )}
         </div>
-        <Icons.ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 text-amber-400 dark:text-amber-500/70" />
+        <Icons.ArrowRight className="text-warning ml-auto h-3.5 w-3.5 shrink-0" />
       </div>
 
       {/* Col 2: search input with icon */}
       <div className="relative [&_[role=combobox]]:h-9 [&_[role=combobox]]:min-h-0 [&_[role=combobox]]:py-1">
-        <Icons.Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-amber-400 dark:text-amber-500/70" />
+        <Icons.Search className="text-warning pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2" />
         <TickerSearchInput
           defaultValue={symbol}
           placeholder={t("activity:import.assets.searchPlaceholder")}
@@ -138,7 +138,7 @@ function NeedsFixingRow({
           size="sm"
           variant="ghost"
           onClick={onMarkCustom}
-          className="text-muted-foreground text-2xs h-7 gap-1 px-2 hover:text-amber-700 dark:hover:text-amber-400"
+          className="text-muted-foreground text-2xs hover:text-warning-subtle-foreground h-7 gap-1 px-2"
         >
           <Icons.Tag className="h-3 w-3 shrink-0" />
           <span className="hidden sm:inline">{t("activity:import.assets.markCustom")}</span>
@@ -148,7 +148,7 @@ function NeedsFixingRow({
           size="sm"
           variant="outline"
           onClick={onCreateAsset}
-          className="text-2xs h-7 gap-1 border-amber-300 px-2.5 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+          className="text-2xs border-warning-subtle-border text-warning-subtle-foreground hover:bg-warning-subtle h-7 gap-1 px-2.5"
         >
           <Icons.Plus className="h-3 w-3 shrink-0" />
           <span className="hidden sm:inline">{t("activity:import.assets.createManually")}</span>
@@ -157,7 +157,7 @@ function NeedsFixingRow({
 
       {/* Errors span all 3 columns */}
       {meaningfulErrors.length > 0 && (
-        <p className="text-2xs col-span-3 flex items-start gap-1.5 text-red-600 dark:text-red-400">
+        <p className="text-2xs text-destructive col-span-3 flex items-start gap-1.5">
           <Icons.AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
           {meaningfulErrors.join(" ")}
         </p>
@@ -217,7 +217,7 @@ function AutoResolvedRow({
         <div className="flex min-w-0 flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-mono text-sm font-bold tracking-tight">{symbol}</span>
-            <span className="text-2xs rounded bg-blue-100 px-1.5 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+            <span className="text-2xs bg-info-subtle text-info-subtle-foreground rounded px-1.5 py-0.5 font-semibold">
               {count}×
             </span>
           </div>
@@ -238,14 +238,14 @@ function AutoResolvedRow({
       ) : (
         <div className="flex min-w-0 flex-wrap items-center gap-1">
           {item.resolutionSource === "mark_custom" && (
-            <span className="text-2xs inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
+            <span className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-semibold uppercase tracking-wide">
               <Icons.Tag className="h-3 w-3 shrink-0" />
               {t("activity:import.assets.custom")}
             </span>
           )}
           {isSuspicious && (
             <span
-              className="text-2xs inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300"
+              className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground inline-flex items-center gap-1 rounded border px-1.5 py-0.5"
               title={t("activity:import.assets.currencyMismatch", {
                 csv: csvCurrency,
                 resolved: asset?.quoteCcy,
@@ -722,18 +722,18 @@ export function AssetReviewStep() {
 
       {/* ── Needs Fixing section ──────────────────────────────────────────── */}
       {needsFixing.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/40 dark:border-amber-500/20 dark:bg-amber-500/[0.04]">
+        <div className="border-warning-subtle-border bg-warning-subtle overflow-hidden rounded-lg border">
           {/* Section header */}
-          <div className="flex items-center gap-3 border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/[0.06]">
+          <div className="border-warning-subtle-border bg-warning-subtle flex items-center gap-3 border-b px-4 py-2.5">
             {/* Left: icon + text — clicking collapses */}
             <button
               type="button"
               className="flex flex-1 items-start gap-2 text-left"
               onClick={() => toggleSection("needsFixing")}
             >
-              <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
               <div className="flex-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                <span className="text-warning-subtle-foreground text-xs font-semibold uppercase tracking-wider">
                   {t("activity:import.assets.needsFixing")}
                 </span>
                 <p className="text-muted-foreground text-2xs mt-0.5">
@@ -748,17 +748,17 @@ export function AssetReviewStep() {
                 size="sm"
                 variant="outline"
                 onClick={handleMarkAllCustom}
-                className="text-2xs h-7 gap-1 border-amber-300 px-2.5 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+                className="text-2xs border-warning-subtle-border text-warning-subtle-foreground hover:bg-warning-subtle h-7 gap-1 px-2.5"
               >
                 <Icons.Tag className="h-3 w-3 shrink-0" />
                 {t("activity:import.assets.markAllCustom")}
               </Button>
-              <span className="text-2xs rounded-full bg-amber-200 px-2 py-0.5 font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
+              <span className="text-2xs bg-warning-subtle text-warning-subtle-foreground rounded-full px-2 py-0.5 font-bold">
                 {needsFixing.length}
               </span>
               <button type="button" onClick={() => toggleSection("needsFixing")}>
                 <Icons.ChevronDown
-                  className={`h-3.5 w-3.5 text-amber-500 transition-transform dark:text-amber-400/70 ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
+                  className={`text-warning h-3.5 w-3.5 transition-transform ${collapsed.has("needsFixing") ? "" : "rotate-180"}`}
                 />
               </button>
             </div>
@@ -817,16 +817,16 @@ export function AssetReviewStep() {
           });
           const suspiciousCount = sortedItems.filter(isItemSuspicious).length;
           return (
-            <div className="overflow-hidden rounded-lg border border-blue-200 bg-blue-50/40 dark:border-blue-400/20 dark:bg-blue-500/[0.06]">
+            <div className="border-info-subtle-border bg-info-subtle overflow-hidden rounded-lg border">
               {/* Section header */}
               <button
                 type="button"
-                className="flex w-full items-start gap-2 border-b border-blue-200 bg-blue-50/60 px-4 py-2.5 text-left dark:border-blue-400/20 dark:bg-blue-500/10"
+                className="border-info-subtle-border bg-info-subtle flex w-full items-start gap-2 border-b px-4 py-2.5 text-left"
                 onClick={() => toggleSection("newAssets")}
               >
-                <Icons.Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <Icons.Sparkles className="text-info mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <div className="flex-1">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                  <span className="text-info-subtle-foreground text-xs font-semibold uppercase tracking-wider">
                     {t("activity:import.assets.newAssets")}
                   </span>
                   <p className="text-muted-foreground text-2xs mt-0.5">
@@ -835,17 +835,17 @@ export function AssetReviewStep() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   {suspiciousCount > 0 && (
-                    <span className="text-2xs inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                    <span className="text-2xs bg-warning-subtle text-warning-subtle-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-bold">
                       <Icons.AlertTriangle className="h-3 w-3" />
                       {suspiciousCount}
                     </span>
                   )}
-                  <span className="text-2xs rounded-full bg-blue-200 px-2 py-0.5 font-bold text-blue-900 dark:bg-blue-500/20 dark:text-blue-200">
+                  <span className="text-2xs bg-info-subtle text-info-subtle-foreground rounded-full px-2 py-0.5 font-bold">
                     {autoResolvedItems.length}
                   </span>
                 </div>
                 <Icons.ChevronDown
-                  className={`mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500 transition-transform dark:text-blue-400/70 ${collapsed.has("newAssets") ? "" : "rotate-180"}`}
+                  className={`text-info mt-0.5 h-3.5 w-3.5 shrink-0 transition-transform ${collapsed.has("newAssets") ? "" : "rotate-180"}`}
                 />
               </button>
 

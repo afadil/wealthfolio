@@ -27,16 +27,16 @@ export function MappingStatusCard({
       className={cn(
         "flex items-center gap-2 rounded-md border p-2",
         isComplete
-          ? "border-green-200 bg-green-50/50 dark:border-green-800/50 dark:bg-green-800/30"
-          : "border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-800/30",
+          ? "border-success-subtle-border bg-success-subtle"
+          : "border-destructive-subtle-border bg-destructive-subtle",
       )}
     >
       <div
         className={cn(
           "rounded-full p-1",
           isComplete
-            ? "bg-green-00 text-green-700 dark:bg-green-800/30 dark:text-green-400"
-            : "bg-orange-100 text-red-700 dark:bg-red-800/30 dark:text-red-400",
+            ? "bg-success-subtle text-success-subtle-foreground"
+            : "bg-destructive-subtle text-destructive-subtle-foreground",
         )}
       >
         {icon}
@@ -45,7 +45,7 @@ export function MappingStatusCard({
         <p
           className={cn(
             "text-sm font-medium",
-            isComplete ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400",
+            isComplete ? "text-success-subtle-foreground" : "text-destructive-subtle-foreground",
           )}
         >
           {title}
@@ -56,9 +56,9 @@ export function MappingStatusCard({
         </p>
       </div>
       {isComplete ? (
-        <Icons.CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
+        <Icons.CheckCircle className="text-success h-4 w-4" />
       ) : (
-        <Icons.AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
+        <Icons.AlertCircle className="text-destructive h-4 w-4" />
       )}
     </div>
   );

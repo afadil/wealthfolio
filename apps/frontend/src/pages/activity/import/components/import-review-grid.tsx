@@ -108,10 +108,10 @@ function getStatusTitle(
 
 const STATUS_DOT_COLOR: Record<DraftActivityStatus, string> = {
   valid: "",
-  error: "bg-red-500",
-  warning: "bg-yellow-500",
-  duplicate: "bg-blue-500",
-  skipped: "bg-gray-400",
+  error: "bg-destructive",
+  warning: "bg-warning",
+  duplicate: "bg-info",
+  skipped: "bg-muted-foreground",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ function useImportReviewColumns({
                 errors,
                 warnings,
               );
-          const dotColor = isForcedDuplicate ? "bg-amber-500" : STATUS_DOT_COLOR[status];
+          const dotColor = isForcedDuplicate ? "bg-warning" : STATUS_DOT_COLOR[status];
           const dot = dotColor ? (
             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
           ) : null;
