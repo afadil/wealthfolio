@@ -32,13 +32,13 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   );
 }
 
-// A row whose menu or popover is open (aria-expanded inside) keeps its hover fill.
+// A row whose menu or popover is open keeps its hover fill; an expanded disclosure doesn't.
 function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
       data-slot="table-row"
       className={cn(
-        "hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
+        "hover:bg-muted/50 has-[[aria-haspopup][aria-expanded=true]]:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
         className,
       )}
       {...props}
