@@ -1028,7 +1028,7 @@ const SelectedItemBadge = ({
                 ? "transition-opacity group-hover:opacity-80"
                 : item.type === "account"
                   ? "bg-muted-foreground group-hover:bg-foreground transition-colors"
-                  : "bg-orange-500 transition-colors group-hover:bg-orange-600 dark:bg-orange-400",
+                  : "bg-warning group-hover:bg-warning transition-colors",
           )}
           style={isPlotted && color ? { backgroundColor: color } : undefined}
         />

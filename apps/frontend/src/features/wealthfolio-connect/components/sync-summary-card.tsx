@@ -71,7 +71,7 @@ export function SyncSummaryCard({
                 : t("connect:status.neverSynced")}
             </p>
             {issueCount > 0 && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+              <p className="text-warning text-sm">
                 {t("connect:sync.needAttention", { count: issueCount })}
               </p>
             )}

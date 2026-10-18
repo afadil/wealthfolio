@@ -23,10 +23,10 @@ const statusColors: Record<AggregatedSyncStatus, string> = {
   restoring: "text-muted-foreground",
   unavailable: "text-warning",
   subscription_required: "text-warning",
-  idle: "text-green-500",
-  running: "text-blue-500",
-  needs_review: "text-yellow-500",
-  failed: "text-red-500",
+  idle: "text-success",
+  running: "text-info",
+  needs_review: "text-warning",
+  failed: "text-destructive",
 };
 
 /**

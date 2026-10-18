@@ -107,7 +107,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
 
           <div className="flex items-center gap-2">
             {hasWarnings && (
-              <span className="text-xs text-yellow-600 dark:text-yellow-400">
+              <span className="text-warning text-xs">
                 {t("connect:syncRuns.warningsCount", { count: run.warnings?.length ?? 0 })}
               </span>
             )}
@@ -128,15 +128,17 @@ function ImportRunItem({ run }: { run: ImportRun }) {
                   <p className="text-muted-foreground text-xs">{t("connect:syncRuns.fetched")}</p>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-green-600">{run.summary.inserted}</p>
+                  <p className="text-success text-lg font-semibold">{run.summary.inserted}</p>
                   <p className="text-muted-foreground text-xs">{t("connect:syncRuns.inserted")}</p>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-blue-600">{run.summary.updated}</p>
+                  <p className="text-info text-lg font-semibold">{run.summary.updated}</p>
                   <p className="text-muted-foreground text-xs">{t("connect:syncRuns.updated")}</p>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-500">{run.summary.skipped}</p>
+                  <p className="text-muted-foreground text-lg font-semibold">
+                    {run.summary.skipped}
+                  </p>
                   <p className="text-muted-foreground text-xs">{t("connect:syncRuns.skipped")}</p>
                 </div>
               </div>
@@ -145,7 +147,7 @@ function ImportRunItem({ run }: { run: ImportRun }) {
             {/* Warnings */}
             {hasWarnings && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="text-warning text-sm font-medium">
                   {t("connect:syncRuns.warningsLabel")}
                 </p>
                 <ul className="space-y-1">
@@ -172,10 +174,8 @@ function ImportRunItem({ run }: { run: ImportRun }) {
 
             {/* Error */}
             {run.error && (
-              <div className="rounded-md bg-red-50 p-2 dark:bg-red-900/20">
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {BROKER_SYNC_RUN_FAILED_MESSAGE}
-                </p>
+              <div className="bg-destructive-subtle rounded-md p-2">
+                <p className="text-destructive text-sm">{BROKER_SYNC_RUN_FAILED_MESSAGE}</p>
               </div>
             )}
 

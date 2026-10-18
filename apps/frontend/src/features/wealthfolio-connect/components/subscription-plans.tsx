@@ -143,7 +143,7 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
           </span>
         </div>
         {billingPeriod === "yearly" && yearlySavings > 0 && (
-          <p className="mt-0.5 text-xs text-green-600 dark:text-green-400">
+          <p className="text-success mt-0.5 text-xs">
             {t("connect:subscription.savings", { percent: yearlySavings })}
           </p>
         )}
@@ -152,7 +152,7 @@ function PlanCard({ plan, billingPeriod, isDefault, isComingSoon }: PlanCardProp
       <ul className="mb-4 flex-1 space-y-1.5">
         {plan.features.map((feature, index) => (
           <li key={index} className="flex items-start gap-2 text-xs">
-            <Icons.Check className="mt-0.5 h-3 w-3 shrink-0 text-green-500" />
+            <Icons.Check className="text-success mt-0.5 h-3 w-3 shrink-0" />
             <span className="text-muted-foreground">{feature}</span>
           </li>
         ))}

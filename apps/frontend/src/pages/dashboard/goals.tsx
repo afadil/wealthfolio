@@ -43,7 +43,7 @@ function sortDashboardGoals(a: Goal, b: Goal) {
 
 function statusDotClass(status: Goal["statusHealth"]) {
   if (status === "off_track") return "bg-destructive";
-  if (status === "at_risk") return "bg-amber-500";
+  if (status === "at_risk") return "bg-warning";
   if (status === "on_track") return "bg-success";
   return "bg-muted-foreground/35";
 }

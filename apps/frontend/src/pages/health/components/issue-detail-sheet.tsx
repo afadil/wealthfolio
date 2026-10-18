@@ -49,7 +49,7 @@ function buildDiagnosticRoute(action: Extract<DiagnosticAction, { kind: "navigat
 
 const SEVERITY_CONFIG: Record<HealthSeverity, { labelKey: string; color: string }> = {
   INFO: { labelKey: "severity.info", color: "text-muted-foreground" },
-  WARNING: { labelKey: "severity.warning", color: "text-yellow-600 dark:text-yellow-400" },
+  WARNING: { labelKey: "severity.warning", color: "text-warning" },
   ERROR: { labelKey: "severity.error", color: "text-destructive" },
   CRITICAL: { labelKey: "severity.critical", color: "text-destructive" },
 };

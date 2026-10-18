@@ -40,7 +40,7 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
     // Yellow/warning dot
     return (
       <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-yellow-500/80" />
+        <span className="bg-warning/80 absolute inline-flex h-full w-full rounded-full" />
       </span>
     );
   }
@@ -49,7 +49,7 @@ function StatusIndicator({ status }: { status: AggregatedSyncStatus }) {
     // Red/error dot
     return (
       <span className="absolute -right-0.5 -top-0.5 flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/80" />
+        <span className="bg-destructive/80 absolute inline-flex h-full w-full rounded-full" />
       </span>
     );
   }

@@ -519,8 +519,8 @@ export function DeviceSyncSection() {
             </div>
 
             <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-              <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
-                <Icons.RefreshCw className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
+              <div className="bg-warning-subtle mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
+                <Icons.RefreshCw className="text-warning h-5 w-5 sm:h-6 sm:w-6" />
               </div>
               <p className="text-foreground text-sm font-medium">
                 {t("sync:stale.keysNeedUpdating")}
@@ -776,7 +776,7 @@ function RestoreBanner({
     >
       <div className="flex items-start gap-2">
         {needsAction ? (
-          <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
         ) : (
           <Spinner className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         )}
@@ -850,8 +850,8 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
   return (
     <>
       <div className="flex flex-col items-center justify-center py-4 text-center sm:py-6">
-        <div className="mb-3 rounded-full bg-amber-100 p-2.5 sm:mb-4 sm:p-3 dark:bg-amber-900/30">
-          <Icons.AlertTriangle className="h-5 w-5 text-amber-600 sm:h-6 sm:w-6 dark:text-amber-400" />
+        <div className="bg-warning-subtle mb-3 rounded-full p-2.5 sm:mb-4 sm:p-3">
+          <Icons.AlertTriangle className="text-warning h-5 w-5 sm:h-6 sm:w-6" />
         </div>
         <p className="text-foreground text-sm font-medium">{t("sync:orphaned.restoreTitle")}</p>
         <p className="text-muted-foreground mt-1 max-w-xs text-xs">
@@ -1040,7 +1040,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
               </Badge>
             </div>
             <div className="text-muted-foreground flex items-center gap-1 text-xs">
-              <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
+              <Icons.ShieldAlert className="text-warning h-3 w-3" />
               {t("sync:untrusted.connectToStartSyncing")}
             </div>
           </div>
@@ -1117,16 +1117,16 @@ function SyncStatusDot({
   let label: string;
 
   if (lastError || consecutiveFailures > 2) {
-    color = "bg-red-500";
+    color = "bg-destructive";
     label = t("sync:status.syncError");
   } else if (!backgroundRunning) {
-    color = "bg-gray-400";
+    color = "bg-muted-foreground";
     label = t("sync:status.syncPaused");
   } else if (lastCycleStatus === "ok") {
-    color = "bg-green-500";
+    color = "bg-success";
     label = t("sync:status.synced");
   } else {
-    color = "bg-yellow-500";
+    color = "bg-warning";
     label = t("sync:status.syncing");
   }
 
@@ -1223,7 +1223,7 @@ function DeviceCard({
             <Icon weight="duotone" className="text-muted-foreground size-5" />
           </div>
           {isOnline && (
-            <span className="border-background absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 bg-green-500" />
+            <span className="border-background bg-success absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2" />
           )}
         </div>
 
@@ -1281,16 +1281,14 @@ function DeviceCard({
               <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
                 {isTrusted && (
                   <>
-                    <Icons.ShieldCheck className="h-3 w-3 text-green-600 dark:text-green-500" />
+                    <Icons.ShieldCheck className="text-success h-3 w-3" />
                     <span>{t("sync:status.connected")}</span>
                   </>
                 )}
                 {isUntrusted && (
                   <>
-                    <Icons.ShieldAlert className="h-3 w-3 text-amber-600 dark:text-amber-500" />
-                    <span className="text-amber-600 dark:text-amber-500">
-                      {t("sync:status.needsSetup")}
-                    </span>
+                    <Icons.ShieldAlert className="text-warning h-3 w-3" />
+                    <span className="text-warning">{t("sync:status.needsSetup")}</span>
                   </>
                 )}
                 {isRevoked && (

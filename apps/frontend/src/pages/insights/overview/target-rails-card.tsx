@@ -31,7 +31,7 @@ interface TargetRailsCardProps {
 
 function driftClass(row: DriftRow): string {
   if (row.status === "overweight" || row.status === "not_targeted") return "text-destructive";
-  if (row.status === "underweight") return "text-blue-600 dark:text-blue-400";
+  if (row.status === "underweight") return "text-info";
   return "text-muted-foreground";
 }
 

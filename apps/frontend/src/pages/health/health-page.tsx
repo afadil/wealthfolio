@@ -356,7 +356,7 @@ export default function HealthPage() {
                       <span className="text-muted-foreground flex cursor-default items-center gap-1.5 text-xs" />
                     }
                   >
-                    {status.isStale && <Icons.AlertCircle className="h-3 w-3 text-amber-500" />}
+                    {status.isStale && <Icons.AlertCircle className="text-warning h-3 w-3" />}
                     {t("health:updatedAt", {
                       time: formatting.formatTime(status.checkedAt, {
                         hour: "2-digit",
