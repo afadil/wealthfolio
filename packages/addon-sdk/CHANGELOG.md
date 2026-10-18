@@ -74,7 +74,9 @@ and this project adheres to
     string, and `Accordion` likewise (no `collapsible`; single items always
     close); `AvatarFallback` takes `delay` instead of `delayMs`; `Tabs`,
     `RadioGroup` and `ToggleGroup` change callbacks receive
-    `(value, eventDetails)`.
+    `(value, eventDetails)`. Tabs still activate as arrow keys move focus; for
+    manual activation, `<Tabs activationMode="manual">` becomes
+    `<TabsList activateOnFocus={false}>`.
   - Single-select `ToggleGroup` items are toggle buttons (`aria-pressed`)
     instead of radios, and `Separator` is announced as a separator.
   - Tooltip and hover card delays are set on the trigger (`delay`, `closeDelay`)
