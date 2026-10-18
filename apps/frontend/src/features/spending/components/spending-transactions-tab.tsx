@@ -31,7 +31,6 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import {
   Button,
   Checkbox,
-  EmptyPlaceholder,
   Icons,
   Skeleton,
   Table,
@@ -40,6 +39,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 
 import { CashActivityForm } from "./cash-activity-form";
@@ -1195,34 +1200,46 @@ export const SpendingTransactionsTab = forwardRef<SpendingTransactionsTabHandle>
             <Skeleton className="h-12" />
           </div>
         ) : isError && !isFetchNextPageError ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="AlertTriangle" />
-            <EmptyPlaceholder.Title>{t("spending:txTab.loadErrorTitle")}</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {error?.message ?? t("spending:txTab.tryRefreshing")}
-            </EmptyPlaceholder.Description>
-            <Button variant="outline" onClick={() => void refetch()}>
-              {t("common:retry")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.AlertTriangle />
+              </EmptyMedia>
+              <EmptyTitle>{t("spending:txTab.loadErrorTitle")}</EmptyTitle>
+              <EmptyDescription>
+                {error?.message ?? t("spending:txTab.tryRefreshing")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button variant="outline" onClick={() => void refetch()}>
+                {t("common:retry")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : rows.length === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="Activity" />
-            <EmptyPlaceholder.Title>{t("spending:txTab.noTransactions")}</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {filtersActive ? t("spending:txTab.noMatchFilters") : t("spending:txTab.addFirst")}
-            </EmptyPlaceholder.Description>
-            {filtersActive ? (
-              <Button variant="outline" onClick={clearAllFilters}>
-                {t("spending:txTab.clearFilters")}
-              </Button>
-            ) : (
-              <Button onClick={openAddForm}>
-                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("spending:txTab.addTransaction")}
-              </Button>
-            )}
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.Activity />
+              </EmptyMedia>
+              <EmptyTitle>{t("spending:txTab.noTransactions")}</EmptyTitle>
+              <EmptyDescription>
+                {filtersActive ? t("spending:txTab.noMatchFilters") : t("spending:txTab.addFirst")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              {filtersActive ? (
+                <Button variant="outline" onClick={clearAllFilters}>
+                  {t("spending:txTab.clearFilters")}
+                </Button>
+              ) : (
+                <Button onClick={openAddForm}>
+                  <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("spending:txTab.addTransaction")}
+                </Button>
+              )}
+            </EmptyContent>
+          </Empty>
         ) : isMobile ? (
           <div className="spending-activity-list space-y-2">
             <SelectionToolbar

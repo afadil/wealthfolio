@@ -15,7 +15,13 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@wealthfolio/ui/components/ui/chart";
-import { EmptyPlaceholder } from "@wealthfolio/ui/components/ui/empty-placeholder";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@wealthfolio/ui/components/ui/empty";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -244,12 +250,15 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
-          <EmptyPlaceholder
-            className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]"
-            icon={<Icons.Activity className="h-8 w-8 md:h-10 md:w-10" />}
-            title={t("income:no_income_history")}
-            description={t("income:no_income_history_desc")}
-          />
+          <Empty className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.Activity className="size-8 md:size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("income:no_income_history")}</EmptyTitle>
+              <EmptyDescription>{t("income:no_income_history_desc")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : effectiveViewMode === "byAccount" ? (
           <ChartContainer
             config={accountChartConfig}

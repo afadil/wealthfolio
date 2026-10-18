@@ -23,7 +23,17 @@ import { UnsavedTargetChangesDialog } from "@/pages/allocation-targets/component
 import { useAllocationTargetDrift } from "@/pages/allocation-targets/hooks/use-allocation-target-drift";
 import { useAllocationTargets } from "@/pages/allocation-targets/hooks/use-allocation-targets";
 import { AllocationDetailSheet } from "@/pages/holdings/components/allocation-detail-sheet";
-import { Button, EmptyPlaceholder, Icons, Skeleton } from "@wealthfolio/ui";
+import {
+  Button,
+  Icons,
+  Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@wealthfolio/ui";
 import { PortfolioComposition } from "@/pages/holdings/components/composition-chart";
 import { DrillableAccountChart } from "@/pages/holdings/components/drillable-account-chart";
 import { DrillableDonutChart } from "@/pages/holdings/components/drillable-donut-chart";
@@ -394,15 +404,22 @@ export function OverviewPage({
             <Skeleton className="h-48 w-full" />
           </div>
         ) : (
-          <EmptyPlaceholder
-            icon={<Icons.Target className="text-muted-foreground h-10 w-10" />}
-            title={t("insights:insights.no_target_selected")}
-            description={t("insights:insights.no_target_selected_description")}
-          >
-            <Button size="sm" onClick={handleCreateTarget}>
-              {t("insights:insights.set_target_allocation")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.Target className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("insights:insights.no_target_selected")}</EmptyTitle>
+              <EmptyDescription>
+                {t("insights:insights.no_target_selected_description")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button size="sm" onClick={handleCreateTarget}>
+                {t("insights:insights.set_target_allocation")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         )}
       </div>
     );

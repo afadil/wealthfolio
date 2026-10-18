@@ -6,7 +6,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  EmptyPlaceholder,
   Icons,
   Input,
   Select,
@@ -16,6 +15,12 @@ import {
   SelectValue,
   Separator,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -311,25 +316,31 @@ export function AddonStoreBrowser({ installedAddonIds, onInstallSuccess }: Addon
 
         {/* Addon Grid */}
         {filteredAndSortedListings.length === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="Search" />
-            <EmptyPlaceholder.Title>{t("settings:addon_store_no_addons")}</EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {searchQuery
-                ? t("settings:addon_store_no_match", { query: searchQuery })
-                : t("settings:addon_store_no_filters")}
-            </EmptyPlaceholder.Description>
-            <div className="flex gap-2">
-              {searchQuery && (
-                <Button variant="outline" onClick={() => setSearchQuery("")}>
-                  {t("settings:addon_store_clear_search_button")}
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.Search />
+              </EmptyMedia>
+              <EmptyTitle>{t("settings:addon_store_no_addons")}</EmptyTitle>
+              <EmptyDescription>
+                {searchQuery
+                  ? t("settings:addon_store_no_match", { query: searchQuery })
+                  : t("settings:addon_store_no_filters")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex gap-2">
+                {searchQuery && (
+                  <Button variant="outline" onClick={() => setSearchQuery("")}>
+                    {t("settings:addon_store_clear_search_button")}
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setFilterBy("all")}>
+                  {t("settings:addon_store_show_all")}
                 </Button>
-              )}
-              <Button variant="outline" onClick={() => setFilterBy("all")}>
-                {t("settings:addon_store_show_all")}
-              </Button>
-            </div>
-          </EmptyPlaceholder>
+              </div>
+            </EmptyContent>
+          </Empty>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
             {filteredAndSortedListings.map((listing) => (

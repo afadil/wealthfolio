@@ -12,8 +12,10 @@ import {
   CardHeader,
   CardTitle,
   DonutChart,
-  EmptyPlaceholder,
   Skeleton,
+  Empty,
+  EmptyHeader,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -212,7 +214,11 @@ export function DrillableAccountChart({
             endAngle={0}
           />
         ) : (
-          <EmptyPlaceholder description={t("holdings:no_account_data")} />
+          <Empty>
+            <EmptyHeader>
+              <EmptyDescription>{t("holdings:no_account_data")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </CardContent>
     </Card>

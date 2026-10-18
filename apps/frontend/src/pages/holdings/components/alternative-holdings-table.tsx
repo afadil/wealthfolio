@@ -4,10 +4,14 @@ import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   AmountDisplay,
-  EmptyPlaceholder,
   GainPercent,
   useDateFormatting,
   Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -296,11 +300,15 @@ export function AlternativeHoldingsTable({
   if (!holdings || holdings.length === 0) {
     return (
       <div className="flex items-center justify-center py-16">
-        <EmptyPlaceholder
-          icon={<Icons.Wallet className="text-muted-foreground h-10 w-10" />}
-          title={resolvedEmptyTitle}
-          description={resolvedEmptyDescription}
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              {<Icons.Wallet className="text-muted-foreground size-10" />}
+            </EmptyMedia>
+            <EmptyTitle>{resolvedEmptyTitle}</EmptyTitle>
+            <EmptyDescription>{resolvedEmptyDescription}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }

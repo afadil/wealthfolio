@@ -9,13 +9,18 @@ import { HoldingsTable } from "@/pages/holdings/components/holdings-table";
 import { HoldingsTableMobile } from "@/pages/holdings/components/holdings-table-mobile";
 import {
   Button,
-  EmptyPlaceholder,
   Icons,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
   buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -149,11 +154,94 @@ const AccountHoldings = ({
     if (isCashOrCreditAccount) {
       return (
         <div className="flex items-center justify-center py-16">
-          <EmptyPlaceholder
-            icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-            title={t("account:empty.no_activity_title")}
-            description={t("account:empty.no_activity_desc")}
-          >
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.TrendingUp className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("account:empty.no_activity_title")}</EmptyTitle>
+              <EmptyDescription>{t("account:empty.no_activity_desc")}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                <Button
+                  size="default"
+                  onClick={() =>
+                    navigate(
+                      `/activities/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
+                    )
+                  }
+                >
+                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  {t("account:actions_add_transaction")}
+                </Button>
+                <Button
+                  size="default"
+                  variant="outline"
+                  onClick={() => navigate(`/import?account=${accountId}`)}
+                >
+                  <Icons.Import className="mr-2 h-4 w-4" />
+                  {t("account:actions_import_csv")}
+                </Button>
+              </div>
+            </EmptyContent>
+          </Empty>
+        </div>
+      );
+    }
+
+    // Different empty state for HOLDINGS mode (manual accounts can edit, connected accounts cannot)
+    if (isHoldingsMode) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                {<Icons.TrendingUp className="text-muted-foreground size-10" />}
+              </EmptyMedia>
+              <EmptyTitle>{t("account:empty.no_holdings_title")}</EmptyTitle>
+              <EmptyDescription>
+                {canEditHoldingsDirectly
+                  ? t("account:empty.no_holdings_manual_desc")
+                  : t("account:empty.no_holdings_synced_desc")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              {canEditHoldingsDirectly && (
+                <div className="flex flex-col items-center gap-3 sm:flex-row">
+                  <Button size="default" onClick={onAddHoldings}>
+                    <Icons.Plus className="mr-2 h-4 w-4" />
+                    {t("account:actions_add_holdings")}
+                  </Button>
+                  <Button
+                    size="default"
+                    variant="outline"
+                    onClick={() => navigate(`/import?account=${accountId}`)}
+                  >
+                    <Icons.Import className="mr-2 h-4 w-4" />
+                    {t("account:actions_import_csv")}
+                  </Button>
+                </div>
+              )}
+              {canEditHoldingsDirectly && connectAccountLink}
+            </EmptyContent>
+          </Empty>
+        </div>
+      );
+    }
+
+    // Default empty state for TRANSACTIONS mode
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              {<Icons.TrendingUp className="text-muted-foreground size-10" />}
+            </EmptyMedia>
+            <EmptyTitle>{t("account:empty.no_holdings_title")}</EmptyTitle>
+            <EmptyDescription>{t("account:empty.no_holdings_default_desc")}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
             <div className="flex flex-col items-center gap-3 sm:flex-row">
               <Button
                 size="default"
@@ -175,77 +263,9 @@ const AccountHoldings = ({
                 {t("account:actions_import_csv")}
               </Button>
             </div>
-          </EmptyPlaceholder>
-        </div>
-      );
-    }
-
-    // Different empty state for HOLDINGS mode (manual accounts can edit, connected accounts cannot)
-    if (isHoldingsMode) {
-      return (
-        <div className="flex items-center justify-center py-16">
-          <EmptyPlaceholder
-            icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-            title={t("account:empty.no_holdings_title")}
-            description={
-              canEditHoldingsDirectly
-                ? t("account:empty.no_holdings_manual_desc")
-                : t("account:empty.no_holdings_synced_desc")
-            }
-          >
-            {canEditHoldingsDirectly && (
-              <div className="flex flex-col items-center gap-3 sm:flex-row">
-                <Button size="default" onClick={onAddHoldings}>
-                  <Icons.Plus className="mr-2 h-4 w-4" />
-                  {t("account:actions_add_holdings")}
-                </Button>
-                <Button
-                  size="default"
-                  variant="outline"
-                  onClick={() => navigate(`/import?account=${accountId}`)}
-                >
-                  <Icons.Import className="mr-2 h-4 w-4" />
-                  {t("account:actions_import_csv")}
-                </Button>
-              </div>
-            )}
-            {canEditHoldingsDirectly && connectAccountLink}
-          </EmptyPlaceholder>
-        </div>
-      );
-    }
-
-    // Default empty state for TRANSACTIONS mode
-    return (
-      <div className="flex items-center justify-center py-16">
-        <EmptyPlaceholder
-          icon={<Icons.TrendingUp className="text-muted-foreground h-10 w-10" />}
-          title={t("account:empty.no_holdings_title")}
-          description={t("account:empty.no_holdings_default_desc")}
-        >
-          <div className="flex flex-col items-center gap-3 sm:flex-row">
-            <Button
-              size="default"
-              onClick={() =>
-                navigate(
-                  `/activities/manage?account=${accountId}&redirect-to=/accounts/${accountId}`,
-                )
-              }
-            >
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("account:actions_add_transaction")}
-            </Button>
-            <Button
-              size="default"
-              variant="outline"
-              onClick={() => navigate(`/import?account=${accountId}`)}
-            >
-              <Icons.Import className="mr-2 h-4 w-4" />
-              {t("account:actions_import_csv")}
-            </Button>
-          </div>
-          {connectAccountLink}
-        </EmptyPlaceholder>
+            {connectAccountLink}
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }

@@ -17,11 +17,16 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  EmptyPlaceholder,
   Icons,
   Input,
   Skeleton,
   Spinner,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -325,31 +330,37 @@ export default function SpendingRulesPage() {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : hasLoadError ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="AlertTriangle" />
-            <EmptyPlaceholder.Title>
-              {t("settings:spending.rules.error_title")}
-            </EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>{loadError}</EmptyPlaceholder.Description>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.AlertTriangle />
+              </EmptyMedia>
+              <EmptyTitle>{t("settings:spending.rules.error_title")}</EmptyTitle>
+              <EmptyDescription>{loadError}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : totalRulesCount === 0 ? (
           <div className="space-y-6">
             <div className="bg-muted/30 rounded-lg border p-4">
               <RulePresetPicker />
             </div>
-            <EmptyPlaceholder>
-              <EmptyPlaceholder.Icon name="ListFilter" />
-              <EmptyPlaceholder.Title>
-                {t("settings:spending.rules.empty_title")}
-              </EmptyPlaceholder.Title>
-              <EmptyPlaceholder.Description>
-                {t("settings:spending.rules.empty_description")}
-              </EmptyPlaceholder.Description>
-              <Button variant="outline" onClick={handleAddRule}>
-                <Icons.Plus className="mr-2 h-4 w-4" />
-                {t("settings:spending.rules.add_manually")}
-              </Button>
-            </EmptyPlaceholder>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Icons.ListFilter />
+                </EmptyMedia>
+                <EmptyTitle>{t("settings:spending.rules.empty_title")}</EmptyTitle>
+                <EmptyDescription>
+                  {t("settings:spending.rules.empty_description")}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button variant="outline" onClick={handleAddRule}>
+                  <Icons.Plus className="mr-2 h-4 w-4" />
+                  {t("settings:spending.rules.add_manually")}
+                </Button>
+              </EmptyContent>
+            </Empty>
           </div>
         ) : (
           <div className="space-y-4">

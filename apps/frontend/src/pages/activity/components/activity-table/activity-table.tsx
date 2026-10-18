@@ -33,11 +33,16 @@ import { observeElementOffset, useVirtualizer } from "@tanstack/react-virtual";
 import {
   AmountDisplay,
   Button,
-  EmptyPlaceholder,
   PriceDisplay,
   useAmountFormatting,
   useDateFormatting,
   buttonVariants,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import { DataTableColumnHeader } from "@wealthfolio/ui/components/ui/data-table/data-table-column-header";
 import {
@@ -842,38 +847,44 @@ export const ActivityTable = ({
   if (!hasRows) {
     return (
       <div className="flex h-full flex-col">
-        <EmptyPlaceholder>
-          <EmptyPlaceholder.Icon name="Activity" />
-          <EmptyPlaceholder.Title>{t("activity:table.no_activities")}</EmptyPlaceholder.Title>
-          <EmptyPlaceholder.Description>
-            {filtersActive
-              ? t("activity:table.no_activities_filtered")
-              : t("activity:table.no_activities_desc")}
-          </EmptyPlaceholder.Description>
-          {filtersActive ? (
-            onClearFilters ? (
-              <Button variant="outline" onClick={onClearFilters}>
-                {t("activity:table.clear_filters")}
-              </Button>
-            ) : null
-          ) : onAdd ? (
-            <div className="flex flex-col items-center gap-3 sm:flex-row">
-              <Button onClick={onAdd}>
-                <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-                {t("activity:add_activity")}
-              </Button>
-              {showConnectAccountLink && (
-                <Link
-                  to={connectPagePath("activities_empty")}
-                  className={buttonVariants({ variant: "outline" })}
-                >
-                  <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {t("activity:page.connect_account")}
-                </Link>
-              )}
-            </div>
-          ) : null}
-        </EmptyPlaceholder>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Icons.Activity />
+            </EmptyMedia>
+            <EmptyTitle>{t("activity:table.no_activities")}</EmptyTitle>
+            <EmptyDescription>
+              {filtersActive
+                ? t("activity:table.no_activities_filtered")
+                : t("activity:table.no_activities_desc")}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            {filtersActive ? (
+              onClearFilters ? (
+                <Button variant="outline" onClick={onClearFilters}>
+                  {t("activity:table.clear_filters")}
+                </Button>
+              ) : null
+            ) : onAdd ? (
+              <div className="flex flex-col items-center gap-3 sm:flex-row">
+                <Button onClick={onAdd}>
+                  <Icons.Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {t("activity:add_activity")}
+                </Button>
+                {showConnectAccountLink && (
+                  <Link
+                    to={connectPagePath("activities_empty")}
+                    className={buttonVariants({ variant: "outline" })}
+                  >
+                    <Icons.CloudSync2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    {t("activity:page.connect_account")}
+                  </Link>
+                )}
+              </div>
+            ) : null}
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }

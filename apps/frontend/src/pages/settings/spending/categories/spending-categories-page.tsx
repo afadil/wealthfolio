@@ -5,13 +5,18 @@ import { toast } from "sonner";
 
 import {
   Button,
-  EmptyPlaceholder,
   Icons,
   Skeleton,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
 } from "@wealthfolio/ui";
 import {
   useCreateCategory,
@@ -261,19 +266,23 @@ export default function SpendingCategoriesPage() {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : total === 0 ? (
-          <EmptyPlaceholder>
-            <EmptyPlaceholder.Icon name="Tag" />
-            <EmptyPlaceholder.Title>
-              {t("settings:spending.categories.empty_title")}
-            </EmptyPlaceholder.Title>
-            <EmptyPlaceholder.Description>
-              {t("settings:spending.categories.empty_description")}
-            </EmptyPlaceholder.Description>
-            <Button onClick={handleAddCategory}>
-              <Icons.Plus className="mr-2 h-4 w-4" />
-              {t("settings:spending.categories.add")}
-            </Button>
-          </EmptyPlaceholder>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icons.Tag />
+              </EmptyMedia>
+              <EmptyTitle>{t("settings:spending.categories.empty_title")}</EmptyTitle>
+              <EmptyDescription>
+                {t("settings:spending.categories.empty_description")}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={handleAddCategory}>
+                <Icons.Plus className="mr-2 h-4 w-4" />
+                {t("settings:spending.categories.add")}
+              </Button>
+            </EmptyContent>
+          </Empty>
         ) : (
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full max-w-md grid-cols-3">
