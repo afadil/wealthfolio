@@ -1062,17 +1062,13 @@ function SyncHistoryItem({
     <div
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex-nowrap sm:gap-4",
-        isFailed
-          ? "bg-destructive/5"
-          : needsAttention
-            ? "bg-yellow-500/10 dark:bg-yellow-500/5"
-            : "hover:bg-muted/30",
+        isFailed ? "bg-destructive/5" : needsAttention ? "bg-warning/10" : "hover:bg-muted/30",
       )}
     >
       <span
         className={cn(
           "inline-block h-2 w-2 shrink-0 rounded-full",
-          isFailed ? "bg-destructive" : needsAttention ? "bg-yellow-500" : "bg-green-500",
+          isFailed ? "bg-destructive" : needsAttention ? "bg-warning" : "bg-success",
         )}
       />
       <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-[80px] sm:text-sm">
@@ -1088,7 +1084,7 @@ function SyncHistoryItem({
         <span
           className={cn(
             isFailed && "text-destructive font-medium",
-            needsAttention && !isFailed && "font-medium text-amber-600 dark:text-amber-400",
+            needsAttention && !isFailed && "text-warning font-medium",
           )}
         >
           {description}

@@ -352,7 +352,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="size-6 p-0 text-blue-500 hover:text-blue-600"
+            className="text-info size-6 p-0"
             onClick={(e) => {
               e.stopPropagation();
               onTogglePin(thread.id, thread.isPinned);

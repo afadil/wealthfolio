@@ -286,7 +286,7 @@ const AccountSummaryComponent = React.memo(
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <span className="inline-block h-2 w-2 shrink-0 cursor-help rounded-full bg-amber-500" />
+                    <span className="bg-warning inline-block h-2 w-2 shrink-0 cursor-help rounded-full" />
                   }
                 />
                 <TooltipContent className="max-w-80">

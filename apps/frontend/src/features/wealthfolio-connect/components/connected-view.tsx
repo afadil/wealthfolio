@@ -180,7 +180,7 @@ function BrokerAccountCard({ account, connections }: BrokerAccountCardProps) {
             <Tooltip>
               <TooltipTrigger>
                 {account.sync_enabled ? (
-                  <Icons.Eye className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                  <Icons.Eye className="text-info h-3.5 w-3.5 shrink-0" />
                 ) : (
                   <Icons.EyeOff className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                 )}
@@ -306,8 +306,8 @@ function BrokerConnectionsCard({
                   <Badge
                     className={`shrink-0 ${
                       isConnected
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        ? "bg-success-subtle text-success-subtle-foreground"
+                        : "bg-warning-subtle text-warning-subtle-foreground"
                     }`}
                   >
                     {isConnected
@@ -432,7 +432,7 @@ export function ConnectedView() {
                     t("connect:account.userFallback")}
                 </h3>
                 {hasSubscription && (
-                  <Badge className="text-2xs h-5 shrink-0 bg-green-100 px-2 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  <Badge className="text-2xs bg-success-subtle text-success-subtle-foreground h-5 shrink-0 px-2 font-medium">
                     {t("connect:account.active")}
                   </Badge>
                 )}

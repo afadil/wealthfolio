@@ -374,7 +374,7 @@ export function NetWorthContent() {
                 />
               ) : (
                 <div
-                  className="rounded-xl border border-orange-200/50 p-6 text-center md:p-8 dark:border-orange-800/50"
+                  className="border-warning-subtle-border rounded-xl border p-6 text-center md:p-8"
                   style={{ backgroundColor: THEME_COLOR_LIGHT }}
                 >
                   <p className="text-sm">{t("insights:networth.no_assets_found")}</p>
