@@ -62,7 +62,7 @@ export function DayOfWeekChart({
             dataKey="day"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <Tooltip
             cursor={{ fill: "var(--chart-cursor)" }}

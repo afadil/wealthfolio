@@ -218,7 +218,7 @@ export function LoanTimeline({
   const referenceLabel = (value: string, position: "insideTopLeft" | "insideTopRight") => ({
     value,
     position,
-    fontSize: 11,
+    fontSize: "0.6875rem",
     fill: "var(--muted-foreground)",
   });
   const title = t(

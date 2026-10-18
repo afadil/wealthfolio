@@ -109,11 +109,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                   {String(lineNumber).padStart(2, "0")}
                 </span>
               </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                sideOffset={10}
-                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
-              >
+              <TooltipContent side="right" sideOffset={10} className="max-w-xs p-3">
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.csvViewer.validationErrors")}
                 </h4>

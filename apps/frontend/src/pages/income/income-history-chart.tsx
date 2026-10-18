@@ -367,7 +367,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 width={isMobile ? 0 : 48}
                 ticks={rightTicks}
                 domain={[0, rightTicks[rightTicks.length - 1] || 0]}
-                tick={{ fontSize: 12, fill: "var(--chart-2)" }}
+                tick={{ fontSize: "0.75rem", fill: "var(--chart-2)" }}
                 tickFormatter={(value: number) => formatCompactAmount(value, currency, false)}
               />
               <ChartTooltip

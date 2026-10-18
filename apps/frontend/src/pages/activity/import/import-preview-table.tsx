@@ -277,7 +277,7 @@ const ErrorCell = ({
             <Icons.AlertCircle className="text-destructive h-3.5 w-3.5 shrink-0" />
           </div>
         </TooltipTrigger>
-        <TooltipContent className="bg-destructive text-destructive-foreground dark:border-destructive max-w-100 flex flex-col gap-2 border-none p-3 shadow-lg">
+        <TooltipContent className="max-w-100 flex flex-col gap-2 p-3">
           <ul className="list-disc space-y-1 pl-5 text-sm">
             {errorMessages.map((error, index) => (
               <li key={index}>{error}</li>
@@ -339,11 +339,7 @@ function getColumns(
                   {String(lineNumber).padStart(2, "0")}
                 </span>
               </TooltipTrigger>
-              <TooltipContent
-                side="right"
-                sideOffset={10}
-                className="bg-destructive text-destructive-foreground max-w-xs border-none p-3"
-              >
+              <TooltipContent side="right" sideOffset={10} className="max-w-xs p-3">
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.preview.validationErrors")}
                 </h4>

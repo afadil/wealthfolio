@@ -53,20 +53,20 @@ const SEVERITY_CONFIG: Record<
   },
   WARNING: {
     label: "Warning",
-    bgColor: "bg-warning/15",
-    textColor: "text-warning",
+    bgColor: "bg-warning-subtle",
+    textColor: "text-warning-subtle-foreground",
     dotColor: "bg-warning",
   },
   ERROR: {
     label: "Error",
-    bgColor: "bg-destructive/10",
-    textColor: "text-destructive",
+    bgColor: "bg-destructive-subtle",
+    textColor: "text-destructive-subtle-foreground",
     dotColor: "bg-destructive",
   },
   CRITICAL: {
     label: "Critical",
-    bgColor: "bg-destructive/15",
-    textColor: "text-destructive",
+    bgColor: "bg-destructive-subtle",
+    textColor: "text-destructive-subtle-foreground",
     dotColor: "bg-destructive",
   },
 };

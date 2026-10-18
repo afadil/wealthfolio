@@ -40,9 +40,9 @@ const STATUS_LABEL_KEYS: Record<Status, string> = {
 };
 
 const STATUS_TONE: Record<Status, string> = {
-  over: "text-destructive",
+  over: "text-destructive-subtle-foreground",
   approaching: "text-foreground",
-  comfortable: "text-success",
+  comfortable: "text-success-subtle-foreground",
   underused: "text-muted-foreground/80",
 };
 
@@ -279,11 +279,11 @@ function SummaryStat({
 function statusPillBg(status: Status): string {
   switch (status) {
     case "over":
-      return "bg-destructive/10";
+      return "bg-destructive-subtle";
     case "approaching":
       return "bg-[var(--status-warn)]/15";
     case "comfortable":
-      return "bg-success/10";
+      return "bg-success-subtle";
     case "underused":
       return "bg-muted/60";
   }

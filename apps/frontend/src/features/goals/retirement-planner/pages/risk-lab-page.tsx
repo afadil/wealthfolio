@@ -838,7 +838,7 @@ function ReferenceCaption({ viewBox, value, fill, side }: ReferenceCaptionProps)
       y={y + 12}
       textAnchor={side === "left" ? "end" : "start"}
       fill={fill}
-      fontSize={11}
+      fontSize="0.6875rem"
       fontWeight={600}
     >
       {value}
@@ -891,12 +891,12 @@ function MonteCarloFanChart({
           dataKey="age"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: CHART.muted, fontSize: 12 }}
+          tick={{ fill: CHART.muted, fontSize: "0.75rem" }}
         />
         <YAxis
           axisLine={false}
           tickLine={false}
-          tick={{ fill: CHART.muted, fontSize: 12 }}
+          tick={{ fill: CHART.muted, fontSize: "0.75rem" }}
           tickFormatter={(value) => formatting.formatCompactAmount(Number(value), currency)}
         />
         <Tooltip content={<MonteCarloTooltip currency={currency} />} />
@@ -1723,13 +1723,13 @@ function SorrChart({
           dataKey="age"
           axisLine={false}
           tickLine={false}
-          tick={{ fill: CHART.muted, fontSize: 12 }}
+          tick={{ fill: CHART.muted, fontSize: "0.75rem" }}
         />
         <YAxis
           width={54}
           axisLine={false}
           tickLine={false}
-          tick={{ fill: CHART.muted, fontSize: 12 }}
+          tick={{ fill: CHART.muted, fontSize: "0.75rem" }}
           tickFormatter={(value) => formatting.formatCompactAmount(Number(value), currency)}
         />
         <Tooltip
