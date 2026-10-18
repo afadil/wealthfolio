@@ -12,7 +12,12 @@ vi.mock("./platform", () => ({
   logger: mocks.logger,
 }));
 
-import { createActivity, saveActivities, updateActivity } from "./activities";
+import {
+  createActivity,
+  saveActivities,
+  saveInternalTransferPair,
+  updateActivity,
+} from "./activities";
 
 const baseActivity = {
   accountId: "account-1",
@@ -59,6 +64,27 @@ describe("activity metadata serialization", () => {
         metadata: '{"raw_type":"merchant_refund","flow":{"is_external":true}}',
       },
     });
+  });
+
+  it("preserves the selected leg and normalizes the date for pair saves", async () => {
+    const request = {
+      editedActivityId: "pair-in",
+      transferOutId: "pair-out",
+      transferInId: "pair-in",
+      fromAccountId: "from",
+      toAccountId: "to",
+      activityDate: new Date("2026-02-01T10:00:00Z"),
+      sourceAmount: 100,
+      destinationAmount: 100,
+      sourceCurrency: "USD",
+      destinationCurrency: "USD",
+      notes: null,
+    };
+    await saveInternalTransferPair(request);
+    expect(mocks.invoke).toHaveBeenCalledWith("save_internal_transfer_pair", {
+      request: { ...request, activityDate: "2026-02-01T10:00:00.000Z" },
+    });
+    expect(request.activityDate).toBeInstanceOf(Date);
   });
 
   it("normalizes metadata in bulk creates and updates while preserving JSON strings", async () => {

@@ -650,6 +650,7 @@ export function MobileActivityForm({
           }
 
           await saveInternalTransferPairMutation.mutateAsync({
+            editedActivityId: id,
             transferOutId: id ? transferOutId : undefined,
             transferInId: id ? transferInId : undefined,
             fromAccountId: submitData.accountId,
