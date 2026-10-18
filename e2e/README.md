@@ -254,4 +254,5 @@ offsets up to 4 px stay in px), and raw colours that bypass the theme's roles
 (`text-amber-600`, hex literals, `rgb()`/`hsl()` values) or tint a status colour
 (`bg-warning/10`), and fails when a file gains one. Sizes in rem follow the root
 font size, which the Text size setting will change. Run it with `--update` after
-removing some.
+removing some, or after moving or renaming a file (counts are kept per path). It
+runs in the PR checks as the "Design ratchet" job.
