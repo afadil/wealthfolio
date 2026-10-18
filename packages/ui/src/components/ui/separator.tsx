@@ -11,6 +11,7 @@ function Separator({ className, orientation = "horizontal", ...props }: Separato
     <SeparatorPrimitive
       data-slot="separator"
       orientation={orientation}
+      // Plain classes, so a call site's h-4 on a vertical separator replaces h-full.
       className={cn("bg-border shrink-0", orientation === "horizontal" ? "h-px w-full" : "h-full w-px", className)}
       {...props}
     />

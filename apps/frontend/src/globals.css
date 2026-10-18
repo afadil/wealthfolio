@@ -18,6 +18,21 @@
 /* Enable class-based dark mode across the subtree (Tailwind v4 pattern) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Orientation variants from shadcn/tailwind.css, which shadcn's Base UI sources use.
+   :where() keeps them at a plain utility's specificity, so a call site's h-4 still
+   wins over data-vertical:h-full. */
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
 /* Tailwind v4 custom utilities for 3D rotation used in the sidebar logo */
 @utility transform-3d {
   transform-style: preserve-3d;

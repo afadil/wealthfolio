@@ -9,7 +9,10 @@ interface ScrollAreaProps extends Omit<ScrollAreaPrimitive.Root.Props, "classNam
 function ScrollArea({ className, children, ...props }: ScrollAreaProps) {
   return (
     <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn("relative overflow-hidden", className)} {...props}>
-      <ScrollAreaPrimitive.Viewport data-slot="scroll-area-viewport" className="h-full w-full rounded-[inherit]">
+      <ScrollAreaPrimitive.Viewport
+        data-slot="scroll-area-viewport"
+        className="focus-visible:outline-solid focus-visible:outline-ring h-full w-full rounded-[inherit] outline-none focus-visible:outline-2 focus-visible:-outline-offset-2"
+      >
         {/* Grows with content wider than the viewport, as Radix's wrapper did. */}
         <ScrollAreaPrimitive.Content data-slot="scroll-area-content">{children}</ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
@@ -31,8 +34,7 @@ function ScrollBar({ className, orientation = "vertical", ...props }: ScrollBarP
       orientation={orientation}
       className={cn(
         "data-hovering:pointer-events-auto data-hovering:opacity-100 data-scrolling:pointer-events-auto data-scrolling:opacity-100 pointer-events-none flex touch-none select-none opacity-0 transition-[opacity,color]",
-        orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent p-px",
-        orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-px",
+        "data-horizontal:h-2.5 data-vertical:h-full data-vertical:w-2.5 data-horizontal:flex-col data-horizontal:border-t data-vertical:border-l data-horizontal:border-t-transparent data-vertical:border-l-transparent p-px",
         className,
       )}
       {...props}

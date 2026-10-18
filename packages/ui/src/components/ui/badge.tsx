@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:outline-destructive aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  "group/badge inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-invalid:outline-destructive aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
   {
     variants: {
       variant: {
@@ -25,6 +25,8 @@ const badgeVariants = cva(
         "destructive-subtle":
           "border-transparent bg-destructive-subtle text-destructive-subtle-foreground [a&]:hover:bg-destructive-subtle/80",
         "info-subtle": "border-transparent bg-info-subtle text-info-subtle-foreground [a&]:hover:bg-info-subtle/80",
+        ghost: "border-transparent hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        link: "border-transparent text-primary underline-offset-4 hover:underline",
       },
     },
     defaultVariants: {
