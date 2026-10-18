@@ -948,12 +948,16 @@ where
         return Ok(HashSet::new());
     }
     let needles: Vec<String> = unique.iter().cloned().collect();
-    let found: Vec<String> = a::assets
-        .select(a::id)
-        .filter(a::id.eq_any(&needles))
-        .load(conn)
-        .map_err(StorageError::from)?;
-    Ok(found.into_iter().collect())
+    let mut found = HashSet::new();
+    for chunk in chunk_for_sqlite(&needles) {
+        let rows: Vec<String> = a::assets
+            .select(a::id)
+            .filter(a::id.eq_any(chunk))
+            .load(conn)
+            .map_err(StorageError::from)?;
+        found.extend(rows);
+    }
+    Ok(found)
 }
 
 /// Mirror of `existing_asset_ids` for the `activities` table. Used to validate
@@ -962,7 +966,7 @@ where
 /// real IDs but don't have rows in `activities`, and a user can delete an
 /// activity at any time. Storing such an ID would violate the FK constraint
 /// and abort the whole batch.
-fn existing_activity_ids<'a, I>(
+pub(crate) fn existing_activity_ids<'a, I>(
     conn: &mut SqliteConnection,
     candidate_ids: I,
 ) -> std::result::Result<HashSet<String>, StorageError>
@@ -976,12 +980,16 @@ where
         return Ok(HashSet::new());
     }
     let needles: Vec<String> = unique.iter().cloned().collect();
-    let found: Vec<String> = ac::activities
-        .select(ac::id)
-        .filter(ac::id.eq_any(&needles))
-        .load(conn)
-        .map_err(StorageError::from)?;
-    Ok(found.into_iter().collect())
+    let mut found = HashSet::new();
+    for chunk in chunk_for_sqlite(&needles) {
+        let rows: Vec<String> = ac::activities
+            .select(ac::id)
+            .filter(ac::id.eq_any(chunk))
+            .load(conn)
+            .map_err(StorageError::from)?;
+        found.extend(rows);
+    }
+    Ok(found)
 }
 
 /// Pre-write normalization for a batch of `LotRecordDB`:
@@ -1147,6 +1155,37 @@ mod tests {
             created_at: "2024-01-15T00:00:00.000Z".to_string(),
             updated_at: "2024-01-15T00:00:00.000Z".to_string(),
         }
+    }
+
+    #[tokio::test]
+    async fn large_lot_asset_reference_lookup_keeps_only_existing_ids() {
+        let (_repo, pool, _dir) = setup().await;
+        insert_asset(&pool, "first");
+        insert_asset(&pool, "last");
+        let mut ids: Vec<String> = (0..32_767).map(|i| format!("missing-{i}")).collect();
+        ids.extend(["first".to_string(), "last".to_string(), "first".to_string()]);
+        let mut conn = get_connection(&pool).unwrap();
+        let found = existing_asset_ids(&mut conn, ids.iter().map(String::as_str)).unwrap();
+        assert_eq!(
+            found,
+            HashSet::from(["first".to_string(), "last".to_string()])
+        );
+    }
+
+    #[tokio::test]
+    async fn large_lot_activity_reference_lookup_keeps_only_existing_ids() {
+        let (_repo, pool, _dir) = setup().await;
+        insert_account(&pool, "acc1");
+        insert_activity(&pool, "open");
+        insert_activity(&pool, "close");
+        let mut ids: Vec<String> = (0..32_767).map(|i| format!("missing-{i}")).collect();
+        ids.extend(["open".to_string(), "close".to_string(), "open".to_string()]);
+        let mut conn = get_connection(&pool).unwrap();
+        let found = existing_activity_ids(&mut conn, ids.iter().map(String::as_str)).unwrap();
+        assert_eq!(
+            found,
+            HashSet::from(["open".to_string(), "close".to_string()])
+        );
     }
 
     /// Account-FX round trip: an open lot persisted with a non-identity account

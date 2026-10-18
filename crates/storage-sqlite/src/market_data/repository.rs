@@ -221,18 +221,22 @@ impl QuoteStore for MarketDataRepository {
                     if provider_pairs.is_empty() {
                         db_rows
                     } else {
-                        let asset_ids: Vec<&str> = provider_pairs.iter().map(|(a, _)| *a).collect();
-                        let days: Vec<&str> = provider_pairs.iter().map(|(_, d)| *d).collect();
-
-                        let manual_days: HashSet<(String, String)> = quotes_dsl::quotes
-                            .filter(quotes_dsl::source.eq("MANUAL"))
-                            .filter(quotes_dsl::asset_id.eq_any(&asset_ids))
-                            .filter(quotes_dsl::day.eq_any(&days))
-                            .select((quotes_dsl::asset_id, quotes_dsl::day))
-                            .load::<(String, String)>(tx.conn())
-                            .map_err(StorageError::QueryFailed)?
-                            .into_iter()
-                            .collect();
+                        let provider_pairs: Vec<_> = provider_pairs.into_iter().collect();
+                        // Each pair can add two IN parameters; reserve one for source.
+                        let pairs_per_chunk = (SQLITE_MAX_PARAMS_CHUNK - 1) / 2;
+                        let mut manual_days = HashSet::new();
+                        for chunk in provider_pairs.chunks(pairs_per_chunk) {
+                            let asset_ids: HashSet<&str> = chunk.iter().map(|(a, _)| *a).collect();
+                            let days: HashSet<&str> = chunk.iter().map(|(_, d)| *d).collect();
+                            let rows = quotes_dsl::quotes
+                                .filter(quotes_dsl::source.eq("MANUAL"))
+                                .filter(quotes_dsl::asset_id.eq_any(asset_ids))
+                                .filter(quotes_dsl::day.eq_any(days))
+                                .select((quotes_dsl::asset_id, quotes_dsl::day))
+                                .load::<(String, String)>(tx.conn())
+                                .map_err(StorageError::QueryFailed)?;
+                            manual_days.extend(rows);
+                        }
 
                         if manual_days.is_empty() {
                             db_rows
@@ -1850,6 +1854,117 @@ mod tests {
             .replace_provider_history(context, vec![quote])
             .await
             .is_err());
+    }
+
+    #[tokio::test]
+    async fn large_quote_batches_preserve_manual_prices_for_exact_asset_days() {
+        let (repo, _temp) = create_test_repository().await;
+        let assets = ["FIRST", "SECOND", "THIRD"];
+        let first_day = NaiveDate::from_ymd_opt(1930, 1, 1).unwrap();
+        let day_count = 32_767;
+        let override_offsets = [0, day_count / 2, day_count - 1];
+        for (asset, offset) in assets.iter().zip(override_offsets) {
+            insert_test_asset(&repo, asset);
+            repo.save_quote(&quote_with_source(
+                asset,
+                first_day + chrono::Duration::days(offset as i64),
+                "MANUAL",
+                Decimal::from(42),
+            ))
+            .await
+            .unwrap();
+        }
+        // Unique dates alone exceed SQLite's limit, so deduplication must be
+        // paired with chunking. Other assets share dates with manual overrides.
+        let mut incoming = Vec::new();
+        for asset in assets {
+            for offset in 0..day_count {
+                if asset != "FIRST" && !override_offsets.contains(&offset) {
+                    continue;
+                }
+                incoming.push(quote_with_source(
+                    asset,
+                    first_day + chrono::Duration::days(offset as i64),
+                    "YAHOO",
+                    Decimal::ONE,
+                ));
+            }
+        }
+        // A manual edit in the same batch must still update its existing row.
+        incoming.push(quote_with_source(
+            "FIRST",
+            first_day,
+            "MANUAL",
+            Decimal::from(77),
+        ));
+        assert_eq!(
+            repo.upsert_quotes(&incoming).await.unwrap(),
+            incoming.len() - assets.len()
+        );
+        for (asset, offset) in assets.iter().zip(override_offsets) {
+            let rows = raw_rows(&repo, asset);
+            let expected_days = if *asset == "FIRST" {
+                day_count
+            } else {
+                override_offsets.len()
+            };
+            assert_eq!(rows.len(), expected_days);
+            let override_day = (first_day + chrono::Duration::days(offset as i64)).to_string();
+            let manual = rows.iter().find(|row| row.source == "MANUAL").unwrap();
+            assert_eq!(manual.day, override_day);
+            assert_eq!(manual.close, if *asset == "FIRST" { "77" } else { "42" });
+            // The override applies only to this pair, not all dates or other assets.
+            assert_eq!(
+                rows.iter().filter(|row| row.source == "YAHOO").count(),
+                expected_days - 1
+            );
+            assert!(rows
+                .iter()
+                .all(|row| row.source != "YAHOO" || (row.day != override_day && row.close == "1")));
+        }
+    }
+
+    #[tokio::test]
+    async fn quote_batch_failure_rolls_back_earlier_writes_and_preserves_manual_prices() {
+        let (repo, _temp) = create_test_repository().await;
+        insert_test_asset(&repo, "ROLLBACK");
+        let first_day = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+        repo.save_quote(&quote_with_source(
+            "ROLLBACK",
+            first_day,
+            "MANUAL",
+            Decimal::from(42),
+        ))
+        .await
+        .unwrap();
+        repo.save_quote(&quote_with_source(
+            "ROLLBACK",
+            first_day + chrono::Duration::days(1000),
+            "YAHOO",
+            Decimal::ONE,
+        ))
+        .await
+        .unwrap();
+        let before = raw_rows(&repo, "ROLLBACK");
+        let mut incoming: Vec<_> = (0..2000)
+            .map(|offset| {
+                quote_with_source(
+                    "ROLLBACK",
+                    first_day + chrono::Duration::days(offset),
+                    "YAHOO",
+                    Decimal::TEN,
+                )
+            })
+            .collect();
+        incoming.last_mut().unwrap().data_source = "FAIL".to_string();
+        diesel::sql_query(
+            "CREATE TRIGGER reject_quote_batch BEFORE INSERT ON quotes \
+             WHEN NEW.source = 'FAIL' BEGIN SELECT RAISE(ABORT, 'injected failure'); END",
+        )
+        .execute(&mut get_connection(&repo.pool).unwrap())
+        .unwrap();
+        assert!(repo.upsert_quotes(&incoming).await.is_err());
+        assert_eq!(raw_rows(&repo, "ROLLBACK"), before);
     }
 
     #[tokio::test]
