@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "@/lib/utils";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -79,7 +79,7 @@ export function SyncButton({ className, showLabel = false, size = "icon" }: Sync
         }
       >
         {isRunning ? (
-          <Icons.Spinner className="h-4 w-4 animate-spin" />
+          <Spinner className="h-4 w-4" />
         ) : (
           <Icons.RefreshCw className={`h-4 w-4 ${colorClass}`} />
         )}

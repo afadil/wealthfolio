@@ -44,6 +44,7 @@ export * from "./components/ui/separator";
 export * from "./components/ui/sheet";
 export * from "./components/ui/shell";
 export * from "./components/ui/skeleton";
+export * from "./components/ui/spinner";
 export * from "./components/ui/star-rating";
 export * from "./components/ui/swipable-view";
 export * from "./components/ui/switch";

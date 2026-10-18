@@ -53,6 +53,7 @@ import {
   ResponsiveSelect,
   type ResponsiveSelectOption,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
 
@@ -424,7 +425,7 @@ export function AssetDetailsSheet({
               </Button>
               <Button type="submit" disabled={isSaving}>
                 {isSaving ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                 ) : (
                   <Icons.Check className="mr-2 h-4 w-4" />
                 )}
@@ -1289,7 +1290,7 @@ function PropertyMortgageSection({
                       className="h-7 px-2"
                     >
                       {unlinkingId === liability.id ? (
-                        <Icons.Spinner className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <Icons.X className="h-3 w-3" />
                       )}
@@ -1349,7 +1350,7 @@ function PropertyMortgageSection({
                     className="flex-1"
                   >
                     {isLinking ? (
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                     ) : (
                       <Icons.Check className="mr-2 h-4 w-4" />
                     )}

@@ -5,7 +5,7 @@ import { useSettingsContext } from "@/lib/settings-provider";
 import type { NewAsset, SymbolSearchResult } from "@/lib/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { CurrencyInput, SearchableSelect } from "@wealthfolio/ui";
+import { CurrencyInput, SearchableSelect, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
+
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import {
   Select,
@@ -571,8 +571,7 @@ export function CreateSecurityDialog({
               >
                 {isPending || isResolvingSubmit ? (
                   <span className="flex items-center gap-2">
-                    <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
-                    {t("asset:createSecurity.creating")}
+                    <Spinner className="h-4 w-4" /> {t("asset:createSecurity.creating")}
                   </span>
                 ) : (
                   resolvedSubmitLabel

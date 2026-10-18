@@ -3,6 +3,7 @@ import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 interface FileDropzoneProps {
   file: File | null;
@@ -167,7 +168,7 @@ export const FileDropzone = ({
               className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 shadow-sm dark:bg-blue-900/20"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <Icons.Spinner className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
+                <Spinner className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </motion.div>
             </motion.div>
           ) : file && (!isValid || error) ? (

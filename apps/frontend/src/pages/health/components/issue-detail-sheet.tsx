@@ -19,6 +19,7 @@ import {
   useDateFormatting,
   type FormattingApi,
   buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import type { TFunction } from "i18next";
@@ -670,7 +671,7 @@ export function IssueDetailSheet({
                                 }
                               >
                                 {isFixing ? (
-                                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                                  <Spinner className="mr-2 h-4 w-4" />
                                 ) : (
                                   <Icons.Wand2 className="mr-2 h-4 w-4" />
                                 )}
@@ -765,7 +766,7 @@ export function IssueDetailSheet({
           {issue.fixAction && !hasDiagnosticActions && (
             <Button onClick={onFix} disabled={isFixing} className="w-full">
               {isFixing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Wand2 className="mr-2 h-4 w-4" />
               )}

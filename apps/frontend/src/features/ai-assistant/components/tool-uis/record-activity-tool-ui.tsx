@@ -28,6 +28,7 @@ import {
   useDateFormatting,
   type FormattingApi,
   buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { parse as dateFnsParse } from "date-fns";
@@ -778,7 +779,7 @@ function DraftReview({
           {t("ai:recordActivity.edit")}
         </Button>
         <Button type="button" size="sm" onClick={onConfirm} disabled={isLoading || !canConfirm}>
-          {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading && <Spinner className="mr-2 h-4 w-4" />}
           {t("ai:recordActivity.confirm")}
         </Button>
       </div>

@@ -6,7 +6,7 @@
 // ==========================================================================
 
 import { cn } from "@/lib/utils";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { MotionConfig, motion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -88,7 +88,7 @@ function DrawnCheck() {
 export function FlowIcon({ kind }: { kind: "working" | "success" | "error" }) {
   switch (kind) {
     case "working":
-      return <Icons.Spinner className="size-8 animate-spin" aria-hidden />;
+      return <Spinner className="size-8" aria-hidden />;
     case "success":
       return <DrawnCheck />;
     case "error":

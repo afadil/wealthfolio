@@ -6,9 +6,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Icons,
   StarRating,
   Textarea,
+  Spinner,
 } from "@wealthfolio/ui";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -126,7 +126,7 @@ export function RatingDialog({
           >
             {isSubmittingRating ? (
               <>
-                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("settings:addon_rating_submitting")}
               </>
             ) : (

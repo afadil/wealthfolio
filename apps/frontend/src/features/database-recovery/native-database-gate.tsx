@@ -21,6 +21,7 @@ import { Button } from "@wealthfolio/ui/components/ui/button";
 import { PasswordInput } from "@wealthfolio/ui/components/ui/password-input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Spinner } from "@wealthfolio/ui";
 
 /** Native startup must succeed before database-dependent providers mount. */
 export function NativeDatabaseGate({ children }: { children: ReactNode }) {
@@ -268,7 +269,7 @@ function NativeStartup({ children }: { children: ReactNode }) {
         <div className="flex flex-col gap-3">
           {!preview && (
             <Button className="w-full" disabled={busy !== null} onClick={() => void retry()}>
-              {busy === "retry" && <Icons.Spinner className="animate-spin" />}
+              {busy === "retry" && <Spinner />}
               {t(busy === "retry" ? "settings:recovery_opening" : "settings:recovery_retry")}
             </Button>
           )}
@@ -315,7 +316,7 @@ function NativeStartup({ children }: { children: ReactNode }) {
                       disabled={busy !== null}
                       onClick={() => void restore()}
                     >
-                      {busy === "restore" && <Icons.Spinner className="animate-spin" />}
+                      {busy === "restore" && <Spinner />}
                       {t(
                         busy === "restore"
                           ? "settings:recovery_restoring"
@@ -370,7 +371,7 @@ function NativeStartup({ children }: { children: ReactNode }) {
                       className="flex-1"
                       disabled={!selected || busy !== null}
                     >
-                      {busy === "inspect" && <Icons.Spinner className="animate-spin" />}
+                      {busy === "inspect" && <Spinner />}
                       {t(
                         busy === "inspect"
                           ? "settings:recovery_inspecting"

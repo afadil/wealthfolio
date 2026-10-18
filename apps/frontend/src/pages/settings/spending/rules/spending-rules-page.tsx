@@ -21,6 +21,7 @@ import {
   Icons,
   Input,
   Skeleton,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useAccounts } from "@/hooks/use-accounts";
@@ -266,7 +267,7 @@ export default function SpendingRulesPage() {
                 }
               >
                 {rerun.isPending ? (
-                  <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="mr-2 h-3.5 w-3.5" />
                 ) : (
                   <Icons.Refresh className="mr-2 h-3.5 w-3.5" />
                 )}

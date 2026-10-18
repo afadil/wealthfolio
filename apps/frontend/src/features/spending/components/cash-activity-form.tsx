@@ -41,6 +41,7 @@ import {
   SheetHeader,
   SheetTitle,
   Textarea,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import {
@@ -904,7 +905,7 @@ export function CashActivityForm({
                       disabled={saveMutation.isPending}
                     >
                       {saveMutation.isPending ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                       ) : (
                         <Icons.Check className="mr-2 h-4 w-4" />
                       )}
@@ -928,7 +929,7 @@ export function CashActivityForm({
                 <Button type="submit" disabled={saveMutation.isPending}>
                   {saveMutation.isPending ? (
                     <>
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                       {t("spending:common.saving")}
                     </>
                   ) : isEditing ? (

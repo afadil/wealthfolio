@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@wealthfolio/ui/components/ui/alert-dialog";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { useSyncActions } from "../hooks";
@@ -50,7 +50,7 @@ export function RecoveryDialog({ open, onOpenChange }: RecoveryDialogProps) {
           <AlertDialogAction onClick={onRecovery} disabled={handleRecovery.isPending}>
             {handleRecovery.isPending ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("sync:recovery.settingUp")}
               </>
             ) : (

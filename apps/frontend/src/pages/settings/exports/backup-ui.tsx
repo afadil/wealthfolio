@@ -25,6 +25,7 @@ import { ActionPalette } from "@/components/action-palette";
 import { useIsMobileViewport } from "@/hooks/use-platform";
 import { BackupError, type BackupFailure } from "./backup-error";
 import { AlertDescription } from "@wealthfolio/ui/components/ui/alert";
+import { Spinner } from "@wealthfolio/ui";
 
 /** Rows shown before "Show older". Connect returns at most 30 restore points. */
 const BACKUP_LIST_LIMIT = 5;
@@ -277,7 +278,7 @@ export function BackupActions({
       disabled={disabled}
     >
       {busy ? (
-        <Icons.Spinner className="size-4 animate-spin" aria-hidden />
+        <Spinner className="size-4" aria-hidden />
       ) : (
         <Icons.MoreHorizontal className="size-4" aria-hidden />
       )}
@@ -384,7 +385,7 @@ export function BackupRowsSkeleton() {
 }
 
 export function PendingIcon({ pending, icon }: { pending: boolean; icon?: ReactNode }) {
-  return pending ? <Icons.Spinner className="size-4 animate-spin" aria-hidden /> : (icon ?? null);
+  return pending ? <Spinner className="size-4" aria-hidden /> : (icon ?? null);
 }
 
 /** Destructive confirmation shared by local and cloud backups. */

@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
+  Spinner,
 } from "@wealthfolio/ui";
 import type { TaxonomyCategory } from "@/lib/types";
 import { useCreateCategory, useUpdateCategory, useDeleteCategory } from "@/hooks/use-taxonomies";
@@ -242,7 +243,7 @@ export function CategoryForm({
               >
                 {isPending ? (
                   <>
-                    <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner className="mr-2 h-4 w-4" />
                     {isCreateMode ? t("settings:tax_creating") : t("settings:tax_saving")}
                   </>
                 ) : isCreateMode ? (
@@ -278,7 +279,7 @@ export function CategoryForm({
                   }
                 >
                   {deleteMutation.isPending ? (
-                    <Icons.Loader className="h-4 w-4 animate-spin" />
+                    <Spinner className="h-4 w-4" />
                   ) : (
                     <Icons.Trash2 className="h-4 w-4" />
                   )}

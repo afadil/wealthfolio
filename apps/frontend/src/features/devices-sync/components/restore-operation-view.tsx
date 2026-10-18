@@ -5,7 +5,7 @@
 // =========================================================================
 
 import { useProfile } from "@/features/profiles/profile-context";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Checkbox } from "@wealthfolio/ui/components/ui/checkbox";
 import { useId, useState, type ReactNode } from "react";
@@ -167,9 +167,7 @@ export function RestoreOperationView({
     phase === "awaiting_consent" ? (
       <>
         <Button className="w-full gap-2" onClick={approve} disabled={busy}>
-          {controller.approve.isPending && (
-            <Icons.Spinner className="size-4 animate-spin" aria-hidden />
-          )}
+          {controller.approve.isPending && <Spinner className="size-4" aria-hidden />}
           {backup ? t("sync:restore.consent.backupAndReplace") : t("sync:restore.consent.replace")}
         </Button>
         <Button variant="ghost" className="w-full" onClick={cancel} disabled={busy}>
@@ -180,16 +178,12 @@ export function RestoreOperationView({
       <>
         {phase === "failed" && operation.error?.retry !== "new_attempt" ? (
           <Button className="w-full gap-2" onClick={retry} disabled={busy}>
-            {controller.retry.isPending && (
-              <Icons.Spinner className="size-4 animate-spin" aria-hidden />
-            )}
+            {controller.retry.isPending && <Spinner className="size-4" aria-hidden />}
             {t("sync:restore.tryAgain")}
           </Button>
         ) : (
           <Button className="w-full gap-2" onClick={startAgain} disabled={busy}>
-            {controller.start.isPending && (
-              <Icons.Spinner className="size-4 animate-spin" aria-hidden />
-            )}
+            {controller.start.isPending && <Spinner className="size-4" aria-hidden />}
             {phase === "cancelled" ? t("sync:restore.finishSetup") : t("sync:restore.startAgain")}
           </Button>
         )}

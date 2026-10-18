@@ -1,5 +1,14 @@
 import { useState, useMemo } from "react";
-import { Icons, ScrollArea, Card, Button, Tabs, TabsList, TabsTrigger } from "@wealthfolio/ui";
+import {
+  Icons,
+  ScrollArea,
+  Card,
+  Button,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   TreeView,
   buildCategoryTree,
@@ -238,7 +247,7 @@ export default function TaxonomiesPage() {
       ) : isLoading ? (
         <Card className="flex h-64 items-center justify-center">
           <div className="text-muted-foreground text-center">
-            <Icons.Loader className="mx-auto mb-2 h-6 w-6 animate-spin" />
+            <Spinner className="mx-auto mb-2 h-6 w-6" />
             <p>{t("settings:tax_loading")}</p>
           </div>
         </Card>

@@ -9,6 +9,7 @@ import {
   Skeleton,
   useAmountFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@wealthfolio/ui/components/ui/tooltip";
@@ -104,7 +105,7 @@ function RetirementAnalysisPendingColumn({ error }: { error: Error | null }) {
         <CardContent className="px-7 py-6">
           <div className="mb-5 flex items-start gap-3">
             <span className="bg-muted/60 flex size-8 shrink-0 items-center justify-center rounded-full">
-              <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+              <Spinner className="text-muted-foreground size-4" />
             </span>
             <div className="min-w-0">
               <p className="text-sm font-semibold">{t("goals:dashboard.pending.calculating")}</p>
@@ -503,7 +504,7 @@ export default function DashboardPage({
     <div className="space-y-6">
       {retirementOverviewIsFetching && (
         <div className="bg-muted/20 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-2 text-xs">
-          <Icons.Spinner className="size-3.5 animate-spin" />
+          <Spinner className="size-3.5" />
           {t("goals:dashboard.recalculating")}
         </div>
       )}

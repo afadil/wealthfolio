@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { isKeyboardEventComposing, useDateFormatting } from "@wealthfolio/ui";
+import { isKeyboardEventComposing, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -303,7 +303,7 @@ export function ThreadSidebar({
       <div className="flex-1 overflow-y-auto p-2">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Icons.Spinner className="text-muted-foreground h-6 w-6 animate-spin" />
+            <Spinner className="text-muted-foreground h-6 w-6" />
           </div>
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

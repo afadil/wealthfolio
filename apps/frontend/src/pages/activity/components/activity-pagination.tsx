@@ -1,4 +1,4 @@
-import { Icons } from "@wealthfolio/ui";
+import { Spinner } from "@wealthfolio/ui";
 import { useTranslation } from "react-i18next";
 
 interface ActivityPaginationProps {
@@ -20,7 +20,7 @@ export function ActivityPagination({
         aria-live="polite"
         className="text-muted-foreground flex items-center gap-2 text-xs"
       >
-        {isFetching ? <Icons.Spinner className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+        {isFetching ? <Spinner className="h-4 w-4" aria-hidden="true" /> : null}
         <span>{t("activity:pagination_count", { fetched: totalFetched, total: totalCount })}</span>
       </div>
     </div>

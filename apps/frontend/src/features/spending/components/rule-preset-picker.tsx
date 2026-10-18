@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Icons,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 
@@ -119,10 +120,7 @@ export function RulePresetPicker({ compact = false }: RulePresetPickerProps) {
                   </span>
                 </div>
                 {isImporting || isRemoving ? (
-                  <Icons.Spinner
-                    className="text-muted-foreground h-4 w-4 shrink-0 animate-spin"
-                    aria-hidden="true"
-                  />
+                  <Spinner className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : preset.installed ? (
                   <Icons.Check className="text-success h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : (

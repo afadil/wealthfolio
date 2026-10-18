@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Icons, MoneyInput, ResponsiveSelect } from "@wealthfolio/ui";
+import { Button, MoneyInput, ResponsiveSelect, Spinner } from "@wealthfolio/ui";
 import { Label } from "@wealthfolio/ui/components/ui/label";
 import { Sheet, SheetDescription, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
 import { linkLoanPayment } from "@/adapters";
@@ -206,7 +206,7 @@ export function ActivityLoanPaymentSheet({
                 })
               }
             >
-              {busy && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+              {busy && <Spinner className="mr-2 h-4 w-4" />}
               {t("asset:loanPayments.link")}
             </Button>
           )}

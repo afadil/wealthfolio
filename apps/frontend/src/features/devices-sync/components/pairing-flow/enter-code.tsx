@@ -4,7 +4,7 @@
 
 import { logger } from "@/adapters";
 import { usePlatform } from "@/hooks/use-platform";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
   Dialog,
@@ -248,7 +248,7 @@ export function EnterCode({
               className="w-full gap-2"
               disabled={code.length !== CODE_LENGTH || isDisabled}
             >
-              {isLoading && <Icons.Spinner className="size-4 animate-spin" aria-hidden />}
+              {isLoading && <Spinner className="size-4" aria-hidden />}
               {isLoading ? t("sync:enterCode.connecting") : t("sync:enterCode.connect")}
             </Button>
             <Button
@@ -327,7 +327,7 @@ export function EnterCode({
             >
               <div className="bg-primary/10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
                 {isScanning ? (
-                  <Icons.Spinner className="text-primary h-6 w-6 animate-spin" />
+                  <Spinner className="text-primary h-6 w-6" />
                 ) : (
                   <Icons.QrCode className="text-primary h-6 w-6" />
                 )}

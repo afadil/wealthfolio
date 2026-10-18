@@ -1,6 +1,6 @@
 import { useIsMobileViewport } from "@/hooks";
 import { useSettingsContext } from "@/lib/settings-provider";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { createPortal } from "react-dom";
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
@@ -36,7 +36,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         info: <Icons.Info className="size-4" />,
         warning: <Icons.AlertTriangle className="size-4" />,
         error: <Icons.OctagonX className="size-4" />,
-        loading: <Icons.Spinner className="size-4 animate-spin" />,
+        loading: <Spinner className="size-4" />,
         close: <Icons.Close className="size-4" />,
       }}
       toastOptions={{

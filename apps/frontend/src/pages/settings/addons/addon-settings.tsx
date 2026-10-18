@@ -21,6 +21,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useToast } from "@wealthfolio/ui/components/ui/use-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -229,7 +230,7 @@ export default function AddonSettingsPage() {
                       title={t("settings:addons_check_updates")}
                     >
                       {isCheckingUpdates ? (
-                        <Icons.Loader className="h-4 w-4 animate-spin" />
+                        <Spinner className="h-4 w-4" />
                       ) : (
                         <Icons.Refresh className="h-4 w-4" />
                       )}
@@ -273,7 +274,7 @@ export default function AddonSettingsPage() {
                       title={t("settings:addons_install_from_file")}
                     >
                       {isLoading ? (
-                        <Icons.Loader className="h-4 w-4 animate-spin" />
+                        <Spinner className="h-4 w-4" />
                       ) : (
                         <Icons.Plus className="h-4 w-4" />
                       )}
@@ -309,7 +310,7 @@ export default function AddonSettingsPage() {
 
             {isLoadingAddons ? (
               <div className="flex items-center justify-center py-12">
-                <Icons.Loader className="text-muted-foreground h-8 w-8 animate-spin" />
+                <Spinner className="text-muted-foreground h-8 w-8" />
                 <span className="text-muted-foreground ml-2 text-sm sm:text-base">
                   {t("settings:addons_loading")}
                 </span>

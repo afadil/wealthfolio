@@ -3,7 +3,7 @@
 // One button: "Enable Device Sync" - handles enrollment + key init automatically
 // ===============================================================================
 
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -96,7 +96,7 @@ export function E2EESetupCard({ onPairingNeeded }: E2EESetupCardProps) {
           >
             {enableSync.isPending ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("sync:setup.settingUp")}
               </>
             ) : (

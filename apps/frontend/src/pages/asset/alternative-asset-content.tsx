@@ -15,6 +15,7 @@ import {
   IntervalSelector,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -859,7 +860,7 @@ export function useAlternativeAssetActions({
             >
               {deleteMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("asset:altContent.deleting")}
                 </>
               ) : (

@@ -2,7 +2,13 @@ import { useBalancePrivacy } from "@/hooks/use-balance-privacy";
 import type { AlternativeAssetHolding } from "@/lib/types";
 import { ALTERNATIVE_ASSET_KIND_DISPLAY_NAMES } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AmountDisplay, EmptyPlaceholder, GainPercent, useDateFormatting } from "@wealthfolio/ui";
+import {
+  AmountDisplay,
+  EmptyPlaceholder,
+  GainPercent,
+  useDateFormatting,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -333,7 +339,7 @@ export function AlternativeHoldingsTable({
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

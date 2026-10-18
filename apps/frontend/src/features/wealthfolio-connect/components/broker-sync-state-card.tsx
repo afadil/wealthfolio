@@ -1,6 +1,6 @@
 import type { Account, Platform } from "@/lib/types";
 import { formatDistanceToNow } from "@/lib/utils";
-import { useLocalizationSettings } from "@wealthfolio/ui";
+import { useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -33,7 +33,7 @@ function buildStatusConfig(t: TFunction): Record<
     RUNNING: {
       label: t("connect:status.syncing"),
       variant: "outline",
-      icon: <Icons.Spinner className="h-4 w-4 animate-spin text-blue-500" />,
+      icon: <Spinner className="h-4 w-4 text-blue-500" />,
     },
     NEEDS_REVIEW: {
       label: t("connect:status.needsReview"),

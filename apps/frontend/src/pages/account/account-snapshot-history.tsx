@@ -5,7 +5,12 @@ import type { Account, SnapshotInfo } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 import { HoldingsEditMode } from "@/pages/holdings/components/holdings-edit-mode";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAmountFormatting, type FormattingApi, useDateFormatting } from "@wealthfolio/ui";
+import {
+  useAmountFormatting,
+  type FormattingApi,
+  useDateFormatting,
+  Spinner,
+} from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -149,7 +154,7 @@ export function AccountSnapshotHistory({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icons.Spinner className="text-muted-foreground size-5 animate-spin" />
+        <Spinner className="text-muted-foreground size-5" />
       </div>
     );
   }

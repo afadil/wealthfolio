@@ -30,6 +30,7 @@ import {
   QuantityInput,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import { useSettingsContext } from "@/lib/settings-provider";
@@ -1019,7 +1020,7 @@ export function AlternativeAssetQuickAddModal({
             >
               {isSubmitting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("asset:quickAdd.creating")}
                 </>
               ) : step === 1 ? (

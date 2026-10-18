@@ -8,7 +8,7 @@ import { WEALTHFOLIO_CONNECT_PORTAL_URL } from "@/lib/constants";
 import { QueryKeys } from "@/lib/query-keys";
 import { formatDate } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { ActionConfirm, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@wealthfolio/ui/components/ui/avatar";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -88,7 +88,7 @@ function ServiceUnavailableCard({ onRetry, isRetrying }: ServiceUnavailableCardP
           <Button variant="outline" onClick={onRetry} disabled={isRetrying}>
             {isRetrying ? (
               <>
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                <Spinner className="h-4 w-4" />
                 {t("connect:serviceUnavailable.retrying")}
               </>
             ) : (
@@ -456,7 +456,7 @@ export function ConnectedView() {
                   disabled={isSigningOut || isLoading}
                 >
                   {isSigningOut ? (
-                    <Icons.Spinner className="h-4 w-4 animate-spin" />
+                    <Spinner className="h-4 w-4" />
                   ) : (
                     <Icons.LogOut className="h-4 w-4" />
                   )}

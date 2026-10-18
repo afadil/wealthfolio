@@ -7,6 +7,7 @@ import {
   MoneyInput,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Sheet, SheetDescription, SheetTitle } from "@wealthfolio/ui/components/ui/sheet";
@@ -91,7 +92,7 @@ export function CloseLoanDialog({
             onClick={handleSubmit}
             disabled={isSubmitting || isDateInvalid}
           >
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="mr-2 h-4 w-4" />}
             {t("asset:loanActions.confirm_close")}
           </Button>
         </LoanSheetFooter>
@@ -269,7 +270,7 @@ export function RecalculateScheduleDialog({
               newPayment <= 0
             }
           >
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="mr-2 h-4 w-4" />}
             {t("asset:loanActions.recalculate_confirm")}
           </Button>
         </LoanSheetFooter>
@@ -444,7 +445,7 @@ export function LoanBalanceEventDialog({
             {t("common:cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={invalid || isSubmitting}>
-            {isSubmitting && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && <Spinner className="mr-2 h-4 w-4" />}
             {t(
               isCorrection
                 ? "asset:loanActions.confirm_balance"

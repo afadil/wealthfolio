@@ -28,6 +28,7 @@ import {
   Switch,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -418,7 +419,7 @@ function SymbolMappingRow({
                   <span className="absolute right-2 flex items-center">
                     {validationStatus === "loading" && (
                       <span data-testid="symbol-validation-loading">
-                        <Icons.Spinner className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+                        <Spinner className="text-muted-foreground h-3.5 w-3.5" />
                       </span>
                     )}
                     {validationStatus === "valid" && (
@@ -1112,8 +1113,7 @@ export function AssetEditSheet({
                         <Button type="submit" disabled={isSaving}>
                           {isSaving ? (
                             <span className="flex items-center gap-2">
-                              <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
-                              {t("asset:editSheet.saving_short")}
+                              <Spinner className="h-4 w-4" /> {t("asset:editSheet.saving_short")}
                             </span>
                           ) : (
                             t("asset:editSheet.save_changes_lower")
@@ -1395,8 +1395,7 @@ export function AssetEditSheet({
                       >
                         {isSaving ? (
                           <span className="flex items-center gap-2">
-                            <Icons.Spinner className="h-4 w-4 animate-spin" />{" "}
-                            {t("asset:editSheet.saving_short")}
+                            <Spinner className="h-4 w-4" /> {t("asset:editSheet.saving_short")}
                           </span>
                         ) : (
                           t("asset:editSheet.save_changes_lower")

@@ -10,7 +10,7 @@ import { DevicesIcon } from "@phosphor-icons/react/dist/csr/Devices";
 import { GlobeIcon } from "@phosphor-icons/react/dist/csr/Globe";
 import { HardDrivesIcon } from "@phosphor-icons/react/dist/csr/HardDrives";
 import { useQueryClient } from "@tanstack/react-query";
-import { Icons, isKeyboardEventComposing, Skeleton } from "@wealthfolio/ui";
+import { Icons, isKeyboardEventComposing, Skeleton, Spinner } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -573,7 +573,7 @@ export function DeviceSyncSection() {
                   disabled={isTogglingEngine}
                 >
                   {isTogglingEngine ? (
-                    <Icons.Loader className="h-4 w-4 animate-spin" />
+                    <Spinner className="h-4 w-4" />
                   ) : isBackgroundRunning ? (
                     <Icons.PauseCircle className="h-4 w-4" />
                   ) : (
@@ -589,7 +589,7 @@ export function DeviceSyncSection() {
                 >
                   {isTogglingEngine ? (
                     <>
-                      <Icons.Loader className="h-4 w-4 animate-spin" />
+                      <Spinner className="h-4 w-4" />
                       {t("sync:engine.updating")}
                     </>
                   ) : isBackgroundRunning ? (
@@ -652,7 +652,7 @@ export function DeviceSyncSection() {
                         >
                           {restore.start.isPending ? (
                             <>
-                              <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                              <Spinner className="mr-2 h-3.5 w-3.5" />
                               {t("sync:waitingSnapshot.checking")}
                             </>
                           ) : (
@@ -671,7 +671,7 @@ export function DeviceSyncSection() {
                           >
                             {isUploadingSnapshot ? (
                               <>
-                                <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                <Spinner className="mr-2 h-3.5 w-3.5" />
                                 {t("sync:waitingSnapshot.preparing")}
                               </>
                             ) : (
@@ -778,7 +778,7 @@ function RestoreBanner({
         {needsAction ? (
           <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
         ) : (
-          <Icons.Spinner className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+          <Spinner className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         )}
         <div className="min-w-0 flex-1">
           <p className="text-foreground font-medium">{t("sync:restore.banner.title")}</p>
@@ -879,7 +879,7 @@ function OrphanedKeysPrompt({ onReinitialize }: { onReinitialize: () => Promise<
             <Button onClick={handleReinitialize} disabled={isReinitializing}>
               {isReinitializing ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("sync:orphaned.restarting")}
                 </>
               ) : (
@@ -1089,7 +1089,7 @@ function PairThisDeviceItem({ onPair }: { onPair: () => void }) {
             <Button variant="destructive" onClick={handleDisconnect} disabled={isResetting}>
               {isResetting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("sync:disconnectDialog.disconnecting")}
                 </>
               ) : (
@@ -1253,7 +1253,7 @@ function DeviceCard({
                 disabled={renameDevice.isPending}
               >
                 {renameDevice.isPending ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Check className="h-3.5 w-3.5" />
                 )}
@@ -1371,7 +1371,7 @@ function DeviceCard({
             <Button variant="destructive" onClick={handleUnpair} disabled={isUnpairing}>
               {isUnpairing ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("sync:unpairDialog.unpairing")}
                 </>
               ) : (

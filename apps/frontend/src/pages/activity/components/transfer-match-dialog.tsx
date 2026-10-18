@@ -34,6 +34,7 @@ import {
   Skeleton,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useActivityMutations } from "../hooks/use-activity-mutations";
 import { ActivityTypeBadge } from "./activity-type-badge";
@@ -880,7 +881,7 @@ export function TransferMatchDialog({
                     </div>
                     <Button type="submit" disabled={manualLoading}>
                       {manualLoading ? (
-                        <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                       ) : (
                         <Icons.Search className="mr-2 h-4 w-4" />
                       )}
@@ -1130,7 +1131,7 @@ export function TransferMatchDialog({
               disabled={!selectedCandidate || isProcessing}
             >
               {isProcessing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Link className="mr-2 h-4 w-4" />
               )}
@@ -1144,7 +1145,7 @@ export function TransferMatchDialog({
               }
             >
               {isProcessing ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Unlink className="mr-2 h-4 w-4" />
               )}

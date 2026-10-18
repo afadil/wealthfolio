@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
   useDateFormatting,
   useNumberFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { format, subMonths } from "date-fns";
 import React, { useCallback, useMemo, useState } from "react";
@@ -233,7 +234,7 @@ const AssetHistoryCard: React.FC<AssetHistoryProps> = ({
                     disabled={syncMarketDataMutation.isPending}
                   >
                     {syncMarketDataMutation.isPending ? (
-                      <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                     ) : (
                       <Icons.Refresh className="mr-2 h-4 w-4" />
                     )}

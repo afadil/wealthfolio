@@ -10,6 +10,7 @@ import {
 } from "@wealthfolio/ui/components/ui/alert-dialog";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 export interface ActivityDeleteModalProps {
   isOpen?: boolean;
@@ -52,7 +53,7 @@ export function ActivityDeleteModal({
             className="max-sm:h-12"
           >
             {isDeleting ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Trash className="mr-2 h-4 w-4" />
             )}

@@ -2,6 +2,7 @@ import { ReactElement, ReactNode, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Button } from "../ui/button";
 import { Icons } from "../ui/icons";
+import { Spinner } from "../ui/spinner";
 
 interface DeleteConfirmProps {
   deleteConfirmMessage: string | ReactNode;
@@ -61,7 +62,7 @@ export const DeleteConfirm = ({
             <Button variant="destructive" size="sm" disabled={isPending} onClick={handleDeleteConfirm}>
               {isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   Deleting...
                 </>
               ) : (

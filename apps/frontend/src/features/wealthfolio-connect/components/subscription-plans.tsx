@@ -2,7 +2,7 @@ import { openUrlInBrowser } from "@/adapters";
 import { useConnectUrl } from "../hooks/use-connect-url";
 import { QueryKeys } from "@/lib/query-keys";
 import { useQuery } from "@tanstack/react-query";
-import { useAmountFormatting } from "@wealthfolio/ui";
+import { useAmountFormatting, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -252,7 +252,7 @@ export function SubscriptionPlans({
               <Button size="sm" onClick={handleReconnect} disabled={isSigningOut}>
                 {isSigningOut ? (
                   <>
-                    <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                    <Spinner className="mr-2 h-4 w-4" />
                     {t("connect:subscription.reconnecting")}
                   </>
                 ) : (
@@ -388,7 +388,7 @@ export function SubscriptionPlans({
               className="h-7 px-2 text-xs"
             >
               {isRefreshing ? (
-                <Icons.Spinner className="mr-1.5 h-3 w-3 animate-spin" />
+                <Spinner className="mr-1.5 h-3 w-3" />
               ) : (
                 <Icons.Refresh className="mr-1.5 h-3 w-3" />
               )}

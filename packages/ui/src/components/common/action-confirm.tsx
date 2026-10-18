@@ -2,6 +2,7 @@ import { ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 import { Button, type ButtonProps } from "../ui/button";
 import { Icons } from "../ui/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Spinner } from "../ui/spinner";
 
 interface ActionConfirmProps {
   confirmMessage: string | ReactNode;
@@ -79,7 +80,7 @@ export const ActionConfirm = ({
             <Button variant={confirmButtonVariant} size="sm" disabled={isPending} onClick={handleConfirm}>
               {isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {pendingText}
                 </>
               ) : (

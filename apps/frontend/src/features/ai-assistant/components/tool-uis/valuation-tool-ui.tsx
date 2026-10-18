@@ -2,12 +2,19 @@ import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { HistoryChart } from "@/components/history-chart";
 import { DateRange, TimePeriod } from "@/lib/types";
 import { makeAssistantToolUI } from "@assistant-ui/react";
-import { Badge, Card, CardContent, CardHeader, CardTitle, IntervalSelector } from "@wealthfolio/ui";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  IntervalSelector,
+  Spinner,
+} from "@wealthfolio/ui";
 import { isAfter, parseISO, subMonths } from "date-fns";
 import { memo, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { CompactToolCard } from "./shared";
 
@@ -220,7 +227,7 @@ function ValuationContentImpl({ args, result, status }: ValuationContentProps) {
             <div className="text-muted-foreground flex h-full flex-col items-center justify-center gap-2 rounded-md border border-dashed px-3 text-sm">
               {isRunning ? (
                 <>
-                  <Icons.Spinner className="h-5 w-5 animate-spin" />
+                  <Spinner className="h-5 w-5" />
                   <span>{t("ai:valuation.fetching")}</span>
                 </>
               ) : isIncomplete ? (

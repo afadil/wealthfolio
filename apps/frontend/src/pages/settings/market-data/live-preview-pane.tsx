@@ -16,7 +16,7 @@ import { Label } from "@wealthfolio/ui/components/ui/label";
 import type { DetectedHtmlTable } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
 
-import { useNumberFormatting, type FormattingApi } from "@wealthfolio/ui";
+import { useNumberFormatting, type FormattingApi, Spinner } from "@wealthfolio/ui";
 import type { FormValues, SourceKey } from "./custom-provider-form";
 import { RawResponseViewer } from "./response-preview";
 import {
@@ -158,7 +158,7 @@ function StatusPill({
   if (isFetching) {
     return (
       <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs">
-        <Icons.Spinner className="h-3 w-3 animate-spin" />
+        <Spinner className="h-3 w-3" />
         {t("settings:market_data_page.fetching")}
       </span>
     );
@@ -824,7 +824,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
             className="h-input-height shrink-0"
           >
             {runtime.isFetching ? (
-              <Icons.Spinner className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Spinner className="mr-1.5 h-3.5 w-3.5" />
             ) : (
               <Icons.PlayCircle className="mr-1.5 h-3.5 w-3.5" />
             )}
