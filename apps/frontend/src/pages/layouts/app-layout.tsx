@@ -22,7 +22,7 @@ const AppLayoutContent = () => {
   const { settings } = useSettingsContext();
   const location = useLocation();
   const navigation = useNavigation();
-  const { isMobile, isDesktop, isMacOS, isTauri } = usePlatform();
+  const { platform, isMobile, isMacOS, isTauri } = usePlatform();
   const isMobileViewport = useIsMobileViewport();
   const isIPad =
     typeof window !== "undefined" &&
@@ -42,8 +42,9 @@ const AppLayoutContent = () => {
       ? "translateY(0.5rem)"
       : undefined;
   // Only a desktop app window can be dragged. In a browser or on a phone the
-  // strip would just cover the top of the page's buttons.
-  const hasWindowDragRegion = isTauri && isDesktop;
+  // strip would just cover the top of the page's buttons, so wait for the
+  // platform lookup: until it resolves, usePlatform reports a desktop.
+  const hasWindowDragRegion = isTauri && platform?.is_desktop === true;
   const launchBarHeight =
     !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
   const isAppShellReady = !!settings?.onboardingCompleted;

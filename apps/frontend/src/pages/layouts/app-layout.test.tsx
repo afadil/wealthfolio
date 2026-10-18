@@ -4,11 +4,22 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLayout } from "./app-layout";
 
-const platform = vi.hoisted(() => ({ isTauri: false, isMobile: false, isDesktop: true }));
+interface PlatformState {
+  isTauri: boolean;
+  info: { is_mobile: boolean; is_desktop: boolean } | null;
+}
+const state = vi.hoisted((): PlatformState => ({ isTauri: false, info: null }));
 
+// Mirrors usePlatform's defaults: until the lookup resolves, it reports a desktop.
 vi.mock("@/hooks/use-platform", () => ({
-  usePlatform: () => ({ ...platform, isMacOS: false }),
-  useIsMobileViewport: () => platform.isMobile,
+  usePlatform: () => ({
+    platform: state.info,
+    isTauri: state.isTauri,
+    isMobile: state.info?.is_mobile ?? false,
+    isDesktop: state.info?.is_desktop ?? true,
+    isMacOS: false,
+  }),
+  useIsMobileViewport: () => state.info?.is_mobile ?? false,
 }));
 vi.mock("@/lib/settings-provider", () => ({
   useSettingsContext: () => ({ settings: { onboardingCompleted: true } }),
@@ -49,20 +60,28 @@ const dragStrip = () => {
   return container.querySelector("main > [data-tauri-drag-region]");
 };
 
+const desktop = { is_mobile: false, is_desktop: true };
+const phone = { is_mobile: true, is_desktop: false };
+
 describe("AppLayout window drag strip", () => {
-  beforeEach(() => Object.assign(platform, { isTauri: false, isMobile: false, isDesktop: true }));
+  beforeEach(() => Object.assign(state, { isTauri: false, info: desktop }));
 
   it("is not rendered in a browser, where it would cover the top of the page", () => {
     expect(dragStrip()).toBeNull();
   });
 
   it("is not rendered in the phone app, which has no window to drag", () => {
-    Object.assign(platform, { isTauri: true, isMobile: true, isDesktop: false });
+    Object.assign(state, { isTauri: true, info: phone });
+    expect(dragStrip()).toBeNull();
+  });
+
+  it("is not rendered before the app knows it runs on a desktop", () => {
+    Object.assign(state, { isTauri: true, info: null });
     expect(dragStrip()).toBeNull();
   });
 
   it("is rendered in the desktop app", () => {
-    Object.assign(platform, { isTauri: true });
+    Object.assign(state, { isTauri: true, info: desktop });
     expect(dragStrip()).toBeInTheDocument();
   });
 });
