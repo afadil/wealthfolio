@@ -28,6 +28,40 @@ beforeAll(() => {
 });
 
 describe("internal transfer currencies (real form)", () => {
+  it("edits an existing same-account FX conversion without rejecting its account", async () => {
+    const onSubmit = vi.fn();
+    const { container } = render(
+      <TransferForm
+        accounts={accounts}
+        isEditing
+        onSubmit={onSubmit}
+        defaultValues={{
+          fromAccountId: "a",
+          toAccountId: "a",
+          activityDate: new Date("2026-02-01T10:00:00Z"),
+          transferMode: "cash",
+          currency: "USD",
+          sourceCurrency: "USD",
+          destinationCurrency: "EUR",
+          sourceAmount: 100,
+          destinationAmount: 90,
+          comment: "Corrected record",
+        }}
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "To Account" })).toHaveTextContent("Account A");
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      fromAccountId: "a",
+      toAccountId: "a",
+      activityDate: new Date("2026-02-01T10:00:00Z"),
+      sourceAmount: 100,
+      destinationAmount: 90,
+      comment: "Corrected record",
+    });
+  });
+
   it("offers the same destination account and exposes currencies without opening advanced options", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

@@ -1483,6 +1483,25 @@ impl ActivityService {
         pair.transfer_in.asset_id.is_none() && pair.transfer_out.asset_id.is_none()
     }
 
+    // Provider records have their own posting dates and descriptions. A
+    // source record on either leg also protects mixed manual/provider pairs;
+    // record IDs need not differ, since providers can scope them by account.
+    fn transfer_pair_has_source_records(pair: &TransferPair) -> bool {
+        [&pair.transfer_out, &pair.transfer_in].iter().any(|leg| {
+            leg.source_record_id
+                .as_deref()
+                .is_some_and(|id| !id.trim().is_empty())
+        })
+    }
+
+    fn transfer_pair_shares_date(pair: &TransferPair) -> bool {
+        !Self::transfer_pair_has_source_records(pair)
+            || crate::activities::is_same_account_cash_fx_conversion(
+                &pair.transfer_in,
+                &pair.transfer_out,
+            )
+    }
+
     fn transfer_pair_response(pair: TransferPair) -> InternalTransferPairResponse {
         InternalTransferPairResponse {
             transfer_out: pair.transfer_out,
@@ -1999,6 +2018,17 @@ impl ActivityService {
         pair: &TransferPair,
         values: &InternalPairValues,
     ) -> Result<Vec<ActivityUpdate>> {
+        if request
+            .edited_activity_id
+            .as_deref()
+            .is_some_and(|id| id != pair.transfer_out.id && id != pair.transfer_in.id)
+        {
+            return Err(Self::invalid_activity_data(
+                "Edited activity must belong to the transfer pair",
+            ));
+        }
+        // Validate shared input even when sourced legs retain their own dates.
+        self.validate_and_normalize_activity_date(&request.activity_date)?;
         let metadata = Self::internal_transfer_metadata();
         // Preserve user valuation overrides only while their currency pair is unchanged.
         let valuation_rate_patch = |existing: &Activity, account_id: &str, currency: &str| {
@@ -2009,7 +2039,7 @@ impl ActivityService {
                     .then_some(None),
             )
         };
-        Ok(vec![
+        let mut updates = vec![
             ActivityUpdate {
                 id: pair.transfer_out.id.clone(),
                 account_id: request.from_account_id.clone(),
@@ -2056,7 +2086,25 @@ impl ActivityService {
                 )?,
                 metadata,
             },
-        ])
+        ];
+        // A sourced form edits the selected record's details. Older callers
+        // without a selection preserve both records. FX dates remain shared.
+        if Self::transfer_pair_has_source_records(pair) {
+            for (update, leg) in updates
+                .iter_mut()
+                .zip([&pair.transfer_out, &pair.transfer_in])
+            {
+                if request.edited_activity_id.as_deref() != Some(leg.id.as_str()) {
+                    // Pair edits can move into or out of same-account FX.
+                    // The validated destination pair determines date sharing.
+                    if request.from_account_id != request.to_account_id {
+                        update.activity_date = leg.activity_date.to_rfc3339();
+                    }
+                    update.notes = leg.notes.clone();
+                }
+            }
+        }
+        Ok(updates)
     }
 
     fn validate_internal_cash_pair_currency_update(
@@ -2132,6 +2180,13 @@ impl ActivityService {
             fx_rate: None,
             metadata: None,
         };
+
+        if Self::transfer_pair_has_source_records(pair) {
+            if !Self::transfer_pair_shares_date(pair) {
+                counterpart_update.activity_date = counterpart.activity_date.to_rfc3339();
+            }
+            counterpart_update.notes = counterpart.notes.clone();
+        }
 
         let Some(Some(amount)) = update.amount else {
             return Ok(Some(counterpart_update));
@@ -5427,6 +5482,11 @@ impl ActivityServiceTrait for ActivityService {
         let pair_values = self.validate_internal_pair_request(&request)?;
 
         let is_update = request.transfer_out_id.is_some() || request.transfer_in_id.is_some();
+        if !is_update && request.edited_activity_id.is_some() {
+            return Err(Self::invalid_activity_data(
+                "Edited activity requires an existing transfer pair",
+            ));
+        }
         let mut old_account_ids: HashSet<String> = HashSet::new();
         let mut old_asset_ids: HashSet<String> = HashSet::new();
         let mut old_currencies: HashSet<String> = HashSet::new();

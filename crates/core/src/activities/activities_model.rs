@@ -848,6 +848,9 @@ pub struct ActivityFinalCashMigrationResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalTransferPairRequest {
+    /// The record whose date and notes the existing activity form is editing.
+    #[serde(default)]
+    pub edited_activity_id: Option<String>,
     #[serde(default)]
     pub transfer_out_id: Option<String>,
     #[serde(default)]
