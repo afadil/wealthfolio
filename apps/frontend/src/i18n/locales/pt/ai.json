@@ -128,6 +128,7 @@
   "tools": {
     "calling": "Chamando {{toolName}}...",
     "cancelled": "{{toolName}} foi cancelado",
+    "notUsed": "Ferramenta não utilizada: {{toolName}}",
     "used": "Ferramenta utilizada: {{toolName}}"
   },
   "accounts": {

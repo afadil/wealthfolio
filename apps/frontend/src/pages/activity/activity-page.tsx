@@ -463,6 +463,14 @@ const ActivityPage = () => {
     ? [activityUrlFilters.activityId]
     : undefined;
 
+  // The table and cards head each day with its date while the list runs in
+  // date order; any other sort shows the plain list.
+  const isDateOrder = (sorting[0]?.id ?? "date") === "date";
+  // A list of one account in date order can show that account's cash: after
+  // each row for a cash or credit-card account, at the end of each day for
+  // the others. Several accounts have no single cash figure.
+  const showsCashBalances = isDateOrder && effectiveInvestmentAccountIds?.length === 1;
+
   // Infinite scroll search for table view
   const infiniteSearch = useActivitySearch({
     mode: "infinite",
@@ -477,6 +485,7 @@ const ActivityPage = () => {
     },
     searchQuery: effectiveSearchQuery,
     sorting,
+    includeCashBalances: showsCashBalances,
   });
 
   // Paginated search for datagrid view
@@ -712,7 +721,9 @@ const ActivityPage = () => {
   );
 
   const investmentContent = (
-    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-hidden">
+    // `overflow-clip` rather than `hidden`: it clips the same, but isn't a
+    // scroll container, so the table's sticky header can pin to the page.
+    <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-clip">
       {statusFilter !== "pending" && (
         <NeedsReviewBanner
           accountIds={effectiveInvestmentAccountIds}
@@ -782,6 +793,7 @@ const ActivityPage = () => {
         <ActivityTableMobile
           activities={tableActivities}
           isCompactView={isCompactView}
+          groupByDay={isDateOrder}
           handleEdit={handleEdit}
           handleDelete={handleDelete}
           onDuplicate={handleDuplicate}
@@ -820,6 +832,7 @@ const ActivityPage = () => {
           isLoading={infiniteSearch.isLoading}
           sorting={sorting}
           onSortingChange={setSorting}
+          groupByDay={isDateOrder}
           handleEdit={handleEdit}
           handleDelete={handleDelete}
           onLinkTransfer={handleLinkTransfer}

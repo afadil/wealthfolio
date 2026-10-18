@@ -246,6 +246,8 @@ export interface ActivityDetails {
   assetSymbol: string;
   assetName?: string;
   assetQuoteMode?: QuoteMode;
+  /** Currency the asset is quoted in, which can differ from the activity currency. */
+  assetQuoteCcy?: string | null;
   /** Canonical exchange MIC code for asset identification */
   exchangeMic?: string;
   instrumentType?: string;
@@ -1056,7 +1058,8 @@ export interface IncomeSummary {
   byMonth: Record<string, number>;
   byType: Record<string, number>;
   byAsset: Record<string, IncomeByAsset>;
-  byCurrency: Record<string, number>;
+  byCurrency: Record<string, number>; // In each currency
+  byCurrencyBase: Record<string, number>; // Converted to the base currency
   byAccount: Record<string, IncomeByAccount>;
   totalIncome: number;
   currency: string;
