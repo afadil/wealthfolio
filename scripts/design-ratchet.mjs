@@ -6,7 +6,8 @@
 // tints of a status colour (bg-warning/10), which status text on them can't
 // read against; those surfaces use bg-warning-subtle and its pair. Borders, rings, outlines, shadows and offsets up to 4px
 // are hairlines and stay in px. Fails when a file gains a use; `--update`
-// records the current counts once uses are removed. Runs in the PR checks.
+// records the current counts once uses are removed. Moving or renaming a file keeps
+// its counts. Runs in the PR checks.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -98,11 +99,26 @@ if (process.argv.includes("--update")) {
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+const present = new Set(files);
 let failed = false;
 for (const [name, { label, fix }] of Object.entries(measures)) {
   const counts = current[name];
   const recorded = baseline[name] ?? {};
-  const grew = Object.entries(counts).filter(([file, n]) => n > (recorded[file] ?? 0));
+  // Counts are kept per path. A recorded path that left the tree (moved, renamed or
+  // deleted) hands its counts to paths with no record, so moving a file is not new debt;
+  // only what exceeds the vanished counts fails.
+  let vanished = Object.entries(recorded)
+    .filter(([file]) => !present.has(file))
+    .reduce((sum, [, n]) => sum + n, 0);
+  const grew = Object.entries(counts)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .filter(([file, n]) => {
+      const added = n - (recorded[file] ?? 0);
+      if (added <= 0) return false;
+      if (file in recorded || vanished < added) return true;
+      vanished -= added;
+      return false;
+    });
   const fell = Object.keys({ ...recorded, ...counts }).filter(
     (file) => (counts[file] ?? 0) < (recorded[file] ?? 0),
   );
@@ -116,9 +132,4 @@ for (const [name, { label, fix }] of Object.entries(measures)) {
     for (const [file, n] of grew) console.error(`    ${file}: ${recorded[file] ?? 0} -> ${n}`);
   }
 }
-// Counts are kept per path, so a moved or renamed file looks new.
-if (failed)
-  console.error(
-    "A moved or renamed file only? Run pnpm ui:design-ratchet --update and commit the result.",
-  );
 if (failed) process.exit(1);
