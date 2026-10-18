@@ -281,7 +281,14 @@ const AccountHoldings = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger
-                  render={<Button variant="ghost" size="icon" onClick={onAddHoldings} />}
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onAddHoldings}
+                      aria-label={t("account:actions_update_holdings")}
+                    />
+                  }
                 >
                   <Icons.Pencil className="h-4 w-4" />
                 </TooltipTrigger>
