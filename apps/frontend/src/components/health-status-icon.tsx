@@ -15,7 +15,7 @@ import type { HealthSeverity } from "@/lib/types";
 const SEVERITY_COLORS: Record<HealthSeverity, string> = {
   CRITICAL: "text-destructive",
   ERROR: "text-destructive",
-  WARNING: "text-yellow-500",
+  WARNING: "text-warning",
   INFO: "text-muted-foreground",
 };
 

@@ -457,10 +457,10 @@ export function MultiSelectTaxonomy({
                 className={cn(
                   "w-20 text-right text-sm font-semibold",
                   totalWeight === 100
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-success"
                     : totalWeight > 100
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-amber-600 dark:text-amber-400",
+                      ? "text-destructive"
+                      : "text-warning",
                 )}
               >
                 {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}%

@@ -38,10 +38,7 @@ export function TrackingModeBadge({ account, syncEnabled, className }: TrackingM
       return (
         <Badge
           variant="outline"
-          className={cn(
-            "rounded-sm border-blue-500/30 text-blue-600 dark:text-blue-400",
-            className,
-          )}
+          className={cn("border-info-subtle-border text-info rounded-sm", className)}
         >
           <Icons.Receipt className="mr-1 h-3 w-3" />
           {t("common:component.tracking_transactions")}
