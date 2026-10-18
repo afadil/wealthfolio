@@ -157,9 +157,9 @@ export default function AddonSettingsPage() {
                 </div>
                 <div className="border-t pt-2">
                   <div className="flex items-start gap-2">
-                    <Icons.AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <Icons.AlertTriangle className="text-warning mt-0.5 h-4 w-4 shrink-0" />
                     <p className="text-muted-foreground text-xs">
-                      <span className="font-medium text-amber-600">
+                      <span className="text-warning font-medium">
                         {t("settings:addons_security_notice")}
                       </span>{" "}
                       {t("settings:addons_security_message")}
@@ -530,7 +530,7 @@ export default function AddonSettingsPage() {
                               onCheckedChange={(checked) =>
                                 handleToggleAddon(addon.metadata.id, !checked)
                               }
-                              className="data-checked:bg-green-600"
+                              className="data-checked:bg-success"
                               disabled={togglingAddonId === addon.metadata.id}
                             />
                           </div>

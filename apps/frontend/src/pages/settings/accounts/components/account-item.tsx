@@ -135,13 +135,13 @@ export function AccountItem({
       </div>
       <div className="flex items-center space-x-2">
         {account.isArchived && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-red-200/40 bg-red-100/30 px-2 py-1 text-xs font-medium text-red-600 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+          <span className="border-destructive-subtle-border bg-destructive-subtle text-destructive-subtle-foreground inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
             <Icons.FileArchive className="h-3 w-3" />
             {t("settings:accounts.badge_archived")}
           </span>
         )}
         {!account.isActive && !account.isArchived && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-orange-200/40 bg-orange-100/30 px-2 py-1 text-xs font-medium text-orange-600 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400">
+          <span className="border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium">
             <Icons.EyeOff className="h-3 w-3" />
             {t("settings:accounts.badge_hidden")}
           </span>

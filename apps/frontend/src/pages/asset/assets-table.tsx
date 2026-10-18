@@ -245,7 +245,7 @@ export function AssetsTable({
                     <TooltipTrigger
                       render={
                         <Icons.AlertTriangle
-                          className="h-3.5 w-3.5 text-amber-500"
+                          className="text-warning h-3.5 w-3.5"
                           aria-label={noQuoteReason}
                         />
                       }
@@ -268,7 +268,7 @@ export function AssetsTable({
                     <TooltipTrigger
                       render={
                         <Icons.AlertTriangle
-                          className="h-3.5 w-3.5 text-amber-500"
+                          className="text-warning h-3.5 w-3.5"
                           aria-label={t("asset:table.quote_behind_aria")}
                         />
                       }

@@ -30,18 +30,18 @@ export function QuoteImportHelpPopover() {
               <li>{t("settings:market_data_page.import_step_4")}</li>
             </ol>
             <div className="mt-4 space-y-3">
-              <div className="rounded-md border border-blue-500 bg-blue-50 p-3 dark:border-blue-500/40 dark:bg-blue-900/40">
+              <div className="border-info bg-info-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-blue-700 dark:text-blue-300">
+                  <strong className="text-info-subtle-foreground">
                     {t("settings:market_data_page.import_tip_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_tip_text")}
                 </p>
               </div>
 
-              <div className="rounded-md border border-green-500 bg-green-50 p-3 dark:border-green-500/40 dark:bg-green-900/40">
+              <div className="border-success bg-success-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-green-700 dark:text-green-300">
+                  <strong className="text-success-subtle-foreground">
                     {t("settings:market_data_page.import_required_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_required_text")}
@@ -120,9 +120,9 @@ export function QuoteImportHelpPopover() {
                 </ul>
               </div>
 
-              <div className="rounded-md border border-yellow-500 bg-yellow-50 p-3 dark:border-yellow-500/40 dark:bg-yellow-900/40">
+              <div className="border-warning bg-warning-subtle rounded-md border p-3">
                 <p className="text-sm">
-                  <strong className="text-yellow-700 dark:text-yellow-300">
+                  <strong className="text-warning-subtle-foreground">
                     {t("settings:market_data_page.import_warning_label")}
                   </strong>{" "}
                   {t("settings:market_data_page.import_warning_text")}

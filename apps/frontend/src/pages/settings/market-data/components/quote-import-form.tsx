@@ -77,12 +77,12 @@ export function QuoteImportForm({
 
     if (file) {
       if (isValidating) {
-        return "border-blue-500 bg-blue-50 dark:bg-blue-900/10";
+        return "border-info bg-info-subtle";
       }
       if (error) {
-        return "border-red-500 bg-red-50 dark:bg-red-900/10";
+        return "border-destructive bg-destructive-subtle";
       }
-      return "border-green-500 bg-green-50 dark:bg-green-900/10";
+      return "border-success bg-success-subtle";
     }
 
     return "border-border bg-background/50 hover:bg-background/80 hover:border-muted-foreground/50";
@@ -166,10 +166,10 @@ export function QuoteImportForm({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 shadow-sm dark:bg-blue-900/20"
+                  className="bg-info-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
                 >
                   <motion.div variants={iconVariants} initial="initial" animate="animate">
-                    <Spinner className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <Spinner className="text-info h-5 w-5" />
                   </motion.div>
                 </motion.div>
               ) : file && error ? (
@@ -179,10 +179,10 @@ export function QuoteImportForm({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shadow-sm dark:bg-red-900/20"
+                  className="bg-destructive-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
                 >
                   <motion.div variants={iconVariants} initial="initial" animate="animate">
-                    <Icons.AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    <Icons.AlertCircle className="text-destructive h-5 w-5" />
                   </motion.div>
                 </motion.div>
               ) : file ? (
@@ -192,10 +192,10 @@ export function QuoteImportForm({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 shadow-sm dark:bg-green-900/20"
+                  className="bg-success-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
                 >
                   <motion.div variants={iconVariants} initial="initial" animate="animate">
-                    <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <Icons.CheckCircle className="text-success h-5 w-5" />
                   </motion.div>
                 </motion.div>
               ) : (
@@ -236,10 +236,8 @@ export function QuoteImportForm({
                     transition={{ duration: 0.2 }}
                     className="space-y-0"
                   >
-                    <p className="font-medium text-red-600 dark:text-red-400">{file.name}</p>
-                    <p className="text-xs text-red-500 dark:text-red-400">
-                      {(file.size / 1024).toFixed(2)} KB
-                    </p>
+                    <p className="text-destructive font-medium">{file.name}</p>
+                    <p className="text-destructive text-xs">{(file.size / 1024).toFixed(2)} KB</p>
                   </motion.div>
                 ) : file ? (
                   <motion.div

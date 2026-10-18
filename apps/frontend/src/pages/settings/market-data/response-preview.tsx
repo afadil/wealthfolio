@@ -253,8 +253,8 @@ function PrimitiveSpan({
   onSelect?: (path: string) => void;
 }) {
   const colorClass = cn(
-    kind === "number" && "text-sky-600 dark:text-sky-400",
-    kind === "string" && "text-emerald-700 dark:text-emerald-400",
+    kind === "number" && "text-info",
+    kind === "string" && "text-success-subtle-foreground",
     kind === "bool" && "text-violet-600 dark:text-violet-400",
     kind === "null" && "text-muted-foreground",
   );

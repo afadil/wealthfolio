@@ -93,7 +93,7 @@ export default function SettingsLayout() {
             title: t("settings:nav.items.connect"),
             href: "connect",
             subtitle: t("settings:nav.subtitles.connect"),
-            icon: <Icons.CloudSync2 className="size-6 text-blue-400" />,
+            icon: <Icons.CloudSync2 className="text-info size-6" />,
           },
           {
             title: t("settings:nav.items.market_data"),

@@ -129,7 +129,7 @@ export function ExchangeRatesSettings() {
                     components={{ b: <strong /> }}
                   />
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400">
+                <p className="text-warning text-xs">
                   <Icons.AlertTriangle className="mr-1 inline h-3 w-3" />
                   {t("settings:fx_delete_warning", { currency: rate.fromCurrency })}
                 </p>

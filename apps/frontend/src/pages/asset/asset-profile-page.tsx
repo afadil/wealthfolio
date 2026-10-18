@@ -1229,7 +1229,7 @@ export const AssetProfilePage = () => {
               {/* Type badge */}
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span className="bg-info h-2 w-2 rounded-full" />
                   {t("asset:profile.fx_rate")}
                 </Badge>
               </div>
@@ -1292,13 +1292,15 @@ export const AssetProfilePage = () => {
         <PageContent>
           <p>{t("asset:profile.could_not_load")}</p>
           {isHoldingError && (
-            <p className="text-sm text-red-500">{t("asset:profile.holding_fetch_error")}</p>
+            <p className="text-destructive text-sm">{t("asset:profile.holding_fetch_error")}</p>
           )}
           {isQuotesError && (
-            <p className="text-sm text-red-500">{t("asset:profile.quote_fetch_error")}</p>
+            <p className="text-destructive text-sm">{t("asset:profile.quote_fetch_error")}</p>
           )}
           {isAssetProfileError && (
-            <p className="text-sm text-red-500">{t("asset:profile.asset_profile_fetch_error")}</p>
+            <p className="text-destructive text-sm">
+              {t("asset:profile.asset_profile_fetch_error")}
+            </p>
           )}
         </PageContent>
       </Page>

@@ -122,7 +122,7 @@ export function QuoteHistoryToolbar({
                 <p className="text-muted-foreground text-sm">
                   {t("asset:quoteToolbar.to_auto_description")}
                 </p>
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="text-warning text-sm font-medium">
                   {t("asset:quoteToolbar.to_auto_warning")}
                 </p>
               </>
@@ -131,7 +131,7 @@ export function QuoteHistoryToolbar({
                 <p className="text-muted-foreground text-sm">
                   {t("asset:quoteToolbar.to_manual_description")}
                 </p>
-                <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="text-warning text-sm font-medium">
                   {t("asset:quoteToolbar.to_manual_warning")}
                 </p>
               </>

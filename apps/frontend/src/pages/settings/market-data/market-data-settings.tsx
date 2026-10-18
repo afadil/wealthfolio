@@ -492,8 +492,8 @@ function ProviderSettings({
                     {provider.errorCount > 0 ? (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Icons.XCircle className="h-4 w-4 text-red-500" />
-                          <span className="text-xs font-medium text-red-500">
+                          <Icons.XCircle className="text-destructive h-4 w-4" />
+                          <span className="text-destructive text-xs font-medium">
                             {t("settings:market_data_page.assets_with_errors", {
                               count: provider.errorCount,
                             })}
@@ -521,7 +521,7 @@ function ProviderSettings({
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Icons.CheckCircle className="h-4 w-4 text-green-500" />
+                        <Icons.CheckCircle className="text-success h-4 w-4" />
                         <span className="text-muted-foreground text-xs">
                           {provider.lastSyncedAt
                             ? t("settings:market_data_page.last_sync", {

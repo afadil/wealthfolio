@@ -78,7 +78,7 @@ export function ContributionLimitOperations({
             <Button
               disabled={isDeleting}
               onClick={() => handleDelete()}
-              className="bg-red-600 focus:ring-red-600"
+              className="bg-destructive focus:ring-destructive"
             >
               {isDeleting ? (
                 <Spinner className="mr-2 h-4 w-4" />
