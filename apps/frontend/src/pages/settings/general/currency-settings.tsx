@@ -58,7 +58,7 @@ export function BaseCurrencyForm() {
           name="baseCurrency"
           render={({ field }) => (
             <FormItem className="flex flex-col">
-              <FormControl className="w-75">
+              <FormControl className="w-[min(100%,18.75rem)]">
                 <CurrencyInput value={field.value} onChange={field.onChange} />
               </FormControl>
               <FormMessage />
