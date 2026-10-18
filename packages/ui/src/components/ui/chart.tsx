@@ -132,6 +132,10 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
       color,
       nameKey,
       labelKey,
+      id,
+      role,
+      style,
+      ...props
     },
     ref,
   ) => {
@@ -165,10 +169,19 @@ const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContent
     }
 
     const nestLabel = resolvedPayload.length === 1 && indicator !== "dot";
+    // Recharts passes every Tooltip prop to its content, so forward only attributes
+    // that are valid on the div rather than everything left over.
+    const ariaAndDataAttributes = Object.fromEntries(
+      Object.entries(props).filter(([key]) => key.startsWith("aria-") || key.startsWith("data-")),
+    );
 
     return (
       <div
         ref={ref}
+        id={id}
+        role={role}
+        style={style}
+        {...ariaAndDataAttributes}
         className={cn(
           "border-border/50 bg-background grid min-w-32 items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
           className,
