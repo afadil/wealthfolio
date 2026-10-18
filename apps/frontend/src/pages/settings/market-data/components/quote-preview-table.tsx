@@ -115,10 +115,7 @@ export function QuotePreviewTable({ quotes, maxRows = 10 }: QuotePreviewTablePro
                                   <Icons.AlertCircle className="text-destructive h-4 w-4 shrink-0 cursor-help" />
                                 }
                               />
-                              <TooltipContent
-                                side="right"
-                                className="bg-destructive text-destructive-foreground max-w-xs"
-                              >
+                              <TooltipContent side="right" className="max-w-xs">
                                 <p>{errorMessage}</p>
                               </TooltipContent>
                             </Tooltip>

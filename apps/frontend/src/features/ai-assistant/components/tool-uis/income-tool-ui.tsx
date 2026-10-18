@@ -417,7 +417,7 @@ export function IncomeContentImpl({ args, result, status }: IncomeContentProps) 
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
                     interval={monthlyData.length > 12 ? Math.floor(monthlyData.length / 12) : 0}
                   />
                   <ChartTooltip

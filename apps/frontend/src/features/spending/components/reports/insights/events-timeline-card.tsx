@@ -354,7 +354,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                   x={x + 6}
                   y={14}
                   className="fill-muted-foreground/80"
-                  fontSize={10}
+                  fontSize="0.6875rem"
                   letterSpacing={0.5}
                 >
                   {label}
@@ -378,7 +378,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
               <text
                 x={padL + innerW + 4}
                 y={yNormal + 3}
-                fontSize={9}
+                fontSize="0.6875rem"
                 className="fill-muted-foreground"
               >
                 {isBalanceHidden
@@ -498,7 +498,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + 8}
                       y={bandY + 16}
-                      fontSize={11}
+                      fontSize="0.6875rem"
                       className="fill-foreground"
                       fontWeight={isSel ? 700 : 600}
                     >
@@ -507,7 +507,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + 8}
                       y={bandY + 32}
-                      fontSize={9.5}
+                      fontSize="0.6875rem"
                       fontWeight={600}
                       className={lift >= 0 ? "fill-destructive" : "fill-success"}
                     >
@@ -516,7 +516,12 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                         ? "••••"
                         : amountFormatting.formatCompactAmount(Math.abs(lift), currency)}
                     </text>
-                    <text x={x1 + 8} y={bandY + 46} fontSize={9} className="fill-muted-foreground">
+                    <text
+                      x={x1 + 8}
+                      y={bandY + 46}
+                      fontSize="0.6875rem"
+                      className="fill-muted-foreground"
+                    >
                       {tr("spending:timeline.daysUpper", { count: days })} · {kindLabel}
                     </text>
                   </>
@@ -536,7 +541,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                     <text
                       x={x1 + w / 2}
                       y={bandY + labelYOffset}
-                      fontSize={10}
+                      fontSize="0.6875rem"
                       fontWeight={isSel ? 700 : 500}
                       textAnchor="middle"
                       className={isSel ? "fill-foreground" : "fill-foreground/80"}
@@ -561,20 +566,26 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
                 strokeWidth={1.5}
               />
               <circle cx={todayX} cy={4} r={3} fill="var(--event-today)" />
-              <text x={todayX + 6} y={14} fontSize={9.5} fontWeight={600} fill="var(--event-today)">
+              <text
+                x={todayX + 6}
+                y={14}
+                fontSize="0.6875rem"
+                fontWeight={600}
+                fill="var(--event-today)"
+              >
                 {tr("spending:timeline.today")}
               </text>
             </>
           )}
 
           {/* Bookend dates */}
-          <text x={padL} y={axisTop + 14} fontSize={9.5} className="fill-muted-foreground">
+          <text x={padL} y={axisTop + 14} fontSize="0.6875rem" className="fill-muted-foreground">
             {formatBookendDate(rangeStart, dateFormatting)}
           </text>
           <text
             x={padL + innerW}
             y={axisTop + 14}
-            fontSize={9.5}
+            fontSize="0.6875rem"
             textAnchor="end"
             className="fill-muted-foreground"
           >
@@ -584,7 +595,7 @@ export const EventsTimelineCard: FC<EventsTimelineCardProps> = ({
           <text
             x={padL + innerW / 2}
             y={axisTop + 14}
-            fontSize={9.5}
+            fontSize="0.6875rem"
             textAnchor="middle"
             className="fill-muted-foreground/70"
           >

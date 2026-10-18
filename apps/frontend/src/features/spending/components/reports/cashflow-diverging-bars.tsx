@@ -100,7 +100,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <YAxis
             axisLine={false}
@@ -108,7 +108,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             tickFormatter={(v: number) =>
               isBalanceHidden ? "••" : formatting.formatCompactAmount(Math.abs(v), currency)
             }
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
             width={56}
           />
           {/* Zero baseline — solid, slightly stronger than the gridlines */}
@@ -152,7 +152,7 @@ export function CashflowDivergingBars({ points, currency, isLoading }: CashflowD
             height={28}
             iconType="circle"
             iconSize={8}
-            wrapperStyle={{ fontSize: 11 }}
+            wrapperStyle={{ fontSize: "0.6875rem" }}
           />
           {/* Same `stackId` on both bars + parent `stackOffset="sign"`:
               recharts puts them in the same x slot and lets each grow in its

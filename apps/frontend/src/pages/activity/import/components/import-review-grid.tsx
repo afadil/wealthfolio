@@ -242,7 +242,7 @@ function useImportReviewColumns({
                       side="right"
                       className={
                         status === "error"
-                          ? "bg-destructive text-destructive-foreground border-destructive max-w-xs whitespace-pre-wrap text-xs"
+                          ? "max-w-xs whitespace-pre-wrap text-xs"
                           : "max-w-xs whitespace-pre-wrap text-xs"
                       }
                     >

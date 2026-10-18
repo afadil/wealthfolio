@@ -617,7 +617,7 @@ function getSaveUpStatus(
       title: goalTitle,
       date: dateLabel,
     }),
-    badgeClass: "bg-destructive text-destructive-foreground",
+    badgeClass: "bg-destructive-subtle text-destructive-subtle-foreground",
     textClass: "text-destructive",
     progressClass: "bg-destructive",
   };

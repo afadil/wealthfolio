@@ -76,7 +76,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
           />
           <YAxis
             axisLine={false}
@@ -84,7 +84,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             tickFormatter={(v: number) =>
               isBalanceHidden ? "••" : formatting.formatCompactAmount(v, currency)
             }
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: "0.6875rem", fill: "var(--muted-foreground)" }}
             width={56}
           />
           <Tooltip
@@ -124,7 +124,7 @@ export function CashflowAreaChart({ months, currency, isLoading }: CashflowAreaC
             height={28}
             iconType="circle"
             iconSize={8}
-            wrapperStyle={{ fontSize: 11 }}
+            wrapperStyle={{ fontSize: "0.6875rem" }}
           />
           <Area
             type="monotone"

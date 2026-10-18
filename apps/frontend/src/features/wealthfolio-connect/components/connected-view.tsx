@@ -418,8 +418,8 @@ export function ConnectedView() {
                 src={user?.user_metadata?.avatar_url}
                 alt={user?.email ?? t("connect:account.userAvatar")}
               />
-              <AvatarFallback className="bg-success/15">
-                <span className="text-success text-lg font-semibold">
+              <AvatarFallback className="bg-success-subtle">
+                <span className="text-success-subtle-foreground text-lg font-semibold">
                   {(userInfo?.full_name?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
                 </span>
               </AvatarFallback>

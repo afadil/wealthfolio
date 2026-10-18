@@ -121,17 +121,17 @@ export function GoalCard({ goal }: { goal: Goal }) {
   if (isAchieved) {
     pill = {
       label: t("goals:card.achieved"),
-      className: "bg-success text-success-foreground",
+      className: "bg-success-subtle text-success-subtle-foreground",
     };
   } else if (isOffTrack) {
     pill = {
       label: t("goals:card.off_track"),
-      className: "bg-destructive text-destructive-foreground",
+      className: "bg-destructive-subtle text-destructive-subtle-foreground",
     };
   } else if (isAtRisk) {
     pill = {
       label: t("goals:card.at_risk"),
-      className: "bg-destructive text-destructive-foreground",
+      className: "bg-destructive-subtle text-destructive-subtle-foreground",
     };
   }
 
