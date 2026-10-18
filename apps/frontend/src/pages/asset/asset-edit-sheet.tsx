@@ -213,7 +213,7 @@ function PricingModeToggle({
           <PopoverTrigger render={<button type="button" className="shrink-0" />}>
             <Switch checked={isAutomatic} />
           </PopoverTrigger>
-          <PopoverContent className="w-[360px] p-4" align="end">
+          <PopoverContent className="w-90 p-4" align="end">
             <div className="space-y-4">
               <h4 className="font-medium">
                 {isAutomatic

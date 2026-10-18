@@ -470,7 +470,7 @@ export function AlternativeAssetQuickAddModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+        className="sm:max-w-140 flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0"
         mobileClassName="flex h-[90vh] flex-col"
       >
         {/* Header with progress indicator */}

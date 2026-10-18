@@ -444,7 +444,7 @@ const getColumns = (
       const value = showConvertedValues ? costBasis.base : costBasis.local;
       const currency = showConvertedValues ? holding.baseCurrency : holding.localCurrency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-muted-foreground text-xs">{currency}</div>
         </div>
@@ -478,7 +478,7 @@ const getColumns = (
       const value = showConvertedValues ? cashFlow.base : cashFlow.local;
       const currency = showConvertedValues ? holding.baseCurrency : holding.localCurrency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-muted-foreground text-xs">{currency}</div>
         </div>
@@ -511,7 +511,7 @@ const getColumns = (
       const value = showConvertedValues ? holding.realizedGain.base : holding.realizedGain.local;
       const currency = showConvertedValues ? holding.baseCurrency : holding.localCurrency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <div className="text-muted-foreground text-xs">{currency}</div>
         </div>
@@ -541,7 +541,7 @@ const getColumns = (
         : holding.realizedGainPct;
 
       return (
-        <div className="flex min-h-[40px] items-center justify-end px-4">
+        <div className="flex min-h-10 items-center justify-end px-4">
           {percentage == null ? (
             <span className="text-muted-foreground">—</span>
           ) : (
@@ -597,7 +597,7 @@ const getColumns = (
         assetTypeKey === "MONEY_MARKET_DEBT";
       const isEtfOrFund = assetTypeKey === "ETF" || assetTypeKey === "FUND_MUTUAL";
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <QuantityDisplay value={holding.quantity} isHidden={isHidden} />
           <span className="text-muted-foreground text-xs">
             {isOption
@@ -636,7 +636,7 @@ const getColumns = (
       const price = holding.price ?? 0;
       const currency = holding.localCurrency;
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <PriceDisplay value={price} currency={currency} />
           <GainPercent className="text-xs" value={holding.dayChangePct || 0} />
         </div>
@@ -662,7 +662,7 @@ const getColumns = (
       const averagePrice = getAveragePrice(row.original);
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           {averagePrice == null ? (
             <span className="text-muted-foreground">-</span>
           ) : (
@@ -705,7 +705,7 @@ const getColumns = (
       const currency = holding.localCurrency;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-xs text-transparent">-</div>
         </div>
@@ -735,7 +735,7 @@ const getColumns = (
       const holding = row.original;
       if (isClosedPosition(holding)) {
         return (
-          <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+          <div className="flex min-h-10 flex-col items-end justify-center px-4">
             <span className="text-muted-foreground">—</span>
             <span className="text-muted-foreground text-xs">{t("holdings:closed")}</span>
           </div>
@@ -748,7 +748,7 @@ const getColumns = (
       );
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} isHidden={isHidden} />
           <div className="text-muted-foreground text-xs">{currency}</div>
         </div>
@@ -784,7 +784,7 @@ const getColumns = (
       isClosedPosition(row.original) ? (
         <div className="text-muted-foreground px-4 text-right">—</div>
       ) : (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <span className="font-medium tabular-nums">
             {formatting.formatPercent(row.original.weight ?? 0)}
           </span>
@@ -821,7 +821,7 @@ const getColumns = (
         : holding.totalGainPct;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <HoldingPerformancePercent className="text-xs" value={percentage} />
         </div>
@@ -866,7 +866,7 @@ const getColumns = (
         : holding.totalReturnPct;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <HoldingPerformancePercent className="text-xs" value={percentage} />
         </div>
@@ -903,7 +903,7 @@ const getColumns = (
       const currency = showConvertedValues ? holding.baseCurrency : holding.localCurrency;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <GainPercent className="text-xs" value={holding.dayChangePct || 0} />
         </div>
@@ -943,7 +943,7 @@ const getColumns = (
         : holding.unrealizedGainPct;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <HoldingPerformancePercent className="text-xs" value={percentage} />
         </div>
@@ -983,7 +983,7 @@ const getColumns = (
         : holding.realizedGainPct;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <HoldingPerformancePercent className="text-xs" value={percentage} />
         </div>
@@ -1016,7 +1016,7 @@ const getColumns = (
       const currency = showConvertedValues ? holding.baseCurrency : holding.localCurrency;
 
       return (
-        <div className="flex min-h-[40px] flex-col items-end justify-center px-4">
+        <div className="flex min-h-10 flex-col items-end justify-center px-4">
           <AmountDisplay value={value} currency={currency} colorFormat={true} isHidden={isHidden} />
           <div className="text-xs text-transparent">-</div>
         </div>

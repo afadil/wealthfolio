@@ -342,7 +342,7 @@ function ProgressBar({ spent, budget }: { spent: number; budget: number }) {
       : "var(--success)";
   return (
     <div className="flex items-center gap-2">
-      <div className="bg-foreground/10 relative h-1.5 min-w-[60px] flex-1 overflow-hidden rounded-full">
+      <div className="bg-foreground/10 min-w-15 relative h-1.5 flex-1 overflow-hidden rounded-full">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${Math.min(100, pct)}%`, backgroundColor: fillColor, opacity: 0.65 }}
@@ -786,7 +786,7 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
           style={{ backgroundColor: tintBg, color: accent }}
           aria-hidden
         >
-          <CategoryIcon icon={node.icon} fallback={node.name} className="h-[18px] w-[18px]" />
+          <CategoryIcon icon={node.icon} fallback={node.name} className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-foreground truncate text-sm font-semibold">{node.name}</div>
@@ -823,7 +823,7 @@ const MobileCategoryRow = memo(function MobileCategoryRow({
         <ul
           className={cn(
             "border-border/30 divide-border/30 mt-1 divide-y border-t pt-1",
-            standalone ? "mx-4 mb-3" : "ml-[52px]",
+            standalone ? "mx-4 mb-3" : "ml-13",
           )}
         >
           {node.children.map((child) => (

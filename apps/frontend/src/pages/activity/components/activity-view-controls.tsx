@@ -168,7 +168,7 @@ export function ActivityViewControls({
             setLocalSearch(value);
             debouncedSearch(value);
           }}
-          className="w-[160px] lg:w-[240px]"
+          className="w-40 lg:w-60"
         />
 
         <FacetedFilter

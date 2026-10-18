@@ -240,7 +240,7 @@ export const ActivityTable = ({
             : null;
 
           const content = (
-            <div className="flex max-w-[220px] items-center gap-2">
+            <div className="max-w-55 flex items-center gap-2">
               <TickerAvatar
                 symbol={avatarSymbol}
                 exchangeMic={row.original.exchangeMic}
@@ -327,7 +327,7 @@ export const ActivityTable = ({
               : undefined;
 
           return (
-            <div className="flex min-w-0 max-w-[160px] flex-col items-start gap-1 text-sm">
+            <div className="flex min-w-0 max-w-40 flex-col items-start gap-1 text-sm">
               <ActivityTypeBadge
                 type={activityType as ActivityType}
                 className="whitespace-nowrap text-xs font-normal"
@@ -625,7 +625,7 @@ export const ActivityTable = ({
           const accountName = row.getValue("account");
           const accountCurrency = row.getValue("accountCurrency");
           return (
-            <div className="ml-2 flex min-w-[150px] flex-col">
+            <div className="min-w-37.5 ml-2 flex flex-col">
               <span>{String(accountName)}</span>
               <span className="text-muted-foreground text-xs font-light">
                 {String(accountCurrency)}

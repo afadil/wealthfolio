@@ -185,7 +185,7 @@ export function RetirementSnapshotTable({
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[860px] text-xs">
+          <table className="min-w-215 w-full text-xs">
             <thead>
               <tr className="text-muted-foreground border-b">
                 <th className="pb-2 text-left">{t("goals:snapshot.col_age")}</th>

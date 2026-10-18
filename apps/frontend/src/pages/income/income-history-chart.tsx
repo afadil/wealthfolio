@@ -250,7 +250,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
       </CardHeader>
       <CardContent className="flex flex-1 flex-col px-4 pt-0 md:px-6">
         {chartData.length === 0 ? (
-          <Empty className="mx-auto flex h-[250px] max-w-[420px] items-center justify-center md:h-[300px]">
+          <Empty className="h-62.5 max-w-105 md:h-75 mx-auto flex items-center justify-center">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 {<Icons.Activity className="size-8 md:size-10" />}
@@ -262,7 +262,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
         ) : effectiveViewMode === "byAccount" ? (
           <ChartContainer
             config={accountChartConfig}
-            className={cn("h-full min-h-[280px] w-full flex-1 md:min-h-[380px]")}
+            className={cn("min-h-70 md:min-h-95 h-full w-full flex-1")}
             data-no-swipe-drag
           >
             <BarChart
@@ -281,7 +281,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    className="min-w-[150px] md:min-w-[180px]"
+                    className="min-w-37.5 md:min-w-45"
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
                         ? "••••"
@@ -343,7 +343,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
                 color: "var(--chart-stone)",
               },
             }}
-            className={cn("h-full min-h-[280px] w-full flex-1 md:min-h-[380px]")}
+            className={cn("min-h-70 md:min-h-95 h-full w-full flex-1")}
             data-no-swipe-drag
           >
             <ComposedChart
@@ -373,7 +373,7 @@ export const IncomeHistoryChart: React.FC<IncomeHistoryChartProps> = ({
               <ChartTooltip
                 content={
                   <ChartTooltipContent
-                    className="min-w-[150px] md:min-w-[180px]"
+                    className="min-w-37.5 md:min-w-45"
                     formatter={(value, name, entry) => {
                       const formattedValue = isBalanceHidden
                         ? "••••"

@@ -46,7 +46,7 @@ export function CategoryBadge({
       title={name}
     >
       <CategoryIcon icon={icon} fallback={name} className="h-3 w-3" />
-      <span className="max-w-[110px] truncate">{name}</span>
+      <span className="max-w-27.5 truncate">{name}</span>
     </span>
   );
 }

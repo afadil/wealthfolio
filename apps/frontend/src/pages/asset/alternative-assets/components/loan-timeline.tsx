@@ -317,9 +317,9 @@ export function LoanTimeline({
             {renderTooltip(focusedEvent)}
           </div>
         )}
-        <div className="h-full min-h-[320px]" data-testid="loan-timeline-chart">
+        <div className="h-full min-h-80" data-testid="loan-timeline-chart">
           {isBalanceHidden ? (
-            <div className="text-muted-foreground flex h-full min-h-[320px] items-center justify-center">
+            <div className="text-muted-foreground flex h-full min-h-80 items-center justify-center">
               ••••
             </div>
           ) : chart.length ? (
@@ -431,7 +431,7 @@ export function LoanTimeline({
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-muted-foreground flex h-full min-h-[320px] items-center justify-center text-sm">
+            <div className="text-muted-foreground flex h-full min-h-80 items-center justify-center text-sm">
               {t("asset:altContent.no_valuation_data")}
             </div>
           )}

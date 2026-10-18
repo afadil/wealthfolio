@@ -329,7 +329,7 @@ function SellProtectionSection({
             {t("allocation:sellProtection.protectedAssets")}
           </span>
           {protectedAssets.length > 0 && (
-            <span className="bg-muted text-muted-foreground text-2xs inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 font-mono font-semibold">
+            <span className="bg-muted text-muted-foreground text-2xs h-4.5 min-w-4.5 inline-flex items-center justify-center rounded-full px-1.5 font-mono font-semibold">
               {protectedAssets.length}
             </span>
           )}
@@ -348,11 +348,11 @@ function SellProtectionSection({
                 {a.symbol.slice(0, 2)}
               </span>
               <span className="text-foreground font-semibold">{a.symbol}</span>
-              <span className="text-muted-foreground max-w-[120px] truncate">{a.name}</span>
+              <span className="text-muted-foreground max-w-30 truncate">{a.name}</span>
               <button
                 type="button"
                 onClick={() => onToggle("asset", a.assetId)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[17px] w-[17px] items-center justify-center rounded-full"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />
               </button>
@@ -382,7 +382,7 @@ function SellProtectionSection({
                   autoFocus
                 />
               </div>
-              <div className="max-h-[228px] overflow-auto p-1">
+              <div className="max-h-57 overflow-auto p-1">
                 {availableAssets.length === 0 ? (
                   <p className="text-muted-foreground text-2xs px-3 py-4 text-center">
                     {assetSearch
@@ -401,7 +401,7 @@ function SellProtectionSection({
                       }}
                       className="hover:bg-muted flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left"
                     >
-                      <span className="bg-muted text-muted-foreground text-2xs flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full font-mono font-bold uppercase">
+                      <span className="bg-muted text-muted-foreground text-2xs h-5.5 w-5.5 flex shrink-0 items-center justify-center rounded-full font-mono font-bold uppercase">
                         {a.symbol.slice(0, 2)}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -427,7 +427,7 @@ function SellProtectionSection({
             {t("allocation:sellProtection.protectedAccounts")}
           </span>
           {protectedAccounts.length > 0 && (
-            <span className="bg-muted text-muted-foreground text-2xs inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 font-mono font-semibold">
+            <span className="bg-muted text-muted-foreground text-2xs h-4.5 min-w-4.5 inline-flex items-center justify-center rounded-full px-1.5 font-mono font-semibold">
               {protectedAccounts.length}
             </span>
           )}
@@ -447,7 +447,7 @@ function SellProtectionSection({
               <button
                 type="button"
                 onClick={() => onToggle("account", a.id)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[17px] w-[17px] items-center justify-center rounded-full"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted ml-0.5 flex h-[1.0625rem] w-[1.0625rem] items-center justify-center rounded-full"
               >
                 <Icons.X className="h-3 w-3" />
               </button>
@@ -910,7 +910,7 @@ function TargetEditor({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <div className="space-y-4">
           <section className="bg-card/80 rounded-lg border p-5 shadow-sm">
             <StepHeader number={1} className="mb-3">

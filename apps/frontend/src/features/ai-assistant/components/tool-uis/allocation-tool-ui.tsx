@@ -311,7 +311,7 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
           </div>
         </CardHeader>
         <CardContent className="pb-4">
-          <div className="max-h-[250px] overflow-y-auto">
+          <div className="max-h-62.5 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-muted-foreground border-b text-left">
@@ -411,7 +411,7 @@ function AllocationContentImpl({ args, result, status }: AllocationContentProps)
           </div>
 
           {/* Legend list */}
-          <div className="max-h-[200px] space-y-1.5 overflow-y-auto">
+          <div className="max-h-50 space-y-1.5 overflow-y-auto">
             {sortedCategories.map((category, index) => {
               const percent = computedTotal > 0 ? category.value / computedTotal : 0;
 

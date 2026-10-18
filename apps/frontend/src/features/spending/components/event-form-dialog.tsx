@@ -313,7 +313,7 @@ export function EventFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("spending:eventForm.editTitle") : t("spending:eventForm.createTitle")}

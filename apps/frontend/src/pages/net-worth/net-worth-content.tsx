@@ -242,7 +242,7 @@ export function NetWorthContent() {
                     >
                       <Icons.AlertCircle className="h-4 w-4" />
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[280px]">
+                    <TooltipContent side="bottom" className="max-w-70">
                       <p className="mb-2 text-xs font-medium">
                         {t("insights:networth.stale_valuations_tooltip")}
                       </p>
@@ -321,7 +321,7 @@ export function NetWorthContent() {
         }}
       >
         {/* Chart section */}
-        <div className="h-[280px]">
+        <div className="h-70">
           {isHistoryLoading ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-full w-full" />

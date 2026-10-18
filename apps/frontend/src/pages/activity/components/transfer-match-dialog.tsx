@@ -741,7 +741,7 @@ export function TransferMatchDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-[760px]">
+      <SheetContent className="sm:max-w-190 flex w-full flex-col overflow-hidden">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -805,8 +805,8 @@ export function TransferMatchDialog({
                 </div>
                 {suggestionsLoading ? (
                   <div className="space-y-2">
-                    <Skeleton className="h-[88px] w-full rounded-md" />
-                    <Skeleton className="h-[88px] w-full rounded-md" />
+                    <Skeleton className="h-22 w-full rounded-md" />
+                    <Skeleton className="h-22 w-full rounded-md" />
                   </div>
                 ) : suggestionsError ? (
                   <div className="text-destructive rounded-md border p-3 text-sm">

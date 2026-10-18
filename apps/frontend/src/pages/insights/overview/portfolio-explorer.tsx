@@ -304,10 +304,10 @@ export function PortfolioExplorer({
             {node.name}
           </span>
         </span>
-        <span className="text-foreground w-[62px] text-right text-sm font-bold tabular-nums">
+        <span className="text-foreground w-15.5 text-right text-sm font-bold tabular-nums">
           {node.percentage.toFixed(1)}%
         </span>
-        <span className="text-muted-foreground w-[84px] text-right text-xs tabular-nums">
+        <span className="text-muted-foreground w-21 text-right text-xs tabular-nums">
           <PrivacyAmount value={node.value} currency={currency} />
         </span>
         <span className="text-muted-foreground w-3.5 text-center">

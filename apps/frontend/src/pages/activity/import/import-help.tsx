@@ -388,7 +388,7 @@ export function ImportHelpPopover({
         <Icons.HelpCircle className="mr-1 h-5 w-5" />
         {t("activity:import.help.button")}
       </PopoverTrigger>
-      <PopoverContent className="m-4 max-h-[80vh] w-[900px] max-w-[calc(100vw-2rem)] overflow-y-auto p-6 text-sm">
+      <PopoverContent className="w-225 m-4 max-h-[80vh] max-w-[calc(100vw-2rem)] overflow-y-auto p-6 text-sm">
         {helpContent}
       </PopoverContent>
     </Popover>

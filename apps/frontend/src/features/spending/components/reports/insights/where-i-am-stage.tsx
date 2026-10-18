@@ -990,7 +990,7 @@ function BreakdownCanvas({
               {t(SORT_LABEL_KEYS[sort])}
               <Icons.ChevronDown className="size-3 opacity-60" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[140px]">
+            <DropdownMenuContent align="end" className="min-w-35">
               {SORT_OPTIONS.map((opt) => (
                 <DropdownMenuItem
                   key={opt}

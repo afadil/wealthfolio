@@ -114,7 +114,7 @@ export function ActivityDataGridPagination({
               onPageSizeChange(Number(value));
             }}
           >
-            <SelectTrigger className="h-7 w-[65px] text-xs">
+            <SelectTrigger className="h-7 w-[4.0625rem] text-xs">
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
@@ -138,7 +138,7 @@ export function ActivityDataGridPagination({
             onKeyDown={handleKeyDown}
             onBlur={handleBlur}
             placeholder={`${currentPage}`}
-            className="h-7 w-[50px] text-center text-xs"
+            className="w-12.5 h-7 text-center text-xs"
             title={t("activity:datagrid.pagination.jump_hint", { count: pageCount })}
           />
           <span className="text-muted-foreground whitespace-nowrap text-xs">

@@ -749,7 +749,7 @@ export default function DashboardPage({
                     )}
                   </h1>
 
-                  <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
+                  <p className="text-muted-foreground max-w-155 mt-4 text-sm leading-relaxed xl:max-w-4xl">
                     <Trans
                       t={t}
                       i18nKey={
@@ -1106,7 +1106,7 @@ export default function DashboardPage({
                         {reached && (
                           <Badge
                             variant="default"
-                            className="text-2xs bg-success hover:bg-success h-[14px] px-1.5 font-semibold tracking-wider"
+                            className="text-2xs bg-success hover:bg-success h-3.5 px-1.5 font-semibold tracking-wider"
                           >
                             {t("goals:dashboard.milestone.done")}
                           </Badge>

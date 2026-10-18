@@ -178,11 +178,11 @@ export function DrillableAccountChart({
     return (
       <Card className="overflow-hidden backdrop-blur-sm">
         <CardHeader className="px-5 pb-1 pt-5">
-          <Skeleton className="h-4 w-[120px]" />
+          <Skeleton className="w-30 h-4" />
         </CardHeader>
         <CardContent className="px-5 pb-5 pt-0">
-          <div className="flex h-[160px] items-center justify-center">
-            <Skeleton className="h-[120px] w-[120px] rounded-full" />
+          <div className="flex h-40 items-center justify-center">
+            <Skeleton className="h-30 w-30 rounded-full" />
           </div>
         </CardContent>
       </Card>

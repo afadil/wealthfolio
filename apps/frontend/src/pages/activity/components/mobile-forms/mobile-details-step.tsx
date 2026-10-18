@@ -1170,7 +1170,7 @@ export function MobileDetailsStep({
                   <FormControl>
                     <Textarea
                       placeholder={t("activity:mobile_description_placeholder")}
-                      className="min-h-[100px] resize-none text-base sm:text-sm"
+                      className="min-h-25 resize-none text-base sm:text-sm"
                       {...field}
                       value={field.value ?? ""}
                     />

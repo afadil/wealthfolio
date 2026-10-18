@@ -1019,7 +1019,7 @@ export default function SpendingTabContent() {
           backgroundImage: `linear-gradient(to top, ${themeBg(theme, 0.3)}, ${themeBg(theme, 0.15)} 50%, transparent 100%)`,
         }}
       >
-        <div className="h-[280px] [&_.recharts-layer]:outline-none [&_.recharts-rectangle]:outline-none [&_.recharts-surface]:outline-none">
+        <div className="h-70 [&_.recharts-layer]:outline-none [&_.recharts-rectangle]:outline-none [&_.recharts-surface]:outline-none">
           {isLoading ? (
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-full w-full" />
@@ -1163,7 +1163,7 @@ export default function SpendingTabContent() {
                 }
               >
                 {isLoading ? (
-                  <Skeleton className="h-[260px] w-full rounded-lg" />
+                  <Skeleton className="h-65 w-full rounded-lg" />
                 ) : whereItWentView === "map" ? (
                   <CategoryTreemapMono
                     rows={categoryRows}
@@ -1459,7 +1459,7 @@ function CategoryTreemapMono({
 
   return (
     <div className="border-border/60 bg-card/40 overflow-hidden rounded-xl border p-4 backdrop-blur-xl md:p-5">
-      <div className="h-[220px] w-full">
+      <div className="h-55 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <Treemap
             data={data}

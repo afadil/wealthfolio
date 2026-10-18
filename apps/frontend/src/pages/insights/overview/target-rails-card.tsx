@@ -156,7 +156,7 @@ export function TargetRailsCard({
               return (
                 <div
                   key={row.categoryId}
-                  className="grid grid-cols-[110px_1fr_62px] items-center gap-2.5 border-t py-3 first:border-t-0"
+                  className="grid grid-cols-[6.875rem_1fr_3.875rem] items-center gap-2.5 border-t py-3 first:border-t-0"
                 >
                   <span className="flex items-center gap-2 overflow-hidden text-xs font-semibold">
                     <span
@@ -276,7 +276,7 @@ export function TargetRailsCard({
                 { width: "46%", target: "58%", color: "bg-warning/70" },
                 { width: "28%", target: "36%", color: "bg-primary/65" },
               ].map((row, index) => (
-                <div key={index} className="grid grid-cols-[14px_1fr] items-center gap-2">
+                <div key={index} className="grid grid-cols-[0.875rem_1fr] items-center gap-2">
                   <span className={cn("h-2.5 w-2.5 rounded-sm", row.color)} />
                   <span className="bg-background relative h-2.5 overflow-visible rounded-full border">
                     <span

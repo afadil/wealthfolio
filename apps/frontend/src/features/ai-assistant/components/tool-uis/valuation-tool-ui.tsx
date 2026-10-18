@@ -194,7 +194,7 @@ function ValuationContentImpl({ args, result, status }: ValuationContentProps) {
   };
 
   return (
-    <Card className="bg-muted/40 border-primary/10 max-h-[320px] overflow-hidden">
+    <Card className="bg-muted/40 border-primary/10 max-h-80 overflow-hidden">
       <CardHeader className="flex flex-col gap-2 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -220,7 +220,7 @@ function ValuationContentImpl({ args, result, status }: ValuationContentProps) {
         )}
       </CardHeader>
       <CardContent>
-        <div className="bg-background/60 h-[200px] w-full min-w-[280px] rounded-xl border p-3 shadow-inner">
+        <div className="bg-background/60 h-50 min-w-70 w-full rounded-xl border p-3 shadow-inner">
           {shouldRenderChart ? (
             <HistoryChart data={chartData} isLoading={false} />
           ) : (

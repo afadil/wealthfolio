@@ -245,7 +245,7 @@ export const BudgetStatusHero: FC<BudgetStatusHeroProps> = ({
     return (
       <div className={CARD_CLASS}>
         <Skeleton className="h-3 w-32" />
-        <Skeleton className="mt-3 h-[88px] w-full" />
+        <Skeleton className="h-22 mt-3 w-full" />
         <Skeleton className="mt-3 h-4 w-2/3" />
       </div>
     );

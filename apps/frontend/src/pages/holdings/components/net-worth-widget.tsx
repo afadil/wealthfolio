@@ -245,7 +245,7 @@ export const NetWorthWidget = ({
                 <TooltipTrigger render={<div className="flex items-center gap-1" />}>
                   <Icons.AlertCircle className="text-warning h-4 w-4" />
                 </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-[250px]">
+                <TooltipContent side="left" className="max-w-62.5">
                   <p className="text-sm">
                     {t("holdings:stale_valuations_warning")}
                     {netWorthData?.oldestValuationDate && (

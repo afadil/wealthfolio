@@ -373,7 +373,7 @@ export function SingleSelectTaxonomy({
               )}
               <Icons.ChevronDown className="h-3 w-3 opacity-50" />
             </PopoverTrigger>
-            <PopoverContent className="w-[350px] p-0" align="start" sideOffset={4}>
+            <PopoverContent className="w-87.5 p-0" align="start" sideOffset={4}>
               <Command>
                 <CommandInput placeholder={t("asset:classification.searchTypes")} className="h-9" />
                 <CommandList className="max-h-72 overflow-y-auto">

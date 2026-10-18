@@ -139,7 +139,7 @@ export default function IncomePage() {
     return (
       <>
         {filters}
-        <Empty className="mx-auto flex max-w-[420px] items-center justify-center pt-12">
+        <Empty className="max-w-105 mx-auto flex items-center justify-center pt-12">
           <EmptyHeader>
             <EmptyMedia variant="icon">{<Icons.DollarSign className="size-10" />}</EmptyMedia>
             <EmptyTitle>{t("income:no_income_data")}</EmptyTitle>
@@ -278,7 +278,7 @@ export default function IncomePage() {
                       },
                       {},
                     )}
-                    className="mx-auto aspect-square max-h-[62px]"
+                    className="max-h-15.5 mx-auto aspect-square"
                   >
                     <PieChart>
                       <ChartTooltip
@@ -435,7 +435,7 @@ export default function IncomePage() {
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
               {topDividendStocks.length === 0 ? (
-                <Empty className="mx-auto flex h-[300px] max-w-[420px] items-center justify-center">
+                <Empty className="h-75 max-w-105 mx-auto flex items-center justify-center">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
                       {<Icons.DollarSign className="size-10" />}
@@ -498,7 +498,7 @@ export default function IncomePage() {
                           >
                             {/* Tooltip */}
                             <div className="absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 transform group-hover:block">
-                              <div className="bg-popover text-popover-foreground min-w-[180px] rounded-lg border px-3 py-2 shadow-md">
+                              <div className="bg-popover text-popover-foreground min-w-45 rounded-lg border px-3 py-2 shadow-md">
                                 <div className="text-sm font-medium">{item.symbol}</div>
                                 <div className="text-muted-foreground text-xs">
                                   {item.companyName}
@@ -524,7 +524,7 @@ export default function IncomePage() {
                   {topDividendStocks.map((asset) => (
                     <div key={asset.assetId} className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <Badge className="bg-primary mr-2 flex min-w-[55px] items-center justify-center rounded-sm text-xs">
+                        <Badge className="bg-primary mr-2 flex min-w-[3.4375rem] items-center justify-center rounded-sm text-xs">
                           {asset.symbol}
                         </Badge>
                         <span className="text-muted-foreground mr-16 text-xs">{asset.name}</span>
@@ -552,12 +552,12 @@ function IncomeDashboardSkeleton() {
           {[...Array(3)].map((_, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-[100px]" />
+                <Skeleton className="w-25 h-4" />
                 <Skeleton className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-8 w-[150px]" />
-                <Skeleton className="mt-2 h-4 w-[100px]" />
+                <Skeleton className="w-37.5 h-8" />
+                <Skeleton className="w-25 mt-2 h-4" />
               </CardContent>
             </Card>
           ))}
@@ -565,23 +565,23 @@ function IncomeDashboardSkeleton() {
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-[150px]" />
-              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="w-37.5 h-6" />
+              <Skeleton className="w-25 h-4" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-[300px] w-full" />
+              <Skeleton className="h-75 w-full" />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-[200px]" />
+              <Skeleton className="w-50 h-6" />
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {[...Array(10)].map((_, index) => (
                   <div key={index} className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-[100px]" />
-                    <Skeleton className="h-4 w-[80px]" />
+                    <Skeleton className="w-25 h-4" />
+                    <Skeleton className="h-4 w-20" />
                   </div>
                 ))}
               </div>

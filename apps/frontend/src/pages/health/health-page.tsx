@@ -309,7 +309,7 @@ export default function HealthPage() {
           actions={headerActions}
         />
         <PageContent className="pt-4">
-          <div className="flex min-h-[300px] flex-col items-center justify-center">
+          <div className="min-h-75 flex flex-col items-center justify-center">
             <div className="text-destructive-subtle-foreground bg-current/15 mb-4 flex h-12 w-12 items-center justify-center rounded-full">
               <Icons.AlertCircle className="h-6 w-6" />
             </div>

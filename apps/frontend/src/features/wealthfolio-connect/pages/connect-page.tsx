@@ -1071,11 +1071,11 @@ function SyncHistoryItem({
           isFailed ? "bg-destructive" : needsAttention ? "bg-warning" : "bg-success",
         )}
       />
-      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-[80px] sm:text-sm">
+      <span className="text-muted-foreground shrink-0 whitespace-nowrap text-xs sm:min-w-20 sm:text-sm">
         {t("connect:page.timeAgo", { time: timeAgo })}
       </span>
       {accountName && (
-        <span className="hidden shrink-0 truncate text-sm font-medium sm:inline sm:min-w-[100px]">
+        <span className="sm:min-w-25 hidden shrink-0 truncate text-sm font-medium sm:inline">
           {accountName}
         </span>
       )}

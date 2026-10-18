@@ -66,7 +66,7 @@ function formatTargetDate(
 export function ProgressBar({ progress, fillClass }: { progress: number; fillClass: string }) {
   const pct = Math.max(0, Math.min(1, progress));
   return (
-    <div className="bg-muted/60 relative h-[5px] w-full overflow-hidden">
+    <div className="bg-muted/60 relative h-[0.3125rem] w-full overflow-hidden">
       <div className={cn("h-full", fillClass)} style={{ width: `${pct * 100}%` }} />
       <div className="pointer-events-none absolute inset-0 flex">
         {Array.from({ length: 20 }).map((_, i) => (
@@ -160,7 +160,7 @@ export function GoalCard({ goal }: { goal: Goal }) {
     <Link to={`/goals/${goal.id}`} className="group block">
       <Card className="overflow-hidden p-0 transition-shadow hover:shadow-md">
         {/* Top cover image panel */}
-        <div className="bg-secondary/50 relative h-[156px] overflow-hidden">
+        <div className="bg-secondary/50 h-39 relative overflow-hidden">
           <img
             src={coverImage}
             alt=""

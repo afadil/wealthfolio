@@ -119,7 +119,7 @@ function CsvPreviewTable({ headers, rows, maxRows = 50 }: CsvPreviewTableProps) 
               {row.map((cell, cellIdx) => (
                 <td
                   key={cellIdx}
-                  className="max-w-[200px] truncate border-r px-2 py-1 last:border-r-0"
+                  className="max-w-50 truncate border-r px-2 py-1 last:border-r-0"
                   title={cell}
                 >
                   {cell || <span className="text-muted-foreground italic">-</span>}
@@ -198,7 +198,7 @@ function CsvPreviewTabs({
         <CardContent className="p-0">
           <TabsContent value="parsed" className="m-0 border-0 p-0">
             {/* `isolate` stops WebKitGTK painting the sticky header over this scrollbar inside a scrolling parent */}
-            <div className="isolate max-h-[300px] overflow-auto border-t">
+            <div className="max-h-75 isolate overflow-auto border-t">
               <CsvPreviewTable headers={headers} rows={rows} maxRows={50} />
             </div>
           </TabsContent>
@@ -881,7 +881,7 @@ export function UploadStep() {
             <h2 className="text-sm font-semibold">{t("activity:import.upload.selectAccount")}</h2>
             <HelpTooltip content={t("activity:import.upload.selectAccountHelp")} />
           </div>
-          <div className="h-[116px]">
+          <div className="h-29">
             {isMobile ? (
               <div
                 className={cn(
@@ -936,7 +936,7 @@ export function UploadStep() {
             <h2 className="text-sm font-semibold">{t("activity:import.upload.uploadCsv")}</h2>
             <HelpTooltip content={t("activity:import.upload.uploadCsvHelp")} />
           </div>
-          <div className="h-[116px]">
+          <div className="h-29">
             <FileDropzone
               file={state.file}
               onFileChange={handleFileSelect}

@@ -110,7 +110,7 @@ export function EventTypeFormDialog({ eventType, open, onOpenChange, prefill, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[26.5625rem]">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? t("spending:events.editTypeTitle") : t("spending:events.createTypeTitle")}

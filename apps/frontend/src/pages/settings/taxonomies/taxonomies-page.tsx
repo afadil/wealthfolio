@@ -193,10 +193,10 @@ export default function TaxonomiesPage() {
           </div>
 
           {/* Categories and details */}
-          <div className="flex min-h-[500px] flex-col lg:flex-row">
+          <div className="min-h-125 flex flex-col lg:flex-row">
             {/* Category tree */}
             <div className="w-full border-b lg:w-80 lg:border-b-0 lg:border-r">
-              <ScrollArea className="h-[300px] lg:h-[500px]">
+              <ScrollArea className="h-75 lg:h-125">
                 {isLoadingCategories ? (
                   <div className="text-muted-foreground p-4 text-center text-sm">
                     {t("settings:tax_loading_generic")}

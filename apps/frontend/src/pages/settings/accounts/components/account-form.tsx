@@ -351,7 +351,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           </div>
         </DialogHeader>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.9fr)]">
           <input type="hidden" name="id" />
           <div className="contents lg:grid lg:content-start lg:gap-4">
             <section className={formCardClassName}>

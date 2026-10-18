@@ -43,7 +43,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             (isMobile
-              ? "!backdrop-blur-[20px] !backdrop-saturate-[1.8] !rounded-2xl !shadow-[0_2px_16px_rgba(0,0,0,0.08)] dark:!shadow-[0_2px_20px_rgba(0,0,0,0.3)] !py-3 !px-4"
+              ? "!backdrop-blur-[1.25rem] !backdrop-saturate-[1.8] !rounded-2xl !shadow-[0_2px_16px_rgba(0,0,0,0.08)] dark:!shadow-[0_2px_20px_rgba(0,0,0,0.3)] !py-3 !px-4"
               : "") + " !pr-8",
           title: isMobile ? "!text-sm !font-semibold" : undefined,
           description: isMobile ? "!text-sm !leading-tight" : undefined,

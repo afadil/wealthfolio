@@ -267,7 +267,7 @@ export function MultiSelectTaxonomy({
               <Icons.Plus className="h-3.5 w-3.5" />
               {t("asset:classification.add")}
             </PopoverTrigger>
-            <PopoverContent className="w-[450px] p-0" align="end" sideOffset={4}>
+            <PopoverContent className="w-112.5 p-0" align="end" sideOffset={4}>
               {/* Pending category weight input */}
               {pendingCategory && (
                 <div className="border-b p-3">

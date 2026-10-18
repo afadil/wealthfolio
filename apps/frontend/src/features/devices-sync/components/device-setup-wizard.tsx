@@ -154,7 +154,7 @@ export function DeviceSetupDialog({ open, onOpenChange, title, children }: Devic
       useIsMobile={() => isMobile}
     >
       <DialogContent
-        className="sm:max-w-[480px]"
+        className="sm:max-w-120"
         mobileClassName="flex h-[90vh] flex-col pb-8"
         showCloseButton={false}
       >

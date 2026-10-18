@@ -190,7 +190,7 @@ function StatusPill({
 function EmptyResponseState() {
   const { t } = useTranslation();
   return (
-    <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center">
+    <div className="min-h-55 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-6 text-center">
       <Icons.Target className="text-muted-foreground/40 h-6 w-6" />
       <div className="space-y-1">
         <p className="text-muted-foreground text-sm">
@@ -300,7 +300,7 @@ function HtmlTableResponse({
         </span>
       </div>
 
-      <div className="bg-background max-h-[420px] overflow-auto rounded-lg border">
+      <div className="bg-background max-h-105 overflow-auto rounded-lg border">
         <table className="w-full text-xs">
           <thead className="bg-muted/40 sticky top-0">
             <tr>
@@ -352,7 +352,7 @@ function CsvResponse({ raw, runtime }: { raw: string; runtime: SourceRuntime }) 
   const { headers, rows } = useMemo(() => parseCsv(raw), [raw]);
   if (headers.length === 0) {
     return (
-      <pre className="bg-background max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg border p-3 font-mono text-xs">
+      <pre className="bg-background max-h-105 overflow-auto whitespace-pre-wrap rounded-lg border p-3 font-mono text-xs">
         {raw.slice(0, 3000)}
       </pre>
     );
@@ -373,7 +373,7 @@ function CsvResponse({ raw, runtime }: { raw: string; runtime: SourceRuntime }) 
             })
           : t("settings:market_data_page.csv_rows_detected", { count: rows.length })}
       </p>
-      <div className="bg-background max-h-[420px] overflow-auto rounded-lg border">
+      <div className="bg-background max-h-105 overflow-auto rounded-lg border">
         <table className="w-full text-xs">
           <thead className="bg-muted/40 sticky top-0">
             <tr>
@@ -464,7 +464,7 @@ function HtmlElementsResponse({ runtime }: { runtime: SourceRuntime }) {
               count: runtime.detectedElements.length,
             })}
       </p>
-      <div className="max-h-[420px] space-y-2 overflow-y-auto">
+      <div className="max-h-105 space-y-2 overflow-y-auto">
         {list.map((el) => (
           <button
             key={el.selector}
@@ -734,7 +734,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
               : t("settings:market_data_page.method_latest")}
           </span>
         </div>
-        <div className="bg-background relative min-h-[40px] rounded-lg border px-3 py-2 pr-10">
+        <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pr-10">
           <PreviewUrl template={runtime.urlTemplate} values={previewValues} />
           <CopyButton text={runtime.expandedUrl} disabled={!runtime.urlTemplate} />
         </div>
@@ -746,7 +746,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
           <Label className="text-muted-foreground text-2xs font-medium uppercase tracking-wide">
             {t("settings:market_data_page.request_body_preview")}
           </Label>
-          <div className="bg-background relative min-h-[40px] rounded-lg border px-3 py-2 pr-10">
+          <div className="bg-background relative min-h-10 rounded-lg border px-3 py-2 pr-10">
             <PreviewUrl
               template={bodyTemplate}
               values={previewValues}
@@ -761,10 +761,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
       {/* Test inputs */}
       <section className="space-y-2">
         <div className="flex flex-wrap items-end gap-2">
-          <TestField
-            label={t("settings:market_data_page.test_symbol")}
-            className="min-w-[140px] flex-1"
-          >
+          <TestField label={t("settings:market_data_page.test_symbol")} className="min-w-35 flex-1">
             <Input
               placeholder={t("settings:market_data_page.test_symbol_placeholder")}
               value={inputs.symbol}
@@ -870,7 +867,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
         ) : format === "csv" && runtime.rawResponse ? (
           <CsvResponse raw={runtime.rawResponse} runtime={runtime} />
         ) : format === "json" && runtime.rawResponse ? (
-          <div className="bg-background max-h-[420px] overflow-auto rounded-lg border">
+          <div className="bg-background max-h-105 overflow-auto rounded-lg border">
             <RawResponseViewer
               rawResponse={runtime.rawResponse}
               format="json"
@@ -878,7 +875,7 @@ export function LivePreviewPane({ form, prefix, runtime }: LivePreviewPaneProps)
             />
           </div>
         ) : runtime.rawResponse ? (
-          <div className="bg-background max-h-[420px] overflow-auto rounded-lg border">
+          <div className="bg-background max-h-105 overflow-auto rounded-lg border">
             <RawResponseViewer rawResponse={runtime.rawResponse} format="html" />
           </div>
         ) : (

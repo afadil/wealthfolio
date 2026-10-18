@@ -626,7 +626,7 @@ export function SidebarConfigurator({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">{t("goals:sidebar.plan.plan_type")}</p>
-                  <p className="text-muted-foreground mt-1 max-w-[260px] text-xs leading-snug">
+                  <p className="text-muted-foreground max-w-65 mt-1 text-xs leading-snug">
                     {t("goals:sidebar.plan.plan_type_help")}
                   </p>
                 </div>
@@ -657,7 +657,7 @@ export function SidebarConfigurator({
                   <div className="text-foreground text-sm font-semibold leading-tight">
                     {t("goals:sidebar.plan.birth_month")}
                   </div>
-                  <div className="text-muted-foreground mt-1 max-w-[240px] text-xs leading-tight">
+                  <div className="text-muted-foreground mt-1 max-w-60 text-xs leading-tight">
                     {t("goals:sidebar.plan.birth_month_help")}
                   </div>
                 </div>

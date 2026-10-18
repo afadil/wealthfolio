@@ -49,7 +49,7 @@ export function CurrentVsTargetCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid items-center gap-6 pt-3 xl:grid-cols-[280px_minmax(0,1fr)] xl:pt-5">
+        <div className="grid items-center gap-6 pt-3 xl:grid-cols-[17.5rem_minmax(0,1fr)] xl:pt-5">
           <div className="mx-auto shrink-0">
             <AllocationDonut
               rows={visibleRows}

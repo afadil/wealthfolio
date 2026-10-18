@@ -198,7 +198,7 @@ export function TargetWeightEditor({
     <div className="space-y-1 overflow-x-auto">
       <div className="min-w-[58rem]">
         {/* Column headers */}
-        <div className="text-muted-foreground text-2xs grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_28px] gap-4 border-b px-1 pb-2 font-medium uppercase tracking-wider">
+        <div className="text-muted-foreground text-2xs grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_1.75rem] gap-4 border-b px-1 pb-2 font-medium uppercase tracking-wider">
           <span>{resolvedCategoryLabel}</span>
           <span>{t("allocation:editor.todayVsTarget")}</span>
           <span className="text-right">{t("allocation:editor.current")}</span>
@@ -214,7 +214,7 @@ export function TargetWeightEditor({
             return (
               <div
                 key={row.cat.id}
-                className="hover:bg-muted/30 group grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_28px] items-center gap-4 rounded px-1 py-3"
+                className="hover:bg-muted/30 group grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_1.75rem] items-center gap-4 rounded px-1 py-3"
               >
                 {/* Name */}
                 <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export function TargetWeightEditor({
 
         {/* Total row */}
         <div className="border-t pt-3">
-          <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_28px] gap-4 px-1">
+          <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(12rem,2fr)_4.25rem_5rem_6rem_1.75rem] gap-4 px-1">
             <span className="text-sm font-medium">{t("allocation:editor.total")}</span>
             <span />
             <span />

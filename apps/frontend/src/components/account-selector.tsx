@@ -219,7 +219,7 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
 
         case "dropdown":
           return (
-            <Button variant="outline" className="w-[240px] justify-between" disabled>
+            <Button variant="outline" className="w-60 justify-between" disabled>
               <div className="flex w-full items-center gap-2">
                 <Skeleton className="h-4 w-4 rounded-full" />
                 <Skeleton className="h-4 w-36" />

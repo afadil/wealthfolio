@@ -57,7 +57,7 @@ function PerformanceLoadingSkeleton() {
           <Skeleton className="h-4 w-32" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-4">
+      <CardContent className="max-h-80 space-y-4">
         {/* Main return display skeleton */}
         <div className="flex items-baseline gap-3">
           <Skeleton className="h-10 w-28" />
@@ -241,7 +241,7 @@ function PerformanceToolUIContentImpl({ args, result, status }: PerformanceToolU
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-4 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-4 overflow-y-auto">
         {/* Primary Return Display */}
         <div className="flex flex-wrap items-baseline gap-3">
           <div className="flex items-center gap-2">

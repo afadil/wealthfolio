@@ -111,7 +111,7 @@ function MonthSwitcher({
           type="month"
           value={monthKey}
           onChange={(event) => onChange(event.target.value || current)}
-          className="text-foreground h-7 w-[110px] cursor-pointer bg-transparent text-xs outline-none"
+          className="text-foreground w-27.5 h-7 cursor-pointer bg-transparent text-xs outline-none"
         />
       </label>
       <Button

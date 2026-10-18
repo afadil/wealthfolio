@@ -346,7 +346,7 @@ export function SplitTransactionSheet({
               const showNoteInput = line.note.trim().length > 0 || expandedNoteLineIds.has(line.id);
               return (
                 <div key={line.id} className="py-2.5">
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto_96px_32px] items-start gap-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_6rem_2rem] items-start gap-2">
                     <div className="min-w-0">
                       <QuickCategorizePopover
                         scope={scopeForTaxonomy(taxonomyId)}

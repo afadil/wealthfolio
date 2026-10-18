@@ -137,7 +137,7 @@ export function AuditLogTable({ disabledNotice }: { disabledNotice?: string }) {
 
         {(logHasData || hasFilters) && (
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-[150px] lg:w-[250px]">
+            <div className="w-37.5 lg:w-62.5 relative">
               <Icons.Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
               <input
                 type="text"

@@ -46,7 +46,7 @@ export function OverallBudgetMeter({
   }, [pct]);
 
   if (isLoading) {
-    return <Skeleton className="h-[88px] w-full rounded-xl" />;
+    return <Skeleton className="h-22 w-full rounded-xl" />;
   }
 
   if (monthlyTarget <= 0) {
