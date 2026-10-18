@@ -236,7 +236,7 @@ function AccountScopeCommand({
           <CommandSeparator alwaysRender className="bg-border/70 mx-3 my-1.5" />
           <Button
             variant="ghost"
-            className={cn("h-auto w-full justify-start has-[>svg]:px-3", itemClassName)}
+            className={cn("h-auto w-full justify-start border-0 has-[>svg]:px-3", itemClassName)}
             onClick={onManagePortfolios}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") event.stopPropagation();
