@@ -22,7 +22,7 @@ const AppLayoutContent = () => {
   const { settings } = useSettingsContext();
   const location = useLocation();
   const navigation = useNavigation();
-  const { isMobile, isMacOS, isTauri } = usePlatform();
+  const { isMobile, isDesktop, isMacOS, isTauri } = usePlatform();
   const isMobileViewport = useIsMobileViewport();
   const isIPad =
     typeof window !== "undefined" &&
@@ -41,6 +41,9 @@ const AppLayoutContent = () => {
     isTauri && isMacOS && !shouldUseMobileNavigation && !hasSidebar
       ? "translateY(0.5rem)"
       : undefined;
+  // Only a desktop app window can be dragged. In a browser or on a phone the
+  // strip would just cover the top of the page's buttons.
+  const hasWindowDragRegion = isTauri && isDesktop;
   const launchBarHeight =
     !shouldUseMobileNavigation && isLaunchBar && !isFocusMode ? "56px" : undefined;
   const isAppShellReady = !!settings?.onboardingCompleted;
@@ -82,10 +85,12 @@ const AppLayoutContent = () => {
           )}
         >
           <main className="relative flex min-h-0 w-full max-w-full flex-1 flex-col overflow-x-hidden">
-            <div
-              data-tauri-drag-region="true"
-              className="draggable pointer-events-auto absolute inset-x-0 top-0 z-50 h-6 cursor-grab opacity-0"
-            ></div>
+            {hasWindowDragRegion && (
+              <div
+                data-tauri-drag-region="true"
+                className="draggable pointer-events-auto absolute inset-x-0 top-0 z-50 h-6 cursor-grab opacity-0"
+              ></div>
+            )}
             {shouldUseMobileNavigation ? (
               <MobileNavigationContainer key={pageScrollKey} />
             ) : (
