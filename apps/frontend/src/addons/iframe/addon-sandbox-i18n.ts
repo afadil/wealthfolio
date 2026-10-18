@@ -10,6 +10,7 @@ import {
   normalizeLocaleCode,
   type LocaleCode,
 } from "@/i18n/locales";
+import arUi from "@/i18n/locales/ar/ui.json";
 import deUi from "@/i18n/locales/de/ui.json";
 import enUi from "@/i18n/locales/en/ui.json";
 import esUi from "@/i18n/locales/es/ui.json";
@@ -35,6 +36,7 @@ import zhHantUi from "@/i18n/locales/zh-Hant/ui.json";
 // SUPPORTED_LOCALES without adding it here is a type error, not a silent
 // fallback to English.
 const resources: Record<LocaleCode, { ui: Record<string, unknown> }> = {
+  ar: { ui: arUi },
   de: { ui: deUi },
   en: { ui: enUi },
   es: { ui: esUi },
