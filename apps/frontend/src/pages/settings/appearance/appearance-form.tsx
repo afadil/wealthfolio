@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@wealthfolio/ui/components/ui/form";
 import { Switch } from "@wealthfolio/ui/components/ui/switch";
+import { Item, ItemActions, ItemContent, ItemTitle } from "@wealthfolio/ui/components/ui/item";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSettingsContext } from "@/lib/settings-provider";
 import { useNavigationMode } from "@/pages/layouts/navigation/navigation-mode-context";
@@ -133,20 +134,28 @@ export function AppearanceForm() {
             control={form.control}
             name="menuBarVisible"
             render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <FormLabel>{t("settings:appearance_menu_bar")}</FormLabel>
-                  <FormDescription>{t("settings:appearance_menu_bar_description")}</FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={(value) => {
-                      field.onChange(value);
-                      handlePartialUpdate({ menuBarVisible: value });
-                    }}
-                  />
-                </FormControl>
+              <FormItem>
+                <Item variant="outline" size="sm">
+                  <ItemContent>
+                    <ItemTitle>
+                      <FormLabel>{t("settings:appearance_menu_bar")}</FormLabel>
+                    </ItemTitle>
+                    <FormDescription>
+                      {t("settings:appearance_menu_bar_description")}
+                    </FormDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(value) => {
+                          field.onChange(value);
+                          handlePartialUpdate({ menuBarVisible: value });
+                        }}
+                      />
+                    </FormControl>
+                  </ItemActions>
+                </Item>
               </FormItem>
             )}
           />
