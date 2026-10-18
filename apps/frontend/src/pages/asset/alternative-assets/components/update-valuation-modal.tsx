@@ -5,6 +5,7 @@ import {
   useAmountFormatting,
   type FormattingApi,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -200,7 +201,7 @@ export function UpdateValuationModal({
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                 ) : (
                   <Icons.Check className="mr-2 h-4 w-4" />
                 )}

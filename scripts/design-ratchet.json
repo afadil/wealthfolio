@@ -143,7 +143,6 @@
     "packages/ui/src/components/ui/calendar-rac.tsx": 1,
     "packages/ui/src/components/ui/chart.tsx": 5,
     "packages/ui/src/components/ui/icons.tsx": 4,
-    "packages/ui/src/components/ui/progress-indicator.tsx": 4,
     "packages/ui/src/components/ui/star-rating.tsx": 2,
     "packages/ui/src/components/ui/tag-input.tsx": 2,
     "packages/ui/src/components/ui/tailwind-indicator.tsx": 1

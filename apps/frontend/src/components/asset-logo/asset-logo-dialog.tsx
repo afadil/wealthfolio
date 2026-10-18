@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useState } from "react";
@@ -194,7 +195,7 @@ function AssetLogoDialogBody({
         >
           {state.status === "processing" ? (
             <>
-              <Icons.Spinner className="size-3.5 animate-spin" />
+              <Spinner className="size-3.5" />
               {t("logo.processing")}
             </>
           ) : isReady ? (
@@ -262,7 +263,7 @@ function AssetLogoDialogBody({
             data-testid="asset-logo-reset"
           >
             {resetLogo.isPending ? (
-              <Icons.Spinner className="size-4 animate-spin" />
+              <Spinner className="size-4" />
             ) : (
               <Icons.RotateCcw className="size-4" />
             )}
@@ -287,7 +288,7 @@ function AssetLogoDialogBody({
             onClick={handleSave}
             data-testid="asset-logo-save"
           >
-            {setLogo.isPending && <Icons.Spinner className="size-4 animate-spin" />}
+            {setLogo.isPending && <Spinner className="size-4" />}
             {t("logo.save")}
           </Button>
         </div>

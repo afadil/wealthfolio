@@ -17,6 +17,7 @@ import {
   useAmountFormatting,
   useNumberFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
@@ -652,7 +653,7 @@ function StressTestsSection({
       {loading && (
         <div className="space-y-3">
           <p className="text-muted-foreground flex items-center gap-2 text-xs">
-            <Icons.Spinner className="size-3 animate-spin" />
+            <Spinner className="size-3" />
             {t("goals:risk_lab.stress.running")}
           </p>
           <div className="grid gap-3 lg:grid-cols-2">
@@ -1014,7 +1015,7 @@ function MonteCarloDistributionSection({
           <div className="bg-muted/20 m-5 rounded-xl border md:m-6">
             <div className="flex min-h-44 flex-col items-center justify-center px-5 py-8 text-center">
               <span className="flex size-11 items-center justify-center rounded-full bg-[hsl(91,34%,29%)]/10 text-[hsl(91,34%,29%)]">
-                <Icons.Spinner className="size-5 animate-spin" />
+                <Spinner className="size-5" />
               </span>
               <p className="mt-4 text-sm font-semibold">
                 {t("goals:risk_lab.montecarlo.running_title")}
@@ -1627,7 +1628,7 @@ function SensitivityLoadingCard({ title, description }: { title: string; descrip
             <CardTitle className="text-base">{title}</CardTitle>
             <p className="text-muted-foreground mt-1 text-sm">{description}</p>
           </div>
-          <Icons.Spinner className="text-muted-foreground mt-1 size-4 animate-spin" />
+          <Spinner className="text-muted-foreground mt-1 size-4" />
         </div>
       </CardHeader>
       <CardContent className="space-y-2 p-5">
@@ -1938,7 +1939,7 @@ function AdvancedSection({
               {canRunSorr && (
                 <Button size="sm" onClick={onRunSorr} disabled={sorrRunning} className="shrink-0">
                   {sorrRunning ? (
-                    <Icons.Spinner className="mr-2 size-3.5 animate-spin" />
+                    <Spinner className="mr-2 size-3.5" />
                   ) : (
                     <Icons.RefreshCw className="mr-2 size-3.5" />
                   )}

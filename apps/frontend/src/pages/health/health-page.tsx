@@ -17,6 +17,7 @@ import {
   TooltipContent,
   TooltipTrigger,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import { useState } from "react";
@@ -162,7 +163,7 @@ function HealthIssueRow({
             disabled={isFixing}
           >
             {isFixing ? (
-              <Icons.Spinner className="h-3 w-3 animate-spin" />
+              <Spinner className="h-3 w-3" />
             ) : (
               <>
                 <Icons.Wand2 className="mr-1 h-3 w-3" />
@@ -181,11 +182,7 @@ function HealthIssueRow({
           }}
           disabled={isDismissing}
         >
-          {isDismissing ? (
-            <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Icons.X className="h-3.5 w-3.5" />
-          )}
+          {isDismissing ? <Spinner className="h-3.5 w-3.5" /> : <Icons.X className="h-3.5 w-3.5" />}
         </Button>
       </div>
     </div>
@@ -295,7 +292,7 @@ export default function HealthPage() {
         className="h-8"
       >
         {runChecksMutation.isPending ? (
-          <Icons.Spinner className="h-4 w-4 animate-spin" />
+          <Spinner className="h-4 w-4" />
         ) : (
           <Icons.RefreshCw className="h-4 w-4" />
         )}

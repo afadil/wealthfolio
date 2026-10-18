@@ -1,7 +1,7 @@
 import { ActivityType } from "@/lib/constants";
 import type { ActivityDetails } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
-import { Button, Icons, useAmountFormatting, useDateFormatting } from "@wealthfolio/ui";
+import { Button, Icons, useAmountFormatting, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -115,7 +115,7 @@ export function LinkTransferModal({
           <AlertDialogCancel disabled={isProcessing}>{t("common:cancel")}</AlertDialogCancel>
           <Button onClick={onConfirm} disabled={isProcessing}>
             {isProcessing ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : isUnlinkMode ? (
               <Icons.Unlink className="mr-2 h-4 w-4" />
             ) : (

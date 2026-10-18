@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Alert, AlertDescription } from "@wealthfolio/ui/components/ui/alert";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
-import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui";
+import { Card, CardContent, CardHeader, CardTitle, Spinner } from "@wealthfolio/ui";
 
 export interface ToolCardProps {
   title: string;
@@ -49,7 +49,7 @@ export function ToolCard({
               {children}
               {isLoading && (
                 <div className="bg-background/60 absolute inset-0 flex items-center justify-center backdrop-blur-sm">
-                  <Icons.Spinner className="text-muted-foreground size-6 animate-spin" />
+                  <Spinner className="text-muted-foreground size-6" />
                 </div>
               )}
             </>

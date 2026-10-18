@@ -21,6 +21,7 @@ import {
   useNumberFormatting,
   type FormattingApi,
   buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import { useCashActivitySearch } from "../../hooks/use-cash-activity-search";
@@ -448,7 +449,7 @@ export function CategoryTransactionsSheet({
                 >
                   {isFetchingNextPage ? (
                     <>
-                      <Icons.Spinner className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden />
+                      <Spinner className="mr-2 h-3.5 w-3.5" aria-hidden />
                       {t("spending:categorySheet.loading")}
                     </>
                   ) : (

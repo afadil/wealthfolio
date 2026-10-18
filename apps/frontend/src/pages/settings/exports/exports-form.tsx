@@ -7,6 +7,7 @@ import { ExportDataType, ExportedFileFormat } from "@/lib/types";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useExportData } from "./use-export-data";
+import { Spinner } from "@wealthfolio/ui";
 
 export const ExportForm = () => {
   const { t } = useTranslation();
@@ -122,7 +123,7 @@ export const ExportForm = () => {
                   exportingFormat === selectedFormat &&
                   exportingData === item.key ? (
                     <>
-                      <Icons.Spinner className="h-4 w-4 animate-spin" />
+                      <Spinner className="h-4 w-4" />
                       <span className="sr-only">
                         {t("settings:export_exporting_item", { name: item.name })}
                       </span>

@@ -34,6 +34,7 @@ import {
   SheetHeader,
   SheetTitle,
   type Icon,
+  Spinner,
 } from "@wealthfolio/ui";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -272,7 +273,7 @@ export function AppLauncher() {
         title: t("common:component.update_quotes"),
         href: "#update-portfolio",
         icon: isUpdatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Refresh className="size-6" />
         ),
@@ -286,7 +287,7 @@ export function AppLauncher() {
         title: t("common:component.rebuild_full_history"),
         href: "#recalculate-portfolio",
         icon: isRecalculatingPortfolio ? (
-          <Icons.Spinner className="size-6 animate-spin" />
+          <Spinner className="size-6" />
         ) : (
           <Icons.Clock className="size-6" />
         ),

@@ -23,6 +23,7 @@ import {
   FormDescription,
   DatePickerInput,
   Input,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import { newContributionLimitSchema } from "@/lib/schemas";
@@ -267,7 +268,7 @@ export function ContributionLimitForm({
               {addContributionLimitMutation.isPending ||
               updateContributionLimitMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {defaultValues?.id
                     ? t("settings:limits_form_updating")
                     : t("settings:limits_form_saving")}

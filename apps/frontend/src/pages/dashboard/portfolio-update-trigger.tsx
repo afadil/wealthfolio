@@ -3,7 +3,7 @@ import {
   useUpdatePortfolioMutation,
 } from "@/hooks/use-calculate-portfolio";
 import { formatDateTime } from "@/lib/utils";
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import {
@@ -87,7 +87,7 @@ export function PortfolioUpdateTrigger({
             disabled={updatePortfolioMutation.isPending} // Use internal mutation state
           >
             {updatePortfolioMutation.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}
@@ -103,7 +103,7 @@ export function PortfolioUpdateTrigger({
             disabled={recalculatePortfolioMutation.isPending}
           >
             {recalculatePortfolioMutation.isPending ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Clock className="mr-2 h-4 w-4" />
             )}

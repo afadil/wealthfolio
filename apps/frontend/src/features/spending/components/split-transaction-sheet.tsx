@@ -16,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import {
@@ -460,7 +461,7 @@ export function SplitTransactionSheet({
           {isMobile ? (
             <div className="flex w-full flex-col gap-2">
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
               <div className="flex gap-2">
@@ -508,7 +509,7 @@ export function SplitTransactionSheet({
                 {t("common:cancel")}
               </Button>
               <Button type="button" onClick={handleSave} disabled={!canSave || isSaving}>
-                {isSaving && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving && <Spinner className="mr-2 h-4 w-4" />}
                 {t("common:save")}
               </Button>
             </>

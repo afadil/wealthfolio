@@ -16,6 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
   useBalancePrivacy,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import { cn } from "@/lib/utils";
@@ -344,10 +345,7 @@ export function TransactionsFilterBar({
         <span className="text-muted-foreground inline-flex items-center gap-1.5 whitespace-nowrap text-xs tabular-nums">
           {countLabel}
           {isRefreshing && (
-            <Icons.Spinner
-              className="h-3 w-3 animate-spin"
-              aria-label={t("spending:filters.refreshing")}
-            />
+            <Spinner className="h-3 w-3" aria-label={t("spending:filters.refreshing")} />
           )}
         </span>
       </div>

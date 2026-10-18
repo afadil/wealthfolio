@@ -12,6 +12,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { Account } from "@/lib/types";
 import { useImportContext, reset, setStep } from "../context";
 import { ImportAlert } from "../components/import-alert";
+import { Spinner } from "@wealthfolio/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Animation Variants
@@ -137,7 +138,7 @@ export function ContextResultStep() {
   if (!importResult) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <Icons.Spinner className="text-primary h-8 w-8 animate-spin" />
+        <Spinner className="text-primary h-8 w-8" />
         <p className="text-muted-foreground mt-4">{t("activity:import.result.loading")}</p>
       </div>
     );

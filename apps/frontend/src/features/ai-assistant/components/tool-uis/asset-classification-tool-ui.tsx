@@ -17,6 +17,7 @@ import {
   useDateFormatting,
   useNumberFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import type { TFunction } from "i18next";
@@ -190,7 +191,7 @@ function AssetClassificationLoadingState() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{t("ai:assetClassification.preparing")}</p>
         </div>
-        <Icons.Spinner className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" />
+        <Spinner className="text-muted-foreground h-4 w-4 shrink-0" />
       </CardContent>
     </Card>
   );
@@ -871,7 +872,7 @@ export function AssetClassificationToolUIContentImpl({
           </div>
           <Button size="sm" onClick={handleConfirm} disabled={!canConfirm}>
             {isSubmitting ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : isApplied ? (
               <Icons.Check className="mr-2 h-4 w-4" />
             ) : null}

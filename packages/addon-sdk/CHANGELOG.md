@@ -178,6 +178,11 @@ and this project adheres to
   instead of a border. Select and command rows have 12 px corners and `py-2`
   (command rows `px-3`); select rows keep `pl-2` so their text lines up with the
   field when the list opens over it.
+- `Spinner`, shadcn's spinner on the Loader2 icon. It is decorative
+  (`aria-hidden`) unless you pass a translated `aria-label`, which makes it a
+  `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
+  close button), with a primary progress bar instead of a red-to-yellow
+  gradient.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve

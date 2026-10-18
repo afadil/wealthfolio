@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, AlertDescription, AlertTitle } from "@wealthfolio/ui/components/ui/alert";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Spinner } from "@wealthfolio/ui";
 
 interface ValidationAlertProps {
   success: boolean;
@@ -71,7 +72,7 @@ const ValidationAlert: React.FC<ValidationAlertProps> = ({
           <Button onClick={onConfirm} disabled={isConfirming}>
             {isConfirming ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 <span className="hidden sm:ml-2 sm:inline">
                   {t("activity:import.validationAlert.importing")}
                 </span>

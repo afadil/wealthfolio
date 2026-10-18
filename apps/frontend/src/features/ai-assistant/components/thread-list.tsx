@@ -18,6 +18,7 @@ import {
   useToggleThreadPin,
 } from "../hooks/use-threads";
 import type { ChatThread } from "../types";
+import { Spinner } from "@wealthfolio/ui";
 
 /** Debounce delay for search input (ms) */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -267,14 +268,14 @@ const ThreadListItems: FC<ThreadListItemsProps> = ({
       {/* Loading indicator for next page */}
       {isFetchingNextPage && (
         <div className="flex items-center justify-center py-2">
-          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+          <Spinner className="text-muted-foreground size-4" />
         </div>
       )}
 
       {/* Show subtle loading indicator while refetching */}
       {isFetching && !isFetchingNextPage && !isLoading && (
         <div className="flex items-center justify-center py-1">
-          <Icons.Spinner className="text-muted-foreground size-3 animate-spin" />
+          <Spinner className="text-muted-foreground size-3" />
         </div>
       )}
     </div>
@@ -344,7 +345,7 @@ const ThreadListItemCustom: FC<ThreadListItemCustomProps> = ({
       </button>
       {isLoading ? (
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center">
-          <Icons.Spinner className="text-muted-foreground size-4 animate-spin" />
+          <Spinner className="text-muted-foreground size-4" />
         </div>
       ) : (
         <div className="pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">

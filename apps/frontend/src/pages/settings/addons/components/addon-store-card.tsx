@@ -17,6 +17,7 @@ import {
   Icons,
   StarRatingDisplay,
   buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -207,7 +208,7 @@ export function AddonStoreCard({
                   >
                     {isInstalling ? (
                       <>
-                        <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                        <Spinner className="mr-2 h-4 w-4" />
                         {t("settings:addon_card_installing")}
                       </>
                     ) : isInstalled ? (
@@ -246,7 +247,7 @@ export function AddonStoreCard({
             >
               {isInstalling ? (
                 <>
-                  <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("settings:addon_card_installing")}
                 </>
               ) : listing.status !== "active" ? (
@@ -413,7 +414,7 @@ export function AddonStoreCard({
                 >
                   {isInstalling ? (
                     <>
-                      <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                      <Spinner className="mr-2 h-4 w-4" />
                       {t("settings:addon_card_installing")}
                     </>
                   ) : isInstalled ? (
@@ -466,7 +467,7 @@ export function AddonStoreCard({
           >
             {isInstalling ? (
               <>
-                <Icons.Loader className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("settings:addon_card_installing")}
               </>
             ) : listing.status !== "active" ? (

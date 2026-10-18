@@ -45,7 +45,7 @@ import { QueryKeys } from "@/lib/query-keys";
 import type { Asset } from "@/lib/types";
 import type { CustomProviderWithSources } from "@/lib/types/custom-provider";
 import { cn } from "@/lib/utils";
-import { ActionConfirm, useDateFormatting } from "@wealthfolio/ui";
+import { ActionConfirm, useDateFormatting, Spinner } from "@wealthfolio/ui";
 import {
   Collapsible,
   CollapsibleContent,
@@ -427,7 +427,7 @@ function ProviderSettings({
                           }
                         >
                           {isLoadingKey ? (
-                            <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                            <Spinner className="h-3.5 w-3.5" />
                           ) : showApiKey ? (
                             <Icons.EyeOff className="h-3.5 w-3.5" />
                           ) : (
@@ -911,7 +911,7 @@ export default function MarketDataSettingsPage() {
               }
             >
               {isRecalculating ? (
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                <Spinner className="h-4 w-4" />
               ) : (
                 <Icons.History className="h-4 w-4" />
               )}
@@ -955,11 +955,7 @@ export default function MarketDataSettingsPage() {
             onClick={() => updatePortfolio()}
             aria-label={t("settings:market_data_page.update_aria")}
           >
-            {isUpdating ? (
-              <Icons.Spinner className="h-4 w-4 animate-spin" />
-            ) : (
-              <Icons.Refresh className="h-4 w-4" />
-            )}
+            {isUpdating ? <Spinner className="h-4 w-4" /> : <Icons.Refresh className="h-4 w-4" />}
           </Button>
 
           <Button
@@ -969,7 +965,7 @@ export default function MarketDataSettingsPage() {
             onClick={() => updatePortfolio()}
           >
             {isUpdating ? (
-              <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+              <Spinner className="mr-2 h-4 w-4" />
             ) : (
               <Icons.Refresh className="mr-2 h-4 w-4" />
             )}

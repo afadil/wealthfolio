@@ -3,7 +3,7 @@ import { clearAddonStaging, downloadAddonForReview, installFromStaging } from "@
 import { reloadAllAddons } from "@/addons/addons-core";
 import { ExternalLink } from "@/components/external-link";
 import type { AddonUpdateInfo, Permission, RiskLevel } from "@wealthfolio/addon-sdk";
-import { useDateFormatting, buttonVariants } from "@wealthfolio/ui";
+import { useDateFormatting, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -231,7 +231,7 @@ export function AddonUpdateCard({
             <Button onClick={handleUpdate} disabled={isUpdating || disabled} size="sm">
               {isUpdating ? (
                 <>
-                  <Icons.Loader className="mr-1 h-3 w-3 animate-spin" />
+                  <Spinner className="mr-1 h-3 w-3" />
                   {t("settings:addon_update_updating")}
                 </>
               ) : (

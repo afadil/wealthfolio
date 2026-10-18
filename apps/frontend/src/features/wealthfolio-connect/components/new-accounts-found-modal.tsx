@@ -3,7 +3,7 @@ import { ExternalLink } from "@/components/external-link";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Input } from "@wealthfolio/ui/components/ui/input";
 import { Label } from "@wealthfolio/ui/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui";
+import { RadioGroup, RadioGroupItem, Spinner } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import {
   Sheet,
@@ -257,7 +257,7 @@ export function NewAccountsFoundModal({
           <Button onClick={handleSaveAndSync} disabled={isSaving}>
             {isSaving ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("connect:newAccounts.saving")}
               </>
             ) : (

@@ -4,6 +4,7 @@ import {
   MoneyInput,
   QuantityInput,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -732,7 +733,7 @@ export const HoldingsEditMode = ({
             <Button onClick={handleSave} disabled={isSaving || isDeleting || !hasChanges}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:saving")}
                 </>
               ) : (
@@ -782,7 +783,7 @@ export const HoldingsEditMode = ({
             >
               {isDeleting ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("holdings:deleting")}
                 </>
               ) : (

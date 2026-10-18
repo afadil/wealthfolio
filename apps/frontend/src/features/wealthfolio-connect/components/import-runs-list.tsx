@@ -1,4 +1,4 @@
-import { useDateFormatting } from "@wealthfolio/ui";
+import { useDateFormatting, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
 import {
@@ -44,7 +44,7 @@ export function ImportRunsList({ runs, isLoading }: ImportRunsListProps) {
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Icons.Spinner className="text-muted-foreground h-6 w-6 animate-spin" />
+            <Spinner className="text-muted-foreground h-6 w-6" />
           </div>
         </CardContent>
       </Card>

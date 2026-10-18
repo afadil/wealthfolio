@@ -8,6 +8,7 @@ import {
   useLocalizationSettings,
   useNumberFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -467,7 +468,7 @@ export function ProviderSettingsCard({
                           }
                         >
                           {isLoadingKey ? (
-                            <Icons.Spinner className="h-4 w-4 animate-spin" />
+                            <Spinner className="h-4 w-4" />
                           ) : showApiKey ? (
                             <Icons.EyeOff className="h-4 w-4" />
                           ) : (
@@ -509,7 +510,7 @@ export function ProviderSettingsCard({
                             }
                           >
                             {isFetchingModels ? (
-                              <Icons.Spinner className="h-3 w-3 animate-spin" />
+                              <Spinner className="h-3 w-3" />
                             ) : (
                               <Icons.RefreshCw className="h-3 w-3" />
                             )}
@@ -534,7 +535,7 @@ export function ProviderSettingsCard({
                                 <CommandEmpty>
                                   {isFetchingModels ? (
                                     <div className="flex items-center justify-center gap-2 py-2">
-                                      <Icons.Spinner className="h-4 w-4 animate-spin" />
+                                      <Spinner className="h-4 w-4" />
                                       <span>{t("ai:providerSettings.loading")}</span>
                                     </div>
                                   ) : (

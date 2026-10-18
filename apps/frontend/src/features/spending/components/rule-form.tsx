@@ -20,6 +20,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from "@wealthfolio/ui";
 
 import type { CategorizationRule, RuleAmountOp, RuleMatchType } from "../types/rule";
@@ -577,7 +578,7 @@ export function RuleForm({
           <Button type="submit" disabled={isLoading}>
             {isLoading ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("spending:common.saving")}
               </>
             ) : rule ? (

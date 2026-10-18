@@ -32,6 +32,7 @@ import {
   SwipableView,
   useDateFormatting,
   type FormattingApi,
+  Spinner,
 } from "@wealthfolio/ui";
 import {
   AlertDialog,
@@ -256,7 +257,7 @@ function AssetHealthBanner({
               onClick={onRefreshPrices}
             >
               {isRefreshingPrices ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Refresh className="mr-2 h-4 w-4" />
               )}
@@ -1121,7 +1122,7 @@ export const AssetProfilePage = () => {
     return (
       <Page>
         <PageContent>
-          <Icons.Spinner className="h-6 w-6 animate-spin" />
+          <Spinner className="h-6 w-6" />
         </PageContent>
       </Page>
     ); // Show loading spinner

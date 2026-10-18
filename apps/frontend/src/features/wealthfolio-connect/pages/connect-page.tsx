@@ -31,7 +31,7 @@ import { InfoIcon } from "@phosphor-icons/react/dist/csr/Info";
 import { WarningIcon } from "@phosphor-icons/react/dist/csr/Warning";
 import { XCircleIcon } from "@phosphor-icons/react/dist/csr/XCircle";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocalizationSettings, buttonVariants } from "@wealthfolio/ui";
+import { useLocalizationSettings, buttonVariants, Spinner } from "@wealthfolio/ui";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card } from "@wealthfolio/ui/components/ui/card";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
@@ -265,7 +265,7 @@ export default function ConnectPage() {
             >
               {isSyncRunning ? (
                 <>
-                  <Icons.Spinner className="h-4 w-4 animate-spin sm:mr-2" />
+                  <Spinner className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">{t("connect:sync.syncingShort")}</span>
                 </>
               ) : (
@@ -1093,7 +1093,7 @@ function SyncHistoryItem({
         >
           {description}
         </span>
-        {isRunning && <Icons.Spinner className="h-3 w-3 animate-spin" />}
+        {isRunning && <Spinner className="h-3 w-3" />}
       </div>
       {canReviewActivities && (
         <Link

@@ -17,6 +17,7 @@ import {
   SelectValue,
   Skeleton,
   buttonVariants,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 
@@ -426,7 +427,7 @@ function ImportCsvToolUIContentImpl({
               disabled={!session.canConfirm || session.isSubmitting}
             >
               {session.isSubmitting ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Download className="mr-2 h-4 w-4" />
               )}

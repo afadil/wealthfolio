@@ -17,6 +17,7 @@ import {
   Skeleton,
   Tabs,
   TabsContent,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
@@ -288,7 +289,7 @@ export default function GoalDetailPage() {
             >
               {deleteMutation.isPending ? (
                 <>
-                  <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-2 h-4 w-4" />
                   {t("goals:detail.deleting")}
                 </>
               ) : (

@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "@/lib/utils";
-import { useDateFormatting, useLocalizationSettings } from "@wealthfolio/ui";
+import { useDateFormatting, useLocalizationSettings, Spinner } from "@wealthfolio/ui";
 import { Badge } from "@wealthfolio/ui/components/ui/badge";
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@wealthfolio/ui/components/ui/card";
@@ -120,7 +120,7 @@ export function SyncHistory({ pageSize = 10 }: SyncHistoryProps) {
           >
             {isFetchingNextPage ? (
               <>
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
                 {t("common:loading")}
               </>
             ) : (

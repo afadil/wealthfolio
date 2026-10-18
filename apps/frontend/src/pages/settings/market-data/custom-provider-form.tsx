@@ -19,7 +19,7 @@ import { Input } from "@wealthfolio/ui/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@wealthfolio/ui/components/ui/radio-group";
 import { Textarea } from "@wealthfolio/ui/components/ui/textarea";
 import { toast } from "@wealthfolio/ui/components/ui/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@wealthfolio/ui";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, Spinner } from "@wealthfolio/ui";
 
 import { ExternalLink } from "@/components/external-link";
 import { useCreateCustomProvider, useUpdateCustomProvider } from "@/hooks/use-custom-providers";
@@ -872,7 +872,7 @@ function CustomProviderFormContent({
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <Icons.Spinner className="mr-1.5 h-4 w-4 animate-spin" />
+                  <Spinner className="mr-1.5 h-4 w-4" />
                   {t("settings:market_data_page.saving")}
                 </>
               ) : (

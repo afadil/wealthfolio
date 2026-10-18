@@ -11,6 +11,7 @@ import {
   FormMessage,
   MoneyInput,
   useAmountFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { AnimatedToggleGroup } from "@wealthfolio/ui/components/ui/animated-toggle-group";
 import { Button } from "@wealthfolio/ui/components/ui/button";
@@ -990,7 +991,7 @@ export function TransferForm({
             </Button>
           )}
           <Button type="submit" disabled={isLoading}>
-            {isLoading && <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading && <Spinner className="mr-2 h-4 w-4" />}
             {isEditing ? (
               <Icons.Check className="mr-2 h-4 w-4" />
             ) : (

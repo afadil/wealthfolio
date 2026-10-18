@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Icons,
+  Spinner,
 } from "@wealthfolio/ui";
 import type { Table } from "@tanstack/react-table";
 import { useTranslation } from "react-i18next";
@@ -254,7 +255,7 @@ export function ActivityDataGridToolbar({
                 disabled={!canUnlinkSelected || isUnlinking || isSaving}
               >
                 {isUnlinking ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Unlink className="h-3.5 w-3.5" />
                 )}
@@ -275,7 +276,7 @@ export function ActivityDataGridToolbar({
                 disabled={!canLinkSelected || isLinking || isSaving}
               >
                 {isLinking ? (
-                  <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   <Icons.Link className="h-3.5 w-3.5" />
                 )}
@@ -309,7 +310,7 @@ export function ActivityDataGridToolbar({
               disabled={isSaving}
             >
               {isSaving ? (
-                <Icons.Spinner className="h-3.5 w-3.5 animate-spin" />
+                <Spinner className="h-3.5 w-3.5" />
               ) : (
                 <Icons.Save className="h-3.5 w-3.5" />
               )}

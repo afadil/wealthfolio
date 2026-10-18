@@ -13,6 +13,7 @@ import {
   FacetedFilter,
   FacetedSearchInput,
   Icons,
+  Spinner,
 } from "@wealthfolio/ui";
 import type { ActivityStatusFilter } from "../hooks/use-activity-search";
 
@@ -233,7 +234,7 @@ export function ActivityViewControls({
           <span className="text-muted-foreground text-xs">
             {isFetching ? (
               <span className="inline-flex items-center gap-1">
-                <Icons.Spinner className="h-4 w-4 animate-spin" />
+                <Spinner className="h-4 w-4" />
                 {t("activity:loading")}
               </span>
             ) : (

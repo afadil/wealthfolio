@@ -19,6 +19,7 @@ import {
   Checkbox,
   useAmountFormatting,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { memo, useEffect, useMemo, useState } from "react";
@@ -77,7 +78,7 @@ function ProposalsLoadingState() {
             {t("ai:categorization.categorizingHint")}
           </p>
         </div>
-        <Icons.Spinner className="text-muted-foreground h-4 w-4 shrink-0 animate-spin" />
+        <Spinner className="text-muted-foreground h-4 w-4 shrink-0" />
       </CardContent>
     </Card>
   );
@@ -493,7 +494,7 @@ function CategorizationProposalsContentImpl({
           <div className="flex items-center justify-end px-6 pt-1">
             <Button onClick={handleSubmit} disabled={!canSubmit}>
               {isSubmitting ? (
-                <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner className="mr-2 h-4 w-4" />
               ) : (
                 <Icons.Check className="mr-2 h-4 w-4" />
               )}

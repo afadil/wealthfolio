@@ -1,5 +1,6 @@
 import { CloudWarningIcon } from "@phosphor-icons/react/dist/csr/CloudWarning";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
+import { Spinner } from "@wealthfolio/ui/components/ui/spinner";
 import { cn } from "@wealthfolio/ui/lib/utils";
 import type { AggregatedSyncStatus } from "../types";
 
@@ -13,12 +14,7 @@ export function SyncStatusIcon({ status, className }: SyncStatusIconProps) {
 
   if (status === "restoring")
     return (
-      <Icons.Spinner
-        className={cn(
-          iconClassName,
-          "text-muted-foreground animate-spin motion-reduce:animate-none",
-        )}
-      />
+      <Spinner className={cn(iconClassName, "text-muted-foreground motion-reduce:animate-none")} />
     );
   if (status === "subscription_required" || status === "unavailable") {
     return <CloudWarningIcon weight="duotone" className={cn(iconClassName, "text-warning")} />;

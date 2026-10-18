@@ -1,6 +1,7 @@
 import { Button } from "@wealthfolio/ui/components/ui/button";
 import { Icons } from "@wealthfolio/ui/components/ui/icons";
 import { useTranslation } from "react-i18next";
+import { Spinner } from "@wealthfolio/ui";
 
 interface StartupErrorProps {
   error?: Error | null;
@@ -31,7 +32,7 @@ export function StartupError({ error, isRetrying = false, onRetry }: StartupErro
 
         <Button onClick={onRetry} disabled={isRetrying}>
           {isRetrying ? (
-            <Icons.Spinner className="mr-2 h-4 w-4 animate-spin" />
+            <Spinner className="mr-2 h-4 w-4" />
           ) : (
             <Icons.RefreshCw className="mr-2 h-4 w-4" />
           )}

@@ -13,7 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@wealthfolio/ui/components/ui/popover";
 import { Skeleton } from "@wealthfolio/ui/components/ui/skeleton";
 import { Input } from "@wealthfolio/ui/components/ui/input";
-import { Icons } from "@wealthfolio/ui";
+import { Icons, Spinner } from "@wealthfolio/ui";
 import { cn } from "@/lib/utils";
 import {
   useTaxonomy,
@@ -311,7 +311,7 @@ export function MultiSelectTaxonomy({
                       disabled={isPending}
                     >
                       {isPending ? (
-                        <Icons.Loader className="h-3 w-3 animate-spin" />
+                        <Spinner className="h-3 w-3" />
                       ) : (
                         <Icons.Check className="h-3 w-3" />
                       )}

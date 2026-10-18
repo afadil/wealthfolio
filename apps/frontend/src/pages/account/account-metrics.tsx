@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
   useDateFormatting,
+  Spinner,
 } from "@wealthfolio/ui";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,11 +50,7 @@ const EditableBalance: React.FC<EditableBalanceProps> = ({ account, initialBalan
       <div className="flex items-center gap-2">
         <MoneyInput value={balance} onValueChange={(value) => setBalance(value ?? 0)} />
         <Button size="sm" onClick={handleSave} disabled={isPending}>
-          {isPending ? (
-            <Icons.Spinner className="h-4 w-4 animate-spin" />
-          ) : (
-            <Icons.Check className="h-4 w-4" />
-          )}
+          {isPending ? <Spinner className="h-4 w-4" /> : <Icons.Check className="h-4 w-4" />}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
           <Icons.Close className="h-4 w-4" />
@@ -308,7 +305,7 @@ const AccountMetrics: React.FC<AccountMetricsProps> = ({
                   }
                 >
                   {balanceWarning.isLoading ? (
-                    <Icons.Spinner className="size-4 animate-spin" />
+                    <Spinner className="size-4" />
                   ) : (
                     <Icons.AlertCircle className="size-4" />
                   )}
