@@ -78,9 +78,10 @@ export function MappingHeaderCell({
             handleColumnMapping(field, val === SKIP_FIELD_VALUE ? "" : val);
             setEditingHeader(null);
           }}
-          value={displayHeader || SKIP_FIELD_VALUE}
-          // Required fields have no skip item, so an unmapped one shows an empty trigger.
-          items={{ [SKIP_FIELD_VALUE]: isRequired ? "" : skipLabel }}
+          // A required field has no skip item: unmapped, its value is null so the
+          // trigger shows the "Select column" placeholder instead of an empty label.
+          value={displayHeader || (isRequired ? null : SKIP_FIELD_VALUE)}
+          items={isRequired ? undefined : { [SKIP_FIELD_VALUE]: skipLabel }}
           onOpenChange={(open) => !open && setEditingHeader(null)}
         >
           <SelectTrigger className={cn(MAPPING_TRIGGER_CLASS, "text-muted-foreground !h-8 w-full")}>
