@@ -272,15 +272,13 @@ export const AccountSelector = forwardRef<HTMLButtonElement, AccountSelectorProp
                       initial="initial"
                       animate="animate"
                       exit="exit"
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 shadow-sm dark:bg-green-900/20"
+                      className="bg-success-subtle flex h-8 w-8 items-center justify-center rounded-full shadow-sm"
                     >
                       <motion.div variants={iconVariants} initial="initial" animate="animate">
                         {(() => {
                           const IconComponent =
                             accountTypeIcons[selectedAccount.accountType] ?? Icons.CreditCard;
-                          return (
-                            <IconComponent className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          );
+                          return <IconComponent className="text-success h-4 w-4" />;
                         })()}
                       </motion.div>
                     </motion.div>

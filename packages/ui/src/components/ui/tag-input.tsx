@@ -56,7 +56,7 @@ const InputTags = React.forwardRef<HTMLInputElement, InputTagsProps>(
           </Badge>
         ))}
         <input
-          className="flex-1 outline-none placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
+          className="placeholder:text-muted-foreground flex-1 outline-none"
           value={pendingDataPoint}
           onChange={(e) => setPendingDataPoint(e.target.value)}
           onKeyDown={(e) => {
