@@ -192,7 +192,7 @@ export const EventsCalendarCard: FC<Props> = ({
                       : formatting.formatAmount(bar.event.totalSpending, currency)
                   }`}
                   className={cn(
-                    "text-2xs min-h-[16px] truncate rounded-sm px-1 text-left leading-[16px]",
+                    "text-2xs min-h-4 truncate rounded-sm px-1 text-left leading-[1rem]",
                     isSel ? "font-semibold" : "hover:brightness-95",
                   )}
                   style={{

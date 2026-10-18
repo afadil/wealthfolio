@@ -170,7 +170,7 @@ export function TopMoversCard({ holdings, currency, isLoading }: HighlightProps)
                             : null
                         }
                         variant="badge"
-                        className="min-w-[60px] justify-center text-xs"
+                        className="min-w-15 justify-center text-xs"
                       />
                     )}
                   </HoldingRow>

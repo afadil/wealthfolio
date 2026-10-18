@@ -395,7 +395,7 @@ export function BudgetLineChartCard({
         <svg
           viewBox={`0 0 ${chartW} ${chartH}`}
           preserveAspectRatio="none"
-          className="block h-[110px] w-full"
+          className="h-27.5 block w-full"
         >
           {targetPacePath ? (
             <path
@@ -439,7 +439,7 @@ export function BudgetLineChartCard({
           // SVG uses preserveAspectRatio="none", which would stretch a circle
           // into an ellipse.
           <div
-            className="absolute h-[9px] w-[9px] rounded-full bg-white"
+            className="absolute h-[0.5625rem] w-[0.5625rem] rounded-full bg-white"
             style={{
               left: `${pillLeftPctRaw}%`,
               top: `${endY}px`,
@@ -674,7 +674,7 @@ function BudgetCardHeaderActions({
         >
           <Icons.ChevronLeft className="h-3.5 w-3.5" />
         </button>
-        <span className="text-foreground text-2xs min-w-[74px] px-1 text-center font-medium tabular-nums">
+        <span className="text-foreground text-2xs min-w-18.5 px-1 text-center font-medium tabular-nums">
           {monthLabel}
         </span>
         <button

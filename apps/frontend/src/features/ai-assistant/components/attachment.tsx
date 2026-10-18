@@ -231,7 +231,7 @@ const AttachmentUI: FC = () => {
               ) : (
                 <div
                   className={cn(
-                    "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[14px] border transition-opacity hover:opacity-75",
+                    "aui-attachment-tile bg-muted size-14 cursor-pointer overflow-hidden rounded-[0.875rem] border transition-opacity hover:opacity-75",
                     isComposer && "aui-attachment-tile-composer border-foreground/20",
                   )}
                   role="button"
@@ -307,7 +307,7 @@ export const ComposerAddAttachment: FC = () => {
         side="bottom"
         variant="ghost"
         size="icon"
-        className="aui-composer-add-attachment hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-[34px] rounded-full p-1 text-xs font-semibold"
+        className="aui-composer-add-attachment hover:bg-muted-foreground/15 dark:border-muted-foreground/15 dark:hover:bg-muted-foreground/30 size-8.5 rounded-full p-1 text-xs font-semibold"
         aria-label={t("ai:attachment.addAttachment")}
       >
         <Icons.Plus className="aui-attachment-add-icon size-5 stroke-[1.5px]" />

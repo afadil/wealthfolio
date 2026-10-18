@@ -63,7 +63,7 @@ export function TimezoneInput({ value, onChange, timezones, placeholder }: Timez
         <span className="truncate">{buttonLabel}</span>
         <Icons.ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
       </PopoverTrigger>
-      <PopoverContent className="w-[360px] max-w-[calc(100vw-2rem)] p-0">
+      <PopoverContent className="w-90 max-w-[calc(100vw-2rem)] p-0">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t("settings:tz_search_placeholder")}

@@ -416,7 +416,7 @@ function PlanResilienceHero({
                 </span>
                 .
               </h2>
-              <p className="text-muted-foreground mt-4 max-w-[620px] text-sm leading-relaxed xl:max-w-4xl">
+              <p className="text-muted-foreground max-w-155 mt-4 text-sm leading-relaxed xl:max-w-4xl">
                 {risk}
               </p>
             </div>
@@ -983,7 +983,7 @@ function MonteCarloDistributionSection({
             <CardTitle className="mt-2 font-serif text-2xl font-normal leading-[1.05] tracking-[-0.02em]">
               {t("goals:risk_lab.montecarlo.heading")}
             </CardTitle>
-            <p className="text-muted-foreground mt-4 max-w-[900px] text-sm leading-relaxed">
+            <p className="text-muted-foreground max-w-225 mt-4 text-sm leading-relaxed">
               {t("goals:risk_lab.montecarlo.intro")} {moneyLastsCopy}
             </p>
           </div>
@@ -1345,7 +1345,7 @@ function DecisionHeatmap({
 
   return (
     <div className="overflow-x-auto px-3 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
-      <table className="w-full min-w-[480px] table-fixed border-separate border-spacing-[2px] text-xs sm:min-w-[540px] sm:border-spacing-[3px] sm:text-sm">
+      <table className="min-w-120 sm:min-w-135 w-full table-fixed border-separate border-spacing-[2px] text-xs sm:border-spacing-[3px] sm:text-sm">
         <thead>
           <tr>
             <th className="w-14 sm:w-16" />
@@ -1398,7 +1398,7 @@ function DecisionHeatmap({
                         render={
                           <div
                             className={cn(
-                              "flex h-12 items-center justify-center rounded-[6px] px-2 text-center text-xs font-semibold tabular-nums leading-none transition-shadow sm:h-[52px] sm:px-3 sm:text-sm",
+                              "sm:h-13 flex h-12 items-center justify-center rounded-[0.375rem] px-2 text-center text-xs font-semibold tabular-nums leading-none transition-shadow sm:px-3 sm:text-sm",
                               active && "ring-2 ring-[hsl(91,34%,29%)] ring-offset-0",
                             )}
                             style={sensitivityCellStyle({ cell, baseline, range, active })}

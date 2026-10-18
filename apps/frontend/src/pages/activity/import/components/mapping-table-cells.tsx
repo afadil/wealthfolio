@@ -92,7 +92,7 @@ export function MappingHeaderCell({
               }
             />
           </SelectTrigger>
-          <SelectContent className="max-h-[min(300px,var(--available-height))] overflow-y-auto">
+          <SelectContent className="max-h-[min(18.75rem,var(--available-height))] overflow-y-auto">
             {!isRequired && (
               <>
                 <SelectItem value={SKIP_FIELD_VALUE}>{skipLabel}</SelectItem>
@@ -195,8 +195,8 @@ function ActivityTypeDisplayCell({
               handleActivityTypeMapping(trimmedCsvType, newType as ActivityType)
             }
             placeholder={t("activity:import.mapping.mapType")}
-            className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-[140px]")}
-            contentClassName="w-[220px]"
+            className={cn(MAPPING_TRIGGER_UNMAPPED_CLASS, "w-35")}
+            contentClassName="w-55"
           />
         )}
       </div>
@@ -264,7 +264,7 @@ function AccountIdDisplayCell({
         {sourceLabel}
       </span>
       <span className="text-muted-foreground shrink-0">→</span>
-      <div className="ml-auto min-w-[180px]">
+      <div className="min-w-45 ml-auto">
         <AccountSelector
           selectedAccount={selectedAccount}
           setSelectedAccount={(account) => {
@@ -319,7 +319,7 @@ function SymbolDisplayCell({
           {csvSymbol || "-"}
         </span>
         <span className="text-muted-foreground shrink-0">→</span>
-        <div className="ml-auto min-w-[180px]">
+        <div className="min-w-45 ml-auto">
           <TickerSearchInput
             defaultValue={mappedSymbol || ""}
             placeholder={t("activity:import.mapping.mapSymbol")}

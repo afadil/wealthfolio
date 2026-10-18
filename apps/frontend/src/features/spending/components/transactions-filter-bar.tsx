@@ -324,7 +324,7 @@ export function TransactionsFilterBar({
       <FacetedSearchInput
         value={searchInput}
         onChange={onSearchInputChange}
-        className="w-[160px] lg:w-[240px]"
+        className="w-40 lg:w-60"
       />
       {filterControls}
       {filtersActive && (

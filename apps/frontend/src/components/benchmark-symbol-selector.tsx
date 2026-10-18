@@ -201,14 +201,14 @@ export function BenchmarkSymbolSelector({
         <Icons.TrendingUp className="h-4 w-4" />
         {!iconOnly && t("common:component.add_benchmark")}
       </PopoverTrigger>
-      <PopoverContent className="w-[350px] p-0">
+      <PopoverContent className="w-87.5 p-0">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t("common:search_benchmarks")}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList className="max-h-75 overflow-y-auto">
             <CommandEmpty>
               {isLoading ? t("common:searching") : t("common:no_benchmarks_found")}
             </CommandEmpty>

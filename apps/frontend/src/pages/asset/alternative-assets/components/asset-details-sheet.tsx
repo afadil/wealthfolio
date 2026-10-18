@@ -403,7 +403,7 @@ export function AssetDetailsSheet({
                               ? "asset:detailsSheet.notes_placeholder_liability"
                               : "asset:detailsSheet.notes_placeholder",
                           )}
-                          className="min-h-[100px] resize-none"
+                          className="min-h-25 resize-none"
                           value={field.value ?? ""}
                           onChange={(e) => field.onChange(e.target.value || null)}
                         />

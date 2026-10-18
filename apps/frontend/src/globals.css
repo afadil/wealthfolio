@@ -72,6 +72,9 @@
 }
 
 @theme {
+  /* Extra-small breakpoint (430 px), below sm, for phone headers */
+  --breakpoint-xs: 26.875rem;
+
   /* Font families */
   --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Merriweather", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;

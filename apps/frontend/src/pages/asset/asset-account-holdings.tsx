@@ -477,7 +477,7 @@ export function AssetSnapshotHistory({
                 <TableHead className="text-right">{t("asset:accountHoldings.shares")}</TableHead>
                 <TableHead className="text-right">{t("asset:accountHoldings.avg_cost")}</TableHead>
                 <TableHead>{t("asset:accountHoldings.source")}</TableHead>
-                <TableHead className="w-[80px]" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>

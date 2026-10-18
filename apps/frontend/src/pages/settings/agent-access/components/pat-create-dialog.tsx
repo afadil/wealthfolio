@@ -177,7 +177,7 @@ export function PatCreateDialog({
           className={cn(
             "grid h-4 w-4 shrink-0 place-items-center transition-colors",
             checked
-              ? "bg-success rounded-[5px] text-white"
+              ? "bg-success rounded-[0.3125rem] text-white"
               : "border-muted-foreground/30 rounded-full border-2",
           )}
           aria-hidden

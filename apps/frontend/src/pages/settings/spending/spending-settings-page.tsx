@@ -122,7 +122,7 @@ interface SectionProps {
 function Section({ title, meta, children }: SectionProps) {
   return (
     <section>
-      <div className="mb-[14px] flex items-baseline justify-between gap-3">
+      <div className="mb-3.5 flex items-baseline justify-between gap-3">
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-widest">
           {title}
         </h2>

@@ -217,7 +217,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             type="submit"
             variant="default"
             size="icon"
-            className="aui-composer-send size-[34px] rounded-full p-1"
+            className="aui-composer-send size-8.5 rounded-full p-1"
             aria-label={t("ai:thread.sendMessage")}
           >
             <Icons.ArrowUp className="aui-composer-send-icon size-5" />
@@ -231,7 +231,7 @@ const ComposerAction: FC<ComposerActionProps> = ({ composerActions }) => {
             type="button"
             variant="default"
             size="icon"
-            className="aui-composer-cancel border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90 size-[34px] rounded-full border"
+            className="aui-composer-cancel border-muted-foreground/60 hover:bg-primary/75 dark:border-muted-foreground/90 size-8.5 rounded-full border"
             aria-label={t("ai:thread.stopGenerating")}
           >
             <Icons.Square className="aui-composer-cancel-icon size-3.5 fill-white dark:fill-black" />
@@ -399,7 +399,7 @@ const AssistantActionBar: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root fade-in slide-in-from-bottom-1 animate-in max-w-(--thread-max-width) mx-auto grid w-full auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 py-4 duration-150 ease-out [&:where(>*)]:col-start-2"
+      className="aui-user-message-root fade-in slide-in-from-bottom-1 animate-in max-w-(--thread-max-width) mx-auto grid w-full auto-rows-auto grid-cols-[minmax(4.5rem,1fr)_auto] content-start gap-y-2 px-2 py-4 duration-150 ease-out [&:where(>*)]:col-start-2"
       data-role="user"
     >
       <UserMessageAttachments />
@@ -446,7 +446,7 @@ const EditComposer: FC = () => {
     <MessagePrimitive.Root className="aui-edit-composer-wrapper max-w-(--thread-max-width) mx-auto flex w-full flex-col gap-4 px-2">
       <ComposerPrimitive.Root className="aui-edit-composer-root bg-muted max-w-7/8 ml-auto flex w-full flex-col rounded-xl">
         <ComposerPrimitive.Input
-          className="aui-edit-composer-input text-foreground flex min-h-[60px] w-full resize-none bg-transparent p-4 outline-none"
+          className="aui-edit-composer-input text-foreground min-h-15 flex w-full resize-none bg-transparent p-4 outline-none"
           autoFocus
         />
 

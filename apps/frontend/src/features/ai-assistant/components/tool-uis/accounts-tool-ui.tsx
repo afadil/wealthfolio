@@ -138,7 +138,7 @@ function AccountsLoadingSkeleton() {
           <Skeleton className="h-5 w-16" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-2 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-2 overflow-y-auto">
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
@@ -265,7 +265,7 @@ function AccountsToolUIContentImpl({ args, result, status }: AccountsToolUIConte
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-2 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-2 overflow-y-auto">
         {accounts.map((account) => (
           <AccountCard key={account.id} account={account} />
         ))}

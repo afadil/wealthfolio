@@ -278,8 +278,8 @@ export function EnterCode({
               finalFocus={scanButtonRef}
               className="qr-overlay data-closed:animate-none data-open:animate-none fixed inset-0 left-0 top-0 z-[10000] flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col items-center justify-end overflow-hidden rounded-none border-0 bg-transparent px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-white shadow-none duration-0"
             >
-              <div className="qr-scan-frame absolute left-1/2 top-1/2 aspect-square w-[min(68vw,34dvh,280px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/25">
-                <div className="absolute bottom-full left-1/2 mb-6 w-[min(85vw,340px)] -translate-x-1/2 text-center">
+              <div className="qr-scan-frame absolute left-1/2 top-1/2 aspect-square w-[min(68vw,34dvh,17.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/25">
+                <div className="absolute bottom-full left-1/2 mb-6 w-[min(85vw,21.25rem)] -translate-x-1/2 text-center">
                   <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10">
                     <Icons.QrCode className="h-5 w-5" aria-hidden="true" />
                   </div>

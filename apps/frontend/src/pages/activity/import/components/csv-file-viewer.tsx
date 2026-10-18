@@ -87,7 +87,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
         const lineNumber = row.original.id + 1;
 
         return isValid ? (
-          <div className="flex w-[60px] items-center gap-1 text-xs">
+          <div className="w-15 flex items-center gap-1 text-xs">
             <div className="text-success-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
               <Icons.CheckCircle className="h-3.5 w-3.5" />
             </div>
@@ -100,7 +100,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
             <Tooltip>
               <TooltipTrigger
                 delay={30}
-                render={<div className="flex w-[60px] cursor-help items-center gap-1 text-xs" />}
+                render={<div className="w-15 flex cursor-help items-center gap-1 text-xs" />}
               >
                 <div className="text-destructive-subtle-foreground bg-current/15 flex h-5 w-5 items-center justify-center rounded-full">
                   <Icons.XCircle className="h-3.5 w-3.5" />
@@ -117,7 +117,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                 <h4 className="mb-2 font-medium">
                   {t("activity:import.csvViewer.validationErrors")}
                 </h4>
-                <ul className="max-h-[300px] list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                <ul className="max-h-75 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
                   {errors.map((error, index) => (
                     <li key={index}>{error}</li>
                   ))}
@@ -220,7 +220,7 @@ export function CSVFileViewer({ data, className, maxHeight = "400px" }: CSVFileV
                         className={cn(
                           "border-0 py-1.5",
                           cell.column.id === "isValid" &&
-                            "bg-background border-border group-hover:bg-muted/40 sticky left-0 w-[60px] border-r p-2",
+                            "bg-background border-border group-hover:bg-muted/40 w-15 sticky left-0 border-r p-2",
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

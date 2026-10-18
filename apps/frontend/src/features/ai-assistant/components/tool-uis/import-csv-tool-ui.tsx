@@ -372,7 +372,7 @@ function ImportCsvToolUIContentImpl({
               if (accountId !== null) session.setAccountId(accountId);
             }}
           >
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-55">
               <SelectValue placeholder={t("ai:importCsv.selectTargetAccount")} />
             </SelectTrigger>
             <SelectContent>

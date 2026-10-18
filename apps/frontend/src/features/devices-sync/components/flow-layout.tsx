@@ -196,10 +196,7 @@ export function FlowFrame({ children, fill = false }: { children: ReactNode; fil
     <MotionConfig reducedMotion="user">
       {/* The negative margin keeps focus rings and the corner control unclipped. */}
       <div
-        className={cn(
-          "-m-2 flex flex-col",
-          fill ? "min-h-0 flex-1 overflow-y-auto" : "min-h-[544px]",
-        )}
+        className={cn("-m-2 flex flex-col", fill ? "min-h-0 flex-1 overflow-y-auto" : "min-h-136")}
       >
         <div className="flex flex-1 flex-col p-2">{children}</div>
       </div>

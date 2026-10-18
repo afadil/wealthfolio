@@ -215,7 +215,7 @@ export function RuleItem({
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
           {target && targetLabel ? (
             <span
-              className="bg-muted/60 inline-flex max-w-[200px] items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
+              className="bg-muted/60 max-w-50 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
               title={targetLabel}
             >
               <span

@@ -96,10 +96,10 @@ export function EligibleHoldingsSelector({
           </span>
           <Icons.ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(420px,calc(100vw-2rem))] p-0">
+        <PopoverContent align="start" className="w-[min(26.25rem,calc(100vw-2rem))] p-0">
           <Command>
             <CommandInput placeholder={t("allocation:eligibleHoldings.searchPlaceholder")} />
-            <CommandList className="max-h-[min(60vh,360px)]">
+            <CommandList className="max-h-[min(60vh,22.5rem)]">
               <CommandEmpty>{t("allocation:eligibleHoldings.noMatches")}</CommandEmpty>
               {groupedHoldings.map((group) => (
                 <CommandGroup key={group.key} heading={groupLabel(group.key, t)}>

@@ -214,7 +214,7 @@ function CurrencyFormatSettings() {
               }
               label={t("settings:currencyFormats.regionFor", { currency })}
               disabled={saving}
-              className="min-w-0 flex-1 sm:w-[240px] sm:flex-none"
+              className="min-w-0 flex-1 sm:w-60 sm:flex-none"
               testId={`currency-format-region-${currency}`}
             />
             <span className="text-muted-foreground order-last basis-full text-sm tabular-nums sm:order-none sm:basis-auto">
@@ -240,7 +240,7 @@ function CurrencyFormatSettings() {
             placeholder={t("settings:currencyFormats.currencyPlaceholder")}
             valueDisplay="code-label"
             allowCustom={false}
-            className="w-full sm:w-[240px]"
+            className="w-full sm:w-60"
             aria-label={t("settings:currencyFormats.currencyPlaceholder")}
             disabled={saving}
             data-testid="currency-format-new-currency"
@@ -252,7 +252,7 @@ function CurrencyFormatSettings() {
             label={t("settings:currencyFormats.regionPlaceholder")}
             placeholder={t("settings:currencyFormats.regionPlaceholder")}
             disabled={saving}
-            className="w-full sm:w-[240px]"
+            className="w-full sm:w-60"
             testId="currency-format-new-region"
           />
           <Button
@@ -320,7 +320,7 @@ export function LanguageRegionSettings() {
           <LanguageSelector
             value={language}
             onChange={handleLanguageChange}
-            className="w-full max-w-[360px]"
+            className="max-w-90 w-full"
           />
         </section>
 
@@ -351,7 +351,7 @@ export function LanguageRegionSettings() {
               if (value !== null) updateSettings({ formattingRegion: value });
             }}
           >
-            <SelectTrigger className="w-full max-w-[360px]" data-testid="formatting-locale-select">
+            <SelectTrigger className="max-w-90 w-full" data-testid="formatting-locale-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -383,7 +383,7 @@ export function LanguageRegionSettings() {
             <h3 className="text-sm font-medium">{t("settings:timezone_title")}</h3>
             <p className="text-muted-foreground text-sm">{t("settings:timezone_description")}</p>
           </div>
-          <div className="w-full max-w-[360px]">
+          <div className="max-w-90 w-full">
             <TimezoneInput value={timezone} onChange={handleTimezoneChange} timezones={timezones} />
           </div>
         </section>

@@ -92,7 +92,7 @@ export function QuickEventPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent className="w-[280px] p-0" align={align}>
+      <PopoverContent className="w-70 p-0" align={align}>
         <Command>
           {loadErrored && (
             <div className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground flex items-center justify-between gap-2 border-b px-3 py-1.5">

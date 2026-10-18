@@ -389,7 +389,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
           </div>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[500px] w-full" />
+          <Skeleton className="h-125 w-full" />
         </CardContent>
       </Card>
     );
@@ -404,7 +404,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
             <CardTitle className="text-md font-medium">{t("holdings:composition")}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="flex h-[500px] items-center justify-center">
+        <CardContent className="h-125 flex items-center justify-center">
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
@@ -440,7 +440,7 @@ export function PortfolioComposition({ holdings, isLoading }: PortfolioCompositi
         </div>
       </CardHeader>
       <CardContent className="pl-2">
-        <RenderableChartContainer className="h-[500px] w-full">
+        <RenderableChartContainer className="h-125 w-full">
           <Treemap
             width={400}
             height={200}

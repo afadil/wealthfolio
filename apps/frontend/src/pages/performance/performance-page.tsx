@@ -926,7 +926,7 @@ function PerformanceContent({
       )}
 
       {!chartData?.length && !isLoading && !hasErrors && (
-        <Empty className="mx-auto flex max-w-[420px] items-center justify-center">
+        <Empty className="max-w-105 mx-auto flex items-center justify-center">
           <EmptyHeader>
             <EmptyMedia variant="icon">{<Icons.BarChart className="size-10" />}</EmptyMedia>
             <EmptyTitle>{t("performance:empty.title")}</EmptyTitle>

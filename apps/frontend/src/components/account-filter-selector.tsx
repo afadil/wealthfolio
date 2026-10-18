@@ -98,7 +98,7 @@ const SelectorTrigger = forwardRef<HTMLButtonElement, SelectorTriggerProps>(
           triggerVariant === "default" &&
             (isMobile
               ? "h-9 w-9 justify-center p-0"
-              : "h-10 min-w-[220px] justify-between px-4 text-sm"),
+              : "min-w-55 h-10 justify-between px-4 text-sm"),
           className,
         )}
         size={compact ? "sm" : "default"}

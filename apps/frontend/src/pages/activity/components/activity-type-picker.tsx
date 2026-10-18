@@ -120,7 +120,7 @@ function ActivityTypeButton({
         "flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 transition-all",
         "hover:bg-muted/50 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
         "cursor-pointer",
-        compact ? "min-h-[72px] min-w-[80px] p-3" : "min-h-[80px] p-4",
+        compact ? "min-h-18 min-w-20 p-3" : "min-h-20 p-4",
         isSelected && "border-foreground bg-primary/5",
         !isSelected && "border-border",
       )}

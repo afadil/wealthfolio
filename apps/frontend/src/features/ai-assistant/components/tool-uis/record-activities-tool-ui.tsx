@@ -311,7 +311,7 @@ function RecordActivitiesToolUIContentImpl({
           </div>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto">
+        <div className="max-h-90 overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -403,14 +403,14 @@ function RecordActivitiesToolUIContentImpl({
                           {rowStatusBadge.label}
                         </Badge>
                         {statusEntry?.error && (
-                          <p className="text-destructive text-2xs max-w-[180px] truncate">
+                          <p className="text-destructive text-2xs max-w-45 truncate">
                             {statusEntry.error}
                           </p>
                         )}
                         {!statusEntry?.error &&
                           row.errors[0] &&
                           statusEntry?.status !== "submitted" && (
-                            <p className="text-muted-foreground text-2xs max-w-[180px] truncate">
+                            <p className="text-muted-foreground text-2xs max-w-45 truncate">
                               {row.errors[0]}
                             </p>
                           )}

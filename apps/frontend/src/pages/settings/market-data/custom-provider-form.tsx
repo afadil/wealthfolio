@@ -264,7 +264,7 @@ export function CustomProviderForm({
       }}
     >
       <DialogContent
-        className="flex h-[92vh] w-[98vw] max-w-[1400px] flex-col overflow-hidden p-0 [--input-height:2.25rem]"
+        className="max-w-350 flex h-[92vh] w-[98vw] flex-col overflow-hidden p-0 [--input-height:2.25rem]"
         showCloseButton={false}
       >
         {open && (
@@ -581,7 +581,7 @@ function CustomProviderFormContent({
         </div>
 
         {/* ── Body: two-pane ── */}
-        <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_560px]">
+        <div className="bg-muted/40 grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_35rem]">
           {/* LEFT pane */}
           <div className="min-h-0 space-y-3 overflow-y-auto border-r p-4">
             {/* Provider Mode */}
@@ -657,7 +657,7 @@ function CustomProviderFormContent({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8.75rem]">
                 <FormField
                   control={form.control}
                   name="name"

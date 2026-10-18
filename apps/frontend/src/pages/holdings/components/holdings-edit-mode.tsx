@@ -663,7 +663,7 @@ export const HoldingsEditMode = ({
                 {/* Add Currency Input */}
                 {showAddCurrency && (
                   <div className="flex items-center gap-2 py-2">
-                    <div className="w-[160px]">
+                    <div className="w-40">
                       <CurrencyInput
                         placeholder={t("holdings:select_currency")}
                         valueDisplay="code"

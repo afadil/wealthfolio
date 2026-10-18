@@ -1245,7 +1245,7 @@ function TradesTable({ trades, currency }: { trades: SuggestedManualTrade[]; cur
       </div>
 
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[920px] table-fixed text-sm">
+        <table className="min-w-230 w-full table-fixed text-sm">
           <colgroup>
             <col className="w-[6%]" />
             <col className="w-[23%]" />

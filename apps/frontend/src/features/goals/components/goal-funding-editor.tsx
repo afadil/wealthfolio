@@ -686,7 +686,7 @@ function AllocationDetailsSheet({
             <p className="text-muted-foreground text-sm">{t("goals:funding.no_active_shares")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm">
+              <table className="min-w-160 w-full border-separate border-spacing-0 text-sm">
                 <thead>
                   <tr className="text-muted-foreground text-2xs text-left uppercase tracking-[0.18em]">
                     <th className="border-border border-b py-2 pr-4 font-medium">

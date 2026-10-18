@@ -71,7 +71,7 @@ export function ActionPalette({
         side={side}
         sideOffset={8}
         className={cn(
-          "w-auto min-w-[260px] max-w-[320px] p-0",
+          "min-w-65 w-auto max-w-80 p-0",
           "rounded-2xl",
           "border-border/50 border dark:border-white/10",
           "bg-card backdrop-blur-xl",

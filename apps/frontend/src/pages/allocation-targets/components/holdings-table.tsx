@@ -265,7 +265,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                     }}
                   >
                     <td className="pl-6 pr-3">
-                      <div className="flex min-w-[280px] items-center gap-2">
+                      <div className="min-w-70 flex items-center gap-2">
                         <HoldingAvatar
                           isCash={row.isCash}
                           symbol={row.symbol}
@@ -277,7 +277,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                           <span className="text-foreground shrink-0 text-xs font-semibold">
                             {row.symbol}
                           </span>
-                          <span className="text-muted-foreground max-w-[330px] truncate text-xs">
+                          <span className="text-muted-foreground max-w-82.5 truncate text-xs">
                             {row.name}
                           </span>
                         </div>
@@ -296,7 +296,7 @@ export function HoldingsTable({ report }: HoldingsTableProps) {
                             {row.categoryName}
                           </span>
                           {row.isUnknownCategory && (
-                            <span className="text-muted-foreground/80 text-2xs block max-w-[220px] truncate">
+                            <span className="text-muted-foreground/80 text-2xs max-w-55 block truncate">
                               {t("allocation:holdings.notMapped")}
                             </span>
                           )}

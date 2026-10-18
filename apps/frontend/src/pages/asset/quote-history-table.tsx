@@ -392,7 +392,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                   {t("asset:quoteTable.manual_tracking")}
                 </Label>
               </PopoverTrigger>
-              <PopoverContent className="w-[360px] p-4">
+              <PopoverContent className="w-90 p-4">
                 <div className="space-y-4">
                   <h4 className="font-medium">{t("asset:quoteTable.change_tracking_mode")}</h4>
                   {isManualDataSource ? (
@@ -573,7 +573,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
               if (value !== null) table.setPageIndex(parseInt(value) - 1);
             }}
           >
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="w-25">
               <SelectValue placeholder={t("asset:quoteTable.page_placeholder")} />
             </SelectTrigger>
             <SelectContent>

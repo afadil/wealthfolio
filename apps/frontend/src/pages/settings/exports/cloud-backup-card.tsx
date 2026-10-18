@@ -162,7 +162,7 @@ function CloudBackupPromotion() {
   const { t } = useTranslation();
   return (
     <Card className="@container border-connect-brand/15 from-connect-brand/5 via-card to-card overflow-hidden rounded-xl bg-gradient-to-br shadow-none">
-      <CardContent className="@min-[640px]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[640px]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
+      <CardContent className="@min-[40rem]:grid-cols-[auto_minmax(0,1fr)_auto] @min-[40rem]:gap-x-4 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-4 py-3">
         <div className="bg-connect-brand/10 text-connect-brand row-start-1 flex size-8 shrink-0 items-center justify-center rounded-lg">
           <Icons.ShieldCheck className="size-4" aria-hidden />
         </div>
@@ -176,7 +176,7 @@ function CloudBackupPromotion() {
         </div>
         <Link
           to="/settings/connect"
-          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[640px]:col-start-3 @min-[640px]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          className="text-connect-brand hover:text-foreground focus-visible:ring-ring @min-[40rem]:col-start-3 @min-[40rem]:row-start-1 col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-xs font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         >
           {t("settings:cloud_backup_promotion_action")}
           <Icons.ArrowRight className="size-3.5 shrink-0" aria-hidden />
@@ -211,7 +211,7 @@ function describeBackupStatus(
 function BackupStatusLine({ dot, parts }: { dot: string; parts: (string | null)[] }) {
   return (
     <p className="text-muted-foreground flex items-start gap-1.5 text-xs">
-      <span className={`mt-[5px] size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span className={`mt-[0.3125rem] size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
       <span>
         {parts.filter(Boolean).map((part, index) => (
           <Fragment key={index}>

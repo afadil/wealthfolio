@@ -318,7 +318,7 @@ function CategorizationProposalsContentImpl({
           </div>
         )}
 
-        <div className="max-h-[420px] overflow-y-auto px-2">
+        <div className="max-h-105 overflow-y-auto px-2">
           {rows.length === 0 && visibleUnproposed.length === 0 && (
             <p className="text-muted-foreground px-4 py-6 text-center text-xs">
               {(result.taxonomies?.length ?? 0) === 0
@@ -370,7 +370,7 @@ function CategorizationProposalsContentImpl({
                       className="h-2 w-2 rounded-full"
                       style={{ backgroundColor: row.categoryColor }}
                     />
-                    <span className="max-w-[180px] truncate">{row.categoryPath}</span>
+                    <span className="max-w-45 truncate">{row.categoryPath}</span>
                   </button>
                 }
                 selectedCategoryId={row.categoryId}

@@ -84,7 +84,7 @@ function Sidebar({ collapsed }: { collapsed?: boolean }) {
     <aside
       className={cn(
         "bg-muted/30 flex h-full flex-col border-r transition-all duration-200",
-        collapsed ? "w-0 overflow-hidden opacity-0" : "w-[260px] opacity-100",
+        collapsed ? "w-0 overflow-hidden opacity-0" : "w-65 opacity-100",
       )}
     >
       <div className="flex-1 overflow-y-auto p-3">
@@ -109,7 +109,7 @@ function MobileSidebar() {
       </SheetTrigger>
       <SheetContent
         side="left"
-        className="flex w-[280px] flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
+        className="w-70 flex flex-col gap-0 px-0 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>{t("ai:shell.conversations")}</SheetTitle>

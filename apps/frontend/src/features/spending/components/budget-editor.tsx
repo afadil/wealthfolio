@@ -248,7 +248,7 @@ export function BudgetEditor({ mode, periodKey }: BudgetEditorProps) {
 
   if (mode === "monthly") {
     return (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
           <BudgetSummary budget={budget} currency={currency} mode={mode} />
           <BudgetFxNote budget={budget} currency={currency} />
@@ -1063,7 +1063,7 @@ function GroupEditDialogBody({
               <label htmlFor="rollover-starting-balance" className="text-muted-foreground text-2xs">
                 {t("spending:budgetEditor.startingBalance")}
               </label>
-              <div className="w-[120px]">
+              <div className="w-30">
                 <input
                   id="rollover-starting-balance"
                   type="text"
@@ -1137,7 +1137,7 @@ function BudgetCategoryLine({
       </span>
       <span className="text-foreground min-w-0 flex-1 truncate">{row.name}</span>
 
-      <div className="relative w-[80px] shrink-0">
+      <div className="relative w-20 shrink-0">
         <AmountInput value={row.target} onCommit={(value) => onSaveTarget(row, value)} />
         {hasOverride && (
           <Tooltip>
@@ -1295,12 +1295,12 @@ function GroupBufferLine({
         <TooltipTrigger render={<span className="text-muted-foreground min-w-0 flex-1 truncate" />}>
           {label}
         </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={4} className="max-w-[220px] text-xs">
+        <TooltipContent side="top" sideOffset={4} className="max-w-55 text-xs">
           {t("spending:budgetEditor.groupBufferTooltip")}
         </TooltipContent>
       </Tooltip>
 
-      <div className="relative w-[80px] shrink-0">
+      <div className="relative w-20 shrink-0">
         <AmountInput
           value={row.buffer}
           variant="dashed"
@@ -1396,7 +1396,7 @@ function IncomeSourcesPanel({
                     </button>
                   )}
                 </div>
-                <div className="w-[80px] shrink-0">
+                <div className="w-20 shrink-0">
                   <AmountInput value={row.target} onCommit={(value) => onSaveTarget(row, value)} />
                 </div>
               </div>
@@ -1656,7 +1656,7 @@ function CopyFromMonthRow({
             value={sourceMonth}
             max={currentPeriodKey}
             onChange={(event) => setSourceMonth(event.target.value || previousMonth)}
-            className="text-foreground h-7 w-[120px] bg-transparent px-2 text-xs outline-none"
+            className="text-foreground w-30 h-7 bg-transparent px-2 text-xs outline-none"
           />
         </div>
         <label className="text-muted-foreground text-2xs inline-flex items-center gap-1.5">
@@ -1800,7 +1800,7 @@ function BudgetSkeleton() {
   return (
     <div className="space-y-4">
       <Skeleton className="h-40 rounded-xl" />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22.5rem]">
         <div className="space-y-4">
           <Skeleton className="h-72 rounded-xl" />
           <Skeleton className="h-56 rounded-xl" />

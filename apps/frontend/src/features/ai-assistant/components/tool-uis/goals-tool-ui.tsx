@@ -226,7 +226,7 @@ function GoalsLoadingSkeleton() {
           <Skeleton className="h-5 w-16" />
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-3 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-3 overflow-y-auto">
         {Array.from({ length: 3 }).map((_, index) => (
           <div key={index} className="bg-background/60 flex flex-col gap-2 rounded-lg border p-3">
             <div className="flex items-center justify-between">
@@ -415,7 +415,7 @@ function GoalsToolUIContentImpl({ args, result, status }: GoalsToolUIContentProp
           )}
         </div>
       </CardHeader>
-      <CardContent className="max-h-[320px] space-y-3 overflow-y-auto">
+      <CardContent className="max-h-80 space-y-3 overflow-y-auto">
         {goals.map((goal) => (
           <GoalCard
             key={goal.id}

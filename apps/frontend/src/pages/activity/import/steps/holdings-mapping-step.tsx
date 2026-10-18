@@ -158,7 +158,7 @@ function CsvPreviewTable({ headers, rows, mapping }: CsvPreviewProps) {
 
   // `isolate` stops WebKitGTK painting the sticky header over this scrollbar inside a scrolling parent
   return (
-    <div className="isolate max-h-[300px] overflow-auto rounded-lg border">
+    <div className="max-h-75 isolate overflow-auto rounded-lg border">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 sticky top-0">
           <tr>
@@ -543,7 +543,7 @@ export function HoldingsMappingStep() {
                   >
                     <SelectTrigger
                       className={cn(
-                        "!h-7 w-[130px] shrink-0 !py-0 text-xs",
+                        "w-32.5 !h-7 shrink-0 !py-0 text-xs",
                         !isMapped && "text-muted-foreground border-dashed",
                       )}
                     >

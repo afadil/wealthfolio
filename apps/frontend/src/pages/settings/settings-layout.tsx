@@ -161,7 +161,7 @@ export default function SettingsLayout() {
         {/* Mobile Settings List View (carded list with dividers) */}
         <div className="scan-hide-target w-full max-w-full overflow-x-hidden">
           <div className="bg-background/95 supports-backdrop-filter:bg-background/60 pt-safe sticky top-0 z-10 border-b backdrop-blur">
-            <div className="flex min-h-[60px] items-center justify-center px-4">
+            <div className="min-h-15 flex items-center justify-center px-4">
               <h1 className="text-lg font-semibold">{t("settings:title")}</h1>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function SettingsLayout() {
             <Separator className="my-6" />
           </div>
           <div className="lg:flex lg:gap-10">
-            <aside className="hidden w-[240px] shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
+            <aside className="hidden w-60 shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
               <div className="space-y-6">
                 {sections.map((section) => (
                   <div key={section.title} className="space-y-2">
