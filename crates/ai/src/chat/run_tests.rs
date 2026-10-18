@@ -882,10 +882,107 @@ async fn a_transient_error_after_output_is_not_retried() {
 async fn a_rejected_request_is_not_retried() {
     let (url, server) = serve(vec![anthropic_error(400), anthropic_answer("Never.")]);
     let env = environment("anthropic", &url);
-    let service = ChatService::new(env, ChatConfig::default());
+    let service = ChatService::new(env.clone(), ChatConfig::default());
 
     let events = send(&service, "anthropic", "claude-sonnet-5-5", "Hello", None).await;
 
     assert!(stream_error(&events).is_some(), "the turn fails");
     assert_eq!(server.await.unwrap().len(), 1);
+    let saved = env
+        .chat_repository()
+        .get_messages_by_thread(&thread_id(&events))
+        .unwrap();
+    assert!(
+        saved
+            .iter()
+            .all(|message| message.role != ChatMessageRole::Assistant),
+        "a turn that streamed nothing saves no reply"
+    );
+}
+
+#[tokio::test]
+async fn a_provider_error_mid_reply_saves_what_was_streamed() {
+    let usage = json!({"input_tokens":1,"output_tokens":1});
+    let event = |v: Value| format!("data: {v}\n\n");
+    let mut first = text_blocks("Checking your accounts.");
+    first.extend(
+        parallel_tool_use_blocks(&["toolu_accounts"], "get_accounts")
+            .into_iter()
+            .map(|mut block| {
+                block["index"] = json!(1);
+                block
+            }),
+    );
+    // The second model call streams part of its answer, then fails.
+    let mut failed = event(json!({"type":"message_start","message":{"id":"msg_fixture",
+        "type":"message","role":"assistant","model":"claude-sonnet-5-5","content":[],
+        "stop_reason":null,"stop_sequence":null,"usage":usage}}));
+    for block in &text_blocks("You have one")[..2] {
+        failed += &event(block.clone());
+    }
+    failed += &event(json!({"type":"error","error":{"type":"overloaded_error",
+        "message":"Overloaded for fixture-key"}}));
+    let (url, server) = serve(vec![
+        (200, anthropic_reply("tool_use", first, usage.clone(), 1)),
+        (200, failed),
+        anthropic_answer("Still one."),
+    ]);
+    let env = environment("anthropic", &url);
+    let service = ChatService::new(env.clone(), ChatConfig::default());
+
+    let events = send(
+        &service,
+        "anthropic",
+        "claude-sonnet-5-5",
+        "Accounts?",
+        None,
+    )
+    .await;
+    let shown = stream_error(&events).expect("the turn fails");
+    assert!(!shown.contains("fixture-key"), "{shown}");
+
+    let thread = thread_id(&events);
+    let saved = env
+        .chat_repository()
+        .get_messages_by_thread(&thread)
+        .unwrap()
+        .into_iter()
+        .find(|message| message.role == ChatMessageRole::Assistant)
+        .expect("the partial reply is saved");
+    let parts = serde_json::to_value(&saved.content.parts).unwrap();
+    assert_eq!(
+        parts[0],
+        json!({"type":"text","content":"Checking your accounts."})
+    );
+    assert_eq!(parts[1]["type"], "toolCall");
+    assert_eq!(parts[1]["toolCallId"], "toolu_accounts");
+    assert_eq!(parts[2]["type"], "toolResult");
+    assert_eq!(parts[2]["toolCallId"], "toolu_accounts");
+    assert_eq!(parts[2]["success"], true);
+    assert_eq!(parts[3], json!({"type":"text","content":"You have one"}));
+    assert_eq!(parts[4]["type"], "error");
+    assert_eq!(parts[4]["code"], "STREAM_ERROR");
+    assert_eq!(parts[4]["message"], json!(shown));
+    assert_eq!(parts.as_array().unwrap().len(), 5);
+
+    // The next turn sees the partial text as history, not the error.
+    done_usage(
+        &send(
+            &service,
+            "anthropic",
+            "claude-sonnet-5-5",
+            "And now?",
+            Some(thread),
+        )
+        .await,
+    );
+    let requests = server.await.unwrap();
+    assert_eq!(requests.len(), 3);
+    let history = requests[2]["messages"].to_string();
+    assert!(
+        history.contains("Checking your accounts.You have one"),
+        "{history}"
+    );
+    assert!(!history.contains("Overloaded"), "{history}");
+    assert!(!history.contains("STREAM_ERROR"), "{history}");
 }
