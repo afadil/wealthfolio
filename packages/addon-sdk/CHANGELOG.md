@@ -178,6 +178,9 @@ and this project adheres to
   instead of a border. Select and command rows have 12 px corners and `py-2`
   (command rows `px-3`); select rows keep `pl-2` so their text lines up with the
   field when the list opens over it.
+- `PopoverContent` is at most as tall as the space beside its trigger
+  (`--available-height`) and scrolls beyond it, as menus and select lists do, so
+  a tall popover no longer runs off the screen.
 - `Spinner`, shadcn's spinner on the Loader2 icon. It is decorative
   (`aria-hidden`) unless you pass a translated `aria-label`, which makes it a
   `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
