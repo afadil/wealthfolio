@@ -1,0 +1,308 @@
+{
+  "bootstrap": {
+    "couldNotRetryTitle": "تعذّرت إعادة محاولة المزامنة"
+  },
+  "connect": {
+    "connectAnotherDevice": "ربط جهاز آخر",
+    "connectThisDevice": "ربط هذا الجهاز",
+    "disconnect": "قطع الاتصال",
+    "pair": "إقران",
+    "rename": "إعادة التسمية",
+    "revoke": "إلغاء الصلاحية",
+    "unpair": "إلغاء الإقران"
+  },
+  "disconnectDialog": {
+    "description": "سيؤدي هذا إلى إزالة المزامنة من هذا الجهاز. يمكنك إعدادها مجددًا لاحقًا.",
+    "disconnect": "قطع الاتصال",
+    "disconnecting": "جارٍ قطع الاتصال...",
+    "title": "هل تريد قطع اتصال هذا الجهاز؟"
+  },
+  "displayCode": {
+    "copied": "تم النسخ",
+    "copyCode": "نسخ الرمز",
+    "expiredDescription": "تعمل الرموز لبضع دقائق فقط للحفاظ على أمان الإقران. احصل على رمز جديد للمتابعة.",
+    "expiredTitle": "انتهت صلاحية هذا الرمز",
+    "expiresIn": "تنتهي الصلاحية خلال {{time}}",
+    "generating": "جارٍ إنشاء الرمز",
+    "newCode": "الحصول على رمز جديد"
+  },
+  "engine": {
+    "backgroundPaused": "تم إيقاف المزامنة في الخلفية مؤقتًا",
+    "backgroundResumed": "تم استئناف المزامنة في الخلفية",
+    "pauseSync": "إيقاف المزامنة مؤقتًا",
+    "resumeSync": "استئناف المزامنة",
+    "updateFailed": "تعذّر تحديث المزامنة في الخلفية",
+    "updating": "جارٍ التحديث..."
+  },
+  "enterCode": {
+    "cameraCloseError": "تعذّر إغلاق الكاميرا. يُرجى المحاولة مرة أخرى.",
+    "cameraOpenError": "تعذّر فتح الكاميرا. يُرجى المحاولة مرة أخرى.",
+    "cameraUnavailable": "لا تتوفر كاميرا. استخدم جهازًا فعليًا للمسح، أو أدخل رمز الإقران أدناه.",
+    "codeLabel": "رمز الإقران",
+    "connect": "اتصال",
+    "connecting": "جارٍ الاتصال…",
+    "openingCamera": "جارٍ فتح الكاميرا…",
+    "or": "أو",
+    "paste": "لصق",
+    "scanHint": "وجّه الكاميرا نحو الرمز الظاهر على جهازك الآخر.",
+    "scanInstructions": "اجعل رمز QR داخل الإطار.",
+    "scanQrCode": "مسح رمز QR"
+  },
+  "errorState": {
+    "failedToInitialize": "تعذّرت تهيئة مزامنة الجهاز.",
+    "failedToLoadDevices": "تعذّر تحميل الأجهزة",
+    "initializationFailed": "فشلت التهيئة",
+    "tryRefreshing": "يُرجى محاولة التحديث."
+  },
+  "orphaned": {
+    "confirmDescription": "سنعيد تشغيل المزامنة باستخدام البيانات الموجودة على هذا الجهاز.",
+    "restarting": "جارٍ إعادة التشغيل...",
+    "restoreDescription": "لا يتوفر أي جهاز متصل آخر. سنعيد تشغيل المزامنة باستخدام البيانات الموجودة بالفعل على هذا الجهاز.",
+    "restoreTitle": "استخدام هذا الجهاز لاستعادة المزامنة"
+  },
+  "pairing": {
+    "connectAnotherTitle": "ربط جهاز آخر",
+    "connectThisDeviceTitle": "ربط هذا الجهاز",
+    "enterCodeDescription": "أدخل الرمز الظاهر على جهازك الآخر.",
+    "gettingReadyDescription": "سيستغرق هذا لحظات فقط.",
+    "gettingReadyTitle": "جارٍ تجهيز هذا الجهاز",
+    "prepareFailed": "تعذّر إكمال تجهيز هذا الجهاز.",
+    "preparingData": "جارٍ تجهيز بياناتك",
+    "preparingDataDescription": "تم تأكيد الاتصال. أبقِ Wealthfolio مفتوحًا على كلا الجهازين أثناء تجهيز بياناتك.",
+    "scanOrEnterDescription": "امسح هذا الرمز بجهازك الجديد، أو اكتبه هناك.",
+    "securingConnection": "جارٍ تأمين الاتصال",
+    "securingConnectionDescription": "جارٍ تبادل مفاتيح التشفير مع جهازك الآخر.",
+    "transferringData": "جارٍ نقل بياناتك",
+    "transferringDataDescription": "جارٍ تشفير نسخة من بياناتك لجهازك الجديد. قد يستغرق ذلك دقيقة.",
+    "verifySecurityCode": "تحقق من رمز الأمان"
+  },
+  "recovery": {
+    "description": "تم إيقاف المزامنة لهذا الجهاز. أعد إعدادها لإبقاء بياناتك محدّثة على جميع أجهزتك.",
+    "notNow": "ليس الآن",
+    "setUpAgain": "إعداد هذا الجهاز مرة أخرى",
+    "settingUp": "جارٍ الإعداد...",
+    "title": "إعداد هذا الجهاز مرة أخرى"
+  },
+  "reinit": {
+    "continue": "متابعة",
+    "description": "سنحتفظ بالبيانات الموجودة على هذا الجهاز ونستخدمها لإعادة تشغيل المزامنة. قد يلزم توصيل الأجهزة المتصلة الأخرى مجددًا.",
+    "notNow": "ليس الآن",
+    "title": "هل تريد إعداد المزامنة مرة أخرى من هذا الجهاز؟"
+  },
+  "restore": {
+    "backingUp": {
+      "description": "جارٍ حفظ نسخة من هذا الملف الشخصي قبل استبدال أي شيء.",
+      "title": "جارٍ نسخ هذا الملف الشخصي احتياطيًا"
+    },
+    "banner": {
+      "cancelled": "تم إلغاء الإعداد. أكمل الإعداد عندما تكون مستعدًا.",
+      "failed": "توقف الإعداد قبل اكتماله.",
+      "needsApproval": "موافقتك مطلوبة لاستبدال بيانات هذا الملف الشخصي.",
+      "running": "يستمر الإعداد في الخلفية.",
+      "show": "عرض التقدم",
+      "title": "لم يكتمل الإعداد على هذا الجهاز"
+    },
+    "cancelSetup": "إلغاء الإعداد",
+    "cancelled": {
+      "description": "لم يتم استبدال أي شيء. يمكنك إكمال الإعداد في أي وقت.",
+      "title": "تم إلغاء الإعداد"
+    },
+    "consent": {
+      "backupAndReplace": "نسخ احتياطي واستبدال",
+      "backupLabel": "نسخ هذا الملف الشخصي احتياطيًا أولًا",
+      "description": "ستحل البيانات من جهازك الآخر محل البيانات الموجودة على هذا الجهاز.",
+      "descriptionDated": "ستحل البيانات من جهازك الآخر (المنسوخة في {{date}}) محل البيانات الموجودة على هذا الجهاز.",
+      "descriptionEmpty": "تحتوي محفظة جهازك الآخر على محفظة فارغة. ستؤدي المتابعة إلى استبدال المحفظة الموجودة على هذا الجهاز بتلك المحفظة الفارغة.",
+      "replace": "استبدال البيانات",
+      "title": "هل تريد استبدال البيانات في هذا الملف الشخصي؟",
+      "titleNamed": "هل تريد استبدال البيانات في \"{{profile}}\"؟"
+    },
+    "continueInBackground": "المتابعة في الخلفية",
+    "dialogTitle": "إكمال إعداد هذا الجهاز",
+    "errors": {
+      "BACKUP_FAILED": "لم يكتمل النسخ الاحتياطي",
+      "DEVICE_NOT_READY": "هذا الجهاز غير جاهز للمزامنة بعد",
+      "RESTORE_FAILED": "تعذّر استبدال البيانات",
+      "SNAPSHOT_INVALID": "تعذّر التحقق من البيانات المنقولة",
+      "SNAPSHOT_SCHEMA_NEWER": "حدّث هذا التطبيق لإكمال الإعداد",
+      "SNAPSHOT_UNAVAILABLE": "النسخة من جهازك الآخر لم تعد متاحة",
+      "SNAPSHOT_WAIT_TIMED_OUT": "لم تتوفر نسخة محدّثة في الوقت المناسب",
+      "SUBSCRIPTION_REQUIRED": "تتطلب مزامنة الأجهزة اشتراكًا نشطًا",
+      "TRANSFER_FAILED": "لم تكتمل عملية النقل"
+    },
+    "finishSetup": "إكمال الإعداد",
+    "hide": "إخفاء",
+    "ready": {
+      "description": "تم إعداد هذا الجهاز وهو متزامن.",
+      "title": "جاهز"
+    },
+    "replacing": {
+      "description": "جارٍ وضع البيانات من جهازك الآخر في مكانها.",
+      "title": "جارٍ استبدال البيانات على هذا الجهاز"
+    },
+    "retryHint": {
+      "consent": "لم يُستبدل أي شيء. ستطلب إعادة المحاولة موافقتك مرة أخرى.",
+      "new_attempt": "لم يُستبدل أي شيء. ابدأ من جديد لاستخدام أحدث نسخة من جهازك الآخر.",
+      "transfer": "لم يتم استبدال أي شيء. يمكنك إعادة محاولة النقل."
+    },
+    "startAgain": "البدء من جديد",
+    "transferring": {
+      "description": "جارٍ تنزيل النسخة المشفّرة من جهازك الآخر والتحقق منها.",
+      "title": "جارٍ نقل بياناتك"
+    },
+    "tryAgain": "حاول مرة أخرى",
+    "waiting": {
+      "description": "لا تتوفر نسخة مشفّرة محدّثة بعد. سيتابع الإعداد تلقائيًا عندما تصبح جاهزة.",
+      "title": "في انتظار نسخة محدّثة"
+    }
+  },
+  "result": {
+    "allSet": "كل شيء جاهز!",
+    "connectedSuccessfully": "تم ربط الجهاز بنجاح",
+    "connectionFailed": "تعذّر الاتصال",
+    "devicesConnected": "تم ربط الأجهزة",
+    "done": "تم",
+    "finishOnOtherDevice": "أكمل الإعداد على جهازك الآخر. سيعرض \"جاهز\" بمجرد وصول بياناتك.",
+    "tryAgain": "حاول مرة أخرى"
+  },
+  "sas": {
+    "codesDontMatch": "غير متطابقين",
+    "codesMatch": "الرمزان متطابقان",
+    "description": "تأكد من أن جهازك الآخر يعرض الرمز نفسه. يمنع ذلك أي شخص آخر من الاتصال.",
+    "mismatchDescription": "لم تتطابق الرموز، لذا لم تتم مشاركة أي شيء. حاول مجددًا باستخدام رمز جديد.",
+    "mismatchTitle": "تم إيقاف الإقران",
+    "waitingDescription": "تحقق من أن جهازك الآخر يعرض هذا الرمز، ثم أكّد من هناك."
+  },
+  "section": {
+    "connectedDevices": "الأجهزة المتصلة",
+    "deviceActions": "إجراءات الجهاز",
+    "deviceSync": "مزامنة الأجهزة",
+    "manageDevices": "إدارة الأجهزة",
+    "options": "الخيارات",
+    "otherConnectedDevices": "الأجهزة المتصلة الأخرى"
+  },
+  "setup": {
+    "cardDescription": "زامن بياناتك بأمان عبر جميع أجهزتك.",
+    "connectThisDevice": "ربط هذا الجهاز",
+    "connectToSync": "اربط هذا الجهاز للمزامنة",
+    "enableDeviceSync": "تفعيل مزامنة الأجهزة",
+    "encryptedInfo": "بياناتك مشفّرة تشفيرًا تامًا بين الطرفين. لا يمكن قراءتها إلا من أجهزتك.",
+    "foundOtherDevices": "تم العثور على أجهزة متصلة أخرى في حسابك. تابع لتوصيل هذا الجهاز.",
+    "keepInSync": "حافظ على تزامن أجهزتك",
+    "morePreview": "+{{count}} أخرى",
+    "morePreview_few": "+{{count}} أخرى",
+    "morePreview_many": "+{{count}} أخرى",
+    "morePreview_one": "+{{count}} أخرى",
+    "morePreview_other": "+{{count}} أخرى",
+    "morePreview_two": "+{{count}} أخرى",
+    "morePreview_zero": "+{{count}} أخرى",
+    "settingUp": "جارٍ الإعداد..."
+  },
+  "snapshot": {
+    "cancelledTitle": "تم إلغاء رفع اللقطة",
+    "failedTitle": "فشل رفع اللقطة",
+    "resultTitle": "نتيجة رفع اللقطة",
+    "skippedTitle": "تم تخطي رفع اللقطة",
+    "uploadedDescription": "يمكن للأجهزة المتصلة حديثًا الآن إكمال المزامنة من هذه اللقطة.",
+    "uploadedTitle": "تم رفع اللقطة"
+  },
+  "stale": {
+    "keysNeedUpdating": "المفاتيح بحاجة إلى تحديث",
+    "keysNeedUpdatingDescription": "تم تغيير إعدادات الأمان على جهاز آخر. أعد توصيل هذا الجهاز لمواصلة المزامنة.",
+    "updateThisDevice": "تحديث هذا الجهاز"
+  },
+  "status": {
+    "connected": "متصل",
+    "daysAgo": "منذ {{count}} يوم",
+    "daysAgo_few": "منذ {{count}} أيام",
+    "daysAgo_many": "منذ {{count}} يومًا",
+    "daysAgo_one": "منذ {{count}} يوم",
+    "daysAgo_other": "منذ {{count}} يوم",
+    "daysAgo_two": "منذ {{count}} أيام",
+    "daysAgo_zero": "منذ {{count}} يوم",
+    "hoursAgo": "منذ {{count}} ساعة",
+    "hoursAgo_few": "منذ {{count}} ساعات",
+    "hoursAgo_many": "منذ {{count}} ساعة",
+    "hoursAgo_one": "منذ {{count}} ساعة",
+    "hoursAgo_other": "منذ {{count}} ساعة",
+    "hoursAgo_two": "منذ {{count}} ساعات",
+    "hoursAgo_zero": "منذ {{count}} ساعة",
+    "minutesAgo": "منذ {{count}} دقيقة",
+    "minutesAgo_few": "منذ {{count}} دقائق",
+    "minutesAgo_many": "منذ {{count}} دقيقة",
+    "minutesAgo_one": "منذ {{count}} دقيقة",
+    "minutesAgo_other": "منذ {{count}} دقيقة",
+    "minutesAgo_two": "منذ {{count}} دقائق",
+    "minutesAgo_zero": "منذ {{count}} دقيقة",
+    "needsSetup": "يحتاج إلى إعداد",
+    "never": "أبدًا",
+    "notConnected": "غير متصل",
+    "online": "متصل بالإنترنت",
+    "revoked": "تم إلغاء الوصول",
+    "syncError": "خطأ في المزامنة",
+    "syncPaused": "المزامنة متوقفة مؤقتًا",
+    "synced": "تمت المزامنة",
+    "syncing": "جارٍ المزامنة",
+    "thisDevice": "هذا الجهاز",
+    "thisDeviceSuffix": "· هذا الجهاز"
+  },
+  "toasts": {
+    "disconnectFailed": "فشل قطع الاتصال",
+    "reinitFailed": "فشلت إعادة تهيئة المزامنة",
+    "unpairFailed": "فشل إلغاء إقران الجهاز"
+  },
+  "unpairDialog": {
+    "description": "سيؤدي هذا إلى إزالة \"{{name}}\" من حسابك. سيلزم توصيل الجهاز مجددًا لمزامنة البيانات.",
+    "descriptionLast": "هذا هو جهازك المتصل الوحيد. ستحتاج إلى توصيل جهاز مجددًا لمواصلة مزامنة بياناتك.",
+    "title": "إلغاء إقران الجهاز؟",
+    "titleLast": "إلغاء إقران آخر جهاز لديك؟",
+    "unpair": "إلغاء الإقران",
+    "unpairing": "جارٍ إلغاء الإقران..."
+  },
+  "untrusted": {
+    "connectThisDevice": "ربط هذا الجهاز",
+    "connectToStartSyncing": "اربط هذا الجهاز لبدء المزامنة.",
+    "enterCodeFromDevices_few": "أدخل الرمز من أحد أجهزتك المتصلة الأخرى ({{count}} أجهزة).",
+    "enterCodeFromDevices_many": "أدخل الرمز من أحد أجهزتك المتصلة الأخرى ({{count}} جهازًا).",
+    "enterCodeFromDevices_one": "أدخل الرمز من جهازك المتصل الآخر ({{count}} جهاز).",
+    "enterCodeFromDevices_other": "أدخل الرمز من أحد أجهزتك المتصلة الأخرى ({{count}} جهاز).",
+    "enterCodeFromDevices_two": "أدخل الرمز من أحد أجهزتك المتصلة الأخرى ({{count}} أجهزة).",
+    "enterCodeFromDevices_zero": "أدخل الرمز من أحد أجهزتك المتصلة الأخرى ({{count}} أجهزة).",
+    "enterCodeGeneric": "أدخل الرمز من جهازك المتصل الآخر لمزامنة بياناتك.",
+    "notConnectedYet": "هذا الجهاز غير مربوط بعد"
+  },
+  "waiting": {
+    "waitingForConfirmation": "في انتظار تأكيد جهازك الآخر…"
+  },
+  "waitingSnapshot": {
+    "checkAgain": "تحقق مرة أخرى",
+    "checking": "جارٍ التحقق...",
+    "otherDeviceFinishing": "جهازك الآخر لا يزال يُكمل الإعداد.",
+    "preparing": "جارٍ التحضير...",
+    "setupAlmostDone": "اكتمل إعدادك تقريبًا.",
+    "speedUpSetup": "تسريع الإعداد",
+    "trustedHint": "يمكنك تسريع العملية الآن، أو الانتظار وسنتابع تلقائيًا في الخلفية.",
+    "untrustedHint": "يُرجى إكمال الإعداد على جهازك المتصل الآخر أولًا. سيتم تحديث هذه الصفحة تلقائيًا."
+  },
+  "wizard": {
+    "backgroundNote": "يمكنك إغلاق هذه النافذة. سيستمر الإعداد في الخلفية.",
+    "details": {
+      "backup": "النسخ الاحتياطي لهذا الملف الشخصي",
+      "downloadAndVerify": "تنزيل النسخة المشفّرة والتحقق منها",
+      "encrypt": "تشفير بياناتك",
+      "replace": "استبدال البيانات على هذا الجهاز",
+      "sendKeys": "إرسال المفاتيح إلى جهازك الجديد",
+      "upload": "رفع النسخة المشفّرة",
+      "waitForUpload": "انتظار نسخة محدّثة"
+    },
+    "encryptedNote": "مشفّر من طرف إلى طرف. وحدها أجهزتك يمكنها قراءة بياناتك.",
+    "progressLabel": "تقدّم الإعداد",
+    "steps": {
+      "apply": "تطبيق",
+      "connect": "اتصال",
+      "done": "تم",
+      "download": "تنزيل",
+      "transfer": "نقل"
+    }
+  }
+}
