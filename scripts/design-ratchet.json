@@ -138,7 +138,6 @@
     "apps/frontend/src/pages/settings/taxonomies/components/category-form.tsx": 3,
     "apps/frontend/src/pages/settings/taxonomies/components/taxonomy-picker.tsx": 1,
     "packages/ui/src/components/data-grid/data-grid-cell-wrapper.tsx": 4,
-    "packages/ui/src/components/ui/autocomplete.tsx": 1,
     "packages/ui/src/components/ui/budget-gauge.tsx": 1,
     "packages/ui/src/components/ui/calendar-rac.tsx": 1,
     "packages/ui/src/components/ui/chart.tsx": 5,
