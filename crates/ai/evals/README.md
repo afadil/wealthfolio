@@ -62,7 +62,7 @@ uses. Without them the model would run with no tools.
 Exit code:
 - `0` — all P0 cases passed every trial (P1/P2 failures still printed but don't fail the run).
 - `1` — at least one P0 case failed a trial.
-- `2` — couldn't load case files or read the configuration.
+- `2` — couldn't load case files, read the configuration or write the results file.
 
 ## Trials, pass^k and comparing runs
 
@@ -87,7 +87,9 @@ run and 13 the next. To tell a change from noise:
 
 Per case the report also shows input, cached input and output tokens, model
 calls, tool calls and chat wall time (per trial when k > 1, judge excluded),
-as the done event reports them. A counter the provider doesn't report shows
+as the done event reports them. A trial retried after a transport error
+counts the time of every attempt; its tokens and tool calls are the last
+attempt's, since a failed attempt ends without a usage report. A counter the provider doesn't report shows
 `—`. Times depend on the machine and on what else Ollama has loaded; the
 app also generates a thread title with the provider's title model
 (`gemma4:e4b` for Ollama) on the first turn, so a run of another model loads
