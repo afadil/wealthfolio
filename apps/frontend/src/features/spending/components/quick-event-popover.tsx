@@ -95,7 +95,7 @@ export function QuickEventPopover({
       <PopoverContent className="w-[280px] p-0" align={align}>
         <Command>
           {loadErrored && (
-            <div className="text-2xs flex items-center justify-between gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-amber-700 dark:text-amber-300">
+            <div className="text-2xs border-warning-subtle-border bg-warning-subtle text-warning-subtle-foreground flex items-center justify-between gap-2 border-b px-3 py-1.5">
               <span>{tr("spending:events.loadError")}</span>
               <button type="button" onClick={retryLoad} className="text-foreground hover:underline">
                 {tr("common:retry")}
