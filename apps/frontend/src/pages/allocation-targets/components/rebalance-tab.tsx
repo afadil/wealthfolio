@@ -846,8 +846,8 @@ function PlannerResult({
             className={cn(
               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-xs font-medium",
               improved
-                ? "bg-[#dfe9df] text-[#2f6b46] dark:bg-emerald-950/40 dark:text-emerald-400"
-                : "bg-[#f0e0da] text-[#b4664a] dark:bg-red-950/40 dark:text-red-400",
+                ? "bg-success-subtle text-success-subtle-foreground"
+                : "bg-destructive-subtle text-destructive-subtle-foreground",
             )}
           >
             {improved ? "↓" : "↑"} {Math.abs(improvedBps / 100).toFixed(1)}%
@@ -857,7 +857,7 @@ function PlannerResult({
       <div
         className={cn(
           "mt-0.5 font-mono text-2xl font-semibold tabular-nums leading-none",
-          improved ? "text-[#2f6b46] dark:text-emerald-400" : "text-foreground",
+          improved ? "text-success" : "text-foreground",
         )}
       >
         {fmtBps(plan.maxDriftBpsAfter)}
@@ -921,7 +921,7 @@ function PlannerResult({
         <button
           type="button"
           onClick={onReview}
-          className="mt-4 inline-flex w-fit items-center gap-1 font-mono text-xs font-medium text-[#2f6b46] underline-offset-4 hover:underline sm:mt-3 dark:text-emerald-400"
+          className="text-success mt-4 inline-flex w-fit items-center gap-1 font-mono text-xs font-medium underline-offset-4 hover:underline sm:mt-3"
         >
           {t("allocation:result.reviewTrades", { trades: tradesWord })}{" "}
           <Icons.ArrowRight className="h-3.5 w-3.5" />
@@ -1115,27 +1115,24 @@ function Warnings({ items }: { items: RebalanceWarning[] }) {
   const [open, setOpen] = useState(false);
   if (!items.length) return null;
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
+    <div className="border-warning-subtle-border bg-warning-subtle rounded-lg border">
       <button
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
       >
-        <Icons.AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <span className="flex-1 font-mono text-xs font-semibold text-amber-800 dark:text-amber-300">
+        <Icons.AlertTriangle className="text-warning h-4 w-4 shrink-0" />
+        <span className="text-warning-subtle-foreground flex-1 font-mono text-xs font-semibold">
           {t("allocation:warnings.thingsToKnow", { count: items.length })}
         </span>
         <Icons.ChevronDown
-          className={cn(
-            "h-4 w-4 text-amber-600 transition-transform dark:text-amber-400",
-            open && "rotate-180",
-          )}
+          className={cn("text-warning h-4 w-4 transition-transform", open && "rotate-180")}
         />
       </button>
       {open && (
-        <ul className="divide-y divide-amber-200/60 border-t border-amber-200/70 dark:divide-amber-900/60 dark:border-amber-900/70">
+        <ul className="divide-warning-subtle-border border-warning-subtle-border divide-y border-t">
           {items.map((w, i) => (
             <li key={i} className="flex items-start gap-3 px-4 py-2.5">
-              <span className="mt-px shrink-0 whitespace-nowrap rounded border border-amber-300 px-1.5 py-0.5 font-mono text-xs font-medium uppercase tracking-wide text-amber-700 dark:border-amber-700 dark:text-amber-400">
+              <span className="border-warning-subtle-border text-warning-subtle-foreground mt-px shrink-0 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-xs font-medium uppercase tracking-wide">
                 {WARN_LABEL_KEYS[w.kind] ? t(WARN_LABEL_KEYS[w.kind]) : w.kind}
               </span>
               <span className="text-foreground/80 text-xs leading-snug">{w.message}</span>
@@ -1162,8 +1159,8 @@ function TradeActionBadge({ action }: { action: string }) {
       className={cn(
         "inline-flex items-center rounded px-1.5 py-0.5 font-mono text-xs font-semibold",
         isSell
-          ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-          : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+          ? "bg-destructive-subtle text-destructive-subtle-foreground"
+          : "bg-success-subtle text-success-subtle-foreground",
       )}
     >
       {isSell ? t("allocation:trades.sell") : t("allocation:trades.buy")}

@@ -20,7 +20,7 @@ interface CurrentVsTargetCardProps {
 function driftColor(row: DriftRow): string {
   if (row.status === "in_band") return "text-muted-foreground";
   if (row.status === "overweight" || row.status === "not_targeted") return "text-destructive";
-  return "text-blue-600 dark:text-blue-400";
+  return "text-info";
 }
 
 function formatTargetBps(bps: number): string {

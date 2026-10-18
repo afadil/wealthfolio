@@ -7,8 +7,8 @@ import { simulationReferenceBand } from "../lib/simulation-reference";
 
 const BAND_COLORS = {
   low: "text-destructive",
-  middle: "text-amber-700 dark:text-amber-400",
-  high: "text-[hsl(102,32%,39%)] dark:text-green-400",
+  middle: "text-warning-subtle-foreground",
+  high: "text-success",
 };
 
 export function SimulationPercentage({

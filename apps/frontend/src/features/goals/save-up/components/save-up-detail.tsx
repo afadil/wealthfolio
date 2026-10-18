@@ -603,9 +603,9 @@ function getSaveUpStatus(
       headlinePrefix: t("goals:save_up.headline_at_risk_prefix", { title: goalTitle }),
       headlineEmphasis: t("goals:save_up.headline_at_risk_emphasis"),
       headlineSuffix: t("goals:save_up.headline_at_risk_suffix", { date: dateLabel }),
-      badgeClass: "bg-yellow-100 text-yellow-800",
-      textClass: "text-yellow-700",
-      progressClass: "bg-yellow-600",
+      badgeClass: "bg-warning-subtle text-warning-subtle-foreground",
+      textClass: "text-warning-subtle-foreground",
+      progressClass: "bg-warning",
     };
   }
 

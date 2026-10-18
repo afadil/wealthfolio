@@ -109,7 +109,7 @@ function CoverageProjectionTooltip({
               {t("goals:coverage_chart.unfunded_spending_yr")}
             </span>
           </div>
-          <span className="text-xs font-semibold tabular-nums text-red-500">
+          <span className="text-destructive text-xs font-semibold tabular-nums">
             {formatting.formatCompactAmount(point.shortfall, currency)}
           </span>
         </div>
@@ -131,10 +131,10 @@ function CoverageProjectionTooltip({
         <span
           className={`text-xs font-semibold tabular-nums ${
             coveragePct >= 100
-              ? "text-green-600"
+              ? "text-success"
               : coveragePct >= 75
-                ? "text-amber-600"
-                : "text-red-500"
+                ? "text-warning"
+                : "text-destructive"
           }`}
         >
           {numberFormatting.formatPercent(coveragePct / 100, { digits: 0 })}
