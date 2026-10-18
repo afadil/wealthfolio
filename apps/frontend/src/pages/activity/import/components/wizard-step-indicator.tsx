@@ -43,7 +43,11 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
                     opacity: 1,
                   }}
                   transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.25 }}
-                  style={{ boxShadow: isCurrent ? "0 0 0 3px rgba(var(--primary), 0.2)" : "none" }}
+                  style={{
+                    boxShadow: isCurrent
+                      ? "0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent)"
+                      : "none",
+                  }}
                   className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                     isCompleted
                       ? "border-primary bg-primary text-primary-foreground"
@@ -93,7 +97,9 @@ export function WizardStepIndicator({ steps, currentStep }: WizardStepIndicatorP
                 animate={{
                   scale: isCurrent ? 1.1 : 1,
                   opacity: 1,
-                  boxShadow: isCurrent ? "0 0 0 4px rgba(var(--primary), 0.15)" : "none",
+                  boxShadow: isCurrent
+                    ? "0 0 0 4px color-mix(in oklab, var(--primary) 15%, transparent)"
+                    : "none",
                 }}
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400, damping: 20, duration: 0.3 }}

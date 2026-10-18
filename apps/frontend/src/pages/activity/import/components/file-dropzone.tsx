@@ -165,10 +165,10 @@ export const FileDropzone = ({
               initial="initial"
               animate="animate"
               exit="exit"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 shadow-sm dark:bg-blue-900/20"
+              className="bg-info-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <Spinner className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <Spinner className="text-info h-5 w-5" />
               </motion.div>
             </motion.div>
           ) : file && (!isValid || error) ? (
@@ -178,10 +178,10 @@ export const FileDropzone = ({
               initial="initial"
               animate="animate"
               exit="exit"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 shadow-sm dark:bg-red-900/20"
+              className="bg-destructive-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
-                <Icons.AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <Icons.AlertCircle className="text-destructive h-5 w-5" />
               </motion.div>
             </motion.div>
           ) : file ? (
@@ -191,13 +191,13 @@ export const FileDropzone = ({
               initial="initial"
               animate="animate"
               exit="exit"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 shadow-sm dark:bg-green-900/20"
+              className="bg-success-subtle flex h-10 w-10 items-center justify-center rounded-full shadow-sm"
             >
               <motion.div variants={iconVariants} initial="initial" animate="animate">
                 {isValid ? (
-                  <Icons.CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Icons.CheckCircle className="text-success h-5 w-5" />
                 ) : (
-                  <Icons.FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Icons.FileText className="text-success h-5 w-5" />
                 )}
               </motion.div>
             </motion.div>
@@ -239,10 +239,8 @@ export const FileDropzone = ({
                 transition={{ duration: 0.2 }}
                 className="space-y-0"
               >
-                <p className="font-medium text-red-600 dark:text-red-400">{file.name}</p>
-                <p className="text-xs text-red-500 dark:text-red-400">
-                  {(file.size / 1024).toFixed(2)} KB
-                </p>
+                <p className="text-destructive font-medium">{file.name}</p>
+                <p className="text-destructive text-xs">{(file.size / 1024).toFixed(2)} KB</p>
               </motion.div>
             ) : file ? (
               <motion.div

@@ -73,18 +73,18 @@ function ActivitiesHelpContent({ transactionImport }: { transactionImport: boole
         </div>
 
         <div className="space-y-3">
-          <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+          <div className="border-info bg-info-subtle p-3">
             <p className="text-sm">
-              <strong className="text-blue-700 dark:text-blue-300">
+              <strong className="text-info-subtle-foreground">
                 {t("activity:import.help.tipBold")}
               </strong>
               {t("activity:import.help.activitiesTip")}
             </p>
           </div>
 
-          <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+          <div className="border-success bg-success-subtle p-3">
             <p className="text-sm">
-              <strong className="text-green-700 dark:text-green-300">
+              <strong className="text-success-subtle-foreground">
                 {t("activity:import.help.amountBold")}
               </strong>
               {t("activity:import.help.activitiesAmount")}
@@ -240,18 +240,18 @@ function HoldingsHelpContent() {
         </div>
 
         <div className="space-y-3">
-          <div className="border-blue-500 bg-blue-50 p-3 dark:bg-blue-900/50">
+          <div className="border-info bg-info-subtle p-3">
             <p className="text-sm">
-              <strong className="text-blue-700 dark:text-blue-300">
+              <strong className="text-info-subtle-foreground">
                 {t("activity:import.help.tipBold")}
               </strong>
               {t("activity:import.help.holdingsTip")}
             </p>
           </div>
 
-          <div className="border-green-500 bg-green-50 p-3 dark:bg-green-900/50">
+          <div className="border-success bg-success-subtle p-3">
             <p className="text-sm">
-              <strong className="text-green-700 dark:text-green-300">
+              <strong className="text-success-subtle-foreground">
                 {t("activity:import.help.cashBalancesBold")}
               </strong>{" "}
               {t("activity:import.help.holdingsCashBalancesUse")}{" "}

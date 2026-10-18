@@ -157,7 +157,7 @@ export function ActivityDataGridToolbar({
                 </span>
               )}
               {changesSummary.updatedCount > 0 && (
-                <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                <span className="text-info flex items-center gap-1">
                   <Icons.Pencil className="h-3 w-3" />
                   <span className="font-medium">{changesSummary.updatedCount}</span>
                 </span>
@@ -231,7 +231,7 @@ export function ActivityDataGridToolbar({
                 onClick={onApproveSelected}
                 size="xs"
                 variant="outline"
-                className="shrink-0 rounded-md border-green-200 bg-green-50 text-xs text-green-700 hover:bg-green-100 hover:text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40"
+                className="border-success-subtle-border bg-success-subtle text-success-subtle-foreground hover:bg-success-subtle-border/50 shrink-0 rounded-md text-xs"
                 title={t("activity:datagrid.approve_selected")}
                 aria-label={t("activity:datagrid.approve_selected")}
                 disabled={isSaving}

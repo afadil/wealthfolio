@@ -210,7 +210,7 @@ export function ActivityDetailSheet({ activity, open, onOpenChange }: ActivityDe
               <div className="flex flex-col items-end gap-2">
                 {statusConfig && <Badge variant={statusConfig.variant}>{statusLabel}</Badge>}
                 {activity.needsReview && (
-                  <Badge variant="outline" className="border-amber-500 text-amber-600">
+                  <Badge variant="outline" className="border-warning text-warning">
                     <Icons.AlertCircle className="mr-1 h-3 w-3" />
                     {t("activity:detail.needs_review")}
                   </Badge>

@@ -81,7 +81,7 @@ interface StatItemProps {
 function StatItem({ label, value, variant = "default" }: StatItemProps) {
   const colorClasses = {
     default: "text-foreground",
-    success: "text-green-600 dark:text-green-400",
+    success: "text-success",
     muted: "text-muted-foreground",
   };
 
@@ -180,10 +180,10 @@ export function ContextResultStep() {
       {/* Success icon with animated checkmark */}
       <motion.div className="relative mb-8" variants={checkmarkVariants}>
         {/* Outer glow ring */}
-        <div className="absolute inset-0 rounded-full bg-green-500/20 blur-xl" />
+        <div className="bg-success-subtle absolute inset-0 rounded-full blur-xl" />
 
         {/* Background circle */}
-        <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-lg shadow-green-500/25">
+        <div className="from-success/80 to-success shadow-success/25 relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br shadow-lg">
           <motion.svg
             className="h-12 w-12 text-white"
             viewBox="0 0 24 24"

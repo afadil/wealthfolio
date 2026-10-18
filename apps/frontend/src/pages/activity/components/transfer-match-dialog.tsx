@@ -387,7 +387,7 @@ function CandidateButton({
               </div>
             ) : null}
             {candidate.warnings.length > 0 ? (
-              <div className="text-2xs flex items-start gap-1.5 text-amber-600">
+              <div className="text-2xs text-warning flex items-start gap-1.5">
                 <Icons.AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>{candidate.warnings.join(" ")}</span>
               </div>
