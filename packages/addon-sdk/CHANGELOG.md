@@ -71,11 +71,11 @@ and this project adheres to
     the Radix variables, and keep 5px from the viewport edge.
   - `Checkbox` takes `indeterminate` instead of `checked="indeterminate"`;
     `ToggleGroup` takes `multiple` and array values instead of `type` and a
-    string, and `Accordion` likewise (no `collapsible`; single items always
-    close); `AvatarFallback` takes `delay` instead of `delayMs`; `Tabs`,
-    `RadioGroup` and `ToggleGroup` change callbacks receive
-    `(value, eventDetails)`. Tabs still activate as arrow keys move focus; for
-    manual activation, `<Tabs activationMode="manual">` becomes
+    string (the old form still works, deprecated), and `Accordion` likewise (no
+    `collapsible`; single items always close); `AvatarFallback` takes `delay`
+    instead of `delayMs`; `Tabs`, `RadioGroup` and `ToggleGroup` change
+    callbacks receive `(value, eventDetails)`. Tabs still activate as arrow keys
+    move focus; for manual activation, `<Tabs activationMode="manual">` becomes
     `<TabsList activateOnFocus={false}>`.
   - Single-select `ToggleGroup` items are toggle buttons (`aria-pressed`)
     instead of radios, and `Separator` is announced as a separator.
@@ -96,8 +96,9 @@ and this project adheres to
     `disablePointerDismissal`. `PopoverAnchor` is replaced by `anchor` on
     `PopoverContent`.
   - `DropdownMenuItem` takes `onClick` instead of `onSelect`, and
-    `closeOnClick={false}` instead of `event.preventDefault()` to stay open.
-    `DropdownMenuLabel` and `SelectLabel` must sit inside a group.
+    `closeOnClick={false}` instead of `event.preventDefault()` to stay open
+    (`onSelect` still works, deprecated). `DropdownMenuLabel` and `SelectLabel`
+    must sit inside a group.
   - `Select` shows the selected item's label only when given `items` (an array
     of `{ value, label }` or a value-to-label record); `onValueChange` can
     receive `null`; `SelectContent` takes `alignItemWithTrigger` instead of
@@ -189,9 +190,10 @@ and this project adheres to
   `status`. `ProgressIndicator` uses it and is now built on `DialogContent` (no
   close button), with a primary progress bar instead of a red-to-yellow
   gradient.
-- **Breaking:** `EmptyPlaceholder` is removed in favour of shadcn's `Empty`:
-  `Empty` > `EmptyHeader` > `EmptyMedia variant="icon"` (the muted icon circle),
-  `EmptyTitle`, `EmptyDescription`, then `EmptyContent` for actions.
+- `EmptyPlaceholder` is deprecated in favour of shadcn's `Empty` (it still
+  renders, as a wrapper over `Empty`): `Empty` > `EmptyHeader` >
+  `EmptyMedia variant="icon"` (the muted icon circle), `EmptyTitle`,
+  `EmptyDescription`, then `EmptyContent` for actions.
   `<EmptyPlaceholder.Icon name="Wallet" />` becomes
   `<EmptyMedia variant="icon"><Icons.Wallet /></EmptyMedia>`.
 - `Combobox` and its parts (`ComboboxInput`, `ComboboxContent`, `ComboboxList`,
@@ -208,6 +210,18 @@ and this project adheres to
 - `IncomeSummary` totals and breakdowns leave out income that has no exchange
   rate to the summary's currency, instead of counting it as if it were already
   in that currency. `byCurrency` still includes it.
+
+### Deprecated
+
+These keep addons built against earlier SDKs working on the Base UI components.
+The app does not use them; they are removed in the next major SDK version.
+
+- `EmptyPlaceholder` (props and compound forms), rendered with `Empty`. Without
+  it, an addon that imports it fails to load.
+- `DropdownMenuItem` `onSelect`: called on click; calling `preventDefault()` on
+  its event keeps the menu open, as with Radix.
+- `ToggleGroup` `type`: `type="single"` takes and returns a string (`""` when
+  nothing is pressed) and `type="multiple"` maps to `multiple`.
 
 ## [3.7.0] - 2026-08-10
 

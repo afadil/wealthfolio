@@ -21,6 +21,28 @@ const ToggleGroupContext = React.createContext<VariantProps<typeof toggleVariant
 interface ToggleGroupProps
   extends Omit<ToggleGroupPrimitive.Props, "className">, VariantProps<typeof toggleVariants>, ToggleGroupOptions {
   className?: string;
+  /**
+   * @deprecated Radix's API (`type` with a string value for "single"), kept so addons built against
+   * earlier SDKs keep working. Use `multiple` and array values.
+   */
+  type?: "single" | "multiple";
+}
+
+// Radix's single-select group took and returned a string ("" when nothing was pressed).
+function legacyToggleGroupProps(
+  type: "single" | "multiple" | undefined,
+  { value, defaultValue, onValueChange }: Pick<ToggleGroupPrimitive.Props, "value" | "defaultValue" | "onValueChange">,
+): Partial<ToggleGroupPrimitive.Props> {
+  if (type === "multiple") return { multiple: true };
+  if (type !== "single") return {};
+  const toArray = (v: unknown) => (typeof v === "string" ? (v ? [v] : []) : v);
+  return {
+    value: toArray(value) as ToggleGroupPrimitive.Props["value"],
+    defaultValue: toArray(defaultValue) as ToggleGroupPrimitive.Props["defaultValue"],
+    onValueChange: onValueChange
+      ? (next, details) => (onValueChange as (value: unknown, details: unknown) => void)(next[0] ?? "", details)
+      : undefined,
+  };
 }
 
 // `spacing` is the gap in spacing steps (default 1, 4 px); 0 joins the items into one segmented control.
@@ -30,6 +52,7 @@ function ToggleGroup({
   size,
   spacing = 1,
   orientation = "horizontal",
+  type,
   children,
   ...props
 }: ToggleGroupProps) {
@@ -46,6 +69,7 @@ function ToggleGroup({
         className,
       )}
       {...props}
+      {...legacyToggleGroupProps(type, props)}
     >
       <ToggleGroupContext.Provider value={{ variant, size, spacing, orientation }}>
         {children}
