@@ -22,7 +22,7 @@ function Tabs({ className, ...props }: TabsProps) {
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list text-muted-foreground group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=horizontal]/tabs:h-10 inline-flex items-center justify-center rounded-md p-1 data-[variant=line]:rounded-none",
+  "group/tabs-list text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col h-10 inline-flex items-center justify-center rounded-md p-1 data-[variant=line]:rounded-none",
   {
     variants: {
       variant: {
@@ -64,9 +64,9 @@ function TabsTrigger({ className, children, ...props }: TabsTriggerProps) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "focus-visible:outline-solid focus-visible:outline-ring text-muted-foreground data-active:text-foreground hover:text-foreground relative inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "focus-visible:outline-solid focus-visible:outline-ring text-muted-foreground data-active:text-foreground hover:text-foreground group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start relative inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         // The line variant underlines the active tab instead of drawing the pill.
-        "after:bg-foreground group-data-[variant=line]/tabs-list:data-active:after:opacity-100 group-data-[orientation=horizontal]/tabs:after:-bottom-1.25 after:absolute after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:w-0.5",
+        "after:bg-foreground group-data-[variant=line]/tabs-list:data-active:after:opacity-100 group-data-horizontal/tabs:after:-bottom-1.25 group-data-horizontal/tabs:after:inset-x-0 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:w-0.5 after:absolute after:opacity-0 after:transition-opacity",
         "isolate overflow-hidden group-data-[variant=line]/tabs-list:overflow-visible",
         className,
       )}

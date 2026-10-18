@@ -159,6 +159,15 @@ and this project adheres to
   `variant="line"` (an underline instead of the pill), tabs support
   `orientation="vertical"`, and `tabsListVariants` is exported. Fields, select
   triggers, toggles and switches show `aria-invalid`.
+- The remaining primitives carry shadcn's data-slots and parts. Added:
+  `CardAction` (a header holding it becomes two columns with the action on the
+  right), `AvatarBadge`, `AvatarGroup`, `AvatarGroupCount`, `Badge` variants
+  `ghost` and `link`, and `Item` size `xs`. A `TableRow` keeps its hover fill
+  while a menu or popover inside it is open. `Card`, `Table`, `Skeleton` and the
+  `InputOTP` parts are function components (refs still pass through).
+  `data-horizontal:` and `data-vertical:` variants match `data-orientation`, as
+  in shadcn. A size set by a variant class overrides a call site's plain size
+  class, so components keep sizes callers may override as plain classes.
 - In dark mode `--success-subtle-foreground` is green-200, the step the other
   status text colours use, so success text reads green rather than near-white.
 - `ActivityUpdate.asset` now has explicit patch semantics: omit it to preserve

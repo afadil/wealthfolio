@@ -25,13 +25,16 @@ function AccordionTrigger({ className, children, ...props }: AccordionTriggerPro
       <AccordionPrimitive.Trigger
         data-slot="accordion-trigger"
         className={cn(
-          "flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-panel-open]>svg]:rotate-180",
+          "group/accordion-trigger flex flex-1 items-center justify-between gap-6 py-4 text-left font-medium transition-all hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50 [&[data-panel-open]>svg]:rotate-180",
           className,
         )}
         {...props}
       >
         {children}
-        <Icons.ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+        <Icons.ChevronDown
+          data-slot="accordion-trigger-icon"
+          className="pointer-events-none h-4 w-4 shrink-0 transition-transform duration-200"
+        />
       </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>
   );
