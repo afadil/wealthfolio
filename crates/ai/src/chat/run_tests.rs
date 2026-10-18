@@ -901,6 +901,40 @@ async fn a_rejected_request_is_not_retried() {
 }
 
 #[tokio::test]
+async fn an_error_after_only_redacted_reasoning_saves_no_reply() {
+    let event = |v: Value| format!("data: {v}\n\n");
+    let mut body = event(json!({"type":"message_start","message":{"id":"msg_fixture",
+        "type":"message","role":"assistant","model":"claude-sonnet-5-5","content":[],
+        "stop_reason":null,"stop_sequence":null,
+        "usage":{"input_tokens":1,"output_tokens":1}}}));
+    body += &event(json!({"type":"content_block_start","index":0,
+        "content_block":{"type":"redacted_thinking","data":"opaque"}}));
+    body += &event(json!({"type":"content_block_stop","index":0}));
+    body += &event(
+        json!({"type":"error","error":{"type":"invalid_request_error",
+        "message":"Rejected"}}),
+    );
+    let (url, server) = serve(vec![(200, body)]);
+    let env = environment("anthropic", &url);
+    let service = ChatService::new(env.clone(), ChatConfig::default());
+
+    let events = send(&service, "anthropic", "claude-sonnet-5-5", "Hello", None).await;
+
+    assert!(stream_error(&events).is_some(), "the turn fails");
+    assert_eq!(server.await.unwrap().len(), 1);
+    let saved = env
+        .chat_repository()
+        .get_messages_by_thread(&thread_id(&events))
+        .unwrap();
+    assert!(
+        saved
+            .iter()
+            .all(|message| message.role != ChatMessageRole::Assistant),
+        "nothing was shown, so no reply is saved"
+    );
+}
+
+#[tokio::test]
 async fn a_provider_error_mid_reply_saves_what_was_streamed() {
     let usage = json!({"input_tokens":1,"output_tokens":1});
     let event = |v: Value| format!("data: {v}\n\n");
