@@ -1163,7 +1163,11 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                 &mut accumulated_reasoning,
                 &mut accumulated_text,
             );
-            if !content_parts.is_empty() {
+            // A redacted reasoning block leaves an empty part that showed nothing.
+            let shown = content_parts.iter().any(|part| {
+                !matches!(part, ChatMessagePart::Reasoning { content } if content.is_empty())
+            });
+            if shown {
                 content_parts.push(ChatMessagePart::Error {
                     code: "STREAM_ERROR".to_string(),
                     message: message.clone(),
