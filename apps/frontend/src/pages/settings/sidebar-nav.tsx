@@ -23,7 +23,8 @@ export function SidebarNav({ className, items, ...props }: SidebarNavProps) {
           to={item.href}
           className={cn(
             buttonVariants({ variant: "ghost" }),
-            "h-9 min-w-0 justify-start rounded-md px-2 [&_svg]:size-4",
+            // Inset, because the settings sidebar scrolls and would clip an outline drawn outside.
+            "h-9 min-w-0 justify-start rounded-md px-2 focus-visible:-outline-offset-2 [&_svg]:size-4",
             location.pathname.includes(item.href) ? "bg-muted hover:bg-muted" : "hover:bg-muted/50",
           )}
           title={item.title}

@@ -207,7 +207,10 @@ export default function SettingsLayout() {
   return (
     <ApplicationShell className="settings-root app-shell h-screen overflow-x-hidden">
       <div className="scan-hide-target pt-safe w-full max-w-full overflow-x-hidden scroll-smooth lg:flex lg:justify-start lg:pt-0">
-        <div className="flex w-full max-w-full flex-col p-2 pb-[var(--mobile-nav-total-offset)] lg:max-w-6xl lg:px-2 lg:py-8">
+        {/* At exactly 1024px the global `.flex { overflow-x: hidden }` rule still applies and
+            would make this padded box the sidebar's sticky container, pinning the sidebar
+            32px lower than its height cap allows. */}
+        <div className="flex w-full max-w-full flex-col p-2 pb-[var(--mobile-nav-total-offset)] lg:max-w-6xl lg:!overflow-visible lg:px-2 lg:py-8">
           <div className="hidden lg:block">
             <div className="space-y-0.5">
               <h2 className="text-2xl font-bold tracking-tight">{t("settings:title")}</h2>
@@ -215,7 +218,10 @@ export default function SettingsLayout() {
             <Separator className="my-6" />
           </div>
           <div className="lg:flex lg:gap-10">
-            <aside className="hidden w-60 shrink-0 lg:sticky lg:top-24 lg:flex lg:flex-col lg:self-start">
+            {/* Uncapped, the sidebar makes the page scroll past short content, taking a
+                self-scrolling table's header out of view (Securities). Fit it below its
+                sticky offset and let it scroll instead. */}
+            <aside className="hidden w-60 shrink-0 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-6rem)] lg:flex-col lg:self-start lg:overflow-y-auto">
               <div className="space-y-6">
                 {sections.map((section) => (
                   <div key={section.title} className="space-y-2">

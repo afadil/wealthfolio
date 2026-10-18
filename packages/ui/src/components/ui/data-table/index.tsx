@@ -185,11 +185,14 @@ export function DataTable<TData, TValue>({
           room for the Holdings page's tabs and toolbar, so the table fits the window
           there), and letting the Table's own overflow wrapper spill into it keeps
           sideways scrolling here too.
-          `isolate` stops WebKitGTK painting the sticky header over this scrollbar. */}
+          `isolate` stops WebKitGTK painting the sticky header over this scrollbar, and
+          top scroll padding as tall as the header cells (h-12) plus the 4px a button's
+          focus outline reaches out stops keyboard focus scrolling a control, or its
+          outline, in under the header. */}
       <div
         className={cn(
           "min-h-0 flex-1 rounded-md border",
-          scrollable && "isolate max-h-[calc(100dvh-9rem)] overflow-auto",
+          scrollable && "scroll-pt-13 isolate max-h-[calc(100dvh-9rem)] overflow-auto",
         )}
       >
         <Table containerClassName={scrollable ? "overflow-visible" : undefined}>
