@@ -1097,6 +1097,11 @@ const AccountPage = () => {
                                 !showSnapshotMarkers && "bg-secondary/50",
                               )}
                               onClick={() => setShowSnapshotMarkers(!showSnapshotMarkers)}
+                              aria-label={
+                                showSnapshotMarkers
+                                  ? t("account:hide_snapshot_markers")
+                                  : t("account:show_snapshot_markers")
+                              }
                             />
                           }
                         >
