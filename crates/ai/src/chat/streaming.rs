@@ -881,6 +881,7 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
         let mut retried = false;
         // The model kept calling tools after it had to answer.
         let mut stopped_at_limit = false;
+        let mut stream_error = None;
 
         while let Some(chunk) = stream.next().await {
             if let Err(error) = &chunk {
@@ -1136,18 +1137,54 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
                 Err(error) => {
                     let message = redact_secret(error.to_string(), provider_secret.as_deref());
                     error!("Stream error: {}", message);
-                    tx.send(AiStreamEvent::error(
-                        &thread_id,
-                        &run_id,
-                        Some(&message_id),
-                        "STREAM_ERROR",
-                        &message,
-                    ))
-                    .await
-                    .map_err(|e| AiError::Internal(e.to_string()))?;
-                    return Err(AiError::Provider(message));
+                    stream_error = Some(message);
+                    break;
                 }
             }
+        }
+
+        let assistant_message = |parts| {
+            let mut message = ChatMessage::assistant_with_id(&message_id, &thread_id);
+            message.content = ChatMessageContent::new(parts);
+            message.content.usage = usage_stats(
+                &title_ctx.provider_id,
+                &title_ctx.model_id,
+                model_turn,
+                usage,
+            );
+            message
+        };
+
+        // Keep what the user already saw, ending with the error. Text the
+        // think parser still holds back was never shown, so it is dropped.
+        if let Some(message) = stream_error {
+            flush_pending_content(
+                &mut content_parts,
+                &mut accumulated_reasoning,
+                &mut accumulated_text,
+            );
+            if !content_parts.is_empty() {
+                content_parts.push(ChatMessagePart::Error {
+                    code: "STREAM_ERROR".to_string(),
+                    message: message.clone(),
+                });
+                if let Err(e) = repo.create_message(assistant_message(content_parts)).await {
+                    error!(
+                        "Failed to save partial assistant message to repository: {}",
+                        e
+                    );
+                }
+            }
+            tx.send(AiStreamEvent::error(
+                &thread_id,
+                &run_id,
+                Some(&message_id),
+                "STREAM_ERROR",
+                &message,
+            ))
+            .await
+            .map_err(|e| AiError::Internal(e.to_string()))?;
+            return Err(AiError::Provider(message));
         }
 
         // Flush any remaining buffered content from the think parser
@@ -1212,30 +1249,15 @@ async fn stream_agent_response<E: AiEnvironment + 'static>(
             .map_err(|e| AiError::Internal(e.to_string()))?;
         }
 
-        // Flush remaining accumulated content in order (reasoning before text)
-        if !accumulated_reasoning.is_empty() {
-            content_parts.push(ChatMessagePart::Reasoning {
-                content: accumulated_reasoning,
-            });
-        }
-
-        // Push any remaining accumulated text at the END to preserve interleaved order
-        // (text before tool calls was already flushed when tool calls arrived)
-        if !accumulated_text.is_empty() {
-            content_parts.push(ChatMessagePart::Text {
-                content: accumulated_text,
-            });
-        }
-
-        // Build final message
-        let mut final_message = ChatMessage::assistant_with_id(&message_id, &thread_id);
-        final_message.content = ChatMessageContent::new(content_parts);
-        final_message.content.usage = usage_stats(
-            &title_ctx.provider_id,
-            &title_ctx.model_id,
-            model_turn,
-            usage,
+        // Flush remaining accumulated content in order (reasoning before text).
+        // Text before tool calls was already flushed when they arrived.
+        flush_pending_content(
+            &mut content_parts,
+            &mut accumulated_reasoning,
+            &mut accumulated_text,
         );
+
+        let final_message = assistant_message(content_parts);
         let done_usage = final_message.content.usage.clone();
 
         // Save assistant message to repository after stream completes
