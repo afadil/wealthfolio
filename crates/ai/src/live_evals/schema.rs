@@ -5,7 +5,7 @@
 //! expectations and optional response rubrics. See the README in the evals
 //! directory for the full schema with examples.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[cfg(feature = "eval")]
 use std::path::Path;
@@ -108,7 +108,7 @@ pub struct CsvImportExpectation {
     pub header_row: usize,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Severity {
     /// Must pass for CI to be green. Fails the run.
