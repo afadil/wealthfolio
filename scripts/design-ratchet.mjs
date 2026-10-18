@@ -6,7 +6,7 @@
 // tints of a status colour (bg-warning/10), which status text on them can't
 // read against; those surfaces use bg-warning-subtle and its pair. Borders, rings, outlines, shadows and offsets up to 4px
 // are hairlines and stay in px. Fails when a file gains a use; `--update`
-// records the current counts once uses are removed. Run on demand, not in CI.
+// records the current counts once uses are removed. Runs in the PR checks.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -116,4 +116,9 @@ for (const [name, { label, fix }] of Object.entries(measures)) {
     for (const [file, n] of grew) console.error(`    ${file}: ${recorded[file] ?? 0} -> ${n}`);
   }
 }
+// Counts are kept per path, so a moved or renamed file looks new.
+if (failed)
+  console.error(
+    "A moved or renamed file only? Run pnpm ui:design-ratchet --update and commit the result.",
+  );
 if (failed) process.exit(1);

@@ -56,6 +56,20 @@ jobs:
       - name: Check every language and namespace
         run: node apps/frontend/scripts/check-translations.mjs
 
+  design-ratchet:
+    name: Design ratchet
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Check that no file gains design-system debt
+        run: node scripts/design-ratchet.mjs
+
   formatting:
     name: Formatting
     needs: changes
@@ -255,6 +269,7 @@ jobs:
         changes,
         formatting,
         translation-parity,
+        design-ratchet,
         frontend-check,
         rust-check,
         android-check,
@@ -275,6 +290,7 @@ jobs:
           FRONTEND_REQUIRED: ${{ needs.changes.outputs.frontend }}
           RUST_REQUIRED: ${{ needs.changes.outputs.rust }}
           TRANSLATION_RESULT: ${{ needs.translation-parity.result }}
+          DESIGN_RATCHET_RESULT: ${{ needs.design-ratchet.result }}
           FRONTEND_RESULT: ${{ needs.frontend-check.result }}
           RUST_RESULT: ${{ needs.rust-check.result }}
         run: |
@@ -282,6 +298,7 @@ jobs:
           if [ "$FRONTEND_REQUIRED" = true ]; then
             test "$FRONTEND_RESULT" = success
             test "$TRANSLATION_RESULT" = success
+            test "$DESIGN_RATCHET_RESULT" = success
           fi
           if [ "$RUST_REQUIRED" = true ]; then
             test "$RUST_RESULT" = success
