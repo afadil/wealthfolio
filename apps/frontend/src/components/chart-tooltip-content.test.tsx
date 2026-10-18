@@ -23,7 +23,7 @@ describe("ChartTooltipContent", () => {
     vi.restoreAllMocks();
   });
 
-  it("does not forward Recharts tooltip props to the DOM", () => {
+  it("forwards DOM attributes but not Recharts tooltip props", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const { container } = render(
@@ -32,7 +32,16 @@ describe("ChartTooltipContent", () => {
           <XAxis dataKey="month" />
           <ChartTooltip
             defaultIndex={0}
-            content={<ChartTooltipContent className="tooltip-under-test" />}
+            content={
+              <ChartTooltipContent
+                className="tooltip-under-test"
+                id="income-tooltip"
+                role="status"
+                style={{ maxWidth: 240 }}
+                aria-label="Income tooltip"
+                data-testid="income-tooltip"
+              />
+            }
           />
           <Bar dataKey="income" isAnimationActive={false} />
         </BarChart>
@@ -40,7 +49,13 @@ describe("ChartTooltipContent", () => {
     );
 
     expect(screen.getByText("Income")).toBeInTheDocument();
-    expect(container.querySelector(".tooltip-under-test")).not.toHaveAttribute("cursor");
+    const tooltip = container.querySelector(".tooltip-under-test");
+    expect(tooltip).toBe(screen.getByTestId("income-tooltip"));
+    expect(tooltip).toHaveAttribute("id", "income-tooltip");
+    expect(tooltip).toHaveAttribute("role", "status");
+    expect(tooltip).toHaveAttribute("aria-label", "Income tooltip");
+    expect(tooltip).toHaveStyle({ maxWidth: "240px" });
+    expect(tooltip).not.toHaveAttribute("cursor");
     expect(consoleError).not.toHaveBeenCalled();
   });
 });
