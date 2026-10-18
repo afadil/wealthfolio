@@ -160,7 +160,7 @@ npx playwright test && npx playwright show-report
 | `33-metric-tile-mobile-tap.spec.ts`    | On a phone, tapping a return tile's animated value opens its explanation                                                    |
 | `31-formatting-regions.spec.ts`        | Austria, Romania, and Bulgaria formatting selections persist after saving and reloading settings                            |
 | `33-cash-balance-edit.spec.ts`         | Desktop/mobile cash adjustments persist the selected currency's native delta without changing other currencies              |
-| `35-holdings-sticky-header.spec.ts`    | Holdings page, account Holdings tab and Securities: the column header stays pinned while the rows scroll (#2125)            |
+| `35-holdings-sticky-header.spec.ts`    | Holdings, account Holdings tab, Securities: header stays pinned as rows scroll, in short windows and on Shift+Tab (#2125)   |
 
 ---
 
