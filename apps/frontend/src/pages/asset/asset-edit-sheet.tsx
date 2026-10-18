@@ -225,7 +225,7 @@ function PricingModeToggle({
                   <p className="text-muted-foreground text-sm">
                     {t("asset:editSheet.disable_automatic_description")}
                   </p>
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  <p className="text-warning text-sm font-medium">
                     {t("asset:editSheet.disable_automatic_warning")}
                   </p>
                 </>
@@ -234,7 +234,7 @@ function PricingModeToggle({
                   <p className="text-muted-foreground text-sm">
                     {t("asset:editSheet.enable_automatic_description")}
                   </p>
-                  <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  <p className="text-warning text-sm font-medium">
                     {t("asset:editSheet.enable_automatic_warning")}
                   </p>
                 </>
@@ -424,12 +424,12 @@ function SymbolMappingRow({
                     )}
                     {validationStatus === "valid" && (
                       <span data-testid="symbol-validation-valid">
-                        <Icons.Check className="h-3.5 w-3.5 text-green-500" />
+                        <Icons.Check className="text-success h-3.5 w-3.5" />
                       </span>
                     )}
                     {validationStatus === "invalid" && (
                       <span data-testid="symbol-validation-invalid">
-                        <Icons.AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                        <Icons.AlertCircle className="text-destructive h-3.5 w-3.5" />
                       </span>
                     )}
                   </span>

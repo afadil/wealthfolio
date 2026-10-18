@@ -712,8 +712,8 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
           <div className="px-5 pb-4 pt-5">
             <AlertDialogHeader className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100/30 dark:bg-orange-100/20">
-                  <Icons.ArrowRightLeft className="h-4 w-4 text-orange-500 dark:text-orange-300" />
+                <div className="bg-warning-subtle flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                  <Icons.ArrowRightLeft className="text-warning h-4 w-4" />
                 </div>
                 <AlertDialogTitle className="text-base font-semibold">
                   {t("settings:accounts.mode_switch_title")}
@@ -725,26 +725,26 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
             </AlertDialogHeader>
 
             {/* Checklist */}
-            <div className="mt-4 rounded-lg border border-orange-100/40 bg-orange-100/30 p-3 dark:border-orange-100/20 dark:bg-orange-100/20">
-              <p className="mb-2 text-xs font-medium text-orange-600 dark:text-orange-200">
+            <div className="border-warning-subtle-border bg-warning-subtle mt-4 rounded-lg border p-3">
+              <p className="text-warning mb-2 text-xs font-medium">
                 {t("settings:accounts.mode_switch_checklist_title")}
               </p>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
-                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.Check className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_recorded")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Icons.Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.Check className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_accurate")}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <Icons.AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600 dark:text-orange-300" />
-                  <span className="text-orange-500 dark:text-orange-200">
+                  <Icons.AlertTriangle className="text-warning mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-warning">
                     {t("settings:accounts.mode_switch_checklist_gaps")}
                   </span>
                 </li>
@@ -773,7 +773,7 @@ export function AccountForm({ defaultValues, onSuccess = () => undefined }: Acco
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Icons.AlertTriangle className="h-5 w-5 text-amber-500" />
+              <Icons.AlertTriangle className="text-warning h-5 w-5" />
               {t("settings:accounts.archive_title")}
             </AlertDialogTitle>
             <AlertDialogDescription>

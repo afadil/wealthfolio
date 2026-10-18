@@ -400,7 +400,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                       <p className="text-muted-foreground text-sm">
                         {t("asset:quoteTable.to_auto_description")}
                       </p>
-                      <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                      <p className="text-warning text-sm font-medium">
                         ⚠️ {t("asset:quoteTable.to_auto_warning")}
                       </p>
                     </>
@@ -409,7 +409,7 @@ export const QuoteHistoryTable: React.FC<QuoteHistoryTableProps> = ({
                       <p className="text-muted-foreground text-sm">
                         {t("asset:quoteTable.to_manual_description")}
                       </p>
-                      <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                      <p className="text-warning text-sm font-medium">
                         ⚠️ {t("asset:quoteTable.to_manual_warning")}
                       </p>
                     </>

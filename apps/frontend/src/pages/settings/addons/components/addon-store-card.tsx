@@ -497,10 +497,7 @@ export function AddonStoreCard({
       {/* Status Indicators */}
       <div className="absolute right-2 top-2 flex flex-col gap-1 opacity-90">
         {isInstalled && (
-          <Badge
-            variant="secondary"
-            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-          >
+          <Badge variant="secondary" className="bg-success-subtle text-success-subtle-foreground">
             <Icons.Check className="mr-1 h-3 w-3" />
             {t("settings:addon_card_installed")}
           </Badge>

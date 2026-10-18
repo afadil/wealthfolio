@@ -112,13 +112,13 @@ export function ModuleCard() {
               <span
                 className={cn(
                   "absolute inline-flex h-full w-full rounded-full opacity-60",
-                  enabled ? "animate-ping bg-green-300" : "bg-background/40",
+                  enabled ? "bg-success animate-ping" : "bg-background/40",
                 )}
               />
               <span
                 className={cn(
                   "relative inline-flex h-2 w-2 rounded-full",
-                  enabled ? "bg-green-300" : "bg-background/40",
+                  enabled ? "bg-success" : "bg-background/40",
                 )}
               />
             </span>
